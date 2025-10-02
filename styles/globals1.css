@@ -1,0 +1,70 @@
+/* styles/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* iOS safe-area */
+:root {
+  --app-100vh: 100svh; /* יתעדכן גם מתוך קוד המשחק שלך */
+}
+/* עדיפות ל-100dvh כשנתמך */
+@supports (height: 100dvh) {
+  :root { --app-100vh: 100dvh; }
+}
+
+/* בסיס עמוד */
+html, body, #__next { height: var(--app-100vh); }  /* ← הוחלף מ-100% */
+html { scroll-behavior: smooth; }
+body { overscroll-behavior: none; }
+
+/* הסתרת scrollbar אלגנטית כשצריך */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* אנימציות עדינות למסכים/טוסט */
+.splash-enter {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+}
+.splash-enter-active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: opacity .5s ease, transform .5s ease;
+}
+
+/* טוסט/פופאפים */
+@keyframes popfade {
+  0% { opacity: 0; transform: translateY(6px) scale(0.96); }
+  15% { opacity: 1; transform: translateY(0) scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-6px) scale(0.98); }
+}
+
+/* ===== Splash / Animations ===== */
+@keyframes mleo-pop {
+  0% { transform: scale(.92) rotate(-2deg); opacity: 0; }
+  60% { transform: scale(1.02) rotate(0); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.animate-mleo-pop { animation: mleo-pop 700ms cubic-bezier(.2,.9,.2,1) both; }
+
+@keyframes mleo-fadeUp {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-mleo-fadeUp { animation: mleo-fadeUp 700ms ease-out both; }
+
+@keyframes mleo-loader {
+  0% { transform: translateX(-150%); }
+  50% { transform: translateX(20%); }
+  100% { transform: translateX(120%); }
+}
+.animate-mleo-loader { animation: mleo-loader 1200ms ease-in-out infinite; }
+
+/* אנימציית ציפה לאייקון הטוקן (לפני ה-INTRO) */
+@keyframes tokenFloat {
+  0% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-6px) scale(1.02); }
+  100% { transform: translateY(0) scale(1); }
+}
+.animate-token-float { animation: tokenFloat 3s ease-in-out infinite; }
