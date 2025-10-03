@@ -69,31 +69,34 @@ const S_ROCK  = "/sounds/rock.mp3";
 const S_GIFT  = "/sounds/gift.mp3";
 
 // ==== On-chain Claim (TBNB) config ====
-const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97); // BSC Testnet
+// BSC Testnet
+const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 
-// אין כתובת ברירת מחדל! חייבים לספק כתובת חדשה דרך ENV
+// כתובת חוזה ה- V3 (חובה!)
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || process.env.NEXT_PUBLIC_CLAIM_ADDRESS || "").trim();
-const MLEO_DECIMALS  = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
-const CLAIM_FN       = (process.env.NEXT_PUBLIC_MLEO_CLAIM_FN || "claim").toLowerCase();
+const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
 
-function isValidAddress(a){
-  return /^0x[0-9a-fA-F]{40}$/.test(a || "");
-}
+// משחק זה = GameId 1
+const GAME_ID = 1;
 
+function isValidAddress(a){ return /^0x[0-9a-fA-F]{40}$/.test(a || ""); }
 
-const CLAIM_ABI_MAP = {
-  claim:  [{ type:"function", name:"claim",  stateMutability:"nonpayable", inputs:[{name:"amount", type:"uint256"}], outputs:[] }],
-  mint:   [{ type:"function", name:"mint",   stateMutability:"nonpayable", inputs:[{name:"to", type:"address"}, {name:"amount", type:"uint256"}], outputs:[] }],
-  mintto: [{ type:"function", name:"mintTo", stateMutability:"nonpayable", inputs:[{name:"to", type:"address"}, {name:"amount", type:"uint256"}], outputs:[] }],
-};
-const GAME_ID = Number(process.env.NEXT_PUBLIC_GAME_ID || 1);
+// ABI מינימלי של V3: claim(gameId, amount)
+const MINING_CLAIM_ABI = [{
+  type: "function",
+  name: "claim",
+  stateMutability: "nonpayable",
+  inputs: [
+    { name: "gameId", type: "uint256" },
+    { name: "amount", type: "uint256" }
+  ],
+  outputs: []
+}];
 
-
-// אפשר להפעיל עקיפה לטסטנט כדי להתעלם מגייטינג של TGE — רק במודל MINING
+// אפשרות עקיפה לטסטנט (אם השתמשת בזה לשחרור מוקדם; לא נדרש לחתימה)
 const ALLOW_TESTNET_WALLET_FLAG =
   (process.env.NEXT_PUBLIC_ALLOW_TESTNET_WALLET || "").toLowerCase() === "1" ||
   (process.env.NEXT_PUBLIC_ALLOW_TESTNET_WALLET || "").toLowerCase() === "true";
-
 
 
 // ===== Debug helpers =====
@@ -677,10 +680,9 @@ const { disconnect } = useDisconnect();
   const [isDesktop,  setIsDesktop]  = useState(false);
   const [isMobileLandscape, setIsMobileLandscape] = useState(false);
 
-  const [showIntro, setShowIntro] = useState(true);
-  const [gamePaused, setGamePaused] = useState(true);
+  const [showIntro, setShowIntro] = useState(false);
+  const [gamePaused, setGamePaused] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
-  const [firstTimeNeedsTerms, setFirstTimeNeedsTerms] = useState(false);
   const [showFullHistory, setShowFullHistory] = useState(false);
 
   const [showHowTo, setShowHowTo] = useState(false);
@@ -754,11 +756,7 @@ const { disconnect } = useDisconnect();
     } catch {}
   }, [showIntro]);
 
-  // Check terms status on mount
-  useEffect(() => {
-    const accepted = isTermsAccepted();
-    setFirstTimeNeedsTerms(!accepted);
-  }, []);
+  // Game starts immediately - terms handled in GAMES page
 
   // ===== Debug UI bootstrap =====
   useEffect(() => {
@@ -830,14 +828,9 @@ const { disconnect } = useDisconnect();
     setGiftToastWithTTL(`Moved ${formatMleoShort(amt)} MLEO to Vault`);
   }
 
-  // === Unified Wallet Modal Opener (מחובר/לא מחובר) + Terms gate ===
+  // === Unified Wallet Modal Opener (מחובר/לא מחובר) ===
   function openWalletModalUnified() {
     try { playSfx(S_CLICK); } catch {}
-    // שער תנאים
-    if (firstTimeNeedsTerms) {
-      setShowTerms(true);
-      return;
-    }
     // סגירת שכבות שיכולות לכסות את RainbowKit
     setMenuOpen(false);
     setShowHowTo(false);
@@ -867,13 +860,11 @@ const { disconnect } = useDisconnect();
     setMenuOpen(false);
   }
 
-// === MINING: CLAIM (איסוף כולל → לארנק) ===
-// חשוב: רק הכפתור בתוך מסך MINING עושה "איסוף כולל לארנק".
-// שני כפתורי CLAIM אחרים באפליקציה לא מושפעים.
+// === MINING: CLAIM (איסוף כולל → לארנק) — V3 strict ===
 async function onClaimMined() {
   try { play?.(S_CLICK); } catch {}
 
-  // 0) קודם לאסוף את ה-balance המקומי אל ה-Vault
+  // 0) לאחד balance לתוך vault המקומי לפני איסוף
   try {
     const st0 = loadMiningState();
     const bal = Number((st0?.balance || 0).toFixed(2));
@@ -888,61 +879,45 @@ async function onClaimMined() {
     }
   } catch {}
 
-  // 1) מצב Vault כעת
+  // 1) כמה דורשים מה־Vault
   const st = loadMiningState();
   const vaultNow = Number((st?.vault || 0).toFixed(2));
   if (!vaultNow) { setGiftToastWithTTL("Vault is empty"); return; }
 
-  // 2) חיבור + רשת
+  // 2) ארנק ורשת
   if (!isConnected) { openConnectModal?.(); return; }
   if (chainId !== CLAIM_CHAIN_ID) {
     try { await switchChain?.({ chainId: CLAIM_CHAIN_ID }); }
     catch { setGiftToastWithTTL("Switch to BSC Testnet (TBNB)"); return; }
   }
 
-  // 3) בדיקת כתובת חוזה – חובה ENV תקין
+  // 3) כתובת חוזה
   if (!isValidAddress(CLAIM_ADDRESS)) {
-    setGiftToastWithTTL("Missing/invalid CLAIM address (set NEXT_PUBLIC_MLEO_CLAIM_ADDRESS)");
+    setGiftToastWithTTL("Missing/invalid CLAIM address (NEXT_PUBLIC_MLEO_CLAIM_ADDRESS)");
     return;
   }
 
-  // ABI מינימלי עבור claim(amount)
- const MINING_CLAIM_ABI = [
-  {
-    type: "function",
-    name: "claim",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "gameId", type: "uint256" },
-      { name: "amount", type: "uint256" }
-    ],
-    outputs: []
-  }
-];
+  // 4) שליחה — claim(gameId, amountUnits)
+  const toClaim = vaultNow;                           // מספר “אנושי” (יכול לכלול עד 2 ספרות)
+  const amountUnits = parseUnits(
+    Number(toClaim).toFixed(Math.min(2, MLEO_DECIMALS)),
+    MLEO_DECIMALS
+  );
 
-
-  // 4) "הכול עכשיו": מושכים את כל ה-Vault לארנק
-  const toClaim = vaultNow;
   setClaiming(true);
   try {
-    const amountWei = parseUnits(
-      Number(toClaim).toFixed(Math.min(2, MLEO_DECIMALS)),
-      MLEO_DECIMALS
-    );
-
     const hash = await writeContractAsync({
       address: CLAIM_ADDRESS,
-      abi: MINING_CLAIM_ABI,
-      functionName: "claim",
-      args: [BigInt(GAME_ID), amountWei],
-
+      abi: MINING_CLAIM_ABI,         // ← ABI היחיד
+      functionName: "claim",         // ← פונקציה יחידה ב־V3
+      args: [BigInt(GAME_ID), amountUnits],
       chainId: CLAIM_CHAIN_ID,
       account: address,
     });
 
     await publicClient.waitForTransactionReceipt({ hash });
 
-    // 5) עדכון לוקאלי לאחר המשיכה
+    // 5) עדכון לוקאלי
     const after = loadMiningState();
     const delta = Number(toClaim);
     after.vault           = Math.max(0, Number(((after.vault || 0) - delta).toFixed(2)));
@@ -996,14 +971,11 @@ async function onClaimMinedToWallet() {
       Number(toClaim).toFixed(Math.min(2, MLEO_DECIMALS)),
       MLEO_DECIMALS
     );
-    const fn   = CLAIM_FN === "mintto" ? "mintTo" : CLAIM_FN;
-    const args = (fn === "claim") ? [amountWei] : [address, amountWei];
-
     const hash = await writeContractAsync({
       address: CLAIM_ADDRESS,
-      abi: CLAIM_ABI,
-      functionName: fn,
-      args,
+      abi: MINING_CLAIM_ABI,
+      functionName: "claim",
+      args: [BigInt(GAME_ID), amountWei],
       chainId: CLAIM_CHAIN_ID,
     });
 
@@ -3697,6 +3669,7 @@ MLEO
                   acceptTerms();
                   setFirstTimeNeedsTerms(false);
                   setShowTerms(false);
+                  setGamePaused(false); // Start the game after accepting terms
                 }}
                 className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-500 font-bold"
               >

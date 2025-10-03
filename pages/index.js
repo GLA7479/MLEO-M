@@ -10,7 +10,7 @@ const EmailTermsGate = dynamic(() => import("../components/EmailTermsGate"), { s
 
 
 
-const GAME_ENTRY_URL = "/games"; // שנה אם צריך
+const GAME_ENTRY_URL = "/mining"; // שנה אם צריך
 
 // ===== Translations =====
 const TEXT = {
