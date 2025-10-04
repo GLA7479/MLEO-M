@@ -1,14 +1,6 @@
 // pages/api/game-pool-data.js
-const { ethers } = require('ethers');
-
-const GAMECLAIM_ADDRESS = "0x92AAcb8dDb86b864977c5546b09350ee929caF96";
-
-const GAMECLAIM_ABI = [
-  "function globalCap() view returns(uint256)",
-  "function globalClaimed() view returns(uint256)", 
-  "function dailyUserCap() view returns(uint256)",
-  "function paused() view returns(bool)"
-];
+// Note: ethers removed as we're using mock data for now
+// When contract is deployed, we can add back ethers dependency
 
 export default async function handler(req, res) {
   try {
