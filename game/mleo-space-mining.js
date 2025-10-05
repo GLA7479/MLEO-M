@@ -761,6 +761,27 @@ export default function MleoSpaceMining() {
     return () => { window.removeEventListener("beforeunload", onSave); window.removeEventListener("pagehide", onSave); };
   }, []);
 
+  // Handle window resize for mobile landscape
+  useEffect(() => {
+    const handleResize = () => {
+      // Force canvas redraw on resize
+      if (canvasRef.current) {
+        draw();
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', () => {
+      // Delay to allow viewport to settle
+      setTimeout(handleResize, 100);
+    });
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
+
   // Initialize game state
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -976,7 +997,10 @@ export default function MleoSpaceMining() {
     drawSpaceBackground(ctx, w, h);
     
     // Draw game elements (offset to avoid header - mobile responsive)
-    const headerHeight = window.innerWidth < 768 ? 40 : 80;
+    let headerHeight = 80;
+    if (window.innerWidth < 768) {
+      headerHeight = window.innerHeight < 500 ? 32 : 40; // Landscape: 32px, Portrait: 40px
+    }
     drawAsteroids(ctx, w, h - headerHeight);
     drawRobots(ctx, w, h - headerHeight);
     drawUI(ctx, w, h);
@@ -1007,7 +1031,10 @@ export default function MleoSpaceMining() {
 
   function drawAsteroids(ctx, w, h) {
     const state = stateRef.current; if (!state) return;
-    const offsetY = window.innerWidth < 768 ? 40 : 80;
+    let offsetY = 80;
+    if (window.innerWidth < 768) {
+      offsetY = window.innerHeight < 500 ? 32 : 40; // Landscape: 32px, Portrait: 40px
+    }
     
     state.asteroids.forEach(asteroid => {
       if (asteroid.hp <= 0) return;
@@ -1034,7 +1061,10 @@ export default function MleoSpaceMining() {
 
   function drawRobots(ctx, w, h) {
     const state = stateRef.current; if (!state) return;
-    const offsetY = window.innerWidth < 768 ? 40 : 80;
+    let offsetY = 80;
+    if (window.innerWidth < 768) {
+      offsetY = window.innerHeight < 500 ? 32 : 40; // Landscape: 32px, Portrait: 40px
+    }
     state.robots.forEach(robot => {
       const robotImage = loadImage(IMAGES.robots[robot.type]);
       if (robotImage.complete && robotImage.naturalWidth > 0) {
@@ -1264,12 +1294,54 @@ export default function MleoSpaceMining() {
               -webkit-overflow-scrolling: touch;
             }
           }
+          
+          /* Landscape mobile fixes */
+          @media (max-height: 500px) and (orientation: landscape) {
+            body {
+              overflow: hidden;
+            }
+            
+            .game-container {
+              height: 100vh !important;
+              height: calc(var(--app-100vh, 100vh)) !important;
+            }
+            
+            .mobile-header {
+              height: 32px !important;
+              padding: 4px 8px !important;
+            }
+            
+            .mobile-header .text-xs {
+              font-size: 10px !important;
+            }
+            
+            .canvas-wrapper {
+              height: calc(100vh - 32px) !important;
+              height: calc(var(--app-100vh, 100vh) - 32px) !important;
+            }
+            
+            /* Fix modals for landscape */
+            .modal-backdrop {
+              padding: 8px !important;
+            }
+            
+            .modal-content {
+              max-height: calc(100vh - 16px) !important;
+              max-height: calc(var(--app-100vh, 100vh) - 16px) !important;
+            }
+            
+            /* Fix upgrades panel for landscape */
+            .upgrades-panel {
+              max-height: calc(100vh - 40px) !important;
+              max-height: calc(var(--app-100vh, 100vh) - 40px) !important;
+            }
+          }
         `}</style>
         {/* Game Canvas */}
-        <div className="relative w-full h-screen">
+        <div className="relative w-full h-screen game-container">
           <canvas
             ref={canvasRef}
-            className="w-full h-full cursor-crosshair relative z-0 top-0 touch-none"
+            className="w-full h-full cursor-crosshair relative z-0 top-0 touch-none canvas-wrapper"
             onClick={(e) => { addRobot(); }}
             onTouchStart={(e) => { 
               e.preventDefault(); 
@@ -1291,7 +1363,7 @@ export default function MleoSpaceMining() {
           {/* Header - Mobile Responsive */}
           <div className="absolute top-0 left-0 w-full z-10">
             {/* Mobile Header (portrait) */}
-            <div className="md:hidden bg-black/90 px-2 py-1">
+            <div className="md:hidden bg-black/90 px-2 py-1 mobile-header">
               {/* Top Row */}
               <div className="flex justify-between items-center text-xs mb-1">
                 <div className="flex items-center gap-2">
@@ -1430,7 +1502,7 @@ export default function MleoSpaceMining() {
           
           {/* Robot Upgrades Panel - Mobile Responsive */}
           {showUpgrades && (
-            <div className="absolute top-12 md:top-20 left-2 right-2 md:left-auto md:right-4 md:w-80 bg-black/90 text-white p-3 md:p-4 rounded-lg z-50 border-2 border-blue-500/50 max-h-[70vh] md:max-h-96 overflow-y-auto">
+            <div className="absolute top-8 md:top-20 left-1 right-1 md:left-auto md:right-4 md:w-80 bg-black/90 text-white p-2 md:p-4 rounded-lg z-50 border-2 border-blue-500/50 max-h-[60vh] md:max-h-96 overflow-y-auto upgrades-panel">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-bold text-blue-300">⚡ Robot Upgrades</h3>
               <button
@@ -1549,18 +1621,18 @@ export default function MleoSpaceMining() {
           ))}
 
           {/* UI Overlay - Mobile Responsive */}
-          <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 flex flex-col gap-2 z-20">
-            {/* Mobile: Horizontal buttons */}
-            <div className="md:hidden flex gap-2">
-              <button onClick={() => setShowShop(true)} className="bg-green-600 hover:bg-green-700 px-3 py-2 rounded-lg font-bold text-sm">
+          <div className="absolute bottom-1 right-1 md:bottom-4 md:right-4 flex flex-col gap-1 md:gap-2 z-20">
+            {/* Mobile: Horizontal buttons - Landscape optimized */}
+            <div className="md:hidden flex gap-1">
+              <button onClick={() => setShowShop(true)} className="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-bold">
                 🤖 Shop
               </button>
               {!showUpgrades && (
-                <button onClick={() => setShowUpgrades(true)} className="bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-lg font-bold text-sm">
+                <button onClick={() => setShowUpgrades(true)} className="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs font-bold">
                   ⚡ Upgrades
                 </button>
               )}
-              <button onClick={() => setShowSectors(true)} className="bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded-lg font-bold text-sm">
+              <button onClick={() => setShowSectors(true)} className="bg-purple-600 hover:bg-purple-700 px-2 py-1 rounded text-xs font-bold">
                 🌌 Sectors
               </button>
             </div>
@@ -1584,8 +1656,8 @@ export default function MleoSpaceMining() {
 
         {/* MLEO Collection Modal - Mobile Responsive */}
         {showMleoCollection && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 md:p-4">
-            <div className="bg-gray-900 p-3 md:p-4 rounded-lg max-w-sm w-full border border-gray-700 max-h-[80vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 md:p-4 modal-backdrop">
+            <div className="bg-gray-900 p-3 md:p-4 rounded-lg max-w-sm w-full border border-gray-700 max-h-[80vh] overflow-y-auto modal-content">
               <h2 className="text-lg md:text-xl font-bold mb-3 text-center text-orange-400">🪙 MLEO Collection</h2>
               
               <div className="space-y-3">
