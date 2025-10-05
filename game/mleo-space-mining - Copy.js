@@ -251,20 +251,7 @@ function applyRobotUpgrades(state) {
     if (!robot.baseEfficiency) robot.baseEfficiency = robot.efficiency;
     
     robot.speed = robot.baseSpeed * speedMultiplier;
-    
-    // Apply both upgrade multiplier and connection bonus
-    const connectionBonus = robot.connectionBonus || 0;
-    const finalEfficiency = robot.baseEfficiency * efficiencyMultiplier * (1 + connectionBonus);
-    robot.efficiency = finalEfficiency;
-    
-    // Debug log for efficiency calculation
-    if (connectionBonus > 0) {
-      console.log(`🔧 Robot ${robot.id} efficiency calculation:`);
-      console.log(`   Base: ${robot.baseEfficiency.toFixed(2)}`);
-      console.log(`   Upgrade multiplier: ${efficiencyMultiplier.toFixed(2)}`);
-      console.log(`   Connection bonus: +${(connectionBonus * 100).toFixed(1)}%`);
-      console.log(`   Final: ${finalEfficiency.toFixed(2)}`);
-    }
+    robot.efficiency = robot.baseEfficiency * efficiencyMultiplier;
   });
 }
 
@@ -362,7 +349,7 @@ function useIOSViewportFix() {
 const STATION_WIDTH = 800;
 const STATION_HEIGHT = 600;
 const ASTEROID_COUNT = 6;
-const MAX_ROBOTS = 20;
+const MAX_ROBOTS = 8;
 
 // MLEO Token Configuration
 const MLEO_BASE_PER_LEVEL = 3; // Base MLEO tokens per asteroid level
@@ -512,7 +499,6 @@ export default function MleoSpaceMining() {
   const [showTerms, setShowTerms] = useState(false);
   const [showShop, setShowShop] = useState(false);
   const [showSectors, setShowSectors] = useState(false);
-  const [showUpgradesModal, setShowUpgradesModal] = useState(false);
   const [selectedRobot, setSelectedRobot] = useState("basic");
   const [showMleoCollection, setShowMleoCollection] = useState(false);
   
@@ -536,7 +522,8 @@ export default function MleoSpaceMining() {
   // Asteroid destruction popup
   const [asteroidPopup, setAsteroidPopup] = useState(null);
   
-  // Upgrades panel visibility - removed, now using modal
+  // Upgrades panel visibility
+  const [showUpgrades, setShowUpgrades] = useState(true);
   
   // Particle effects
   const [particles, setParticles] = useState([]);
@@ -816,15 +803,6 @@ export default function MleoSpaceMining() {
       }
     }
     
-    // Initialize robot connections for existing robots
-    if (state.robots && state.robots.length > 0) {
-      state.robots.forEach(robot => {
-        if (!robot.connectedRobots) robot.connectedRobots = [];
-        if (!robot.connectionBonus) robot.connectionBonus = 0;
-      });
-      forceConnectionCheck(state);
-    }
-    
     setUi({
       credits: state.credits,
       energy: state.energy,
@@ -886,14 +864,11 @@ export default function MleoSpaceMining() {
     };
   }, [mounted]);
 
-  // Robot merging function - FORCED CONNECTIONS VERSION
+  // Robot merging function - OPTIMIZED VERSION
   function checkRobotMerging(state) {
     if (!state.robots || state.robots.length < 2) return;
     
-    // FORCE CONNECTION CHECK EVERY TIME - NO COOLDOWN
-    forceConnectionCheck(state);
-    
-    // Group robots by level for merging
+    // Group robots by level
     const robotsByLevel = {};
     state.robots.forEach(robot => {
       if (!robotsByLevel[robot.level]) robotsByLevel[robot.level] = [];
@@ -903,7 +878,6 @@ export default function MleoSpaceMining() {
     Object.keys(robotsByLevel).forEach(level => {
       const robots = robotsByLevel[level];
       if (robots.length >= 2) {
-        // Check for merging (same level, very close)
         let closestDistance = Infinity, robot1 = null, robot2 = null;
         for (let i = 0; i < robots.length - 1; i++) {
           for (let j = i + 1; j < robots.length; j++) {
@@ -953,59 +927,6 @@ export default function MleoSpaceMining() {
       }
     });
   }
-
-  // FORCED CONNECTIONS - AGGRESSIVE VERSION
-  function checkRobotConnections(state, robots) {
-    const CONNECTION_RANGE = 250; // Even larger range for easier connections
-    const CONNECTION_BONUS = 0.01; // 1% efficiency bonus per connection
-    
-    robots.forEach(robot => {
-      if (!robot.connectedRobots) robot.connectedRobots = [];
-      
-      // Reset connection bonus
-      robot.connectionBonus = 0;
-      
-      // Find robots within connection range
-      const nearbyRobots = robots.filter(otherRobot => {
-        if (otherRobot.id === robot.id) return false;
-        const distance = calculateDistance(robot.x, robot.y, otherRobot.x, otherRobot.y);
-        return distance <= CONNECTION_RANGE;
-      });
-      
-      // Update connected robots list
-      robot.connectedRobots = nearbyRobots.map(r => r.id);
-      
-      // Calculate connection bonus (1% per connected robot)
-      robot.connectionBonus = robot.connectedRobots.length * CONNECTION_BONUS;
-      
-      // FORCE apply connection bonus to efficiency immediately
-      if (robot.baseEfficiency) {
-        robot.efficiency = robot.baseEfficiency * (1 + robot.connectionBonus);
-      } else {
-        // If no base efficiency, set it from robot type
-        const robotType = ROBOT_TYPES[robot.type];
-        if (robotType) {
-          robot.baseEfficiency = robotType.efficiency;
-          robot.efficiency = robotType.efficiency * (1 + robot.connectionBonus);
-        }
-      }
-      
-      // FORCE update efficiency with upgrades
-      if (state.robotUpgrades) {
-        const efficiencyMultiplier = ROBOT_UPGRADES.efficiency.effect(state.robotUpgrades.efficiency || 0);
-        robot.efficiency = robot.baseEfficiency * efficiencyMultiplier * (1 + robot.connectionBonus);
-      }
-      
-      // Debug log for connections
-      if (robot.connectedRobots.length > 0) {
-        console.log(`🔗 Robot ${robot.id} (Level ${robot.level}) connected to ${robot.connectedRobots.length} robots: ${robot.connectedRobots.join(', ')}`);
-        console.log(`   Connection bonus: +${Math.round(robot.connectionBonus * 100)}% efficiency`);
-        console.log(`   Base efficiency: ${robot.baseEfficiency?.toFixed(2) || 'N/A'}`);
-        console.log(`   Final efficiency: ${robot.efficiency.toFixed(2)}`);
-        console.log(`   Efficiency increase: ${((robot.efficiency / (robot.baseEfficiency || 1)) - 1 * 100).toFixed(1)}%`);
-      }
-    });
-  }
   
   // Merge two robots into one upgraded robot - OPTIMIZED VERSION
   function mergeRobots(state, robot1, robot2) {
@@ -1033,7 +954,6 @@ export default function MleoSpaceMining() {
     });
     
     // Create new merged robot
-    const baseEfficiency = Math.min((robot1.baseEfficiency || robot1.efficiency) * 1.01, 5); // 1% increase, max 5
     const newRobot = {
       id: state.nextRobotId++,
       type: robot1.type, // Keep the same type
@@ -1041,25 +961,17 @@ export default function MleoSpaceMining() {
       x: (robot1.x + robot2.x) / 2, // Average position
       y: (robot1.y + robot2.y) / 2,
       targetAsteroid: null,
-      efficiency: baseEfficiency, // Set efficiency based on base
-      speed: Math.max(robot1.speed, robot2.speed), // Take the faster speed
-      baseEfficiency: baseEfficiency, // Set base efficiency
-      connectedRobots: [], // Initialize connection array
-      connectionBonus: 0 // Initialize connection bonus
+      efficiency: Math.min(robot1.efficiency * 1.1, 5), // 10% increase, max 5
+      speed: Math.max(robot1.speed, robot2.speed) // Take the faster speed
     };
     
     state.robots.push(newRobot);
     
-    // Force connection check for new merged robot
-    forceConnectionCheck(state);
-    
     console.log(`✅ Merged robots: ${robot1.id} + ${robot2.id} = ${newRobot.id} (Level ${newRobot.level})`);
-    console.log(`   New robot efficiency: ${newRobot.efficiency.toFixed(2)} (base + connections)`);
     
-    // Show merge notification with actual efficiency
-    const efficiencyIncrease = ((newRobot.baseEfficiency / (robot1.baseEfficiency || robot1.efficiency)) - 1) * 100;
+    // Show merge notification
     setCenterPopup?.({ 
-      text: `🤖 Robot Level ${newRobot.level}! Efficiency +${efficiencyIncrease.toFixed(1)}%`, 
+      text: `🤖 Robot Level ${newRobot.level}! Efficiency +10%`, 
       id: Math.random() 
     });
     
@@ -1100,8 +1012,11 @@ export default function MleoSpaceMining() {
       return;
     }
     
-    // FORCE CONNECTION CHECK EVERY TICK - NO COOLDOWN
-    checkRobotMerging(state);
+    // Auto-merge robots (with cooldown to prevent stuttering)
+    if (now - (state.lastMerge || 0) > 1000) { // 1 second cooldown
+      checkRobotMerging(state);
+      state.lastMerge = now;
+    }
     
     // Apply robot upgrades
     applyRobotUpgrades(state);
@@ -1125,13 +1040,6 @@ export default function MleoSpaceMining() {
             const speed = (robot.speed * 50 * (dt / 1000)) || 1; // Prevent NaN
             robot.x += (dx / distance) * speed;
             robot.y += (dy / distance) * speed;
-            
-            // Force connection check when robot moves
-            const robotLevel = robot.level;
-            const sameLevelRobots = state.robots.filter(r => r.level === robotLevel && r.id !== robot.id);
-            if (sameLevelRobots.length > 0) {
-              checkRobotConnections(state, [robot, ...sameLevelRobots]);
-            }
           } else {
             const damage = (robot.efficiency * (dt / 1000) * 10) || 0.1; // Prevent NaN
             asteroid.hp -= damage;
@@ -1195,11 +1103,7 @@ export default function MleoSpaceMining() {
     // Draw game elements (offset to avoid header - mobile responsive)
     let headerHeight = 80;
     if (window.innerWidth < 768) {
-      if (window.innerHeight < 500) {
-        headerHeight = 28; // Landscape: 28px
-      } else {
-        headerHeight = 48; // Portrait: 48px
-      }
+      headerHeight = window.innerHeight < 500 ? 32 : 40; // Landscape: 32px, Portrait: 40px
     }
     drawAsteroids(ctx, w, h - headerHeight);
     drawRobots(ctx, w, h - headerHeight);
@@ -1233,11 +1137,7 @@ export default function MleoSpaceMining() {
     const state = stateRef.current; if (!state) return;
     let offsetY = 80;
     if (window.innerWidth < 768) {
-      if (window.innerHeight < 500) {
-        offsetY = 28; // Landscape: 28px
-      } else {
-        offsetY = 48; // Portrait: 48px
-      }
+      offsetY = window.innerHeight < 500 ? 32 : 40; // Landscape: 32px, Portrait: 40px
     }
     
     state.asteroids.forEach(asteroid => {
@@ -1267,34 +1167,8 @@ export default function MleoSpaceMining() {
     const state = stateRef.current; if (!state) return;
     let offsetY = 80;
     if (window.innerWidth < 768) {
-      if (window.innerHeight < 500) {
-        offsetY = 28; // Landscape: 28px
-      } else {
-        offsetY = 48; // Portrait: 48px
-      }
+      offsetY = window.innerHeight < 500 ? 32 : 40; // Landscape: 32px, Portrait: 40px
     }
-    
-    // Draw robot connections first (behind robots)
-    state.robots.forEach(robot => {
-      if (robot.connectedRobots && robot.connectedRobots.length > 0) {
-        robot.connectedRobots.forEach(connectedId => {
-          const connectedRobot = state.robots.find(r => r.id === connectedId);
-          if (connectedRobot) {
-            // Draw connection line
-            ctx.strokeStyle = "rgba(0, 255, 255, 0.3)"; // Cyan with transparency
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]); // Dashed line
-            ctx.beginPath();
-            ctx.moveTo(robot.x, robot.y + offsetY);
-            ctx.lineTo(connectedRobot.x, connectedRobot.y + offsetY);
-            ctx.stroke();
-            ctx.setLineDash([]); // Reset line dash
-          }
-        });
-      }
-    });
-    
-    // Draw robots
     state.robots.forEach(robot => {
       const robotImage = loadImage(IMAGES.robots[robot.type]);
       if (robotImage.complete && robotImage.naturalWidth > 0) {
@@ -1306,24 +1180,10 @@ export default function MleoSpaceMining() {
         ctx.beginPath(); ctx.arc(robot.x, robot.y + offsetY, 20, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.stroke();
       }
-      
-      // Draw connection indicator
-      if (robot.connectedRobots && robot.connectedRobots.length > 0) {
-        ctx.fillStyle = "rgba(0, 255, 255, 0.8)"; // Cyan glow
-        ctx.beginPath(); ctx.arc(robot.x, robot.y + offsetY, 25, 0, Math.PI * 2); ctx.fill();
-      }
-      
       const levelText = robot.level.toString();
       ctx.font = "bold 10px Arial"; ctx.textAlign = "center";
       ctx.strokeStyle = "#000"; ctx.lineWidth = 3; ctx.strokeText(levelText, robot.x, robot.y + 25 + offsetY);
       ctx.fillStyle = "#fff"; ctx.fillText(levelText, robot.x, robot.y + 25 + offsetY);
-      
-      // Show connection bonus if any
-      if (robot.connectionBonus && robot.connectionBonus > 0) {
-        const bonusText = `+${Math.round(robot.connectionBonus * 100)}%`;
-        ctx.font = "bold 8px Arial"; ctx.textAlign = "center";
-        ctx.fillStyle = "#00ffff"; ctx.fillText(bonusText, robot.x, robot.y + 35 + offsetY);
-      }
     });
   }
 
@@ -1378,19 +1238,7 @@ export default function MleoSpaceMining() {
     if (state.credits < robotType.cost) return;
     if (state.robots.length >= MAX_ROBOTS) return;
     
-    // Mobile responsive margins
-    let margin = 80, topMargin = 100, bottomMargin = 120;
-    if (window.innerWidth < 768) {
-      margin = 20;
-      if (window.innerHeight < 500) {
-        topMargin = 40; // Landscape
-        bottomMargin = 60;
-      } else {
-        topMargin = 60; // Portrait
-        bottomMargin = 80;
-      }
-    }
-    
+    const margin = 80, topMargin = 100, bottomMargin = 120;
     const robot = {
       id: state.nextRobotId++,
       type: selectedRobot,
@@ -1399,48 +1247,13 @@ export default function MleoSpaceMining() {
       y: Math.random() * (STATION_HEIGHT - topMargin - bottomMargin) + topMargin,
       targetAsteroid: null,
       efficiency: robotType.efficiency,
-      speed: robotType.speed,
-      baseEfficiency: robotType.efficiency, // Set base efficiency
-      connectedRobots: [], // Initialize connection array
-      connectionBonus: 0 // Initialize connection bonus
+      speed: robotType.speed
     };
     state.robots.push(robot);
     state.credits -= robotType.cost;
     state.totalRobots++;
-    
-    // Force immediate connection check for new robot
-    forceConnectionCheck(state);
-    
-    // Show connection status
-    const connections = state.robots.reduce((total, r) => total + (r.connectedRobots?.length || 0), 0);
-    if (connections > 0) {
-      setCenterPopup?.({ text: `🔗 ${connections} Active Connections!`, id: Math.random() });
-    }
-    
     setUi(prev => ({ ...prev, credits: state.credits }));
     saveGameState(state);
-  }
-
-  // Force connection check for all robots
-  function forceConnectionCheck(state) {
-    if (!state.robots || state.robots.length < 2) return;
-    
-    // Group robots by level
-    const robotsByLevel = {};
-    state.robots.forEach(robot => {
-      if (!robotsByLevel[robot.level]) robotsByLevel[robot.level] = [];
-      robotsByLevel[robot.level].push(robot);
-    });
-    
-    // Check connections for each level
-    Object.keys(robotsByLevel).forEach(level => {
-      const robots = robotsByLevel[level];
-      if (robots.length >= 2) {
-        checkRobotConnections(state, robots);
-      }
-    });
-    
-    console.log(`🔗 Force connection check completed for ${state.robots.length} robots`);
   }
 
   function switchSector(sectorId) {
@@ -1539,19 +1352,7 @@ export default function MleoSpaceMining() {
     const sectorData = SPACE_SECTORS.find(s => s.id === sector);
     const asteroidType = sectorData.asteroidTypes[Math.floor(Math.random() * sectorData.asteroidTypes.length)];
     const typeData = ASTEROID_TYPES[asteroidType];
-    // Mobile responsive margins
-    let margin = 80, topMargin = 100, bottomMargin = 120;
-    if (window.innerWidth < 768) {
-      margin = 20;
-      if (window.innerHeight < 500) {
-        topMargin = 40; // Landscape
-        bottomMargin = 60;
-      } else {
-        topMargin = 60; // Portrait
-        bottomMargin = 80;
-      }
-    }
-    
+    const margin = 80, topMargin = 100, bottomMargin = 120;
     return {
       id: Date.now() + Math.random(),
       x: Math.random() * (STATION_WIDTH - margin * 2) + margin,
@@ -1578,31 +1379,13 @@ export default function MleoSpaceMining() {
       <div className="min-h-screen bg-black text-white overflow-hidden">
         {/* Mobile-specific styles */}
         <style jsx>{`
-          /* Global mobile optimizations */
-          * {
-            box-sizing: border-box;
-          }
-          
-          html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-          }
-          
           @media (max-width: 768px) {
-            html, body {
-              position: fixed;
-              width: 100vw;
-              height: 100vh;
-              height: calc(var(--app-100vh, 100vh));
+            body {
               touch-action: manipulation;
               -webkit-user-select: none;
               -moz-user-select: none;
               -ms-user-select: none;
               user-select: none;
-              -webkit-overflow-scrolling: touch;
             }
             
             /* Prevent zoom on input focus */
@@ -1614,106 +1397,47 @@ export default function MleoSpaceMining() {
             .modal-content {
               -webkit-overflow-scrolling: touch;
             }
-            
-            /* Game container mobile */
-            .game-container {
-              position: fixed;
-              top: 0;
-              left: 0;
-              width: 100vw;
-              height: 100vh;
-              height: calc(var(--app-100vh, 100vh));
-            }
-            
-            /* Canvas mobile */
-            .canvas-wrapper {
-              position: absolute;
-              top: 0;
-              left: 0;
-              width: 100% !important;
-              height: 100% !important;
-            }
-          }
-          
-          /* Portrait mobile fixes */
-          @media (max-width: 768px) and (orientation: portrait) {
-            .mobile-header {
-              height: 48px !important;
-              padding: 6px 12px !important;
-            }
-            
-            .canvas-wrapper {
-              height: calc(100vh - 48px) !important;
-              height: calc(var(--app-100vh, 100vh) - 48px) !important;
-              top: 48px !important;
-            }
-            
-            /* UI buttons for portrait */
-            .mobile-ui-buttons {
-              bottom: 8px !important;
-              right: 8px !important;
-              gap: 6px !important;
-            }
-            
-            .mobile-ui-buttons button {
-              padding: 8px 12px !important;
-              font-size: 12px !important;
-            }
           }
           
           /* Landscape mobile fixes */
           @media (max-height: 500px) and (orientation: landscape) {
+            body {
+              overflow: hidden;
+            }
+            
+            .game-container {
+              height: 100vh !important;
+              height: calc(var(--app-100vh, 100vh)) !important;
+            }
+            
             .mobile-header {
-              height: 28px !important;
-              padding: 2px 6px !important;
+              height: 32px !important;
+              padding: 4px 8px !important;
             }
             
             .mobile-header .text-xs {
-              font-size: 9px !important;
-            }
-            
-            .mobile-header .font-bold {
               font-size: 10px !important;
             }
             
             .canvas-wrapper {
-              height: calc(100vh - 28px) !important;
-              height: calc(var(--app-100vh, 100vh) - 28px) !important;
-              top: 28px !important;
-            }
-            
-            /* UI buttons for landscape */
-            .mobile-ui-buttons {
-              bottom: 4px !important;
-              right: 4px !important;
-              gap: 3px !important;
-            }
-            
-            .mobile-ui-buttons button {
-              padding: 4px 6px !important;
-              font-size: 10px !important;
-              border-radius: 4px !important;
+              height: calc(100vh - 32px) !important;
+              height: calc(var(--app-100vh, 100vh) - 32px) !important;
             }
             
             /* Fix modals for landscape */
             .modal-backdrop {
-              padding: 4px !important;
+              padding: 8px !important;
             }
             
             .modal-content {
-              max-height: calc(100vh - 8px) !important;
-              max-height: calc(var(--app-100vh, 100vh) - 8px) !important;
-              padding: 8px !important;
+              max-height: calc(100vh - 16px) !important;
+              max-height: calc(var(--app-100vh, 100vh) - 16px) !important;
             }
             
             /* Fix upgrades panel for landscape */
             .upgrades-panel {
-              max-height: calc(100vh - 32px) !important;
-              max-height: calc(var(--app-100vh, 100vh) - 32px) !important;
-              top: 32px !important;
-              left: 4px !important;
-              right: 4px !important;
-              padding: 6px !important;
+              max-height: calc(100vh - 40px) !important;
+              max-height: calc(var(--app-100vh, 100vh) - 40px) !important;
             }
           }
         `}</style>
@@ -1721,9 +1445,16 @@ export default function MleoSpaceMining() {
         <div className="relative w-full h-screen game-container">
           <canvas
             ref={canvasRef}
-            className="w-full h-full cursor-default relative z-0 top-0 touch-none canvas-wrapper"
+            className="w-full h-full cursor-crosshair relative z-0 top-0 touch-none canvas-wrapper"
+            onClick={(e) => { addRobot(); }}
             onTouchStart={(e) => { 
               e.preventDefault(); 
+              const touch = e.touches[0];
+              const rect = canvasRef.current.getBoundingClientRect();
+              const x = touch.clientX - rect.left;
+              const y = touch.clientY - rect.top;
+              // Add robot at touch position
+              addRobot();
             }}
             onTouchMove={(e) => {
               e.preventDefault();
@@ -1767,11 +1498,6 @@ export default function MleoSpaceMining() {
                 <div className="flex items-center gap-1">
                   <span className="font-bold text-white">
                     {stateRef.current?.robots?.length || 0}/{MAX_ROBOTS}
-                    {stateRef.current?.robots?.some(r => r.connectedRobots?.length > 0) && (
-                      <span className="text-cyan-400 ml-1">
-                        🔗{stateRef.current.robots.reduce((total, r) => total + (r.connectedRobots?.length || 0), 0)}
-                      </span>
-                    )}
                   </span>
                 </div>
                 <button
@@ -1779,17 +1505,6 @@ export default function MleoSpaceMining() {
                   className="bg-orange-600 hover:bg-orange-700 px-2 py-1 rounded text-xs font-bold"
                 >
                   🪙 {stateRef.current?.mleo || 0}
-                </button>
-                <button
-                  onClick={() => addRobot()}
-                  disabled={stateRef.current?.credits < ROBOT_TYPES[selectedRobot].cost || stateRef.current?.robots.length >= MAX_ROBOTS}
-                  className={`px-2 py-1 rounded text-xs font-bold ${
-                    (stateRef.current?.credits >= ROBOT_TYPES[selectedRobot].cost && stateRef.current?.robots.length < MAX_ROBOTS)
-                      ? 'bg-orange-600 hover:bg-orange-700' 
-                      : 'bg-gray-600 cursor-not-allowed opacity-50'
-                  }`}
-                >
-                  ➕
                 </button>
                 <button
                   onClick={() => setMenuOpen(true)}
@@ -1851,11 +1566,6 @@ export default function MleoSpaceMining() {
                       (Max Level: {Math.max(...(stateRef.current.robots.map(r => r.level) || [1]))})
                     </span>
                   )}
-                  {stateRef.current?.robots?.some(r => r.connectedRobots?.length > 0) && (
-                    <span className="text-cyan-400 ml-1 text-xs">
-                      🔗 {stateRef.current.robots.reduce((total, r) => total + (r.connectedRobots?.length || 0), 0)} Connections
-                    </span>
-                  )}
                 </span>
               </div>
               
@@ -1881,19 +1591,6 @@ export default function MleoSpaceMining() {
                 🪙 MLEO: {stateRef.current?.mleo || 0}
               </button>
               
-              {/* ADD Robot Button */}
-              <button
-                onClick={() => addRobot()}
-                disabled={stateRef.current?.credits < ROBOT_TYPES[selectedRobot].cost || stateRef.current?.robots.length >= MAX_ROBOTS}
-                className={`px-4 py-2 rounded-lg font-bold text-sm ${
-                  (stateRef.current?.credits >= ROBOT_TYPES[selectedRobot].cost && stateRef.current?.robots.length < MAX_ROBOTS)
-                    ? 'bg-orange-600 hover:bg-orange-700' 
-                    : 'bg-gray-600 cursor-not-allowed opacity-50'
-                }`}
-              >
-                ➕ ADD Robot
-              </button>
-              
               {/* Menu Button */}
               <button
                 onClick={() => setMenuOpen(true)}
@@ -1907,6 +1604,110 @@ export default function MleoSpaceMining() {
             </div>
           </div>
           
+          {/* Robot Upgrades Panel - Mobile Responsive */}
+          {showUpgrades && (
+            <div className="absolute top-8 md:top-20 left-1 right-1 md:left-auto md:right-4 md:w-80 bg-black/90 text-white p-2 md:p-4 rounded-lg z-50 border-2 border-blue-500/50 max-h-[60vh] md:max-h-96 overflow-y-auto upgrades-panel">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-bold text-blue-300">⚡ Robot Upgrades</h3>
+              <button
+                onClick={() => {
+                  const info = Object.entries(ROBOT_UPGRADES).map(([id, upgrade]) => {
+                    const level = stateRef.current?.robotUpgrades?.[id] || 0;
+                    const effect = Math.round((upgrade.effect(level) - 1) * 100);
+                    return `${upgrade.name}: Level ${level} (${effect > 0 ? '+' : ''}${effect}%)`;
+                  }).join('\n');
+                  alert(`Upgrade Information:\n\n${info}`);
+                }}
+                className="w-6 h-6 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center text-xs font-bold"
+                title="Upgrade Information"
+              >
+                ?
+              </button>
+            </div>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {Object.entries(ROBOT_UPGRADES).map(([id, upgrade]) => {
+                const currentLevel = stateRef.current?.robotUpgrades?.[id] || 0;
+                const cost = getUpgradeCost(id, currentLevel);
+                const canAfford = stateRef.current?.credits >= cost;
+                const maxed = currentLevel >= upgrade.maxLevel;
+                const effectValue = Math.round((upgrade.effect(currentLevel) - 1) * 100);
+                
+                return (
+                  <div key={id} className="bg-gray-800/80 p-3 rounded border border-gray-700 hover:border-blue-500/50 transition-all duration-200 hover:scale-105">
+                    <div className="flex justify-between items-start mb-1">
+                      <div className="font-semibold text-yellow-300">{upgrade.name}</div>
+                      <div className="text-xs text-gray-400">
+                        {currentLevel}/{upgrade.maxLevel}
+                      </div>
+                    </div>
+                    
+                    {/* Progress Bar */}
+                    <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
+                      <div 
+                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${(currentLevel / upgrade.maxLevel) * 100}%` }}
+                      />
+                    </div>
+                    <div className="text-xs text-gray-300 mb-2" title={`Next cost: ${getUpgradeCost(id, currentLevel + 1)} credits`}>
+                      {upgrade.description}
+                    </div>
+                    {currentLevel > 0 && (
+                      <div className="text-xs text-green-400 mb-2">
+                        ✓ Current Effect: +{effectValue}%
+                      </div>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        if (purchaseUpgrade(stateRef.current, id)) {
+                          saveGameState(stateRef.current);
+                          setUi(prev => ({ ...prev, credits: stateRef.current.credits }));
+                          setCenterPopup?.({ text: `⚡ Upgraded ${upgrade.name}!`, id: Math.random() });
+                          createUpgradeParticles(e.clientX, e.clientY);
+                          playUpgradeSound();
+                        }
+                      }}
+                      disabled={!canAfford || maxed}
+                      className={`w-full py-2 md:py-2 px-3 rounded text-xs md:text-sm font-bold transition-all touch-manipulation ${
+                        canAfford && !maxed 
+                          ? 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 hover:scale-105' 
+                          : 'bg-gray-600 cursor-not-allowed opacity-50'
+                      }`}
+                    >
+                      {maxed ? '✓ Maxed' : `Upgrade (${cost} 💰)`}
+            </button>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="absolute top-2 right-2 flex gap-1">
+              <button
+                onClick={() => {
+                  if (confirm("Are you sure you want to reset all upgrades?")) {
+                    stateRef.current.robotUpgrades = {
+                      speed: 0,
+                      efficiency: 0,
+                      range: 0,
+                      autoMerge: 0
+                    };
+                    saveGameState(stateRef.current);
+                    setCenterPopup?.({ text: "🔄 Upgrades reset!", id: Math.random() });
+                  }
+                }}
+                className="w-6 h-6 bg-orange-600 hover:bg-orange-700 rounded-full flex items-center justify-center text-xs font-bold"
+                title="Reset Upgrades"
+              >
+                ↺
+              </button>
+              <button
+                onClick={() => setShowUpgrades(false)}
+                className="w-6 h-6 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center text-xs font-bold"
+                title="Hide Upgrades Panel"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+          )}
 
           {/* Particle Effects */}
           {particles.map(particle => (
@@ -1924,26 +1725,17 @@ export default function MleoSpaceMining() {
           ))}
 
           {/* UI Overlay - Mobile Responsive */}
-          <div className="absolute bottom-1 right-1 md:bottom-4 md:right-4 flex flex-col gap-1 md:gap-2 z-20 mobile-ui-buttons">
+          <div className="absolute bottom-1 right-1 md:bottom-4 md:right-4 flex flex-col gap-1 md:gap-2 z-20">
             {/* Mobile: Horizontal buttons - Landscape optimized */}
             <div className="md:hidden flex gap-1">
-              <button 
-                onClick={() => addRobot()} 
-                disabled={stateRef.current?.credits < ROBOT_TYPES[selectedRobot].cost || stateRef.current?.robots.length >= MAX_ROBOTS}
-                className={`px-2 py-1 rounded text-xs font-bold ${
-                  (stateRef.current?.credits >= ROBOT_TYPES[selectedRobot].cost && stateRef.current?.robots.length < MAX_ROBOTS)
-                    ? 'bg-orange-600 hover:bg-orange-700' 
-                    : 'bg-gray-600 cursor-not-allowed opacity-50'
-                }`}
-              >
-                ➕ ADD
-              </button>
               <button onClick={() => setShowShop(true)} className="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-bold">
                 🤖 Shop
               </button>
-              <button onClick={() => setShowUpgradesModal(true)} className="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs font-bold">
-                ⚡ Upgrades
-              </button>
+              {!showUpgrades && (
+                <button onClick={() => setShowUpgrades(true)} className="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs font-bold">
+                  ⚡ Upgrades
+                </button>
+              )}
               <button onClick={() => setShowSectors(true)} className="bg-purple-600 hover:bg-purple-700 px-2 py-1 rounded text-xs font-bold">
                 🌌 Sectors
               </button>
@@ -1951,23 +1743,14 @@ export default function MleoSpaceMining() {
             
             {/* Desktop: Vertical buttons */}
             <div className="hidden md:flex flex-col gap-2">
-              <button 
-                onClick={() => addRobot()} 
-                disabled={stateRef.current?.credits < ROBOT_TYPES[selectedRobot].cost || stateRef.current?.robots.length >= MAX_ROBOTS}
-                className={`px-4 py-2 rounded-lg font-bold ${
-                  (stateRef.current?.credits >= ROBOT_TYPES[selectedRobot].cost && stateRef.current?.robots.length < MAX_ROBOTS)
-                    ? 'bg-orange-600 hover:bg-orange-700' 
-                    : 'bg-gray-600 cursor-not-allowed opacity-50'
-                }`}
-              >
-                ➕ ADD Robot
-              </button>
               <button onClick={() => setShowShop(true)} className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg font-bold">
                 🤖 Shop
               </button>
-              <button onClick={() => setShowUpgradesModal(true)} className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-bold">
-                ⚡ Upgrades
-              </button>
+              {!showUpgrades && (
+                <button onClick={() => setShowUpgrades(true)} className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-bold">
+                  ⚡ Upgrades
+                </button>
+              )}
               <button onClick={() => setShowSectors(true)} className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg font-bold">
                 🌌 Sectors
               </button>
@@ -2236,98 +2019,6 @@ export default function MleoSpaceMining() {
           </div>
         )}
 
-        {/* Upgrades Modal - Mobile Responsive */}
-        {showUpgradesModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 md:p-4">
-            <div className="bg-gray-900 p-2 md:p-4 rounded-lg w-[90%] max-w-sm border border-gray-700 overflow-hidden flex flex-col">
-              <h2 className="text-base md:text-lg font-bold mb-2 text-center">⚡ Robot Upgrades</h2>
-              
-
-              <div className="space-y-2 flex-1">
-                {Object.entries(ROBOT_UPGRADES).map(([id, upgrade]) => {
-                  const currentLevel = stateRef.current?.robotUpgrades?.[id] || 0;
-                  const cost = getUpgradeCost(id, currentLevel);
-                  const canAfford = stateRef.current?.credits >= cost;
-                  const maxed = currentLevel >= upgrade.maxLevel;
-                  const effectValue = Math.round((upgrade.effect(currentLevel) - 1) * 100);
-                  
-                  return (
-                    <div key={id} className="bg-gray-800/80 p-2 rounded border border-gray-700 hover:border-blue-500/50 transition-all duration-200">
-                      <div className="flex justify-between items-start mb-1">
-                        <div className="font-semibold text-yellow-300 text-sm">{upgrade.name}</div>
-                        <div className="text-xs text-gray-400">
-                          {currentLevel}/{upgrade.maxLevel}
-                        </div>
-                      </div>
-                      
-                      {/* Progress Bar */}
-                      <div className="w-full bg-gray-700 rounded-full h-1.5 mb-1">
-                        <div 
-                          className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
-                          style={{ width: `${(currentLevel / upgrade.maxLevel) * 100}%` }}
-                        />
-                      </div>
-                      <div className="text-xs text-gray-300 mb-1">
-                        {upgrade.description}
-                      </div>
-                      {currentLevel > 0 && (
-                        <div className="text-xs text-green-400 mb-1">
-                          ✓ Current Effect: +{effectValue}%
-                        </div>
-                      )}
-                      <button
-                        onClick={(e) => {
-                          if (purchaseUpgrade(stateRef.current, id)) {
-                            saveGameState(stateRef.current);
-                            setUi(prev => ({ ...prev, credits: stateRef.current.credits }));
-                            setCenterPopup?.({ text: `⚡ Upgraded ${upgrade.name}!`, id: Math.random() });
-                            createUpgradeParticles(e.clientX, e.clientY);
-                            playUpgradeSound();
-                          }
-                        }}
-                        disabled={!canAfford || maxed}
-                        className={`w-full py-1.5 px-2 rounded text-xs font-bold transition-all ${
-                          canAfford && !maxed 
-                            ? 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800' 
-                            : 'bg-gray-600 cursor-not-allowed opacity-50'
-                        }`}
-                      >
-                        {maxed ? '✓ Maxed' : `Upgrade (${cost} 💰)`}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-              
-              {/* Action Buttons */}
-              <div className="mt-2 flex gap-2 flex-shrink-0">
-                <button
-                  onClick={() => {
-                    const info = Object.entries(ROBOT_UPGRADES).map(([id, upgrade]) => {
-                      const level = stateRef.current?.robotUpgrades?.[id] || 0;
-                      const effect = Math.round((upgrade.effect(level) - 1) * 100);
-                      return `${upgrade.name}: Level ${level} (${effect > 0 ? '+' : ''}${effect}%)`;
-                    }).join('\n');
-                    const connectionInfo = stateRef.current?.robots?.map(r => {
-                      const connections = r.connectedRobots?.length || 0;
-                      const bonus = r.connectionBonus || 0;
-                      return `Robot ${r.id} (L${r.level}): ${connections} connections, +${Math.round(bonus * 100)}% bonus`;
-                    }).join('\n') || 'No robots with connections';
-                    
-                    alert(`Upgrade Information:\n\n${info}\n\n🔗 Robot Connections:\nRobots of the same level within 250px range get +1% efficiency per connection!\nConnected robots show cyan glow and connection lines.\n\nCurrent Connections:\n${connectionInfo}`);
-                  }}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded text-xs font-bold"
-                >
-                  ❓ Help
-                </button>
-                <button onClick={() => setShowUpgradesModal(false)} className="flex-1 bg-red-600 hover:bg-red-700 px-2 py-1.5 rounded text-xs font-bold">
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Terms Modal */}
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -2335,9 +2026,6 @@ export default function MleoSpaceMining() {
             <h2 className="text-2xl font-bold mb-4 text-center">🚀 Terms & Conditions</h2>
               <p className="text-sm text-gray-300 mb-4">
                 Welcome to MLEO Space Mining Station! This is a futuristic mining game where you control robots to mine asteroids in space.
-                <br/><br/>
-                <span className="text-orange-300 font-bold">NEW:</span> Use the ADD button to add robots. No more tapping on screen!
-                <br/><br/>
                 By playing, you agree to our terms of service.
               </p>
               <div className="flex gap-2">
