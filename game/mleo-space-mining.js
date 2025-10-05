@@ -42,31 +42,12 @@ const ALLOW_TESTNET_WALLET_FLAG =
   (process.env.NEXT_PUBLIC_ALLOW_TESTNET_WALLET || "").toLowerCase() === "1" ||
   (process.env.NEXT_PUBLIC_ALLOW_TESTNET_WALLET || "").toLowerCase() === "true";
 
-function loadSpaceMleoState(){
-  try {
-    const raw = localStorage.getItem(SPACE_MLEO_LS_KEY);
-    if (raw) {
-      const st = JSON.parse(raw);
-      st.vault = st.vault || 0;
-      st.claimedToWallet = st.claimedToWallet || 0;
-      st.history = Array.isArray(st.history) ? st.history : [];
-      return st;
-    }
-  } catch {}
-  return { vault: 0, claimedToWallet: 0, history: [] };
-}
-
-function saveSpaceMleoState(st){
-  try { localStorage.setItem(SPACE_MLEO_LS_KEY, JSON.stringify(st)); } catch {}
-}
-
 // ===== Formatting Functions =====
 const SUFFIXES_BASE = ["", "K", "M", "B", "T"];
 
 function suffixFromTier(tier) {
   if (tier < SUFFIXES_BASE.length) return SUFFIXES_BASE[tier];
   const idx = tier - SUFFIXES_BASE.length; // 0→AA, 1→AB ...
-  // ממיר למחרוזת אותיות בסגנון גיליון (A..Z, AA..), ומבריח ל-2+ אותיות
   let n = idx + 26; // 26→"AA"
   let s = "";
   while (n >= 0) {
@@ -109,7 +90,24 @@ function formatMleo2(n) {
   return sign + t.toString();
 }
 
-// ===== Space MLEO Functions =====
+// ===== Space MLEO Functions (vault/history) =====
+function loadSpaceMleoState(){
+  try {
+    const raw = localStorage.getItem(SPACE_MLEO_LS_KEY);
+    if (raw) {
+      const st = JSON.parse(raw);
+      st.vault = Number(st.vault || 0);
+      st.claimedToWallet = Number(st.claimedToWallet || 0);
+      st.history = Array.isArray(st.history) ? st.history : [];
+      return st;
+    }
+  } catch {}
+  return { vault: 0, claimedToWallet: 0, history: [] };
+}
+function saveSpaceMleoState(st){
+  try { localStorage.setItem(SPACE_MLEO_LS_KEY, JSON.stringify(st)); } catch {}
+}
+
 function addMleoToVault(amount, setSpaceMleo) {
   const st = loadSpaceMleoState();
   st.vault = Number(((st.vault || 0) + amount).toFixed(2));
@@ -118,111 +116,203 @@ function addMleoToVault(amount, setSpaceMleo) {
   return st;
 }
 
-function claimGameMleoToVault(setSpaceMleo, setCenterPopup, setGiftToastWithTTL, gameMleo, stateRef) {
-  const gameMleoAmount = Number((gameMleo || 0).toFixed(2));
-  if (!gameMleoAmount) { 
-    setGiftToastWithTTL("No MLEO to claim from game"); 
-    return; 
-  }
-
-  // Move MLEO from game to vault
-  const st = loadSpaceMleoState();
-  st.vault = Number(((st.vault || 0) + gameMleoAmount).toFixed(2));
-  st.history = Array.isArray(st.history) ? st.history : [];
-  st.history.unshift({ 
-    t: Date.now(), 
-    kind: "claim_to_vault", 
-    amount: gameMleoAmount, 
-    tx: "space_mining_game" 
-  });
-  
-  saveSpaceMleoState(st);
-  setSpaceMleo(st);
-  
-  // Reset game MLEO to 0
-  if (stateRef.current) {
-    stateRef.current.mleo = 0;
-    stateRef.current.totalMleo = Math.max(0, (stateRef.current.totalMleo || 0) - gameMleoAmount);
-  }
-  
-  setCenterPopup?.({ text: `✅ Moved ${formatMleoShort(gameMleoAmount)} MLEO to vault`, id: Math.random() });
+// ===== Robust Game-State Persist (Atomic + Throttle) =====
+const LS_KEY = "mleoSpaceMining_v1_1";
+const LS_STAGING = `${LS_KEY}__staging`;
+const SAVE_THROTTLE_MS = 1500;
+function atomicSave(key, obj) {
+  const payload = JSON.stringify(obj);
+  localStorage.setItem(LS_STAGING, payload);
+  localStorage.setItem(key, payload);
+  localStorage.removeItem(LS_STAGING);
 }
-
-async function claimSpaceMleoToWallet(setSpaceMleo, setCenterPopup, setGiftToastWithTTL, isConnected, openConnectModal, chainId, switchChain, writeContractAsync, publicClient, address) {
-  const st = loadSpaceMleoState();
-  const vaultNow = Number((st?.vault || 0).toFixed(2));
-  if (!vaultNow) { 
-    setGiftToastWithTTL("Vault is empty"); 
-    return; 
-  }
-
-  // Check if wallet is connected
-  if (!isConnected) { 
-    openConnectModal?.(); 
-    return; 
-  }
-
-  // Check if we're on the correct chain
-  if (chainId !== CLAIM_CHAIN_ID) {
-    try { 
-      await switchChain?.({ chainId: CLAIM_CHAIN_ID }); 
-    }
-    catch { 
-      setGiftToastWithTTL("Switch to BSC Testnet (TBNB)"); 
-      return; 
-    }
-  }
-
-  // Check if contract address is valid
-  if (!isValidAddress(CLAIM_ADDRESS)) {
-    setGiftToastWithTTL("Missing/invalid CLAIM address (NEXT_PUBLIC_MLEO_CLAIM_ADDRESS)");
-    return;
-  }
-
+let __saveTimer = 0;
+function saveGameState(state, {force=false} = {}) {
   try {
-    // Convert to wei
-    const amountWei = parseUnits(
-      vaultNow.toString(),
-      MLEO_DECIMALS
-    );
-
-    // Call the contract
-    const hash = await writeContractAsync({
-      address: CLAIM_ADDRESS,
-      abi: MINING_CLAIM_ABI,
-      functionName: "claim",
-      args: [BigInt(GAME_ID), amountWei],
-      chainId: CLAIM_CHAIN_ID,
-      account: address,
-    });
-
-    // Wait for transaction confirmation
-    await publicClient.waitForTransactionReceipt({ hash });
-
-    // Update local state only after successful transaction
-    const after = loadSpaceMleoState();
-    const delta = Number(vaultNow);
-    after.vault = Math.max(0, Number(((after.vault || 0) - delta).toFixed(2)));
-    after.claimedToWallet = Number(((after.claimedToWallet || 0) + delta).toFixed(2));
-    after.history = Array.isArray(after.history) ? after.history : [];
-    after.history.unshift({ 
-      t: Date.now(), 
-      kind: "claim_wallet", 
-      amount: delta, 
-      tx: String(hash) 
-    });
-    
-    saveSpaceMleoState(after);
-    setSpaceMleo(after);
-    
-    setCenterPopup?.({ text: `✅ Sent ${formatMleoShort(delta)} MLEO to wallet`, id: Math.random() });
-  } catch (err) {
-    console.error(err);
-    setGiftToastWithTTL("Claim failed or rejected");
+    if (force) { atomicSave(LS_KEY, state); state.lastSave = Date.now(); return; }
+    if (__saveTimer) clearTimeout(__saveTimer);
+    __saveTimer = setTimeout(() => {
+      atomicSave(LS_KEY, state);
+      state.lastSave = Date.now();
+      __saveTimer = 0;
+    }, SAVE_THROTTLE_MS);
+  } catch (e) {
+    console.warn("Failed to save game state:", e);
   }
 }
 
+function loadGameState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY) || localStorage.getItem(LS_STAGING);
+    if (!raw) return getInitialState();
+    const state = JSON.parse(raw);
+    // Ensure all required arrays/objects exist
+    state.robots = state.robots || [];
+    state.asteroids = state.asteroids || [];
+    state.materials = state.materials || {
+      iron: 0, silicon: 0, titanium: 0, platinum: 0, rare_earth: 0, quantum_core: 0
+    };
+    state.nextRobotId = state.nextRobotId || 1;
+    state.lastSave = state.lastSave || Date.now();
+    state.lastUpdate = state.lastUpdate || Date.now();
+    
+    // Ensure robot upgrades exist
+    state.robotUpgrades = state.robotUpgrades || {
+      speed: 0,
+      efficiency: 0,
+      range: 0,
+      autoMerge: 0
+    };
+    
+    return state;
+  } catch {
+    return getInitialState();
+  }
+}
 
+// ===== Robot Upgrades System =====
+const ROBOT_UPGRADES = {
+  speed: {
+    id: 'speed',
+    name: 'Speed Boost',
+    description: 'Increase robot movement speed by 50%',
+    baseCost: 300,
+    maxLevel: 5,
+    effect: (level) => 1 + (level * 0.5) // +50% per level
+  },
+  efficiency: {
+    id: 'efficiency',
+    name: 'Mining Efficiency',
+    description: 'Increase mining efficiency by 30%',
+    baseCost: 500,
+    maxLevel: 5,
+    effect: (level) => 1 + (level * 0.3) // +30% per level
+  },
+  range: {
+    id: 'range',
+    name: 'Mining Range',
+    description: 'Increase mining range by 100%',
+    baseCost: 800,
+    maxLevel: 3,
+    effect: (level) => 1 + (level * 1.0) // +100% per level
+  },
+  autoMerge: {
+    id: 'autoMerge',
+    name: 'Auto Merge',
+    description: 'Increase auto merge speed',
+    baseCost: 1000,
+    maxLevel: 3,
+    effect: (level) => 1 - (level * 0.2) // -20% cooldown per level
+  }
+};
+
+// ===== Robot Upgrade Functions =====
+function getUpgradeCost(upgradeId, currentLevel) {
+  const upgrade = ROBOT_UPGRADES[upgradeId];
+  if (!upgrade) return 0;
+  return Math.floor(upgrade.baseCost * Math.pow(1.5, currentLevel));
+}
+
+function canAffordUpgrade(state, upgradeId) {
+  const upgrade = ROBOT_UPGRADES[upgradeId];
+  if (!upgrade) return false;
+  
+  const currentLevel = state.robotUpgrades?.[upgradeId] || 0;
+  if (currentLevel >= upgrade.maxLevel) return false;
+  
+  const cost = getUpgradeCost(upgradeId, currentLevel);
+  return state.credits >= cost;
+}
+
+function purchaseUpgrade(state, upgradeId) {
+  if (!canAffordUpgrade(state, upgradeId)) return false;
+  
+  const upgrade = ROBOT_UPGRADES[upgradeId];
+  const currentLevel = state.robotUpgrades?.[upgradeId] || 0;
+  const cost = getUpgradeCost(upgradeId, currentLevel);
+  
+  state.credits -= cost;
+  state.robotUpgrades = state.robotUpgrades || {};
+  state.robotUpgrades[upgradeId] = currentLevel + 1;
+  
+  console.log(`⚡ Upgraded ${upgrade.name} to level ${currentLevel + 1}!`);
+  return true;
+}
+
+function applyRobotUpgrades(state) {
+  if (!state.robotUpgrades || !state.robots) return;
+  
+  const speedMultiplier = ROBOT_UPGRADES.speed.effect(state.robotUpgrades.speed || 0);
+  const efficiencyMultiplier = ROBOT_UPGRADES.efficiency.effect(state.robotUpgrades.efficiency || 0);
+  
+  state.robots.forEach(robot => {
+    // Store base values if not already stored
+    if (!robot.baseSpeed) robot.baseSpeed = robot.speed;
+    if (!robot.baseEfficiency) robot.baseEfficiency = robot.efficiency;
+    
+    robot.speed = robot.baseSpeed * speedMultiplier;
+    robot.efficiency = robot.baseEfficiency * efficiencyMultiplier;
+  });
+}
+
+function getInitialState() {
+  return {
+    // Resources
+    credits: 500,
+    energy: 100,
+    mleo: 0, // MLEO tokens
+    materials: {
+      iron: 0, silicon: 0, titanium: 0, platinum: 0, rare_earth: 0, quantum_core: 0
+    },
+
+    // Station
+    currentSector: "alpha",
+    unlockedSectors: ["alpha"],
+
+    // Robots
+    robots: [],
+    nextRobotId: 1,
+
+    // Asteroids
+    asteroids: [],
+
+    // Upgrades
+    stationLevel: 1,
+    energyCapacity: 100,
+    energyRegen: 1,
+
+    // Statistics
+    totalMined: 0,
+    totalRobots: 0,
+    totalCredits: 500,
+    totalMleo: 0,
+
+    // Timers
+    lastSave: Date.now(),
+    lastUpdate: Date.now(),
+
+    // Settings
+    muted: false,
+    showTutorial: true,
+    
+    // Robot Upgrades
+    robotUpgrades: {
+      speed: 0,
+      efficiency: 0,
+      range: 0,
+      autoMerge: 0
+    }
+  };
+}
+
+// ===== WAL (write-ahead log) for claim to wallet =====
+const WAL_LS_KEY = "mleoSpaceMining_v1_1__wal";
+function walLoad(){ try{ return JSON.parse(localStorage.getItem(WAL_LS_KEY)||"null"); }catch{return null;} }
+function walSave(obj){ try{ localStorage.setItem(WAL_LS_KEY, JSON.stringify(obj)); }catch{} }
+function walSetPending(amount){ walSave({ amount: Number(amount||0), createdAt: Date.now(), txHash: null }); }
+function walAttachTx(hash){ const w = walLoad(); if(!w) return; w.txHash = hash; walSave(w); }
+function walClear(){ try{ localStorage.removeItem(WAL_LS_KEY); }catch{} }
+function walIsPending(){ const w = walLoad(); return !!(w && (w.amount > 0)); }
 
 // --- iOS 100vh fix ---
 function useIOSViewportFix() {
@@ -259,7 +349,6 @@ const STATION_WIDTH = 800;
 const STATION_HEIGHT = 600;
 const ASTEROID_COUNT = 6;
 const MAX_ROBOTS = 8;
-const LS_KEY = "mleoSpaceMining_v1_1";
 
 // MLEO Token Configuration
 const MLEO_BASE_PER_LEVEL = 3; // Base MLEO tokens per asteroid level
@@ -314,38 +403,10 @@ const SPACE_SECTORS = [
 
 // Robot Types
 const ROBOT_TYPES = {
-  basic: {
-    name: "Mining Bot",
-    color: "#00ff88",
-    efficiency: 1,
-    speed: 1,
-    cost: 100,
-    description: "Basic mining robot"
-  },
-  advanced: {
-    name: "Quantum Bot",
-    color: "#0088ff",
-    efficiency: 2,
-    speed: 1.5,
-    cost: 500,
-    description: "Advanced quantum mining bot"
-  },
-  elite: {
-    name: "Nebula Bot",
-    color: "#ff0088",
-    efficiency: 3,
-    speed: 2,
-    cost: 2000,
-    description: "Elite nebula mining bot"
-  },
-  legendary: {
-    name: "Cosmic Bot",
-    color: "#ffaa00",
-    efficiency: 5,
-    speed: 3,
-    cost: 10000,
-    description: "Legendary cosmic mining bot"
-  }
+  basic: { name: "Mining Bot", color: "#00ff88", efficiency: 1, speed: 1, cost: 100, description: "Basic mining robot" },
+  advanced: { name: "Quantum Bot", color: "#0088ff", efficiency: 2, speed: 1.5, cost: 500, description: "Advanced quantum mining bot" },
+  elite: { name: "Nebula Bot", color: "#ff0088", efficiency: 3, speed: 2, cost: 2000, description: "Elite nebula mining bot" },
+  legendary: { name: "Cosmic Bot", color: "#ffaa00", efficiency: 5, speed: 3, cost: 10000, description: "Legendary cosmic mining bot" }
 };
 
 // Asteroid Types
@@ -367,7 +428,6 @@ const IMAGES = {
     gamma: "/images/space/space-bg-gamma.png",
     omega: "/images/space/space-bg-omega.png"
   },
-  
   // Robots
   robots: {
     basic: "/images/space/robot-basic.png",
@@ -375,7 +435,6 @@ const IMAGES = {
     elite: "/images/space/robot-nebula.png",
     legendary: "/images/space/robot-cosmic.png"
   },
-  
   // Asteroids
   asteroids: {
     iron: "/images/space/asteroid-iron.png",
@@ -385,7 +444,6 @@ const IMAGES = {
     rare_earth: "/images/space/asteroid-rare-earth.png",
     quantum_core: "/images/space/asteroid-quantum-core.png"
   },
-  
   // Effects
   effects: {
     sparkle: "/images/space/particle-sparkle.png",
@@ -399,164 +457,18 @@ const TERMS_KEY = `mleoSpaceMining_termsAccepted_${TERMS_VERSION}`;
 
 // ===== Image Loading System =====
 const IMAGE_CACHE = {};
-
 function loadImage(src) {
-  if (IMAGE_CACHE[src]) {
-    return IMAGE_CACHE[src];
-  }
-  
+  if (IMAGE_CACHE[src]) return IMAGE_CACHE[src];
   const img = new Image();
   img.src = src;
   IMAGE_CACHE[src] = img;
   return img;
 }
-
 function preloadImages() {
-  // Preload all images
   Object.values(IMAGES.spaceBg).forEach(src => loadImage(src));
   Object.values(IMAGES.robots).forEach(src => loadImage(src));
   Object.values(IMAGES.asteroids).forEach(src => loadImage(src));
   Object.values(IMAGES.effects).forEach(src => loadImage(src));
-}
-
-// ===== Game State Management =====
-function loadGameState() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return getInitialState();
-    const state = JSON.parse(raw);
-    
-    // Ensure all required arrays and objects exist
-    state.robots = state.robots || [];
-    state.asteroids = state.asteroids || [];
-    state.materials = state.materials || {
-      iron: 0,
-      silicon: 0,
-      titanium: 0,
-      platinum: 0,
-      rare_earth: 0,
-      quantum_core: 0
-    };
-    state.nextRobotId = state.nextRobotId || 1;
-    
-    return state;
-  } catch {
-    return getInitialState();
-  }
-}
-
-function saveGameState(state) {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(state));
-  } catch (e) {
-    console.warn("Failed to save game state:", e);
-  }
-}
-
-function getInitialState() {
-  return {
-    // Resources
-    credits: 500,
-    energy: 100,
-    mleo: 0, // MLEO tokens
-    materials: {
-      iron: 0,
-      silicon: 0,
-      titanium: 0,
-      platinum: 0,
-      rare_earth: 0,
-      quantum_core: 0
-    },
-    
-    // Station
-    currentSector: "alpha",
-    unlockedSectors: ["alpha"],
-    
-    // Robots
-    robots: [],
-    nextRobotId: 1,
-    
-    // Asteroids
-    asteroids: [],
-    
-    // Upgrades
-    stationLevel: 1,
-    energyCapacity: 100,
-    energyRegen: 1,
-    
-    // Statistics
-    totalMined: 0,
-    totalRobots: 0,
-    totalCredits: 500,
-    totalMleo: 0,
-    
-    // Timers
-    lastSave: Date.now(),
-    lastUpdate: Date.now(),
-    
-    // Settings
-    muted: false,
-    showTutorial: true
-  };
-}
-
-// ===== MLEO Functions =====
-function calculateMleoReward(asteroidType) {
-  const level = MLEO_LEVELS[asteroidType] || 1;
-  return level * MLEO_BASE_PER_LEVEL;
-}
-
-function destroyAsteroid(state, asteroid, setAsteroidPopup) {
-  const materialType = asteroid.type;
-  const value = asteroid.value;
-  const mleoReward = calculateMleoReward(materialType);
-  
-  // Add credits and materials
-  state.materials[materialType] = (state.materials[materialType] || 0) + value;
-  state.credits += value;
-  state.totalMined += value;
-  
-  // Add MLEO tokens to game state (not vault yet)
-  state.mleo += mleoReward;
-  state.totalMleo += mleoReward;
-  
-  // Show asteroid destruction popup
-  setAsteroidPopup?.({
-    credits: value,
-    mleo: mleoReward,
-    material: materialType,
-    id: Math.random()
-  });
-  
-  return { credits: value, mleo: mleoReward };
-}
-
-// ===== Utility Functions =====
-function generateAsteroid(sector) {
-  const sectorData = SPACE_SECTORS.find(s => s.id === sector);
-  const asteroidType = sectorData.asteroidTypes[Math.floor(Math.random() * sectorData.asteroidTypes.length)];
-  const typeData = ASTEROID_TYPES[asteroidType];
-  
-  // Define safe boundaries to avoid clipping
-  const margin = 80; // Space from edges
-  const topMargin = 100; // Space from header
-  const bottomMargin = 120; // Space from bottom
-  
-  return {
-    id: Date.now() + Math.random(),
-    x: Math.random() * (STATION_WIDTH - margin * 2) + margin,
-    y: Math.random() * (STATION_HEIGHT - topMargin - bottomMargin) + topMargin,
-    type: asteroidType,
-    size: 30 + Math.random() * 40,
-    hp: typeData.hardness * 100,
-    maxHp: typeData.hardness * 100,
-    value: typeData.value,
-    color: typeData.color
-  };
-}
-
-function calculateDistance(x1, y1, x2, y2) {
-  return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
 }
 
 // ===== Main Game Component =====
@@ -579,11 +491,7 @@ export default function MleoSpaceMining() {
   const { disconnect } = useDisconnect();
 
   const [ui, setUi] = useState({
-    credits: 500,
-    energy: 100,
-    mleo: 0,
-    currentSector: "alpha",
-    stationLevel: 1
+    credits: 500, energy: 100, mleo: 0, currentSector: "alpha", stationLevel: 1
   });
 
   const [mounted, setMounted] = useState(false);
@@ -600,9 +508,7 @@ export default function MleoSpaceMining() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   
   // Space MLEO state
-  const [spaceMleo, setSpaceMleo] = useState({
-    vault: 0, claimedToWallet: 0, history: []
-  });
+  const [spaceMleo, setSpaceMleo] = useState({ vault: 0, claimedToWallet: 0, history: [] });
   const [centerPopup, setCenterPopup] = useState(null);
   const [giftToast, setGiftToast] = useState(null);
   const [isOnline, setIsOnline] = useState(true);
@@ -614,14 +520,76 @@ export default function MleoSpaceMining() {
   
   // Asteroid destruction popup
   const [asteroidPopup, setAsteroidPopup] = useState(null);
+  
+  // Upgrades panel visibility
+  const [showUpgrades, setShowUpgrades] = useState(true);
+  
+  // Particle effects
+  const [particles, setParticles] = useState([]);
+
+  // Play upgrade sound effect
+  function playUpgradeSound() {
+    try {
+      // Create a simple beep sound using Web Audio API
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(1200, audioContext.currentTime + 0.1);
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.3);
+    } catch (error) {
+      console.log('Audio not available');
+    }
+  }
+
+  // Create particle effects
+  function createUpgradeParticles(x, y) {
+    const newParticles = [];
+    for (let i = 0; i < 10; i++) {
+      newParticles.push({
+        id: Math.random(),
+        x: x + (Math.random() - 0.5) * 50,
+        y: y + (Math.random() - 0.5) * 50,
+        vx: (Math.random() - 0.5) * 4,
+        vy: (Math.random() - 0.5) * 4,
+        life: 1,
+        color: `hsl(${Math.random() * 60 + 180}, 100%, 50%)` // Blue-green colors
+      });
+    }
+    setParticles(prev => [...prev, ...newParticles]);
+    
+    // Remove particles after animation
+    setTimeout(() => {
+      setParticles(prev => prev.filter(p => !newParticles.includes(p)));
+    }, 2000);
+  }
+
+  // Double-click guard
+  function useOneShot(delay=1200){
+    const busyRef = useRef(false);
+    return async (fn) => {
+      if (busyRef.current) return;
+      busyRef.current = true;
+      try { await fn(); } finally { setTimeout(()=>{ busyRef.current=false; }, delay); }
+    };
+  }
+  const runOnceVault = useOneShot();
+  const runOnceWallet = useOneShot();
 
   // Load space MLEO state
   useEffect(() => {
     if (!mounted) return;
     try { setSpaceMleo(loadSpaceMleoState()); } catch {}
-    const id = setInterval(() => {
-      try { setSpaceMleo(loadSpaceMleoState()); } catch {}
-    }, 1000);
+    const id = setInterval(() => { try { setSpaceMleo(loadSpaceMleoState()); } catch {} }, 1000);
     return () => clearInterval(id);
   }, [mounted]);
 
@@ -639,14 +607,12 @@ export default function MleoSpaceMining() {
         setGiftTimer(remainingSeconds);
         setLastGiftTime(data.lastGiftTime);
       } else {
-        // First time - set initial time
         const now = Date.now();
         setLastGiftTime(now);
         localStorage.setItem('spaceGiftTimer', JSON.stringify({ lastGiftTime: now }));
         setGiftTimer(30);
       }
     } catch {
-      // Fallback - set initial time
       const now = Date.now();
       setLastGiftTime(now);
       localStorage.setItem('spaceGiftTimer', JSON.stringify({ lastGiftTime: now }));
@@ -668,194 +634,147 @@ export default function MleoSpaceMining() {
     return () => clearTimeout(id);
   }, [asteroidPopup]);
 
-  // Gift modal - no auto-hide, requires button click
+  // Update particles
+  useEffect(() => {
+    if (particles.length === 0) return;
+    
+    const interval = setInterval(() => {
+      setParticles(prev => prev.map(particle => ({
+        ...particle,
+        x: particle.x + particle.vx,
+        y: particle.y + particle.vy,
+        life: particle.life - 0.02
+      })).filter(particle => particle.life > 0));
+    }, 16); // 60 FPS
+    
+    return () => clearInterval(interval);
+  }, [particles.length]);
 
   // Online/Offline status
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    
     setIsOnline(navigator.onLine);
-    
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
+    return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
   }, []);
 
   // Auto-offline after 1 minute of inactivity
   useEffect(() => {
     if (!mounted) return;
-    
     let inactivityTimer;
-    
     const resetInactivityTimer = () => {
       clearTimeout(inactivityTimer);
-      inactivityTimer = setTimeout(() => {
-        setIsOnline(false);
-      }, 60000); // 1 minute = 60000ms
+      inactivityTimer = setTimeout(() => { setIsOnline(false); }, 60000);
     };
-    
-    // Reset timer on any user interaction
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    events.forEach(event => {
-      document.addEventListener(event, resetInactivityTimer, true);
-    });
-    
-    // Start the timer
+    const events = ['mousedown','mousemove','keypress','scroll','touchstart','click'];
+    events.forEach(evt => document.addEventListener(evt, resetInactivityTimer, true));
     resetInactivityTimer();
-    
     return () => {
       clearTimeout(inactivityTimer);
-      events.forEach(event => {
-        document.removeEventListener(event, resetInactivityTimer, true);
-      });
+      events.forEach(evt => document.removeEventListener(evt, resetInactivityTimer, true));
     };
   }, [mounted]);
 
   // Gift timer - countdown every second
   useEffect(() => {
     if (!mounted || !lastGiftTime) return;
-    
     const timerInterval = setInterval(() => {
       const now = Date.now();
       const timeSinceLastGift = now - lastGiftTime;
       const remainingTime = Math.max(0, 30000 - timeSinceLastGift);
       const remainingSeconds = Math.ceil(remainingTime / 1000);
-      
       setGiftTimer(remainingSeconds);
-      
-      // If time is up, reset the timer
       if (remainingTime <= 0) {
         const newTime = Date.now();
         setLastGiftTime(newTime);
         localStorage.setItem('spaceGiftTimer', JSON.stringify({ lastGiftTime: newTime }));
         setGiftTimer(30);
       }
-    }, 1000); // Every second
-
+    }, 1000);
     return () => clearInterval(timerInterval);
   }, [mounted, lastGiftTime]);
 
   // Gift system - every 30 seconds
   useEffect(() => {
     if (!mounted || !lastGiftTime) return;
-    
     const giftInterval = setInterval(() => {
       const now = Date.now();
       const timeSinceLastGift = now - lastGiftTime;
-      
-      // Only give gift if 30 seconds have passed
       if (timeSinceLastGift >= 30000) {
         const random = Math.random();
         if (random < 0.8) {
-          // 80% chance for credits
-          const creditsAmount = Math.floor(Math.random() * 200) + 50; // 50-250 credits
-          setGiftType('credits');
-          setGiftAmount(creditsAmount);
-          setShowGiftModal(true);
+          const creditsAmount = Math.floor(Math.random() * 200) + 50;
+          setGiftType('credits'); setGiftAmount(creditsAmount); setShowGiftModal(true);
         } else {
-          // 20% chance for robot
-          setGiftType('robot');
-          setGiftAmount(1);
-          setShowGiftModal(true);
+          setGiftType('robot'); setGiftAmount(1); setShowGiftModal(true);
         }
-        
-        // Save the time when gift was given
         setLastGiftTime(now);
         localStorage.setItem('spaceGiftTimer', JSON.stringify({ lastGiftTime: now }));
       }
-    }, 1000); // Check every second
-
+    }, 1000);
     return () => clearInterval(giftInterval);
   }, [mounted, lastGiftTime]);
 
-  // Gift functions
-  function setGiftToastWithTTL(text, ttl = 3000) {
-    const id = Math.random().toString(36).slice(2);
-    setGiftToast?.({ text, id });
-    setTimeout(() => { setGiftToast?.(cur => (cur && cur.id === id ? null : cur)); }, ttl);
-  }
-
-  function claimGift() {
-    if (giftType === 'credits') {
-      // Add credits to game state
-      if (stateRef.current) {
-        stateRef.current.credits += giftAmount;
-        setCenterPopup?.({ text: `🎁 +${giftAmount} Credits!`, id: Math.random() });
-      }
-    } else if (giftType === 'robot') {
-      // Add robot if there's space
-      if (stateRef.current && stateRef.current.robots.length < MAX_ROBOTS) {
-        const newRobot = {
-          id: stateRef.current.nextRobotId++,
-          x: Math.random() * (STATION_WIDTH - 40) + 20,
-          y: Math.random() * (STATION_HEIGHT - 40) + 20,
-          type: "basic",
-          level: 1,
-          targetAsteroid: null,
-          efficiency: 1,
-          speed: 1
-        };
-        stateRef.current.robots.push(newRobot);
-        setCenterPopup?.({ text: `🎁 +1 Robot!`, id: Math.random() });
-      } else {
-        setGiftToastWithTTL("No space for robot!");
-      }
+  // Reconcile WAL on mount/focus (finishes pending claim after refresh)
+  useEffect(() => {
+    const pending = walLoad();
+    if (!pending || !pending.txHash) return;
+    let alive = true;
+    async function recon() {
+      try {
+        const rcpt = await publicClient.waitForTransactionReceipt({ hash: pending.txHash });
+        if (!alive) return;
+        if (rcpt?.status === 'success') {
+          const after = loadSpaceMleoState();
+          const delta = Number(pending.amount || 0);
+          after.vault = Math.max(0, Number(((after.vault || 0) - delta).toFixed(2)));
+          after.claimedToWallet = Number(((after.claimedToWallet || 0) + delta).toFixed(2));
+          after.history = Array.isArray(after.history) ? after.history : [];
+          after.history.unshift({ t: Date.now(), kind: "claim_wallet", amount: delta, tx: String(pending.txHash) });
+          saveSpaceMleoState(after);
+          setSpaceMleo(after);
+          walClear();
+          setCenterPopup?.({ text: "✅ Claim confirmed on-chain", id: Math.random() });
+        }
+      } catch { /* still pending / RPC issue — try again next focus */ }
     }
-    
-    // Set online status when claiming gift
-    setIsOnline(true);
-    
-    setShowGiftModal(false);
-    setGiftType(null);
-    setGiftAmount(0);
-  }
+    recon();
+    const onF = () => recon();
+    window.addEventListener('focus', onF);
+    return () => { alive = false; window.removeEventListener('focus', onF); };
+  }, [publicClient]);
 
-  // Helper functions
-  function shortAddr(addr) {
-    if (!addr) return "";
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-  }
+  // Periodic autosave for long sessions
+  useEffect(() => {
+    if (!mounted) return;
+    const id = setInterval(() => { if (stateRef.current) saveGameState(stateRef.current); }, 10000);
+    return () => clearInterval(id);
+  }, [mounted]);
 
-  function openWalletModalUnified() {
-    try { 
-      // Close overlays that might cover RainbowKit
-      setMenuOpen(false);
-      setShowShop(false);
-      setShowSectors(false);
-    } catch {}
-    
-    if (isConnected) {
-      openAccountModal();
-    } else {
-      openConnectModal();
-    }
-  }
-
-  function hardDisconnect() {
-    try { disconnect(); } catch {}
-    setMenuOpen(false);
-  }
+  // Save on unload/pagehide (mobile-safe)
+  useEffect(() => {
+    const onSave = () => stateRef.current && saveGameState(stateRef.current, {force:true});
+    window.addEventListener("beforeunload", onSave);
+    window.addEventListener("pagehide", onSave);
+    return () => { window.removeEventListener("beforeunload", onSave); window.removeEventListener("pagehide", onSave); };
+  }, []);
 
   // Initialize game state
   useEffect(() => {
     if (typeof window === "undefined") return;
-    
     const state = loadGameState();
     stateRef.current = state;
     
-    // Debug: Log loaded state
+    // Debug
     console.log("Loaded game state:", {
       robots: state.robots?.length || 0,
       asteroids: state.asteroids?.length || 0,
       credits: state.credits
     });
     
-    // Only generate initial asteroids if none exist (new game)
+    // Initial asteroids
     if (!state.asteroids || state.asteroids.length === 0) {
       for (let i = 0; i < ASTEROID_COUNT; i++) {
         state.asteroids.push(generateAsteroid(state.currentSector));
@@ -870,41 +789,50 @@ export default function MleoSpaceMining() {
       stationLevel: state.stationLevel
     });
     
-    // Preload images
     preloadImages();
-    
     setMounted(true);
     
-    // Check terms acceptance
+    // Terms
     const termsAccepted = localStorage.getItem(TERMS_KEY);
-    if (!termsAccepted) {
-      setShowTerms(true);
-    }
+    if (!termsAccepted) setShowTerms(true);
   }, []);
 
-  // Game loop
+  // Game loop (mobile-safe): clamp dt + pause on hidden
   useEffect(() => {
     if (!mounted) return;
-
     let lastTime = 0;
-    const gameLoop = (currentTime) => {
-      if (!stateRef.current) return;
+    let running = true;
       
-      const deltaTime = currentTime - lastTime;
+    const loop = (currentTime) => {
+      if (!running || !stateRef.current) return;
+      if (!lastTime) lastTime = currentTime;
+      let dt = currentTime - lastTime;
       lastTime = currentTime;
+      if (dt > 50) dt = 50; // clamp jumps after background
       
-      tick(deltaTime);
+      tick(dt);
       draw();
       
-      rafRef.current = requestAnimationFrame(gameLoop);
+      rafRef.current = requestAnimationFrame(loop);
     };
-    
-    rafRef.current = requestAnimationFrame(gameLoop);
+
+    const onVis = () => {
+      if (document.hidden) {
+        running = false;
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      } else {
+        running = true;
+        lastTime = 0; // reset delta
+        rafRef.current = requestAnimationFrame(loop);
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVis);
+    rafRef.current = requestAnimationFrame(loop);
     
     return () => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-      }
+      document.removeEventListener("visibilitychange", onVis);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [mounted]);
 
@@ -912,58 +840,34 @@ export default function MleoSpaceMining() {
   function checkRobotMerging(state) {
     if (!state.robots || state.robots.length < 2) return;
     
-    // Group robots by level
     const robotsByLevel = {};
     state.robots.forEach(robot => {
-      if (!robotsByLevel[robot.level]) {
-        robotsByLevel[robot.level] = [];
-      }
+      if (!robotsByLevel[robot.level]) robotsByLevel[robot.level] = [];
       robotsByLevel[robot.level].push(robot);
     });
     
-    // Check each level for mergeable robots
     Object.keys(robotsByLevel).forEach(level => {
       const robots = robotsByLevel[level];
       if (robots.length >= 2) {
-        // Find the two closest robots of the same level
-        let closestDistance = Infinity;
-        let robot1 = null;
-        let robot2 = null;
-        
+        let closestDistance = Infinity, robot1 = null, robot2 = null;
         for (let i = 0; i < robots.length - 1; i++) {
           for (let j = i + 1; j < robots.length; j++) {
-            const distance = calculateDistance(robots[i].x, robots[i].y, robots[j].x, robots[j].y);
-            if (distance < closestDistance) {
-              closestDistance = distance;
-              robot1 = robots[i];
-              robot2 = robots[j];
-            }
+            const d = calculateDistance(robots[i].x, robots[i].y, robots[j].x, robots[j].y);
+            if (d < closestDistance) { closestDistance = d; robot1 = robots[i]; robot2 = robots[j]; }
           }
         }
-        
         if (robot1 && robot2) {
-          // Force robots to move towards each other
           const dx = robot2.x - robot1.x;
           const dy = robot2.y - robot1.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
-          
           if (distance > 0) {
-            // Move both robots towards each other
-            const moveSpeed = 2; // Speed of movement towards each other
+            const moveSpeed = 2;
             const moveX = (dx / distance) * moveSpeed;
             const moveY = (dy / distance) * moveSpeed;
-            
-            robot1.x += moveX;
-            robot1.y += moveY;
-            robot2.x -= moveX;
-            robot2.y -= moveY;
-            
-            // If they're close enough, merge them
+            robot1.x += moveX; robot1.y += moveY;
+            robot2.x -= moveX; robot2.y -= moveY;
             const newDistance = calculateDistance(robot1.x, robot1.y, robot2.x, robot2.y);
-            if (newDistance <= 20) { // Smaller merge distance for forced merging
-              mergeRobots(state, robot1, robot2);
-              return; // Exit after one merge per tick
-            }
+            if (newDistance <= 20) { mergeRobots(state, robot1, robot2); return; }
           }
         }
       }
@@ -972,37 +876,27 @@ export default function MleoSpaceMining() {
   
   // Merge two robots into one upgraded robot
   function mergeRobots(state, robot1, robot2) {
-    // Remove both robots from the array
     const index1 = state.robots.findIndex(r => r.id === robot1.id);
     const index2 = state.robots.findIndex(r => r.id === robot2.id);
-    
-    if (index1 !== -1 && index2 !== -1) {
-      state.robots.splice(Math.max(index1, index2), 1);
-      state.robots.splice(Math.min(index1, index2), 1);
-      
-      // Create new merged robot
+    if (index1 === -1 || index2 === -1) return;
+
+    const hi = Math.max(index1, index2), lo = Math.min(index1, index2);
+    state.robots.splice(hi, 1);
+    state.robots.splice(lo, 1);
+
       const newRobot = {
         id: state.nextRobotId++,
-        type: robot1.type, // Keep the same type
-        level: robot1.level + 1, // Increase level
-        x: (robot1.x + robot2.x) / 2, // Average position
+      type: robot1.type,
+      level: robot1.level + 1,
+      x: (robot1.x + robot2.x) / 2,
         y: (robot1.y + robot2.y) / 2,
         targetAsteroid: null,
-        efficiency: robot1.efficiency * 1.01, // Increase efficiency by 1%
-        speed: robot1.speed // Keep same speed
+      efficiency: robot1.efficiency * 1.01,
+      speed: robot1.speed
       };
-      
       state.robots.push(newRobot);
-      
-      // Show merge notification
-      setCenterPopup?.({ 
-        text: `🤖 Robot Level ${newRobot.level}! Efficiency +1%`, 
-        id: Math.random() 
-      });
-      
-      // Save the state
+    setCenterPopup?.({ text: `🤖 Robot Level ${newRobot.level}! Efficiency +1%`, id: Math.random() });
       saveGameState(state);
-    }
   }
 
   // Game tick function
@@ -1012,74 +906,51 @@ export default function MleoSpaceMining() {
     
     const now = Date.now();
     
-    // Auto-merge robots of same level
+    // Auto-merge robots
     checkRobotMerging(state);
+    
+    // Apply robot upgrades
+    applyRobotUpgrades(state);
     
     // Update robots
     state.robots.forEach(robot => {
       if (robot.targetAsteroid) {
         const asteroid = state.asteroids.find(a => a.id === robot.targetAsteroid);
         if (asteroid && asteroid.hp > 0) {
-          // Move towards asteroid
           const dx = asteroid.x - robot.x;
           const dy = asteroid.y - robot.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
-          
           if (distance > 5) {
             const speed = robot.speed * 50 * (dt / 1000);
             robot.x += (dx / distance) * speed;
             robot.y += (dy / distance) * speed;
           } else {
-            // Mine asteroid
             const damage = robot.efficiency * (dt / 1000) * 10;
             asteroid.hp -= damage;
-            
             if (asteroid.hp <= 0) {
-              // Asteroid destroyed, collect resources
-              const rewards = destroyAsteroid(state, asteroid, setAsteroidPopup);
-              
-              // Remove asteroid and generate new one
               const asteroidIndex = state.asteroids.findIndex(a => a.id === asteroid.id);
+              const rewards = destroyAsteroid(state, asteroid, setAsteroidPopup);
               state.asteroids[asteroidIndex] = generateAsteroid(state.currentSector);
-              
-              // Update UI
-              setUi(prev => ({ 
-                ...prev, 
-                credits: state.credits,
-                mleo: state.mleo 
-              }));
+              setUi(prev => ({ ...prev, credits: state.credits, mleo: state.mleo }));
             }
           }
         } else {
-          // Find new target
           robot.targetAsteroid = null;
         }
       } else {
-        // Find nearest asteroid
-        let nearestAsteroid = null;
-        let nearestDistance = Infinity;
-        
+        let nearestAsteroid = null, nearestDistance = Infinity;
         state.asteroids.forEach(asteroid => {
           if (asteroid.hp > 0) {
-            const distance = calculateDistance(robot.x, robot.y, asteroid.x, asteroid.y);
-            if (distance < nearestDistance) {
-              nearestDistance = distance;
-              nearestAsteroid = asteroid;
-            }
+            const d = calculateDistance(robot.x, robot.y, asteroid.x, asteroid.y);
+            if (d < nearestDistance) { nearestDistance = d; nearestAsteroid = asteroid; }
           }
         });
-        
-        if (nearestAsteroid) {
-          robot.targetAsteroid = nearestAsteroid.id;
-        }
+        if (nearestAsteroid) robot.targetAsteroid = nearestAsteroid.id;
       }
     });
-    
-    // Auto-save every 30 seconds
-    if (now - state.lastSave > 30000) {
-      saveGameState(state);
-      state.lastSave = now;
-    }
+
+    // periodic autosave (backup)
+    if (now - state.lastSave > 30000) { saveGameState(state); state.lastSave = now; }
   }
 
   // Drawing function
@@ -1092,7 +963,7 @@ export default function MleoSpaceMining() {
     
     canvas.width = rect.width * window.devicePixelRatio;
     canvas.height = rect.height * window.devicePixelRatio;
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
     
     const w = rect.width;
     const h = rect.height;
@@ -1104,162 +975,136 @@ export default function MleoSpaceMining() {
     // Draw space background (full screen)
     drawSpaceBackground(ctx, w, h);
     
-    // Draw game elements (offset to avoid header)
-    drawAsteroids(ctx, w, h - 80);
-    drawRobots(ctx, w, h - 80);
+    // Draw game elements (offset to avoid header - mobile responsive)
+    const headerHeight = window.innerWidth < 768 ? 40 : 80;
+    drawAsteroids(ctx, w, h - headerHeight);
+    drawRobots(ctx, w, h - headerHeight);
     drawUI(ctx, w, h);
   }
 
   function drawSpaceBackground(ctx, w, h) {
-    const state = stateRef.current;
-    if (!state) return;
-    
+    const state = stateRef.current; if (!state) return;
     const sector = SPACE_SECTORS.find(s => s.id === state.currentSector);
     const bgImageSrc = IMAGES.spaceBg[sector.id];
     const bgImage = loadImage(bgImageSrc);
-    
     if (bgImage.complete && bgImage.naturalWidth > 0) {
-      // Draw space background image (full screen)
       ctx.drawImage(bgImage, 0, 0, w, h);
     } else {
-      // Fallback: draw gradient background (full screen)
       const gradient = ctx.createLinearGradient(0, 0, 0, h);
       gradient.addColorStop(0, sector.color);
       gradient.addColorStop(1, "#000000");
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, w, h);
-      
-      // Draw stars (full screen)
       ctx.fillStyle = "#ffffff";
       for (let i = 0; i < 100; i++) {
         const x = (i * 137.5) % w;
         const y = (i * 73.2) % h;
         const size = Math.random() * 2;
-        ctx.beginPath();
-        ctx.arc(x, y, size, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fill();
       }
     }
   }
 
   function drawAsteroids(ctx, w, h) {
-    const state = stateRef.current;
-    if (!state) return;
-    
-    const offsetY = 80; // Offset to avoid header
+    const state = stateRef.current; if (!state) return;
+    const offsetY = window.innerWidth < 768 ? 40 : 80;
     
     state.asteroids.forEach(asteroid => {
       if (asteroid.hp <= 0) return;
       
-      const asteroidImageSrc = IMAGES.asteroids[asteroid.type];
-      const asteroidImage = loadImage(asteroidImageSrc);
-      
-      // Calculate size based on HP
+      const asteroidImage = loadImage(IMAGES.asteroids[asteroid.type]);
       const hpPercent = asteroid.hp / asteroid.maxHp;
-      const currentSize = asteroid.size * (0.3 + 0.7 * hpPercent); // Size between 30% and 100%
+      const currentSize = asteroid.size * (0.3 + 0.7 * hpPercent);
       
       if (asteroidImage.complete && asteroidImage.naturalWidth > 0) {
-        // Draw asteroid image
         const size = currentSize * 2;
         ctx.drawImage(asteroidImage, asteroid.x - size/2, asteroid.y - size/2 + offsetY, size, size);
       } else {
-        // Fallback: draw asteroid shape
         ctx.fillStyle = asteroid.color;
-        ctx.beginPath();
-        ctx.arc(asteroid.x, asteroid.y + offsetY, currentSize, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Draw asteroid border
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        ctx.beginPath(); ctx.arc(asteroid.x, asteroid.y + offsetY, currentSize, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.stroke();
       }
-      
-      // Draw HP bar at bottom of asteroid
-      const barWidth = currentSize * 1.2;
-      const barHeight = 6;
-      const barY = asteroid.y + offsetY + currentSize - 12;
-      
-      // HP bar background
-      ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-      ctx.fillRect(asteroid.x - barWidth/2, barY, barWidth, barHeight);
-      
-      // HP bar fill
+
+      const barWidth = currentSize * 1.2, barHeight = 6, barY = asteroid.y + offsetY + currentSize - 12;
+      ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(asteroid.x - barWidth/2, barY, barWidth, barHeight);
       ctx.fillStyle = hpPercent > 0.5 ? "#00ff00" : hpPercent > 0.25 ? "#ffff00" : "#ff0000";
       ctx.fillRect(asteroid.x - barWidth/2, barY, barWidth * hpPercent, barHeight);
     });
   }
 
   function drawRobots(ctx, w, h) {
-    const state = stateRef.current;
-    if (!state) return;
-    
-    const offsetY = 80; // Offset to avoid header
-    
+    const state = stateRef.current; if (!state) return;
+    const offsetY = window.innerWidth < 768 ? 40 : 80;
     state.robots.forEach(robot => {
-      const robotType = ROBOT_TYPES[robot.type];
-      const robotImageSrc = IMAGES.robots[robot.type];
-      const robotImage = loadImage(robotImageSrc);
-      
+      const robotImage = loadImage(IMAGES.robots[robot.type]);
       if (robotImage.complete && robotImage.naturalWidth > 0) {
-        // Draw robot image (increased size)
         const size = 40;
         ctx.drawImage(robotImage, robot.x - size/2, robot.y - size/2 + offsetY, size, size);
       } else {
-        // Fallback: draw robot shape (increased size)
+        const robotType = ROBOT_TYPES[robot.type];
         ctx.fillStyle = robotType.color;
-        ctx.beginPath();
-        ctx.arc(robot.x, robot.y + offsetY, 20, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Draw robot border
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        ctx.beginPath(); ctx.arc(robot.x, robot.y + offsetY, 20, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.stroke();
       }
-      
-      // Direction indicator removed for cleaner look
-      
-      // Draw robot level at bottom (no background/shadow)
       const levelText = robot.level.toString();
-      
-      // Set font size with outline
-      ctx.font = "bold 10px Arial";
-      ctx.textAlign = "center";
-      
-      // Draw black outline first
-      ctx.strokeStyle = "#000000";
-      ctx.lineWidth = 3;
-      ctx.strokeText(levelText, robot.x, robot.y + 25 + offsetY);
-      
-      // Draw white text on top
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(levelText, robot.x, robot.y + 25 + offsetY);
+      ctx.font = "bold 10px Arial"; ctx.textAlign = "center";
+      ctx.strokeStyle = "#000"; ctx.lineWidth = 3; ctx.strokeText(levelText, robot.x, robot.y + 25 + offsetY);
+      ctx.fillStyle = "#fff"; ctx.fillText(levelText, robot.x, robot.y + 25 + offsetY);
     });
   }
 
   function drawUI(ctx, w, h) {
     const state = stateRef.current;
     if (!state) return;
-    
     // All UI elements moved to HTML header
   }
 
+  // ===== MLEO core actions =====
+  function setGiftToastWithTTL(text, ttl = 3000) {
+    const id = Math.random().toString(36).slice(2);
+    setGiftToast?.({ text, id });
+    setTimeout(() => { setGiftToast?.(cur => (cur && cur.id === id ? null : cur)); }, ttl);
+  }
 
-  // Game actions
+  function claimGift() {
+    if (giftType === 'credits') {
+      if (stateRef.current) {
+        stateRef.current.credits += giftAmount;
+        setCenterPopup?.({ text: `🎁 +${giftAmount} Credits!`, id: Math.random() });
+        saveGameState(stateRef.current);
+      }
+    } else if (giftType === 'robot') {
+      if (stateRef.current && stateRef.current.robots.length < MAX_ROBOTS) {
+        const newRobot = {
+          id: stateRef.current.nextRobotId++,
+          x: Math.random() * (STATION_WIDTH - 40) + 20,
+          y: Math.random() * (STATION_HEIGHT - 40) + 20,
+          type: "basic",
+          level: 1,
+          targetAsteroid: null,
+          efficiency: 1,
+          speed: 1
+        };
+        stateRef.current.robots.push(newRobot);
+        setCenterPopup?.({ text: `🎁 +1 Robot!`, id: Math.random() });
+        saveGameState(stateRef.current);
+      } else {
+        setGiftToastWithTTL("No space for robot!");
+      }
+    }
+    setIsOnline(true);
+    setShowGiftModal(false);
+    setGiftType(null);
+    setGiftAmount(0);
+  }
+
   function addRobot() {
-    const state = stateRef.current;
-    if (!state) return;
-    
+    const state = stateRef.current; if (!state) return;
     const robotType = ROBOT_TYPES[selectedRobot];
     if (state.credits < robotType.cost) return;
     if (state.robots.length >= MAX_ROBOTS) return;
     
-    // Define safe boundaries for robots
-    const margin = 80;
-    const topMargin = 100;
-    const bottomMargin = 120;
-    
+    const margin = 80, topMargin = 100, bottomMargin = 120;
     const robot = {
       id: state.nextRobotId++,
       type: selectedRobot,
@@ -1270,40 +1115,125 @@ export default function MleoSpaceMining() {
       efficiency: robotType.efficiency,
       speed: robotType.speed
     };
-    
     state.robots.push(robot);
     state.credits -= robotType.cost;
     state.totalRobots++;
-    
-    // Debug: Log robot addition
-    console.log("Added robot:", robot, "Total robots:", state.robots.length);
-    
     setUi(prev => ({ ...prev, credits: state.credits }));
     saveGameState(state);
   }
 
   function switchSector(sectorId) {
-    const state = stateRef.current;
-    if (!state) return;
-    
+    const state = stateRef.current; if (!state) return;
     const sector = SPACE_SECTORS.find(s => s.id === sectorId);
     if (!sector) return;
-    
     if (sector.unlockCost > 0 && state.credits < sector.unlockCost) return;
     
     state.currentSector = sectorId;
     state.credits -= sector.unlockCost;
     
-    // Generate new asteroids for this sector
     state.asteroids = [];
     for (let i = 0; i < ASTEROID_COUNT; i++) {
       state.asteroids.push(generateAsteroid(sectorId));
     }
-    
     setUi(prev => ({ ...prev, currentSector: sectorId, credits: state.credits }));
     saveGameState(state);
   }
 
+  function copyAddressToClipboard(){
+    if (!address) return;
+    try { navigator.clipboard.writeText(address); setCopiedAddr(true); setTimeout(()=>setCopiedAddr(false), 1500); } catch {}
+  }
+
+  // ===== CLAIM FLOWS =====
+  function claimGameMleoToVault() {
+    const gameMleoAmount = Number(((stateRef.current?.mleo || 0)).toFixed(2));
+    if (!gameMleoAmount) { setGiftToastWithTTL("No MLEO to claim from game"); return; }
+    const st = loadSpaceMleoState();
+    st.vault = Math.max(0, Number(((st.vault || 0) + gameMleoAmount).toFixed(2)));
+    st.history = Array.isArray(st.history) ? st.history : [];
+    st.history.unshift({ t: Date.now(), kind: "claim_to_vault", amount: gameMleoAmount, tx: "space_mining_game" });
+    saveSpaceMleoState(st);
+    setSpaceMleo(st);
+    if (stateRef.current){
+      stateRef.current.mleo = 0;
+      stateRef.current.totalMleo = Math.max(0, Number((stateRef.current.totalMleo - gameMleoAmount).toFixed(2)));
+      saveGameState(stateRef.current);
+    }
+    setCenterPopup?.({ text: `✅ Moved ${formatMleoShort(gameMleoAmount)} MLEO to vault`, id: Math.random() });
+  }
+
+  async function claimSpaceMleoToWallet() {
+    const st = loadSpaceMleoState();
+    const vaultNow = Number((st?.vault || 0).toFixed(2));
+    if (!vaultNow) { setGiftToastWithTTL("Vault is empty"); return; }
+
+    if (!isConnected) { openConnectModal?.(); return; }
+
+    if (chainId !== CLAIM_CHAIN_ID) {
+      try { await switchChain?.({ chainId: CLAIM_CHAIN_ID }); }
+      catch { setGiftToastWithTTL("Switch to BSC Testnet (TBNB)"); return; }
+    }
+    if (!isValidAddress(CLAIM_ADDRESS)) {
+      setGiftToastWithTTL("Missing/invalid CLAIM address (NEXT_PUBLIC_MLEO_CLAIM_ADDRESS)");
+      return;
+    }
+
+    if (walIsPending()) { setGiftToastWithTTL("Claim already in progress…"); return; }
+    walSetPending(vaultNow);
+
+    try {
+      const amountWei = parseUnits(vaultNow.toString(), MLEO_DECIMALS);
+      const hash = await writeContractAsync({
+        address: CLAIM_ADDRESS,
+        abi: MINING_CLAIM_ABI,
+        functionName: "claim",
+        args: [BigInt(GAME_ID), amountWei],
+        chainId: CLAIM_CHAIN_ID,
+        account: address,
+      });
+
+      walAttachTx(hash);
+      await publicClient.waitForTransactionReceipt({ hash });
+
+      const after = loadSpaceMleoState();
+      const delta = Number(vaultNow);
+      after.vault = Math.max(0, Number(((after.vault || 0) - delta).toFixed(2)));
+      after.claimedToWallet = Number(((after.claimedToWallet || 0) + delta).toFixed(2));
+      after.history = Array.isArray(after.history) ? after.history : [];
+      after.history.unshift({ t: Date.now(), kind: "claim_wallet", amount: delta, tx: String(hash) });
+      saveSpaceMleoState(after);
+      setSpaceMleo(after);
+
+      walClear();
+      setCenterPopup?.({ text: `✅ Sent ${formatMleoShort(delta)} MLEO to wallet`, id: Math.random() });
+    } catch (err) {
+      console.error(err);
+      walClear(); // clear lock on failure/reject
+      setGiftToastWithTTL("Claim failed or rejected");
+    }
+  }
+
+  // ===== Utility Functions =====
+  function generateAsteroid(sector) {
+    const sectorData = SPACE_SECTORS.find(s => s.id === sector);
+    const asteroidType = sectorData.asteroidTypes[Math.floor(Math.random() * sectorData.asteroidTypes.length)];
+    const typeData = ASTEROID_TYPES[asteroidType];
+    const margin = 80, topMargin = 100, bottomMargin = 120;
+    return {
+      id: Date.now() + Math.random(),
+      x: Math.random() * (STATION_WIDTH - margin * 2) + margin,
+      y: Math.random() * (STATION_HEIGHT - topMargin - bottomMargin) + topMargin,
+      type: asteroidType,
+      size: 30 + Math.random() * 40,
+      hp: typeData.hardness * 100,
+      maxHp: typeData.hardness * 100,
+      value: typeData.value,
+      color: typeData.color
+    };
+  }
+  function calculateDistance(x1, y1, x2, y2) { return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2); }
+
+  // ===== RENDER =====
   if (!mounted) {
     return <div className="flex items-center justify-center min-h-screen bg-black text-white">
       <div className="text-2xl">Loading Space Station...</div>
@@ -1312,50 +1242,134 @@ export default function MleoSpaceMining() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-black text-white">
+      <div className="min-h-screen bg-black text-white overflow-hidden">
+        {/* Mobile-specific styles */}
+        <style jsx>{`
+          @media (max-width: 768px) {
+            body {
+              touch-action: manipulation;
+              -webkit-user-select: none;
+              -moz-user-select: none;
+              -ms-user-select: none;
+              user-select: none;
+            }
+            
+            /* Prevent zoom on input focus */
+            input, select, textarea {
+              font-size: 16px;
+            }
+            
+            /* Smooth scrolling for modals */
+            .modal-content {
+              -webkit-overflow-scrolling: touch;
+            }
+          }
+        `}</style>
         {/* Game Canvas */}
         <div className="relative w-full h-screen">
           <canvas
             ref={canvasRef}
-            className="w-full h-full cursor-crosshair relative z-0 top-0"
-            onClick={(e) => {
-              // Add robot at click position
+            className="w-full h-full cursor-crosshair relative z-0 top-0 touch-none"
+            onClick={(e) => { addRobot(); }}
+            onTouchStart={(e) => { 
+              e.preventDefault(); 
+              const touch = e.touches[0];
+              const rect = canvasRef.current.getBoundingClientRect();
+              const x = touch.clientX - rect.left;
+              const y = touch.clientY - rect.top;
+              // Add robot at touch position
               addRobot();
+            }}
+            onTouchMove={(e) => {
+              e.preventDefault();
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
             }}
           />
           
-          {/* Header */}
-          <div className="absolute top-0 left-0 w-full h-16 flex items-center justify-between px-4 z-10">
-            {/* Left side - Credits and Energy */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                <span className="font-bold text-yellow-400 text-sm">Credits: {ui.credits}</span>
+          {/* Header - Mobile Responsive */}
+          <div className="absolute top-0 left-0 w-full z-10">
+            {/* Mobile Header (portrait) */}
+            <div className="md:hidden bg-black/90 px-2 py-1">
+              {/* Top Row */}
+              <div className="flex justify-between items-center text-xs mb-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                  <span className="font-bold text-yellow-400">{ui.credits}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                  <span className="font-bold text-blue-400">{ui.energy}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-gray-300">Sector:</span>
+                  <span className="font-bold text-white">{SPACE_SECTORS.find(s => s.id === ui.currentSector)?.name || 'Unknown'}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-blue-400"></div>
-                <span className="font-bold text-blue-400 text-sm">Energy: {ui.energy}</span>
+              
+              {/* Bottom Row */}
+              <div className="flex justify-between items-center text-xs">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                  <span className={`font-bold text-xs ${isOnline ? 'text-green-400' : 'text-red-400'}`}>
+                    {isOnline ? 'ONLINE' : 'OFFLINE'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-yellow-400">🎁 {giftTimer}s</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="font-bold text-white">
+                    {stateRef.current?.robots?.length || 0}/{MAX_ROBOTS}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowMleoCollection(true)}
+                  className="bg-orange-600 hover:bg-orange-700 px-2 py-1 rounded text-xs font-bold"
+                >
+                  🪙 {stateRef.current?.mleo || 0}
+                </button>
+                <button
+                  onClick={() => setMenuOpen(true)}
+                  className="bg-gray-800 hover:bg-gray-700 w-6 h-6 rounded flex items-center justify-center"
+                >
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
               </div>
             </div>
-            
-            {/* Center - Sector Info */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-300">Sector:</span>
-              <span className="font-bold text-white text-sm">{SPACE_SECTORS.find(s => s.id === ui.currentSector)?.name || 'Unknown'}</span>
-            </div>
-            
-            {/* Right side - MLEO, Status, and Game Info */}
-            <div className="flex items-center gap-4">
+
+            {/* Desktop Header (landscape) */}
+            <div className="hidden md:flex items-center justify-between px-4 h-16">
+              {/* Left side - Credits and Energy */}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                  <span className="font-bold text-yellow-400 text-sm">Credits: {ui.credits}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-400"></div>
+                  <span className="font-bold text-blue-400 text-sm">Energy: {ui.energy}</span>
+                </div>
+              </div>
+
+              {/* Center - Sector Info */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-300">Sector:</span>
+                <span className="font-bold text-white text-sm">{SPACE_SECTORS.find(s => s.id === ui.currentSector)?.name || 'Unknown'}</span>
+              </div>
+
+              {/* Right side - MLEO, Status, and Game Info */}
+              <div className="flex items-center gap-4">
               {/* Online/Offline Status */}
               <div className="flex items-center gap-2 text-xs">
                 <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-400' : 'bg-red-400'}`}></div>
                 {isOnline ? (
                   <span className="font-bold text-green-400 text-xs">ONLINE</span>
                 ) : (
-                  <button
-                    onClick={() => setIsOnline(true)}
-                    className="font-bold text-red-400 hover:text-red-300 underline text-xs"
-                  >
+                  <button onClick={() => setIsOnline(true)} className="font-bold text-red-400 hover:text-red-300 underline text-xs">
                     OFFLINE
                   </button>
                 )}
@@ -1364,9 +1378,7 @@ export default function MleoSpaceMining() {
               {/* Gift Timer */}
               <div className="flex items-center gap-2 text-xs">
                 <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
-                <span className="font-bold text-yellow-400 text-xs">
-                  🎁 {giftTimer}s
-                </span>
+                <span className="font-bold text-yellow-400 text-xs">🎁 {giftTimer}s</span>
               </div>
               
               {/* Robots Count */}
@@ -1383,7 +1395,7 @@ export default function MleoSpaceMining() {
               
               {/* Materials */}
               <div className="flex items-center gap-2 text-xs">
-                {Object.entries(stateRef.current?.materials || {}).map(([material, amount], index) => {
+                {Object.entries(stateRef.current?.materials || {}).map(([material, amount]) => {
                   if (amount > 0) {
                     return (
                       <span key={material} className="font-bold text-white text-xs">
@@ -1413,30 +1425,168 @@ export default function MleoSpaceMining() {
                 </svg>
               </button>
             </div>
+            </div>
           </div>
           
-          {/* UI Overlay */}
-          <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-20">
-            <button
-              onClick={() => setShowShop(true)}
-              className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg font-bold"
-            >
-              🤖 Shop
+          {/* Robot Upgrades Panel - Mobile Responsive */}
+          {showUpgrades && (
+            <div className="absolute top-12 md:top-20 left-2 right-2 md:left-auto md:right-4 md:w-80 bg-black/90 text-white p-3 md:p-4 rounded-lg z-50 border-2 border-blue-500/50 max-h-[70vh] md:max-h-96 overflow-y-auto">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-bold text-blue-300">⚡ Robot Upgrades</h3>
+              <button
+                onClick={() => {
+                  const info = Object.entries(ROBOT_UPGRADES).map(([id, upgrade]) => {
+                    const level = stateRef.current?.robotUpgrades?.[id] || 0;
+                    const effect = Math.round((upgrade.effect(level) - 1) * 100);
+                    return `${upgrade.name}: Level ${level} (${effect > 0 ? '+' : ''}${effect}%)`;
+                  }).join('\n');
+                  alert(`Upgrade Information:\n\n${info}`);
+                }}
+                className="w-6 h-6 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center text-xs font-bold"
+                title="Upgrade Information"
+              >
+                ?
+              </button>
+            </div>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {Object.entries(ROBOT_UPGRADES).map(([id, upgrade]) => {
+                const currentLevel = stateRef.current?.robotUpgrades?.[id] || 0;
+                const cost = getUpgradeCost(id, currentLevel);
+                const canAfford = stateRef.current?.credits >= cost;
+                const maxed = currentLevel >= upgrade.maxLevel;
+                const effectValue = Math.round((upgrade.effect(currentLevel) - 1) * 100);
+                
+                return (
+                  <div key={id} className="bg-gray-800/80 p-3 rounded border border-gray-700 hover:border-blue-500/50 transition-all duration-200 hover:scale-105">
+                    <div className="flex justify-between items-start mb-1">
+                      <div className="font-semibold text-yellow-300">{upgrade.name}</div>
+                      <div className="text-xs text-gray-400">
+                        {currentLevel}/{upgrade.maxLevel}
+                      </div>
+                    </div>
+                    
+                    {/* Progress Bar */}
+                    <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
+                      <div 
+                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${(currentLevel / upgrade.maxLevel) * 100}%` }}
+                      />
+                    </div>
+                    <div className="text-xs text-gray-300 mb-2" title={`Next cost: ${getUpgradeCost(id, currentLevel + 1)} credits`}>
+                      {upgrade.description}
+                    </div>
+                    {currentLevel > 0 && (
+                      <div className="text-xs text-green-400 mb-2">
+                        ✓ Current Effect: +{effectValue}%
+                      </div>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        if (purchaseUpgrade(stateRef.current, id)) {
+                          saveGameState(stateRef.current);
+                          setUi(prev => ({ ...prev, credits: stateRef.current.credits }));
+                          setCenterPopup?.({ text: `⚡ Upgraded ${upgrade.name}!`, id: Math.random() });
+                          createUpgradeParticles(e.clientX, e.clientY);
+                          playUpgradeSound();
+                        }
+                      }}
+                      disabled={!canAfford || maxed}
+                      className={`w-full py-2 md:py-2 px-3 rounded text-xs md:text-sm font-bold transition-all touch-manipulation ${
+                        canAfford && !maxed 
+                          ? 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 hover:scale-105' 
+                          : 'bg-gray-600 cursor-not-allowed opacity-50'
+                      }`}
+                    >
+                      {maxed ? '✓ Maxed' : `Upgrade (${cost} 💰)`}
             </button>
-            <button
-              onClick={() => setShowSectors(true)}
-              className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-bold"
-            >
-              🌌 Sectors
-            </button>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="absolute top-2 right-2 flex gap-1">
+              <button
+                onClick={() => {
+                  if (confirm("Are you sure you want to reset all upgrades?")) {
+                    stateRef.current.robotUpgrades = {
+                      speed: 0,
+                      efficiency: 0,
+                      range: 0,
+                      autoMerge: 0
+                    };
+                    saveGameState(stateRef.current);
+                    setCenterPopup?.({ text: "🔄 Upgrades reset!", id: Math.random() });
+                  }
+                }}
+                className="w-6 h-6 bg-orange-600 hover:bg-orange-700 rounded-full flex items-center justify-center text-xs font-bold"
+                title="Reset Upgrades"
+              >
+                ↺
+              </button>
+              <button
+                onClick={() => setShowUpgrades(false)}
+                className="w-6 h-6 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center text-xs font-bold"
+                title="Hide Upgrades Panel"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+          )}
+
+          {/* Particle Effects */}
+          {particles.map(particle => (
+            <div
+              key={particle.id}
+              className="absolute w-2 h-2 rounded-full pointer-events-none z-40"
+              style={{
+                left: particle.x,
+                top: particle.y,
+                backgroundColor: particle.color,
+                opacity: particle.life,
+                transform: `scale(${particle.life})`
+              }}
+            />
+          ))}
+
+          {/* UI Overlay - Mobile Responsive */}
+          <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 flex flex-col gap-2 z-20">
+            {/* Mobile: Horizontal buttons */}
+            <div className="md:hidden flex gap-2">
+              <button onClick={() => setShowShop(true)} className="bg-green-600 hover:bg-green-700 px-3 py-2 rounded-lg font-bold text-sm">
+                🤖 Shop
+              </button>
+              {!showUpgrades && (
+                <button onClick={() => setShowUpgrades(true)} className="bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-lg font-bold text-sm">
+                  ⚡ Upgrades
+                </button>
+              )}
+              <button onClick={() => setShowSectors(true)} className="bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded-lg font-bold text-sm">
+                🌌 Sectors
+              </button>
+            </div>
+            
+            {/* Desktop: Vertical buttons */}
+            <div className="hidden md:flex flex-col gap-2">
+              <button onClick={() => setShowShop(true)} className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg font-bold">
+                🤖 Shop
+              </button>
+              {!showUpgrades && (
+                <button onClick={() => setShowUpgrades(true)} className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-bold">
+                  ⚡ Upgrades
+                </button>
+              )}
+              <button onClick={() => setShowSectors(true)} className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg font-bold">
+                🌌 Sectors
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* MLEO Collection Modal */}
+        {/* MLEO Collection Modal - Mobile Responsive */}
         {showMleoCollection && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-900 p-4 rounded-lg max-w-sm w-full border border-gray-700 max-h-[80vh] overflow-y-auto">
-              <h2 className="text-xl font-bold mb-3 text-center text-orange-400">🪙 MLEO Collection</h2>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 md:p-4">
+            <div className="bg-gray-900 p-3 md:p-4 rounded-lg max-w-sm w-full border border-gray-700 max-h-[80vh] overflow-y-auto">
+              <h2 className="text-lg md:text-xl font-bold mb-3 text-center text-orange-400">🪙 MLEO Collection</h2>
               
               <div className="space-y-3">
                 <div className="text-center">
@@ -1449,30 +1599,12 @@ export default function MleoSpaceMining() {
                 <div className="bg-gray-800 p-3 rounded-lg">
                   <h3 className="text-sm font-semibold mb-2 text-orange-400">Asteroid Rewards:</h3>
                   <div className="grid grid-cols-2 gap-1 text-xs">
-                    <div className="flex justify-between">
-                      <span>Iron:</span>
-                      <span className="text-orange-400">3</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Silicon:</span>
-                      <span className="text-orange-400">6</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Titanium:</span>
-                      <span className="text-orange-400">9</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Platinum:</span>
-                      <span className="text-orange-400">12</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Rare Earth:</span>
-                      <span className="text-orange-400">15</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Quantum Core:</span>
-                      <span className="text-orange-400">18</span>
-                    </div>
+                    <div className="flex justify-between"><span>Iron:</span><span className="text-orange-400">3</span></div>
+                    <div className="flex justify-between"><span>Silicon:</span><span className="text-orange-400">6</span></div>
+                    <div className="flex justify-between"><span>Titanium:</span><span className="text-orange-400">9</span></div>
+                    <div className="flex justify-between"><span>Platinum:</span><span className="text-orange-400">12</span></div>
+                    <div className="flex justify-between"><span>Rare Earth:</span><span className="text-orange-400">15</span></div>
+                    <div className="flex justify-between"><span>Quantum Core:</span><span className="text-orange-400">18</span></div>
                   </div>
                 </div>
                 
@@ -1487,27 +1619,17 @@ export default function MleoSpaceMining() {
                 <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                   <div className="p-2 rounded bg-slate-100">
                     <div className="text-slate-500 text-xs">Vault</div>
-                    <div className="font-extrabold text-slate-900 tabular-nums">
-                      {formatMleo2(Number(spaceMleo?.vault || 0))}
-                    </div>
+                    <div className="font-extrabold text-slate-900 tabular-nums">{formatMleo2(Number(spaceMleo?.vault || 0))}</div>
                   </div>
                   <div className="p-2 rounded bg-slate-100">
                     <div className="text-slate-500 text-xs">Claimed</div>
-                    <div className="font-extrabold text-slate-900 tabular-nums">
-                      {formatMleo2(Number(spaceMleo?.claimedToWallet || 0))}
-                    </div>
+                    <div className="font-extrabold text-slate-900 tabular-nums">{formatMleo2(Number(spaceMleo?.claimedToWallet || 0))}</div>
                   </div>
                 </div>
                 
                 <div className="flex flex-col gap-2">
                   <button
-                    onClick={() => claimGameMleoToVault(
-                      setSpaceMleo, 
-                      setCenterPopup, 
-                      setGiftToastWithTTL, 
-                      stateRef.current?.mleo || 0,
-                      stateRef
-                    )}
+                    onClick={() => runOnceVault(claimGameMleoToVault)}
                     disabled={Number((stateRef.current?.mleo || 0).toFixed(2)) <= 0}
                     className={`px-3 py-2 rounded-lg font-extrabold text-xs active:scale-95 ${
                       Number((stateRef.current?.mleo || 0).toFixed(2)) > 0
@@ -1520,60 +1642,46 @@ export default function MleoSpaceMining() {
                   </button>
                   
                   <button
-                    onClick={() => claimSpaceMleoToWallet(
-                      setSpaceMleo, 
-                      setCenterPopup, 
-                      setGiftToastWithTTL, 
-                      isConnected, 
-                      openConnectModal, 
-                      chainId, 
-                      switchChain, 
-                      writeContractAsync, 
-                      publicClient, 
-                      address
-                    )}
-                    disabled={Number((spaceMleo?.vault || 0).toFixed(2)) <= 0}
+                    onClick={() => runOnceWallet(claimSpaceMleoToWallet)}
+                    disabled={Number((spaceMleo?.vault || 0).toFixed(2)) <= 0 || walIsPending()}
                     className={`px-3 py-2 rounded-lg font-extrabold text-xs active:scale-95 ${
-                      Number((spaceMleo?.vault || 0).toFixed(2)) > 0
+                      Number((spaceMleo?.vault || 0).toFixed(2)) > 0 && !walIsPending()
                         ? "bg-yellow-400 hover:bg-yellow-300 text-black"
                         : "bg-slate-300 text-slate-500 cursor-not-allowed"
                     }`}
                     title="Claim MLEO from vault to wallet"
                   >
-                    CLAIM TO WALLET
+                    {walIsPending() ? "PENDING…" : "CLAIM TO WALLET"}
                   </button>
                 </div>
               </div>
               
-              <button
-                onClick={() => setShowMleoCollection(false)}
-                className="w-full bg-orange-600 hover:bg-orange-700 px-3 py-2 rounded font-bold text-sm"
-              >
+              <button onClick={() => setShowMleoCollection(false)} className="w-full bg-orange-600 hover:bg-orange-700 px-3 py-2 rounded font-bold text-sm">
                 Close
               </button>
             </div>
           </div>
         )}
 
-        {/* Center Popup */}
+        {/* Center Popup - Mobile Responsive */}
         {centerPopup && (
-          <div className="fixed inset-0 z-[10000] pointer-events-none flex items-center justify-center">
-            <div className="bg-black/80 text-white px-6 py-3 rounded-lg font-bold text-lg">
+          <div className="fixed inset-0 z-[10000] pointer-events-none flex items-center justify-center p-4">
+            <div className="bg-black/80 text-white px-4 md:px-6 py-2 md:py-3 rounded-lg font-bold text-sm md:text-lg text-center">
               {centerPopup.text}
             </div>
           </div>
         )}
 
-        {/* Asteroid Destruction Popup */}
+        {/* Asteroid Destruction Popup - Mobile Responsive */}
         {asteroidPopup && (
-          <div className="fixed inset-0 z-[10000] pointer-events-none flex items-center justify-center">
-            <div className="bg-black/80 text-white px-4 py-3 rounded-lg font-bold text-center shadow-2xl">
-              <div className="text-lg mb-1">💥 Asteroid Destroyed!</div>
-              <div className="text-sm">
+          <div className="fixed inset-0 z-[10000] pointer-events-none flex items-center justify-center p-4">
+            <div className="bg-black/80 text-white px-3 md:px-4 py-2 md:py-3 rounded-lg font-bold text-center shadow-2xl">
+              <div className="text-sm md:text-lg mb-1">💥 Asteroid Destroyed!</div>
+              <div className="text-xs md:text-sm">
                 <div className="text-yellow-300">💰 Credits: +{asteroidPopup.credits}</div>
                 <div className="text-orange-300">🪙 MLEO: +{asteroidPopup.mleo}</div>
                 <div className="text-gray-300 text-xs mt-1 capitalize">
-                  {asteroidPopup.material.replace('_', ' ')} Asteroid
+{humanizeMaterial(asteroidPopup?.material)} Asteroid
                 </div>
               </div>
             </div>
@@ -1593,17 +1701,10 @@ export default function MleoSpaceMining() {
             <div className="bg-black/80 text-white px-4 py-3 rounded-lg font-bold text-center shadow-2xl">
               <div className="text-lg mb-1">🎁 Gift Received!</div>
               <div className="text-sm mb-2">
-                {giftType === 'credits' && (
-                  <div className="text-yellow-300">💰 Credits: +{giftAmount}</div>
-                )}
-                {giftType === 'robot' && (
-                  <div className="text-blue-300">🤖 Robot: +1</div>
-                )}
+                {giftType === 'credits' && (<div className="text-yellow-300">💰 Credits: +{giftAmount}</div>)}
+                {giftType === 'robot' && (<div className="text-blue-300">🤖 Robot: +1</div>)}
               </div>
-              <button
-                onClick={claimGift}
-                className="bg-orange-500 hover:bg-orange-400 text-white px-3 py-1 rounded text-xs font-bold active:scale-95"
-              >
+              <button onClick={claimGift} className="bg-orange-500 hover:bg-orange-400 text-white px-3 py-1 rounded text-xs font-bold active:scale-95">
                 CLAIM
               </button>
             </div>
@@ -1612,32 +1713,15 @@ export default function MleoSpaceMining() {
 
         {/* Settings Modal */}
         {menuOpen && (
-          <div
-            className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3"
-            onClick={() => setMenuOpen(false)}
-          >
+          <div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}>
             <div
-              className="
-                w-[86vw] max-w-[250px]
-                max-h-[70vh]
-                bg-[#0b1220] text-white
-                shadow-2xl rounded-2xl
-                p-4 md:p-5
-                overflow-y-auto
-              "
+              className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-2 md:mb-3">
                 <h2 className="text-xl font-extrabold">Settings</h2>
-                <button
-                  onClick={() => setMenuOpen(false)}
-                  className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center"
-                  title="Close"
-                >
-                  ✕
-                </button>
+                <button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center" title="Close">✕</button>
               </div>
-
 
               {/* Sound */}
               <div className="mb-4 space-y-2">
@@ -1645,21 +1729,13 @@ export default function MleoSpaceMining() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setSfxMuted(v => !v)}
-                    className={`px-3 py-2 rounded-lg text-sm font-semibold ${
-                      sfxMuted
-                        ? "bg-rose-500/90 hover:bg-rose-500 text-white"
-                        : "bg-emerald-500/90 hover:bg-emerald-500 text-white"
-                    }`}
+                    className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}
                   >
                     SFX: {sfxMuted ? "Off" : "On"}
                   </button>
                   <button
                     onClick={() => setMusicMuted(v => !v)}
-                    className={`px-3 py-2 rounded-lg text-sm font-semibold ${
-                      musicMuted
-                        ? "bg-rose-500/90 hover:bg-rose-500 text-white"
-                        : "bg-emerald-500/90 hover:bg-emerald-500 text-white"
-                    }`}
+                    className={`px-3 py-2 rounded-lg text-sm font-semibold ${musicMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}
                   >
                     Music: {musicMuted ? "Off" : "On"}
                   </button>
@@ -1682,29 +1758,12 @@ export default function MleoSpaceMining() {
                 <button
                   onClick={() => {
                     if (confirm("Are you sure you want to reset the game? This will delete all progress!")) {
-                      // Reset game state
                       const initialState = getInitialState();
                       stateRef.current = initialState;
-                      
-                      // Generate new asteroids
                       initialState.asteroids = [];
-                      for (let i = 0; i < ASTEROID_COUNT; i++) {
-                        initialState.asteroids.push(generateAsteroid(initialState.currentSector));
-                      }
-                      
-                      // Update UI
-                      setUi({
-                        credits: initialState.credits,
-                        energy: initialState.energy,
-                        mleo: initialState.mleo,
-                        currentSector: initialState.currentSector,
-                        stationLevel: initialState.stationLevel
-                      });
-                      
-                      // Save reset state
-                      saveGameState(initialState);
-                      
-                      // Close settings
+                      for (let i = 0; i < ASTEROID_COUNT; i++) initialState.asteroids.push(generateAsteroid(initialState.currentSector));
+                      setUi({ credits: initialState.credits, energy: initialState.energy, mleo: initialState.mleo, currentSector: initialState.currentSector, stationLevel: initialState.stationLevel });
+                      saveGameState(initialState, {force:true});
                       setMenuOpen(false);
                     }
                   }}
@@ -1721,11 +1780,11 @@ export default function MleoSpaceMining() {
           </div>
         )}
 
-        {/* Shop Modal */}
+        {/* Shop Modal - Mobile Responsive */}
         {showShop && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-gray-900 p-6 rounded-lg max-w-md w-full mx-4 border border-gray-700">
-              <h2 className="text-2xl font-bold mb-4 text-center">🤖 Robot Shop</h2>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 md:p-4">
+            <div className="bg-gray-900 p-3 md:p-6 rounded-lg max-w-md w-full border border-gray-700 max-h-[80vh] overflow-y-auto">
+              <h2 className="text-lg md:text-2xl font-bold mb-4 text-center">🤖 Robot Shop</h2>
               <div className="space-y-3">
                 {Object.entries(ROBOT_TYPES).map(([type, data]) => (
                   <div key={type} className="flex items-center justify-between p-3 bg-gray-800 rounded">
@@ -1736,10 +1795,7 @@ export default function MleoSpaceMining() {
                     <div className="text-right">
                       <div className="text-green-400">{data.cost} Credits</div>
                       <button
-                        onClick={() => {
-                          setSelectedRobot(type);
-                          addRobot();
-                        }}
+                        onClick={() => { setSelectedRobot(type); addRobot(); }}
                         disabled={stateRef.current?.credits < data.cost || stateRef.current?.robots.length >= MAX_ROBOTS}
                         className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded text-sm"
                       >
@@ -1749,29 +1805,23 @@ export default function MleoSpaceMining() {
                   </div>
                 ))}
               </div>
-              <button
-                onClick={() => setShowShop(false)}
-                className="mt-4 w-full bg-red-600 hover:bg-red-700 px-4 py-2 rounded"
-              >
+              <button onClick={() => setShowShop(false)} className="mt-4 w-full bg-red-600 hover:bg-red-700 px-4 py-2 rounded">
                 Close
               </button>
             </div>
           </div>
         )}
 
-        {/* Sectors Modal */}
+        {/* Sectors Modal - Mobile Responsive */}
         {showSectors && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-gray-900 p-6 rounded-lg max-w-md w-full mx-4 border border-gray-700">
-              <h2 className="text-2xl font-bold mb-4 text-center">🌌 Space Sectors</h2>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 md:p-4">
+            <div className="bg-gray-900 p-3 md:p-6 rounded-lg max-w-md w-full border border-gray-700 max-h-[80vh] overflow-y-auto">
+              <h2 className="text-lg md:text-2xl font-bold mb-4 text-center">🌌 Space Sectors</h2>
               <div className="space-y-3">
                 {SPACE_SECTORS.map(sector => (
                   <button
                     key={sector.id}
-                    onClick={() => {
-                      switchSector(sector.id);
-                      setShowSectors(false);
-                    }}
+                    onClick={() => { switchSector(sector.id); setShowSectors(false); }}
                     disabled={sector.unlockCost > 0 && stateRef.current?.credits < sector.unlockCost}
                     className={`w-full p-3 rounded text-left ${
                       sector.unlockCost === 0 || (stateRef.current?.credits >= sector.unlockCost)
@@ -1781,21 +1831,12 @@ export default function MleoSpaceMining() {
                     style={{ borderLeft: `4px solid ${sector.color}` }}
                   >
                     <div className="font-bold">{sector.name}</div>
-                    <div className="text-sm text-gray-400">
-                      Difficulty: {sector.difficulty}x | Reward: {sector.reward}x
-                    </div>
-                    {sector.unlockCost > 0 && (
-                      <div className="text-sm text-yellow-400">
-                        Unlock Cost: {sector.unlockCost} Credits
-                      </div>
-                    )}
+                    <div className="text-sm text-gray-400">Difficulty: {sector.difficulty}x | Reward: {sector.reward}x</div>
+                    {sector.unlockCost > 0 && (<div className="text-sm text-yellow-400">Unlock Cost: {sector.unlockCost} Credits</div>)}
                   </button>
                 ))}
               </div>
-              <button
-                onClick={() => setShowSectors(false)}
-                className="mt-4 w-full bg-red-600 hover:bg-red-700 px-4 py-2 rounded"
-              >
+              <button onClick={() => setShowSectors(false)} className="mt-4 w-full bg-red-600 hover:bg-red-700 px-4 py-2 rounded">
                 Close
               </button>
             </div>
@@ -1813,18 +1854,12 @@ export default function MleoSpaceMining() {
               </p>
               <div className="flex gap-2">
                 <button
-                  onClick={() => {
-                    localStorage.setItem(TERMS_KEY, "accepted");
-                    setShowTerms(false);
-                  }}
+                  onClick={() => { localStorage.setItem(TERMS_KEY, "accepted"); setShowTerms(false); }}
                   className="flex-1 bg-green-600 hover:bg-green-700 px-4 py-2 rounded font-bold"
                 >
                   Accept
                 </button>
-                <button
-                  onClick={() => router.push('/')}
-                  className="flex-1 bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-bold"
-                >
+                <button onClick={() => router.push('/')} className="flex-1 bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-bold">
                   Decline
                 </button>
               </div>
@@ -1834,4 +1869,30 @@ export default function MleoSpaceMining() {
       </div>
     </Layout>
   );
+}
+
+// ===== MLEO reward helpers & asteroid destruction =====
+function calculateMleoReward(asteroidType) {
+  const level = MLEO_LEVELS[asteroidType] || 1;
+  return level * MLEO_BASE_PER_LEVEL;
+}
+function humanizeMaterial(m) {
+  const s = String(m || "");
+  return s ? s.replace(/_/g, " ") : "unknown";
+}
+
+function destroyAsteroid(state, asteroid, setAsteroidPopup) {
+  const materialType = asteroid.type;
+  const value = asteroid.value;
+  const mleoReward = calculateMleoReward(materialType);
+
+  state.materials[materialType] = (state.materials[materialType] || 0) + value;
+  state.credits += value;
+  state.totalMined += value;
+
+  state.mleo += mleoReward;
+  state.totalMleo += mleoReward;
+
+  setAsteroidPopup?.({ credits: value, mleo: mleoReward, material: materialType, id: Math.random() });
+  return { credits: value, mleo: mleoReward };
 }
