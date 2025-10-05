@@ -290,6 +290,7 @@ function getInitialState() {
     // Timers
     lastSave: Date.now(),
     lastUpdate: Date.now(),
+    lastMerge: 0,
 
     // Settings
     muted: false,
@@ -818,22 +819,28 @@ export default function MleoSpaceMining() {
     if (!termsAccepted) setShowTerms(true);
   }, []);
 
-  // Game loop (mobile-safe): clamp dt + pause on hidden
+  // Game loop (mobile-safe): clamp dt + pause on hidden + FPS limit
   useEffect(() => {
     if (!mounted) return;
     let lastTime = 0;
     let running = true;
+    const TARGET_FPS = 60;
+    const FRAME_TIME = 1000 / TARGET_FPS;
       
     const loop = (currentTime) => {
       if (!running || !stateRef.current) return;
       if (!lastTime) lastTime = currentTime;
-      let dt = currentTime - lastTime;
+      
+      // Limit FPS to 60 and clamp delta time
+      const deltaTime = Math.min(currentTime - lastTime, FRAME_TIME);
       lastTime = currentTime;
-      if (dt > 50) dt = 50; // clamp jumps after background
       
-      tick(dt);
+      // Only tick if not paused
+      if (!flagsRef.current.paused) {
+        tick(deltaTime);
+      }
+      
       draw();
-      
       rafRef.current = requestAnimationFrame(loop);
     };
 
@@ -857,10 +864,11 @@ export default function MleoSpaceMining() {
     };
   }, [mounted]);
 
-  // Robot merging function - Force robots of same level to meet and merge
+  // Robot merging function - OPTIMIZED VERSION
   function checkRobotMerging(state) {
     if (!state.robots || state.robots.length < 2) return;
     
+    // Group robots by level
     const robotsByLevel = {};
     state.robots.forEach(robot => {
       if (!robotsByLevel[robot.level]) robotsByLevel[robot.level] = [];
@@ -877,95 +885,191 @@ export default function MleoSpaceMining() {
             if (d < closestDistance) { closestDistance = d; robot1 = robots[i]; robot2 = robots[j]; }
           }
         }
-        if (robot1 && robot2) {
+        if (robot1 && robot2 && closestDistance < 100) { // Only merge if close enough
+          // Additional validation
+          if (robot1.id === robot2.id) {
+            console.warn("Attempting to merge robot with itself!");
+            return;
+          }
+          
+          // Check if robots still exist in state
+          const robot1Exists = state.robots.find(r => r.id === robot1.id);
+          const robot2Exists = state.robots.find(r => r.id === robot2.id);
+          
+          if (!robot1Exists || !robot2Exists) {
+            console.warn("Robot disappeared before merge!");
+            return;
+          }
+          
+          // Move robots towards each other
           const dx = robot2.x - robot1.x;
           const dy = robot2.y - robot1.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
+          
           if (distance > 0) {
-            const moveSpeed = 2;
+            const moveSpeed = 3; // Slightly faster movement
             const moveX = (dx / distance) * moveSpeed;
             const moveY = (dy / distance) * moveSpeed;
-            robot1.x += moveX; robot1.y += moveY;
-            robot2.x -= moveX; robot2.y -= moveY;
+            
+            robot1.x += moveX; 
+            robot1.y += moveY;
+            robot2.x -= moveX; 
+            robot2.y -= moveY;
+            
+            // Check if close enough to merge
             const newDistance = calculateDistance(robot1.x, robot1.y, robot2.x, robot2.y);
-            if (newDistance <= 20) { mergeRobots(state, robot1, robot2); return; }
+            if (newDistance <= 30) { 
+              mergeRobots(state, robot1, robot2); 
+              return; 
+            }
           }
         }
       }
     });
   }
   
-  // Merge two robots into one upgraded robot
+  // Merge two robots into one upgraded robot - OPTIMIZED VERSION
   function mergeRobots(state, robot1, robot2) {
+    // Validate robots exist and are different
+    if (!robot1 || !robot2 || robot1.id === robot2.id) {
+      console.warn("Invalid robots for merging:", robot1?.id, robot2?.id);
+      return;
+    }
+    
+    // Find robot indices safely
     const index1 = state.robots.findIndex(r => r.id === robot1.id);
     const index2 = state.robots.findIndex(r => r.id === robot2.id);
-    if (index1 === -1 || index2 === -1) return;
-
-    const hi = Math.max(index1, index2), lo = Math.min(index1, index2);
-    state.robots.splice(hi, 1);
-    state.robots.splice(lo, 1);
-
-      const newRobot = {
-        id: state.nextRobotId++,
-      type: robot1.type,
-      level: robot1.level + 1,
-      x: (robot1.x + robot2.x) / 2,
-        y: (robot1.y + robot2.y) / 2,
-        targetAsteroid: null,
-      efficiency: robot1.efficiency * 1.01,
-      speed: robot1.speed
-      };
-      state.robots.push(newRobot);
-    setCenterPopup?.({ text: `🤖 Robot Level ${newRobot.level}! Efficiency +1%`, id: Math.random() });
-      saveGameState(state);
+    
+    if (index1 === -1 || index2 === -1) {
+      console.warn("Robot not found for merging:", robot1.id, robot2.id);
+      return;
+    }
+    
+    // Remove robots safely (from highest index to lowest)
+    const indices = [index1, index2].sort((a, b) => b - a);
+    indices.forEach(index => {
+      if (index >= 0 && index < state.robots.length) {
+        state.robots.splice(index, 1);
+      }
+    });
+    
+    // Create new merged robot
+    const newRobot = {
+      id: state.nextRobotId++,
+      type: robot1.type, // Keep the same type
+      level: robot1.level + 1, // Increase level
+      x: (robot1.x + robot2.x) / 2, // Average position
+      y: (robot1.y + robot2.y) / 2,
+      targetAsteroid: null,
+      efficiency: Math.min(robot1.efficiency * 1.1, 5), // 10% increase, max 5
+      speed: Math.max(robot1.speed, robot2.speed) // Take the faster speed
+    };
+    
+    state.robots.push(newRobot);
+    
+    console.log(`✅ Merged robots: ${robot1.id} + ${robot2.id} = ${newRobot.id} (Level ${newRobot.level})`);
+    
+    // Show merge notification
+    setCenterPopup?.({ 
+      text: `🤖 Robot Level ${newRobot.level}! Efficiency +10%`, 
+      id: Math.random() 
+    });
+    
+    // Save the state
+    saveGameState(state);
   }
 
-  // Game tick function
+  // Debug function for robot tracking
+  function debugRobots(state) {
+    console.log(`🔍 Debug: ${state.robots.length} robots active`);
+    state.robots.forEach((robot, i) => {
+      console.log(`Robot ${i}: ID=${robot.id}, Level=${robot.level}, Pos=(${robot.x.toFixed(1)}, ${robot.y.toFixed(1)}), Target=${robot.targetAsteroid}`);
+    });
+  }
+  
+  // Performance monitoring
+  let debugCounter = 0;
+  const DEBUG_INTERVAL = 300; // Debug every 5 seconds at 60fps
+
+  // Game tick function - PERFORMANCE OPTIMIZED
   function tick(dt) {
     const state = stateRef.current;
     if (!state || flagsRef.current.paused) return;
     
     const now = Date.now();
     
-    // Auto-merge robots
-    checkRobotMerging(state);
+    // Debug every 5 seconds
+    debugCounter++;
+    if (debugCounter >= DEBUG_INTERVAL) {
+      debugRobots(state);
+      debugCounter = 0;
+    }
+    
+    // Validate robot array integrity
+    if (!Array.isArray(state.robots)) {
+      console.error("Robots array is corrupted!");
+      state.robots = [];
+      return;
+    }
+    
+    // Auto-merge robots (with cooldown to prevent stuttering)
+    if (now - (state.lastMerge || 0) > 1000) { // 1 second cooldown
+      checkRobotMerging(state);
+      state.lastMerge = now;
+    }
     
     // Apply robot upgrades
     applyRobotUpgrades(state);
     
-    // Update robots
-    state.robots.forEach(robot => {
+    // Update robots - OPTIMIZED VERSION
+    state.robots.forEach((robot, index) => {
+      // Validate robot exists
+      if (!robot || !robot.id) {
+        console.warn("Invalid robot at index:", index);
+        return;
+      }
+      
       if (robot.targetAsteroid) {
         const asteroid = state.asteroids.find(a => a.id === robot.targetAsteroid);
         if (asteroid && asteroid.hp > 0) {
           const dx = asteroid.x - robot.x;
           const dy = asteroid.y - robot.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
-          if (distance > 5) {
-            const speed = robot.speed * 50 * (dt / 1000);
+          
+          if (distance > 10) { // Increased distance for better performance
+            const speed = (robot.speed * 50 * (dt / 1000)) || 1; // Prevent NaN
             robot.x += (dx / distance) * speed;
             robot.y += (dy / distance) * speed;
           } else {
-            const damage = robot.efficiency * (dt / 1000) * 10;
+            const damage = (robot.efficiency * (dt / 1000) * 10) || 0.1; // Prevent NaN
             asteroid.hp -= damage;
+            
             if (asteroid.hp <= 0) {
               const asteroidIndex = state.asteroids.findIndex(a => a.id === asteroid.id);
-              const rewards = destroyAsteroid(state, asteroid, setAsteroidPopup);
-              state.asteroids[asteroidIndex] = generateAsteroid(state.currentSector);
-              setUi(prev => ({ ...prev, credits: state.credits, mleo: state.mleo }));
+              if (asteroidIndex !== -1) {
+                const rewards = destroyAsteroid(state, asteroid, setAsteroidPopup);
+                state.asteroids[asteroidIndex] = generateAsteroid(state.currentSector);
+                setUi(prev => ({ ...prev, credits: state.credits, mleo: state.mleo }));
+              }
             }
           }
         } else {
           robot.targetAsteroid = null;
         }
       } else {
+        // Find new target - OPTIMIZED
         let nearestAsteroid = null, nearestDistance = Infinity;
-        state.asteroids.forEach(asteroid => {
-          if (asteroid.hp > 0) {
+        
+        for (const asteroid of state.asteroids) {
+          if (asteroid && asteroid.hp > 0) {
             const d = calculateDistance(robot.x, robot.y, asteroid.x, asteroid.y);
-            if (d < nearestDistance) { nearestDistance = d; nearestAsteroid = asteroid; }
+            if (d < nearestDistance && d < 300) { // Limit search range
+              nearestDistance = d; 
+              nearestAsteroid = asteroid;
+            }
           }
-        });
+        }
+        
         if (nearestAsteroid) robot.targetAsteroid = nearestAsteroid.id;
       }
     });
@@ -999,7 +1103,11 @@ export default function MleoSpaceMining() {
     // Draw game elements (offset to avoid header - mobile responsive)
     let headerHeight = 80;
     if (window.innerWidth < 768) {
-      headerHeight = window.innerHeight < 500 ? 32 : 40; // Landscape: 32px, Portrait: 40px
+      if (window.innerHeight < 500) {
+        headerHeight = 28; // Landscape: 28px
+      } else {
+        headerHeight = 48; // Portrait: 48px
+      }
     }
     drawAsteroids(ctx, w, h - headerHeight);
     drawRobots(ctx, w, h - headerHeight);
@@ -1033,7 +1141,11 @@ export default function MleoSpaceMining() {
     const state = stateRef.current; if (!state) return;
     let offsetY = 80;
     if (window.innerWidth < 768) {
-      offsetY = window.innerHeight < 500 ? 32 : 40; // Landscape: 32px, Portrait: 40px
+      if (window.innerHeight < 500) {
+        offsetY = 28; // Landscape: 28px
+      } else {
+        offsetY = 48; // Portrait: 48px
+      }
     }
     
     state.asteroids.forEach(asteroid => {
@@ -1063,7 +1175,11 @@ export default function MleoSpaceMining() {
     const state = stateRef.current; if (!state) return;
     let offsetY = 80;
     if (window.innerWidth < 768) {
-      offsetY = window.innerHeight < 500 ? 32 : 40; // Landscape: 32px, Portrait: 40px
+      if (window.innerHeight < 500) {
+        offsetY = 28; // Landscape: 28px
+      } else {
+        offsetY = 48; // Portrait: 48px
+      }
     }
     state.robots.forEach(robot => {
       const robotImage = loadImage(IMAGES.robots[robot.type]);
@@ -1134,7 +1250,19 @@ export default function MleoSpaceMining() {
     if (state.credits < robotType.cost) return;
     if (state.robots.length >= MAX_ROBOTS) return;
     
-    const margin = 80, topMargin = 100, bottomMargin = 120;
+    // Mobile responsive margins
+    let margin = 80, topMargin = 100, bottomMargin = 120;
+    if (window.innerWidth < 768) {
+      margin = 20;
+      if (window.innerHeight < 500) {
+        topMargin = 40; // Landscape
+        bottomMargin = 60;
+      } else {
+        topMargin = 60; // Portrait
+        bottomMargin = 80;
+      }
+    }
+    
     const robot = {
       id: state.nextRobotId++,
       type: selectedRobot,
@@ -1248,7 +1376,19 @@ export default function MleoSpaceMining() {
     const sectorData = SPACE_SECTORS.find(s => s.id === sector);
     const asteroidType = sectorData.asteroidTypes[Math.floor(Math.random() * sectorData.asteroidTypes.length)];
     const typeData = ASTEROID_TYPES[asteroidType];
-    const margin = 80, topMargin = 100, bottomMargin = 120;
+    // Mobile responsive margins
+    let margin = 80, topMargin = 100, bottomMargin = 120;
+    if (window.innerWidth < 768) {
+      margin = 20;
+      if (window.innerHeight < 500) {
+        topMargin = 40; // Landscape
+        bottomMargin = 60;
+      } else {
+        topMargin = 60; // Portrait
+        bottomMargin = 80;
+      }
+    }
+    
     return {
       id: Date.now() + Math.random(),
       x: Math.random() * (STATION_WIDTH - margin * 2) + margin,
@@ -1275,13 +1415,31 @@ export default function MleoSpaceMining() {
       <div className="min-h-screen bg-black text-white overflow-hidden">
         {/* Mobile-specific styles */}
         <style jsx>{`
+          /* Global mobile optimizations */
+          * {
+            box-sizing: border-box;
+          }
+          
+          html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+          }
+          
           @media (max-width: 768px) {
-            body {
+            html, body {
+              position: fixed;
+              width: 100vw;
+              height: 100vh;
+              height: calc(var(--app-100vh, 100vh));
               touch-action: manipulation;
               -webkit-user-select: none;
               -moz-user-select: none;
               -ms-user-select: none;
               user-select: none;
+              -webkit-overflow-scrolling: touch;
             }
             
             /* Prevent zoom on input focus */
@@ -1293,47 +1451,106 @@ export default function MleoSpaceMining() {
             .modal-content {
               -webkit-overflow-scrolling: touch;
             }
+            
+            /* Game container mobile */
+            .game-container {
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100vw;
+              height: 100vh;
+              height: calc(var(--app-100vh, 100vh));
+            }
+            
+            /* Canvas mobile */
+            .canvas-wrapper {
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 100% !important;
+              height: 100% !important;
+            }
+          }
+          
+          /* Portrait mobile fixes */
+          @media (max-width: 768px) and (orientation: portrait) {
+            .mobile-header {
+              height: 48px !important;
+              padding: 6px 12px !important;
+            }
+            
+            .canvas-wrapper {
+              height: calc(100vh - 48px) !important;
+              height: calc(var(--app-100vh, 100vh) - 48px) !important;
+              top: 48px !important;
+            }
+            
+            /* UI buttons for portrait */
+            .mobile-ui-buttons {
+              bottom: 8px !important;
+              right: 8px !important;
+              gap: 6px !important;
+            }
+            
+            .mobile-ui-buttons button {
+              padding: 8px 12px !important;
+              font-size: 12px !important;
+            }
           }
           
           /* Landscape mobile fixes */
           @media (max-height: 500px) and (orientation: landscape) {
-            body {
-              overflow: hidden;
-            }
-            
-            .game-container {
-              height: 100vh !important;
-              height: calc(var(--app-100vh, 100vh)) !important;
-            }
-            
             .mobile-header {
-              height: 32px !important;
-              padding: 4px 8px !important;
+              height: 28px !important;
+              padding: 2px 6px !important;
             }
             
             .mobile-header .text-xs {
+              font-size: 9px !important;
+            }
+            
+            .mobile-header .font-bold {
               font-size: 10px !important;
             }
             
             .canvas-wrapper {
-              height: calc(100vh - 32px) !important;
-              height: calc(var(--app-100vh, 100vh) - 32px) !important;
+              height: calc(100vh - 28px) !important;
+              height: calc(var(--app-100vh, 100vh) - 28px) !important;
+              top: 28px !important;
+            }
+            
+            /* UI buttons for landscape */
+            .mobile-ui-buttons {
+              bottom: 4px !important;
+              right: 4px !important;
+              gap: 3px !important;
+            }
+            
+            .mobile-ui-buttons button {
+              padding: 4px 6px !important;
+              font-size: 10px !important;
+              border-radius: 4px !important;
             }
             
             /* Fix modals for landscape */
             .modal-backdrop {
-              padding: 8px !important;
+              padding: 4px !important;
             }
             
             .modal-content {
-              max-height: calc(100vh - 16px) !important;
-              max-height: calc(var(--app-100vh, 100vh) - 16px) !important;
+              max-height: calc(100vh - 8px) !important;
+              max-height: calc(var(--app-100vh, 100vh) - 8px) !important;
+              padding: 8px !important;
             }
             
             /* Fix upgrades panel for landscape */
             .upgrades-panel {
-              max-height: calc(100vh - 40px) !important;
-              max-height: calc(var(--app-100vh, 100vh) - 40px) !important;
+              max-height: calc(100vh - 32px) !important;
+              max-height: calc(var(--app-100vh, 100vh) - 32px) !important;
+              top: 32px !important;
+              left: 4px !important;
+              right: 4px !important;
+              padding: 6px !important;
             }
           }
         `}</style>
@@ -1621,7 +1838,7 @@ export default function MleoSpaceMining() {
           ))}
 
           {/* UI Overlay - Mobile Responsive */}
-          <div className="absolute bottom-1 right-1 md:bottom-4 md:right-4 flex flex-col gap-1 md:gap-2 z-20">
+          <div className="absolute bottom-1 right-1 md:bottom-4 md:right-4 flex flex-col gap-1 md:gap-2 z-20 mobile-ui-buttons">
             {/* Mobile: Horizontal buttons - Landscape optimized */}
             <div className="md:hidden flex gap-1">
               <button onClick={() => setShowShop(true)} className="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-bold">
