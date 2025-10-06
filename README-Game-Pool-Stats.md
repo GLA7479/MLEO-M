@@ -12,6 +12,7 @@
 - **Daily Cap**: 50M MLEO לכל משתמש ביום
 - **Status**: Active/Paused
 - **Progress Bar**: אחוז הביקוש
+- **Token Address**: כתובת MLEO עם אפשרות העתקה
 
 ## 🔧 איך זה עובד:
 
@@ -29,6 +30,7 @@
 - מציג את הנתונים בפורמט ידידותי (200B במקום 200000000000000000000000000000)
 - מראה אינדיקטור אם הנתונים חיים או מדומים
 - מעדכן אוטומטית כל 30 שניות
+- כולל כתובת MLEO עם אפשרות העתקה ופידבק חזותי
 
 ## 🚀 הפעלה:
 
@@ -66,6 +68,7 @@ MLEOGameClaimV3: 0xC19AA307ed110F416dA458b4687a606ffbaCc1D0
 - הנתונים מתעדכנים כל 30 שניות
 - התצוגה תומכת במספרים גדולים (B, M, K)
 - יש טיפול בשגיאות עם הודעות ברורות
+- כתובת MLEO עם אפשרות העתקה ופידבק חזותי
 
 ## 🎮 שימוש במשחק:
 
@@ -73,3 +76,4 @@ MLEOGameClaimV3: 0xC19AA307ed110F416dA458b4687a606ffbaCc1D0
 - כמה MLEO נותרו לביקוש
 - מה התקרה היומית שלהם
 - מצב הבריכת המטבעות (פעיל/מושהה)
+- כתובת MLEO עם אפשרות העתקה

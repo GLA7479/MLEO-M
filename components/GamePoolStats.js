@@ -38,6 +38,25 @@ export default function GamePoolStats() {
     }
   }, [error, data]);
 
+  // Copy token address function
+  const copyTokenAddress = () => {
+    const tokenAddress = "0xDe428F98f6CB756bBB436618E8a97e0aa9bb9787";
+    navigator.clipboard.writeText(tokenAddress);
+    
+    // Show temporary notification
+    const button = document.querySelector('[title="Click to copy MLEO token address"]');
+    if (button) {
+      const originalText = button.textContent;
+      const originalBg = button.style.backgroundColor;
+      button.textContent = "Copied! ✅";
+      button.style.backgroundColor = "rgba(34, 197, 94, 0.8)";
+      setTimeout(() => {
+        button.textContent = originalText;
+        button.style.backgroundColor = originalBg || "rgba(17, 24, 39, 0.6)";
+      }, 2000);
+    }
+  };
+
   if (loading) {
     return (
       <div className={styles.gamePoolStats}>
@@ -116,6 +135,18 @@ export default function GamePoolStats() {
         <p className={styles.dailyCap}>
           Daily Cap: {formatLargeNumber(data.dailyUserCap)} MLEO per user
         </p>
+        
+        {/* Token Address */}
+        <div className={styles.tokenAddress}>
+          <span className={styles.tokenLabel}>MLEO Token:</span>
+          <button
+            onClick={() => copyTokenAddress()}
+            className={styles.tokenButton}
+            title="Click to copy MLEO token address"
+          >
+            0xDe428F98f6CB756bBB436618E8a97e0aa9bb9787 📋
+          </button>
+        </div>
       </div>
     </div>
   );
