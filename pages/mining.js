@@ -397,10 +397,11 @@ export default function GamesHub() {
           backgroundImage: `url(${BG_URL})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat'
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'fixed'
         }}
       >
-        <div className="absolute inset-0 bg-black/60"></div>
+        <div className="absolute inset-0 bg-black/30"></div>
         <div className="relative z-10 container mx-auto px-4 py-8">
           <div className="max-w-4xl mx-auto">
             {/* Navigation */}
