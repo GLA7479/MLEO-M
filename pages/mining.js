@@ -411,7 +411,12 @@ export default function GamesHub() {
                 </button>
               </Link>
               <div style={{ transform: 'scale(0.8)' }}>
-                <ConnectButton />
+                <ConnectButton 
+                  chainStatus="none"
+                  accountStatus="avatar"
+                  showBalance={false}
+                  label="CONNECT"
+                />
               </div>
             </div>
 

@@ -73,9 +73,10 @@ export default function GamesHub() {
 
   {/* Wallet connect */}
   <ConnectButton
-    showBalance={false}
-    accountStatus={{ smallScreen: "avatar", largeScreen: "full" }}
     chainStatus="none"
+    accountStatus="avatar"
+    showBalance={false}
+    label="CONNECT"
   />
 </div>
 
