@@ -1107,7 +1107,7 @@ async function withdrawAllToWallet() {
   // PART 16 — RENDER
   // ========================================================================
   return (
-    <Layout>
+    <Layout isGame={true} title="MLEO — Token Rush">
       <main className="min-h-[100svh] bg-gradient-to-b from-zinc-950 to-black text-zinc-100">
         <div className="max-w-6xl mx-auto p-4">
 

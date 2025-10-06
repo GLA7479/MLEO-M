@@ -3,6 +3,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import game fixes */
+@import './game-fixes.css';
+
 /* ===== iOS/Android real viewport height (updated by JS too) ===== */
 :root {
   /* start with small-viewport unit; JS will overwrite to visualViewport height on iOS */

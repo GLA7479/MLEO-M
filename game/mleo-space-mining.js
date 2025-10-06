@@ -1574,7 +1574,7 @@ export default function MleoSpaceMining() {
   }
 
   return (
-    <Layout>
+    <Layout isGame={true} title="MLEO — Space Mining">
       <div className="min-h-screen bg-black text-white overflow-hidden">
         {/* Mobile-specific styles */}
         <style jsx>{`
