@@ -34,22 +34,7 @@ canvas {
   max-height: 100% !important;
 }
 
-/* Mobile viewport fixes */
-@media (max-width: 768px) {
-  html, body {
-    overflow: hidden !important;
-    position: fixed !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    height: calc(var(--app-100vh, 100vh)) !important;
-  }
-  
-  .game-container {
-    width: 100vw !important;
-    height: 100vh !important;
-    height: calc(var(--app-100vh, 100vh)) !important;
-  }
-}
+/* Mobile viewport fixes - REMOVED */
 
 /* Landscape mobile fixes */
 @media (max-height: 500px) and (orientation: landscape) {
