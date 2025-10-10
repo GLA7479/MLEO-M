@@ -23,7 +23,7 @@ const TEXT = {
     playMiners: "Play Miners",
     acceptTermsToPlay: "🔒 Accept Terms to Play",
     rush: "MLEO — Rush",
-    rushDesc: "Advanced mining with Prestige system! Mine MLEO passively, upgrade equipment, earn achievements, and reset for permanent bonuses. Complete prestige cycles for infinite progression.",
+    rushDesc: "Advanced mining with Prestige system! Mine MLEO passively, upgrade equipment, earn achievements, and reset for permanent bonuses.",
     passive: "Passive",
     playTokenRush: "Play Token Rush",
     howToPlayTitle: "How to Play",
@@ -92,7 +92,7 @@ const TEXT = {
     playMiners: "שחק כורים",
     acceptTermsToPlay: "🔒 קבל תנאים כדי לשחק",
     rush: "MLEO — Rush",
-    rushDesc: "כרייה מתקדמת עם מערכת Prestige! כרה MLEO פסיבית, שדרג ציוד, השג הישגים ואיפוס עבור בונוסים קבועים. השלם מחזורי prestige להתקדמות אינסופית.",
+    rushDesc: "כרייה מתקדמת עם מערכת Prestige! כרה MLEO פסיבית, שדרג ציוד, השג הישגים ואיפוס עבור בונוסים קבועים.",
     passive: "פסיבי",
     playTokenRush: "שחק Token Rush",
     howToPlayTitle: "איך לשחק",
@@ -503,14 +503,14 @@ export default function GamesHub() {
             <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch max-w-[750px] mx-auto justify-items-center">
   {/* MINERS */}
               <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-6 flex flex-col w-full max-w-[350px] min-h-[320px]">
-    <div className="flex items-start justify-between">
-                  <div className="flex-1 pr-2">
+    <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
+                  <div>
                     <h2 className="text-[20px] sm:text-2xl font-extrabold">{text.miners}</h2>
                     <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
                       {text.minersDesc}
         </p>
       </div>
-                  <span className="ml-2 mt-1 rounded-full px-2 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  <span className="rounded-full px-2 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                     {text.active}
       </span>
     </div>
@@ -541,14 +541,14 @@ export default function GamesHub() {
 
   {/* TOKEN RUSH */}
               <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-6 flex flex-col w-full max-w-[350px] min-h-[320px]">
-    <div className="flex items-start justify-between">
-                  <div className="flex-1 pr-2">
+    <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
+                  <div>
                     <h2 className="text-[20px] sm:text-2xl font-extrabold">{text.rush}</h2>
                     <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
                       {text.rushDesc}
         </p>
       </div>
-                  <span className="ml-2 mt-1 rounded-full px-2 py-1 text-xs font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30">
+                  <span className="rounded-full px-2 py-1 text-xs font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30">
                     {text.passive}
       </span>
     </div>
