@@ -21,9 +21,12 @@ import { parseUnits } from "viem";
 // CONFIG & CONSTANTS
 // ============================================================================
 const LS_KEYS = {
-  CORE: "mleo_rush_core_v3",
-  SESSION: "mleo_rush_session_v3",
-  GUILD: "mleo_rush_guild_v3",
+  CORE: "mleo_rush_core_v4",
+  SESSION: "mleo_rush_session_v4",
+  GUILD: "mleo_rush_guild_v4",
+  PRESTIGE: "mleo_rush_prestige_v4",
+  ACHIEVEMENTS: "mleo_rush_achievements_v4",
+  MASTERY: "mleo_rush_mastery_v4",
 };
 
 const OTHER_GAME_CORE_KEY = "mleoMiningEconomy_v2.1"; // MLEO-MINERS
@@ -94,6 +97,36 @@ const CONFIG = {
   CHEST_MINUTES_MAX: 40,
   CHEST_WINDOW_SEC: 60,                      // 60s to claim
   CHEST_REWARD_RANGE: [500, 5000],
+
+  // Prestige System
+  PRESTIGE_MIN_VAULT: 10000000,              // 10M MLEO minimum for prestige
+  PRESTIGE_POINTS_PER_MILLION: 1,            // 1 prestige point per 1M MLEO
+  PRESTIGE_MULT_PER_POINT: 0.02,             // +2% per prestige point
+
+  // Prestige Upgrades (persist through resets)
+  PRESTIGE_UPGRADES: [
+    { id: "pp_mult", name: "Prestige Multiplier", baseCost: 1, mult: 0.5, maxLvl: 10, desc: "Increases prestige points gained" },
+    { id: "pp_auto", name: "Auto Prestige", baseCost: 3, mult: 1, maxLvl: 1, desc: "Automatically prestige at 15M MLEO" },
+    { id: "pp_efficiency", name: "Prestige Efficiency", baseCost: 2, mult: 0.3, maxLvl: 15, desc: "More MLEO from mining" },
+    { id: "pp_speed", name: "Prestige Speed", baseCost: 5, mult: 0.2, maxLvl: 8, desc: "Faster upgrade progression" },
+  ],
+
+  // Achievements
+  ACHIEVEMENTS: [
+    { id: "first_million", name: "First Million", desc: "Mine 1M MLEO total", goal: 1000000, reward: { type: "prestige", amount: 1 } },
+    { id: "boost_master", name: "Boost Master", desc: "Click boost 1000 times", goal: 1000, reward: { type: "prestige", amount: 1 } },
+    { id: "online_warrior", name: "Online Warrior", desc: "Stay online for 24 hours", goal: 1440, reward: { type: "prestige", amount: 2 } },
+    { id: "upgrade_king", name: "Upgrade King", desc: "Buy 100 upgrades total", goal: 100, reward: { type: "prestige", amount: 1 } },
+    { id: "gift_collector", name: "Gift Collector", desc: "Claim 500 gifts", goal: 500, reward: { type: "prestige", amount: 1 } },
+    { id: "prestige_novice", name: "Prestige Novice", desc: "Complete your first prestige", goal: 1, reward: { type: "prestige", amount: 5 } },
+  ],
+
+  // Mastery System
+  MASTERY_BRANCHES: [
+    { id: "mining", name: "Mining Mastery", color: "emerald" },
+    { id: "efficiency", name: "Efficiency Mastery", color: "blue" },
+    { id: "automation", name: "Automation Mastery", color: "purple" },
+  ],
 };
 
 // ============================================================================
@@ -128,6 +161,14 @@ const initialCore = {
   dailyStreak: 0,
 
   guild: { id: null, name: null, members: 0, bonus: 0 },
+
+  // New progression systems
+  prestigePoints: 0,
+  prestigeUpgrades: {},
+  totalBoosts: 0,
+  totalUpgrades: 0,
+  totalGifts: 0,
+  totalMinutesOnline: 0,
 };
 
 const initialSession = {
@@ -399,14 +440,14 @@ function calcUpgradeCost(baseCost, level, liveModifierMult) {
   return Math.floor(baseCost * Math.pow(1.35, level) * sale);
 }
 
-function upgradesMultiplier(upgrades = {}, guild = null) {
+function upgradesMultiplier(upgrades = {}, guild = null, prestigeMultiplier = 1) {
   let mult = 1;
   for (const u of CONFIG.UPGRADES) {
     const lvl = upgrades[u.id] || 0;
     if (lvl > 0) mult += u.mult * lvl;
   }
   if (guild?.bonus) mult += guild.bonus;
-  return mult;
+  return mult * prestigeMultiplier;
 }
 
 function canClaimGift(core) {
@@ -545,6 +586,7 @@ export default function MLEOTokenRushPage() {
     return () => clearInterval(id);
   }, []);
 
+
   // Core hooks
   const liveModifierMult = (kind) => {
     const m = sess.modifier;
@@ -552,10 +594,31 @@ export default function MLEOTokenRushPage() {
     return m.mult?.[kind] || 1;
   };
 
-  const getMultiplier = () => upgradesMultiplier(core.upgrades, core.guild);
+  const getMultiplier = () => upgradesMultiplier(core.upgrades, core.guild, 1 + (core.prestigePoints * CONFIG.PRESTIGE_MULT_PER_POINT));
 
   const { core, setCore, sess, setSess, markActivity, wake } = 
     usePresenceAndMining(getMultiplier, liveModifierMult);
+
+  // New state for progression systems
+  const [achievements, setAchievements] = useState(() => safeRead(LS_KEYS.ACHIEVEMENTS, {}));
+  const [mastery, setMastery] = useState(() => safeRead(LS_KEYS.MASTERY, {}));
+
+  // Track boost clicks for achievements
+  useEffect(() => {
+    if (sess?.boost > 0 && sess?.lastBoostTick) {
+      setCore(c => ({ ...c, totalBoosts: c.totalBoosts + 1 }));
+    }
+  }, [sess?.boost, sess?.lastBoostTick]);
+
+  // Track online time for achievements
+  useEffect(() => {
+    if (core.mode === "online") {
+      const interval = setInterval(() => {
+        setCore(c => ({ ...c, totalMinutesOnline: c.totalMinutesOnline + 1 }));
+      }, 60000); // Every minute
+      return () => clearInterval(interval);
+    }
+  }, [core.mode]);
 
   // Wallet hooks
     const { isConnected, address } = useAccount();
@@ -618,6 +681,105 @@ export default function MLEOTokenRushPage() {
     showToast(`💰 Collected ${fmt(amt)} MLEO!`);
   };
 
+  // Prestige System
+  const canPrestige = () => core.vault >= CONFIG.PRESTIGE_MIN_VAULT;
+  const getPrestigePoints = () => Math.floor(core.vault / 1000000) * CONFIG.PRESTIGE_POINTS_PER_MILLION;
+  const getPrestigeMultiplier = () => 1 + (core.prestigePoints * CONFIG.PRESTIGE_MULT_PER_POINT);
+
+  const performPrestige = () => {
+    if (!canPrestige()) return;
+    
+    const points = getPrestigePoints();
+    const newPrestigePoints = core.prestigePoints + points;
+    
+    // Reset everything except prestige data
+    setCore(c => ({
+      ...initialCore,
+      prestigePoints: newPrestigePoints,
+      prestigeUpgrades: c.prestigeUpgrades,
+      totalBoosts: c.totalBoosts,
+      totalUpgrades: c.totalUpgrades,
+      totalGifts: c.totalGifts,
+      totalMinutesOnline: c.totalMinutesOnline,
+    }));
+    
+    showToast(`🌟 Prestiged! Gained ${points} Prestige Points!`);
+    checkAchievements();
+  };
+
+  // Achievement System
+  const checkAchievements = () => {
+    const newAchievements = { ...achievements };
+    let hasNew = false;
+
+    CONFIG.ACHIEVEMENTS.forEach(achievement => {
+      if (newAchievements[achievement.id]) return; // Already unlocked
+
+      let progress = 0;
+      switch (achievement.id) {
+        case "first_million":
+          progress = core.totalMined;
+          break;
+        case "boost_master":
+          progress = core.totalBoosts;
+          break;
+        case "online_warrior":
+          progress = core.totalMinutesOnline;
+          break;
+        case "upgrade_king":
+          progress = core.totalUpgrades;
+          break;
+        case "gift_collector":
+          progress = core.totalGifts;
+          break;
+        case "prestige_novice":
+          progress = core.prestigePoints > 0 ? 1 : 0;
+          break;
+      }
+
+      if (progress >= achievement.goal) {
+        newAchievements[achievement.id] = {
+          unlocked: true,
+          unlockedAt: Date.now(),
+          reward: achievement.reward
+        };
+        
+        // Apply reward
+        if (achievement.reward.type === "prestige") {
+          setCore(c => ({ ...c, prestigePoints: c.prestigePoints + achievement.reward.amount }));
+        }
+        
+        showToast(`🏆 Achievement Unlocked: ${achievement.name}!`);
+        hasNew = true;
+      }
+    });
+
+    if (hasNew) {
+      setAchievements(newAchievements);
+      safeWrite(LS_KEYS.ACHIEVEMENTS, newAchievements);
+    }
+  };
+
+  // Prestige Upgrades
+  const buyPrestigeUpgrade = (upgradeId) => {
+    const upgrade = CONFIG.PRESTIGE_UPGRADES.find(u => u.id === upgradeId);
+    if (!upgrade) return;
+
+    const currentLevel = core.prestigeUpgrades[upgradeId] || 0;
+    if (currentLevel >= upgrade.maxLvl) return;
+
+    const cost = Math.floor(upgrade.baseCost * Math.pow(1.5, currentLevel));
+    if (core.prestigePoints < cost) return;
+
+    setCore(c => ({
+      ...c,
+      prestigePoints: c.prestigePoints - cost,
+      prestigeUpgrades: { ...c.prestigeUpgrades, [upgradeId]: currentLevel + 1 }
+    }));
+
+    showToast(`⭐ Bought ${upgrade.name} Level ${currentLevel + 1}!`);
+  };
+
   const canGift = canClaimGift(core);
   const canDaily = canClaimDaily(core);
 
@@ -637,8 +799,10 @@ export default function MLEOTokenRushPage() {
       lastGiftAt: Date.now(),
       vault: c.vault + amt,
       totalMined: c.totalMined + amt,
+      totalGifts: c.totalGifts + 1,
     }));
     showToast(`🎁 Gift claimed: ${fmt(amt)} MLEO${luck > 1 ? ` (Lucky ×${luck}!)` : ''}!`);
+    checkAchievements();
   };
 
   const claimDaily = () => {
@@ -678,8 +842,10 @@ export default function MLEOTokenRushPage() {
       ...c,
       vault: c.vault - cost,
       upgrades: { ...c.upgrades, [id]: lvl + 1 },
+      totalUpgrades: c.totalUpgrades + 1,
     }));
     showToast(`⬆️ Upgraded ${u.name} to Level ${lvl + 1}!`);
+    checkAchievements();
   };
 
   // Claim to wallet
@@ -1132,6 +1298,115 @@ export default function MLEOTokenRushPage() {
   </div>
 </Section>
 
+          {/* PRESTIGE SYSTEM */}
+          <Section 
+            title="🌟 Prestige System"
+            onInfo={() => setInfoModal('prestige')}
+          >
+            <div className="grid lg:grid-cols-2 gap-4 mb-4">
+              <div className="rounded-xl p-4 bg-gradient-to-br from-yellow-600/20 to-orange-600/20 border border-yellow-500/30">
+                <div className="text-sm font-semibold mb-2">Prestige Points</div>
+                <div className="text-2xl font-bold text-yellow-400">{core.prestigePoints}</div>
+                <div className="text-xs opacity-70 mt-1">Permanent boost: +{Math.round((getPrestigeMultiplier() - 1) * 100)}%</div>
+    </div>
+              
+              <div className="rounded-xl p-4 bg-gradient-to-br from-purple-600/20 to-pink-600/20 border border-purple-500/30">
+                <div className="text-sm font-semibold mb-2">Next Prestige</div>
+                <div className="text-lg font-bold text-purple-400">
+                  {canPrestige() ? `+${getPrestigePoints()} Points` : `${fmt(CONFIG.PRESTIGE_MIN_VAULT - core.vault)} to go`}
+                </div>
+            <button
+                  onClick={performPrestige}
+                  disabled={!canPrestige()}
+                  className={`w-full mt-3 py-2 rounded-lg font-bold text-white text-sm transition-all ${
+                    canPrestige()
+                      ? "bg-gradient-to-r from-yellow-600 to-orange-500 hover:from-yellow-500 hover:to-orange-400 shadow-lg"
+                      : "bg-zinc-700 cursor-not-allowed opacity-50"
+                  }`}
+                >
+                  {canPrestige() ? `🌟 PRESTIGE (+${getPrestigePoints()})` : "Need 10M MLEO"}
+            </button>
+    </div>
+  </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              {CONFIG.PRESTIGE_UPGRADES.map(u => {
+                const lvl = core.prestigeUpgrades[u.id] || 0;
+                const maxed = lvl >= u.maxLvl;
+                const cost = Math.floor(u.baseCost * Math.pow(1.5, lvl));
+                const cantAfford = core.prestigePoints < cost;
+                
+                return (
+                  <div key={u.id} className="rounded-xl p-3 bg-gradient-to-br from-yellow-600/10 to-orange-600/10 border border-yellow-500/20">
+                    <div className="text-sm font-semibold mb-1">{u.name}</div>
+                    <div className="text-xs opacity-70 mb-1">{u.desc}</div>
+                    <div className="text-sm font-bold mb-2">Lv {lvl}/{u.maxLvl}</div>
+                    <button
+                      onClick={() => buyPrestigeUpgrade(u.id)}
+                      disabled={maxed || cantAfford}
+                      className={`w-full py-1.5 rounded text-white text-xs font-bold transition-all ${
+                        maxed
+                          ? "bg-zinc-700 cursor-not-allowed opacity-50"
+                          : cantAfford
+                          ? "bg-zinc-700 cursor-not-allowed opacity-50"
+                          : "bg-gradient-to-r from-yellow-600 to-orange-500 hover:from-yellow-500 hover:to-orange-400"
+                      }`}
+                    >
+                      {maxed ? "✓ MAXED" : cantAfford ? `${cost} PP` : `Buy ${cost} PP`}
+                    </button>
+    </div>
+                );
+              })}
+    </div>
+  </Section>
+
+          {/* ACHIEVEMENTS */}
+<Section
+            title="🏆 Achievements"
+            onInfo={() => setInfoModal('achievements')}
+          >
+            <div className="grid sm:grid-cols-2 gap-3">
+              {CONFIG.ACHIEVEMENTS.map(achievement => {
+                const unlocked = achievements[achievement.id];
+                let progress = 0;
+                
+                switch (achievement.id) {
+                  case "first_million": progress = core.totalMined; break;
+                  case "boost_master": progress = core.totalBoosts; break;
+                  case "online_warrior": progress = core.totalMinutesOnline; break;
+                  case "upgrade_king": progress = core.totalUpgrades; break;
+                  case "gift_collector": progress = core.totalGifts; break;
+                  case "prestige_novice": progress = core.prestigePoints > 0 ? 1 : 0; break;
+                }
+                
+                const progressPercent = Math.min((progress / achievement.goal) * 100, 100);
+                
+                return (
+                  <div key={achievement.id} className={`rounded-xl p-3 border ${
+                    unlocked 
+                      ? "bg-gradient-to-br from-green-600/20 to-emerald-600/20 border-green-500/30" 
+                      : "bg-gradient-to-br from-white/5 to-white/10 border-white/10"
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-semibold">{achievement.name}</div>
+                      {unlocked && <span className="text-green-400">✓</span>}
+  </div>
+                    <div className="text-xs opacity-70 mb-2">{achievement.desc}</div>
+                    <div className="w-full bg-white/10 rounded-full h-2 mb-2">
+                      <div 
+                        className="h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full" 
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+                    <div className="text-xs opacity-60">
+                      {progress >= achievement.goal ? "Completed!" : `${progress}/${achievement.goal}`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+</Section>
+
           {/* INFO MODALS */}
           <InfoModal isOpen={infoModal === 'vault'} onClose={() => setInfoModal(null)} title="💰 MLEO Vault">
             <p><strong>Mining Pool:</strong> Accumulates passively from your mining operations.</p>
@@ -1165,6 +1440,33 @@ export default function MLEOTokenRushPage() {
               ))}
   </ul>
             <p className="text-emerald-400 mt-2"><strong>💡 Tip:</strong> Watch for -25% Upgrade cost events to save MLEO!</p>
+          </InfoModal>
+
+          <InfoModal isOpen={infoModal === 'prestige'} onClose={() => setInfoModal(null)} title="🌟 Prestige System">
+            <p><strong>Prestige</strong> resets your progress in exchange for permanent bonuses!</p>
+            <p><strong>How it works:</strong></p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>Need 10M MLEO in vault to prestige</li>
+              <li>Gain 1 Prestige Point per 1M MLEO</li>
+              <li>Each Prestige Point gives +2% permanent boost</li>
+              <li>Prestige Upgrades persist through resets</li>
+            </ul>
+            <p className="text-yellow-400 mt-2"><strong>🌟 Prestige Upgrades:</strong></p>
+            <ul className="list-disc list-inside mt-1 space-y-1">
+              {CONFIG.PRESTIGE_UPGRADES.map(u => (
+                <li key={u.id}><strong>{u.name}:</strong> {u.desc}</li>
+              ))}
+            </ul>
+          </InfoModal>
+
+          <InfoModal isOpen={infoModal === 'achievements'} onClose={() => setInfoModal(null)} title="🏆 Achievements">
+            <p><strong>Achievements</strong> reward you for reaching milestones!</p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              {CONFIG.ACHIEVEMENTS.map(a => (
+                <li key={a.id}><strong>{a.name}:</strong> {a.desc} → {a.reward.amount} Prestige Points</li>
+              ))}
+            </ul>
+            <p className="text-green-400 mt-2"><strong>🏆 Tip:</strong> Complete achievements to earn bonus Prestige Points!</p>
           </InfoModal>
 
           <InfoModal isOpen={infoModal === 'guild'} onClose={() => setInfoModal(null)} title="👥 Mining Guild">
