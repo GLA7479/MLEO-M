@@ -23,11 +23,31 @@ const TEXT = {
     playMiners: "Play Miners",
     acceptTermsToPlay: "🔒 Accept Terms to Play",
     rush: "MLEO — Rush",
-    rushDesc: "Passive online mining with automatic offline accrual (time-capped). Same Vault + CLAIM flow for background gains.",
+    rushDesc: "Advanced mining with Prestige system! Mine MLEO passively, upgrade equipment, earn achievements, and reset for permanent bonuses. Complete prestige cycles for infinite progression.",
     passive: "Passive",
     playTokenRush: "Play Token Rush",
     howToPlayTitle: "How to Play",
     goal: "Goal",
+    rushGoal: "Rush Goal",
+    rushGoalDesc: "Mine MLEO tokens passively and build your empire! Use mined MLEO to upgrade equipment, earn achievements, and prestige for permanent bonuses. The more you play, the stronger you become.",
+    rushGameplay: "Gameplay",
+    rushGameplaySteps: [
+      "Mine MLEO passively - your equipment works automatically",
+      "Click BOOST to increase mining speed temporarily (+2% per click)",
+      "Collect mined MLEO to your Vault for upgrades and claims",
+      "Buy upgrades: Auto-Drill, Helmet, Cart, and Leo Bot for faster mining",
+      "Earn achievements by reaching milestones for bonus rewards",
+      "Prestige at 10M MLEO to reset progress for permanent bonuses"
+    ],
+    rushFeatures: "Key Features",
+    rushFeaturesList: [
+      "Prestige System: Reset upgrades for permanent +2% per prestige point",
+      "Achievements: 6 different achievements with Prestige Point rewards",
+      "Upgrades: 4 equipment types with multiple levels each",
+      "Boost System: Temporary speed increase that decays over time",
+      "Guild System: Join mining guilds for bonus multipliers",
+      "Bridge: Transfer MLEO from Miners game to Rush vault"
+    ],
     goalDesc: "Merge dogs (miners), break rocks, and earn Coins. Coins are an in-game resource used for upgrades and buying more miners. Some activity in the game can also accrue MLEO (see \"Mining & Tokens\" below).",
     boardMerging: "Board & Merging",
     boardSteps: [
@@ -72,11 +92,31 @@ const TEXT = {
     playMiners: "שחק כורים",
     acceptTermsToPlay: "🔒 קבל תנאים כדי לשחק",
     rush: "MLEO — Rush",
-    rushDesc: "כרייה פסיבית אונליין עם צבירה אוטומטית אופליין (מוגבלת זמן). אותו Vault + זרימת CLAIM לרווחים ברקע.",
+    rushDesc: "כרייה מתקדמת עם מערכת Prestige! כרה MLEO פסיבית, שדרג ציוד, השג הישגים ואיפוס עבור בונוסים קבועים. השלם מחזורי prestige להתקדמות אינסופית.",
     passive: "פסיבי",
     playTokenRush: "שחק Token Rush",
     howToPlayTitle: "איך לשחק",
     goal: "מטרה",
+    rushGoal: "מטרת Rush",
+    rushGoalDesc: "כרה מטבעות MLEO פסיבית ובנה את האימפריה שלך! השתמש ב-MLEO הכרו לשדרוג ציוד, השג הישגים ו-prestige עבור בונוסים קבועים. ככל שתשחק יותר, תהיה חזק יותר.",
+    rushGameplay: "משחק",
+    rushGameplaySteps: [
+      "כרה MLEO פסיבית - הציוד שלך עובד אוטומטית",
+      "לחץ BOOST כדי להגדיל זמנית את מהירות הכרייה (+2% לכל לחיצה)",
+      "אסוף MLEO כרו ל-Vault שלך לשדרוגים ותביעות",
+      "קנה שדרוגים: Auto-Drill, Helmet, Cart ו-Leo Bot לכרייה מהירה יותר",
+      "השג הישגים על ידי הגעה לאבני דרך עבור תגמולי בונוס",
+      "Prestige ב-10M MLEO כדי לאפס התקדמות עבור בונוסים קבועים"
+    ],
+    rushFeatures: "תכונות עיקריות",
+    rushFeaturesList: [
+      "מערכת Prestige: אפס שדרוגים עבור +2% קבוע לכל נקודת prestige",
+      "הישגים: 6 הישגים שונים עם תגמולי נקודות Prestige",
+      "שדרוגים: 4 סוגי ציוד עם מספר רמות כל אחד",
+      "מערכת Boost: הגדלת מהירות זמנית שמדעכת עם הזמן",
+      "מערכת Guild: הצטרף לגילדות כרייה עבור מכפילי בונוס",
+      "Bridge: העבר MLEO ממשחק Miners ל-Vault של Rush"
+    ],
     goalDesc: "מזג כלבים (כורים), שבור סלעים והרווח מטבעות. מטבעות הם משאב במשחק המשמש לשדרוגים וקניית כורים נוספים. פעילות מסוימת במשחק יכולה גם לצבור MLEO (ראה \"כרייה ומטבעות\" למטה).",
     boardMerging: "לוח ומיזוג",
     boardSteps: [
@@ -154,12 +194,43 @@ function Modal({ isOpen, onClose, children }) {
 }
 
 // ===== How to Play Component =====
-function HowToPlay({ lang, onClose }) {
+function HowToPlay({ lang, onClose, gameType = "miners" }) {
   const text = TEXT[lang];
+  
+  if (gameType === "rush") {
+    return (
+      <div>
+        <h2 className="text-2xl font-bold mb-4">{text.howToPlayTitle} - Rush</h2>
+        
+        <section className="mb-6">
+          <h3 className="font-bold text-lg mb-2">{text.rushGoal}</h3>
+          <p className="text-gray-700">{text.rushGoalDesc}</p>
+        </section>
+        
+        <section className="mb-6">
+          <h3 className="font-bold text-lg mb-2">{text.rushGameplay}</h3>
+          <ol className="list-decimal ml-5 space-y-2">
+            {text.rushGameplaySteps.map((step, index) => (
+              <li key={index} className="text-gray-700">{step}</li>
+            ))}
+          </ol>
+        </section>
+        
+        <section className="mb-6">
+          <h3 className="font-bold text-lg mb-2">{text.rushFeatures}</h3>
+          <ul className="list-disc ml-5 space-y-2">
+            {text.rushFeaturesList.map((item, index) => (
+              <li key={index} className="text-gray-700">{item}</li>
+            ))}
+          </ul>
+        </section>
+      </div>
+    );
+  }
   
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4">{text.howToPlayTitle}</h2>
+      <h2 className="text-2xl font-bold mb-4">{text.howToPlayTitle} - Miners</h2>
       
       <section className="mb-6">
         <h3 className="font-bold text-lg mb-2">{text.goal}</h3>
@@ -429,13 +500,13 @@ export default function GamesHub() {
           </header>
 
             {/* Cards */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-stretch max-w-[700px] mx-auto justify-items-center">
+            <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch max-w-[750px] mx-auto justify-items-center">
   {/* MINERS */}
-              <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-4 flex flex-col w-full max-w-[320px] min-h-[280px]">
+              <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-6 flex flex-col w-full max-w-[350px] min-h-[320px]">
     <div className="flex items-start justify-between">
                   <div className="flex-1 pr-2">
-                    <h2 className="text-[18px] sm:text-xl font-extrabold">{text.miners}</h2>
-                    <p className="text-[12px] sm:text-xs text-zinc-300 mt-1 leading-5 break-words hyphens-auto">
+                    <h2 className="text-[20px] sm:text-2xl font-extrabold">{text.miners}</h2>
+                    <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
                       {text.minersDesc}
         </p>
       </div>
@@ -448,13 +519,13 @@ export default function GamesHub() {
       <div className="flex flex-wrap gap-2 mb-3 justify-center">
         <button
           onClick={() => open("miners-how")}
-                      className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-500/30 transition-colors"
+                      className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-4 py-2 rounded-lg text-sm font-bold border border-blue-500/30 transition-colors"
         >
                       {text.howToPlay}
         </button>
         <button
                       onClick={() => open("terms")}
-                      className="bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-500/30 transition-colors"
+                      className="bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 px-4 py-2 rounded-lg text-sm font-bold border border-gray-500/30 transition-colors"
         >
                       {text.terms}
         </button>
@@ -469,11 +540,11 @@ export default function GamesHub() {
   </article>
 
   {/* TOKEN RUSH */}
-              <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-4 flex flex-col w-full max-w-[320px] min-h-[280px]">
+              <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-6 flex flex-col w-full max-w-[350px] min-h-[320px]">
     <div className="flex items-start justify-between">
                   <div className="flex-1 pr-2">
-                    <h2 className="text-[18px] sm:text-xl font-extrabold">{text.rush}</h2>
-                    <p className="text-[12px] sm:text-xs text-zinc-300 mt-1 leading-5 break-words hyphens-auto">
+                    <h2 className="text-[20px] sm:text-2xl font-extrabold">{text.rush}</h2>
+                    <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
                       {text.rushDesc}
         </p>
       </div>
@@ -486,13 +557,13 @@ export default function GamesHub() {
       <div className="flex flex-wrap gap-2 mb-3 justify-center">
         <button
           onClick={() => open("rush-how")}
-                      className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-500/30 transition-colors"
+                      className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-4 py-2 rounded-lg text-sm font-bold border border-blue-500/30 transition-colors"
         >
                       {text.howToPlay}
         </button>
         <button
                       onClick={() => open("terms")}
-                      className="bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-500/30 transition-colors"
+                      className="bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 px-4 py-2 rounded-lg text-sm font-bold border border-gray-500/30 transition-colors"
         >
                       {text.terms}
         </button>
@@ -526,7 +597,7 @@ export default function GamesHub() {
         </Modal>
 
       <Modal isOpen={modal === "rush-how"} onClose={close}>
-        <HowToPlay lang={lang} onClose={close} />
+        <HowToPlay lang={lang} onClose={close} gameType="rush" />
         </Modal>
 
       <Modal isOpen={modal === "terms"} onClose={close}>

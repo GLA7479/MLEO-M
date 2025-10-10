@@ -113,7 +113,7 @@ const CONFIG = {
 
   // Achievements
   ACHIEVEMENTS: [
-    { id: "first_million", name: "First Million", desc: "Mine 1M MLEO total", goal: 1000000, reward: { type: "prestige", amount: 1 } },
+    { id: "first_million", name: "First Million", desc: "Mine 1.00M MLEO total", goal: 1000000, reward: { type: "prestige", amount: 1 } },
     { id: "boost_master", name: "Boost Master", desc: "Click boost 1000 times", goal: 1000, reward: { type: "prestige", amount: 1 } },
     { id: "online_warrior", name: "Online Warrior", desc: "Stay online for 24 hours", goal: 1440, reward: { type: "prestige", amount: 2 } },
     { id: "upgrade_king", name: "Upgrade King", desc: "Buy 100 upgrades total", goal: 100, reward: { type: "prestige", amount: 1 } },
@@ -489,10 +489,21 @@ function useGuildActions(setCore) {
 // ============================================================================
 // UI COMPONENTS
 // ============================================================================
-function Stat({ label, value, sub }) {
+function Stat({ label, value, sub, onInfo }) {
   return (
     <div className="rounded-xl p-3 bg-gradient-to-br from-white/5 to-white/10 border border-white/10 shadow-sm">
-      <div className="text-xs uppercase opacity-70 font-semibold">{label}</div>
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase opacity-70 font-semibold">{label}</div>
+        {onInfo && (
+          <button
+            onClick={onInfo}
+            className="w-4 h-4 rounded-full bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/30 font-bold text-xs flex items-center justify-center"
+            title="Info"
+          >
+            ?
+          </button>
+        )}
+      </div>
       <div className="text-xl font-bold tabular-nums mt-1">{value}</div>
       {sub ? <div className="text-xs opacity-60 mt-1">{sub}</div> : null}
     </div>
@@ -1031,23 +1042,35 @@ export default function MLEOTokenRushPage() {
       </span>
     }
               sub={core.mode === "online" ? "Active mining" : "Offline (reduced rate)"}
+              onInfo={() => setInfoModal('mining_status')}
             />
 
             <Stat 
               label="Mining Pool" 
               value={fmt(core.miningPool)} 
-              sub="Click COLLECT to claim" 
+              sub="Click COLLECT to claim"
+              onInfo={() => setInfoModal('mining_pool')}
             />
 
             <Stat 
               label="Total Mined" 
               value={fmt(core.totalMined)} 
-              sub={`Multiplier: ${mult.toFixed(2)}×`} 
+              sub={`Multiplier: ${mult.toFixed(2)}×`}
+              onInfo={() => setInfoModal('total_mined')}
             />
 
             <div className="rounded-xl p-3 bg-gradient-to-br from-white/5 to-white/10 border border-white/10 shadow-sm">
               <div className="flex items-center justify-between mb-2">
-                <div className="text-xs uppercase opacity-70 font-semibold">BOOST</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-xs uppercase opacity-70 font-semibold">BOOST</div>
+                  <button
+                    onClick={() => setInfoModal('boost')}
+                    className="w-4 h-4 rounded-full bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/30 font-bold text-xs flex items-center justify-center"
+                    title="Info"
+                  >
+                    ?
+                  </button>
+                </div>
     <button
       onClick={wake}
                   className={`px-2 py-1 rounded text-white text-xs font-bold ${
@@ -1399,7 +1422,10 @@ export default function MLEOTokenRushPage() {
                       />
                     </div>
                     <div className="text-xs opacity-60">
-                      {progress >= achievement.goal ? "Completed!" : `${progress}/${achievement.goal}`}
+                      {progress >= achievement.goal ? "Completed!" : 
+                        achievement.id === "first_million" ? 
+                          `${fmt(progress)}/1.00M` : 
+                          `${fmt(progress)}/${fmt(achievement.goal)}`}
                     </div>
                   </div>
                 );
@@ -1467,6 +1493,39 @@ export default function MLEOTokenRushPage() {
               ))}
             </ul>
             <p className="text-green-400 mt-2"><strong>🏆 Tip:</strong> Complete achievements to earn bonus Prestige Points!</p>
+          </InfoModal>
+
+          <InfoModal isOpen={infoModal === 'mining_status'} onClose={() => setInfoModal(null)} title="⛏️ Mining Status">
+            <p><strong>ONLINE:</strong> Active mining at full speed with all bonuses applied.</p>
+            <p><strong>OFFLINE:</strong> Reduced mining rate (50% of online speed) with a 12-hour cap.</p>
+            <p><strong>Switch:</strong> Click the BOOST button to toggle between online/offline modes.</p>
+            <p className="text-emerald-400 mt-2"><strong>💡 Tip:</strong> Stay online for maximum mining efficiency!</p>
+          </InfoModal>
+
+          <InfoModal isOpen={infoModal === 'mining_pool'} onClose={() => setInfoModal(null)} title="⛏️ Mining Pool">
+            <p><strong>Mining Pool</strong> accumulates MLEO from your passive mining operations.</p>
+            <p><strong>Collection:</strong> Click "COLLECT MINED" to transfer all accumulated MLEO to your Vault.</p>
+            <p><strong>Rate:</strong> Mining speed depends on your upgrades, guild bonus, and prestige multiplier.</p>
+            <p className="text-blue-400 mt-2"><strong>💡 Tip:</strong> Collect regularly to avoid losing progress!</p>
+          </InfoModal>
+
+          <InfoModal isOpen={infoModal === 'total_mined'} onClose={() => setInfoModal(null)} title="📊 Total Mined">
+            <p><strong>Total Mined</strong> tracks your lifetime MLEO production across all sessions.</p>
+            <p><strong>Multiplier:</strong> Shows your current mining multiplier from upgrades, guild, and prestige.</p>
+            <p><strong>Prestige:</strong> Higher prestige levels increase your base multiplier permanently.</p>
+            <p className="text-purple-400 mt-2"><strong>💡 Tip:</strong> This number never resets, even after prestige!</p>
+          </InfoModal>
+
+          <InfoModal isOpen={infoModal === 'boost'} onClose={() => setInfoModal(null)} title="⚡ Boost System">
+            <p><strong>BOOST</strong> temporarily increases your mining speed!</p>
+            <p><strong>How it works:</strong></p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>Click to add +2% mining speed</li>
+              <li>Maximum boost: 50% (25 clicks)</li>
+              <li>Decays over 60 seconds</li>
+              <li>When offline: Click to resume mining</li>
+            </ul>
+            <p className="text-emerald-400 mt-2"><strong>⚡ Tip:</strong> Click frequently for maximum mining efficiency!</p>
           </InfoModal>
 
           <InfoModal isOpen={infoModal === 'guild'} onClose={() => setInfoModal(null)} title="👥 Mining Guild">
