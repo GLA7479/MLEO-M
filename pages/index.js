@@ -776,7 +776,7 @@ function LanguageSelector({ lang, setLang }) {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/15 transition text-sm flex items-center gap-2"
+        className="px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 hover:bg-white/15 transition text-xs flex items-center gap-1.5"
         style={{ fontFamily: "system-ui, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol" }}
       >
         <span className="mr-1">{FLAGS[lang] || '🌐'}</span>
@@ -786,16 +786,20 @@ function LanguageSelector({ lang, setLang }) {
         </svg>
       </button>
       
-      {isOpen && (
+      {isOpen && createPortal(
         <>
-          <div className="fixed inset-0 z-[100]" onClick={() => setIsOpen(false)} />
           <div 
-            className="absolute right-0 top-full mt-2 w-52 bg-gray-900 border border-white/20 rounded-xl shadow-2xl overflow-hidden max-h-[400px] overflow-y-auto"
+            className="fixed inset-0 bg-black/20"
+            style={{ zIndex: 2147483646 }}
+            onClick={() => setIsOpen(false)} 
+          />
+          <div 
+            className="fixed right-4 top-16 w-52 bg-gray-900 border border-white/20 rounded-xl shadow-2xl overflow-hidden max-h-[400px] overflow-y-auto"
             style={{ 
               fontFamily: "system-ui, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol",
               backdropFilter: "blur(10px)",
               backgroundColor: "rgba(17, 24, 39, 0.95)",
-              zIndex: 999999
+              zIndex: 2147483647
             }}
           >
             {ALL.map(opt => (
@@ -814,7 +818,8 @@ function LanguageSelector({ lang, setLang }) {
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
@@ -898,7 +903,7 @@ const [showGate, setShowGate] = useState(false);
 
             <button
   onClick={() => setShowGate(true)}
-  className="hidden sm:inline-flex px-4 py-2 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition"
+  className="hidden sm:inline-flex px-2 py-1.5 rounded-lg bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition text-xs"
 >
   {t.start}
 </button>
