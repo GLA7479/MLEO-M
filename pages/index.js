@@ -722,13 +722,13 @@ pt: {
 // ===== Flags =====
 const FLAGS = {
   en: "🇺🇸",
- he: "🇮🇱",
+  he: "🇮🇱", 
   ar: "🇸🇦",
   ru: "🇷🇺",
   es: "🇪🇸",
   fr: "🇫🇷",
   de: "🇩🇪",
-   pt: "🇧🇷",
+  pt: "🇧🇷",
   zh: "🇨🇳",
   ja: "🇯🇵",
   ko: "🇰🇷",
@@ -762,6 +762,62 @@ function pickInitialLang() {
     const guess = Object.keys(TEXT).find(k => k.startsWith(nav));
     return guess || "en";
   } catch { return "en"; }
+}
+
+// ===== Language Selector =====
+function LanguageSelector({ lang, setLang }) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  
+  // Debug: check if flags are loading
+  console.log('Current lang:', lang, 'Flag:', FLAGS[lang]);
+  
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/15 transition text-sm flex items-center gap-2"
+        style={{ fontFamily: "system-ui, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol" }}
+      >
+        <span className="mr-1">{FLAGS[lang] || '🌐'}</span>
+        <span>{TEXT[lang].name}</span>
+        <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-[100]" onClick={() => setIsOpen(false)} />
+          <div 
+            className="absolute right-0 top-full mt-2 w-52 bg-gray-900 border border-white/20 rounded-xl shadow-2xl overflow-hidden max-h-[400px] overflow-y-auto"
+            style={{ 
+              fontFamily: "system-ui, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol",
+              backdropFilter: "blur(10px)",
+              backgroundColor: "rgba(17, 24, 39, 0.95)",
+              zIndex: 999999
+            }}
+          >
+            {ALL.map(opt => (
+              <button
+                key={opt.code}
+                onClick={() => {
+                  setLang(opt.code);
+                  setIsOpen(false);
+                }}
+                className={`w-full px-4 py-3 text-left hover:bg-white/15 transition flex items-center gap-3 text-sm ${
+                  lang === opt.code ? 'bg-white/25 font-bold' : ''
+                }`}
+              >
+                <span className="text-lg mr-2">{FLAGS[opt.code] || '🌐'}</span>
+                <span>{TEXT[opt.code].name}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function Home() {
@@ -836,21 +892,7 @@ const [showGate, setShowGate] = useState(false);
 
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Language select */}
-           <select
-  value={lang}
-  onChange={e => setLang(e.target.value)}
-  className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/15 transition text-sm"
-  aria-label="Language"
-  dir="ltr"
-  style={{ fontFamily: "system-ui, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol" }}
->
-  {ALL.map(opt => (
-    <option key={opt.code} value={opt.code}>
-      {(FLAGS[opt.code] ? FLAGS[opt.code] + " " : "") + TEXT[opt.code].name}
-    </option>
-  ))}
-</select>
-
+            <LanguageSelector lang={lang} setLang={setLang} />
 
             <PWAInstall />
 
