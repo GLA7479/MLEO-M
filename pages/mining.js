@@ -14,7 +14,7 @@ const TEXT = {
     back: "← BACK",
     liveTestnet: "Live Testnet • Earn in-game MLEO",
     chooseGame: "Choose Your Game",
-    chooseGameDesc: "Three modes, one Vault. Play actively with upgrades (Miners), mine in space (Space Mining), or let passive accrual run (Token Rush). You can switch anytime.",
+    chooseGameDesc: "Two modes, one Vault. Play actively with upgrades (Miners) or let passive accrual run (Token Rush). You can switch anytime.",
     miners: "MLEO — Miners",
     minersDesc: "Idle & upgrades with tap gifts and boosts. Vault integration + on-chain CLAIM for steady, hands-on progress.",
     active: "Active",
@@ -22,10 +22,6 @@ const TEXT = {
     terms: "TERMS",
     playMiners: "Play Miners",
     acceptTermsToPlay: "🔒 Accept Terms to Play",
-    spaceMining: "MLEO — Space Mining",
-    spaceMiningDesc: "Control robots to mine asteroids in space. Explore different sectors and collect rare materials.",
-    futuristic: "Futuristic",
-    playSpaceMining: "Play Space Mining",
     rush: "MLEO — Rush",
     rushDesc: "Passive online mining with automatic offline accrual (time-capped). Same Vault + CLAIM flow for background gains.",
     passive: "Passive",
@@ -67,7 +63,7 @@ const TEXT = {
     back: "← חזרה",
     liveTestnet: "רשת בדיקה חיה • הרוויחו MLEO במשחק",
     chooseGame: "בחר את המשחק שלך",
-    chooseGameDesc: "שלושה מצבים, Vault אחד. שחק באופן פעיל עם שדרוגים (כורים), כרה בחלל (Space Mining), או תן לצבירה פסיבית לרוץ (Token Rush). אתה יכול להחליף בכל עת.",
+    chooseGameDesc: "שני מצבים, Vault אחד. שחק באופן פעיל עם שדרוגים (כורים) או תן לצבירה פסיבית לרוץ (Token Rush). אתה יכול להחליף בכל עת.",
     miners: "MLEO — כורים",
     minersDesc: "משחק מנוחה ושדרוגים עם מתנות לחיצה והגברות. אינטגרציה עם Vault + CLAIM על השרשרת להתקדמות יציבה וידנית.",
     active: "פעיל",
@@ -75,10 +71,6 @@ const TEXT = {
     terms: "תנאים",
     playMiners: "שחק כורים",
     acceptTermsToPlay: "🔒 קבל תנאים כדי לשחק",
-    spaceMining: "MLEO — כריית חלל",
-    spaceMiningDesc: "שלוט ברובוטים לכריית אסטרואידים בחלל. חקור מגזרים שונים ואסוף חומרים נדירים.",
-    futuristic: "עתידני",
-    playSpaceMining: "שחק כריית חלל",
     rush: "MLEO — Rush",
     rushDesc: "כרייה פסיבית אונליין עם צבירה אוטומטית אופליין (מוגבלת זמן). אותו Vault + זרימת CLAIM לרווחים ברקע.",
     passive: "פסיבי",
@@ -437,9 +429,9 @@ export default function GamesHub() {
           </header>
 
             {/* Cards */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-3 items-stretch max-w-[1000px] mx-auto">
+            <section className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-stretch max-w-[700px] mx-auto justify-items-center">
   {/* MINERS */}
-              <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-4 flex flex-col w-full sm:max-w-[300px] min-h-[280px]">
+              <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-4 flex flex-col w-full max-w-[320px] min-h-[280px]">
     <div className="flex items-start justify-between">
                   <div className="flex-1 pr-2">
                     <h2 className="text-[18px] sm:text-xl font-extrabold">{text.miners}</h2>
@@ -476,46 +468,8 @@ export default function GamesHub() {
     </div>
   </article>
 
-  {/* SPACE MINING */}
-              <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-4 flex flex-col w-full sm:max-w-[300px] min-h-[280px]">
-    <div className="flex items-start justify-between">
-                  <div className="flex-1 pr-2">
-                    <h2 className="text-[18px] sm:text-xl font-extrabold">{text.spaceMining}</h2>
-                    <p className="text-[12px] sm:text-xs text-zinc-300 mt-1 leading-5 break-words hyphens-auto">
-                      {text.spaceMiningDesc}
-        </p>
-      </div>
-                  <span className="ml-2 mt-1 rounded-full px-2 py-1 text-xs font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
-                    {text.futuristic}
-      </span>
-    </div>
-
-    <div className="mt-auto">
-      <div className="flex flex-wrap gap-2 mb-3 justify-center">
-        <button
-                      onClick={() => open("space-how")}
-                      className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-500/30 transition-colors"
-        >
-                      {text.howToPlay}
-        </button>
-        <button
-                      onClick={() => open("terms")}
-                      className="bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-500/30 transition-colors"
-        >
-                      {text.terms}
-        </button>
-      </div>
-
-                  <Link href="/space-mining">
-                    <button className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors">
-                      {text.playSpaceMining}
-          </button>
-                  </Link>
-    </div>
-  </article>
-
   {/* TOKEN RUSH */}
-              <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-4 flex flex-col w-full sm:max-w-[300px] min-h-[280px]">
+              <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-4 flex flex-col w-full max-w-[320px] min-h-[280px]">
     <div className="flex items-start justify-between">
                   <div className="flex-1 pr-2">
                     <h2 className="text-[18px] sm:text-xl font-extrabold">{text.rush}</h2>
@@ -568,10 +522,6 @@ export default function GamesHub() {
 
       {/* Modals */}
       <Modal isOpen={modal === "miners-how"} onClose={close}>
-        <HowToPlay lang={lang} onClose={close} />
-        </Modal>
-
-      <Modal isOpen={modal === "space-how"} onClose={close}>
         <HowToPlay lang={lang} onClose={close} />
         </Modal>
 

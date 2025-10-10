@@ -103,3 +103,21 @@ body {
 .mleo-modal, .mleo-toast { position: absolute; inset: 0; z-index: 20; pointer-events: none; }
 .mleo-modal * , .mleo-toast * { pointer-events: auto; }
 
+/* Toast notification bounce-in animation */
+@keyframes bounce-in {
+  0% { 
+    opacity: 0; 
+    transform: translate(-50%, -20px) scale(0.9); 
+  }
+  50% { 
+    transform: translate(-50%, 5px) scale(1.05); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: translate(-50%, 0) scale(1); 
+  }
+}
+.animate-bounce-in { 
+  animation: bounce-in 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55) both; 
+}
+
