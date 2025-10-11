@@ -1160,19 +1160,34 @@ async function onClaimMinedToWallet() {
  // Back יציאה מפול-סקין + חזרה, עם fallback ל-root
    function backSafe() {
      try { playSfx(S_CLICK); } catch {}
-     const p = document.fullscreenElement
-       ? document.exitFullscreen?.()
-       : Promise.resolve();
-     Promise.resolve(p).finally(() => {
-       // תן לרגע לדפדפן להשתחרר מפול-סקין לפני ניווט
-       setTimeout(() => {
-         if (window.history.length > 1) {
-           try { router.back(); } catch { window.history.back(); }
-         } else {
-           try { router.push("/"); } catch { window.location.href = "/"; }
+     
+     // צא מפול-סקין אם צריך ואז תעביר לדף
+     if (document.fullscreenElement) {
+       document.exitFullscreen?.().then(() => {
+         // רק אחרי שיוצא מפול-סקין, תעביר לדף MINING
+         setTimeout(() => {
+           try {
+             router.push("/mining");
+           } catch {
+             window.location.href = "/mining";
+           }
+         }, 100);
+       }).catch(() => {
+         // אם יציאה מפול-סקין נכשלת, תעביר בכל מקרה
+         try {
+           router.push("/mining");
+         } catch {
+           window.location.href = "/mining";
          }
-       }, 0);
-     });
+       });
+     } else {
+       // אם לא בפול-סקין, תעביר ישירות
+       try {
+         router.push("/mining");
+       } catch {
+         window.location.href = "/mining";
+       }
+     }
    }
    // שמירה על תאימות אם יש קריאות ישנות ל-onBack()
    function onBack(){ backSafe(); }
