@@ -318,7 +318,7 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
       const decayedBoost = currentBoost * (1 - decayFactor);
       
       // Add new boost
-      const newBoost = Math.min(decayedBoost + CONFIG.BOOST_PER_CLICK, 0.5);
+      const newBoost = Math.min(decayedBoost + CONFIG.BOOST_PER_CLICK, 1.0);
       
       console.log("Boost update:", { currentBoost, elapsed, decayFactor, newBoost });
 
@@ -1073,14 +1073,14 @@ export default function MLEOTokenRushPage() {
             <div className="rounded-xl p-3 bg-gradient-to-br from-white/5 to-white/10 border border-white/10 shadow-sm">
   <div className="flex items-center justify-between">
                 <div className="text-xs uppercase opacity-70 font-semibold">BOOST</div>
-                <button
+    <button
                   onClick={() => setInfoModal('boost')}
                   className="w-4 h-4 rounded-full bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/30 font-bold text-xs flex items-center justify-center"
                   title="Info"
                 >
                   ?
-                </button>
-    </div>
+    </button>
+  </div>
               <div className="text-xl font-bold tabular-nums mt-1">
                 {(() => {
                   const boost = Number(sess.boost) || 0;
@@ -1094,7 +1094,7 @@ export default function MLEOTokenRushPage() {
                   const currentBoost = Math.max(0, boost * (1 - progress));
                   
                   if (currentBoost < 0.001) return "0%";
-                  if (currentBoost > 0.5) return "50%";
+                  if (currentBoost > 1.0) return "100%";
                   return Math.round(currentBoost * 100) + "%";
                 })()}
   </div>
@@ -1113,6 +1113,9 @@ export default function MLEOTokenRushPage() {
                     return Math.min(currentBoost * 100, 100);
                   })()}%` 
                 }} />
+              </div>
+              <div className="text-xs opacity-60 mt-1">
+                {core.mode === "online" ? "Click to boost" : "Click to resume"}
               </div>
   </div>
 </div>
@@ -1516,7 +1519,7 @@ export default function MLEOTokenRushPage() {
             <p><strong>How it works:</strong></p>
             <ul className="list-disc list-inside mt-2 space-y-1">
               <li>Click to add +2% mining speed</li>
-              <li>Maximum boost: 50% (25 clicks)</li>
+              <li>Maximum boost: 100% (50 clicks)</li>
               <li>Decays over 60 seconds</li>
               <li>When offline: Click to resume mining</li>
             </ul>
