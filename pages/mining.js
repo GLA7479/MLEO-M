@@ -1773,10 +1773,6 @@ export default function GamesHub() {
               <GamePoolStats />
             </div>
 
-            {/* Language Selector */}
-            <div className="flex justify-center mt-8">
-              <LanguageSelector currentLang={lang} onLanguageChange={handleLanguageChange} />
-            </div>
           </div>
         </div>
       </div>
