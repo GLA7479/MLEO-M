@@ -3,7 +3,7 @@
 // Clean, focused mining experience with meaningful progression
 // ============================================================================
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Layout from "../components/Layout";
 import {
   useAccount,
@@ -752,84 +752,101 @@ export default function MLEOTokenRushPage() {
     const { isConnected, address } = useAccount();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
-  const { writeContract, isPending } = useWriteContract();
+  const { writeContract, isPending } = useWriteContract({
+    mutation: {
+      onSuccess: (hash) => {
+        console.log("🔵 [CLAIM] Transaction hash received from hook:", hash);
+        localStorage.setItem('pendingClaimHash', hash);
+        localStorage.setItem('pendingClaimTime', Date.now().toString());
+      },
+      onError: (error) => {
+        console.error("🔵 [CLAIM] Hook error:", error);
+      }
+    }
+  });
   const publicClient = usePublicClient();
 
-  // Check for pending claims after page refresh
-  async function checkForPendingClaims(currentCore, userAddress, client) {
-    // Skip if no wallet connected or no recent claim
-    if (!userAddress || !currentCore.lastClaimAt) return;
+  // Simple approach: just wait and check for pending claims
+  const checkForPendingClaims = useCallback(async (currentCore, userAddress, client) => {
+    if (!userAddress || !client) return;
     
-    try {
-      const timeSinceLastClaim = Date.now() - currentCore.lastClaimAt;
-      if (timeSinceLastClaim > 5 * 60 * 1000) return; // More than 5 minutes ago
+    console.log("🔍 [SIMPLE] Checking for pending claims...");
+    
+    // Check for recent claim attempt
+    const lastClaimAttempt = localStorage.getItem('lastClaimAttempt');
+    if (lastClaimAttempt) {
+      const timeSinceAttempt = Date.now() - parseInt(lastClaimAttempt);
+      console.log("🔍 [SIMPLE] Last claim attempt was", timeSinceAttempt, "ms ago");
       
-      console.log("🔍 [PENDING] Checking for pending claims...");
-      
-      // Get recent transactions from this address
-      const blockNumber = await client.getBlockNumber();
-      
-      // Search in recent blocks for our transaction
-      for (let i = 0; i < 10; i++) {
-        const block = await client.getBlock({
-          blockNumber: blockNumber - BigInt(i),
-          includeTransactions: true
-        });
+      if (timeSinceAttempt < 10 * 60 * 1000) { // Within last 10 minutes
+        console.log("🔍 [SIMPLE] Recent claim attempt found, checking for transaction...");
         
-        // Look for transactions from our address to the claim contract
-        const claimTx = block.transactions.find(tx => 
-          tx.from?.toLowerCase() === userAddress.toLowerCase() &&
-          tx.to?.toLowerCase() === ENV.CLAIM_ADDRESS.toLowerCase() &&
-          tx.input && tx.input.length > 10 && // Has some data (function call)
-          tx.timestamp && tx.timestamp * 1000 > currentCore.lastClaimAt // After our last claim
-        );
+        // Wait a bit for transaction to be mined
+        await new Promise(resolve => setTimeout(resolve, 5000));
         
-        if (claimTx && claimTx.hash) {
-          console.log("🔍 [PENDING] Found recent claim transaction:", claimTx.hash);
+        try {
+          // Get recent transactions from this address
+          const blockNumber = await client.getBlockNumber();
+          console.log("🔍 [SIMPLE] Current block:", blockNumber);
           
-          try {
-            const receipt = await client.getTransactionReceipt({
-              hash: claimTx.hash
+          // Search in recent blocks
+          for (let i = 0; i < 10; i++) {
+            const block = await client.getBlock({
+              blockNumber: blockNumber - BigInt(i),
+              includeTransactions: true
             });
             
-            // Check if transaction was successful
-            const isSuccess = receipt?.status === "success" || 
-                             receipt?.status === 1 || 
-                             receipt?.status === "0x1" ||
-                             receipt?.status === "1";
+            // Look for transactions from our address to the claim contract
+            const claimTx = block.transactions.find(tx => 
+              tx.from?.toLowerCase() === userAddress.toLowerCase() &&
+              tx.to?.toLowerCase() === ENV.CLAIM_ADDRESS.toLowerCase() &&
+              tx.input && tx.input.length > 10 &&
+              tx.timestamp && tx.timestamp * 1000 > parseInt(lastClaimAttempt) // After our claim attempt
+            );
             
-            if (isSuccess && receipt.timestamp * 1000 > currentCore.lastClaimAt) {
-              console.log("✅ [PENDING] Found successful claim after lastClaimAt!");
+            if (claimTx && claimTx.hash) {
+              console.log("🔍 [SIMPLE] Found claim transaction:", claimTx.hash);
               
-              // Update lastClaimAt to prevent duplicate processing
-              setCore(c => ({
-                ...c,
-                lastClaimAt: receipt.timestamp * 1000
-              }));
-              
-              // Show notification that claim was processed
-              showToast("✅ Previous claim processed after refresh!");
-              break;
+              try {
+                const receipt = await client.getTransactionReceipt({ hash: claimTx.hash });
+                
+                if (receipt?.status === 1 || receipt?.status === "success") {
+                  console.log("✅ [SIMPLE] Transaction confirmed!");
+                  
+                  // Clear localStorage and update state
+                  localStorage.removeItem('lastClaimAttempt');
+                  localStorage.removeItem('pendingClaimHash');
+                  localStorage.removeItem('pendingClaimTime');
+                  
+                  setCore(c => ({ ...c, lastClaimAt: Date.now() }));
+                  showToast("✅ Previous claim processed!");
+                  return;
+                }
+              } catch (receiptError) {
+                console.log("🔍 [SIMPLE] Could not get receipt:", receiptError);
+              }
             }
-          } catch (receiptError) {
-            console.log("🔍 [PENDING] Could not get receipt for", claimTx.hash, receiptError);
           }
+        } catch (error) {
+          console.log("🔍 [SIMPLE] Error checking blocks:", error);
         }
       }
-    } catch (error) {
-      console.log("🔍 [PENDING] Error checking for pending claims:", error);
     }
-  }
+    
+    console.log("🔍 [SIMPLE] No pending claims found");
+  }, [setCore, showToast]);
 
-  // Check for pending claims after page load when wallet is connected
+  // Check for pending claims after page load
   useEffect(() => {
-    if (isConnected && address && publicClient && core.lastClaimAt) {
-      const timeSinceLastClaim = Date.now() - core.lastClaimAt;
-      if (timeSinceLastClaim < 5 * 60 * 1000) { // Within last 5 minutes
+    if (isConnected && address && publicClient) {
+      // Simple delay then check
+      const timer = setTimeout(() => {
         checkForPendingClaims(core, address, publicClient);
-      }
+      }, 1000); // Wait 1 second after page load
+      
+      return () => clearTimeout(timer);
     }
-  }, [isConnected, address, publicClient, core.lastClaimAt]);
+  }, [isConnected, address, publicClient, checkForPendingClaims]);
 
   // Guild
   const { joinRandomGuild, leaveGuild } = useGuildActions(setCore);
@@ -1126,138 +1143,58 @@ export default function MLEOTokenRushPage() {
       console.log("🔵 [CLAIM] Writing contract...");
       showToast("⏳ Please confirm in wallet...");
       
+      // Initialize hash variable
       let hash;
+      
+      // Use writeContract and wait for the hook to handle the hash
       try {
-        console.log("🔵 [CLAIM] Attempting to write contract...");
+        writeContract(request);
+        console.log("🔵 [CLAIM] Contract write initiated, waiting for hook...");
         
-        // Try writeContract with better error handling
-        hash = await writeContract(request);
-        console.log("🔵 [CLAIM] writeContract result:", hash, "Type:", typeof hash);
+        // Wait for the hook to save the hash
+        await new Promise(resolve => setTimeout(resolve, 3000));
         
-        // If hash is undefined but no error thrown, wait a bit and try to get it
-        if (!hash) {
-          console.log("🔵 [CLAIM] Hash is undefined, waiting 2 seconds...");
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Try to get the hash from the transaction
-          console.log("🔵 [CLAIM] Attempting to retrieve hash...");
-          // Sometimes writeContract returns undefined but the transaction is still sent
-          // We'll proceed and let waitForTransactionReceipt handle it
-        }
-        
-      } catch (writeError) {
-        console.error("❌ [WRITE ERROR] Failed to write contract:", writeError);
-        const errorMsg = String(writeError?.message || writeError);
-        if (errorMsg.includes("User rejected") || errorMsg.includes("user rejected")) {
-          showToast("❌ Transaction cancelled by user");
-        } else if (errorMsg.includes("timeout")) {
-          showToast("❌ Transaction timeout - please try again");
+        // Check if hook saved a hash
+        const pendingHash = localStorage.getItem('pendingClaimHash');
+        if (pendingHash) {
+          console.log("🔵 [CLAIM] Hash received from hook:", pendingHash);
+          hash = pendingHash;
         } else {
-          showToast("❌ Failed to send transaction");
+          console.log("🔵 [CLAIM] No hash from hook, checking for existing pending...");
+          
+          // Check for any existing pending hash
+          const existingHash = localStorage.getItem('pendingClaimHash');
+          const existingTime = localStorage.getItem('pendingClaimTime');
+          
+          if (existingHash && existingTime) {
+            const timeSince = Date.now() - parseInt(existingTime);
+            if (timeSince < 10 * 60 * 1000) { // Within 10 minutes
+              console.log("🔵 [CLAIM] Using existing pending hash:", existingHash);
+              hash = existingHash;
+            }
+          }
         }
+      } catch (error) {
+        console.error("❌ [ERROR] Contract write failed:", error);
+        showToast("❌ Transaction failed");
         return;
       }
       
-      // Don't fail if hash is undefined - sometimes writeContract doesn't return it
-      // but the transaction is still sent to the wallet
       if (!hash) {
-        console.log("⚠️ [WARNING] No hash from writeContract, but proceeding anyway...");
-        showToast("⏳ Transaction sent, waiting for confirmation...");
+        console.log("❌ [ERROR] No transaction hash available");
+        showToast("❌ Transaction failed - no hash received");
+        return;
       }
 
       console.log("🔵 [CLAIM] Transaction sent, hash:", hash);
       showToast("⏳ Waiting for blockchain confirmation...");
 
-      let receipt;
-      if (hash) {
-        // Normal case: we have a hash
-        receipt = await publicClient.waitForTransactionReceipt({ 
-          hash,
-          confirmations: 1,
-          timeout: 60000
-        });
-      } else {
-        // No hash case: wait for user to confirm in wallet, then poll for recent transactions
-        console.log("🔵 [CLAIM] No hash available, waiting for user confirmation...");
-        showToast("⏳ Please confirm transaction in MetaMask...");
-        
-        // Wait for user to confirm (up to 2 minutes)
-        let attempts = 0;
-        const maxAttempts = 24; // 24 * 5 seconds = 2 minutes
-        
-        while (attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-          attempts++;
-          
-          try {
-            console.log("🔵 [CLAIM] Poll attempt", attempts, "- searching for transaction...");
-            
-            // Method 1: Try to get recent transactions from this address
-            const blockNumber = await publicClient.getBlockNumber();
-            console.log("🔵 [CLAIM] Current block:", blockNumber);
-            
-            // Search in recent blocks for our transaction
-            for (let i = 0; i < 5; i++) {
-              const block = await publicClient.getBlock({
-                blockNumber: blockNumber - BigInt(i),
-                includeTransactions: true
-              });
-              
-              console.log("🔵 [CLAIM] Checking block", block.number, "with", block.transactions.length, "transactions");
-              
-              // Look for transactions from our address to the claim contract
-              const claimTx = block.transactions.find(tx => 
-                tx.from?.toLowerCase() === address.toLowerCase() &&
-                tx.to?.toLowerCase() === ENV.CLAIM_ADDRESS.toLowerCase() &&
-                tx.input && tx.input.length > 10 // Has some data (function call)
-              );
-              
-              if (claimTx && claimTx.hash) {
-                console.log("🔵 [CLAIM] Found claim transaction:", claimTx.hash);
-                receipt = await publicClient.getTransactionReceipt({
-                  hash: claimTx.hash
-                });
-                break;
-              }
-            }
-            
-            if (receipt) break;
-            
-            // Method 2: Try logs as backup
-            const logs = await publicClient.getLogs({
-              address: ENV.CLAIM_ADDRESS,
-              fromBlock: blockNumber - 10n, // Last 10 blocks
-              toBlock: 'latest'
-            });
-            
-            console.log("🔵 [CLAIM] Checking", logs.length, "logs for claim transaction...");
-            
-            const claimLog = logs.find(log => 
-              log.address === ENV.CLAIM_ADDRESS &&
-              log.transactionHash // Make sure it has a transaction hash
-            );
-            
-            console.log("🔵 [CLAIM] Found claim log:", claimLog);
-            
-            if (claimLog) {
-              console.log("🔵 [CLAIM] Found claim transaction in logs:", claimLog.transactionHash);
-              receipt = await publicClient.getTransactionReceipt({
-                hash: claimLog.transactionHash
-              });
-              break;
-            }
-            
-          } catch (pollError) {
-            console.log("🔵 [CLAIM] Poll attempt", attempts, "failed:", pollError);
-          }
-        }
-        
-        if (!receipt) {
-          console.error("❌ [TIMEOUT] Could not find transaction after waiting");
-          showToast("❌ Transaction confirmation timeout");
-          return;
-        }
-      }
+      // Wait for transaction receipt
+      const receipt = await publicClient.waitForTransactionReceipt({ 
+        hash,
+        confirmations: 1,
+        timeout: 120000 // 2 minutes
+      });
 
       console.log("🔵 [CLAIM] Receipt received:", receipt);
       console.log("🔵 [CLAIM] Status type:", typeof receipt?.status, "Value:", receipt?.status);
@@ -1290,6 +1227,11 @@ export default function MLEOTokenRushPage() {
         
         setClaimAmount("");
         showToast(`✅ Successfully claimed ${fmt(amount)} MLEO!`);
+        
+        // Clear pending claim from localStorage
+        localStorage.removeItem('pendingClaimHash');
+        localStorage.removeItem('pendingClaimTime');
+        localStorage.removeItem('lastClaimAttempt');
       } else {
         console.error("❌ [FAILED] Transaction failed, status:", receipt?.status, "Receipt:", receipt);
         showToast("❌ Transaction failed");
