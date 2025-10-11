@@ -165,6 +165,7 @@ const initialCore = {
   lastGiftAt: 0,
   lastDailyAt: 0,
   dailyStreak: 0,
+  lastClaimAt: 0,     // Track when user last claimed to wallet
 
   guild: { id: null, name: null, members: 0, bonus: 0 },
 
@@ -274,6 +275,7 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
     sessRef.current = sess; // Keep ref in sync
   }, [sess]);
 
+
   // Init: schedule modifiers & chest
   useEffect(() => {
     // Check if user was offline
@@ -293,6 +295,8 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
     resetIdleTimer();
     scheduleNextModifier(setSess);
     maybeSpawnChest(setSess);
+    
+    // Check for pending claims after page load - moved to main component
     // eslint-disable-next-line
   }, []);
 
@@ -751,6 +755,82 @@ export default function MLEOTokenRushPage() {
   const { writeContract, isPending } = useWriteContract();
   const publicClient = usePublicClient();
 
+  // Check for pending claims after page refresh
+  async function checkForPendingClaims(currentCore, userAddress, client) {
+    // Skip if no wallet connected or no recent claim
+    if (!userAddress || !currentCore.lastClaimAt) return;
+    
+    try {
+      const timeSinceLastClaim = Date.now() - currentCore.lastClaimAt;
+      if (timeSinceLastClaim > 5 * 60 * 1000) return; // More than 5 minutes ago
+      
+      console.log("🔍 [PENDING] Checking for pending claims...");
+      
+      // Get recent transactions from this address
+      const blockNumber = await client.getBlockNumber();
+      
+      // Search in recent blocks for our transaction
+      for (let i = 0; i < 10; i++) {
+        const block = await client.getBlock({
+          blockNumber: blockNumber - BigInt(i),
+          includeTransactions: true
+        });
+        
+        // Look for transactions from our address to the claim contract
+        const claimTx = block.transactions.find(tx => 
+          tx.from?.toLowerCase() === userAddress.toLowerCase() &&
+          tx.to?.toLowerCase() === ENV.CLAIM_ADDRESS.toLowerCase() &&
+          tx.input && tx.input.length > 10 && // Has some data (function call)
+          tx.timestamp && tx.timestamp * 1000 > currentCore.lastClaimAt // After our last claim
+        );
+        
+        if (claimTx && claimTx.hash) {
+          console.log("🔍 [PENDING] Found recent claim transaction:", claimTx.hash);
+          
+          try {
+            const receipt = await client.getTransactionReceipt({
+              hash: claimTx.hash
+            });
+            
+            // Check if transaction was successful
+            const isSuccess = receipt?.status === "success" || 
+                             receipt?.status === 1 || 
+                             receipt?.status === "0x1" ||
+                             receipt?.status === "1";
+            
+            if (isSuccess && receipt.timestamp * 1000 > currentCore.lastClaimAt) {
+              console.log("✅ [PENDING] Found successful claim after lastClaimAt!");
+              
+              // Update lastClaimAt to prevent duplicate processing
+              setCore(c => ({
+                ...c,
+                lastClaimAt: receipt.timestamp * 1000
+              }));
+              
+              // Show notification that claim was processed
+              showToast("✅ Previous claim processed after refresh!");
+              break;
+            }
+          } catch (receiptError) {
+            console.log("🔍 [PENDING] Could not get receipt for", claimTx.hash, receiptError);
+          }
+        }
+      }
+    } catch (error) {
+      console.log("🔍 [PENDING] Error checking for pending claims:", error);
+    }
+  }
+
+  // Check for pending claims after page load when wallet is connected
+  useEffect(() => {
+    if (isConnected && address && publicClient && core.lastClaimAt) {
+      const timeSinceLastClaim = Date.now() - core.lastClaimAt;
+      if (timeSinceLastClaim < 5 * 60 * 1000) { // Within last 5 minutes
+        checkForPendingClaims(core, address, publicClient);
+      }
+    }
+  }, [isConnected, address, publicClient, core.lastClaimAt]);
+
   // Guild
   const { joinRandomGuild, leaveGuild } = useGuildActions(setCore);
 
@@ -1196,7 +1276,11 @@ export default function MLEOTokenRushPage() {
           const currentVault = prevCore.vault || 0;
           const newVault = Math.max(0, currentVault - amount);
           console.log("✅ [SUCCESS] Vault updated:", currentVault, "→", newVault);
-          const updated = { ...prevCore, vault: newVault };
+          const updated = { 
+            ...prevCore, 
+            vault: newVault,
+            lastClaimAt: Date.now() // Track when claim was made
+          };
           
           // Force save to localStorage immediately
           setTimeout(() => safeWrite(LS_KEYS.CORE, updated), 0);
