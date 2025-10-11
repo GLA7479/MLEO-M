@@ -972,12 +972,12 @@ export default function MLEOTokenRushPage() {
     checkAchievements();
   };
 
-  // Claim to wallet
-  const claimingRef = useRef(false);
+  // Claim to wallet - NEW APPROACH: Update AFTER success
+  const [isClaiming, setIsClaiming] = useState(false);
   const [claimAmount, setClaimAmount] = useState("");
   
   async function claimToWallet() {
-    if (claimingRef.current) {
+    if (isClaiming) {
       console.log("Already claiming, skipping...");
       showToast("⏳ Transaction in progress...");
       return;
@@ -999,7 +999,7 @@ export default function MLEOTokenRushPage() {
     
     if (amount <= 0) { showToast("❌ Nothing to claim"); return; }
     
-    console.log("🔵 Starting claim process, claiming amount:", amount, "vault total:", vaultAmount);
+    console.log("🔵 [CLAIM] Starting process, amount:", amount, "vault:", vaultAmount);
     
     if (!ENV.CLAIM_ADDRESS) { 
       showToast("❌ CLAIM_ADDRESS not configured"); 
@@ -1022,102 +1022,206 @@ export default function MLEOTokenRushPage() {
       }
     }
 
-    // Set claiming flag to prevent double claims
-    claimingRef.current = true;
+    // Set claiming state to disable button
+    setIsClaiming(true);
     
     try {
       const units = parseUnits(amount.toFixed(2), ENV.TOKEN_DECIMALS);
       if (units <= 0n) { 
-        claimingRef.current = false;
         showToast("❌ Invalid amount"); 
         return; 
       }
       
-      // ✅ DEDUCT FROM VAULT NOW - before sending transaction
-      console.log("🔵 [CLAIM] Deducting", amount, "from vault");
-      
-      setCore(prevCore => {
-        const oldVault = prevCore.vault || 0;
-        const newVault = Math.max(0, oldVault - amount);
-        console.log("🔵 [CLAIM] Vault update: Before:", oldVault, "After:", newVault);
-        return { ...prevCore, vault: newVault };
-      });
-      
-      // Clear claim amount input
-      setClaimAmount("");
-      
       showToast("⏳ Preparing transaction...");
 
-      console.log("🔵 Simulating contract call...");
-      const { request } = await publicClient.simulateContract({
-        address: ENV.CLAIM_ADDRESS,
-        abi: CLAIM_ABI_V3,
-        functionName: "claim",
+      console.log("🔵 [CLAIM] Simulating contract call...");
+    const { request } = await publicClient.simulateContract({
+      address: ENV.CLAIM_ADDRESS,
+      abi: CLAIM_ABI_V3,
+      functionName: "claim",
         args: [GAME_ID_BI, units],
-        account: address,
-      });
+      account: address,
+    });
 
-      console.log("🔵 Writing contract...");
+      console.log("🔵 [CLAIM] Writing contract...");
       showToast("⏳ Please confirm in wallet...");
-      const hash = await writeContract(request);
       
-      if (!hash) {
-        console.error("❌ No transaction hash returned");
-        showToast("❌ Transaction failed - refunding...");
-        // ROLLBACK: Return the amount to vault
-        setCore(prevCore => {
-          const refundedVault = prevCore.vault + amount;
-          console.log("🔵 [ROLLBACK] Refunding", amount, "new vault:", refundedVault);
-          return { ...prevCore, vault: refundedVault };
-        });
+      let hash;
+      try {
+        console.log("🔵 [CLAIM] Attempting to write contract...");
+        
+        // Try writeContract with better error handling
+        hash = await writeContract(request);
+        console.log("🔵 [CLAIM] writeContract result:", hash, "Type:", typeof hash);
+        
+        // If hash is undefined but no error thrown, wait a bit and try to get it
+        if (!hash) {
+          console.log("🔵 [CLAIM] Hash is undefined, waiting 2 seconds...");
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Try to get the hash from the transaction
+          console.log("🔵 [CLAIM] Attempting to retrieve hash...");
+          // Sometimes writeContract returns undefined but the transaction is still sent
+          // We'll proceed and let waitForTransactionReceipt handle it
+        }
+        
+      } catch (writeError) {
+        console.error("❌ [WRITE ERROR] Failed to write contract:", writeError);
+        const errorMsg = String(writeError?.message || writeError);
+        if (errorMsg.includes("User rejected") || errorMsg.includes("user rejected")) {
+          showToast("❌ Transaction cancelled by user");
+        } else if (errorMsg.includes("timeout")) {
+          showToast("❌ Transaction timeout - please try again");
+        } else {
+          showToast("❌ Failed to send transaction");
+        }
         return;
       }
+      
+      // Don't fail if hash is undefined - sometimes writeContract doesn't return it
+      // but the transaction is still sent to the wallet
+      if (!hash) {
+        console.log("⚠️ [WARNING] No hash from writeContract, but proceeding anyway...");
+        showToast("⏳ Transaction sent, waiting for confirmation...");
+      }
 
-      console.log("🔵 Transaction sent, hash:", hash);
+      console.log("🔵 [CLAIM] Transaction sent, hash:", hash);
       showToast("⏳ Waiting for blockchain confirmation...");
 
-      const receipt = await publicClient.waitForTransactionReceipt({ 
-        hash,
-        confirmations: 1,
-        timeout: 60000 // 60 seconds
-      });
+      let receipt;
+      if (hash) {
+        // Normal case: we have a hash
+        receipt = await publicClient.waitForTransactionReceipt({ 
+          hash,
+          confirmations: 1,
+          timeout: 60000
+        });
+      } else {
+        // No hash case: wait for user to confirm in wallet, then poll for recent transactions
+        console.log("🔵 [CLAIM] No hash available, waiting for user confirmation...");
+        showToast("⏳ Please confirm transaction in MetaMask...");
+        
+        // Wait for user to confirm (up to 2 minutes)
+        let attempts = 0;
+        const maxAttempts = 24; // 24 * 5 seconds = 2 minutes
+        
+        while (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+          attempts++;
+          
+          try {
+            console.log("🔵 [CLAIM] Poll attempt", attempts, "- searching for transaction...");
+            
+            // Method 1: Try to get recent transactions from this address
+            const blockNumber = await publicClient.getBlockNumber();
+            console.log("🔵 [CLAIM] Current block:", blockNumber);
+            
+            // Search in recent blocks for our transaction
+            for (let i = 0; i < 5; i++) {
+              const block = await publicClient.getBlock({
+                blockNumber: blockNumber - BigInt(i),
+                includeTransactions: true
+              });
+              
+              console.log("🔵 [CLAIM] Checking block", block.number, "with", block.transactions.length, "transactions");
+              
+              // Look for transactions from our address to the claim contract
+              const claimTx = block.transactions.find(tx => 
+                tx.from?.toLowerCase() === address.toLowerCase() &&
+                tx.to?.toLowerCase() === ENV.CLAIM_ADDRESS.toLowerCase() &&
+                tx.input && tx.input.length > 10 // Has some data (function call)
+              );
+              
+              if (claimTx && claimTx.hash) {
+                console.log("🔵 [CLAIM] Found claim transaction:", claimTx.hash);
+                receipt = await publicClient.getTransactionReceipt({
+                  hash: claimTx.hash
+                });
+                break;
+              }
+            }
+            
+            if (receipt) break;
+            
+            // Method 2: Try logs as backup
+            const logs = await publicClient.getLogs({
+              address: ENV.CLAIM_ADDRESS,
+              fromBlock: blockNumber - 10n, // Last 10 blocks
+              toBlock: 'latest'
+            });
+            
+            console.log("🔵 [CLAIM] Checking", logs.length, "logs for claim transaction...");
+            
+            const claimLog = logs.find(log => 
+              log.address === ENV.CLAIM_ADDRESS &&
+              log.transactionHash // Make sure it has a transaction hash
+            );
+            
+            console.log("🔵 [CLAIM] Found claim log:", claimLog);
+            
+            if (claimLog) {
+              console.log("🔵 [CLAIM] Found claim transaction in logs:", claimLog.transactionHash);
+              receipt = await publicClient.getTransactionReceipt({
+                hash: claimLog.transactionHash
+              });
+              break;
+            }
+            
+          } catch (pollError) {
+            console.log("🔵 [CLAIM] Poll attempt", attempts, "failed:", pollError);
+          }
+        }
+        
+        if (!receipt) {
+          console.error("❌ [TIMEOUT] Could not find transaction after waiting");
+          showToast("❌ Transaction confirmation timeout");
+          return;
+        }
+      }
 
-      console.log("🔵 Receipt received:", receipt?.status);
+      console.log("🔵 [CLAIM] Receipt received:", receipt);
+      console.log("🔵 [CLAIM] Status type:", typeof receipt?.status, "Value:", receipt?.status);
 
-      if (receipt?.status === "success") {
-        console.log("✅ [SUCCESS] Transaction confirmed successfully!");
+      // Check if transaction was successful (status can be "success", 1, or "0x1")
+      const isSuccess = receipt?.status === "success" || 
+                       receipt?.status === 1 || 
+                       receipt?.status === "0x1" ||
+                       receipt?.status === "1";
+
+      if (isSuccess) {
+        // ✅ UPDATE VAULT ONLY AFTER SUCCESS
+        console.log("✅ [SUCCESS] Transaction confirmed! Deducting", amount, "from vault");
+        
+        setCore(prevCore => {
+          const currentVault = prevCore.vault || 0;
+          const newVault = Math.max(0, currentVault - amount);
+          console.log("✅ [SUCCESS] Vault updated:", currentVault, "→", newVault);
+          const updated = { ...prevCore, vault: newVault };
+          
+          // Force save to localStorage immediately
+          setTimeout(() => safeWrite(LS_KEYS.CORE, updated), 0);
+          
+          return updated;
+        });
+        
+        setClaimAmount("");
         showToast(`✅ Successfully claimed ${fmt(amount)} MLEO!`);
       } else {
-        console.error("❌ Transaction failed on blockchain - refunding...");
-        showToast("❌ Transaction failed - refunding...");
-        // ROLLBACK: Return the amount to vault
-        setCore(prevCore => {
-          const refundedVault = prevCore.vault + amount;
-          console.log("🔵 [ROLLBACK] Refunding", amount, "new vault:", refundedVault);
-          return { ...prevCore, vault: refundedVault };
-        });
+        console.error("❌ [FAILED] Transaction failed, status:", receipt?.status, "Receipt:", receipt);
+        showToast("❌ Transaction failed");
       }
     } catch (err) {
       console.error("❌ Claim error:", err);
       const msg = String(err?.shortMessage || err?.message || err);
       
-      // ROLLBACK: Return the amount to vault on any error
-      console.log("🔵 [ROLLBACK] Error occurred, refunding to vault");
-      setCore(prevCore => {
-        const refundedVault = prevCore.vault + amount;
-        console.log("🔵 [ROLLBACK] Refunding", amount, "new vault:", refundedVault);
-        return { ...prevCore, vault: refundedVault };
-      });
-      
-      // Don't show confusing technical errors
       if (msg.includes("User rejected") || msg.includes("user rejected")) {
         showToast("❌ Transaction cancelled");
       } else if (!/Cannot convert undefined to a BigInt/i.test(msg)) {
         showToast(`❌ Error: ${msg.slice(0, 50)}`);
       }
     } finally {
-      claimingRef.current = false;
-      console.log("🔵 Claim process finished, ref reset");
+      setIsClaiming(false);
+      console.log("🔵 [CLAIM] Process finished");
     }
   }
 
@@ -1317,14 +1421,14 @@ export default function MLEOTokenRushPage() {
 
                 <button 
                   onClick={claimToWallet}
-                  disabled={isPending || core.vault <= 0}
+                  disabled={isClaiming || core.vault <= 0}
                   className={`h-10 rounded-lg font-bold text-white text-sm transition-all ${
-                    (isPending || core.vault <= 0)
+                    (isClaiming || core.vault <= 0)
                       ? "bg-zinc-700 cursor-not-allowed opacity-50"
                       : "bg-gradient-to-r from-indigo-600 to-purple-500 hover:from-indigo-500 hover:to-purple-400"
                   }`}
                 >
-                  {isPending ? "⏳ CLAIMING..." : "🔗 CLAIM"}
+                  {isClaiming ? "⏳ CLAIMING..." : "🔗 CLAIM"}
         </button>
       </div>
 
