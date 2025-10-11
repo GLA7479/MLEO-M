@@ -1022,12 +1022,23 @@ export default function MLEOTokenRushPage() {
   </div>
 
             <div className="flex items-center gap-2">
-    <WalletStatus />
               <Link href="/mining">
                 <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
                   ← BACK
                 </button>
     </Link>
+    <WalletStatus />
+              <button
+                onClick={wake}
+                className={`px-4 py-2 rounded-xl text-sm font-bold ${
+                  core.mode === "online"
+                    ? "bg-emerald-600 hover:bg-emerald-500"
+                    : "bg-amber-600 hover:bg-amber-500 animate-pulse"
+                }`}
+                title={core.mode === "online" ? "Click to boost mining speed" : "Resume mining and collect offline earnings"}
+              >
+                {core.mode === "online" ? "⚡ BOOST" : "🔔 RESUME"}
+              </button>
   </div>
 </header>
 
@@ -1103,19 +1114,6 @@ export default function MLEOTokenRushPage() {
                   })()}%` 
                 }} />
               </div>
-              <div className="flex justify-end mt-2">
-    <button
-      onClick={wake}
-                  className={`px-4 py-2 rounded-lg text-white text-sm font-bold ${
-        core.mode === "online"
-          ? "bg-emerald-600 hover:bg-emerald-500"
-                      : "bg-amber-600 hover:bg-amber-500 animate-pulse"
-                  }`}
-                  title={core.mode === "online" ? "Click to boost mining speed" : "Resume mining and collect offline earnings"}
-                >
-                  {core.mode === "online" ? "⚡ BOOST" : "🔔 RESUME"}
-    </button>
-  </div>
   </div>
 </div>
 
