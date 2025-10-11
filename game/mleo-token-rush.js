@@ -1060,30 +1060,17 @@ export default function MLEOTokenRushPage() {
             />
 
             <div className="rounded-xl p-3 bg-gradient-to-br from-white/5 to-white/10 border border-white/10 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="text-xs uppercase opacity-70 font-semibold">BOOST</div>
-                  <button
-                    onClick={() => setInfoModal('boost')}
-                    className="w-4 h-4 rounded-full bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/30 font-bold text-xs flex items-center justify-center"
-                    title="Info"
-                  >
-                    ?
-                  </button>
-                </div>
-    <button
-      onClick={wake}
-                  className={`px-2 py-1 rounded text-white text-xs font-bold ${
-        core.mode === "online"
-          ? "bg-emerald-600 hover:bg-emerald-500"
-                      : "bg-amber-600 hover:bg-amber-500 animate-pulse"
-                  }`}
-                  title={core.mode === "online" ? "Click to boost mining speed" : "Resume mining and collect offline earnings"}
+  <div className="flex items-center justify-between">
+                <div className="text-xs uppercase opacity-70 font-semibold">BOOST</div>
+                <button
+                  onClick={() => setInfoModal('boost')}
+                  className="w-4 h-4 rounded-full bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/30 font-bold text-xs flex items-center justify-center"
+                  title="Info"
                 >
-                  {core.mode === "online" ? "⚡" : "🔔"}
-    </button>
-  </div>
-              <div className="text-lg font-bold tabular-nums">
+                  ?
+                </button>
+    </div>
+              <div className="text-xl font-bold tabular-nums mt-1">
                 {(() => {
                   const boost = Number(sess.boost) || 0;
                   const lastTick = Number(sess.lastBoostTick) || 0;
@@ -1116,10 +1103,20 @@ export default function MLEOTokenRushPage() {
                   })()}%` 
                 }} />
               </div>
-              <div className="text-xs opacity-60 mt-1">
-                {core.mode === "online" ? "Click to boost" : "Click to resume"}
-              </div>
-            </div>
+              <div className="flex justify-end mt-2">
+    <button
+      onClick={wake}
+                  className={`px-4 py-2 rounded-lg text-white text-sm font-bold ${
+        core.mode === "online"
+          ? "bg-emerald-600 hover:bg-emerald-500"
+                      : "bg-amber-600 hover:bg-amber-500 animate-pulse"
+                  }`}
+                  title={core.mode === "online" ? "Click to boost mining speed" : "Resume mining and collect offline earnings"}
+                >
+                  {core.mode === "online" ? "⚡ BOOST" : "🔔 RESUME"}
+    </button>
+  </div>
+  </div>
 </div>
 
           {/* VAULT & ACTIONS */}
