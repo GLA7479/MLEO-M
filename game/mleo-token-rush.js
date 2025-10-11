@@ -55,10 +55,16 @@ const CLAIM_ABI_V3 = [
 
 const CONFIG = {
   // Core Mining
-  IDLE_TO_OFFLINE_MS: 5 * 60 * 1000,        // 5 minutes idle → offline
+  IDLE_TO_OFFLINE_MS: 2 * 60 * 1000,        // 2 minutes idle → offline
   OFFLINE_MAX_HOURS: 12,                     // max offline accumulation
   ONLINE_BASE_RATE: 1200,                    // MLEO per hour (online)
-  OFFLINE_RATE_FACTOR: 0.6,                  // 60% rate when offline
+  // Offline rates - tiered system (12 hours total)
+  OFFLINE_TIERS: [
+    { hours: 2, rate: 0.50 },  // First 2 hours: 50% effectiveness
+    { hours: 2, rate: 0.40 },  // Next 2 hours: 40% effectiveness
+    { hours: 4, rate: 0.30 },  // Next 4 hours: 30% effectiveness
+    { hours: 4, rate: 0.20 },  // Final 4 hours: 20% effectiveness
+  ],
   
   // Boost (simple)
   BOOST_PER_CLICK: 0.02,                     // +2% per click
@@ -270,7 +276,20 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
 
   // Init: schedule modifiers & chest
   useEffect(() => {
-    if (core.offlineStart && core.offlineStart > 0) setCore(c => ({ ...c, mode: "offline" }));
+    // Check if user was offline
+    if (core.offlineStart && core.offlineStart > 0) {
+      setCore(c => ({ ...c, mode: "offline" }));
+    } else if (core.lastActiveAt) {
+      // If user hasn't been active for more than IDLE time, mark as offline
+      const timeSinceActive = Date.now() - core.lastActiveAt;
+      if (timeSinceActive > CONFIG.IDLE_TO_OFFLINE_MS) {
+      setCore(c => ({
+        ...c,
+          mode: "offline", 
+          offlineStart: core.lastActiveAt + CONFIG.IDLE_TO_OFFLINE_MS 
+        }));
+      }
+    }
     resetIdleTimer();
     scheduleNextModifier(setSess);
     maybeSpawnChest(setSess);
@@ -291,9 +310,27 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
     const start = c.offlineStart || Date.now();
     const elapsedMs = Date.now() - start;
     const capped = Math.min(elapsedMs, CONFIG.OFFLINE_MAX_HOURS * 3600 * 1000);
-    const hours = capped / 3600000;
-    const perHour = CONFIG.ONLINE_BASE_RATE * CONFIG.OFFLINE_RATE_FACTOR * mult * (liveModifierMult("offline") || 1);
-    return Math.floor(perHour * hours);
+    const totalHours = capped / 3600000;
+    
+    // Calculate earnings using tiered rates
+    let totalEarnings = 0;
+    let remainingHours = totalHours;
+    let hoursProcessed = 0;
+    
+    const basePerHour = CONFIG.ONLINE_BASE_RATE * mult * (liveModifierMult("offline") || 1);
+    
+    for (const tier of CONFIG.OFFLINE_TIERS) {
+      if (remainingHours <= 0) break;
+      
+      const hoursInThisTier = Math.min(remainingHours, tier.hours);
+      const earningsInThisTier = basePerHour * tier.rate * hoursInThisTier;
+      
+      totalEarnings += earningsInThisTier;
+      remainingHours -= hoursInThisTier;
+      hoursProcessed += hoursInThisTier;
+    }
+    
+    return Math.floor(totalEarnings);
   }
 
   function markActivity(ev) {
@@ -942,6 +979,7 @@ export default function MLEOTokenRushPage() {
   async function claimToWallet() {
     if (claimingRef.current) {
       console.log("Already claiming, skipping...");
+      showToast("⏳ Transaction in progress...");
       return;
     }
     
@@ -959,11 +997,18 @@ export default function MLEOTokenRushPage() {
       amount = vaultAmount;
     }
     
+    if (amount <= 0) { showToast("❌ Nothing to claim"); return; }
+    
     console.log("🔵 Starting claim process, claiming amount:", amount, "vault total:", vaultAmount);
     
-    if (!ENV.CLAIM_ADDRESS) { showToast("❌ CLAIM_ADDRESS not configured"); return; }
-    if (!isConnected || !address) { showToast("❌ Connect wallet first"); return; }
-    if (amount <= 0) { showToast("❌ Nothing to claim"); return; }
+    if (!ENV.CLAIM_ADDRESS) { 
+      showToast("❌ CLAIM_ADDRESS not configured"); 
+      return; 
+    }
+    if (!isConnected || !address) { 
+      showToast("❌ Connect wallet first"); 
+      return; 
+    }
 
     if (chainId !== ENV.CLAIM_CHAIN_ID) {
       try { 
@@ -977,29 +1022,54 @@ export default function MLEOTokenRushPage() {
       }
     }
 
+    // Set claiming flag to prevent double claims
+    claimingRef.current = true;
+    
     try {
       const units = parseUnits(amount.toFixed(2), ENV.TOKEN_DECIMALS);
-      if (units <= 0n) { showToast("❌ Invalid amount"); return; }
-
-    claimingRef.current = true;
+      if (units <= 0n) { 
+        claimingRef.current = false;
+        showToast("❌ Invalid amount"); 
+        return; 
+      }
+      
+      // ✅ DEDUCT FROM VAULT NOW - before sending transaction
+      console.log("🔵 [CLAIM] Deducting", amount, "from vault");
+      
+      setCore(prevCore => {
+        const oldVault = prevCore.vault || 0;
+        const newVault = Math.max(0, oldVault - amount);
+        console.log("🔵 [CLAIM] Vault update: Before:", oldVault, "After:", newVault);
+        return { ...prevCore, vault: newVault };
+      });
+      
+      // Clear claim amount input
+      setClaimAmount("");
+      
       showToast("⏳ Preparing transaction...");
 
       console.log("🔵 Simulating contract call...");
-    const { request } = await publicClient.simulateContract({
-      address: ENV.CLAIM_ADDRESS,
-      abi: CLAIM_ABI_V3,
-      functionName: "claim",
+      const { request } = await publicClient.simulateContract({
+        address: ENV.CLAIM_ADDRESS,
+        abi: CLAIM_ABI_V3,
+        functionName: "claim",
         args: [GAME_ID_BI, units],
-      account: address,
-    });
+        account: address,
+      });
 
       console.log("🔵 Writing contract...");
       showToast("⏳ Please confirm in wallet...");
-    const hash = await writeContract(request);
+      const hash = await writeContract(request);
       
       if (!hash) {
         console.error("❌ No transaction hash returned");
-        showToast("❌ Transaction failed");
+        showToast("❌ Transaction failed - refunding...");
+        // ROLLBACK: Return the amount to vault
+        setCore(prevCore => {
+          const refundedVault = prevCore.vault + amount;
+          console.log("🔵 [ROLLBACK] Refunding", amount, "new vault:", refundedVault);
+          return { ...prevCore, vault: refundedVault };
+        });
         return;
       }
 
@@ -1015,28 +1085,29 @@ export default function MLEOTokenRushPage() {
       console.log("🔵 Receipt received:", receipt?.status);
 
       if (receipt?.status === "success") {
-        console.log("✅ Transaction confirmed! Resetting vault...");
-        
-        // Deduct claimed amount from vault
-        setCore(prevCore => {
-          const currentVault = prevCore.vault || 0;
-          const newVault = Math.max(0, currentVault - amount);
-          const newCore = { ...prevCore, vault: newVault };
-          console.log("✅ Vault updated. Before:", currentVault, "Claimed:", amount, "After:", newVault);
-          return newCore;
-        });
-        
-        // Clear claim amount input
-        setClaimAmount("");
-        
+        console.log("✅ [SUCCESS] Transaction confirmed successfully!");
         showToast(`✅ Successfully claimed ${fmt(amount)} MLEO!`);
       } else {
-        console.error("❌ Transaction status:", receipt?.status);
-        showToast("❌ Transaction failed on blockchain");
+        console.error("❌ Transaction failed on blockchain - refunding...");
+        showToast("❌ Transaction failed - refunding...");
+        // ROLLBACK: Return the amount to vault
+        setCore(prevCore => {
+          const refundedVault = prevCore.vault + amount;
+          console.log("🔵 [ROLLBACK] Refunding", amount, "new vault:", refundedVault);
+          return { ...prevCore, vault: refundedVault };
+        });
       }
     } catch (err) {
       console.error("❌ Claim error:", err);
       const msg = String(err?.shortMessage || err?.message || err);
+      
+      // ROLLBACK: Return the amount to vault on any error
+      console.log("🔵 [ROLLBACK] Error occurred, refunding to vault");
+      setCore(prevCore => {
+        const refundedVault = prevCore.vault + amount;
+        console.log("🔵 [ROLLBACK] Refunding", amount, "new vault:", refundedVault);
+        return { ...prevCore, vault: refundedVault };
+      });
       
       // Don't show confusing technical errors
       if (msg.includes("User rejected") || msg.includes("user rejected")) {
@@ -1581,8 +1652,14 @@ export default function MLEOTokenRushPage() {
 
           <InfoModal isOpen={infoModal === 'mining_status'} onClose={() => setInfoModal(null)} title="⛏️ Mining Status">
             <p><strong>ONLINE:</strong> Active mining at full speed with all bonuses applied.</p>
-            <p><strong>OFFLINE:</strong> Reduced mining rate (50% of online speed) with a 12-hour cap.</p>
-            <p><strong>Switch:</strong> Click the BOOST button to toggle between online/offline modes.</p>
+            <p><strong>OFFLINE:</strong> Reduced mining rate with a 12-hour cap. Tiered effectiveness:</p>
+            <ul className="list-disc list-inside text-xs ml-4 mt-1 space-y-0.5">
+              <li>First 2 hours: 50% effectiveness</li>
+              <li>Next 2 hours: 40% effectiveness</li>
+              <li>Next 4 hours: 30% effectiveness</li>
+              <li>Final 4 hours: 20% effectiveness</li>
+            </ul>
+            <p className="mt-2"><strong>Switch:</strong> Click the BOOST button to resume and collect offline earnings.</p>
             <p className="text-emerald-400 mt-2"><strong>💡 Tip:</strong> Stay online for maximum mining efficiency!</p>
           </InfoModal>
 
