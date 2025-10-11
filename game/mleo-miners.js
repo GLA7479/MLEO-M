@@ -712,6 +712,7 @@ const { disconnect } = useDisconnect();
     vault: 0, claimedTotal: 0, history: []
   });
   const [claiming, setClaiming] = useState(false);
+  const [claimAmount, setClaimAmount] = useState("");
 
   // ====== SFX / MUSIC (נוסף — לא מחליף את ui.muted הקיים של המשחק) ======
   const [sfxMuted, setSfxMuted] = useState(() => {
@@ -908,7 +909,20 @@ async function onClaimMined() {
   }
 
   // 4) שליחה — claim(gameId, amountUnits)
-  const toClaim = vaultNow;                           // מספר “אנושי” (יכול לכלול עד 2 ספרות)
+  let toClaim;
+  if (claimAmount && claimAmount.trim() !== "") {
+    toClaim = Math.floor(Number(claimAmount) || 0);
+    if (toClaim <= 0) { 
+      setGiftToastWithTTL("Enter a valid amount"); 
+      return; 
+    }
+    if (toClaim > vaultNow) { 
+      setGiftToastWithTTL(`Not enough balance. Available: ${formatMleoShort(vaultNow)}`); 
+      return; 
+    }
+  } else {
+    toClaim = vaultNow;                           // מספר "אנושי" (יכול לכלול עד 2 ספרות)
+  }
   const amountUnits = parseUnits(
     Number(toClaim).toFixed(Math.min(2, MLEO_DECIMALS)),
     MLEO_DECIMALS
@@ -937,6 +951,7 @@ async function onClaimMined() {
     saveMiningState(after);
     setMining(after);
     setCenterPopup?.({ text: `✅ Sent ${formatMleoShort(delta)} MLEO to wallet`, id: Math.random() });
+    setClaimAmount(""); // Reset claim amount after successful claim
   } catch (err) {
     console.error(err);
     setGiftToastWithTTL("Claim failed or rejected");
@@ -3932,6 +3947,25 @@ MLEO
 
               {/* Wallet actions */}
               <div className="mb-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                {/* Claim Amount Input */}
+                <div className="mb-3">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Claim Amount
+                  </label>
+                  <input
+                    type="number"
+                    value={claimAmount}
+                    onChange={(e) => setClaimAmount(e.target.value)}
+                    placeholder="Enter amount or leave empty for all"
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
+                    min="0"
+                    step="0.01"
+                  />
+                  <div className="text-xs text-slate-500 mt-1">
+                    Available: {formatMleoShort(Number((mining?.vault || 0).toFixed(2)))} MLEO
+                  </div>
+                </div>
+
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <button
                     onClick={() => {

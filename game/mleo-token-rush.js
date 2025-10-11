@@ -752,18 +752,7 @@ export default function MLEOTokenRushPage() {
     const { isConnected, address } = useAccount();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
-  const { writeContract, isPending } = useWriteContract({
-    mutation: {
-      onSuccess: (hash) => {
-        console.log("🔵 [CLAIM] Transaction hash received from hook:", hash);
-        localStorage.setItem('pendingClaimHash', hash);
-        localStorage.setItem('pendingClaimTime', Date.now().toString());
-      },
-      onError: (error) => {
-        console.error("🔵 [CLAIM] Hook error:", error);
-      }
-    }
-  });
+  const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
 
   // Simple approach: just wait and check for pending claims
@@ -1143,48 +1132,17 @@ export default function MLEOTokenRushPage() {
       console.log("🔵 [CLAIM] Writing contract...");
       showToast("⏳ Please confirm in wallet...");
       
-      // Initialize hash variable
-      let hash;
+      // Use writeContractAsync like in MINERS game
+      const hash = await writeContractAsync({
+        address: ENV.CLAIM_ADDRESS,
+        abi: CLAIM_ABI_V3,
+        functionName: "claim",
+        args: [GAME_ID_BI, units],
+        chainId: ENV.CLAIM_CHAIN_ID,
+        account: address,
+      });
       
-      // Use writeContract and wait for the hook to handle the hash
-      try {
-        writeContract(request);
-        console.log("🔵 [CLAIM] Contract write initiated, waiting for hook...");
-        
-        // Wait for the hook to save the hash
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        // Check if hook saved a hash
-        const pendingHash = localStorage.getItem('pendingClaimHash');
-        if (pendingHash) {
-          console.log("🔵 [CLAIM] Hash received from hook:", pendingHash);
-          hash = pendingHash;
-        } else {
-          console.log("🔵 [CLAIM] No hash from hook, checking for existing pending...");
-          
-          // Check for any existing pending hash
-          const existingHash = localStorage.getItem('pendingClaimHash');
-          const existingTime = localStorage.getItem('pendingClaimTime');
-          
-          if (existingHash && existingTime) {
-            const timeSince = Date.now() - parseInt(existingTime);
-            if (timeSince < 10 * 60 * 1000) { // Within 10 minutes
-              console.log("🔵 [CLAIM] Using existing pending hash:", existingHash);
-              hash = existingHash;
-            }
-          }
-        }
-      } catch (error) {
-        console.error("❌ [ERROR] Contract write failed:", error);
-        showToast("❌ Transaction failed");
-        return;
-      }
-      
-      if (!hash) {
-        console.log("❌ [ERROR] No transaction hash available");
-        showToast("❌ Transaction failed - no hash received");
-        return;
-      }
+      console.log("🔵 [CLAIM] Transaction hash received:", hash);
 
       console.log("🔵 [CLAIM] Transaction sent, hash:", hash);
       showToast("⏳ Waiting for blockchain confirmation...");
