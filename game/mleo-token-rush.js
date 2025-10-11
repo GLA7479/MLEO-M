@@ -235,15 +235,15 @@ function InfoModal({ isOpen, onClose, title, children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="fixed inset-0 bg-black/70 backdrop-blur-sm"></div>
-      <div className="relative bg-gradient-to-br from-zinc-900 to-zinc-950 border-2 border-emerald-500/30 rounded-3xl max-w-md w-full p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="relative bg-gradient-to-br from-zinc-900 to-zinc-950 border-2 border-emerald-500/30 rounded-2xl max-w-sm w-full p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-2xl font-bold text-zinc-400 hover:text-white"
+          className="absolute top-4 right-4 text-xl font-bold text-zinc-400 hover:text-white"
         >
           ×
         </button>
-        <h3 className="text-2xl font-bold mb-4 text-emerald-400">{title}</h3>
-        <div className="text-zinc-300 space-y-3">
+        <h3 className="text-xl font-bold mb-3 text-emerald-400">{title}</h3>
+        <div className="text-zinc-300 space-y-3 text-sm">
           {children}
         </div>
       </div>
@@ -1083,9 +1083,12 @@ export default function MLEOTokenRushPage() {
       {(() => {
                   const { modifier } = getCurrentGlobalEvent();
                   return modifier ? (
-                    <span className="px-3 py-1.5 rounded-xl text-xs border border-amber-500/30 bg-amber-500/10 text-amber-300 font-bold">
+                    <button
+                      onClick={() => setInfoModal('events')}
+                      className="px-3 py-1.5 rounded-xl text-xs border border-amber-500/30 bg-amber-500/10 text-amber-300 font-bold hover:bg-amber-500/20 transition cursor-pointer"
+                    >
                       🔥 Active: {modifier.label}
-                    </span>
+                    </button>
                   ) : (
                     <button
                       onClick={() => setInfoModal('events')}
@@ -1609,62 +1612,57 @@ export default function MLEOTokenRushPage() {
             <p className="text-emerald-400 mt-2"><strong>⚡ Tip:</strong> Click frequently for maximum mining efficiency!</p>
           </InfoModal>
 
-          <InfoModal isOpen={infoModal === 'events'} onClose={() => setInfoModal(null)} title="🔥 Global Events Schedule">
-            <p><strong>Global Events</strong> run on a fixed UTC-based schedule, active for everyone at the same time!</p>
-            <div className="mt-4 space-y-4">
+          <InfoModal isOpen={infoModal === 'events'} onClose={() => setInfoModal(null)} title="🔥 Events">
+            <div className="space-y-3">
               <div>
-                <p className="font-bold text-emerald-400 mb-2">Available Events:</p>
-                <div className="space-y-2">
-                  {CONFIG.MODIFIERS_POOL.map(mod => (
-                    <div key={mod.id} className="p-2 rounded-lg bg-white/5 border border-white/10">
-                      <div className="font-bold">{mod.label}</div>
-                      <div className="text-xs opacity-70 mt-1">{mod.desc}</div>
-                    </div>
-                  ))}
-                </div>
-</div>
-
-              <div>
-                <p className="font-bold text-amber-400 mb-2">Event Schedule:</p>
-                <div className="text-xs opacity-70 space-y-1">
-                  <p>• Each event lasts <strong>30 minutes</strong></p>
-                  <p>• Events repeat every <strong>3 hours</strong></p>
-                  <p>• 30-minute break between events</p>
-                  <p>• Schedule is synchronized globally (UTC time)</p>
+                <p className="text-xs font-bold mb-2">All Events:</p>
+                <div className="space-y-1.5">
+                  {(() => {
+                    const { modifier: activeMod } = getCurrentGlobalEvent();
+                    return CONFIG.MODIFIERS_POOL.map(mod => {
+                      const isActive = activeMod && activeMod.id === mod.id;
+                      return (
+                        <div key={mod.id} className={`p-2 rounded ${isActive ? 'bg-amber-500/20 border border-amber-500/50' : 'bg-white/5 border border-white/10'}`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-xs ${isActive ? 'font-bold' : ''}`}>{mod.label}</span>
+                            {isActive && <span className="text-xs text-amber-300 font-bold">🔥 ACTIVE</span>}
         </div>
+                          <p className="text-xs opacity-60">{mod.desc}</p>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
               </div>
 
               <div>
-                <p className="font-bold text-blue-400 mb-2">Upcoming Events:</p>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {getEventSchedule().map((event, idx) => {
-                    const timeUntil = event.start - Date.now();
-                    const duration = event.end - event.start;
-                    const hours = Math.floor(timeUntil / (60 * 60 * 1000));
-                    const minutes = Math.floor((timeUntil % (60 * 60 * 1000)) / (60 * 1000));
-                    
+                <p className="text-xs font-bold mb-2">Next Event:</p>
+                {(() => {
+                  const schedule = getEventSchedule();
+                  const nextEvent = schedule.find(e => !e.isActive);
+                  
+                  if (!nextEvent) return <p className="text-xs opacity-60">No upcoming events</p>;
+                  
+                  const timeUntil = nextEvent.start - Date.now();
+                  const hours = Math.floor(timeUntil / (60 * 60 * 1000));
+                  const minutes = Math.floor((timeUntil % (60 * 60 * 1000)) / (60 * 1000));
+                  
     return (
-                      <div key={idx} className={`p-2 rounded-lg ${event.isActive ? 'bg-amber-500/20 border border-amber-500/50' : 'bg-white/5 border border-white/10'}`}>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold">{event.modifier.label}</span>
-                          {event.isActive ? (
-                            <span className="text-xs text-amber-300 font-bold">🔥 ACTIVE NOW</span>
-                          ) : (
-                            <span className="text-xs opacity-60">
-                              {hours > 0 ? `in ${hours}h ${minutes}m` : `in ${minutes}m`}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs opacity-60 mt-1">
-                          {new Date(event.start).toLocaleTimeString()} - {new Date(event.end).toLocaleTimeString()}
-                        </div>
+                    <div className="p-2 rounded bg-white/5 border border-white/10">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold">{nextEvent.modifier.label}</span>
+                        <span className="text-xs opacity-60">
+                          {hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`}
+                        </span>
+                      </div>
+                      <p className="text-xs opacity-60">{nextEvent.modifier.desc}</p>
       </div>
     );
-                  })}
+                })()}
       </div>
+
+              <p className="text-xs opacity-70 text-center">• 30 min each • 3h cycle • UTC time</p>
     </div>
-            </div>
-            <p className="text-emerald-400 mt-4"><strong>💡 Tip:</strong> Plan your gameplay around events to maximize your rewards!</p>
           </InfoModal>
 
           <InfoModal isOpen={infoModal === 'guild'} onClose={() => setInfoModal(null)} title="👥 Mining Guild">
