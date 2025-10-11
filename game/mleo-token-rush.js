@@ -82,14 +82,14 @@ const CONFIG = {
   // Guild
   GUILD_SAMPLES: [0.02, 0.03, 0.05, 0.08],  // random bonuses
 
-  // Modifiers (mini-events)
-  MODIFIER_ROTATE_EVERY_MIN: 15,             // rotate every 15 min
-  MODIFIER_DURATION_MIN: 5,                  // active for 5 min
+  // Modifiers (mini-events) - Fixed global schedule
+  MODIFIER_CYCLE_HOURS: 3,                   // Full cycle every 3 hours
+  MODIFIER_DURATION_MIN: 30,                 // Each event lasts 30 minutes
   MODIFIERS_POOL: [
-    { id: "GIFT_X2",   label: "🎁 Gifts ×2",      mult: { gift: 2 } },
-    { id: "ONLINE_P",  label: "⚡ +30% Mining",   mult: { online: 1.30 } },
-    { id: "OFFLINE_P", label: "🌙 +30% Offline",  mult: { offline: 1.30 } },
-    { id: "SALE_25",   label: "💰 -25% Upgrades", mult: { upgradeCost: 0.75 } },
+    { id: "GIFT_X2",   label: "🎁 Gifts ×2",      mult: { gift: 2 }, desc: "Double rewards from hourly gifts" },
+    { id: "ONLINE_P",  label: "⚡ +30% Mining",   mult: { online: 1.30 }, desc: "30% increased online mining speed" },
+    { id: "OFFLINE_P", label: "🌙 +30% Offline",  mult: { offline: 1.30 }, desc: "30% increased offline mining rate" },
+    { id: "SALE_25",   label: "💰 -25% Upgrades", mult: { upgradeCost: 0.75 }, desc: "25% discount on all upgrades" },
   ],
   
   // Time Chest (random spawn)
@@ -473,6 +473,82 @@ function luckyRoll() {
 }
 
 // ============================================================================
+// GLOBAL EVENT SCHEDULER (Fixed UTC-based)
+// ============================================================================
+function getCurrentGlobalEvent() {
+  const now = Date.now();
+  const cycleMs = CONFIG.MODIFIER_CYCLE_HOURS * 60 * 60 * 1000; // 3 hours in ms
+  const durationMs = CONFIG.MODIFIER_DURATION_MIN * 60 * 1000;   // 30 min in ms
+  
+  // Calculate which cycle we're in (since Unix epoch)
+  const cycleIndex = Math.floor(now / cycleMs);
+  const cycleStart = cycleIndex * cycleMs;
+  const timeInCycle = now - cycleStart;
+  
+  // Each event takes 30 minutes, then 30 minutes break, repeat
+  const eventIndex = Math.floor(timeInCycle / durationMs);
+  const eventInCycleStart = eventIndex * durationMs;
+  const eventEnd = cycleStart + eventInCycleStart + durationMs;
+  
+  // Check if we're in an active event window
+  if (timeInCycle >= eventInCycleStart && timeInCycle < (eventInCycleStart + durationMs)) {
+    const modifierIndex = eventIndex % CONFIG.MODIFIERS_POOL.length;
+    const modifier = CONFIG.MODIFIERS_POOL[modifierIndex];
+    
+    return {
+      modifier: {
+        ...modifier,
+        until: eventEnd
+      },
+      nextEventStart: eventEnd + durationMs // Next event starts after current ends + break
+    };
+  }
+  
+  // We're in a break period, calculate next event
+  const nextEventIndex = eventIndex + 1;
+  const nextEventStart = cycleStart + (nextEventIndex * durationMs);
+  
+  return {
+    modifier: null,
+    nextEventStart: nextEventStart
+  };
+}
+
+function getEventSchedule() {
+  const now = Date.now();
+  const cycleMs = CONFIG.MODIFIER_CYCLE_HOURS * 60 * 60 * 1000;
+  const durationMs = CONFIG.MODIFIER_DURATION_MIN * 60 * 1000;
+  
+  const schedule = [];
+  const cycleIndex = Math.floor(now / cycleMs);
+  const cycleStart = cycleIndex * cycleMs;
+  
+  // Generate schedule for current and next cycle
+  for (let cycle = 0; cycle < 2; cycle++) {
+    const currentCycleStart = cycleStart + (cycle * cycleMs);
+    
+    for (let i = 0; i < CONFIG.MODIFIERS_POOL.length; i++) {
+      const eventStart = currentCycleStart + (i * durationMs);
+      const eventEnd = eventStart + durationMs;
+      
+      if (eventEnd > now) { // Only show future/current events
+        const modifier = CONFIG.MODIFIERS_POOL[i];
+        const isActive = now >= eventStart && now < eventEnd;
+        
+        schedule.push({
+          modifier,
+          start: eventStart,
+          end: eventEnd,
+          isActive
+        });
+      }
+    }
+  }
+  
+  return schedule.slice(0, 8); // Return next 8 events
+}
+
+// ============================================================================
 // GUILD FUNCTIONS
 // ============================================================================
 function useGuildActions(setCore) {
@@ -598,11 +674,11 @@ export default function MLEOTokenRushPage() {
   }, []);
 
 
-  // Core hooks
+  // Core hooks - Use global event system
   const liveModifierMult = (kind) => {
-    const m = sess.modifier;
-    if (!m || !m.until || m.until < Date.now()) return 1;
-    return m.mult?.[kind] || 1;
+    const { modifier } = getCurrentGlobalEvent();
+    if (!modifier) return 1;
+    return modifier.mult?.[kind] || 1;
   };
 
   const getMultiplier = () => upgradesMultiplier(core.upgrades, core.guild, 1 + (core.prestigePoints * CONFIG.PRESTIGE_MULT_PER_POINT));
@@ -1004,15 +1080,21 @@ export default function MLEOTokenRushPage() {
               </h1>
               <div className="text-sm opacity-70 mt-1">Passive crypto mining • Earn MLEO tokens</div>
               <div className="mt-3 flex flex-wrap gap-2">
-      {sess.modifier && sess.modifier.until > Date.now() ? (
-                  <span className="px-3 py-1.5 rounded-xl text-xs border border-amber-500/30 bg-amber-500/10 text-amber-300 font-bold">
-                    🔥 Active: {sess.modifier.label}
-                  </span>
-                ) : (
-                  <span className="px-3 py-1.5 rounded-xl text-xs border border-white/10 bg-white/5 opacity-60">
-                    No active event
-                  </span>
-                )}
+      {(() => {
+                  const { modifier } = getCurrentGlobalEvent();
+                  return modifier ? (
+                    <span className="px-3 py-1.5 rounded-xl text-xs border border-amber-500/30 bg-amber-500/10 text-amber-300 font-bold">
+                      🔥 Active: {modifier.label}
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setInfoModal('events')}
+                      className="px-3 py-1.5 rounded-xl text-xs border border-white/10 bg-white/5 opacity-60 hover:opacity-100 hover:bg-white/10 transition"
+                    >
+                      No active event
+                    </button>
+                  );
+                })()}
                 {sess.chest && sess.chest.expiresAt > Date.now() && (
                   <span className="px-3 py-1.5 rounded-xl text-xs border border-yellow-500/30 bg-yellow-500/10 text-yellow-300 font-bold animate-pulse">
                     📦 Chest expires in {Math.max(0, Math.ceil((sess.chest.expiresAt - Date.now())/1000))}s!
@@ -1442,9 +1524,10 @@ export default function MLEOTokenRushPage() {
 
           <InfoModal isOpen={infoModal === 'gifts'} onClose={() => setInfoModal(null)} title="🎁 Gifts & Bonuses">
             <p><strong>Hourly Gift:</strong> Claim every hour for bonus MLEO. 10% chance for Lucky multiplier (×2 or ×3)!</p>
+            <p><strong>How it works:</strong> After claiming, you must wait exactly 1 hour before the next gift is available.</p>
             <p><strong>Daily Bonus:</strong> Claim once per day. Streak increases reward amount (up to 7 days).</p>
             <p><strong>Time Chest:</strong> Spawns randomly every 20-40 minutes. You have 60 seconds to claim it!</p>
-            <p><strong>Events:</strong> Random modifiers appear every 15 minutes for 5 minutes (×2 Gifts, +30% Mining, -25% Upgrade costs, etc.)</p>
+            <p className="text-emerald-400 mt-2"><strong>💡 Tip:</strong> Check back every hour to claim your gifts!</p>
           </InfoModal>
 
           <InfoModal isOpen={infoModal === 'bridge'} onClose={() => setInfoModal(null)} title="🌉 Bridge">
@@ -1524,6 +1607,64 @@ export default function MLEOTokenRushPage() {
               <li>When offline: Click to resume mining</li>
             </ul>
             <p className="text-emerald-400 mt-2"><strong>⚡ Tip:</strong> Click frequently for maximum mining efficiency!</p>
+          </InfoModal>
+
+          <InfoModal isOpen={infoModal === 'events'} onClose={() => setInfoModal(null)} title="🔥 Global Events Schedule">
+            <p><strong>Global Events</strong> run on a fixed UTC-based schedule, active for everyone at the same time!</p>
+            <div className="mt-4 space-y-4">
+              <div>
+                <p className="font-bold text-emerald-400 mb-2">Available Events:</p>
+                <div className="space-y-2">
+                  {CONFIG.MODIFIERS_POOL.map(mod => (
+                    <div key={mod.id} className="p-2 rounded-lg bg-white/5 border border-white/10">
+                      <div className="font-bold">{mod.label}</div>
+                      <div className="text-xs opacity-70 mt-1">{mod.desc}</div>
+                    </div>
+                  ))}
+                </div>
+</div>
+
+              <div>
+                <p className="font-bold text-amber-400 mb-2">Event Schedule:</p>
+                <div className="text-xs opacity-70 space-y-1">
+                  <p>• Each event lasts <strong>30 minutes</strong></p>
+                  <p>• Events repeat every <strong>3 hours</strong></p>
+                  <p>• 30-minute break between events</p>
+                  <p>• Schedule is synchronized globally (UTC time)</p>
+        </div>
+              </div>
+
+              <div>
+                <p className="font-bold text-blue-400 mb-2">Upcoming Events:</p>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {getEventSchedule().map((event, idx) => {
+                    const timeUntil = event.start - Date.now();
+                    const duration = event.end - event.start;
+                    const hours = Math.floor(timeUntil / (60 * 60 * 1000));
+                    const minutes = Math.floor((timeUntil % (60 * 60 * 1000)) / (60 * 1000));
+                    
+    return (
+                      <div key={idx} className={`p-2 rounded-lg ${event.isActive ? 'bg-amber-500/20 border border-amber-500/50' : 'bg-white/5 border border-white/10'}`}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold">{event.modifier.label}</span>
+                          {event.isActive ? (
+                            <span className="text-xs text-amber-300 font-bold">🔥 ACTIVE NOW</span>
+                          ) : (
+                            <span className="text-xs opacity-60">
+                              {hours > 0 ? `in ${hours}h ${minutes}m` : `in ${minutes}m`}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs opacity-60 mt-1">
+                          {new Date(event.start).toLocaleTimeString()} - {new Date(event.end).toLocaleTimeString()}
+                        </div>
+      </div>
+    );
+                  })}
+      </div>
+    </div>
+            </div>
+            <p className="text-emerald-400 mt-4"><strong>💡 Tip:</strong> Plan your gameplay around events to maximize your rewards!</p>
           </InfoModal>
 
           <InfoModal isOpen={infoModal === 'guild'} onClose={() => setInfoModal(null)} title="👥 Mining Guild">
