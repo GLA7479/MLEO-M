@@ -312,48 +312,26 @@ export default function ScratchCardPage() {
       <main className="min-h-[100svh] bg-gradient-to-b from-teal-950 via-cyan-950 to-black text-zinc-100">
         <div className="max-w-4xl mx-auto p-4 pb-20">
           
-          {/* HEADER */}
+          {/* HEADER - Centered */}
           <header className="flex items-center justify-between mb-6">
-            <div>
+            <Link href="/arcade">
+              <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+                ← BACK
+              </button>
+            </Link>
+            
+            <div className="text-center">
               <h1 className="text-4xl font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">
                 🃏 Scratch Card
               </h1>
               <div className="text-sm opacity-70 mt-1">Scratch 3 matching symbols to win!</div>
             </div>
-            <Link href="/play">
-              <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
-                ← BACK
-              </button>
-            </Link>
+            
+            <div className="w-[88px]"></div>
           </header>
 
-          {/* VAULT & STATS */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <div className="rounded-xl p-3 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
-              <div className="text-xs opacity-70 mb-1">Your Vault</div>
-              <div className="text-xl font-bold text-emerald-400">{fmt(vault)}</div>
-              <button onClick={refreshVault} className="text-xs opacity-60 hover:opacity-100 mt-1">↻ Refresh</button>
-            </div>
-            
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Cards Played</div>
-              <div className="text-lg font-bold">{stats.totalCards}</div>
-            </div>
-
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Total Won</div>
-              <div className="text-lg font-bold text-green-400">{fmt(stats.totalWon)}</div>
-            </div>
-
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Wins</div>
-              <div className="text-lg font-bold text-amber-400">{stats.wins}</div>
-            </div>
-          </div>
-
-          {/* SCRATCH CARD */}
+          {/* SCRATCH CARD - Main Window */}
           <div className="rounded-3xl p-8 bg-gradient-to-br from-teal-900/30 via-cyan-900/20 to-blue-900/30 border-4 border-cyan-600/50 shadow-2xl mb-6">
-            
             {!playing && cells.length === 0 ? (
               // Initial state - Buy card
               <div className="text-center py-12">
@@ -454,6 +432,30 @@ export default function ScratchCardPage() {
             )}
           </div>
 
+          {/* STATS - 4 Windows below game */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <div className="rounded-xl p-3 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
+              <div className="text-xs opacity-70 mb-1">Your Vault</div>
+              <div className="text-xl font-bold text-emerald-400">{fmt(vault)}</div>
+              <button onClick={refreshVault} className="text-xs opacity-60 hover:opacity-100 mt-1">↻ Refresh</button>
+            </div>
+            
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Cards Played</div>
+              <div className="text-lg font-bold">{stats.totalCards}</div>
+            </div>
+
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Total Won</div>
+              <div className="text-lg font-bold text-green-400">{fmt(stats.totalWon)}</div>
+            </div>
+
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Wins</div>
+              <div className="text-lg font-bold text-amber-400">{stats.wins}</div>
+            </div>
+          </div>
+
           {/* WIN TABLE */}
           <div className="rounded-2xl p-6 bg-white/5 border border-white/10 mb-6">
             <h3 className="text-lg font-bold mb-4">🏆 Prize Table</h3>
@@ -480,42 +482,6 @@ export default function ScratchCardPage() {
             </div>
           </div>
 
-          {/* STATS */}
-          <div className="rounded-2xl p-6 bg-gradient-to-br from-cyan-900/20 to-teal-900/20 border border-cyan-500/30">
-            <h3 className="text-xl font-bold mb-4">📊 Your Stats</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-sm opacity-70">Cards Played</div>
-                <div className="text-2xl font-bold">{stats.totalCards}</div>
-              </div>
-              <div>
-                <div className="text-sm opacity-70">Total Wins</div>
-                <div className="text-2xl font-bold text-green-400">{stats.wins}</div>
-              </div>
-              <div>
-                <div className="text-sm opacity-70">Total Won</div>
-                <div className="text-2xl font-bold text-emerald-400">{fmt(stats.totalWon)}</div>
-              </div>
-              <div>
-                <div className="text-sm opacity-70">Biggest Win</div>
-                <div className="text-2xl font-bold text-amber-400">{fmt(stats.biggestWin)}</div>
-              </div>
-              <div>
-                <div className="text-sm opacity-70">Win Rate</div>
-                <div className="text-2xl font-bold text-blue-400">
-                  {stats.totalCards > 0 ? `${((stats.wins / stats.totalCards) * 100).toFixed(1)}%` : "0%"}
-                </div>
-              </div>
-              <div>
-                <div className="text-sm opacity-70">Net Profit</div>
-                <div className={`text-2xl font-bold ${
-                  stats.totalWon - (stats.totalCards * CARD_COST) >= 0 ? "text-green-400" : "text-red-400"
-                }`}>
-                  {fmt(stats.totalWon - (stats.totalCards * CARD_COST))}
-                </div>
-              </div>
-            </div>
-          </div>
 
         </div>
       </main>

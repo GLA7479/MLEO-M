@@ -222,44 +222,23 @@ export default function SlotMachinePage() {
       <main className="min-h-[100svh] bg-gradient-to-b from-purple-950 via-indigo-950 to-black text-zinc-100">
         <div className="max-w-4xl mx-auto p-4 pb-20">
           
-          {/* HEADER */}
+          {/* HEADER - Centered title with BACK on opposite side */}
           <header className="flex items-center justify-between mb-6">
-            <div>
+            <Link href="/arcade">
+              <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+                ← BACK
+              </button>
+            </Link>
+            
+            <div className="text-center">
               <h1 className="text-4xl font-bold bg-gradient-to-r from-yellow-400 via-amber-400 to-yellow-300 bg-clip-text text-transparent">
                 🎰 MLEO Slots
               </h1>
               <div className="text-sm opacity-70 mt-1">Classic 3-Reel Slot Machine</div>
             </div>
-            <Link href="/play">
-              <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
-                ← BACK
-              </button>
-            </Link>
-          </header>
-
-          {/* VAULT & STATS */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <div className="rounded-xl p-3 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
-              <div className="text-xs opacity-70 mb-1">Your Vault</div>
-              <div className="text-xl font-bold text-emerald-400">{fmt(vault)}</div>
-              <button onClick={refreshVault} className="text-xs opacity-60 hover:opacity-100 mt-1">↻ Refresh</button>
-            </div>
             
-            <div className="rounded-xl p-3 bg-gradient-to-br from-amber-600/20 to-yellow-600/20 border border-amber-500/30">
-              <div className="text-xs opacity-70 mb-1">Free Spins</div>
-              <div className="text-xl font-bold text-amber-400">{freeSpins}</div>
-            </div>
-
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Total Spins</div>
-              <div className="text-lg font-bold">{stats.totalSpins}</div>
-            </div>
-
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Total Won</div>
-              <div className="text-lg font-bold text-green-400">{fmt(stats.totalWon)}</div>
-            </div>
-          </div>
+            <div className="w-[88px]"></div>
+          </header>
 
           {/* SLOT MACHINE */}
           <div className="rounded-3xl p-8 bg-gradient-to-br from-amber-900/30 via-yellow-900/20 to-amber-900/30 border-4 border-yellow-600/50 shadow-2xl mb-6">
@@ -319,6 +298,30 @@ export default function SlotMachinePage() {
               <div className="text-sm opacity-60 mt-3">
                 {freeSpins > 0 ? `${freeSpins} free spins available` : `${fmt(SPIN_COST)} MLEO per spin`}
               </div>
+            </div>
+          </div>
+
+          {/* STATS - Moved below game window */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <div className="rounded-xl p-3 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
+              <div className="text-xs opacity-70 mb-1">Your Vault</div>
+              <div className="text-xl font-bold text-emerald-400">{fmt(vault)}</div>
+              <button onClick={refreshVault} className="text-xs opacity-60 hover:opacity-100 mt-1">↻ Refresh</button>
+            </div>
+            
+            <div className="rounded-xl p-3 bg-gradient-to-br from-amber-600/20 to-yellow-600/20 border border-amber-500/30">
+              <div className="text-xs opacity-70 mb-1">Free Spins</div>
+              <div className="text-xl font-bold text-amber-400">{freeSpins}</div>
+            </div>
+
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Total Spins</div>
+              <div className="text-lg font-bold">{stats.totalSpins}</div>
+            </div>
+
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Total Won</div>
+              <div className="text-lg font-bold text-green-400">{fmt(stats.totalWon)}</div>
             </div>
           </div>
 

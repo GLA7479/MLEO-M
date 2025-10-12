@@ -235,46 +235,25 @@ export default function HiLoPage() {
       <main className="min-h-[100svh] bg-gradient-to-b from-green-950 via-emerald-950 to-black text-zinc-100">
         <div className="max-w-4xl mx-auto p-4 pb-20">
           
-          {/* HEADER */}
+          {/* HEADER - Centered */}
           <header className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400 bg-clip-text text-transparent">
-                🃏 MLEO Hi-Lo
-              </h1>
-              <div className="text-sm opacity-70 mt-1">Guess Higher or Lower!</div>
-            </div>
             <Link href="/arcade">
               <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
                 ← BACK
               </button>
             </Link>
-          </header>
-
-          {/* VAULT & STATS */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <div className="rounded-xl p-3 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
-              <div className="text-xs opacity-70 mb-1">Your Vault</div>
-              <div className="text-xl font-bold text-emerald-400">{fmt(vault)}</div>
-              <button onClick={refreshVault} className="text-xs opacity-60 hover:opacity-100 mt-1">↻ Refresh</button>
+            
+            <div className="text-center">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400 bg-clip-text text-transparent">
+                🃏 MLEO Hi-Lo
+              </h1>
+              <div className="text-sm opacity-70 mt-1">Guess Higher or Lower!</div>
             </div>
             
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Current Streak</div>
-              <div className="text-lg font-bold text-amber-400">{streak}</div>
-            </div>
+            <div className="w-[88px]"></div>
+          </header>
 
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Total Won</div>
-              <div className="text-lg font-bold text-green-400">{fmt(stats.totalWon)}</div>
-            </div>
-
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Longest Streak</div>
-              <div className="text-lg font-bold text-purple-400">{stats.longestStreak}</div>
-            </div>
-          </div>
-
-          {/* GAME AREA */}
+          {/* HI-LO GAME - Main Window */}
           <div className="rounded-3xl p-8 bg-gradient-to-br from-green-900/30 via-emerald-900/20 to-teal-900/30 border-4 border-green-600/50 shadow-2xl mb-6">
             
             {!playing && !currentCard ? (
@@ -414,6 +393,30 @@ export default function HiLoPage() {
                 )}
               </>
             )}
+          </div>
+
+          {/* STATS - 4 Windows below game */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <div className="rounded-xl p-3 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
+              <div className="text-xs opacity-70 mb-1">Your Vault</div>
+              <div className="text-xl font-bold text-emerald-400">{fmt(vault)}</div>
+              <button onClick={refreshVault} className="text-xs opacity-60 hover:opacity-100 mt-1">↻ Refresh</button>
+            </div>
+            
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Current Streak</div>
+              <div className="text-lg font-bold text-amber-400">{streak}</div>
+            </div>
+
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Total Won</div>
+              <div className="text-lg font-bold text-green-400">{fmt(stats.totalWon)}</div>
+            </div>
+
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Longest Streak</div>
+              <div className="text-lg font-bold text-purple-400">{stats.longestStreak}</div>
+            </div>
           </div>
 
           {/* HOW TO PLAY */}

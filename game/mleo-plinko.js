@@ -629,43 +629,25 @@ function buildBoardGeometry(w, h) {
     <Layout isGame={true} title="MLEO Plinko 🎯">
       <main className="min-h-[100svh] bg-gradient-to-b from-blue-950 via-indigo-950 to-black text-zinc-100">
         <div className="max-w-6xl mx-auto p-4 pb-20">
-          {/* HEADER */}
+          {/* HEADER - Centered */}
           <header className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-teal-400 bg-clip-text text-transparent">
-                🎯 MLEO Plinko
-              </h1>
-              <div className="text-sm opacity-70 mt-1">Real physics • Watch the ball dance on pegs</div>
-            </div>
             <Link href="/arcade">
               <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
                 ← BACK
               </button>
             </Link>
+            
+            <div className="text-center">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-teal-400 bg-clip-text text-transparent">
+                🎯 MLEO Plinko
+              </h1>
+              <div className="text-sm opacity-70 mt-1">Real physics • Watch the ball dance on pegs</div>
+            </div>
+            
+            <div className="w-[88px]"></div>
           </header>
 
-          {/* VAULT & STATS */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <div className="rounded-xl p-3 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
-              <div className="text-xs opacity-70 mb-1">Your Vault</div>
-              <div className="text-xl font-bold text-emerald-400">{fmt(vault)}</div>
-              <button onClick={refreshVault} className="text-xs opacity-60 hover:opacity-100 mt-1">↻ Refresh</button>
-            </div>
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Total Drops</div>
-              <div className="text-lg font-bold">{stats.totalDrops}</div>
-            </div>
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Total Won</div>
-              <div className="text-lg font-bold text-green-400">{fmt(stats.totalWon)}</div>
-            </div>
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Biggest Win</div>
-              <div className="text-lg font-bold text-amber-400">{fmt(stats.biggestWin)}</div>
-            </div>
-          </div>
-
-          {/* PLINKO BOARD (CANVAS) */}
+          {/* PLINKO BOARD (CANVAS) - Main Window */}
           <div className="rounded-3xl p-3 sm:p-6 bg-gradient-to-br from-blue-900/30 via-indigo-900/20 to-cyan-900/30 border-2 sm:border-4 border-blue-600/50 shadow-2xl mb-6">
             <div className="relative bg-gradient-to-b from-indigo-900/50 to-blue-950/80 rounded-2xl p-2 sm:p-4 mb-6 overflow-hidden" style={{ minHeight: 420 }}>
               <div className="relative mx-auto max-w-2xl">
@@ -745,6 +727,30 @@ function buildBoardGeometry(w, h) {
                   <div className="text-sm font-bold text-red-400">{result.message}</div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* STATS - 4 Windows below game */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <div className="rounded-xl p-3 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
+              <div className="text-xs opacity-70 mb-1">Your Vault</div>
+              <div className="text-xl font-bold text-emerald-400">{fmt(vault)}</div>
+              <button onClick={refreshVault} className="text-xs opacity-60 hover:opacity-100 mt-1">↻ Refresh</button>
+            </div>
+            
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Total Drops</div>
+              <div className="text-lg font-bold">{stats.totalDrops}</div>
+            </div>
+
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Total Won</div>
+              <div className="text-lg font-bold text-green-400">{fmt(stats.totalWon)}</div>
+            </div>
+
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Biggest Win</div>
+              <div className="text-lg font-bold text-amber-400">{fmt(stats.biggestWin)}</div>
             </div>
           </div>
 

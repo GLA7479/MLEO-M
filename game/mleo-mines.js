@@ -238,46 +238,25 @@ export default function MinesPage() {
       <main className="min-h-[100svh] bg-gradient-to-b from-gray-950 via-zinc-950 to-black text-zinc-100">
         <div className="max-w-4xl mx-auto p-4 pb-20">
           
-          {/* HEADER */}
+          {/* HEADER - Centered */}
           <header className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-400 via-zinc-400 to-slate-400 bg-clip-text text-transparent">
-                💣 MLEO Mines
-              </h1>
-              <div className="text-sm opacity-70 mt-1">Find safe tiles and cash out!</div>
-            </div>
             <Link href="/arcade">
               <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
                 ← BACK
               </button>
             </Link>
-          </header>
-
-          {/* VAULT & STATS */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <div className="rounded-xl p-3 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
-              <div className="text-xs opacity-70 mb-1">Your Vault</div>
-              <div className="text-xl font-bold text-emerald-400">{fmt(vault)}</div>
-              <button onClick={refreshVault} className="text-xs opacity-60 hover:opacity-100 mt-1">↻ Refresh</button>
+            
+            <div className="text-center">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-400 via-zinc-400 to-slate-400 bg-clip-text text-transparent">
+                💣 MLEO Mines
+              </h1>
+              <div className="text-sm opacity-70 mt-1">Find safe tiles and cash out!</div>
             </div>
             
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Games Played</div>
-              <div className="text-lg font-bold">{stats.totalGames}</div>
-            </div>
+            <div className="w-[88px]"></div>
+          </header>
 
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Total Won</div>
-              <div className="text-lg font-bold text-green-400">{fmt(stats.totalWon)}</div>
-            </div>
-
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Successful Cashouts</div>
-              <div className="text-lg font-bold text-amber-400">{stats.cashouts}</div>
-            </div>
-          </div>
-
-          {/* GAME AREA */}
+          {/* MINES GAME - Main Window */}
           <div className="rounded-3xl p-6 bg-gradient-to-br from-gray-900/30 via-zinc-900/20 to-slate-900/30 border-4 border-gray-600/50 shadow-2xl mb-6">
             
             {!playing && !gameOver ? (
@@ -402,6 +381,30 @@ export default function MinesPage() {
                 </div>
               </>
             )}
+          </div>
+
+          {/* STATS - 4 Windows below game */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <div className="rounded-xl p-3 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
+              <div className="text-xs opacity-70 mb-1">Your Vault</div>
+              <div className="text-xl font-bold text-emerald-400">{fmt(vault)}</div>
+              <button onClick={refreshVault} className="text-xs opacity-60 hover:opacity-100 mt-1">↻ Refresh</button>
+            </div>
+            
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Games Played</div>
+              <div className="text-lg font-bold">{stats.totalGames}</div>
+            </div>
+
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Total Won</div>
+              <div className="text-lg font-bold text-green-400">{fmt(stats.totalWon)}</div>
+            </div>
+
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Cashouts</div>
+              <div className="text-lg font-bold text-amber-400">{stats.cashouts}</div>
+            </div>
           </div>
 
           {/* HOW TO PLAY */}

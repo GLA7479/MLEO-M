@@ -224,48 +224,25 @@ export default function CoinFlipPage() {
       <main className="min-h-[100svh] bg-gradient-to-b from-yellow-950 via-amber-950 to-black text-zinc-100">
         <div className="max-w-4xl mx-auto p-4 pb-20">
           
-          {/* HEADER */}
+          {/* HEADER - Centered */}
           <header className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-yellow-400 via-amber-400 to-orange-400 bg-clip-text text-transparent">
-                🪙 MLEO Coin Flip
-              </h1>
-              <div className="text-sm opacity-70 mt-1">50/50 chance with multipliers!</div>
-            </div>
             <Link href="/arcade">
               <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
                 ← BACK
               </button>
             </Link>
-          </header>
-
-          {/* VAULT & STATS */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <div className="rounded-xl p-3 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
-              <div className="text-xs opacity-70 mb-1">Your Vault</div>
-              <div className="text-xl font-bold text-emerald-400">{fmt(vault)}</div>
-              <button onClick={refreshVault} className="text-xs opacity-60 hover:opacity-100 mt-1">↻ Refresh</button>
+            
+            <div className="text-center">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-yellow-400 via-amber-400 to-orange-400 bg-clip-text text-transparent">
+                🪙 MLEO Coin Flip
+              </h1>
+              <div className="text-sm opacity-70 mt-1">50/50 chance with multipliers!</div>
             </div>
             
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Win Streak</div>
-              <div className="text-lg font-bold text-amber-400">{stats.streak}</div>
-            </div>
+            <div className="w-[88px]"></div>
+          </header>
 
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Total Won</div>
-              <div className="text-lg font-bold text-green-400">{fmt(stats.totalWon)}</div>
-            </div>
-
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Win Rate</div>
-              <div className="text-lg font-bold text-blue-400">
-                {stats.totalFlips > 0 ? `${((stats.wins / stats.totalFlips) * 100).toFixed(1)}%` : "0%"}
-              </div>
-            </div>
-          </div>
-
-          {/* COIN FLIP AREA */}
+          {/* COIN FLIP GAME - Main Window */}
           <div className="rounded-3xl p-8 bg-gradient-to-br from-yellow-900/30 via-amber-900/20 to-orange-900/30 border-4 border-yellow-600/50 shadow-2xl mb-6">
             
             {/* Coin */}
@@ -341,6 +318,32 @@ export default function CoinFlipPage() {
 
             <div className="text-center text-sm opacity-60">
               {fmt(FLIP_COST)} MLEO per flip
+            </div>
+          </div>
+
+          {/* STATS - 4 Windows below game */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <div className="rounded-xl p-3 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
+              <div className="text-xs opacity-70 mb-1">Your Vault</div>
+              <div className="text-xl font-bold text-emerald-400">{fmt(vault)}</div>
+              <button onClick={refreshVault} className="text-xs opacity-60 hover:opacity-100 mt-1">↻ Refresh</button>
+            </div>
+            
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Win Streak</div>
+              <div className="text-lg font-bold text-amber-400">{stats.streak}</div>
+            </div>
+
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Total Won</div>
+              <div className="text-lg font-bold text-green-400">{fmt(stats.totalWon)}</div>
+            </div>
+
+            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
+              <div className="text-xs opacity-70 mb-1">Win Rate</div>
+              <div className="text-lg font-bold text-blue-400">
+                {stats.totalFlips > 0 ? `${((stats.wins / stats.totalFlips) * 100).toFixed(1)}%` : "0%"}
+              </div>
             </div>
           </div>
 

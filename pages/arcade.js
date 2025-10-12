@@ -240,7 +240,7 @@ export default function ArcadeHub() {
           {/* Back to Main Games */}
           <div className="mt-12 text-center">
             <Link
-              href="/games"
+              href="/mining"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-white shadow-lg"
             >
               <span>⬅️</span>
