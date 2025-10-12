@@ -33,7 +33,11 @@ export default async function handler(req, res) {
     const now = Date.now();
     
     if (engine.state.phase === 'betting' && now >= engine.state.bettingEndTime) {
-      // Start running
+      // Start running even if no bets
+      await engine.startRunning();
+      await redis.set(GAME_STATE_KEY, JSON.stringify(engine.toJSON()));
+    } else if (engine.state.phase === 'betting' && Object.keys(engine.state.bets).length === 0 && now >= engine.state.bettingEndTime + 2000) {
+      // If no bets after 2 extra seconds, start anyway
       await engine.startRunning();
       await redis.set(GAME_STATE_KEY, JSON.stringify(engine.toJSON()));
     } else if (engine.state.phase === 'running') {
@@ -44,6 +48,20 @@ export default async function handler(req, res) {
       if (engine.state.phase === 'crashed' || Object.values(engine.state.bets).some(b => b.cashedOutAt)) {
         await redis.set(GAME_STATE_KEY, JSON.stringify(engine.toJSON()));
       }
+    } else if (engine.state.phase === 'crashed') {
+      // Check if we should start a new round
+      const crashTime = engine.state.crashTime || engine.state.runningStartTime;
+      if (now >= crashTime + 3000) { // 3 seconds after crash
+        await engine.initRound();
+        await redis.set(GAME_STATE_KEY, JSON.stringify(engine.toJSON()));
+      }
+    }
+    
+    // Force start new round if stuck in any phase too long
+    const lastUpdate = engine.state.lastUpdate || engine.state.bettingEndTime || now;
+    if (now - lastUpdate > 30000) { // 30 seconds max
+      await engine.initRound();
+      await redis.set(GAME_STATE_KEY, JSON.stringify(engine.toJSON()));
     }
 
     // Get user-specific state if userId provided
