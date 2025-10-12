@@ -123,19 +123,24 @@ export default function PlinkoPage() {
     safeWrite(LS_KEY, stats);
   }, [stats]);
 
-  // Animate ball dropping
+  // Animate ball dropping with realistic physics timing
   useEffect(() => {
     if (dropping && ballPath.length > 0 && currentStep < ballPath.length) {
+      // VERY slow timing with gravity effect
+      const baseDelay = 800; // Much much slower
+      const accelerationFactor = Math.min(currentStep * 10, 100); // Gradual acceleration
+      const delay = baseDelay - accelerationFactor;
+      
       const timer = setTimeout(() => {
         setCurrentStep(currentStep + 1);
         
         // Play bounce sound on impact
         if (bounceSound.current && currentStep > 0 && currentStep < ballPath.length - 1) {
           bounceSound.current.currentTime = 0;
-          bounceSound.current.volume = 0.2;
+          bounceSound.current.volume = 0.25;
           bounceSound.current.play().catch(() => {});
         }
-      }, 280); // Slightly slower for better physics feel
+      }, delay);
       
       return () => clearTimeout(timer);
     } else if (dropping && currentStep >= ballPath.length) {
@@ -251,10 +256,31 @@ export default function PlinkoPage() {
   return (
     <Layout isGame={true} title="MLEO Plinko 🎯">
       <style jsx>{`
-        @keyframes bounce-ball {
-          0% { transform: scale(1) rotate(0deg); }
-          50% { transform: scale(1.2) rotate(180deg); }
-          100% { transform: scale(1) rotate(360deg); }
+        @keyframes bounce-impact {
+          0% { 
+            transform: scale(1) translateY(-5px) rotate(0deg); 
+          }
+          15% { 
+            transform: scale(1.1, 0.85) translateY(0) rotate(30deg); 
+          }
+          30% { 
+            transform: scale(0.75, 1.25) translateY(2px) rotate(90deg); 
+          }
+          45% { 
+            transform: scale(1.3, 0.7) translateY(0) rotate(135deg); 
+          }
+          60% { 
+            transform: scale(0.9, 1.1) translateY(-4px) rotate(180deg); 
+          }
+          75% { 
+            transform: scale(1.1, 0.9) translateY(0) rotate(270deg); 
+          }
+          90% { 
+            transform: scale(0.95, 1.05) translateY(-1px) rotate(330deg); 
+          }
+          100% { 
+            transform: scale(1) translateY(0) rotate(360deg); 
+          }
         }
       `}</style>
       <main className="min-h-[100svh] bg-gradient-to-b from-blue-950 via-indigo-950 to-black text-zinc-100">
@@ -300,32 +326,44 @@ export default function PlinkoPage() {
           </div>
 
           {/* PLINKO BOARD */}
-          <div className="rounded-3xl p-6 bg-gradient-to-br from-blue-900/30 via-indigo-900/20 to-cyan-900/30 border-4 border-blue-600/50 shadow-2xl mb-6">
+          <div className="rounded-3xl p-3 sm:p-6 bg-gradient-to-br from-blue-900/30 via-indigo-900/20 to-cyan-900/30 border-2 sm:border-4 border-blue-600/50 shadow-2xl mb-6">
             
             {/* Visual Plinko Board with Pegs */}
-            <div className="relative bg-gradient-to-b from-indigo-900/50 to-blue-950/80 rounded-2xl p-6 mb-6 overflow-hidden" style={{ minHeight: '520px' }}>
-              {/* Draw Pegs in Zigzag Pattern */}
-              <div className="relative" style={{ height: '480px' }}>
+            <div className="relative bg-gradient-to-b from-indigo-900/50 to-blue-950/80 rounded-2xl p-4 sm:p-6 mb-6 overflow-hidden" style={{ minHeight: '400px' }}>
+              {/* Draw Pegs in Zigzag Pattern with more spacing */}
+              <div className="relative mx-auto max-w-2xl" style={{ height: '380px' }}>
                 {[...Array(ROWS)].map((_, rowIndex) => {
                   const pegsInRow = rowIndex % 2 === 0 ? 13 : 12; // Alternate between 13 and 12 pegs
-                  const rowY = ((rowIndex + 0.5) / (ROWS + 1)) * 100;
+                  const rowY = ((rowIndex + 1) / (ROWS + 2)) * 100; // Better vertical spacing
                   const isEvenRow = rowIndex % 2 === 0;
                   
                   return (
                     <div key={rowIndex} className="absolute w-full" style={{ top: `${rowY}%` }}>
-                      <div className="flex justify-around px-8" style={{ 
-                        paddingLeft: isEvenRow ? '32px' : '60px',
-                        paddingRight: isEvenRow ? '32px' : '60px'
+                      <div className="flex justify-between px-4 sm:px-8" style={{ 
+                        paddingLeft: isEvenRow ? '16px' : '28px',
+                        paddingRight: isEvenRow ? '16px' : '28px'
                       }}>
-                        {[...Array(pegsInRow)].map((_, pegIndex) => (
-                          <div
-                            key={pegIndex}
-                            className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-blue-300 to-blue-500 shadow-lg border border-blue-200"
-                            style={{
-                              boxShadow: '0 0 8px rgba(59, 130, 246, 0.5)'
-                            }}
-                          />
-                        ))}
+                        {[...Array(pegsInRow)].map((_, pegIndex) => {
+                          // Check if this peg should be highlighted (ball is near it)
+                          const isPegHit = ballPos && ballPos.row === rowIndex && 
+                                          Math.abs(ballPos.pos - pegIndex) <= 0.5;
+                          
+                          return (
+                            <div
+                              key={pegIndex}
+                              className={`w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full shadow-lg border transition-all duration-200 ${
+                                isPegHit 
+                                  ? 'bg-gradient-to-br from-yellow-300 to-orange-400 border-yellow-200 scale-150' 
+                                  : 'bg-gradient-to-br from-blue-300 to-blue-500 border-blue-200'
+                              }`}
+                              style={{
+                                boxShadow: isPegHit 
+                                  ? '0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 165, 0, 0.6)'
+                                  : '0 0 8px rgba(59, 130, 246, 0.5)'
+                              }}
+                            />
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -336,27 +374,29 @@ export default function PlinkoPage() {
                   <div
                     className="absolute"
                     style={{
-                      top: `${(ballPos.row / ROWS) * 100}%`,
+                      top: `${((ballPos.row + 1) / (ROWS + 2)) * 100}%`,
                       left: `${((ballPos.pos / 12) * 100)}%`,
                       transform: 'translate(-50%, -50%)',
-                      transition: 'top 0.25s cubic-bezier(0.4, 0, 0.2, 1), left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                      transition: 'top 0.7s cubic-bezier(0.33, 1, 0.68, 1), left 0.7s cubic-bezier(0.33, 1, 0.68, 1)',
                       zIndex: 10
                     }}
                   >
                     <div 
                       className="relative"
                       style={{
-                        animation: 'bounce-ball 0.25s ease-in-out'
+                        animation: 'bounce-impact 0.7s ease-in-out'
                       }}
                     >
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-yellow-300 via-orange-400 to-red-500 shadow-xl border border-yellow-200"
+                      <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-gradient-to-br from-yellow-300 via-orange-400 to-red-500 shadow-xl border border-yellow-200"
                            style={{
-                             boxShadow: '0 0 15px rgba(255, 215, 0, 0.6), 0 0 25px rgba(255, 165, 0, 0.3)'
+                             boxShadow: '0 0 15px rgba(255, 215, 0, 0.8), 0 0 25px rgba(255, 165, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3)'
                            }}>
-                        <div className="w-full h-full rounded-full bg-gradient-to-br from-white/40 via-transparent to-transparent"></div>
+                        <div className="w-full h-full rounded-full bg-gradient-to-br from-white/60 via-white/20 to-transparent"></div>
                       </div>
-                      {/* Trail effect */}
-                      <div className="absolute inset-0 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 opacity-25 blur-sm"></div>
+                      {/* Impact ring */}
+                      <div className="absolute inset-0 rounded-full bg-yellow-400/40 animate-ping"></div>
+                      {/* Glow effect */}
+                      <div className="absolute inset-0 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 opacity-40 blur-lg scale-110"></div>
                     </div>
                   </div>
                 )}
@@ -364,21 +404,21 @@ export default function PlinkoPage() {
             </div>
 
             {/* Multiplier Buckets */}
-            <div className="grid gap-1 mb-6" style={{ gridTemplateColumns: 'repeat(13, minmax(0, 1fr))' }}>
+            <div className="grid gap-0.5 sm:gap-1 mb-4 sm:mb-6 max-w-2xl mx-auto" style={{ gridTemplateColumns: 'repeat(13, minmax(0, 1fr))' }}>
               {MULTIPLIERS.map((mult, idx) => (
                 <div
                   key={idx}
-                  className={`relative p-2 rounded-lg text-center font-bold text-xs transition-all ${
-                    finalBucket === idx ? 'scale-110 shadow-2xl ring-4 ring-white/50' : ''
+                  className={`relative p-1 sm:p-2 rounded text-center font-bold text-[9px] sm:text-xs transition-all ${
+                    finalBucket === idx ? 'scale-110 shadow-2xl ring-2 sm:ring-4 ring-white/50' : ''
                   }`}
                 >
-                  <div className={`absolute inset-0 bg-gradient-to-b ${BUCKET_COLORS[idx]} rounded-lg`}></div>
-                  <div className="relative text-white">
+                  <div className={`absolute inset-0 bg-gradient-to-b ${BUCKET_COLORS[idx]} rounded`}></div>
+                  <div className="relative text-white whitespace-nowrap">
                     {mult >= 1 ? `×${mult}` : `×${mult}`}
                   </div>
                   {finalBucket === idx && (
-                    <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 animate-bounce">
-                      <div className="text-4xl">⬇️</div>
+                    <div className="absolute -top-8 sm:-top-12 left-1/2 transform -translate-x-1/2 animate-bounce">
+                      <div className="text-2xl sm:text-4xl">⬇️</div>
                     </div>
                   )}
                 </div>
@@ -477,9 +517,10 @@ export default function PlinkoPage() {
             <h3 className="text-lg font-bold mb-4">📖 How to Play</h3>
             <ul className="text-sm space-y-2 text-zinc-300">
               <li>• Click DROP BALL to start the game</li>
-              <li>• Watch the ball fall with realistic physics through the pegs</li>
-              <li>• Ball bounces left or right randomly at each peg with smooth animation</li>
-              <li>• Ball lands in a bucket at the bottom (takes ~3.5 seconds)</li>
+              <li>• Watch the ball fall slowly with realistic physics through the pegs</li>
+              <li>• Ball bounces and squashes on impact with each peg</li>
+              <li>• Ball lands in a bucket at the bottom (takes ~8-10 seconds)</li>
+              <li>• Watch the pegs light up yellow when the ball hits them!</li>
               <li>• Edge buckets (×10, ×5) are hardest to hit but pay big!</li>
               <li>• Center has mix: some good (×2, ×3) and some losses (×0.5, ×0.2, ×0)</li>
               <li>• Pure luck and physics - no skill required!</li>
