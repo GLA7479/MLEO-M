@@ -39,28 +39,50 @@ const ROWS = 10;     // peg rows (triangle: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 const COLS = 15;     // peg columns (also number of buckets)
 const OFFSET_ROWS = true; // stagger every other row for zigzag pattern
 
-// Physics tunables
-const PHYS = {
-  gravity: 1200,          // px/s^2 downward (reduced from 1800 for slower fall)
-  airDrag: 0.012,         // linear damping per step (increased slightly for smoother fall)
-  restitution: 0.45,      // bounciness on pegs
-  wallRestitution: 0.35,  // side walls bounciness
-  pegRadius: 6,           // visual peg radius (collision uses this)
-  ballRadius: 5,          // ball radius (smaller for better mobile experience)
-  maxVel: 2200,           // clamp extreme velocities (reduced to match slower gravity)
-  spawnJitterX: 14,       // horizontal random spawn jitter (px)
-  spawnVy: 30,            // initial downward velocity (reduced slightly)
-  centerBias: 0.0008,     // tiny horizontal drift towards board center (feel)
-  bucketCaptureVy: 150,   // below this vertical speed near floor → snap/capture (reduced)
+// Physics tunables - RESPONSIVE
+const PHYS_WIDE = {  // Desktop/Wide screens
+  gravity: 1200,
+  airDrag: 0.012,
+  restitution: 0.45,
+  wallRestitution: 0.35,
+  pegRadius: 8,           // Larger pegs for wide screens
+  ballRadius: 6,          // Larger ball for wide screens
+  maxVel: 2200,
+  spawnJitterX: 14,
+  spawnVy: 30,
+  centerBias: 0.0008,
+  bucketCaptureVy: 150,
 };
 
-// Board layout
-const BOARD = {
-  marginX: 20,        // left/right inner margin inside canvas (smaller for more space)
-  marginTop: 20,      // top margin (smaller for more space)
-  marginBottom: 40,   // bottom space for buckets (much smaller to bring buckets closer to pyramid)
-  pegGapX: 38,        // horizontal distance between peg columns (smaller for more pegs)
-  pegGapY: 40,        // vertical distance between peg rows (smaller for more rows)
+const PHYS_NARROW = {  // Mobile/Narrow screens
+  gravity: 1000,          // Slower gravity for mobile
+  airDrag: 0.015,         // More damping for mobile
+  restitution: 0.4,       // Less bouncy for mobile
+  wallRestitution: 0.3,
+  pegRadius: 4,           // Smaller pegs for mobile
+  ballRadius: 3,          // Much smaller ball for mobile
+  maxVel: 1800,           // Lower max velocity
+  spawnJitterX: 10,       // Less jitter on mobile
+  spawnVy: 25,
+  centerBias: 0.001,
+  bucketCaptureVy: 120,   // Lower capture speed
+};
+
+// Board layout - RESPONSIVE
+const BOARD_WIDE = {
+  marginX: 20,
+  marginTop: 20,
+  marginBottom: 40,
+  pegGapX: 42,        // Larger gaps for wide screens
+  pegGapY: 44,        // Larger gaps for wide screens
+};
+
+const BOARD_NARROW = {
+  marginX: 15,        // Smaller margins for mobile
+  marginTop: 15,
+  marginBottom: 35,
+  pegGapX: 28,        // Smaller gaps for mobile
+  pegGapY: 32,        // Smaller gaps for mobile
 };
 
 // Sounds (optional)
@@ -131,6 +153,10 @@ function rand01() {
 export default function PlinkoPage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
+  
+  // Screen detection
+  const [isWideScreen, setIsWideScreen] = useState(true);
+  const [screenWidth, setScreenWidth] = useState(0);
 
   const [result, setResult] = useState(null);
   const [finalBuckets, setFinalBuckets] = useState([]); // recent landings visual
@@ -147,6 +173,10 @@ export default function PlinkoPage() {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
   const rafRef = useRef(0);
+
+  // Get responsive config based on screen size
+  const PHYS = useMemo(() => isWideScreen ? PHYS_WIDE : PHYS_NARROW, [isWideScreen]);
+  const BOARD = useMemo(() => isWideScreen ? BOARD_WIDE : BOARD_NARROW, [isWideScreen]);
   const pegsRef = useRef([]);
   const ballsRef = useRef([]);
   const bucketsRef = useRef([]); // {x, width, index}
@@ -156,6 +186,26 @@ export default function PlinkoPage() {
   const lastTsRef = useRef(0);
   const accumulatorRef = useRef(0);
   const FIXED_DT = 1 / 120; // 120 Hz physics
+
+  // Screen detection effect
+  useEffect(() => {
+    const checkScreenSize = () => {
+      const width = window.innerWidth;
+      setScreenWidth(width);
+      // Consider wide screen if width > 768px or aspect ratio > 1.2
+      const isWide = width > 768 || (width / window.innerHeight) > 1.2;
+      setIsWideScreen(isWide);
+    };
+
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    window.addEventListener('orientationchange', checkScreenSize);
+
+    return () => {
+      window.removeEventListener('resize', checkScreenSize);
+      window.removeEventListener('orientationchange', checkScreenSize);
+    };
+  }, []);
 
   // Init
   useEffect(() => {
@@ -702,7 +752,12 @@ function buildBoardGeometry(w, h) {
                   MLEO Plinko
                 </h1>
               </div>
-              <div className="text-sm opacity-70 mt-1">Real physics • Watch the ball dance on pegs</div>
+              <div className="text-sm opacity-70 mt-1">
+                Real physics • Watch the ball dance on pegs
+                <span className={`ml-2 px-2 py-1 rounded text-xs ${isWideScreen ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                  {isWideScreen ? '🖥️ Wide' : '📱 Narrow'}
+                </span>
+              </div>
             </div>
             
             <div className="w-[88px]"></div>

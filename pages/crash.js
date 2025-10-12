@@ -306,8 +306,10 @@ export default function MLEOCrash() {
         
         // Resolve loss if not cashed out
         if (!cashedOutAt && playerBet?.accepted) {
-          // no payout - loss
-          setPayout({ win: false, amount: 0, at: currentCrashPoint });
+          // no payout - loss (only if we haven't already won)
+          if (!payout) {
+            setPayout({ win: false, amount: 0, at: currentCrashPoint });
+          }
           
           // Update stats
           const newStats = {
@@ -531,7 +533,7 @@ export default function MLEOCrash() {
                         {multiplier.toFixed(ROUND.decimals)}×
                       </span>
                     </div>
-                    {crashPoint && phase !== "betting" ? (
+                    {crashPoint && phase === "crashed" ? (
                       <div className="text-xs text-zinc-500">Crash: {crashPoint.toFixed(2)}×</div>
                     ) : null}
                   </div>
@@ -568,15 +570,7 @@ export default function MLEOCrash() {
                       <path d={chart.d} fill="none" stroke={phase === "crashed" ? "#ef4444" : "#22c55e"} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
                     ) : null}
 
-                    {/* crash marker */}
-                    {phase !== "betting" && crashPoint && chart.xCrash != null ? (
-                      <g>
-                        <circle cx={chart.xCrash} cy={chart.yCrash} r="5" fill="#ef4444" />
-                        <text x={chart.xCrash + 6} y={chart.yCrash - 6} fontSize="11" fill="#ef4444">
-                          {crashPoint.toFixed(2)}×
-                        </text>
-                      </g>
-                    ) : null}
+                    {/* crash marker - removed to prevent spoilers */}
                   </svg>
                 </div>
 
