@@ -1,76 +1,13 @@
 // ============================================================================
-// MLEO Crash — Multiplier Betting Game
-// - 30s betting phase
-// - Live multiplier chart (SVG)
-// - Cash Out before crash to win bet * multiplier
-// Cost: Variable (player choice)
+// MLEO Crash — Multiplayer with Server Polling
 // ============================================================================
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Layout from "../components/Layout";
 import Link from "next/link";
 
-// ------------------------------- Config -------------------------------------
 const LS_KEY = "mleo_crash_v1";
-const ROUND = {
-  bettingSeconds: 30,           // time for all players to bet
-  intermissionMs: 4000,         // pause after round ends before next betting opens
-  fps: 60,                      // animation FPS
-  decimals: 2,                  // display precision
-  minCrash: 1.1,                // min crash multiplier inclusive
-  maxCrash: 10.0,               // max crash multiplier inclusive
-  // growth: multiplier function as a function of elapsed ms since takeoff
-  growth: (elapsedMs) => {
-    // Smooth exponential-ish growth starting at 1.00
-    const t = elapsedMs / 1000;             // seconds
-    const rate = 0.25;                       // tune feel (very slow for better gameplay)
-    const m = Math.exp(rate * t * 0.5);      // very slow growth - plenty of time to cash out
-    return Math.max(1, m);
-  },
-};
-
-// ---------------------------- Helpers (provably fair) ------------------------
-async function sha256Hex(str) {
-  const enc = new TextEncoder();
-  const data = enc.encode(str);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/** Map 256-bit hash to [0,1) float */
-function hashToUnitFloat(hex) {
-  // take first 13 hex chars (~52 bits) to stay within JS number precision
-  const slice = hex.slice(0, 13);
-  const int = parseInt(slice, 16);
-  const max = Math.pow(16, slice.length);
-  return int / max; // in [0,1)
-}
-
-/** Map hash to crash point in [minCrash, maxCrash] with strong skew toward early busts */
-function hashToCrash(hex, minCrash, maxCrash) {
-  const u = hashToUnitFloat(hex);
-  // Strong exponential skew toward lower values
-  // Using 1/u^k creates house edge - most crashes happen early
-  const k = 3.5; // Higher k = more early crashes
-  const skew = 1 - Math.pow(1 - u, k);
-  
-  // Map to range with bias toward low values
-  let v = minCrash + (maxCrash - minCrash) * skew;
-  
-  // Additional clamping to favor very low crashes (house edge)
-  if (u < 0.3) { // 30% chance of very early crash
-    v = minCrash + (2 - minCrash) * (u / 0.3); // 1.1 to 2.0
-  } else if (u < 0.6) { // 30% chance of early-mid crash
-    v = 2 + 1.5 * ((u - 0.3) / 0.3); // 2.0 to 3.5
-  } else if (u < 0.85) { // 25% chance of mid crash
-    v = 3.5 + 2 * ((u - 0.6) / 0.25); // 3.5 to 5.5
-  } else { // 15% chance of high crash
-    v = 5.5 + (maxCrash - 5.5) * ((u - 0.85) / 0.15); // 5.5 to 10.0
-  }
-  
-  // clamp & 2 decimals
-  return Math.max(minCrash, Math.min(maxCrash, Math.round(v * 100) / 100));
-}
+const POLL_INTERVAL = 200; // Poll every 200ms for smooth updates
 
 // ============================================================================
 // STORAGE
@@ -109,327 +46,224 @@ function fmt(n) {
   return Math.floor(n).toString();
 }
 
-// ------------------------------ Main Page -----------------------------------
-export default function MLEOCrash() {
+// Generate unique user ID
+function getUserId() {
+  let userId = localStorage.getItem('crash_user_id');
+  if (!userId) {
+    userId = 'user_' + Math.random().toString(36).slice(2) + Date.now();
+    localStorage.setItem('crash_user_id', userId);
+  }
+  return userId;
+}
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+export default function CrashMultiplayer() {
   const [mounted, setMounted] = useState(false);
-  
-  // Game state
-  const [phase, setPhase] = useState("betting"); // betting | running | crashed | revealing | intermission
-  const [countdown, setCountdown] = useState(ROUND.bettingSeconds);
-  const [betAmount, setBetAmount] = useState("");
-  const [playerBet, setPlayerBet] = useState(null); // { amount:number, accepted:boolean }
-  const [canCashOut, setCanCashOut] = useState(false);
-  const [cashedOutAt, setCashedOutAt] = useState(null); // multiplier at cashout
-  const [payout, setPayout] = useState(null);
-  const [autoCashOut, setAutoCashOut] = useState(""); // auto cash out multiplier
-  const [autoCashOutEnabled, setAutoCashOutEnabled] = useState(false);
-
-  // Provably-fair data (client demo)
-  const [serverSeed, setServerSeed] = useState("");        // revealed after round
-  const [serverSeedHash, setServerSeedHash] = useState(""); // shown before round
-  const [clientSeed, setClientSeed] = useState(() => Math.random().toString(36).slice(2));
-  const [nonce, setNonce] = useState(0);
-  const [crashPoint, setCrashPoint] = useState(null);
-
-  // Live chart/multiplier
-  const [multiplier, setMultiplier] = useState(1.0);
-  const startTimeRef = useRef(0);
-  const rafRef = useRef(0);
-  const dataRef = useRef([]); // sampled points for chart
-  const crashPointRef = useRef(null); // ref for crash point to use in animation loop
-  const autoCashOutRef = useRef({ enabled: false, target: 0, cashedOut: false }); // ref for auto cash out
-  const playerBetRef = useRef(null); // ref for player bet
-  const vaultRef = useRef(0); // ref for vault
-  const statsRef = useRef(null); // ref for stats
-
-  // Vault
   const [vault, setVault] = useState(0);
+  
+  // Server state (polled from API)
+  const [serverState, setServerState] = useState({
+    phase: 'betting',
+    multiplier: 1.0,
+    crashPoint: null,
+    serverSeedHash: '',
+    serverSeed: null,
+    timeLeft: 30,
+    history: [],
+    totalBets: 0,
+  });
+  
+  // Local player state
+  const [betAmount, setBetAmount] = useState("");
+  const [autoCashOut, setAutoCashOut] = useState("");
+  const [autoCashOutEnabled, setAutoCashOutEnabled] = useState(false);
+  const [playerBet, setPlayerBet] = useState(null);
+  const [payout, setPayout] = useState(null);
+  const [lastRoundId, setLastRoundId] = useState(null);
+  
+  // Chart data
+  const dataRef = useRef([]);
   
   // Stats
   const [stats, setStats] = useState(() =>
     safeRead(LS_KEY, { totalRounds: 0, wins: 0, totalWon: 0, totalLost: 0, biggestWin: 0, bestMultiplier: 0, history: [] })
   );
 
-  // ----------------------- Mount -------------------
+  const userIdRef = useRef(null);
+
+  // ============================================================================
+  // MOUNT & POLLING
+  // ============================================================================
   useEffect(() => {
     setMounted(true);
     setVault(getVault());
+    userIdRef.current = getUserId();
     
-    // Refresh vault every 2 seconds
-    const interval = setInterval(() => {
+    // Vault refresh
+    const vaultInterval = setInterval(() => {
       setVault(getVault());
     }, 2000);
     
-    return () => clearInterval(interval);
+    // Poll server state
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/crash/state?userId=${userIdRef.current}`);
+        const data = await res.json();
+        
+        setServerState(data);
+        
+        // Update chart data
+        if (data.phase === 'running' && data.multiplier > 1) {
+          const elapsed = Date.now(); // approximate time
+          dataRef.current.push({ t: elapsed, m: data.multiplier });
+          if (dataRef.current.length > 800) dataRef.current.shift();
+        } else if (data.phase === 'betting') {
+          dataRef.current = []; // Clear chart for new round
+        }
+        
+        // Check if new round started
+        if (data.roundId !== lastRoundId) {
+          setLastRoundId(data.roundId);
+          setPlayerBet(null);
+          setPayout(null);
+          dataRef.current = [];
+        }
+        
+        // Update player bet from server
+        if (data.player && data.player.bet) {
+          setPlayerBet(data.player.bet);
+          
+          // Check if auto cashed out or crashed
+          if (data.player.bet.cashedOutAt && !payout) {
+            const winAmount = Math.round(data.player.bet.amount * data.player.bet.cashedOutAt * 100) / 100;
+            setPayout({ win: true, amount: winAmount, at: data.player.bet.cashedOutAt });
+            
+            // Update vault
+            const newVault = vault + winAmount;
+            setVault(newVault);
+            setVaultAmount(newVault);
+            
+            // Update stats
+            const newStats = {
+              ...stats,
+              totalRounds: stats.totalRounds + 1,
+              wins: stats.wins + 1,
+              totalWon: stats.totalWon + winAmount,
+              biggestWin: Math.max(stats.biggestWin, winAmount),
+              bestMultiplier: Math.max(stats.bestMultiplier, data.player.bet.cashedOutAt),
+            };
+            setStats(newStats);
+            safeWrite(LS_KEY, newStats);
+          } else if (data.phase === 'crashed' && data.player.bet && !data.player.bet.cashedOutAt && !payout) {
+            // Lost
+            setPayout({ win: false, amount: 0, at: data.crashPoint });
+            
+            const newStats = {
+              ...stats,
+              totalRounds: stats.totalRounds + 1,
+              totalLost: stats.totalLost + data.player.bet.amount,
+            };
+            setStats(newStats);
+            safeWrite(LS_KEY, newStats);
+          }
+        }
+        
+      } catch (error) {
+        console.error('Polling error:', error);
+      }
+    }, POLL_INTERVAL);
+    
+    return () => {
+      clearInterval(vaultInterval);
+      clearInterval(pollInterval);
+    };
   }, []);
 
   function refreshVault() {
     setVault(getVault());
   }
 
-  // ----------------------- Lifecycle: start betting window -------------------
-  useEffect(() => {
-    if (!mounted) return;
-    
-    // Fresh seeds for the upcoming round
-    // serverSeed kept secret until reveal; we show only its hash now.
-    (async () => {
-      const newServerSeed = crypto.getRandomValues(new Uint32Array(8)).join("-");
-      const hash = await sha256Hex(newServerSeed);
-      setServerSeed(newServerSeed);
-      setServerSeedHash(hash);
-      setCrashPoint(null);
-      crashPointRef.current = null;
-      autoCashOutRef.current = { enabled: false, target: 0, cashedOut: false };
-      setCashedOutAt(null);
-      setPayout(null);
-      setPlayerBet(null);
-      setCanCashOut(false);
-      dataRef.current = [];
-      setMultiplier(1.0);
-      setNonce((n) => n + 1);
-    })();
-
-    // 30s countdown
-    setPhase("betting");
-    setCountdown(ROUND.bettingSeconds);
-    const id = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          clearInterval(id);
-        }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [mounted]); // run once on mount
-
-  // When betting ends -> lock bets and takeoff
-  useEffect(() => {
-    if (phase !== "betting") return;
-    if (countdown <= 0) {
-      // Lock bet (accept if placed)
-      if (playerBet && !playerBet.accepted) {
-        setPlayerBet({ ...playerBet, accepted: true });
-      }
-      // Compute crash from provably-fair hash(serverSeed + clientSeed + nonce)
-      (async () => {
-        const h = await sha256Hex(`${serverSeed}|${clientSeed}|${nonce}`);
-        const crash = hashToCrash(h, ROUND.minCrash, ROUND.maxCrash);
-        setCrashPoint(crash);
-        crashPointRef.current = crash; // Store in ref for animation loop
-        
-        // Setup auto cash out
-        autoCashOutRef.current = {
-          enabled: autoCashOutEnabled && autoCashOut && Number(autoCashOut) > 0,
-          target: Number(autoCashOut) || 0,
-          cashedOut: false,
-        };
-        
-        // Start live run
-        setPhase("running");
-        takeoff();
-      })();
-    }
-  }, [countdown, phase, playerBet, serverSeed, clientSeed, nonce, autoCashOutEnabled, autoCashOut]);
-
-  // ------------------------------- Engine -----------------------------------
-  const takeoff = () => {
-    startTimeRef.current = performance.now();
-    setCanCashOut(true);
-    cancelAnimationFrame(rafRef.current);
-    
-    // Update refs for use in animation loop
-    playerBetRef.current = playerBet;
-    vaultRef.current = vault;
-    statsRef.current = stats;
-
-    const tick = () => {
-      const now = performance.now();
-      const elapsed = now - startTimeRef.current;
-      const m = ROUND.growth(elapsed);
-      const mFixed = Math.max(1, Math.floor(m * Math.pow(10, ROUND.decimals)) / Math.pow(10, ROUND.decimals));
-      setMultiplier(mFixed);
-
-      // sample for chart (cap samples)
-      dataRef.current.push({ t: elapsed, m: mFixed });
-      if (dataRef.current.length > 800) dataRef.current.shift();
-
-      // Auto cash out check
-      const autoConfig = autoCashOutRef.current;
-      const currentPlayerBet = playerBetRef.current;
-      const currentVault = vaultRef.current;
-      const currentStats = statsRef.current;
-      
-      if (autoConfig.enabled && !autoConfig.cashedOut && currentPlayerBet?.accepted && mFixed >= autoConfig.target) {
-        console.log('AUTO CASH OUT triggered at', mFixed, 'target was', autoConfig.target);
-        autoConfig.cashedOut = true; // Mark as cashed out
-        
-        // Call cashOut directly inline
-        setCanCashOut(false);
-        setCashedOutAt(mFixed);
-        
-        const winAmount = Math.round(currentPlayerBet.amount * mFixed * 100) / 100;
-        setPayout({ win: true, amount: winAmount, at: mFixed });
-
-        // Credit to vault
-        const newVault = currentVault + winAmount;
-        setVault(newVault);
-        setVaultAmount(newVault);
-        vaultRef.current = newVault; // Update ref
-
-        // Update stats
-        const newStats = {
-          ...currentStats,
-          totalRounds: currentStats.totalRounds + 1,
-          wins: currentStats.wins + 1,
-          totalWon: currentStats.totalWon + winAmount,
-          biggestWin: Math.max(currentStats.biggestWin, winAmount),
-          bestMultiplier: Math.max(currentStats.bestMultiplier, mFixed),
-        };
-        setStats(newStats);
-        safeWrite(LS_KEY, newStats);
-        statsRef.current = newStats; // Update ref
-      }
-
-      // Crash?
-      const currentCrashPoint = crashPointRef.current;
-      if (currentCrashPoint && mFixed >= currentCrashPoint) {
-        setMultiplier(currentCrashPoint);
-        setPhase("crashed");
-        setCanCashOut(false);
-        cancelAnimationFrame(rafRef.current);
-        
-        // Update history with crash point
-        const newHistory = [...(stats.history || []), { mult: currentCrashPoint, timestamp: Date.now() }];
-        if (newHistory.length > 10) newHistory.shift(); // Keep only last 10
-        
-        // Resolve loss if not cashed out
-        if (!cashedOutAt && playerBet?.accepted) {
-          // no payout - loss
-          setPayout({ win: false, amount: 0, at: currentCrashPoint });
-          
-          // Update stats
-          const newStats = {
-            ...stats,
-            totalRounds: stats.totalRounds + 1,
-            totalLost: stats.totalLost + playerBet.amount,
-            history: newHistory,
-          };
-          setStats(newStats);
-          safeWrite(LS_KEY, newStats);
-        } else {
-          // Just update history even if player cashed out
-          const newStats = {
-            ...stats,
-            history: newHistory,
-          };
-          setStats(newStats);
-          safeWrite(LS_KEY, newStats);
-        }
-        
-        // Reveal seeds a moment later
-        setTimeout(() => setPhase("revealing"), 600);
-        // After short intermission → next betting window
-        setTimeout(() => startNextRound(), 600 + ROUND.intermissionMs);
-        return;
-      }
-
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-  };
-
-  const startNextRound = async () => {
-    // Reveal already occurred; now reset to new betting window
-    // New seeds:
-    const newServerSeed = crypto.getRandomValues(new Uint32Array(8)).join("-");
-    const hash = await sha256Hex(newServerSeed);
-    setServerSeed(newServerSeed);
-    setServerSeedHash(hash);
-    setClientSeed(Math.random().toString(36).slice(2));
-    setNonce((n) => n + 1);
-    setCrashPoint(null);
-    crashPointRef.current = null;
-    autoCashOutRef.current = { enabled: false, target: 0, cashedOut: false };
-    setMultiplier(1.0);
-    dataRef.current = [];
-    setCashedOutAt(null);
-    setPayout(null);
-    setPlayerBet(null);
-    setCanCashOut(false);
-
-    setPhase("betting");
-    setCountdown(ROUND.bettingSeconds);
-    const id = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) clearInterval(id);
-        return c - 1;
-      });
-    }, 1000);
-  };
-
-  // ------------------------------- Actions ----------------------------------
-  const placeBet = () => {
+  // ============================================================================
+  // ACTIONS
+  // ============================================================================
+  const placeBet = async () => {
     const amt = Number(betAmount);
     if (!Number.isFinite(amt) || amt <= 0) return;
-    if (phase !== "betting") return;
+    if (serverState.phase !== "betting") return;
     if (amt > vault) return;
 
     // Deduct from vault
     const newVault = vault - amt;
     setVault(newVault);
     setVaultAmount(newVault);
-    setPlayerBet({ amount: amt, accepted: false });
+
+    try {
+      const res = await fetch('/api/crash/bet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userIdRef.current,
+          amount: amt,
+          autoCashOut: autoCashOutEnabled && autoCashOut ? Number(autoCashOut) : null,
+        }),
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        setPlayerBet({ amount: amt, autoCashOut: autoCashOutEnabled && autoCashOut ? Number(autoCashOut) : null });
+      } else {
+        // Refund on error
+        setVault(vault);
+        setVaultAmount(vault);
+        alert(data.error || 'Failed to place bet');
+      }
+    } catch (error) {
+      console.error('Bet error:', error);
+      // Refund on error
+      setVault(vault);
+      setVaultAmount(vault);
+    }
   };
 
-  const cashOut = () => {
-    if (!canCashOut || phase !== "running") return;
-    if (!playerBet?.accepted) return; // only after takeoff
-    setCanCashOut(false);
-    setCashedOutAt(multiplier);
-    // DON'T cancel animation - game continues for other players!
+  const cashOut = async () => {
+    if (serverState.phase !== 'running') return;
+    if (!playerBet || playerBet.cashedOutAt) return;
 
-    const winAmount = Math.round(playerBet.amount * multiplier * 100) / 100;
-    setPayout({ win: true, amount: winAmount, at: multiplier });
-
-    // Credit to vault
-    const newVault = vault + winAmount;
-    setVault(newVault);
-    setVaultAmount(newVault);
-
-    // Update stats
-    const newStats = {
-      ...stats,
-      totalRounds: stats.totalRounds + 1,
-      wins: stats.wins + 1,
-      totalWon: stats.totalWon + winAmount,
-      biggestWin: Math.max(stats.biggestWin, winAmount),
-      bestMultiplier: Math.max(stats.bestMultiplier, multiplier),
-    };
-    setStats(newStats);
-    safeWrite(LS_KEY, newStats);
-
-    // Game continues! Don't end the round
-    // setPhase("revealing");
-    // setTimeout(() => startNextRound(), ROUND.intermissionMs);
+    try {
+      const res = await fetch('/api/crash/cashout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userIdRef.current,
+        }),
+      });
+      
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.error || 'Failed to cash out');
+      }
+      // The polling will update the state
+    } catch (error) {
+      console.error('Cashout error:', error);
+    }
   };
 
-  // ------------------------------- Derived ----------------------------------
+  // ============================================================================
+  // CHART
+  // ============================================================================
   const chartData = dataRef.current;
   const maxY = useMemo(() => {
     if (!chartData || chartData.length === 0) return 3;
-    const current = Math.max(1, ...chartData.map((p) => p.m));
-    // Keep Y axis more stable - only grow when needed
-    // This creates a "zoomed out" view that shows the curve better
+    const current = serverState.multiplier;
     if (current <= 2) return 3;
     if (current <= 3) return 4;
     if (current <= 5) return 6;
     if (current <= 7) return 8;
-    return Math.min(Math.ceil(current) + 2, ROUND.maxCrash);
-  }, [multiplier, crashPoint]); // Use multiplier instead of chartData to trigger updates
+    return Math.min(Math.ceil(current) + 2, 10);
+  }, [serverState.multiplier]);
 
-  // Build SVG path
   const chart = useMemo(() => {
     const W = 600;
     const H = 260;
@@ -439,17 +273,15 @@ export default function MLEOCrash() {
     const mMin = 1;
     const mMax = maxY;
 
-    // Default scaleY function (even when no data)
     const scaleY = (m) => padT + ih - ((m - mMin) / (mMax - mMin)) * ih;
 
     if (!chartData.length) {
       return { W, H, d: "", xCrash: null, yCrash: null, padL, padR, padT, padB, scaleY, mMin, mMax };
     }
 
-    const tMax = chartData[chartData.length - 1].t || 1000;
     const t0 = chartData[0].t;
-    const tSpan = Math.max(1000, tMax - t0); // avoid div/0
-
+    const tMax = chartData[chartData.length - 1].t || t0 + 1000;
+    const tSpan = Math.max(1000, tMax - t0);
     const scaleX = (t) => padL + ((t - t0) / tSpan) * iw;
 
     let d = "";
@@ -460,14 +292,14 @@ export default function MLEOCrash() {
     });
 
     let xCrash = null, yCrash = null;
-    if (crashPoint) {
+    if (serverState.crashPoint && chartData.length > 0) {
       const lastX = scaleX(chartData[chartData.length - 1].t);
       xCrash = lastX;
-      yCrash = scaleY(crashPoint);
+      yCrash = scaleY(serverState.crashPoint);
     }
 
     return { W, H, d, xCrash, yCrash, padL, padR, padT, padB, scaleY, mMin, mMax };
-  }, [multiplier, crashPoint, maxY]); // Use multiplier to update chart every frame
+  }, [serverState.multiplier, serverState.crashPoint, maxY, chartData.length]);
 
   if (!mounted) {
     return (
@@ -479,12 +311,14 @@ export default function MLEOCrash() {
     );
   }
 
-  // ------------------------------- Render -----------------------------------
+  // ============================================================================
+  // RENDER
+  // ============================================================================
   return (
     <Layout title="MLEO Crash">
       <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-zinc-900 to-black text-white">
         <div className="mx-auto max-w-6xl px-4 py-6">
-          {/* HEADER - Centered */}
+          {/* HEADER */}
           <header className="flex items-center justify-between mb-6">
             <Link href="/arcade">
               <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
@@ -499,7 +333,7 @@ export default function MLEOCrash() {
                   MLEO Crash
                 </h1>
               </div>
-              <div className="text-sm opacity-70 mt-1">Multiplier Betting Game</div>
+              <div className="text-sm opacity-70 mt-1">Multiplayer • Real-time</div>
             </div>
 
             <div className="w-[100px]"></div>
@@ -510,29 +344,36 @@ export default function MLEOCrash() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* CHART SECTION */}
               <div className="md:col-span-2 rounded-2xl bg-zinc-900/70 p-4 md:p-6 shadow-lg">
-                {/* Top row: seeds + multiplier */}
+                {/* Top row: info + multiplier */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
                   <div className="text-xs text-zinc-400">
                     <div>
                       <span className="text-zinc-500">Hash:</span>{" "}
-                      <span className="font-mono">{serverSeedHash.slice(0, 16)}…</span>
+                      <span className="font-mono">{serverState.serverSeedHash?.slice(0, 16)}…</span>
                     </div>
-                    {phase !== "betting" && (phase === "revealing" || phase === "crashed") ? (
+                    {serverState.serverSeed && (
                       <div className="mt-1">
                         <span className="text-zinc-500">Seed:</span>{" "}
-                        <span className="font-mono break-all text-[10px]">{serverSeed.slice(0, 30)}…</span>
+                        <span className="font-mono break-all text-[10px]">{serverState.serverSeed.slice(0, 30)}…</span>
                       </div>
-                    ) : null}
+                    )}
+                    <div className="mt-1 text-cyan-400">
+                      <span className="text-zinc-500">Players:</span> {serverState.totalBets}
+                    </div>
                   </div>
 
                   <div className="text-right">
                     <div className="text-5xl md:text-6xl font-black">
-                      <span className={phase === "running" ? "text-emerald-400" : phase === "crashed" ? "text-red-400" : "text-zinc-300"}>
-                        {multiplier.toFixed(ROUND.decimals)}×
+                      <span className={
+                        serverState.phase === "running" ? "text-emerald-400" : 
+                        serverState.phase === "crashed" ? "text-red-400" : 
+                        "text-zinc-300"
+                      }>
+                        {serverState.multiplier.toFixed(2)}×
                       </span>
                     </div>
-                    {crashPoint && phase !== "betting" ? (
-                      <div className="text-xs text-zinc-500">Crash: {crashPoint.toFixed(2)}×</div>
+                    {serverState.crashPoint && serverState.phase !== "betting" ? (
+                      <div className="text-xs text-zinc-500">Crash: {serverState.crashPoint.toFixed(2)}×</div>
                     ) : null}
                   </div>
                 </div>
@@ -565,15 +406,22 @@ export default function MLEOCrash() {
 
                     {/* path */}
                     {chart.d ? (
-                      <path d={chart.d} fill="none" stroke={phase === "crashed" ? "#ef4444" : "#22c55e"} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+                      <path 
+                        d={chart.d} 
+                        fill="none" 
+                        stroke={serverState.phase === "crashed" ? "#ef4444" : "#22c55e"} 
+                        strokeWidth="3" 
+                        strokeLinejoin="round" 
+                        strokeLinecap="round" 
+                      />
                     ) : null}
 
                     {/* crash marker */}
-                    {phase !== "betting" && crashPoint && chart.xCrash != null ? (
+                    {serverState.phase !== "betting" && serverState.crashPoint && chart.xCrash != null ? (
                       <g>
                         <circle cx={chart.xCrash} cy={chart.yCrash} r="5" fill="#ef4444" />
                         <text x={chart.xCrash + 6} y={chart.yCrash - 6} fontSize="11" fill="#ef4444">
-                          {crashPoint.toFixed(2)}×
+                          {serverState.crashPoint.toFixed(2)}×
                         </text>
                       </g>
                     ) : null}
@@ -583,21 +431,19 @@ export default function MLEOCrash() {
                 {/* Run controls */}
                 <div className="mt-4 flex items-center justify-between">
                   <div className="text-sm text-zinc-400">
-                    {phase === "betting" ? (
-                      <span>🔒 Bets lock in <span className="text-white font-semibold">{countdown}s</span></span>
-                    ) : phase === "running" ? (
-                      <span>🚀 Running… click <span className="text-white font-semibold">CASH OUT</span> before crash!</span>
-                    ) : phase === "crashed" ? (
-                      <span className="text-red-400">💥 Crashed at {crashPoint?.toFixed(2)}×</span>
-                    ) : phase === "revealing" ? (
-                      <span>🔎 Revealing seeds… Next round soon.</span>
+                    {serverState.phase === "betting" ? (
+                      <span>🔒 Bets lock in <span className="text-white font-semibold">{serverState.timeLeft}s</span></span>
+                    ) : serverState.phase === "running" ? (
+                      <span>🚀 Running… cash out before crash!</span>
+                    ) : serverState.phase === "crashed" ? (
+                      <span className="text-red-400">💥 Crashed at {serverState.crashPoint?.toFixed(2)}×</span>
                     ) : (
                       <span>⏳ Next round soon…</span>
                     )}
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {/* Auto Cash Out - Left side */}
+                    {/* Auto Cash Out */}
                     <div className="flex items-center gap-2 text-xs">
                       <input
                         type="checkbox"
@@ -605,7 +451,7 @@ export default function MLEOCrash() {
                         checked={autoCashOutEnabled}
                         onChange={(e) => setAutoCashOutEnabled(e.target.checked)}
                         className="rounded"
-                        disabled={phase !== "betting"}
+                        disabled={serverState.phase !== "betting"}
                       />
                       <label htmlFor="autoCashOut" className="text-zinc-400 whitespace-nowrap">Auto @</label>
                       <input
@@ -617,18 +463,18 @@ export default function MLEOCrash() {
                         onChange={(e) => setAutoCashOut(e.target.value)}
                         className="w-16 rounded bg-zinc-950/70 border border-zinc-800 px-2 py-1 text-white text-xs"
                         placeholder="2.0"
-                        disabled={phase !== "betting"}
+                        disabled={serverState.phase !== "betting"}
                       />
                       <span className="text-zinc-500">×</span>
                     </div>
                     
-                    {/* Cash Out Button - Right side */}
+                    {/* Cash Out Button */}
                     <button
                       onClick={cashOut}
-                      disabled={!canCashOut || phase !== "running" || !playerBet?.accepted}
+                      disabled={serverState.phase !== "running" || !playerBet || playerBet.cashedOutAt}
                       className={[
                         "rounded-xl px-5 py-3 text-sm font-semibold shadow transition",
-                        canCashOut && phase === "running" && playerBet?.accepted
+                        serverState.phase === "running" && playerBet && !playerBet.cashedOutAt
                           ? "bg-emerald-500 hover:bg-emerald-400 text-black"
                           : "bg-zinc-800 text-zinc-400 cursor-not-allowed",
                       ].join(" ")}
@@ -653,14 +499,14 @@ export default function MLEOCrash() {
                     onChange={(e) => setBetAmount(e.target.value)}
                     className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
                     placeholder="e.g. 1000"
-                    disabled={phase !== "betting"}
+                    disabled={serverState.phase !== "betting"}
                   />
                   <div className="flex gap-2 mt-2 flex-wrap">
                     {[100, 500, 1000, 5000].map((v) => (
                       <button
                         key={v}
                         onClick={() => setBetAmount(String(v))}
-                        disabled={phase !== "betting"}
+                        disabled={serverState.phase !== "betting"}
                         className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
                       >
                         {v}
@@ -671,23 +517,23 @@ export default function MLEOCrash() {
 
                 <button
                   onClick={placeBet}
-                  disabled={phase !== "betting" || !betAmount || Number(betAmount) <= 0 || Number(betAmount) > vault}
+                  disabled={serverState.phase !== "betting" || !betAmount || Number(betAmount) <= 0 || Number(betAmount) > vault || playerBet}
                   className="w-full rounded-xl bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 px-4 py-2.5 font-semibold text-white shadow hover:from-red-400 hover:via-orange-400 hover:to-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  🎯 Join Round
+                  🎯 {playerBet ? 'Bet Placed' : 'Join Round'}
                 </button>
 
                 <div className="mt-4 space-y-2 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-zinc-400">Your bet</span>
                     <span className="font-medium">
-                      {playerBet ? `${fmt(playerBet.amount)} ${playerBet.accepted ? "(🔒)" : "(⏳)"}` : "-"}
+                      {playerBet ? `${fmt(playerBet.amount)} ${playerBet.cashedOutAt ? '(✅)' : '(🔒)'}` : "-"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-zinc-400">Potential win</span>
                     <span className="font-medium text-emerald-400">
-                      {playerBet?.accepted ? `${fmt(Math.round(playerBet.amount * multiplier))}` : "-"}
+                      {playerBet && !playerBet.cashedOutAt ? `${fmt(Math.round(playerBet.amount * serverState.multiplier))}` : "-"}
                     </span>
                   </div>
                   {payout ? (
@@ -702,9 +548,9 @@ export default function MLEOCrash() {
                 {/* RECENT HISTORY */}
                 <div className="mt-5 border-t border-zinc-800/80 pt-3">
                   <div className="text-xs font-semibold text-zinc-300 mb-2">🎲 Last 10 Crashes</div>
-                  {stats.history && stats.history.length > 0 ? (
+                  {serverState.history && serverState.history.length > 0 ? (
                     <div className="flex gap-1.5 flex-wrap">
-                      {stats.history.slice().reverse().map((item, idx) => (
+                      {serverState.history.slice().reverse().map((item, idx) => (
                         <div
                           key={idx}
                           className={`px-2 py-1 rounded text-xs font-bold border ${
@@ -753,18 +599,17 @@ export default function MLEOCrash() {
             </div>
           </div>
 
-
           {/* HOW TO PLAY */}
           <div className="rounded-2xl p-6 bg-white/5 border border-white/10 mb-6">
             <h3 className="text-lg font-bold mb-4">📖 How to Play</h3>
             <ul className="text-sm space-y-2 text-zinc-300">
+              <li>• <strong>Multiplayer:</strong> All players share the same round - it runs continuously!</li>
               <li>• <strong>Betting Phase (30s):</strong> Place your bet before the round starts</li>
               <li>• <strong>Running Phase:</strong> Watch the multiplier grow from 1.00× upward</li>
-              <li>• <strong>Cash Out:</strong> Click "CASH OUT" before it crashes to win bet × multiplier</li>
-              <li>• <strong>Auto Cash Out:</strong> Enable auto-exit at a specific multiplier (e.g., 2.0×) - set during betting phase</li>
-              <li>• <strong>Crash:</strong> If you don't cash out in time, you lose your bet</li>
-              <li>• <strong>Multiplayer:</strong> Game continues for all players until crash - your cash out doesn't end the round!</li>
-              <li>• <strong>Provably Fair:</strong> Each round's crash point is determined by a hash shown before takeoff</li>
+              <li>• <strong>Cash Out:</strong> Click "CASH OUT" or set auto cash out before it crashes</li>
+              <li>• <strong>Auto Cash Out:</strong> Set a target multiplier (e.g., 2.0×) for automatic exit</li>
+              <li>• <strong>Crash:</strong> The game crashes randomly - if you didn't cash out, you lose</li>
+              <li>• <strong>Provably Fair:</strong> Crash point is determined by SHA256 hash shown before round</li>
             </ul>
           </div>
 
