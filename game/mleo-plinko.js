@@ -15,21 +15,21 @@ const LS_KEY = "mleo_plinko_v2_physics";
 const DROP_COST = 1000;
 
 // 15 buckets (13 original + 2 zero buckets at edges)
-const MULTIPLIERS = [0, 10, 5, 3, 2, 0.5, 0.2, 0, 0.2, 0.5, 2, 3, 5, 10, 0];
+const MULTIPLIERS = [0, 10, 1.5, 3, 1, 0.5, 0.2, 0, 0.2, 0.5, 1, 3, 1.5, 10, 0];
 const BUCKET_COLORS = [
   "from-gray-700 to-gray-800",       // 0x (edge)
   "from-yellow-400 to-amber-500",    // 10x
-  "from-orange-500 to-orange-600",   // 5x
+  "from-orange-500 to-orange-600",   // 1.5x
   "from-green-500 to-emerald-500",   // 3x
-  "from-blue-500 to-cyan-500",       // 2x
+  "from-blue-500 to-cyan-500",       // 1x
   "from-purple-500 to-purple-600",   // 0.5x
   "from-red-500 to-red-600",         // 0.2x
   "from-gray-700 to-gray-800",       // 0x
   "from-red-500 to-red-600",         // 0.2x
   "from-purple-500 to-purple-600",   // 0.5x
-  "from-blue-500 to-cyan-500",       // 2x
+  "from-blue-500 to-cyan-500",       // 1x
   "from-green-500 to-emerald-500",   // 3x
-  "from-orange-500 to-orange-600",   // 5x
+  "from-orange-500 to-orange-600",   // 1.5x
   "from-yellow-400 to-amber-500",    // 10x
   "from-gray-700 to-gray-800",       // 0x (edge)
 ];
@@ -216,10 +216,10 @@ function buildBoardGeometry(w, h) {
   const innerWidth = right - left;
   const scaleX = innerWidth / totalWidth;
   const gapX = BOARD.pegGapX * scaleX;
-  const gapY = BOARD.pegGapY * Math.max(0.9, Math.min(1.2, scaleX)); 
+  const gapY = BOARD.pegGapY * Math.max(0.85, Math.min(1.15, scaleX)); // Reduced gap
 
   const centerX = left + innerWidth * 0.5;
-  const totalRows = 12; // Triangle with 12 rows to reach bottom
+  const totalRows = 13; // Triangle with 13 rows to reach bottom
   const maxPegsInRow = 15; // Make triangle wider to reach edges
 
   // נחשב איפה נמצאת שורת היתדות האחרונה
@@ -238,32 +238,44 @@ function buildBoardGeometry(w, h) {
     for (let r = 0; r < totalRows; r++) {
       // Calculate pegs in row - triangle that reaches bottom
       let pegsInRow;
-      if (r < 8) {
-        pegsInRow = r + 1; // Growing: 1, 2, 3, 4, 5, 6, 7, 8
+      if (r === 0) {
+        pegsInRow = 1; // New row 0 with 1 peg
+      } else if (r < 9) {
+        pegsInRow = r + 1; // Growing: 2, 3, 4, 5, 6, 7, 8, 9
       } else {
-        pegsInRow = 9 + (r - 8) * 2; // Growing: 9, 11, 13, 15
+        pegsInRow = 10 + (r - 9) * 2; // Growing: 10, 12, 14, 16
       }
       
-      // Add extra pegs on sides for rows 2-9 (indices 1-8)
-      if (r >= 1 && r <= 8) {
+      // Add extra pegs on sides for row 1 (index 0)
+      if (r === 0) {
         pegsInRow += 2; // Add one peg on each side
       }
       
-      // Add one extra peg on right side for row 10 (index 9)
-      if (r === 9) {
+      // Add extra pegs on sides for row 2 (old row 1, index 1)
+      if (r === 1) {
+        pegsInRow += 2; // Add one peg on each side
+      }
+      
+      // Add extra pegs on sides for rows 3-10 (old rows 2-9, indices 2-9)
+      if (r >= 2 && r <= 9) {
+        pegsInRow += 2; // Add one peg on each side
+      }
+      
+      // Add one extra peg on right side for row 11 (old row 10, index 10)
+      if (r === 10) {
         pegsInRow += 1; // Add one peg on right side
       }
       
       // Perfect staggering offset for zigzag pattern - shift even rows right slightly
       let offset = (r % 2 === 1) ? gapX * 0.05 : 0;
       
-      // Special case: row 10 shift right by 0.05
-      if (r === 9) { // row 10 (0-indexed)
+      // Special case: row 11 (old row 10) shift right by 0.05
+      if (r === 10) { // row 11 (0-indexed)
         offset = gapX * 0.05;
       }
       
-      // Special case: row 12 shift left by 0.4
-      if (r === 11) { // row 12 (0-indexed)
+      // Special case: row 13 (old row 12) shift left by 0.4
+      if (r === 12) { // row 13 (0-indexed)
         offset = -gapX * 0.4;
       }
       
@@ -278,17 +290,33 @@ function buildBoardGeometry(w, h) {
       }
     }
 
-    // Buckets: 15 equal spans along width
-    const bucketWidth = innerWidth / COLS;
+    // Buckets: Custom widths - ×10 buckets half size, ×0 edge buckets larger
+    // Calculate total flex units: 0.5 + 1 + 1 + ... + 1 + 0.5 = 0.5 + 1.5 + 13*1 + 1.5 + 0.5 = 17
+    const totalFlexUnits = 1.5 + 0.5 + 13 + 0.5 + 1.5; // = 17
+    const unitWidth = innerWidth / totalFlexUnits;
     const buckets = [];
+    let currentX = left;
+    
     for (let i = 0; i < COLS; i++) {
-      const bx = left + i * bucketWidth;
-      buckets.push({ x: bx, width: bucketWidth, index: i });
+      let bucketFlex;
+      if (i === 0 || i === 14) {
+        bucketFlex = 1.5; // ×0 edge buckets larger
+      } else if (i === 1 || i === 13) {
+        bucketFlex = 0.5; // ×10 buckets half size
+      } else {
+        bucketFlex = 1; // Normal buckets
+      }
+      const bucketWidth = unitWidth * bucketFlex;
+      buckets.push({ x: currentX, width: bucketWidth, index: i });
+      currentX += bucketWidth;
     }
+    
+    // For compatibility, store average bucket width
+    const avgBucketWidth = innerWidth / COLS;
 
     boardRef.current = {
       w, h, left, right, top, bottom, centerX,
-      gapX, gapY, innerWidth, bucketWidth,
+      gapX, gapY, innerWidth, bucketWidth: avgBucketWidth,
     };
     pegsRef.current = pegs;
     bucketsRef.current = buckets;
@@ -326,15 +354,9 @@ function buildBoardGeometry(w, h) {
       b.x += b.vx * dt;
       b.y += b.vy * dt;
 
-      // Collide walls
+      // Collide walls - REMOVED side walls to allow balls to exit
       const R = PHYS.ballRadius;
-      if (b.x < board.left + R) {
-        b.x = board.left + R;
-        b.vx = -b.vx * PHYS.wallRestitution;
-      } else if (b.x > board.right - R) {
-        b.x = board.right - R;
-        b.vx = -b.vx * PHYS.wallRestitution;
-      }
+      // Side walls removed - balls can now exit from sides
 
       if (b.y < board.top + R) {
         b.y = board.top + R;
@@ -508,23 +530,15 @@ function buildBoardGeometry(w, h) {
 
     // Board walls (glow)
     ctx.save();
-    ctx.strokeStyle = "rgba(59,130,246,0.35)";
-    ctx.lineWidth = 4;
-    ctx.shadowColor = "rgba(56,189,248,0.35)";
-    ctx.shadowBlur = 18;
-    ctx.beginPath();
-    ctx.moveTo(left, top);
-    ctx.lineTo(left, bottom);
-    ctx.moveTo(right, top);
-    ctx.lineTo(right, bottom);
-    ctx.stroke();
+    // Side borders removed - balls can now exit from sides
     ctx.restore();
 
-    // Buckets background
-    for (let i = 0; i < COLS; i++) {
-      const x = left + i * bucketWidth;
+    // Buckets background - use custom widths from buckets array
+    const buckets = bucketsRef.current || [];
+    for (let i = 0; i < buckets.length; i++) {
+      const bucket = buckets[i];
       ctx.fillStyle = i % 2 === 0 ? "rgba(30,58,138,0.24)" : "rgba(6,78,59,0.22)";
-      ctx.fillRect(x + 1, bottom, bucketWidth - 2, 18);
+      ctx.fillRect(bucket.x + 1, bottom, bucket.width - 2, 18);
     }
 
     // Pegs
@@ -699,14 +713,16 @@ function buildBoardGeometry(w, h) {
 
             {/* Buckets display */}
             <div className="relative -mt-2 sm:-mt-3">
-              <div className="grid gap-0 sm:gap-0.5 mb-4 sm:mb-6 max-w-2xl mx-auto" style={{ gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))` }}>
+              <div className="flex gap-0 sm:gap-0.5 mb-4 sm:mb-6 max-w-2xl mx-auto">
                 {MULTIPLIERS.map((mult, idx) => {
                   const landed = finalBuckets.filter(i => i === idx).length;
                   const isHighlighted = landed > 0 || landingNow.includes(idx);
+                  // Make ×10 buckets (index 1 and 13) half size, ×0 edge buckets (index 0 and 14) larger
+                  const widthClass = (idx === 1 || idx === 13) ? "flex-[0.5]" : (idx === 0 || idx === 14) ? "flex-[1.5]" : "flex-1";
                   return (
                     <div
                       key={idx}
-                      className={`relative p-1 sm:p-2 rounded text-center font-bold text-[8px] sm:text-[10px] transition-all ${
+                      className={`relative p-1 sm:p-2 rounded text-center font-bold text-[8px] sm:text-[10px] transition-all ${widthClass} ${
                         isHighlighted ? "scale-105 shadow-lg ring-1 sm:ring-2 ring-white/30" : ""
                       }`}
                     >
