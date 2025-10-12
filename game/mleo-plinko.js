@@ -14,9 +14,10 @@ import Link from "next/link";
 const LS_KEY = "mleo_plinko_v2_physics";
 const DROP_COST = 1000;
 
-// 13 buckets (aligned with 13 columns)
-const MULTIPLIERS = [10, 5, 3, 2, 0.5, 0.2, 0, 0.2, 0.5, 2, 3, 5, 10];
+// 15 buckets (13 original + 2 zero buckets at edges)
+const MULTIPLIERS = [0, 10, 5, 3, 2, 0.5, 0.2, 0, 0.2, 0.5, 2, 3, 5, 10, 0];
 const BUCKET_COLORS = [
+  "from-gray-700 to-gray-800",       // 0x (edge)
   "from-yellow-400 to-amber-500",    // 10x
   "from-orange-500 to-orange-600",   // 5x
   "from-green-500 to-emerald-500",   // 3x
@@ -30,12 +31,13 @@ const BUCKET_COLORS = [
   "from-green-500 to-emerald-500",   // 3x
   "from-orange-500 to-orange-600",   // 5x
   "from-yellow-400 to-amber-500",    // 10x
+  "from-gray-700 to-gray-800",       // 0x (edge)
 ];
 
 // Peg grid
 const ROWS = 10;     // peg rows (triangle: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-const COLS = 13;     // peg columns (also number of buckets)
-const OFFSET_ROWS = false; // no stagger for triangle
+const COLS = 15;     // peg columns (also number of buckets)
+const OFFSET_ROWS = true; // stagger every other row for zigzag pattern
 
 // Physics tunables
 const PHYS = {
@@ -54,11 +56,11 @@ const PHYS = {
 
 // Board layout
 const BOARD = {
-  marginX: 36,        // left/right inner margin inside canvas
-  marginTop: 36,      // top margin
-  marginBottom: 140,  // bottom space for buckets
-  pegGapX: 44,        // horizontal distance between peg columns
-  pegGapY: 46,        // vertical distance between peg rows
+  marginX: 20,        // left/right inner margin inside canvas (smaller for more space)
+  marginTop: 20,      // top margin (smaller for more space)
+  marginBottom: 40,   // bottom space for buckets (much smaller to bring buckets closer to pyramid)
+  pegGapX: 38,        // horizontal distance between peg columns (smaller for more pegs)
+  pegGapY: 40,        // vertical distance between peg rows (smaller for more rows)
 };
 
 // Sounds (optional)
@@ -217,7 +219,8 @@ function buildBoardGeometry(w, h) {
   const gapY = BOARD.pegGapY * Math.max(0.9, Math.min(1.2, scaleX)); 
 
   const centerX = left + innerWidth * 0.5;
-  const totalRows = 10; // Triangle with 10 rows
+  const totalRows = 12; // Triangle with 12 rows to reach bottom
+  const maxPegsInRow = 15; // Make triangle wider to reach edges
 
   // נחשב איפה נמצאת שורת היתדות האחרונה
   const lastPegY = top + (totalRows - 1) * gapY + 24; // כמו בציור היתדות
@@ -233,11 +236,40 @@ function buildBoardGeometry(w, h) {
     const pegs = [];
     
     for (let r = 0; r < totalRows; r++) {
-      const pegsInRow = r + 1; // Growing: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+      // Calculate pegs in row - triangle that reaches bottom
+      let pegsInRow;
+      if (r < 8) {
+        pegsInRow = r + 1; // Growing: 1, 2, 3, 4, 5, 6, 7, 8
+      } else {
+        pegsInRow = 9 + (r - 8) * 2; // Growing: 9, 11, 13, 15
+      }
+      
+      // Add extra pegs on sides for rows 2-9 (indices 1-8)
+      if (r >= 1 && r <= 8) {
+        pegsInRow += 2; // Add one peg on each side
+      }
+      
+      // Add one extra peg on right side for row 10 (index 9)
+      if (r === 9) {
+        pegsInRow += 1; // Add one peg on right side
+      }
+      
+      // Perfect staggering offset for zigzag pattern - shift even rows right slightly
+      let offset = (r % 2 === 1) ? gapX * 0.05 : 0;
+      
+      // Special case: row 10 shift right by 0.05
+      if (r === 9) { // row 10 (0-indexed)
+        offset = gapX * 0.05;
+      }
+      
+      // Special case: row 12 shift left by 0.4
+      if (r === 11) { // row 12 (0-indexed)
+        offset = -gapX * 0.4;
+      }
       
       // Center the row
       const rowWidth = (pegsInRow - 1) * gapX;
-      const startX = centerX - rowWidth / 2;
+      const startX = centerX - rowWidth / 2 + offset;
       
       for (let c = 0; c < pegsInRow; c++) {
         const x = startX + c * gapX;
@@ -246,7 +278,7 @@ function buildBoardGeometry(w, h) {
       }
     }
 
-    // Buckets: 13 equal spans along width
+    // Buckets: 15 equal spans along width
     const bucketWidth = innerWidth / COLS;
     const buckets = [];
     for (let i = 0; i < COLS; i++) {
@@ -666,16 +698,16 @@ function buildBoardGeometry(w, h) {
             </div>
 
             {/* Buckets display */}
-            <div className="relative">
-              <div className="grid gap-0.5 sm:gap-1 mb-4 sm:mb-6 max-w-2xl mx-auto" style={{ gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))` }}>
+            <div className="relative -mt-2 sm:-mt-3">
+              <div className="grid gap-0 sm:gap-0.5 mb-4 sm:mb-6 max-w-2xl mx-auto" style={{ gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))` }}>
                 {MULTIPLIERS.map((mult, idx) => {
                   const landed = finalBuckets.filter(i => i === idx).length;
                   const isHighlighted = landed > 0 || landingNow.includes(idx);
                   return (
                     <div
                       key={idx}
-                      className={`relative p-1 sm:p-2 rounded text-center font-bold text-[9px] sm:text-xs transition-all ${
-                        isHighlighted ? "scale-110 shadow-2xl ring-2 sm:ring-4 ring-white/50" : ""
+                      className={`relative p-1 sm:p-2 rounded text-center font-bold text-[8px] sm:text-[10px] transition-all ${
+                        isHighlighted ? "scale-105 shadow-lg ring-1 sm:ring-2 ring-white/30" : ""
                       }`}
                     >
                       <div className={`absolute inset-0 bg-gradient-to-b ${BUCKET_COLORS[idx]} rounded`}></div>
