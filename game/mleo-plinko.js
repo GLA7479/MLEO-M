@@ -120,6 +120,14 @@ function generatePath() {
   // Final bucket position (map to 13 buckets)
   const finalBucket = Math.round(path[path.length - 1].displayX);
   
+  // Add final landing step - ball falls into bucket
+  path.push({ 
+    row: ROWS + 1, 
+    pegColumn: finalBucket, 
+    displayX: finalBucket, 
+    isBucket: true 
+  });
+  
   return { path, finalBucket };
 }
 
@@ -419,18 +427,22 @@ export default function PlinkoPage() {
                 })}
                 
                 {/* Animated Balls */}
-                {activeBallPositions.map((ballPos, idx) => (
-                  <div
-                    key={ballPos.ballId}
-                    className="absolute"
-                    style={{
-                      top: `${((ballPos.row + 1) / (ROWS + 2)) * 100}%`,
-                      left: `${((ballPos.displayX / 12) * 100)}%`,
-                      transform: 'translate(-50%, -50%)',
-                      transition: 'top 0.7s cubic-bezier(0.33, 1, 0.68, 1), left 0.7s cubic-bezier(0.33, 1, 0.68, 1)',
-                      zIndex: 10 + idx
-                    }}
-                  >
+                {activeBallPositions.map((ballPos, idx) => {
+                  // If ball is in bucket (final position), hide it (we'll show it in the bucket below)
+                  if (ballPos.isBucket) return null;
+                  
+                  return (
+                    <div
+                      key={ballPos.ballId}
+                      className="absolute"
+                      style={{
+                        top: `${((ballPos.row + 1) / (ROWS + 2)) * 100}%`,
+                        left: `${((ballPos.displayX / 12) * 100)}%`,
+                        transform: 'translate(-50%, -50%)',
+                        transition: 'top 0.7s cubic-bezier(0.33, 1, 0.68, 1), left 0.7s cubic-bezier(0.33, 1, 0.68, 1)',
+                        zIndex: 10 + idx
+                      }}
+                    >
                     <div 
                       className="relative"
                       style={{
@@ -448,43 +460,63 @@ export default function PlinkoPage() {
                       {/* Glow effect */}
                       <div className="absolute inset-0 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 opacity-40 blur-lg scale-110"></div>
                     </div>
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Multiplier Buckets */}
-            <div className="grid gap-0.5 sm:gap-1 mb-4 sm:mb-6 max-w-2xl mx-auto" style={{ gridTemplateColumns: 'repeat(13, minmax(0, 1fr))' }}>
-              {MULTIPLIERS.map((mult, idx) => {
-                const ballsInBucket = finalBuckets.filter(b => b === idx).length;
-                const isHighlighted = ballsInBucket > 0;
-                
-                return (
-                  <div
-                    key={idx}
-                    className={`relative p-1 sm:p-2 rounded text-center font-bold text-[9px] sm:text-xs transition-all ${
-                      isHighlighted ? 'scale-110 shadow-2xl ring-2 sm:ring-4 ring-white/50' : ''
-                    }`}
-                  >
-                    <div className={`absolute inset-0 bg-gradient-to-b ${BUCKET_COLORS[idx]} rounded`}></div>
-                    <div className="relative text-white whitespace-nowrap">
-                      {mult >= 1 ? `×${mult}` : `×${mult}`}
-                    </div>
-                    {isHighlighted && (
-                      <>
-                        <div className="absolute -top-8 sm:-top-12 left-1/2 transform -translate-x-1/2 animate-bounce">
-                          <div className="text-2xl sm:text-4xl">⬇️</div>
-                        </div>
-                        {ballsInBucket > 1 && (
-                          <div className="absolute -top-4 sm:-top-6 right-0 bg-green-500 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs font-bold">
-                            {ballsInBucket}
+            {/* Multiplier Buckets with visible balls landing */}
+            <div className="relative">
+              <div className="grid gap-0.5 sm:gap-1 mb-4 sm:mb-6 max-w-2xl mx-auto" style={{ gridTemplateColumns: 'repeat(13, minmax(0, 1fr))' }}>
+                {MULTIPLIERS.map((mult, idx) => {
+                  const ballsInBucket = finalBuckets.filter(b => b === idx).length;
+                  const isHighlighted = ballsInBucket > 0;
+                  
+                  // Check if any ball is currently landing in this bucket
+                  const ballsLanding = activeBallPositions.filter(pos => 
+                    pos.isBucket && pos.pegColumn === idx
+                  );
+                  
+                  return (
+                    <div
+                      key={idx}
+                      className={`relative p-1 sm:p-2 rounded text-center font-bold text-[9px] sm:text-xs transition-all ${
+                        isHighlighted ? 'scale-110 shadow-2xl ring-2 sm:ring-4 ring-white/50' : ''
+                      }`}
+                    >
+                      <div className={`absolute inset-0 bg-gradient-to-b ${BUCKET_COLORS[idx]} rounded`}></div>
+                      <div className="relative text-white whitespace-nowrap">
+                        {mult >= 1 ? `×${mult}` : `×${mult}`}
+                      </div>
+                      
+                      {/* Show balls landing in this bucket */}
+                      {ballsLanding.length > 0 && (
+                        <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2">
+                          <div className="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-300 to-orange-500 border-2 border-yellow-200 shadow-2xl animate-bounce"
+                               style={{
+                                 boxShadow: '0 0 20px rgba(255, 215, 0, 1), 0 0 35px rgba(255, 165, 0, 0.7)'
+                               }}>
                           </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                );
-              })}
+                        </div>
+                      )}
+                      
+                      {isHighlighted && (
+                        <>
+                          <div className="absolute -top-8 sm:-top-12 left-1/2 transform -translate-x-1/2 animate-bounce">
+                            <div className="text-2xl sm:text-4xl">⬇️</div>
+                          </div>
+                          {ballsInBucket > 1 && (
+                            <div className="absolute -top-4 sm:-top-6 right-0 bg-green-500 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs font-bold">
+                              {ballsInBucket}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Drop Button - Click anytime to add a ball */}
