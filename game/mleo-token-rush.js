@@ -3,7 +3,7 @@
 // Clean, focused mining experience with meaningful progression
 // ============================================================================
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Layout from "../components/Layout";
 import {
   useAccount,
@@ -27,7 +27,6 @@ const LS_KEYS = {
   PRESTIGE: "mleo_rush_prestige_v4",
   ACHIEVEMENTS: "mleo_rush_achievements_v4",
   MASTERY: "mleo_rush_mastery_v4",
-  FORTUNE_WHEEL: "mleo_rush_fortune_wheel_v4",
 };
 
 const OTHER_GAME_CORE_KEY = "mleoMiningEconomy_v2.1"; // MLEO-MINERS
@@ -56,16 +55,10 @@ const CLAIM_ABI_V3 = [
 
 const CONFIG = {
   // Core Mining
-  IDLE_TO_OFFLINE_MS: 2 * 60 * 1000,        // 2 minutes idle → offline
+  IDLE_TO_OFFLINE_MS: 5 * 60 * 1000,        // 5 minutes idle → offline
   OFFLINE_MAX_HOURS: 12,                     // max offline accumulation
   ONLINE_BASE_RATE: 1200,                    // MLEO per hour (online)
-  // Offline rates - tiered system (12 hours total)
-  OFFLINE_TIERS: [
-    { hours: 2, rate: 0.50 },  // First 2 hours: 50% effectiveness
-    { hours: 2, rate: 0.40 },  // Next 2 hours: 40% effectiveness
-    { hours: 4, rate: 0.30 },  // Next 4 hours: 30% effectiveness
-    { hours: 4, rate: 0.20 },  // Final 4 hours: 20% effectiveness
-  ],
+  OFFLINE_RATE_FACTOR: 0.6,                  // 60% rate when offline
   
   // Boost (simple)
   BOOST_PER_CLICK: 0.02,                     // +2% per click
@@ -89,30 +82,14 @@ const CONFIG = {
   // Guild
   GUILD_SAMPLES: [0.02, 0.03, 0.05, 0.08],  // random bonuses
 
-  // Modifiers (mini-events) - Fixed global schedule
-  MODIFIER_CYCLE_HOURS: 3,                   // Full cycle every 3 hours
-  MODIFIER_DURATION_MIN: 30,                 // Each event lasts 30 minutes
+  // Modifiers (mini-events)
+  MODIFIER_ROTATE_EVERY_MIN: 15,             // rotate every 15 min
+  MODIFIER_DURATION_MIN: 5,                  // active for 5 min
   MODIFIERS_POOL: [
-    { id: "GIFT_X2",   label: "🎁 Gifts ×2",      mult: { gift: 2 }, desc: "Double rewards from hourly gifts" },
-    { id: "ONLINE_P",  label: "⚡ +30% Mining",   mult: { online: 1.30 }, desc: "30% increased online mining speed" },
-    { id: "OFFLINE_P", label: "🌙 +30% Offline",  mult: { offline: 1.30 }, desc: "30% increased offline mining rate" },
-    { id: "SALE_25",   label: "💰 -25% Upgrades", mult: { upgradeCost: 0.75 }, desc: "25% discount on all upgrades" },
-  ],
-  
-  // Fortune Wheel
-  FORTUNE_WHEEL_COOLDOWN_SEC: 3600,          // 1 hour cooldown for free spin
-  FORTUNE_WHEEL_MAX_EXTRA_SPINS: 999,        // Unlimited extra spins
-  FORTUNE_WHEEL_COSTS: [1000],               // Fixed cost for extra spins
-  FORTUNE_WHEEL_PRIZES: [
-    { id: "mleo_1k",    label: "💰 1,000 MLEO",     type: "mleo", value: 1000,   weight: 25, color: "#10b981" },
-    { id: "mleo_5k",    label: "💰 5,000 MLEO",     type: "mleo", value: 5000,   weight: 15, color: "#10b981" },
-    { id: "mleo_10k",   label: "💰 10,000 MLEO",    type: "mleo", value: 10000,  weight: 8,  color: "#10b981" },
-    { id: "boost_2x_30", label: "⚡ 2× Mining (30m)", type: "boost", value: { mult: 2, duration: 30*60*1000 }, weight: 12, color: "#f59e0b" },
-    { id: "boost_3x_15", label: "⚡ 3× Mining (15m)", type: "boost", value: { mult: 3, duration: 15*60*1000 }, weight: 8,  color: "#f59e0b" },
-    { id: "pp_1",       label: "💎 1 Prestige Point", type: "prestige", value: 1, weight: 10, color: "#8b5cf6" },
-    { id: "pp_3",       label: "💎 3 Prestige Points", type: "prestige", value: 3, weight: 5,  color: "#8b5cf6" },
-    { id: "bot_1h",     label: "🤖 Mining Bot (1h)", type: "bot", value: { mult: 1.5, duration: 60*60*1000 }, weight: 7,  color: "#06b6d4" },
-    { id: "boost_10_10", label: "⚡ +10% Boost (10m)", type: "boost_add", value: { amount: 0.1, duration: 10*60*1000 }, weight: 10, color: "#f59e0b" },
+    { id: "GIFT_X2",   label: "🎁 Gifts ×2",      mult: { gift: 2 } },
+    { id: "ONLINE_P",  label: "⚡ +30% Mining",   mult: { online: 1.30 } },
+    { id: "OFFLINE_P", label: "🌙 +30% Offline",  mult: { offline: 1.30 } },
+    { id: "SALE_25",   label: "💰 -25% Upgrades", mult: { upgradeCost: 0.75 } },
   ],
   
   // Time Chest (random spawn)
@@ -182,7 +159,6 @@ const initialCore = {
   lastGiftAt: 0,
   lastDailyAt: 0,
   dailyStreak: 0,
-  lastClaimAt: 0,     // Track when user last claimed to wallet
 
   guild: { id: null, name: null, members: 0, bonus: 0 },
 
@@ -259,15 +235,15 @@ function InfoModal({ isOpen, onClose, title, children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="fixed inset-0 bg-black/70 backdrop-blur-sm"></div>
-      <div className="relative bg-gradient-to-br from-zinc-900 to-zinc-950 border-2 border-emerald-500/30 rounded-2xl max-w-sm w-full p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="relative bg-gradient-to-br from-zinc-900 to-zinc-950 border-2 border-emerald-500/30 rounded-3xl max-w-md w-full p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-xl font-bold text-zinc-400 hover:text-white"
+          className="absolute top-4 right-4 text-2xl font-bold text-zinc-400 hover:text-white"
         >
           ×
         </button>
-        <h3 className="text-xl font-bold mb-3 text-emerald-400">{title}</h3>
-        <div className="text-zinc-300 space-y-3 text-sm">
+        <h3 className="text-2xl font-bold mb-4 text-emerald-400">{title}</h3>
+        <div className="text-zinc-300 space-y-3">
           {children}
         </div>
       </div>
@@ -280,17 +256,6 @@ function InfoModal({ isOpen, onClose, title, children }) {
 // ============================================================================
 function usePresenceAndMining(getMultiplier, liveModifierMult) {
   const [core, setCore] = useState(() => ({ ...initialCore, ...safeRead(LS_KEYS.CORE, initialCore) }));
-  
-  // Fortune Wheel state
-  const [fortuneWheel, setFortuneWheel] = useState(() => {
-    const saved = safeRead(LS_KEYS.FORTUNE_WHEEL);
-    return saved || {
-      lastFreeSpin: 0,
-      extraSpinsToday: 0,
-      lastSpinDay: new Date().toDateString(),
-      activeEffects: [],
-    };
-  });
   const [sess, setSess] = useState(() => ({ ...initialSession, ...safeRead(LS_KEYS.SESSION, initialSession) }));
   const idleTimerRef = useRef(null);
   const rafRef = useRef(0);
@@ -302,53 +267,13 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
     safeWrite(LS_KEYS.SESSION, sess); 
     sessRef.current = sess; // Keep ref in sync
   }, [sess]);
-  useEffect(() => { safeWrite(LS_KEYS.FORTUNE_WHEEL, fortuneWheel); }, [fortuneWheel]);
-
-  // Calculate multiplier with fortune wheel effects
-  const getMultiplierWithEffects = () => {
-    let baseMultiplier = getMultiplier();
-    
-    // Apply fortune wheel effects
-    const now = Date.now();
-    const activeEffects = fortuneWheel.activeEffects.filter(effect => effect.expires > now);
-    
-    for (const effect of activeEffects) {
-      switch (effect.type) {
-        case "boost":
-          baseMultiplier *= effect.mult;
-          break;
-        case "bot":
-          baseMultiplier *= effect.mult;
-          break;
-        // boost_add is handled separately in the boost calculation
-      }
-    }
-    
-    return baseMultiplier;
-  };
-
 
   // Init: schedule modifiers & chest
   useEffect(() => {
-    // Check if user was offline
-    if (core.offlineStart && core.offlineStart > 0) {
-      setCore(c => ({ ...c, mode: "offline" }));
-    } else if (core.lastActiveAt) {
-      // If user hasn't been active for more than IDLE time, mark as offline
-      const timeSinceActive = Date.now() - core.lastActiveAt;
-      if (timeSinceActive > CONFIG.IDLE_TO_OFFLINE_MS) {
-      setCore(c => ({
-        ...c,
-          mode: "offline", 
-          offlineStart: core.lastActiveAt + CONFIG.IDLE_TO_OFFLINE_MS 
-        }));
-      }
-    }
+    if (core.offlineStart && core.offlineStart > 0) setCore(c => ({ ...c, mode: "offline" }));
     resetIdleTimer();
     scheduleNextModifier(setSess);
     maybeSpawnChest(setSess);
-    
-    // Check for pending claims after page load - moved to main component
     // eslint-disable-next-line
   }, []);
 
@@ -366,27 +291,9 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
     const start = c.offlineStart || Date.now();
     const elapsedMs = Date.now() - start;
     const capped = Math.min(elapsedMs, CONFIG.OFFLINE_MAX_HOURS * 3600 * 1000);
-    const totalHours = capped / 3600000;
-    
-    // Calculate earnings using tiered rates
-    let totalEarnings = 0;
-    let remainingHours = totalHours;
-    let hoursProcessed = 0;
-    
-    const basePerHour = CONFIG.ONLINE_BASE_RATE * mult * (liveModifierMult("offline") || 1);
-    
-    for (const tier of CONFIG.OFFLINE_TIERS) {
-      if (remainingHours <= 0) break;
-      
-      const hoursInThisTier = Math.min(remainingHours, tier.hours);
-      const earningsInThisTier = basePerHour * tier.rate * hoursInThisTier;
-      
-      totalEarnings += earningsInThisTier;
-      remainingHours -= hoursInThisTier;
-      hoursProcessed += hoursInThisTier;
-    }
-    
-    return Math.floor(totalEarnings);
+    const hours = capped / 3600000;
+    const perHour = CONFIG.ONLINE_BASE_RATE * CONFIG.OFFLINE_RATE_FACTOR * mult * (liveModifierMult("offline") || 1);
+    return Math.floor(perHour * hours);
   }
 
   function markActivity(ev) {
@@ -411,7 +318,7 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
       const decayedBoost = currentBoost * (1 - decayFactor);
       
       // Add new boost
-      const newBoost = Math.min(decayedBoost + CONFIG.BOOST_PER_CLICK, 1.0);
+      const newBoost = Math.min(decayedBoost + CONFIG.BOOST_PER_CLICK, 0.5);
       
       console.log("Boost update:", { currentBoost, elapsed, decayFactor, newBoost });
 
@@ -427,7 +334,7 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
     setCore(c => {
       let next = { ...c, lastActiveAt: now };
       if (c.mode === "offline") {
-        const mult = getMultiplierWithEffects();
+        const mult = getMultiplier();
         const earned = settleOffline(c, mult);
         next.miningPool += earned;
         next.totalMined += earned;
@@ -475,7 +382,7 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
       // 2) Mine with current boost (using ref for performance)
       setCore(c => {
         if (c.mode !== "online") return c;
-        const mult = getMultiplierWithEffects();
+        const mult = getMultiplier();
         const perSec = (CONFIG.ONLINE_BASE_RATE * mult * (liveModifierMult("online") || 1)) / 3600;
         const focusFactor = document?.hidden ? 0.5 : 1;
         const boostFactor = 1 + (sessRef.current.boost || 0);
@@ -494,7 +401,6 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
   return {
     core, setCore,
     sess, setSess,
-    fortuneWheel, setFortuneWheel,
     markActivity,
     wake: () => markActivity({ isTrusted: true }),
   };
@@ -564,82 +470,6 @@ function nextDailyAmount(core) {
 
 function luckyRoll() {
   return Math.random() < CONFIG.GIFT_LUCK_CHANCE ? pick(CONFIG.GIFT_LUCK_MULT) : 1;
-}
-
-// ============================================================================
-// GLOBAL EVENT SCHEDULER (Fixed UTC-based)
-// ============================================================================
-function getCurrentGlobalEvent() {
-  const now = Date.now();
-  const cycleMs = CONFIG.MODIFIER_CYCLE_HOURS * 60 * 60 * 1000; // 3 hours in ms
-  const durationMs = CONFIG.MODIFIER_DURATION_MIN * 60 * 1000;   // 30 min in ms
-  
-  // Calculate which cycle we're in (since Unix epoch)
-  const cycleIndex = Math.floor(now / cycleMs);
-  const cycleStart = cycleIndex * cycleMs;
-  const timeInCycle = now - cycleStart;
-  
-  // Each event takes 30 minutes, then 30 minutes break, repeat
-  const eventIndex = Math.floor(timeInCycle / durationMs);
-  const eventInCycleStart = eventIndex * durationMs;
-  const eventEnd = cycleStart + eventInCycleStart + durationMs;
-  
-  // Check if we're in an active event window
-  if (timeInCycle >= eventInCycleStart && timeInCycle < (eventInCycleStart + durationMs)) {
-    const modifierIndex = eventIndex % CONFIG.MODIFIERS_POOL.length;
-    const modifier = CONFIG.MODIFIERS_POOL[modifierIndex];
-    
-    return {
-      modifier: {
-        ...modifier,
-        until: eventEnd
-      },
-      nextEventStart: eventEnd + durationMs // Next event starts after current ends + break
-    };
-  }
-  
-  // We're in a break period, calculate next event
-  const nextEventIndex = eventIndex + 1;
-  const nextEventStart = cycleStart + (nextEventIndex * durationMs);
-  
-  return {
-    modifier: null,
-    nextEventStart: nextEventStart
-  };
-}
-
-function getEventSchedule() {
-  const now = Date.now();
-  const cycleMs = CONFIG.MODIFIER_CYCLE_HOURS * 60 * 60 * 1000;
-  const durationMs = CONFIG.MODIFIER_DURATION_MIN * 60 * 1000;
-  
-  const schedule = [];
-  const cycleIndex = Math.floor(now / cycleMs);
-  const cycleStart = cycleIndex * cycleMs;
-  
-  // Generate schedule for current and next cycle
-  for (let cycle = 0; cycle < 2; cycle++) {
-    const currentCycleStart = cycleStart + (cycle * cycleMs);
-    
-    for (let i = 0; i < CONFIG.MODIFIERS_POOL.length; i++) {
-      const eventStart = currentCycleStart + (i * durationMs);
-      const eventEnd = eventStart + durationMs;
-      
-      if (eventEnd > now) { // Only show future/current events
-        const modifier = CONFIG.MODIFIERS_POOL[i];
-        const isActive = now >= eventStart && now < eventEnd;
-        
-        schedule.push({
-          modifier,
-          start: eventStart,
-          end: eventEnd,
-          isActive
-        });
-      }
-    }
-  }
-  
-  return schedule.slice(0, 8); // Return next 8 events
 }
 
 // ============================================================================
@@ -759,9 +589,6 @@ export default function MLEOTokenRushPage() {
   const [mounted, setMounted] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [infoModal, setInfoModal] = useState(null);
-  const [fortuneWheelModal, setFortuneWheelModal] = useState(false);
-  const [isSpinning, setIsSpinning] = useState(false);
-  const [wonPrize, setWonPrize] = useState(null);
   const { showToast, ToastContainer } = useToast();
 
   useEffect(() => { setMounted(true); }, []);
@@ -771,19 +598,16 @@ export default function MLEOTokenRushPage() {
   }, []);
 
 
-  // Core hooks - Use global event system
+  // Core hooks
   const liveModifierMult = (kind) => {
-    const { modifier } = getCurrentGlobalEvent();
-    if (!modifier) return 1;
-    return modifier.mult?.[kind] || 1;
+    const m = sess.modifier;
+    if (!m || !m.until || m.until < Date.now()) return 1;
+    return m.mult?.[kind] || 1;
   };
 
-  const getMultiplier = () => {
-    let baseMultiplier = upgradesMultiplier(core.upgrades, core.guild, 1 + (core.prestigePoints * CONFIG.PRESTIGE_MULT_PER_POINT));
-    return baseMultiplier;
-  };
+  const getMultiplier = () => upgradesMultiplier(core.upgrades, core.guild, 1 + (core.prestigePoints * CONFIG.PRESTIGE_MULT_PER_POINT));
 
-  const { core, setCore, sess, setSess, fortuneWheel, setFortuneWheel, markActivity, wake } = 
+  const { core, setCore, sess, setSess, markActivity, wake } = 
     usePresenceAndMining(getMultiplier, liveModifierMult);
 
   // New state for progression systems
@@ -811,90 +635,8 @@ export default function MLEOTokenRushPage() {
     const { isConnected, address } = useAccount();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
-  const { writeContractAsync } = useWriteContract();
+  const { writeContract, isPending } = useWriteContract();
   const publicClient = usePublicClient();
-
-  // Simple approach: just wait and check for pending claims
-  const checkForPendingClaims = useCallback(async (currentCore, userAddress, client) => {
-    if (!userAddress || !client) return;
-    
-    console.log("🔍 [SIMPLE] Checking for pending claims...");
-    
-    // Check for recent claim attempt
-    const lastClaimAttempt = localStorage.getItem('lastClaimAttempt');
-    if (lastClaimAttempt) {
-      const timeSinceAttempt = Date.now() - parseInt(lastClaimAttempt);
-      console.log("🔍 [SIMPLE] Last claim attempt was", timeSinceAttempt, "ms ago");
-      
-      if (timeSinceAttempt < 10 * 60 * 1000) { // Within last 10 minutes
-        console.log("🔍 [SIMPLE] Recent claim attempt found, checking for transaction...");
-        
-        // Wait a bit for transaction to be mined
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        
-        try {
-          // Get recent transactions from this address
-          const blockNumber = await client.getBlockNumber();
-          console.log("🔍 [SIMPLE] Current block:", blockNumber);
-          
-          // Search in recent blocks
-          for (let i = 0; i < 10; i++) {
-            const block = await client.getBlock({
-              blockNumber: blockNumber - BigInt(i),
-              includeTransactions: true
-            });
-            
-            // Look for transactions from our address to the claim contract
-            const claimTx = block.transactions.find(tx => 
-              tx.from?.toLowerCase() === userAddress.toLowerCase() &&
-              tx.to?.toLowerCase() === ENV.CLAIM_ADDRESS.toLowerCase() &&
-              tx.input && tx.input.length > 10 &&
-              tx.timestamp && tx.timestamp * 1000 > parseInt(lastClaimAttempt) // After our claim attempt
-            );
-            
-            if (claimTx && claimTx.hash) {
-              console.log("🔍 [SIMPLE] Found claim transaction:", claimTx.hash);
-              
-              try {
-                const receipt = await client.getTransactionReceipt({ hash: claimTx.hash });
-                
-                if (receipt?.status === 1 || receipt?.status === "success") {
-                  console.log("✅ [SIMPLE] Transaction confirmed!");
-                  
-                  // Clear localStorage and update state
-                  localStorage.removeItem('lastClaimAttempt');
-                  localStorage.removeItem('pendingClaimHash');
-                  localStorage.removeItem('pendingClaimTime');
-                  
-                  setCore(c => ({ ...c, lastClaimAt: Date.now() }));
-                  showToast("✅ Previous claim processed!");
-                  return;
-                }
-              } catch (receiptError) {
-                console.log("🔍 [SIMPLE] Could not get receipt:", receiptError);
-              }
-            }
-          }
-        } catch (error) {
-          console.log("🔍 [SIMPLE] Error checking blocks:", error);
-        }
-      }
-    }
-    
-    console.log("🔍 [SIMPLE] No pending claims found");
-  }, [setCore, showToast]);
-
-  // Check for pending claims after page load
-  useEffect(() => {
-    if (isConnected && address && publicClient) {
-      // Simple delay then check
-      const timer = setTimeout(() => {
-        checkForPendingClaims(core, address, publicClient);
-      }, 1000); // Wait 1 second after page load
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isConnected, address, publicClient, checkForPendingClaims]);
 
   // Guild
   const { joinRandomGuild, leaveGuild } = useGuildActions(setCore);
@@ -1117,14 +859,13 @@ export default function MLEOTokenRushPage() {
     checkAchievements();
   };
 
-  // Claim to wallet - NEW APPROACH: Update AFTER success
-  const [isClaiming, setIsClaiming] = useState(false);
+  // Claim to wallet
+  const claimingRef = useRef(false);
   const [claimAmount, setClaimAmount] = useState("");
   
   async function claimToWallet() {
-    if (isClaiming) {
+    if (claimingRef.current) {
       console.log("Already claiming, skipping...");
-      showToast("⏳ Transaction in progress...");
       return;
     }
     
@@ -1142,18 +883,11 @@ export default function MLEOTokenRushPage() {
       amount = vaultAmount;
     }
     
+    console.log("🔵 Starting claim process, claiming amount:", amount, "vault total:", vaultAmount);
+    
+    if (!ENV.CLAIM_ADDRESS) { showToast("❌ CLAIM_ADDRESS not configured"); return; }
+    if (!isConnected || !address) { showToast("❌ Connect wallet first"); return; }
     if (amount <= 0) { showToast("❌ Nothing to claim"); return; }
-    
-    console.log("🔵 [CLAIM] Starting process, amount:", amount, "vault:", vaultAmount);
-    
-    if (!ENV.CLAIM_ADDRESS) { 
-      showToast("❌ CLAIM_ADDRESS not configured"); 
-      return; 
-    }
-    if (!isConnected || !address) { 
-      showToast("❌ Connect wallet first"); 
-      return; 
-    }
 
     if (chainId !== ENV.CLAIM_CHAIN_ID) {
       try { 
@@ -1167,19 +901,14 @@ export default function MLEOTokenRushPage() {
       }
     }
 
-    // Set claiming state to disable button
-    setIsClaiming(true);
-    
     try {
       const units = parseUnits(amount.toFixed(2), ENV.TOKEN_DECIMALS);
-      if (units <= 0n) { 
-        showToast("❌ Invalid amount"); 
-        return; 
-      }
-      
+      if (units <= 0n) { showToast("❌ Invalid amount"); return; }
+
+    claimingRef.current = true;
       showToast("⏳ Preparing transaction...");
 
-      console.log("🔵 [CLAIM] Simulating contract call...");
+      console.log("🔵 Simulating contract call...");
     const { request } = await publicClient.simulateContract({
       address: ENV.CLAIM_ADDRESS,
       abi: CLAIM_ABI_V3,
@@ -1188,260 +917,62 @@ export default function MLEOTokenRushPage() {
       account: address,
     });
 
-      console.log("🔵 [CLAIM] Writing contract...");
+      console.log("🔵 Writing contract...");
       showToast("⏳ Please confirm in wallet...");
+    const hash = await writeContract(request);
       
-      // Use writeContractAsync like in MINERS game
-      const hash = await writeContractAsync({
-        address: ENV.CLAIM_ADDRESS,
-        abi: CLAIM_ABI_V3,
-        functionName: "claim",
-        args: [GAME_ID_BI, units],
-        chainId: ENV.CLAIM_CHAIN_ID,
-        account: address,
-      });
-      
-      console.log("🔵 [CLAIM] Transaction hash received:", hash);
+      if (!hash) {
+        console.error("❌ No transaction hash returned");
+        showToast("❌ Transaction failed");
+        return;
+      }
 
-      console.log("🔵 [CLAIM] Transaction sent, hash:", hash);
+      console.log("🔵 Transaction sent, hash:", hash);
       showToast("⏳ Waiting for blockchain confirmation...");
 
-      // Wait for transaction receipt
       const receipt = await publicClient.waitForTransactionReceipt({ 
         hash,
         confirmations: 1,
-        timeout: 120000 // 2 minutes
+        timeout: 60000 // 60 seconds
       });
 
-      console.log("🔵 [CLAIM] Receipt received:", receipt);
-      console.log("🔵 [CLAIM] Status type:", typeof receipt?.status, "Value:", receipt?.status);
+      console.log("🔵 Receipt received:", receipt?.status);
 
-      // Check if transaction was successful (status can be "success", 1, or "0x1")
-      const isSuccess = receipt?.status === "success" || 
-                       receipt?.status === 1 || 
-                       receipt?.status === "0x1" ||
-                       receipt?.status === "1";
-
-      if (isSuccess) {
-        // ✅ UPDATE VAULT ONLY AFTER SUCCESS
-        console.log("✅ [SUCCESS] Transaction confirmed! Deducting", amount, "from vault");
+      if (receipt?.status === "success") {
+        console.log("✅ Transaction confirmed! Resetting vault...");
         
+        // Deduct claimed amount from vault
         setCore(prevCore => {
           const currentVault = prevCore.vault || 0;
           const newVault = Math.max(0, currentVault - amount);
-          console.log("✅ [SUCCESS] Vault updated:", currentVault, "→", newVault);
-          const updated = { 
-            ...prevCore, 
-            vault: newVault,
-            lastClaimAt: Date.now() // Track when claim was made
-          };
-          
-          // Force save to localStorage immediately
-          setTimeout(() => safeWrite(LS_KEYS.CORE, updated), 0);
-          
-          return updated;
+          const newCore = { ...prevCore, vault: newVault };
+          console.log("✅ Vault updated. Before:", currentVault, "Claimed:", amount, "After:", newVault);
+          return newCore;
         });
         
+        // Clear claim amount input
         setClaimAmount("");
-        showToast(`✅ Successfully claimed ${fmt(amount)} MLEO!`);
         
-        // Clear pending claim from localStorage
-        localStorage.removeItem('pendingClaimHash');
-        localStorage.removeItem('pendingClaimTime');
-        localStorage.removeItem('lastClaimAttempt');
+        showToast(`✅ Successfully claimed ${fmt(amount)} MLEO!`);
       } else {
-        console.error("❌ [FAILED] Transaction failed, status:", receipt?.status, "Receipt:", receipt);
-        showToast("❌ Transaction failed");
+        console.error("❌ Transaction status:", receipt?.status);
+        showToast("❌ Transaction failed on blockchain");
       }
-  } catch (err) {
+    } catch (err) {
       console.error("❌ Claim error:", err);
       const msg = String(err?.shortMessage || err?.message || err);
       
+      // Don't show confusing technical errors
       if (msg.includes("User rejected") || msg.includes("user rejected")) {
         showToast("❌ Transaction cancelled");
       } else if (!/Cannot convert undefined to a BigInt/i.test(msg)) {
         showToast(`❌ Error: ${msg.slice(0, 50)}`);
-    }
-  } finally {
-      setIsClaiming(false);
-      console.log("🔵 [CLAIM] Process finished");
-    }
-  }
-
-
-  // ============================================================================
-  // FORTUNE WHEEL FUNCTIONS
-  // ============================================================================
-  
-  // Check if free spin is available
-  function canSpinFree() {
-    const now = Date.now();
-    const timeSinceLastSpin = now - fortuneWheel.lastFreeSpin;
-    return timeSinceLastSpin >= CONFIG.FORTUNE_WHEEL_COOLDOWN_SEC * 1000;
-  }
-  
-  // Check if can buy extra spin
-  function canBuyExtraSpin() {
-    const today = new Date().toDateString();
-    const currentSpins = fortuneWheel.extraSpinsToday || 0;
-    const cost = getNextSpinCost();
-    const hasBalance = core.balance >= cost;
-    const underLimit = currentSpins < CONFIG.FORTUNE_WHEEL_MAX_EXTRA_SPINS;
-    
-    
-    if (fortuneWheel.lastSpinDay !== today) {
-      // New day, reset extra spins
-      setFortuneWheel(prev => ({ ...prev, extraSpinsToday: 0, lastSpinDay: today }));
-      return hasBalance;
-    }
-    // Check if user has enough balance AND hasn't exceeded daily limit
-    return hasBalance && underLimit;
-  }
-  
-  // Get cost for next extra spin
-  function getNextSpinCost() {
-    return 1000; // Fixed cost
-  }
-  
-  // Select random prize based on weights
-  function selectPrize() {
-    const totalWeight = CONFIG.FORTUNE_WHEEL_PRIZES.reduce((sum, prize) => sum + prize.weight, 0);
-    let random = Math.random() * totalWeight;
-    
-    for (const prize of CONFIG.FORTUNE_WHEEL_PRIZES) {
-      random -= prize.weight;
-      if (random <= 0) {
-        return prize;
       }
-    }
-    
-    // Fallback to first prize
-    return CONFIG.FORTUNE_WHEEL_PRIZES[0];
-  }
-  
-  // Apply prize effect to game
-  function applyPrize(prize) {
-    const now = Date.now();
-    
-    switch (prize.type) {
-      case "mleo":
-        setCore(prevCore => ({
-          ...prevCore,
-          vault: (prevCore.vault || 0) + prize.value
-        }));
-        showToast(`🎉 Won ${fmt(prize.value)} MLEO!`);
-        break;
-        
-      case "prestige":
-        setCore(prevCore => ({
-          ...prevCore,
-          prestigePoints: (prevCore.prestigePoints || 0) + prize.value
-        }));
-        showToast(`🎉 Won ${prize.value} Prestige Point${prize.value > 1 ? 's' : ''}!`);
-        break;
-        
-      case "boost":
-        const boostEffect = {
-          id: `boost_${now}`,
-          type: "boost",
-          mult: prize.value.mult,
-          expires: now + prize.value.duration,
-          label: `${prize.value.mult}× Mining`
-        };
-        setFortuneWheel(prev => ({
-          ...prev,
-          activeEffects: [...(prev.activeEffects || []), boostEffect]
-        }));
-        showToast(`🎉 Won ${prize.value.mult}× Mining for ${Math.round(prize.value.duration / 60000)} minutes!`);
-        break;
-        
-      case "boost_add":
-        const boostAddEffect = {
-          id: `boost_add_${now}`,
-          type: "boost_add",
-          amount: prize.value.amount,
-          expires: now + prize.value.duration,
-          label: `+${Math.round(prize.value.amount * 100)}% Boost`
-        };
-        setFortuneWheel(prev => ({
-          ...prev,
-          activeEffects: [...(prev.activeEffects || []), boostAddEffect]
-        }));
-        showToast(`🎉 Won +${Math.round(prize.value.amount * 100)}% Boost for ${Math.round(prize.value.duration / 60000)} minutes!`);
-        break;
-        
-      case "bot":
-        const botEffect = {
-          id: `bot_${now}`,
-          type: "bot",
-          mult: prize.value.mult,
-          expires: now + prize.value.duration,
-          label: `Mining Bot ${prize.value.mult}×`
-        };
-        setFortuneWheel(prev => ({
-          ...prev,
-          activeEffects: [...(prev.activeEffects || []), botEffect]
-        }));
-        showToast(`🎉 Won Mining Bot ${prize.value.mult}× for ${Math.round(prize.value.duration / 60000)} minutes!`);
-        break;
+    } finally {
+      claimingRef.current = false;
+      console.log("🔵 Claim process finished, ref reset");
     }
   }
-  
-  // Clean expired effects
-  function cleanExpiredEffects() {
-    const now = Date.now();
-    setFortuneWheel(prev => ({
-      ...prev,
-      activeEffects: (prev.activeEffects || []).filter(effect => effect.expires > now)
-    }));
-  }
-  
-  // Spin the fortune wheel
-  function spinFortuneWheel(isFree = true) {
-    if (!isFree) {
-      const cost = getNextSpinCost();
-      if (core.vault < cost) {
-        showToast(`❌ Not enough MLEO. Need ${fmt(cost)}`);
-        return;
-      }
-      
-      // Deduct cost
-      setCore(prevCore => ({
-        ...prevCore,
-        vault: Math.max(0, (prevCore.vault || 0) - cost)
-      }));
-    }
-    
-    // Select and apply prize
-    const prize = selectPrize();
-    applyPrize(prize);
-    
-    // Update spin state
-    const now = Date.now();
-    setFortuneWheel(prev => ({
-      ...prev,
-      lastFreeSpin: isFree ? now : prev.lastFreeSpin,
-      extraSpinsToday: isFree ? prev.extraSpinsToday : prev.extraSpinsToday + 1,
-      lastSpinDay: new Date().toDateString()
-    }));
-    
-    // Save to localStorage
-    setTimeout(() => {
-      const updated = {
-        ...fortuneWheel,
-        lastFreeSpin: isFree ? now : fortuneWheel.lastFreeSpin,
-        extraSpinsToday: isFree ? fortuneWheel.extraSpinsToday : fortuneWheel.extraSpinsToday + 1,
-        lastSpinDay: new Date().toDateString()
-      };
-      safeWrite(LS_KEYS.FORTUNE_WHEEL, updated);
-    }, 0);
-  }
-
-  // Clean expired fortune wheel effects every minute
-  useEffect(() => {
-    const interval = setInterval(cleanExpiredEffects, 60000); // Every minute
-    return () => clearInterval(interval);
-  }, []);
 
   const mult = useMemo(() => getMultiplier(), [core.upgrades, core.guild]);
 
@@ -1473,55 +1004,30 @@ export default function MLEOTokenRushPage() {
               </h1>
               <div className="text-sm opacity-70 mt-1">Passive crypto mining • Earn MLEO tokens</div>
               <div className="mt-3 flex flex-wrap gap-2">
-      {(() => {
-                  const { modifier } = getCurrentGlobalEvent();
-                  return modifier ? (
-                    <button
-                      onClick={() => setInfoModal('events')}
-                      className="px-3 py-1.5 rounded-xl text-xs border border-amber-500/30 bg-amber-500/10 text-amber-300 font-bold hover:bg-amber-500/20 transition cursor-pointer"
-                    >
-                      🔥 Active: {modifier.label}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setInfoModal('events')}
-                      className="px-3 py-1.5 rounded-xl text-xs border border-white/10 bg-white/5 opacity-60 hover:opacity-100 hover:bg-white/10 transition"
-                    >
-                      No active event
-                    </button>
-                  );
-                })()}
+      {sess.modifier && sess.modifier.until > Date.now() ? (
+                  <span className="px-3 py-1.5 rounded-xl text-xs border border-amber-500/30 bg-amber-500/10 text-amber-300 font-bold">
+                    🔥 Active: {sess.modifier.label}
+                  </span>
+                ) : (
+                  <span className="px-3 py-1.5 rounded-xl text-xs border border-white/10 bg-white/5 opacity-60">
+                    No active event
+                  </span>
+                )}
                 {sess.chest && sess.chest.expiresAt > Date.now() && (
                   <span className="px-3 py-1.5 rounded-xl text-xs border border-yellow-500/30 bg-yellow-500/10 text-yellow-300 font-bold animate-pulse">
                     📦 Chest expires in {Math.max(0, Math.ceil((sess.chest.expiresAt - Date.now())/1000))}s!
                   </span>
                 )}
-                {fortuneWheel?.activeEffects?.filter(effect => effect.expires > Date.now()).map(effect => (
-                  <span key={effect.id} className="px-3 py-1.5 rounded-xl text-xs border border-purple-500/30 bg-purple-500/10 text-purple-300 font-bold">
-                    {effect.label} ({Math.ceil((effect.expires - Date.now()) / 60000)}m)
-                  </span>
-                )) || []}
     </div>
   </div>
 
             <div className="flex items-center gap-2">
+    <WalletStatus />
               <Link href="/mining">
                 <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
                   ← BACK
                 </button>
     </Link>
-    <WalletStatus />
-              <button
-                onClick={wake}
-                className={`px-4 py-2 rounded-xl text-sm font-bold ${
-                  core.mode === "online"
-                    ? "bg-emerald-600 hover:bg-emerald-500"
-                    : "bg-amber-600 hover:bg-amber-500 animate-pulse"
-                }`}
-                title={core.mode === "online" ? "Click to boost mining speed" : "Resume mining and collect offline earnings"}
-              >
-                {core.mode === "online" ? "⚡ BOOST" : "🔔 RESUME"}
-              </button>
   </div>
 </header>
 
@@ -1554,17 +1060,30 @@ export default function MLEOTokenRushPage() {
             />
 
             <div className="rounded-xl p-3 bg-gradient-to-br from-white/5 to-white/10 border border-white/10 shadow-sm">
-  <div className="flex items-center justify-between">
-                <div className="text-xs uppercase opacity-70 font-semibold">BOOST</div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="text-xs uppercase opacity-70 font-semibold">BOOST</div>
+                  <button
+                    onClick={() => setInfoModal('boost')}
+                    className="w-4 h-4 rounded-full bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/30 font-bold text-xs flex items-center justify-center"
+                    title="Info"
+                  >
+                    ?
+                  </button>
+                </div>
     <button
-                  onClick={() => setInfoModal('boost')}
-                  className="w-4 h-4 rounded-full bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/30 font-bold text-xs flex items-center justify-center"
-                  title="Info"
+      onClick={wake}
+                  className={`px-2 py-1 rounded text-white text-xs font-bold ${
+        core.mode === "online"
+          ? "bg-emerald-600 hover:bg-emerald-500"
+                      : "bg-amber-600 hover:bg-amber-500 animate-pulse"
+                  }`}
+                  title={core.mode === "online" ? "Click to boost mining speed" : "Resume mining and collect offline earnings"}
                 >
-                  ?
+                  {core.mode === "online" ? "⚡" : "🔔"}
     </button>
   </div>
-              <div className="text-xl font-bold tabular-nums mt-1">
+              <div className="text-lg font-bold tabular-nums">
                 {(() => {
                   const boost = Number(sess.boost) || 0;
                   const lastTick = Number(sess.lastBoostTick) || 0;
@@ -1577,7 +1096,7 @@ export default function MLEOTokenRushPage() {
                   const currentBoost = Math.max(0, boost * (1 - progress));
                   
                   if (currentBoost < 0.001) return "0%";
-                  if (currentBoost > 1.0) return "100%";
+                  if (currentBoost > 0.5) return "50%";
                   return Math.round(currentBoost * 100) + "%";
                 })()}
   </div>
@@ -1600,7 +1119,7 @@ export default function MLEOTokenRushPage() {
               <div className="text-xs opacity-60 mt-1">
                 {core.mode === "online" ? "Click to boost" : "Click to resume"}
               </div>
-  </div>
+            </div>
 </div>
 
           {/* VAULT & ACTIONS */}
@@ -1644,14 +1163,14 @@ export default function MLEOTokenRushPage() {
 
                 <button 
                   onClick={claimToWallet}
-                  disabled={isClaiming || core.vault <= 0}
+                  disabled={isPending || core.vault <= 0}
                   className={`h-10 rounded-lg font-bold text-white text-sm transition-all ${
-                    (isClaiming || core.vault <= 0)
+                    (isPending || core.vault <= 0)
                       ? "bg-zinc-700 cursor-not-allowed opacity-50"
                       : "bg-gradient-to-r from-indigo-600 to-purple-500 hover:from-indigo-500 hover:to-purple-400"
                   }`}
                 >
-                  {isClaiming ? "⏳ CLAIMING..." : "🔗 CLAIM"}
+                  {isPending ? "⏳ CLAIMING..." : "🔗 CLAIM"}
         </button>
       </div>
 
@@ -1753,45 +1272,6 @@ export default function MLEOTokenRushPage() {
               )}
   </Section>
 </div>
-
-          {/* FORTUNE WHEEL */}
-          <Section 
-            title="🎰 Fortune Wheel"
-            onInfo={() => setInfoModal('fortune_wheel')}
-          >
-            <div className="flex flex-col items-center gap-4">
-              <div className="text-sm opacity-80 text-center">
-                Spin the wheel for amazing prizes! Free spin every hour.
-          </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setFortuneWheelModal(true)}
-                  className={`px-6 py-3 rounded-xl font-bold text-white transition-all ${
-                    canSpinFree()
-                      ? "bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400"
-                      : canBuyExtraSpin()
-                      ? "bg-gradient-to-r from-orange-600 to-red-500 hover:from-orange-500 hover:to-red-400"
-                      : "bg-gradient-to-r from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400"
-                  }`}
-                >
-                  {canSpinFree() ? "🎰 FREE SPIN" : canBuyExtraSpin() ? `🎰 BUY SPIN (${fmt(getNextSpinCost())})` : "🎰 OPEN WHEEL"}
-          </button>
-        </div>
-              
-              <div className="text-xs opacity-60 text-center">
-                {canSpinFree() 
-                  ? "Free spin available!" 
-                  : `Next free spin in ${Math.ceil((CONFIG.FORTUNE_WHEEL_COOLDOWN_SEC * 1000 - (Date.now() - (fortuneWheel.lastFreeSpin || Date.now() - CONFIG.FORTUNE_WHEEL_COOLDOWN_SEC * 1000))) / 60000)} minutes`
-                }
-                {canBuyExtraSpin() && (
-                  <div className="mt-1">
-                    Extra spins today: {fortuneWheel.extraSpinsToday}/{CONFIG.FORTUNE_WHEEL_MAX_EXTRA_SPINS}
-  </div>
-                )}
-              </div>
-  </div>
-</Section>
 
           {/* UPGRADES */}
           <Section 
@@ -1964,10 +1444,9 @@ export default function MLEOTokenRushPage() {
 
           <InfoModal isOpen={infoModal === 'gifts'} onClose={() => setInfoModal(null)} title="🎁 Gifts & Bonuses">
             <p><strong>Hourly Gift:</strong> Claim every hour for bonus MLEO. 10% chance for Lucky multiplier (×2 or ×3)!</p>
-            <p><strong>How it works:</strong> After claiming, you must wait exactly 1 hour before the next gift is available.</p>
             <p><strong>Daily Bonus:</strong> Claim once per day. Streak increases reward amount (up to 7 days).</p>
             <p><strong>Time Chest:</strong> Spawns randomly every 20-40 minutes. You have 60 seconds to claim it!</p>
-            <p className="text-emerald-400 mt-2"><strong>💡 Tip:</strong> Check back every hour to claim your gifts!</p>
+            <p><strong>Events:</strong> Random modifiers appear every 15 minutes for 5 minutes (×2 Gifts, +30% Mining, -25% Upgrade costs, etc.)</p>
           </InfoModal>
 
           <InfoModal isOpen={infoModal === 'bridge'} onClose={() => setInfoModal(null)} title="🌉 Bridge">
@@ -2018,14 +1497,8 @@ export default function MLEOTokenRushPage() {
 
           <InfoModal isOpen={infoModal === 'mining_status'} onClose={() => setInfoModal(null)} title="⛏️ Mining Status">
             <p><strong>ONLINE:</strong> Active mining at full speed with all bonuses applied.</p>
-            <p><strong>OFFLINE:</strong> Reduced mining rate with a 12-hour cap. Tiered effectiveness:</p>
-            <ul className="list-disc list-inside text-xs ml-4 mt-1 space-y-0.5">
-              <li>First 2 hours: 50% effectiveness</li>
-              <li>Next 2 hours: 40% effectiveness</li>
-              <li>Next 4 hours: 30% effectiveness</li>
-              <li>Final 4 hours: 20% effectiveness</li>
-            </ul>
-            <p className="mt-2"><strong>Switch:</strong> Click the BOOST button to resume and collect offline earnings.</p>
+            <p><strong>OFFLINE:</strong> Reduced mining rate (50% of online speed) with a 12-hour cap.</p>
+            <p><strong>Switch:</strong> Click the BOOST button to toggle between online/offline modes.</p>
             <p className="text-emerald-400 mt-2"><strong>💡 Tip:</strong> Stay online for maximum mining efficiency!</p>
           </InfoModal>
 
@@ -2048,64 +1521,11 @@ export default function MLEOTokenRushPage() {
             <p><strong>How it works:</strong></p>
             <ul className="list-disc list-inside mt-2 space-y-1">
               <li>Click to add +2% mining speed</li>
-              <li>Maximum boost: 100% (50 clicks)</li>
+              <li>Maximum boost: 50% (25 clicks)</li>
               <li>Decays over 60 seconds</li>
               <li>When offline: Click to resume mining</li>
             </ul>
             <p className="text-emerald-400 mt-2"><strong>⚡ Tip:</strong> Click frequently for maximum mining efficiency!</p>
-          </InfoModal>
-
-          <InfoModal isOpen={infoModal === 'events'} onClose={() => setInfoModal(null)} title="🔥 Events">
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs font-bold mb-2">All Events:</p>
-                <div className="space-y-1.5">
-                  {(() => {
-                    const { modifier: activeMod } = getCurrentGlobalEvent();
-                    return CONFIG.MODIFIERS_POOL.map(mod => {
-                      const isActive = activeMod && activeMod.id === mod.id;
-                      return (
-                        <div key={mod.id} className={`p-2 rounded ${isActive ? 'bg-amber-500/20 border border-amber-500/50' : 'bg-white/5 border border-white/10'}`}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className={`text-xs ${isActive ? 'font-bold' : ''}`}>{mod.label}</span>
-                            {isActive && <span className="text-xs text-amber-300 font-bold">🔥 ACTIVE</span>}
-        </div>
-                          <p className="text-xs opacity-60">{mod.desc}</p>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs font-bold mb-2">Next Event:</p>
-                {(() => {
-                  const schedule = getEventSchedule();
-                  const nextEvent = schedule.find(e => !e.isActive);
-                  
-                  if (!nextEvent) return <p className="text-xs opacity-60">No upcoming events</p>;
-                  
-                  const timeUntil = nextEvent.start - Date.now();
-                  const hours = Math.floor(timeUntil / (60 * 60 * 1000));
-                  const minutes = Math.floor((timeUntil % (60 * 60 * 1000)) / (60 * 1000));
-                  
-    return (
-                    <div className="p-2 rounded bg-white/5 border border-white/10">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold">{nextEvent.modifier.label}</span>
-                        <span className="text-xs opacity-60">
-                          {hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`}
-                        </span>
-                      </div>
-                      <p className="text-xs opacity-60">{nextEvent.modifier.desc}</p>
-      </div>
-    );
-                })()}
-      </div>
-
-              <p className="text-xs opacity-70 text-center">• 30 min each • 3h cycle • UTC time</p>
-    </div>
           </InfoModal>
 
           <InfoModal isOpen={infoModal === 'guild'} onClose={() => setInfoModal(null)} title="👥 Mining Guild">
@@ -2115,251 +1535,6 @@ export default function MLEOTokenRushPage() {
             <p><strong>Leave anytime:</strong> You can leave and join a different guild if you want a better bonus.</p>
             <p className="text-amber-400"><strong>Note:</strong> This is a local demo. In production, guilds would be shared across players.</p>
           </InfoModal>
-
-          <InfoModal isOpen={infoModal === 'fortune_wheel'} onClose={() => setInfoModal(null)} title="🎰 Fortune Wheel">
-            <p><strong>What is the Fortune Wheel?</strong> A mini-game where you can win amazing prizes!</p>
-            <p><strong>Free Spins:</strong> You get one free spin every hour.</p>
-            <p><strong>Extra Spins:</strong> Buy up to 4 additional spins per day using MLEO tokens.</p>
-            <p><strong>Prize Types:</strong></p>
-            <ul className="ml-4 space-y-1">
-              <li>• 💰 <strong>MLEO Tokens:</strong> 1,000 - 10,000 MLEO</li>
-              <li>• ⚡ <strong>Mining Boosts:</strong> 2× or 3× mining speed for limited time</li>
-              <li>• 💎 <strong>Prestige Points:</strong> 1-3 points for permanent upgrades</li>
-              <li>• 🤖 <strong>Mining Bot:</strong> +50% mining speed for 1 hour</li>
-              <li>• ⚡ <strong>Boost Addition:</strong> +10% to your current boost</li>
-            </ul>
-            <p className="text-emerald-400"><strong>Tip:</strong> Higher value prizes have lower chances, making them more exciting to win!</p>
-          </InfoModal>
-
-          {/* Fortune Wheel Modal */}
-          {fortuneWheelModal && (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-gradient-to-br from-purple-900/90 to-pink-900/90 backdrop-blur-xl rounded-2xl border border-white/20 p-4 max-w-sm w-full">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-white">🎰 Fortune Wheel</h2>
-                  <button
-                    onClick={() => {
-                      setFortuneWheelModal(false);
-                      setIsSpinning(false);
-                      setWonPrize(null);
-                    }}
-                    className="text-white/60 hover:text-white text-2xl"
-                  >
-                    ×
-                  </button>
-                </div>
-
-                {/* Wheel */}
-                <div className="relative w-64 h-64 mx-auto mb-4">
-                  <div 
-                    className={`w-full h-full rounded-full border-6 border-white/20 relative overflow-hidden transition-transform duration-3000 ${
-                      isSpinning ? 'animate-spin' : ''
-                    }`}
-                    style={{
-                      background: `conic-gradient(
-                        #10b981 0deg 36deg,
-                        #f59e0b 36deg 72deg,
-                        #8b5cf6 72deg 108deg,
-                        #06b6d4 108deg 144deg,
-                        #ef4444 144deg 180deg,
-                        #10b981 180deg 216deg,
-                        #f59e0b 216deg 252deg,
-                        #8b5cf6 252deg 288deg,
-                        #06b6d4 288deg 324deg,
-                        #ef4444 324deg 360deg
-                      )`
-                    }}
-                  >
-                    {/* Prize labels - positioned around the wheel */}
-                    {CONFIG.FORTUNE_WHEEL_PRIZES.map((prize, index) => {
-                      const angle = (index * 360) / CONFIG.FORTUNE_WHEEL_PRIZES.length;
-                      const radius = 85; // Distance from center
-                      const x = Math.cos((angle - 90) * Math.PI / 180) * radius;
-                      const y = Math.sin((angle - 90) * Math.PI / 180) * radius;
-                      
-                      // Create shorter labels for better display
-                      let shortLabel = prize.label;
-                      if (shortLabel.includes('MLEO')) {
-                        shortLabel = shortLabel.replace('💰 ', '').replace(' MLEO', 'M');
-                      } else if (shortLabel.includes('Mining')) {
-                        shortLabel = shortLabel.replace('⚡ ', '').replace(' Mining', '');
-                      } else if (shortLabel.includes('Prestige')) {
-                        shortLabel = shortLabel.replace('💎 ', '').replace(' Prestige Point', 'PP').replace('s', '');
-                      } else if (shortLabel.includes('Bot')) {
-                        shortLabel = shortLabel.replace('🤖 ', '').replace(' (1h)', '');
-                      } else if (shortLabel.includes('Boost')) {
-                        shortLabel = shortLabel.replace('⚡ ', '').replace(' (10m)', '');
-                      }
-                      
-  return (
-                        <div
-                          key={prize.id}
-                          className="absolute"
-                          style={{
-                            left: `calc(50% + ${x}px)`,
-                            top: `calc(50% + ${y}px)`,
-                            transform: 'translate(-50%, -50%)'
-                          }}
-                        >
-                          <div className="text-xs font-bold text-white text-center bg-black/70 rounded px-1 py-0.5 whitespace-nowrap border border-white/20">
-                            {shortLabel}
-      </div>
-    </div>
-  );
-                    })}
-                  </div>
-                  
-                  {/* Pointer */}
-                  <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2">
-                    <div className="w-0 h-0 border-l-4 border-r-4 border-b-8 border-transparent border-b-white"></div>
-                  </div>
-                </div>
-
-                {/* Prize List */}
-                <div className="mb-4">
-                  <h3 className="text-sm font-bold text-white mb-2 text-center">Available Prizes:</h3>
-                  <div className="grid grid-cols-2 gap-1 text-xs">
-                    {CONFIG.FORTUNE_WHEEL_PRIZES.map((prize, index) => (
-                      <div key={prize.id} className="flex items-center gap-1 p-1 bg-white/10 rounded">
-                        <div 
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: prize.color }}
-                        />
-                        <span className="text-white text-xs">{prize.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Won Prize Display */}
-                {wonPrize && (
-                  <div className="text-center mb-3">
-                    <div className="text-lg mb-1">🎉 Congratulations! 🎉</div>
-                    <div className="text-sm font-bold text-yellow-400">{wonPrize.label}</div>
-                  </div>
-                )}
-
-                {/* Controls */}
-                <div className="flex gap-2">
-                  {canSpinFree() && (
-                    <button
-                      onClick={() => {
-                        setIsSpinning(true);
-                        setWonPrize(null);
-                        
-                        // Simulate spinning for 3 seconds
-                        setTimeout(() => {
-                          const prize = selectPrize();
-                          setWonPrize(prize);
-                          applyPrize(prize);
-                          setIsSpinning(false);
-                          
-                          // Update fortune wheel state
-                          setFortuneWheel(prev => ({
-                            ...prev,
-                            lastFreeSpin: Date.now(),
-                            lastSpinDay: new Date().toDateString()
-                          }));
-                          
-                          // Save to localStorage
-                          setTimeout(() => {
-                            const updated = {
-                              ...fortuneWheel,
-                              lastFreeSpin: Date.now(),
-                              lastSpinDay: new Date().toDateString()
-                            };
-                            safeWrite(LS_KEYS.FORTUNE_WHEEL, updated);
-                          }, 0);
-                        }, 3000);
-                      }}
-                      disabled={isSpinning}
-                      className="flex-1 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 text-white font-bold py-2 px-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                    >
-                      {isSpinning ? "Spinning..." : "🎰 FREE SPIN"}
-                    </button>
-                  )}
-                  
-                  <button
-                      onClick={() => {
-                        const cost = getNextSpinCost();
-                        
-                        // Deduct cost immediately
-                        setCore(prevCore => {
-                          // Fix negative balance issue
-                          const currentBalance = prevCore.balance < 0 ? 0 : prevCore.balance;
-                          const newBalance = currentBalance - cost;
-                          const updatedCore = {
-                            ...prevCore,
-                            balance: newBalance
-                          };
-                          
-                          // Force save to localStorage immediately
-                          setTimeout(() => safeWrite(LS_KEYS.CORE, updatedCore), 0);
-                          
-                          // Force re-render
-                          setTimeout(() => {
-                            setCore(prev => ({ ...prev }));
-                          }, 100);
-                          
-                          return updatedCore;
-                        });
-                        
-                        // Show success message
-                        showToast(`✅ Purchased spin for ${fmt(cost)} MLEO!`);
-                        
-                        // Start spinning
-                        setTimeout(() => {
-                          setIsSpinning(true);
-                          setWonPrize(null);
-                        }, 0);
-                        
-                        // Simulate spinning for 3 seconds
-                        setTimeout(() => {
-                          const prize = selectPrize();
-                          setWonPrize(prize);
-                          applyPrize(prize);
-                          setIsSpinning(false);
-                          
-                          // Update fortune wheel state
-                          setFortuneWheel(prev => ({
-                            ...prev,
-                            extraSpinsToday: prev.extraSpinsToday + 1,
-                            lastSpinDay: new Date().toDateString()
-                          }));
-                          
-                          // Save to localStorage
-                          setTimeout(() => {
-                            const updated = {
-                              ...fortuneWheel,
-                              extraSpinsToday: fortuneWheel.extraSpinsToday + 1,
-                              lastSpinDay: new Date().toDateString()
-                            };
-                            safeWrite(LS_KEYS.FORTUNE_WHEEL, updated);
-                          }, 0);
-                        }, 3000);
-                      }}
-                      disabled={isSpinning}
-                      className="flex-1 bg-gradient-to-r from-orange-600 to-red-500 hover:from-orange-500 hover:to-red-400 text-white font-bold py-2 px-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                    >
-                      {isSpinning ? "Spinning..." : `🎰 BUY (${fmt(getNextSpinCost())})`}
-                    </button>
-                </div>
-
-                {/* Status */}
-                <div className="text-center mt-2 text-xs text-white/70">
-                  {canSpinFree() 
-                    ? "Free spin available!" 
-                    : `Next free: ${Math.ceil((CONFIG.FORTUNE_WHEEL_COOLDOWN_SEC * 1000 - (Date.now() - (fortuneWheel.lastFreeSpin || Date.now() - CONFIG.FORTUNE_WHEEL_COOLDOWN_SEC * 1000))) / 60000)}m`
-                  }
-                  {canBuyExtraSpin() && (
-                    <div className="mt-1">
-                      Extra: {fortuneWheel.extraSpinsToday}/{CONFIG.FORTUNE_WHEEL_MAX_EXTRA_SPINS}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
 
         </div>
       </main>

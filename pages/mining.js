@@ -1690,7 +1690,7 @@ export default function GamesHub() {
           </header>
 
             {/* Cards */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch max-w-[750px] mx-auto justify-items-center">
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch max-w-[1100px] mx-auto justify-items-center">
   {/* MINERS */}
               <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-6 flex flex-col w-full max-w-[350px] min-h-[320px]">
     <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
@@ -1762,6 +1762,36 @@ export default function GamesHub() {
                   <Link href="/rush">
                     <button className="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors">
                       {text.playTokenRush}
+          </button>
+                  </Link>
+    </div>
+  </article>
+
+  {/* ARCADE GAMES */}
+              <article className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/20 to-indigo-900/20 backdrop-blur-md shadow-xl p-6 flex flex-col w-full max-w-[350px] min-h-[320px]">
+    <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
+                  <div>
+                    <h2 className="text-[20px] sm:text-2xl font-extrabold">🎮 MLEO Arcade</h2>
+                    <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
+                      Mini-games casino! Play Slots, Dice, Wheel & Scratch cards. 1,000 MLEO per play with prizes up to 10,000 MLEO!
+        </p>
+                  </div>
+                  <span className="rounded-full px-2.5 py-1 text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 whitespace-nowrap">
+                    Fun
+      </span>
+    </div>
+
+                  <div className="mt-auto">
+                    <div className="flex flex-wrap gap-2 justify-center mb-3">
+                      <div className="text-2xl">🎰</div>
+                      <div className="text-2xl">🎲</div>
+                      <div className="text-2xl">🎡</div>
+                      <div className="text-2xl">🃏</div>
+        </div>
+
+                  <Link href="/arcade">
+                    <button className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
+                      Play Arcade Games
           </button>
                   </Link>
     </div>
