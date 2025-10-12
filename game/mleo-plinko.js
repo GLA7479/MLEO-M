@@ -71,22 +71,56 @@ function fmt(n) {
 }
 
 // ============================================================================
-// PLINKO PATH GENERATOR
+// PLINKO PATH GENERATOR - Aligned to actual peg positions
 // ============================================================================
 function generatePath() {
   const path = [];
-  let position = 6; // Start at middle (0-12 range for 13 buckets)
   
-  path.push({ row: 0, pos: position });
+  // Row 0: Start at middle of top row (13 pegs, position 6 is center)
+  let position = 6;
+  let pegColumn = 6;
+  
+  path.push({ row: 0, pegColumn, displayX: pegColumn });
   
   for (let row = 1; row <= ROWS; row++) {
-    // Random direction
-    const direction = Math.random() < 0.5 ? -1 : 1;
-    position = Math.max(0, Math.min(12, position + direction));
-    path.push({ row, pos: position });
+    const isEvenRow = row % 2 === 0;
+    const previousIsEven = (row - 1) % 2 === 0;
+    
+    // Calculate which peg we hit based on previous position
+    if (previousIsEven && !isEvenRow) {
+      // Going from 13-peg row to 12-peg row (offset row)
+      // The ball can go to same column or one left
+      const goLeft = Math.random() < 0.5;
+      pegColumn = goLeft ? Math.max(0, pegColumn - 1) : Math.min(11, pegColumn);
+      
+    } else if (!previousIsEven && isEvenRow) {
+      // Going from 12-peg row to 13-peg row (normal row)
+      // The ball bounces to adjacent peg
+      const goRight = Math.random() < 0.5;
+      pegColumn = goRight ? Math.min(12, pegColumn + 1) : pegColumn;
+      
+    } else if (previousIsEven && isEvenRow) {
+      // 13-peg to 13-peg
+      const direction = Math.random() < 0.5 ? -1 : 1;
+      pegColumn = Math.max(0, Math.min(12, pegColumn + direction));
+      
+    } else {
+      // 12-peg to 12-peg
+      const direction = Math.random() < 0.5 ? -1 : 1;
+      pegColumn = Math.max(0, Math.min(11, pegColumn + direction));
+    }
+    
+    // For display, we need to map the peg position to a consistent X coordinate
+    // Offset rows are shifted, so we need to account for that
+    const displayX = isEvenRow ? pegColumn : pegColumn + 0.5;
+    
+    path.push({ row, pegColumn, displayX, isOffset: !isEvenRow });
   }
   
-  return path;
+  // Final bucket position (map to 13 buckets)
+  const finalBucket = Math.round(path[path.length - 1].displayX);
+  
+  return { path, finalBucket };
 }
 
 // ============================================================================
@@ -95,10 +129,8 @@ function generatePath() {
 export default function PlinkoPage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
-  const [dropping, setDropping] = useState(false);
-  const [ballPath, setBallPath] = useState([]);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [finalBucket, setFinalBucket] = useState(null);
+  const [activeBalls, setActiveBalls] = useState([]); // Array of balls with their paths
+  const [finalBuckets, setFinalBuckets] = useState([]); // Array of final bucket positions
   const [result, setResult] = useState(null);
   const [stats, setStats] = useState(() => 
     safeRead(LS_KEY, { totalDrops: 0, totalWon: 0, biggestWin: 0, history: [] })
@@ -107,6 +139,7 @@ export default function PlinkoPage() {
   const dropSound = useRef(null);
   const winSound = useRef(null);
   const bounceSound = useRef(null);
+  const animationFrameRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
@@ -123,113 +156,123 @@ export default function PlinkoPage() {
     safeWrite(LS_KEY, stats);
   }, [stats]);
 
-  // Animate ball dropping with realistic physics timing
+  // Animate all active balls continuously
   useEffect(() => {
-    if (dropping && ballPath.length > 0 && currentStep < ballPath.length) {
-      // VERY slow timing with gravity effect
-      const baseDelay = 800; // Much much slower
-      const accelerationFactor = Math.min(currentStep * 10, 100); // Gradual acceleration
-      const delay = baseDelay - accelerationFactor;
-      
-      const timer = setTimeout(() => {
-        setCurrentStep(currentStep + 1);
+    if (activeBalls.length === 0) return;
+    
+    const interval = setInterval(() => {
+      setActiveBalls(balls => {
+        if (balls.length === 0) return balls;
         
-        // Play bounce sound on impact
-        if (bounceSound.current && currentStep > 0 && currentStep < ballPath.length - 1) {
-          bounceSound.current.currentTime = 0;
-          bounceSound.current.volume = 0.25;
-          bounceSound.current.play().catch(() => {});
+        const updatedBalls = [];
+        const finishedBalls = [];
+        
+        balls.forEach(ball => {
+          if (ball.currentStep >= ball.path.length) {
+            finishedBalls.push(ball);
+          } else {
+            // Play bounce sound
+            if (bounceSound.current && ball.currentStep > 0 && ball.currentStep < ball.path.length - 1) {
+              bounceSound.current.currentTime = 0;
+              bounceSound.current.volume = 0.12;
+              bounceSound.current.play().catch(() => {});
+            }
+            
+            updatedBalls.push({
+              ...ball,
+              currentStep: ball.currentStep + 1
+            });
+          }
+        });
+        
+        // Process finished balls
+        if (finishedBalls.length > 0) {
+          processFinishedBalls(finishedBalls);
         }
-      }, delay);
-      
-      return () => clearTimeout(timer);
-    } else if (dropping && currentStep >= ballPath.length) {
-      // Ball finished dropping
-      finalizeDrop();
-    }
-  }, [dropping, currentStep, ballPath]);
+        
+        return updatedBalls;
+      });
+    }, 700); // MUCH SLOWER - 700ms per step
+    
+    return () => clearInterval(interval);
+  }, [activeBalls.length]);
 
   const refreshVault = () => {
     setVaultState(getVault());
   };
 
-  const finalizeDrop = async () => {
-    const finalPos = ballPath[ballPath.length - 1].pos;
-    setFinalBucket(finalPos);
+  const processFinishedBalls = (finishedBalls) => {
+    // Add to final buckets display
+    const bucketPositions = finishedBalls.map(ball => ball.finalBucket);
+    setFinalBuckets(prev => [...prev, ...bucketPositions]);
     
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Calculate prize
-    const multiplier = MULTIPLIERS[finalPos];
-    const prize = Math.floor(DROP_COST * multiplier);
-    
-    if (prize > 0) {
-      const newVault = getVault() + prize;
-      setVault(newVault);
-      setVaultState(newVault);
+    // Calculate and award prizes immediately
+    finishedBalls.forEach(ball => {
+      const finalPos = ball.finalBucket;
+      const multiplier = MULTIPLIERS[finalPos] || 0;
+      const prize = Math.floor(DROP_COST * multiplier);
       
-      const newHistory = [
-        { mult: multiplier, prize, bucket: finalPos, timestamp: Date.now() },
-        ...stats.history.slice(0, 9)
-      ];
+      if (prize > 0) {
+        const newVault = getVault() + prize;
+        setVault(newVault);
+        setVaultState(newVault);
+      }
       
+      // Update stats
       setStats(s => ({
         totalDrops: s.totalDrops + 1,
         totalWon: s.totalWon + prize,
         biggestWin: Math.max(s.biggestWin, prize),
-        history: newHistory
+        history: [
+          { mult: multiplier, prize, bucket: finalPos, timestamp: Date.now() },
+          ...s.history.slice(0, 9)
+        ]
       }));
-
+      
+      // Show result for this ball
       setResult({ 
         win: multiplier >= 1, 
-        message: multiplier >= 1 ? `Win ×${multiplier}!` : `×${multiplier}`,
+        message: `×${multiplier}`,
         prize,
         multiplier
       });
       
       if (winSound.current && multiplier >= 2) {
         winSound.current.currentTime = 0;
+        winSound.current.volume = 0.3;
         winSound.current.play().catch(() => {});
       }
-    } else {
-      setStats(s => ({
-        ...s,
-        totalDrops: s.totalDrops + 1,
-        history: [
-          { mult: 0, prize: 0, bucket: finalPos, timestamp: Date.now() },
-          ...s.history.slice(0, 9)
-        ]
-      }));
-      setResult({ 
-        win: false, 
-        message: "No win",
-        prize: 0
-      });
-    }
-
-    setDropping(false);
+    });
+    
+    // Clear bucket highlights after delay
+    setTimeout(() => {
+      setFinalBuckets(prev => prev.filter(b => !bucketPositions.includes(b)));
+    }, 2000);
   };
 
-  const dropBall = async () => {
-    if (dropping) return;
-
+  const dropBall = () => {
     const currentVault = getVault();
+    
     if (currentVault < DROP_COST) {
-      setResult({ error: true, message: "Not enough MLEO!" });
+      setResult({ error: true, message: `Need ${fmt(DROP_COST)} MLEO!` });
       return;
     }
 
-    // Deduct cost
+    // Deduct cost for ONE ball
     setVault(currentVault - DROP_COST);
     setVaultState(currentVault - DROP_COST);
 
-    // Generate path and start drop
-    const path = generatePath();
-    setBallPath(path);
-    setCurrentStep(0);
-    setFinalBucket(null);
-    setResult(null);
-    setDropping(true);
+    // Generate path for ONE ball
+    const { path, finalBucket: endBucket } = generatePath();
+    const newBall = {
+      id: Date.now() + Math.random(), // Unique ID
+      path,
+      finalBucket: endBucket,
+      currentStep: 0
+    };
+    
+    // Add to active balls array
+    setActiveBalls(prev => [...prev, newBall]);
     
     if (dropSound.current) {
       dropSound.current.currentTime = 0;
@@ -250,8 +293,13 @@ export default function PlinkoPage() {
     );
   }
 
-  // Calculate ball position for rendering
-  const ballPos = currentStep < ballPath.length ? ballPath[currentStep] : null;
+  // Get current positions of all active balls
+  const activeBallPositions = activeBalls
+    .filter(ball => ball.currentStep < ball.path.length)
+    .map(ball => ({
+      ...ball.path[ball.currentStep],
+      ballId: ball.id
+    }));
 
   return (
     <Layout isGame={true} title="MLEO Plinko 🎯">
@@ -344,21 +392,22 @@ export default function PlinkoPage() {
                         paddingRight: isEvenRow ? '16px' : '28px'
                       }}>
                         {[...Array(pegsInRow)].map((_, pegIndex) => {
-                          // Check if this peg should be highlighted (ball is near it)
-                          const isPegHit = ballPos && ballPos.row === rowIndex && 
-                                          Math.abs(ballPos.pos - pegIndex) <= 0.5;
+                          // Check if ANY ball is hitting this peg
+                          const isPegHit = activeBallPositions.some(pos => 
+                            pos.row === rowIndex && pos.pegColumn === pegIndex
+                          );
                           
                           return (
                             <div
                               key={pegIndex}
-                              className={`w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full shadow-lg border transition-all duration-200 ${
+                              className={`w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full shadow-lg border transition-all duration-300 ${
                                 isPegHit 
-                                  ? 'bg-gradient-to-br from-yellow-300 to-orange-400 border-yellow-200 scale-150' 
+                                  ? 'bg-gradient-to-br from-yellow-300 to-orange-400 border-yellow-200 scale-[2]' 
                                   : 'bg-gradient-to-br from-blue-300 to-blue-500 border-blue-200'
                               }`}
                               style={{
                                 boxShadow: isPegHit 
-                                  ? '0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 165, 0, 0.6)'
+                                  ? '0 0 25px rgba(255, 215, 0, 1), 0 0 50px rgba(255, 165, 0, 0.8)'
                                   : '0 0 8px rgba(59, 130, 246, 0.5)'
                               }}
                             />
@@ -369,22 +418,23 @@ export default function PlinkoPage() {
                   );
                 })}
                 
-                {/* Animated Ball */}
-                {ballPos && (
+                {/* Animated Balls */}
+                {activeBallPositions.map((ballPos, idx) => (
                   <div
+                    key={ballPos.ballId}
                     className="absolute"
                     style={{
                       top: `${((ballPos.row + 1) / (ROWS + 2)) * 100}%`,
-                      left: `${((ballPos.pos / 12) * 100)}%`,
+                      left: `${((ballPos.displayX / 12) * 100)}%`,
                       transform: 'translate(-50%, -50%)',
                       transition: 'top 0.7s cubic-bezier(0.33, 1, 0.68, 1), left 0.7s cubic-bezier(0.33, 1, 0.68, 1)',
-                      zIndex: 10
+                      zIndex: 10 + idx
                     }}
                   >
                     <div 
                       className="relative"
                       style={{
-                        animation: 'bounce-impact 0.7s ease-in-out'
+                        animation: 'bounce-impact 0.7s ease-in-out infinite'
                       }}
                     >
                       <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-gradient-to-br from-yellow-300 via-orange-400 to-red-500 shadow-xl border border-yellow-200"
@@ -399,66 +449,89 @@ export default function PlinkoPage() {
                       <div className="absolute inset-0 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 opacity-40 blur-lg scale-110"></div>
                     </div>
                   </div>
-                )}
+                ))}
               </div>
             </div>
 
             {/* Multiplier Buckets */}
             <div className="grid gap-0.5 sm:gap-1 mb-4 sm:mb-6 max-w-2xl mx-auto" style={{ gridTemplateColumns: 'repeat(13, minmax(0, 1fr))' }}>
-              {MULTIPLIERS.map((mult, idx) => (
-                <div
-                  key={idx}
-                  className={`relative p-1 sm:p-2 rounded text-center font-bold text-[9px] sm:text-xs transition-all ${
-                    finalBucket === idx ? 'scale-110 shadow-2xl ring-2 sm:ring-4 ring-white/50' : ''
-                  }`}
-                >
-                  <div className={`absolute inset-0 bg-gradient-to-b ${BUCKET_COLORS[idx]} rounded`}></div>
-                  <div className="relative text-white whitespace-nowrap">
-                    {mult >= 1 ? `×${mult}` : `×${mult}`}
-                  </div>
-                  {finalBucket === idx && (
-                    <div className="absolute -top-8 sm:-top-12 left-1/2 transform -translate-x-1/2 animate-bounce">
-                      <div className="text-2xl sm:text-4xl">⬇️</div>
+              {MULTIPLIERS.map((mult, idx) => {
+                const ballsInBucket = finalBuckets.filter(b => b === idx).length;
+                const isHighlighted = ballsInBucket > 0;
+                
+                return (
+                  <div
+                    key={idx}
+                    className={`relative p-1 sm:p-2 rounded text-center font-bold text-[9px] sm:text-xs transition-all ${
+                      isHighlighted ? 'scale-110 shadow-2xl ring-2 sm:ring-4 ring-white/50' : ''
+                    }`}
+                  >
+                    <div className={`absolute inset-0 bg-gradient-to-b ${BUCKET_COLORS[idx]} rounded`}></div>
+                    <div className="relative text-white whitespace-nowrap">
+                      {mult >= 1 ? `×${mult}` : `×${mult}`}
                     </div>
-                  )}
-                </div>
-              ))}
+                    {isHighlighted && (
+                      <>
+                        <div className="absolute -top-8 sm:-top-12 left-1/2 transform -translate-x-1/2 animate-bounce">
+                          <div className="text-2xl sm:text-4xl">⬇️</div>
+                        </div>
+                        {ballsInBucket > 1 && (
+                          <div className="absolute -top-4 sm:-top-6 right-0 bg-green-500 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs font-bold">
+                            {ballsInBucket}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
-            {/* Result */}
-            {result && (
-              <div className={`text-center mb-6 p-6 rounded-xl border-2 ${
-                result.error
-                  ? "bg-red-900/30 border-red-500"
-                  : result.win
-                  ? "bg-green-900/30 border-green-500 animate-pulse"
-                  : "bg-red-900/30 border-red-500"
-              }`}>
-                <div className="text-3xl font-bold mb-2">{result.message}</div>
-                <div className={`text-5xl font-bold ${result.win ? 'text-green-400' : 'text-red-400'}`}>
-                  {result.prize > 0 ? `+${fmt(result.prize)} MLEO` : 'Lost'}
-                </div>
-              </div>
-            )}
-
-            {/* Drop Button */}
-            <div className="text-center">
+            {/* Drop Button - Click anytime to add a ball */}
+            <div className="text-center mb-6">
               <button
                 onClick={dropBall}
-                disabled={dropping || vault < DROP_COST}
+                disabled={vault < DROP_COST}
                 className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl ${
-                  dropping
-                    ? "bg-zinc-700 cursor-wait opacity-70"
-                    : vault < DROP_COST
+                  vault < DROP_COST
                     ? "bg-zinc-700 cursor-not-allowed opacity-50"
-                    : "bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-600 hover:from-blue-500 hover:via-cyan-400 hover:to-teal-500 hover:scale-105"
+                    : "bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-600 hover:from-blue-500 hover:via-cyan-400 hover:to-teal-500 hover:scale-105 active:scale-95"
                 }`}
               >
-                {dropping ? "🎯 DROPPING..." : `🎯 DROP BALL (${fmt(DROP_COST)})`}
+                🎯 DROP BALL ({fmt(DROP_COST)})
               </button>
-              <div className="text-sm opacity-60 mt-3">
-                {fmt(DROP_COST)} MLEO per drop
+              <div className="text-sm opacity-70 mt-3">
+                Click to drop a ball anytime! • No limit on active balls
               </div>
+            </div>
+
+            {/* Active Balls & Result - Same Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 max-w-3xl mx-auto">
+              {/* Active Balls */}
+              <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30">
+                <div className="text-sm opacity-70 mb-1">Active Balls</div>
+                <div className="text-3xl font-bold text-cyan-400">{activeBalls.length}</div>
+              </div>
+              
+              {/* Result */}
+              {result && !result.error && (
+                <div className={`p-4 rounded-xl border-2 ${
+                  result.win
+                    ? "bg-green-900/30 border-green-500"
+                    : "bg-red-900/30 border-red-500"
+                }`}>
+                  <div className="text-sm font-bold mb-1">{result.message}</div>
+                  <div className={`text-2xl font-bold ${result.win && result.prize > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {result.prize > 0 ? `+${fmt(result.prize)}` : 'No Win'}
+                  </div>
+                </div>
+              )}
+              
+              {result && result.error && (
+                <div className="p-4 rounded-xl border-2 bg-red-900/30 border-red-500">
+                  <div className="text-sm font-bold text-red-400">{result.message}</div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -516,14 +589,14 @@ export default function PlinkoPage() {
           <div className="rounded-2xl p-6 bg-white/5 border border-white/10 mb-6">
             <h3 className="text-lg font-bold mb-4">📖 How to Play</h3>
             <ul className="text-sm space-y-2 text-zinc-300">
-              <li>• Click DROP BALL to start the game</li>
-              <li>• Watch the ball fall slowly with realistic physics through the pegs</li>
-              <li>• Ball bounces and squashes on impact with each peg</li>
-              <li>• Ball lands in a bucket at the bottom (takes ~8-10 seconds)</li>
-              <li>• Watch the pegs light up yellow when the ball hits them!</li>
-              <li>• Edge buckets (×10, ×5) are hardest to hit but pay big!</li>
-              <li>• Center has mix: some good (×2, ×3) and some losses (×0.5, ×0.2, ×0)</li>
-              <li>• Pure luck and physics - no skill required!</li>
+              <li>• <strong>Click DROP BALL anytime:</strong> Each click adds a new ball for 1,000 MLEO</li>
+              <li>• <strong>Multiple balls:</strong> Click multiple times to drop many balls at once!</li>
+              <li>• <strong>No limit:</strong> Drop as many balls as you want simultaneously</li>
+              <li>• <strong>Slow physics:</strong> Each ball takes ~8-10 seconds to drop</li>
+              <li>• <strong>Peg impacts:</strong> Pegs light up yellow when balls hit them</li>
+              <li>• <strong>Edge buckets (×10, ×5):</strong> Hardest to hit but pay big!</li>
+              <li>• <strong>Center buckets:</strong> Mix of wins (×2, ×3) and losses (×0.5, ×0.2, ×0)</li>
+              <li>• <strong>Instant payout:</strong> Win immediately when each ball lands!</li>
             </ul>
           </div>
 
