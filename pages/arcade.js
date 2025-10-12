@@ -155,9 +155,9 @@ export default function ArcadeHub() {
       title: "Mines",
       emoji: "💣",
       description: "Minesweeper-style risk game. Find safe tiles and cash out before hitting a mine!",
-      prize: "6,000 MLEO",
+      prize: "10,000 MLEO",
       href: "/mines",
-      color: "#6B7280",
+      color: "#DC2626",
     },
     {
       title: "Hi-Lo Cards",
@@ -165,7 +165,7 @@ export default function ArcadeHub() {
       description: "Guess if the next card is higher or lower. Build streaks for huge multipliers!",
       prize: "Unlimited",
       href: "/hilo",
-      color: "#10B981",
+      color: "#EC4899",
     },
     {
       title: "Coin Flip",

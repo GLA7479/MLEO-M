@@ -633,14 +633,17 @@ function buildBoardGeometry(w, h) {
           <header className="flex items-center justify-between mb-6">
             <Link href="/arcade">
               <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
-                ← BACK
+                BACK
               </button>
             </Link>
             
             <div className="text-center">
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-teal-400 bg-clip-text text-transparent">
-                🎯 MLEO Plinko
-              </h1>
+              <div className="flex items-center justify-center gap-3">
+                <span className="text-5xl">🎯</span>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-teal-400 bg-clip-text text-transparent">
+                  MLEO Plinko
+                </h1>
+              </div>
               <div className="text-sm opacity-70 mt-1">Real physics • Watch the ball dance on pegs</div>
             </div>
             

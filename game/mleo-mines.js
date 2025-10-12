@@ -63,11 +63,12 @@ function generateMines(mineCount) {
   return Array.from(mines);
 }
 
-function calculateMultiplier(revealed, totalSafe) {
-  // Progressive multiplier based on how many safe tiles revealed
-  // Each safe tile increases the multiplier
+function calculateMultiplier(revealed, totalSafe, difficulty) {
+  // Progressive multiplier based on how many safe tiles revealed and difficulty level
+  // Max multipliers: Easy (3 mines) = 4x, Medium (5 mines) = 7x, Hard (7 mines) = 10x
   const progress = revealed / totalSafe;
-  return 1 + (progress * 5); // Up to 6x when all safe tiles revealed
+  const maxMultipliers = [4, 7, 10]; // Easy, Medium, Hard
+  return 1 + (progress * (maxMultipliers[difficulty] - 1));
 }
 
 // ============================================================================
@@ -164,7 +165,7 @@ export default function MinesPage() {
 
     // Calculate new multiplier
     const totalSafe = GRID_SIZE - MINE_COUNTS[difficulty];
-    const mult = calculateMultiplier(newRevealed.length, totalSafe);
+    const mult = calculateMultiplier(newRevealed.length, totalSafe, difficulty);
     setCurrentMultiplier(mult);
 
     // Check if won (revealed all safe tiles)
@@ -232,6 +233,7 @@ export default function MinesPage() {
 
   const difficultyNames = ["Easy (3 mines)", "Medium (5 mines)", "Hard (7 mines)"];
   const difficultyColors = ["text-green-400", "text-yellow-400", "text-red-400"];
+  const maxPrizes = [4000, 7000, 10000]; // Easy, Medium, Hard
 
   return (
     <Layout isGame={true} title="MLEO Mines 💣">
@@ -242,14 +244,17 @@ export default function MinesPage() {
           <header className="flex items-center justify-between mb-6">
             <Link href="/arcade">
               <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
-                ← BACK
+                BACK
               </button>
             </Link>
             
             <div className="text-center">
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-400 via-zinc-400 to-slate-400 bg-clip-text text-transparent">
-                💣 MLEO Mines
-              </h1>
+              <div className="flex items-center justify-center gap-3">
+                <span className="text-5xl">💣</span>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-400 via-zinc-400 to-slate-400 bg-clip-text text-transparent">
+                  MLEO Mines
+                </h1>
+              </div>
               <div className="text-sm opacity-70 mt-1">Find safe tiles and cash out!</div>
             </div>
             
@@ -265,7 +270,7 @@ export default function MinesPage() {
                 <div className="text-6xl mb-6">💣</div>
                 <h2 className="text-2xl font-bold mb-4">Choose Difficulty</h2>
                 
-                <div className="flex flex-col gap-3 max-w-xs mx-auto mb-6">
+                <div className="flex flex-col gap-3 max-w-sm mx-auto mb-6">
                   {difficultyNames.map((name, idx) => (
                     <button
                       key={idx}
@@ -276,7 +281,10 @@ export default function MinesPage() {
                           : 'bg-white/5 border-white/10 hover:bg-white/10'
                       }`}
                     >
-                      <span className={difficultyColors[idx]}>{name}</span>
+                      <div className="flex flex-col items-center">
+                        <span className={difficultyColors[idx]}>{name}</span>
+                        <span className="text-xs opacity-70 mt-1">Max Prize: {fmt(maxPrizes[idx])} MLEO</span>
+                      </div>
                     </button>
                   ))}
                 </div>
