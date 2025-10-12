@@ -41,17 +41,17 @@ const OFFSET_ROWS = true; // stagger every other row for zigzag pattern
 
 // Physics tunables
 const PHYS = {
-  gravity: 1800,          // px/s^2 downward
-  airDrag: 0.010,         // linear damping per step (0..~0.02)
+  gravity: 1200,          // px/s^2 downward (reduced from 1800 for slower fall)
+  airDrag: 0.012,         // linear damping per step (increased slightly for smoother fall)
   restitution: 0.45,      // bounciness on pegs
   wallRestitution: 0.35,  // side walls bounciness
   pegRadius: 6,           // visual peg radius (collision uses this)
   ballRadius: 5,          // ball radius (smaller for better mobile experience)
-  maxVel: 2600,           // clamp extreme velocities
+  maxVel: 2200,           // clamp extreme velocities (reduced to match slower gravity)
   spawnJitterX: 14,       // horizontal random spawn jitter (px)
-  spawnVy: 40,            // initial downward velocity
+  spawnVy: 30,            // initial downward velocity (reduced slightly)
   centerBias: 0.0008,     // tiny horizontal drift towards board center (feel)
-  bucketCaptureVy: 180,   // below this vertical speed near floor → snap/capture
+  bucketCaptureVy: 150,   // below this vertical speed near floor → snap/capture (reduced)
 };
 
 // Board layout
@@ -279,6 +279,9 @@ function buildBoardGeometry(w, h) {
         offset = -gapX * 0.4;
       }
       
+      // Global shift: move all rows 0.1 to the left
+      offset -= gapX * 0.1;
+      
       // Center the row
       const rowWidth = (pegsInRow - 1) * gapX;
       const startX = centerX - rowWidth / 2 + offset;
@@ -290,9 +293,9 @@ function buildBoardGeometry(w, h) {
       }
     }
 
-    // Buckets: Custom widths - ×10 buckets half size, ×0 edge buckets larger
-    // Calculate total flex units: 0.5 + 1 + 1 + ... + 1 + 0.5 = 0.5 + 1.5 + 13*1 + 1.5 + 0.5 = 17
-    const totalFlexUnits = 1.5 + 0.5 + 13 + 0.5 + 1.5; // = 17
+    // Buckets: Custom widths - ×10 and ×3 buckets half size, ×0 buckets larger
+    // Calculate total flex units: 1.5 + 0.5 + 1 + 0.5 + 1 + 1 + 1 + 2 + 1 + 1 + 1 + 0.5 + 1 + 0.5 + 1.5 = 15
+    const totalFlexUnits = 1.5 + 0.5 + 1 + 0.5 + 1 + 1 + 1 + 2 + 1 + 1 + 1 + 0.5 + 1 + 0.5 + 1.5; // = 15
     const unitWidth = innerWidth / totalFlexUnits;
     const buckets = [];
     let currentX = left;
@@ -301,8 +304,10 @@ function buildBoardGeometry(w, h) {
       let bucketFlex;
       if (i === 0 || i === 14) {
         bucketFlex = 1.5; // ×0 edge buckets larger
-      } else if (i === 1 || i === 13) {
-        bucketFlex = 0.5; // ×10 buckets half size
+      } else if (i === 1 || i === 13 || i === 3 || i === 11) {
+        bucketFlex = 0.5; // ×10 and ×3 buckets half size
+      } else if (i === 7) {
+        bucketFlex = 2; // ×0 center bucket larger
       } else {
         bucketFlex = 1; // Normal buckets
       }
@@ -718,7 +723,17 @@ function buildBoardGeometry(w, h) {
                   const landed = finalBuckets.filter(i => i === idx).length;
                   const isHighlighted = landed > 0 || landingNow.includes(idx);
                   // Make ×10 buckets (index 1 and 13) half size, ×0 edge buckets (index 0 and 14) larger
-                  const widthClass = (idx === 1 || idx === 13) ? "flex-[0.5]" : (idx === 0 || idx === 14) ? "flex-[1.5]" : "flex-1";
+                  // Make ×3 buckets (index 3 and 11) half size, ×0 center bucket (index 7) larger
+                  let widthClass;
+                  if (idx === 1 || idx === 13 || idx === 3 || idx === 11) {
+                    widthClass = "flex-[0.5]"; // ×10 and ×3 buckets half size
+                  } else if (idx === 0 || idx === 14) {
+                    widthClass = "flex-[1.5]"; // ×0 edge buckets larger
+                  } else if (idx === 7) {
+                    widthClass = "flex-[2]"; // ×0 center bucket larger
+                  } else {
+                    widthClass = "flex-1"; // Normal buckets
+                  }
                   return (
                     <div
                       key={idx}
