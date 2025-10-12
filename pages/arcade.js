@@ -1,5 +1,5 @@
 // pages/arcade.js - MLEO Arcade/Casino Hub
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Layout from "../components/Layout";
 import Link from "next/link";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
@@ -9,33 +9,36 @@ const ARCADE_BG = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
 function GameCard({ title, emoji, description, prize, href, color }) {
   return (
     <article 
-      className="rounded-2xl border border-white/10 backdrop-blur-md shadow-xl p-6 flex flex-col h-full transition-all hover:scale-105 hover:border-white/30"
+      className="rounded-xl border border-white/10 backdrop-blur-md shadow-lg p-5 flex flex-col h-full transition-all hover:scale-105 hover:border-white/30"
       style={{
         background: `linear-gradient(135deg, ${color}15 0%, ${color}05 100%)`,
       }}
     >
       <div className="text-center mb-4">
-        <div className="text-6xl mb-3">{emoji}</div>
-        <h2 className="text-2xl font-extrabold mb-2">{title}</h2>
-        <p className="text-sm text-zinc-300 leading-relaxed">
+        <div className="text-5xl mb-3">{emoji}</div>
+        <h2 className="text-xl font-extrabold mb-2">{title}</h2>
+        <p className="text-sm text-zinc-300 leading-relaxed line-clamp-2">
           {description}
         </p>
       </div>
 
       <div className="mt-auto">
-        <div className="rounded-xl bg-black/30 border border-white/10 p-3 mb-4">
-          <div className="text-xs opacity-70 mb-1">Cost per Play</div>
-          <div className="text-2xl font-bold text-amber-400">1,000 MLEO</div>
-        </div>
-
-        <div className="rounded-xl bg-black/30 border border-white/10 p-3 mb-4">
-          <div className="text-xs opacity-70 mb-1">Max Win</div>
-          <div className="text-xl font-bold text-green-400">{prize}</div>
+        {/* Cost & Max Win in same row */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="rounded-lg bg-black/30 border border-white/10 p-2.5 text-center">
+            <div className="text-xs opacity-70 mb-1">Cost</div>
+            <div className="text-base font-bold text-amber-400">1,000</div>
+          </div>
+          
+          <div className="rounded-lg bg-black/30 border border-white/10 p-2.5 text-center">
+            <div className="text-xs opacity-70 mb-1">Max Win</div>
+            <div className="text-base font-bold text-green-400">{prize}</div>
+          </div>
         </div>
 
         <Link
           href={href}
-          className="block w-full text-center px-5 py-3 rounded-xl font-extrabold text-white shadow-lg transition-all"
+          className="block w-full text-center px-5 py-2.5 rounded-lg font-extrabold text-white text-base shadow-lg transition-all hover:scale-105"
           style={{
             background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
           }}
@@ -77,6 +80,35 @@ function Modal({ open, onClose, children }) {
 
 export default function ArcadeHub() {
   const [infoModal, setInfoModal] = useState(false);
+  const [vault, setVault] = useState(0);
+  
+  // Read vault from RUSH game
+  function getVault() {
+    if (typeof window === "undefined") return 0;
+    try {
+      const rushData = localStorage.getItem("mleo_rush_core_v4");
+      if (!rushData) return 0;
+      const data = JSON.parse(rushData);
+      return data.vault || 0;
+    } catch {
+      return 0;
+    }
+  }
+  
+  function fmt(n) {
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
+    return Math.floor(n).toString();
+  }
+  
+  // Load vault on mount and refresh every 2 seconds
+  useEffect(() => {
+    setVault(getVault());
+    const interval = setInterval(() => {
+      setVault(getVault());
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   const games = [
     {
@@ -156,19 +188,36 @@ export default function ArcadeHub() {
         <div className="mx-auto max-w-7xl px-4 py-8">
           {/* Top bar */}
           <div className="flex justify-between items-center mb-8">
-            <Link
-              href="/mining"
-              className="rounded-full px-4 py-2 text-sm font-bold bg-white/10 border border-white/20 hover:bg-white/20"
-            >
-              ← BACK
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/mining"
+                className="rounded-full px-4 py-2 text-sm font-bold bg-white/10 border border-white/20 hover:bg-white/20"
+              >
+                ← BACK
+              </Link>
+              
+              <div className="rounded-xl px-4 py-2 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
+                <div className="text-xs opacity-70">Your Vault</div>
+                <div className="text-lg font-bold text-emerald-400">{fmt(vault)} MLEO</div>
+              </div>
+            </div>
 
-            <ConnectButton
-              chainStatus="none"
-              accountStatus="avatar"
-              showBalance={false}
-              label="CONNECT"
-            />
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setInfoModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 font-semibold text-sm"
+              >
+                <span>ℹ️</span>
+                <span>How to Play</span>
+              </button>
+              
+              <ConnectButton
+                chainStatus="none"
+                accountStatus="avatar"
+                showBalance={false}
+                label="CONNECT"
+              />
+            </div>
           </div>
 
           {/* Header */}
@@ -182,21 +231,27 @@ export default function ArcadeHub() {
               🎮 MLEO Arcade
             </h1>
             
-            <p className="text-lg text-white/90 max-w-2xl mx-auto mb-6">
+            <p className="text-lg text-white/90 max-w-2xl mx-auto">
               Play mini-games and win MLEO tokens! Each game costs 1,000 MLEO per round.
               Win prizes, free spins, and multipliers up to 10x!
             </p>
-
-            <button
-              onClick={() => setInfoModal(true)}
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 font-semibold"
-            >
-              <span>ℹ️</span>
-              <span>How to Play</span>
-            </button>
           </header>
 
-          {/* Important Notice */}
+          {/* Games Grid */}
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {games.map((game, idx) => (
+              <GameCard key={idx} {...game} />
+            ))}
+          </section>
+          
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/40">
+              <span className="text-2xl">🎮</span>
+              <span className="font-bold text-purple-300">8 Exciting Games to Play!</span>
+            </div>
+          </div>
+
+          {/* Important Notice - Moved below games */}
           <div className="max-w-4xl mx-auto mb-8 rounded-2xl bg-yellow-500/10 border-2 border-yellow-500/30 p-6">
             <div className="flex items-start gap-4">
               <div className="text-3xl">⚠️</div>
@@ -210,20 +265,6 @@ export default function ArcadeHub() {
                   <li>• <strong>Statistics:</strong> Track your wins and losses in each game</li>
                 </ul>
               </div>
-            </div>
-          </div>
-
-          {/* Games Grid */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-            {games.map((game, idx) => (
-              <GameCard key={idx} {...game} />
-            ))}
-          </section>
-          
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/40">
-              <span className="text-2xl">🎮</span>
-              <span className="font-bold text-purple-300">8 Exciting Games to Play!</span>
             </div>
           </div>
 
@@ -250,7 +291,7 @@ export default function ArcadeHub() {
         </div>
       </main>
 
-      {/* Info Modal */}
+      {/* Info Modal - Updated with all 8 games */}
       <Modal open={infoModal} onClose={() => setInfoModal(false)}>
         <div className="space-y-6">
           <section>
@@ -279,7 +320,7 @@ export default function ArcadeHub() {
               Roll 3 dice and match conditions:
               <br />• Triple Six (666) = 10,000 MLEO (×10)
               <br />• Any Triple = 6,000 MLEO (×6)
-              <br />• Sum 18, 17, 16 = various multipliers
+              <br />• Sum 18, 17, 16, 15, 14... = various multipliers
               <br />• All Even/Odd = 1,500 MLEO (×1.5)
             </p>
           </section>
@@ -307,13 +348,60 @@ export default function ArcadeHub() {
           </section>
 
           <section>
+            <h4 className="text-lg font-bold text-white mb-2">🎯 Plinko</h4>
+            <p>
+              Drop a ball through pegs with real physics! Click anytime to drop more balls.
+              <br />• Ball bounces through pegs randomly
+              <br />• Edge buckets: ×10, ×5 (rare but huge!)
+              <br />• Center buckets: ×2, ×3 (wins) or ×0.5, ×0.2, ×0 (losses)
+              <br />• Drop multiple balls simultaneously for more action!
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-lg font-bold text-white mb-2">💣 Mines</h4>
+            <p>
+              Minesweeper-style risk game. Reveal safe tiles and cash out!
+              <br />• Choose difficulty: Easy (3 mines), Medium (5), Hard (7)
+              <br />• Each safe tile increases your multiplier
+              <br />• Cash out anytime to collect current prize
+              <br />• Hit a mine = lose everything!
+              <br />• Max prize: up to ×6 multiplier
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-lg font-bold text-white mb-2">🃏 Hi-Lo Cards</h4>
+            <p>
+              Guess if the next card is Higher or Lower!
+              <br />• Each correct guess: +30% multiplier
+              <br />• Equal cards = automatic win
+              <br />• Cash out anytime to collect
+              <br />• Wrong guess = lose everything
+              <br />• Build long streaks for unlimited prizes!
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-lg font-bold text-white mb-2">🪙 Coin Flip</h4>
+            <p>
+              Classic 50/50 game with random multipliers!
+              <br />• Choose HEADS 👑 or TAILS ⭐
+              <br />• Win = random multiplier (×1.5 to ×10!)
+              <br />• ×10 multiplier: 1% chance
+              <br />• ×5 multiplier: 5% chance
+              <br />• Build win streaks!
+            </p>
+          </section>
+
+          <section>
             <h4 className="text-lg font-bold text-white mb-2">📊 Statistics</h4>
             <p>
               Each game tracks your personal stats:
               <br />• Total plays
               <br />• Total won
               <br />• Biggest win
-              <br />• Win rate
+              <br />• Win rate / Streaks
               <br />• Net profit/loss
             </p>
           </section>
