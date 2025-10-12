@@ -27,7 +27,6 @@ const LS_KEYS = {
   PRESTIGE: "mleo_rush_prestige_v4",
   ACHIEVEMENTS: "mleo_rush_achievements_v4",
   MASTERY: "mleo_rush_mastery_v4",
-  FORTUNE_WHEEL: "mleo_rush_fortune_wheel_v4",
 };
 
 const OTHER_GAME_CORE_KEY = "mleoMiningEconomy_v2.1"; // MLEO-MINERS
@@ -97,22 +96,6 @@ const CONFIG = {
     { id: "ONLINE_P",  label: "⚡ +30% Mining",   mult: { online: 1.30 }, desc: "30% increased online mining speed" },
     { id: "OFFLINE_P", label: "🌙 +30% Offline",  mult: { offline: 1.30 }, desc: "30% increased offline mining rate" },
     { id: "SALE_25",   label: "💰 -25% Upgrades", mult: { upgradeCost: 0.75 }, desc: "25% discount on all upgrades" },
-  ],
-  
-  // Fortune Wheel
-  FORTUNE_WHEEL_COOLDOWN_SEC: 3600,          // 1 hour cooldown for free spin
-  FORTUNE_WHEEL_MAX_EXTRA_SPINS: 999,        // Unlimited extra spins
-  FORTUNE_WHEEL_COSTS: [1000],               // Fixed cost for extra spins
-  FORTUNE_WHEEL_PRIZES: [
-    { id: "mleo_1k",    label: "💰 1,000 MLEO",     type: "mleo", value: 1000,   weight: 25, color: "#10b981" },
-    { id: "mleo_5k",    label: "💰 5,000 MLEO",     type: "mleo", value: 5000,   weight: 15, color: "#10b981" },
-    { id: "mleo_10k",   label: "💰 10,000 MLEO",    type: "mleo", value: 10000,  weight: 8,  color: "#10b981" },
-    { id: "boost_2x_30", label: "⚡ 2× Mining (30m)", type: "boost", value: { mult: 2, duration: 30*60*1000 }, weight: 12, color: "#f59e0b" },
-    { id: "boost_3x_15", label: "⚡ 3× Mining (15m)", type: "boost", value: { mult: 3, duration: 15*60*1000 }, weight: 8,  color: "#f59e0b" },
-    { id: "pp_1",       label: "💎 1 Prestige Point", type: "prestige", value: 1, weight: 10, color: "#8b5cf6" },
-    { id: "pp_3",       label: "💎 3 Prestige Points", type: "prestige", value: 3, weight: 5,  color: "#8b5cf6" },
-    { id: "bot_1h",     label: "🤖 Mining Bot (1h)", type: "bot", value: { mult: 1.5, duration: 60*60*1000 }, weight: 7,  color: "#06b6d4" },
-    { id: "boost_10_10", label: "⚡ +10% Boost (10m)", type: "boost_add", value: { amount: 0.1, duration: 10*60*1000 }, weight: 10, color: "#f59e0b" },
   ],
   
   // Time Chest (random spawn)
@@ -280,17 +263,6 @@ function InfoModal({ isOpen, onClose, title, children }) {
 // ============================================================================
 function usePresenceAndMining(getMultiplier, liveModifierMult) {
   const [core, setCore] = useState(() => ({ ...initialCore, ...safeRead(LS_KEYS.CORE, initialCore) }));
-  
-  // Fortune Wheel state
-  const [fortuneWheel, setFortuneWheel] = useState(() => {
-    const saved = safeRead(LS_KEYS.FORTUNE_WHEEL);
-    return saved || {
-      lastFreeSpin: 0,
-      extraSpinsToday: 0,
-      lastSpinDay: new Date().toDateString(),
-      activeEffects: [],
-    };
-  });
   const [sess, setSess] = useState(() => ({ ...initialSession, ...safeRead(LS_KEYS.SESSION, initialSession) }));
   const idleTimerRef = useRef(null);
   const rafRef = useRef(0);
@@ -302,30 +274,6 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
     safeWrite(LS_KEYS.SESSION, sess); 
     sessRef.current = sess; // Keep ref in sync
   }, [sess]);
-  useEffect(() => { safeWrite(LS_KEYS.FORTUNE_WHEEL, fortuneWheel); }, [fortuneWheel]);
-
-  // Calculate multiplier with fortune wheel effects
-  const getMultiplierWithEffects = () => {
-    let baseMultiplier = getMultiplier();
-    
-    // Apply fortune wheel effects
-    const now = Date.now();
-    const activeEffects = fortuneWheel.activeEffects.filter(effect => effect.expires > now);
-    
-    for (const effect of activeEffects) {
-      switch (effect.type) {
-        case "boost":
-          baseMultiplier *= effect.mult;
-          break;
-        case "bot":
-          baseMultiplier *= effect.mult;
-          break;
-        // boost_add is handled separately in the boost calculation
-      }
-    }
-    
-    return baseMultiplier;
-  };
 
 
   // Init: schedule modifiers & chest
@@ -427,7 +375,7 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
     setCore(c => {
       let next = { ...c, lastActiveAt: now };
       if (c.mode === "offline") {
-        const mult = getMultiplierWithEffects();
+        const mult = getMultiplier();
         const earned = settleOffline(c, mult);
         next.miningPool += earned;
         next.totalMined += earned;
@@ -475,7 +423,7 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
       // 2) Mine with current boost (using ref for performance)
       setCore(c => {
         if (c.mode !== "online") return c;
-        const mult = getMultiplierWithEffects();
+        const mult = getMultiplier();
         const perSec = (CONFIG.ONLINE_BASE_RATE * mult * (liveModifierMult("online") || 1)) / 3600;
         const focusFactor = document?.hidden ? 0.5 : 1;
         const boostFactor = 1 + (sessRef.current.boost || 0);
@@ -494,7 +442,6 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
   return {
     core, setCore,
     sess, setSess,
-    fortuneWheel, setFortuneWheel,
     markActivity,
     wake: () => markActivity({ isTrusted: true }),
   };
@@ -759,9 +706,6 @@ export default function MLEOTokenRushPage() {
   const [mounted, setMounted] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [infoModal, setInfoModal] = useState(null);
-  const [fortuneWheelModal, setFortuneWheelModal] = useState(false);
-  const [isSpinning, setIsSpinning] = useState(false);
-  const [wonPrize, setWonPrize] = useState(null);
   const { showToast, ToastContainer } = useToast();
 
   useEffect(() => { setMounted(true); }, []);
@@ -778,12 +722,9 @@ export default function MLEOTokenRushPage() {
     return modifier.mult?.[kind] || 1;
   };
 
-  const getMultiplier = () => {
-    let baseMultiplier = upgradesMultiplier(core.upgrades, core.guild, 1 + (core.prestigePoints * CONFIG.PRESTIGE_MULT_PER_POINT));
-    return baseMultiplier;
-  };
+  const getMultiplier = () => upgradesMultiplier(core.upgrades, core.guild, 1 + (core.prestigePoints * CONFIG.PRESTIGE_MULT_PER_POINT));
 
-  const { core, setCore, sess, setSess, fortuneWheel, setFortuneWheel, markActivity, wake } = 
+  const { core, setCore, sess, setSess, markActivity, wake } = 
     usePresenceAndMining(getMultiplier, liveModifierMult);
 
   // New state for progression systems
@@ -1253,7 +1194,7 @@ export default function MLEOTokenRushPage() {
         console.error("❌ [FAILED] Transaction failed, status:", receipt?.status, "Receipt:", receipt);
         showToast("❌ Transaction failed");
       }
-  } catch (err) {
+    } catch (err) {
       console.error("❌ Claim error:", err);
       const msg = String(err?.shortMessage || err?.message || err);
       
@@ -1261,187 +1202,12 @@ export default function MLEOTokenRushPage() {
         showToast("❌ Transaction cancelled");
       } else if (!/Cannot convert undefined to a BigInt/i.test(msg)) {
         showToast(`❌ Error: ${msg.slice(0, 50)}`);
-    }
-  } finally {
+      }
+    } finally {
       setIsClaiming(false);
       console.log("🔵 [CLAIM] Process finished");
     }
   }
-
-
-  // ============================================================================
-  // FORTUNE WHEEL FUNCTIONS
-  // ============================================================================
-  
-  // Check if free spin is available
-  function canSpinFree() {
-    const now = Date.now();
-    const timeSinceLastSpin = now - fortuneWheel.lastFreeSpin;
-    return timeSinceLastSpin >= CONFIG.FORTUNE_WHEEL_COOLDOWN_SEC * 1000;
-  }
-  
-  // Check if can buy extra spin
-  function canBuyExtraSpin() {
-    const today = new Date().toDateString();
-    const currentSpins = fortuneWheel.extraSpinsToday || 0;
-    const cost = getNextSpinCost();
-    const hasBalance = core.balance >= cost;
-    const underLimit = currentSpins < CONFIG.FORTUNE_WHEEL_MAX_EXTRA_SPINS;
-    
-    
-    if (fortuneWheel.lastSpinDay !== today) {
-      // New day, reset extra spins
-      setFortuneWheel(prev => ({ ...prev, extraSpinsToday: 0, lastSpinDay: today }));
-      return hasBalance;
-    }
-    // Check if user has enough balance AND hasn't exceeded daily limit
-    return hasBalance && underLimit;
-  }
-  
-  // Get cost for next extra spin
-  function getNextSpinCost() {
-    return 1000; // Fixed cost
-  }
-  
-  // Select random prize based on weights
-  function selectPrize() {
-    const totalWeight = CONFIG.FORTUNE_WHEEL_PRIZES.reduce((sum, prize) => sum + prize.weight, 0);
-    let random = Math.random() * totalWeight;
-    
-    for (const prize of CONFIG.FORTUNE_WHEEL_PRIZES) {
-      random -= prize.weight;
-      if (random <= 0) {
-        return prize;
-      }
-    }
-    
-    // Fallback to first prize
-    return CONFIG.FORTUNE_WHEEL_PRIZES[0];
-  }
-  
-  // Apply prize effect to game
-  function applyPrize(prize) {
-    const now = Date.now();
-    
-    switch (prize.type) {
-      case "mleo":
-        setCore(prevCore => ({
-          ...prevCore,
-          vault: (prevCore.vault || 0) + prize.value
-        }));
-        showToast(`🎉 Won ${fmt(prize.value)} MLEO!`);
-        break;
-        
-      case "prestige":
-        setCore(prevCore => ({
-          ...prevCore,
-          prestigePoints: (prevCore.prestigePoints || 0) + prize.value
-        }));
-        showToast(`🎉 Won ${prize.value} Prestige Point${prize.value > 1 ? 's' : ''}!`);
-        break;
-        
-      case "boost":
-        const boostEffect = {
-          id: `boost_${now}`,
-          type: "boost",
-          mult: prize.value.mult,
-          expires: now + prize.value.duration,
-          label: `${prize.value.mult}× Mining`
-        };
-        setFortuneWheel(prev => ({
-          ...prev,
-          activeEffects: [...(prev.activeEffects || []), boostEffect]
-        }));
-        showToast(`🎉 Won ${prize.value.mult}× Mining for ${Math.round(prize.value.duration / 60000)} minutes!`);
-        break;
-        
-      case "boost_add":
-        const boostAddEffect = {
-          id: `boost_add_${now}`,
-          type: "boost_add",
-          amount: prize.value.amount,
-          expires: now + prize.value.duration,
-          label: `+${Math.round(prize.value.amount * 100)}% Boost`
-        };
-        setFortuneWheel(prev => ({
-          ...prev,
-          activeEffects: [...(prev.activeEffects || []), boostAddEffect]
-        }));
-        showToast(`🎉 Won +${Math.round(prize.value.amount * 100)}% Boost for ${Math.round(prize.value.duration / 60000)} minutes!`);
-        break;
-        
-      case "bot":
-        const botEffect = {
-          id: `bot_${now}`,
-          type: "bot",
-          mult: prize.value.mult,
-          expires: now + prize.value.duration,
-          label: `Mining Bot ${prize.value.mult}×`
-        };
-        setFortuneWheel(prev => ({
-          ...prev,
-          activeEffects: [...(prev.activeEffects || []), botEffect]
-        }));
-        showToast(`🎉 Won Mining Bot ${prize.value.mult}× for ${Math.round(prize.value.duration / 60000)} minutes!`);
-        break;
-    }
-  }
-  
-  // Clean expired effects
-  function cleanExpiredEffects() {
-    const now = Date.now();
-    setFortuneWheel(prev => ({
-      ...prev,
-      activeEffects: (prev.activeEffects || []).filter(effect => effect.expires > now)
-    }));
-  }
-  
-  // Spin the fortune wheel
-  function spinFortuneWheel(isFree = true) {
-    if (!isFree) {
-      const cost = getNextSpinCost();
-      if (core.vault < cost) {
-        showToast(`❌ Not enough MLEO. Need ${fmt(cost)}`);
-        return;
-      }
-      
-      // Deduct cost
-      setCore(prevCore => ({
-        ...prevCore,
-        vault: Math.max(0, (prevCore.vault || 0) - cost)
-      }));
-    }
-    
-    // Select and apply prize
-    const prize = selectPrize();
-    applyPrize(prize);
-    
-    // Update spin state
-    const now = Date.now();
-    setFortuneWheel(prev => ({
-      ...prev,
-      lastFreeSpin: isFree ? now : prev.lastFreeSpin,
-      extraSpinsToday: isFree ? prev.extraSpinsToday : prev.extraSpinsToday + 1,
-      lastSpinDay: new Date().toDateString()
-    }));
-    
-    // Save to localStorage
-    setTimeout(() => {
-      const updated = {
-        ...fortuneWheel,
-        lastFreeSpin: isFree ? now : fortuneWheel.lastFreeSpin,
-        extraSpinsToday: isFree ? fortuneWheel.extraSpinsToday : fortuneWheel.extraSpinsToday + 1,
-        lastSpinDay: new Date().toDateString()
-      };
-      safeWrite(LS_KEYS.FORTUNE_WHEEL, updated);
-    }, 0);
-  }
-
-  // Clean expired fortune wheel effects every minute
-  useEffect(() => {
-    const interval = setInterval(cleanExpiredEffects, 60000); // Every minute
-    return () => clearInterval(interval);
-  }, []);
 
   const mult = useMemo(() => getMultiplier(), [core.upgrades, core.guild]);
 
@@ -1496,11 +1262,6 @@ export default function MLEOTokenRushPage() {
                     📦 Chest expires in {Math.max(0, Math.ceil((sess.chest.expiresAt - Date.now())/1000))}s!
                   </span>
                 )}
-                {fortuneWheel?.activeEffects?.filter(effect => effect.expires > Date.now()).map(effect => (
-                  <span key={effect.id} className="px-3 py-1.5 rounded-xl text-xs border border-purple-500/30 bg-purple-500/10 text-purple-300 font-bold">
-                    {effect.label} ({Math.ceil((effect.expires - Date.now()) / 60000)}m)
-                  </span>
-                )) || []}
     </div>
   </div>
 
@@ -1753,45 +1514,6 @@ export default function MLEOTokenRushPage() {
               )}
   </Section>
 </div>
-
-          {/* FORTUNE WHEEL */}
-          <Section 
-            title="🎰 Fortune Wheel"
-            onInfo={() => setInfoModal('fortune_wheel')}
-          >
-            <div className="flex flex-col items-center gap-4">
-              <div className="text-sm opacity-80 text-center">
-                Spin the wheel for amazing prizes! Free spin every hour.
-          </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setFortuneWheelModal(true)}
-                  className={`px-6 py-3 rounded-xl font-bold text-white transition-all ${
-                    canSpinFree()
-                      ? "bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400"
-                      : canBuyExtraSpin()
-                      ? "bg-gradient-to-r from-orange-600 to-red-500 hover:from-orange-500 hover:to-red-400"
-                      : "bg-gradient-to-r from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400"
-                  }`}
-                >
-                  {canSpinFree() ? "🎰 FREE SPIN" : canBuyExtraSpin() ? `🎰 BUY SPIN (${fmt(getNextSpinCost())})` : "🎰 OPEN WHEEL"}
-          </button>
-        </div>
-              
-              <div className="text-xs opacity-60 text-center">
-                {canSpinFree() 
-                  ? "Free spin available!" 
-                  : `Next free spin in ${Math.ceil((CONFIG.FORTUNE_WHEEL_COOLDOWN_SEC * 1000 - (Date.now() - (fortuneWheel.lastFreeSpin || Date.now() - CONFIG.FORTUNE_WHEEL_COOLDOWN_SEC * 1000))) / 60000)} minutes`
-                }
-                {canBuyExtraSpin() && (
-                  <div className="mt-1">
-                    Extra spins today: {fortuneWheel.extraSpinsToday}/{CONFIG.FORTUNE_WHEEL_MAX_EXTRA_SPINS}
-  </div>
-                )}
-              </div>
-  </div>
-</Section>
 
           {/* UPGRADES */}
           <Section 
@@ -2115,251 +1837,6 @@ export default function MLEOTokenRushPage() {
             <p><strong>Leave anytime:</strong> You can leave and join a different guild if you want a better bonus.</p>
             <p className="text-amber-400"><strong>Note:</strong> This is a local demo. In production, guilds would be shared across players.</p>
           </InfoModal>
-
-          <InfoModal isOpen={infoModal === 'fortune_wheel'} onClose={() => setInfoModal(null)} title="🎰 Fortune Wheel">
-            <p><strong>What is the Fortune Wheel?</strong> A mini-game where you can win amazing prizes!</p>
-            <p><strong>Free Spins:</strong> You get one free spin every hour.</p>
-            <p><strong>Extra Spins:</strong> Buy up to 4 additional spins per day using MLEO tokens.</p>
-            <p><strong>Prize Types:</strong></p>
-            <ul className="ml-4 space-y-1">
-              <li>• 💰 <strong>MLEO Tokens:</strong> 1,000 - 10,000 MLEO</li>
-              <li>• ⚡ <strong>Mining Boosts:</strong> 2× or 3× mining speed for limited time</li>
-              <li>• 💎 <strong>Prestige Points:</strong> 1-3 points for permanent upgrades</li>
-              <li>• 🤖 <strong>Mining Bot:</strong> +50% mining speed for 1 hour</li>
-              <li>• ⚡ <strong>Boost Addition:</strong> +10% to your current boost</li>
-            </ul>
-            <p className="text-emerald-400"><strong>Tip:</strong> Higher value prizes have lower chances, making them more exciting to win!</p>
-          </InfoModal>
-
-          {/* Fortune Wheel Modal */}
-          {fortuneWheelModal && (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-gradient-to-br from-purple-900/90 to-pink-900/90 backdrop-blur-xl rounded-2xl border border-white/20 p-4 max-w-sm w-full">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-white">🎰 Fortune Wheel</h2>
-                  <button
-                    onClick={() => {
-                      setFortuneWheelModal(false);
-                      setIsSpinning(false);
-                      setWonPrize(null);
-                    }}
-                    className="text-white/60 hover:text-white text-2xl"
-                  >
-                    ×
-                  </button>
-                </div>
-
-                {/* Wheel */}
-                <div className="relative w-64 h-64 mx-auto mb-4">
-                  <div 
-                    className={`w-full h-full rounded-full border-6 border-white/20 relative overflow-hidden transition-transform duration-3000 ${
-                      isSpinning ? 'animate-spin' : ''
-                    }`}
-                    style={{
-                      background: `conic-gradient(
-                        #10b981 0deg 36deg,
-                        #f59e0b 36deg 72deg,
-                        #8b5cf6 72deg 108deg,
-                        #06b6d4 108deg 144deg,
-                        #ef4444 144deg 180deg,
-                        #10b981 180deg 216deg,
-                        #f59e0b 216deg 252deg,
-                        #8b5cf6 252deg 288deg,
-                        #06b6d4 288deg 324deg,
-                        #ef4444 324deg 360deg
-                      )`
-                    }}
-                  >
-                    {/* Prize labels - positioned around the wheel */}
-                    {CONFIG.FORTUNE_WHEEL_PRIZES.map((prize, index) => {
-                      const angle = (index * 360) / CONFIG.FORTUNE_WHEEL_PRIZES.length;
-                      const radius = 85; // Distance from center
-                      const x = Math.cos((angle - 90) * Math.PI / 180) * radius;
-                      const y = Math.sin((angle - 90) * Math.PI / 180) * radius;
-                      
-                      // Create shorter labels for better display
-                      let shortLabel = prize.label;
-                      if (shortLabel.includes('MLEO')) {
-                        shortLabel = shortLabel.replace('💰 ', '').replace(' MLEO', 'M');
-                      } else if (shortLabel.includes('Mining')) {
-                        shortLabel = shortLabel.replace('⚡ ', '').replace(' Mining', '');
-                      } else if (shortLabel.includes('Prestige')) {
-                        shortLabel = shortLabel.replace('💎 ', '').replace(' Prestige Point', 'PP').replace('s', '');
-                      } else if (shortLabel.includes('Bot')) {
-                        shortLabel = shortLabel.replace('🤖 ', '').replace(' (1h)', '');
-                      } else if (shortLabel.includes('Boost')) {
-                        shortLabel = shortLabel.replace('⚡ ', '').replace(' (10m)', '');
-                      }
-                      
-  return (
-                        <div
-                          key={prize.id}
-                          className="absolute"
-                          style={{
-                            left: `calc(50% + ${x}px)`,
-                            top: `calc(50% + ${y}px)`,
-                            transform: 'translate(-50%, -50%)'
-                          }}
-                        >
-                          <div className="text-xs font-bold text-white text-center bg-black/70 rounded px-1 py-0.5 whitespace-nowrap border border-white/20">
-                            {shortLabel}
-      </div>
-    </div>
-  );
-                    })}
-                  </div>
-                  
-                  {/* Pointer */}
-                  <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2">
-                    <div className="w-0 h-0 border-l-4 border-r-4 border-b-8 border-transparent border-b-white"></div>
-                  </div>
-                </div>
-
-                {/* Prize List */}
-                <div className="mb-4">
-                  <h3 className="text-sm font-bold text-white mb-2 text-center">Available Prizes:</h3>
-                  <div className="grid grid-cols-2 gap-1 text-xs">
-                    {CONFIG.FORTUNE_WHEEL_PRIZES.map((prize, index) => (
-                      <div key={prize.id} className="flex items-center gap-1 p-1 bg-white/10 rounded">
-                        <div 
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: prize.color }}
-                        />
-                        <span className="text-white text-xs">{prize.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Won Prize Display */}
-                {wonPrize && (
-                  <div className="text-center mb-3">
-                    <div className="text-lg mb-1">🎉 Congratulations! 🎉</div>
-                    <div className="text-sm font-bold text-yellow-400">{wonPrize.label}</div>
-                  </div>
-                )}
-
-                {/* Controls */}
-                <div className="flex gap-2">
-                  {canSpinFree() && (
-                    <button
-                      onClick={() => {
-                        setIsSpinning(true);
-                        setWonPrize(null);
-                        
-                        // Simulate spinning for 3 seconds
-                        setTimeout(() => {
-                          const prize = selectPrize();
-                          setWonPrize(prize);
-                          applyPrize(prize);
-                          setIsSpinning(false);
-                          
-                          // Update fortune wheel state
-                          setFortuneWheel(prev => ({
-                            ...prev,
-                            lastFreeSpin: Date.now(),
-                            lastSpinDay: new Date().toDateString()
-                          }));
-                          
-                          // Save to localStorage
-                          setTimeout(() => {
-                            const updated = {
-                              ...fortuneWheel,
-                              lastFreeSpin: Date.now(),
-                              lastSpinDay: new Date().toDateString()
-                            };
-                            safeWrite(LS_KEYS.FORTUNE_WHEEL, updated);
-                          }, 0);
-                        }, 3000);
-                      }}
-                      disabled={isSpinning}
-                      className="flex-1 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 text-white font-bold py-2 px-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                    >
-                      {isSpinning ? "Spinning..." : "🎰 FREE SPIN"}
-                    </button>
-                  )}
-                  
-                  <button
-                      onClick={() => {
-                        const cost = getNextSpinCost();
-                        
-                        // Deduct cost immediately
-                        setCore(prevCore => {
-                          // Fix negative balance issue
-                          const currentBalance = prevCore.balance < 0 ? 0 : prevCore.balance;
-                          const newBalance = currentBalance - cost;
-                          const updatedCore = {
-                            ...prevCore,
-                            balance: newBalance
-                          };
-                          
-                          // Force save to localStorage immediately
-                          setTimeout(() => safeWrite(LS_KEYS.CORE, updatedCore), 0);
-                          
-                          // Force re-render
-                          setTimeout(() => {
-                            setCore(prev => ({ ...prev }));
-                          }, 100);
-                          
-                          return updatedCore;
-                        });
-                        
-                        // Show success message
-                        showToast(`✅ Purchased spin for ${fmt(cost)} MLEO!`);
-                        
-                        // Start spinning
-                        setTimeout(() => {
-                          setIsSpinning(true);
-                          setWonPrize(null);
-                        }, 0);
-                        
-                        // Simulate spinning for 3 seconds
-                        setTimeout(() => {
-                          const prize = selectPrize();
-                          setWonPrize(prize);
-                          applyPrize(prize);
-                          setIsSpinning(false);
-                          
-                          // Update fortune wheel state
-                          setFortuneWheel(prev => ({
-                            ...prev,
-                            extraSpinsToday: prev.extraSpinsToday + 1,
-                            lastSpinDay: new Date().toDateString()
-                          }));
-                          
-                          // Save to localStorage
-                          setTimeout(() => {
-                            const updated = {
-                              ...fortuneWheel,
-                              extraSpinsToday: fortuneWheel.extraSpinsToday + 1,
-                              lastSpinDay: new Date().toDateString()
-                            };
-                            safeWrite(LS_KEYS.FORTUNE_WHEEL, updated);
-                          }, 0);
-                        }, 3000);
-                      }}
-                      disabled={isSpinning}
-                      className="flex-1 bg-gradient-to-r from-orange-600 to-red-500 hover:from-orange-500 hover:to-red-400 text-white font-bold py-2 px-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                    >
-                      {isSpinning ? "Spinning..." : `🎰 BUY (${fmt(getNextSpinCost())})`}
-                    </button>
-                </div>
-
-                {/* Status */}
-                <div className="text-center mt-2 text-xs text-white/70">
-                  {canSpinFree() 
-                    ? "Free spin available!" 
-                    : `Next free: ${Math.ceil((CONFIG.FORTUNE_WHEEL_COOLDOWN_SEC * 1000 - (Date.now() - (fortuneWheel.lastFreeSpin || Date.now() - CONFIG.FORTUNE_WHEEL_COOLDOWN_SEC * 1000))) / 60000)}m`
-                  }
-                  {canBuyExtraSpin() && (
-                    <div className="mt-1">
-                      Extra: {fortuneWheel.extraSpinsToday}/{CONFIG.FORTUNE_WHEEL_MAX_EXTRA_SPINS}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
 
         </div>
       </main>
