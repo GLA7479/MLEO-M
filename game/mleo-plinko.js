@@ -33,9 +33,9 @@ const BUCKET_COLORS = [
 ];
 
 // Peg grid
-const ROWS = 12;     // peg rows
+const ROWS = 10;     // peg rows (triangle: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 const COLS = 13;     // peg columns (also number of buckets)
-const OFFSET_ROWS = true; // stagger every other row
+const OFFSET_ROWS = false; // no stagger for triangle
 
 // Physics tunables
 const PHYS = {
@@ -43,8 +43,8 @@ const PHYS = {
   airDrag: 0.010,         // linear damping per step (0..~0.02)
   restitution: 0.45,      // bounciness on pegs
   wallRestitution: 0.35,  // side walls bounciness
-  pegRadius: 7,           // visual peg radius (collision uses this)
-  ballRadius: 7.5,        // ball radius
+  pegRadius: 6,           // visual peg radius (collision uses this)
+  ballRadius: 5,          // ball radius (smaller for better mobile experience)
   maxVel: 2600,           // clamp extreme velocities
   spawnJitterX: 14,       // horizontal random spawn jitter (px)
   spawnVy: 40,            // initial downward velocity
@@ -217,9 +217,10 @@ function buildBoardGeometry(w, h) {
   const gapY = BOARD.pegGapY * Math.max(0.9, Math.min(1.2, scaleX)); 
 
   const centerX = left + innerWidth * 0.5;
+  const totalRows = 10; // Triangle with 10 rows
 
   // נחשב איפה נמצאת שורת היתדות האחרונה
-  const lastPegY = top + (ROWS - 1) * gapY + 24; // כמו בציור היתדות
+  const lastPegY = top + (totalRows - 1) * gapY + 24; // כמו בציור היתדות
   const baseBottom = h - BOARD.marginBottom;     // הרצפה הקבועה המקורית
   const desiredBottom =
     lastPegY + PHYS.pegRadius + Math.max(48, gapY * 0.9); // עוד מרווח לבאקטים
@@ -228,13 +229,19 @@ function buildBoardGeometry(w, h) {
   const bottom = Math.min(h - 20, Math.max(baseBottom, desiredBottom));
 
 
-    // Pegs
+    // Pegs - Perfect triangle shape
     const pegs = [];
-    for (let r = 0; r < ROWS; r++) {
-      const offset = OFFSET_ROWS && (r % 2 === 1) ? 0.5 : 0;
-      for (let c = 0; c < COLS - (OFFSET_ROWS && (r % 2 === 1) ? 1 : 0); c++) {
-        const x = left + (c + offset) * gapX;
-        const y = top + r * gapY + 24; // small extra spacing
+    
+    for (let r = 0; r < totalRows; r++) {
+      const pegsInRow = r + 1; // Growing: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+      
+      // Center the row
+      const rowWidth = (pegsInRow - 1) * gapX;
+      const startX = centerX - rowWidth / 2;
+      
+      for (let c = 0; c < pegsInRow; c++) {
+        const x = startX + c * gapX;
+        const y = top + r * gapY + 24;
         pegs.push({ x, y, r: PHYS.pegRadius });
       }
     }
@@ -572,7 +579,7 @@ function buildBoardGeometry(w, h) {
     if (!board) return;
 
     const x0 = board.centerX + (rand01() * 2 - 1) * PHYS.spawnJitterX;
-    const y0 = board.top + 2; // just below top
+    const y0 = board.top - 20; // Start above the pyramid top
     const ball = {
       x: x0,
       y: y0,
