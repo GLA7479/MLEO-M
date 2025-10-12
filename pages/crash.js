@@ -46,13 +46,28 @@ function hashToUnitFloat(hex) {
   return int / max; // in [0,1)
 }
 
-/** Map hash to crash point in [minCrash, maxCrash] with slight skew toward early busts */
+/** Map hash to crash point in [minCrash, maxCrash] with strong skew toward early busts */
 function hashToCrash(hex, minCrash, maxCrash) {
   const u = hashToUnitFloat(hex);
-  // Skew: y = u^k (k>1 favors earlier crashes). Tune k=1.45
-  const k = 1.45;
-  const skew = Math.pow(u, k);
-  const v = minCrash + (maxCrash - minCrash) * skew;
+  // Strong exponential skew toward lower values
+  // Using 1/u^k creates house edge - most crashes happen early
+  const k = 3.5; // Higher k = more early crashes
+  const skew = 1 - Math.pow(1 - u, k);
+  
+  // Map to range with bias toward low values
+  let v = minCrash + (maxCrash - minCrash) * skew;
+  
+  // Additional clamping to favor very low crashes (house edge)
+  if (u < 0.3) { // 30% chance of very early crash
+    v = minCrash + (2 - minCrash) * (u / 0.3); // 1.1 to 2.0
+  } else if (u < 0.6) { // 30% chance of early-mid crash
+    v = 2 + 1.5 * ((u - 0.3) / 0.3); // 2.0 to 3.5
+  } else if (u < 0.85) { // 25% chance of mid crash
+    v = 3.5 + 2 * ((u - 0.6) / 0.25); // 3.5 to 5.5
+  } else { // 15% chance of high crash
+    v = 5.5 + (maxCrash - 5.5) * ((u - 0.85) / 0.15); // 5.5 to 10.0
+  }
+  
   // clamp & 2 decimals
   return Math.max(minCrash, Math.min(maxCrash, Math.round(v * 100) / 100));
 }
@@ -403,10 +418,16 @@ export default function MLEOCrash() {
   // ------------------------------- Derived ----------------------------------
   const chartData = dataRef.current;
   const maxY = useMemo(() => {
+    if (!chartData || chartData.length === 0) return 3;
     const current = Math.max(1, ...chartData.map((p) => p.m));
-    const ceil = Math.ceil(Math.max(current, crashPoint || 1) * 1.1 * 10) / 10;
-    return Math.min(ceil, ROUND.maxCrash);
-  }, [chartData, crashPoint]);
+    // Keep Y axis more stable - only grow when needed
+    // This creates a "zoomed out" view that shows the curve better
+    if (current <= 2) return 3;
+    if (current <= 3) return 4;
+    if (current <= 5) return 6;
+    if (current <= 7) return 8;
+    return Math.min(Math.ceil(current) + 2, ROUND.maxCrash);
+  }, [multiplier, crashPoint]); // Use multiplier instead of chartData to trigger updates
 
   // Build SVG path
   const chart = useMemo(() => {
@@ -446,7 +467,7 @@ export default function MLEOCrash() {
     }
 
     return { W, H, d, xCrash, yCrash, padL, padR, padT, padB, scaleY, mMin, mMax };
-  }, [chartData, crashPoint, maxY]);
+  }, [multiplier, crashPoint, maxY]); // Use multiplier to update chart every frame
 
   if (!mounted) {
     return (
