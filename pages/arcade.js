@@ -175,6 +175,14 @@ export default function ArcadeHub() {
       href: "/coinflip",
       color: "#F59E0B",
     },
+    {
+      title: "Crash",
+      emoji: "🚀",
+      description: "Watch the multiplier grow! Cash out before it crashes to win big!",
+      prize: "Unlimited",
+      href: "/crash",
+      color: "#DC2626",
+    },
   ];
 
   return (
@@ -247,7 +255,7 @@ export default function ArcadeHub() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/40">
               <span className="text-2xl">🎮</span>
-              <span className="font-bold text-purple-300">8 Exciting Games to Play!</span>
+              <span className="font-bold text-purple-300">9 Exciting Games to Play!</span>
             </div>
           </div>
 
@@ -297,9 +305,9 @@ export default function ArcadeHub() {
           <section>
             <h4 className="text-lg font-bold text-white mb-2">💰 How It Works</h4>
             <p>
-              Each arcade game costs <strong className="text-amber-400">1,000 MLEO</strong> per play.
-              The MLEO is taken from your <strong>RUSH game vault</strong>. When you win, 
-              the prize is added back to your vault.
+              Most arcade games cost <strong className="text-amber-400">1,000 MLEO</strong> per play
+              (Crash has variable betting). The MLEO is taken from your <strong>RUSH game vault</strong>. 
+              When you win, the prize is added back to your vault.
             </p>
           </section>
 
@@ -391,6 +399,19 @@ export default function ArcadeHub() {
               <br />• ×10 multiplier: 1% chance
               <br />• ×5 multiplier: 5% chance
               <br />• Build win streaks!
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-lg font-bold text-white mb-2">🚀 Crash</h4>
+            <p>
+              Multiplier betting game - cash out before it crashes!
+              <br />• Betting phase: 30 seconds to place your bet
+              <br />• Watch multiplier grow from 1.00× upward
+              <br />• Cash out anytime before crash
+              <br />• Crash: Random between 1.1× and 10.0×
+              <br />• Provably-fair with SHA256 hash
+              <br />• Unlimited win potential!
             </p>
           </section>
 
