@@ -107,7 +107,7 @@ function Modal({ open, onClose, children }) {
         onClick={onClose}
       />
       <div className="absolute inset-0 flex items-center justify-center px-4">
-        <div className="w-full max-w-md rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl max-h-[85vh] overflow-auto">
+        <div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl max-h-[85vh] overflow-auto">
           <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 sticky top-0 bg-zinc-900 z-10">
             <h3 className="text-xl font-bold text-white">🎮 How to Play</h3>
             <button
@@ -605,67 +605,66 @@ export default function ArcadeHub() {
       {/* Settings Modal */}
       {showSettingsModal && (
         <Modal open={showSettingsModal} onClose={() => setShowSettingsModal(false)}>
-          <div className="w-96 space-y-5">
-            <div className="text-center mb-5">
-              <div className="text-3xl mb-3">⚙️</div>
+          <div className="w-80 space-y-4">
+            <div className="text-center mb-3">
+              <div className="text-3xl mb-2">⚙️</div>
               <h2 className="text-xl font-bold">Settings</h2>
             </div>
 
             {/* Audio Settings + Wallet - 3 buttons in one row */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🔊</span>
-                  <span className="text-sm font-medium">Sound</span>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-center">
+                <div className="text-sm font-medium mb-2">SOUND</div>
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => setSoundEnabled(!soundEnabled)}
+                    className={`px-4 py-2 rounded-full flex items-center justify-center text-sm transition-all ${
+                      soundEnabled 
+                        ? 'bg-emerald-500 hover:bg-emerald-600' 
+                        : 'bg-zinc-700 hover:bg-zinc-600 opacity-50'
+                    }`}
+                    style={{ minWidth: '60px', height: '32px' }}
+                  >
+                    {soundEnabled ? '🔊' : '🔇'}
+                  </button>
                 </div>
-                <button
-                  onClick={() => setSoundEnabled(!soundEnabled)}
-                  className={`w-8 h-4 rounded-full transition-all ${
-                    soundEnabled ? 'bg-emerald-500' : 'bg-zinc-600'
-                  }`}
-                >
-                  <div className={`w-3 h-3 bg-white rounded-full transition-transform ${
-                    soundEnabled ? 'translate-x-4' : 'translate-x-0.5'
-                  }`}></div>
-                </button>
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🎵</span>
-                  <span className="text-sm font-medium">Music</span>
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-center">
+                <div className="text-sm font-medium mb-2">MUSIC</div>
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => setMusicEnabled(!musicEnabled)}
+                    className={`px-4 py-2 rounded-full flex items-center justify-center text-sm transition-all ${
+                      musicEnabled 
+                        ? 'bg-amber-500 hover:bg-amber-600' 
+                        : 'bg-zinc-700 hover:bg-zinc-600 opacity-50'
+                    }`}
+                    style={{ minWidth: '60px', height: '32px' }}
+                  >
+                    {musicEnabled ? '🎵' : '🔇'}
+                  </button>
                 </div>
-                <button
-                  onClick={() => setMusicEnabled(!musicEnabled)}
-                  className={`w-8 h-4 rounded-full transition-all ${
-                    musicEnabled ? 'bg-emerald-500' : 'bg-zinc-600'
-                  }`}
-                >
-                  <div className={`w-3 h-3 bg-white rounded-full transition-transform ${
-                    musicEnabled ? 'translate-x-4' : 'translate-x-0.5'
-                  }`}></div>
-                </button>
               </div>
 
-              <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-lg">🔗</span>
-                  <span className="text-sm font-medium">Wallet</span>
-                </div>
-                <div className="scale-75 origin-left">
-                  <ConnectButton
-                    chainStatus="none"
-                    accountStatus="avatar"
-                    showBalance={false}
-                    label="CONNECT"
-                  />
+              <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-center">
+                <div className="text-sm font-medium mb-2">WALLET</div>
+                <div className="flex justify-center">
+                  <div className="scale-90">
+                    <ConnectButton
+                      chainStatus="none"
+                      accountStatus="avatar"
+                      showBalance={false}
+                      label="CONNECT"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Token Collection */}
             <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-3">
                 <span className="text-lg">💰</span>
                 <span className="text-sm font-medium">Collect MLEO</span>
               </div>
