@@ -37,7 +37,7 @@ const BUCKET_COLORS = [
 ];
 
 // Peg grid
-const ROWS = 10;     // peg rows (triangle: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+const ROWS = 12;     // peg rows (triangle: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
 const COLS = 15;     // peg columns (also number of buckets)
 const OFFSET_ROWS = true; // stagger every other row for zigzag pattern
 
@@ -314,7 +314,7 @@ function buildBoardGeometry(w, h) {
   const gapY = BOARD.pegGapY * Math.max(0.85, Math.min(1.15, scaleX)); // Reduced gap
 
   const centerX = left + innerWidth * 0.5;
-  const totalRows = 13; // Triangle with 13 rows to reach bottom
+  const totalRows = 15; // Triangle with 15 rows to reach bottom
   const maxPegsInRow = 15; // Make triangle wider to reach edges
 
   // נחשב איפה נמצאת שורת היתדות האחרונה
@@ -363,6 +363,12 @@ function buildBoardGeometry(w, h) {
         pegsInRow += 1; // Add one peg on right side
       }
       
+      // Add one extra peg on right side for row 12 (index 11)
+      if (r === 11) {
+        pegsInRow += 1; // Add one peg on right side
+      }
+      
+      
       // Perfect staggering offset for zigzag pattern - shift even rows right slightly
       let offset = (r % 2 === 1) ? gapX * 0.05 : 0;
       
@@ -370,6 +376,7 @@ function buildBoardGeometry(w, h) {
       if (r === 10) { // row 11 (0-indexed)
         offset = gapX * 0.05;
       }
+      
       
       // Special case: row 13 (old row 12) shift left by 0.4
       if (r === 12) { // row 13 (0-indexed)
@@ -625,12 +632,7 @@ function buildBoardGeometry(w, h) {
     // Clear
     ctx.clearRect(0, 0, w, h);
 
-    // BG
-    const g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, "rgba(18, 24, 40, 0.95)");
-    g.addColorStop(1, "rgba(8, 12, 24, 0.98)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
+    // BG - רקע שקוף כדי לראות את המשטח האחיד
 
     // Board walls (glow)
     ctx.save();
@@ -848,16 +850,16 @@ function buildBoardGeometry(w, h) {
             <div className="w-[88px]"></div>
           </header>
 
-          {/* PLINKO BOARD (CANVAS) - Main Window */}
-          <div className="rounded-3xl p-3 sm:p-6 bg-gradient-to-br from-blue-900/30 via-indigo-900/20 to-cyan-900/30 border-2 sm:border-4 border-blue-600/50 shadow-2xl mb-6">
-            <div className="relative bg-gradient-to-b from-indigo-900/50 to-blue-950/80 rounded-2xl p-2 sm:p-4 mb-6 overflow-hidden" style={{ minHeight: 420 }}>
-              <div className="relative mx-auto max-w-2xl">
-                <canvas ref={canvasRef} className="w-full h-[420px] rounded-xl outline-none select-none" />
-              </div>
+          {/* UNIFIED GAME SURFACE - משטח אחיד עם רקע אחיד */}
+          <div className="relative mx-auto max-w-4xl mb-6 rounded-2xl bg-slate-800/70 border border-white/20 shadow-xl p-4 sm:p-6">
+            
+            {/* Canvas עם המכשולים - ללא רקע */}
+            <div className="relative mb-4 max-w-2xl mx-auto">
+              <canvas ref={canvasRef} className="w-full h-[420px] rounded-xl outline-none select-none" />
             </div>
 
-            {/* Buckets display */}
-            <div className="relative -mt-2 sm:-mt-3" style={{ marginTop: isWideScreen ? '-2rem' : '-3rem' }}>
+            {/* קוביות הזכייה - מחוברות לקנבס */}
+            <div className="relative -mt-2 sm:-mt-3" style={{ marginTop: isWideScreen ? '-0.5rem' : '-0.75rem' }}>
               <div className="flex gap-0 sm:gap-0.5 mb-4 sm:mb-6 max-w-2xl mx-auto">
                 {MULTIPLIERS.map((mult, idx) => {
                   const landed = finalBuckets.filter(i => i === idx).length;
@@ -899,8 +901,8 @@ function buildBoardGeometry(w, h) {
               </div>
             </div>
 
-            {/* Drop Button & Bet Amount */}
-            <div className="text-center mb-6">
+            {/* כפתור DROP BALL */}
+            <div className="text-center mb-4">
               {freePlayTokens > 0 && (
                 <button
                   onClick={startFreePlay}
@@ -913,51 +915,54 @@ function buildBoardGeometry(w, h) {
               <button
                 onClick={() => dropBall(false)}
                 disabled={vault < (Number(betAmount) || MIN_BET)}
-                className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-6 ${
+                className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-lg ${
                   vault < (Number(betAmount) || MIN_BET)
                     ? "bg-zinc-700 cursor-not-allowed opacity-50"
-                    : "bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-600 hover:from-blue-500 hover:via-cyan-400 hover:to-teal-500 hover:scale-105 active:scale-95"
+                    : "bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-500 hover:to-teal-500 hover:scale-105 active:scale-95"
                 }`}
               >
                 🎯 DROP BALL ({fmt(Number(betAmount) || MIN_BET)})
               </button>
-              <div className="text-sm opacity-70 mb-4">
-                Real physics • Multiple balls supported • Max win: {fmt((Number(betAmount) || MIN_BET) * 10)}
-              </div>
-              
-              <div className="max-w-sm mx-auto">
-                <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
-                <input 
-                  type="number" 
-                  min={MIN_BET} 
-                  step="100" 
-                  value={betAmount} 
-                  onChange={(e) => setBetAmount(e.target.value)} 
-                  className="rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                  placeholder="1000" 
-                />
-                <div className="flex gap-2 mt-2 justify-center flex-wrap">
-                  {[1000, 2500, 5000, 10000].map((v) => (
-                    <button 
-                      key={v} 
-                      onClick={() => setBetAmount(String(v))} 
-                      className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
-                    >
-                      {fmt(v)}
-                    </button>
-                  ))}
-                </div>
+            </div>
+
+            {/* Real physics text */}
+            <div className="text-sm opacity-70 mb-4 text-center">
+              Real physics • Multiple balls supported • Max win: {fmt((Number(betAmount) || MIN_BET) * 10)}
+            </div>
+
+            {/* Bet Amount */}
+            <div className="max-w-sm mx-auto mb-4">
+              <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
+              <input 
+                type="number" 
+                min={MIN_BET} 
+                step="100" 
+                value={betAmount} 
+                onChange={(e) => setBetAmount(e.target.value)} 
+                className="w-full rounded-lg bg-white/5 border border-white/10 px-4 py-3 text-white text-center text-lg font-bold focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500" 
+                placeholder="1000" 
+              />
+              <div className="flex gap-2 mt-2 justify-center flex-wrap">
+                {[1000, 2500, 5000, 10000].map((v) => (
+                  <button 
+                    key={v} 
+                    onClick={() => setBetAmount(String(v))} 
+                    className="rounded-lg bg-white/10 border border-white/20 px-3 py-1 text-sm text-white hover:bg-white/20 transition-all"
+                  >
+                    {fmt(v)}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Active & Result */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 max-w-3xl mx-auto">
-              <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30">
+            {/* Active Balls */}
+            <div className="text-center">
+              <div className="inline-block p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30">
                 <div className="text-sm opacity-70 mb-1">Active Balls</div>
                 <div className="text-3xl font-bold text-cyan-400">{activeCount}</div>
               </div>
-
             </div>
+
           </div>
 
           {/* STATS - 4 Windows below game */}
