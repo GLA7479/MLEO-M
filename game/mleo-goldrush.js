@@ -265,6 +265,15 @@ export default function GoldRushPage() {
     }, 100);
   };
 
+  const resetToSetup = () => {
+    setGameResult(null);
+    setShowResultPopup(false);
+    setDugCells([]);
+    setTotalMultiplier(0);
+    setMap([]);
+    setGameActive(false);
+  };
+
   if (!mounted) {
     return <div className="min-h-screen bg-gradient-to-br from-yellow-900 via-black to-amber-900 flex items-center justify-center">
       <div className="text-white text-xl">Loading...</div>
@@ -279,11 +288,20 @@ export default function GoldRushPage() {
         <div className="max-w-6xl mx-auto p-4 pb-20">
           {/* HEADER */}
           <header className="flex items-center justify-between mb-6">
-            <Link href="/arcade">
-              <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+            {gameActive || gameResult ? (
+              <button 
+                onClick={resetToSetup}
+                className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+              >
                 BACK
               </button>
-            </Link>
+            ) : (
+              <Link href="/arcade">
+                <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+                  BACK
+                </button>
+              </Link>
+            )}
 
             <div className="text-center">
               <h1 className="text-3xl font-bold mb-1">
@@ -303,11 +321,10 @@ export default function GoldRushPage() {
             {/* Current Progress */}
             {gameActive && !gameResult && totalMultiplier > 0 && (
               <div className="text-center mb-6">
-                <div className="text-sm opacity-70 mb-2">Current Treasure</div>
-                <div className="text-4xl font-bold text-amber-400">
-                  {fmt(currentPrize)} MLEO
+                <div className="text-lg font-bold text-amber-400">
+                  Current: {fmt(currentPrize)} MLEO (×{totalMultiplier})
                 </div>
-                <div className="text-lg opacity-70">×{totalMultiplier} | Dug {dugCells.length}/25</div>
+                <div className="text-sm opacity-70">Dug {dugCells.length}/25</div>
               </div>
             )}
 
@@ -380,9 +397,9 @@ export default function GoldRushPage() {
                 <div className="mt-6 text-center">
                   <button
                     onClick={cashOut}
-                    className="px-12 py-3 rounded-xl font-bold text-xl text-white bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 transition-all hover:scale-105 shadow-lg"
+                    className="px-6 py-2 rounded-lg font-bold text-base text-white bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 transition-all hover:scale-105 shadow-lg"
                   >
-                    💰 Cash Out ({fmt(currentPrize)} MLEO)
+                    💰 Cash Out
                   </button>
                 </div>
               )}

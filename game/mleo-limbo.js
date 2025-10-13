@@ -225,6 +225,13 @@ export default function LimboPage() {
     }, 100);
   };
 
+  const resetToSetup = () => {
+    setGameResult(null);
+    setShowResultPopup(false);
+    setResult(null);
+    setRolling(false);
+  };
+
   if (!mounted) {
     return <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-black to-purple-900 flex items-center justify-center">
       <div className="text-white text-xl">Loading...</div>
@@ -240,11 +247,20 @@ export default function LimboPage() {
         <div className="max-w-6xl mx-auto p-4 pb-20">
           {/* HEADER */}
           <header className="flex items-center justify-between mb-6">
-            <Link href="/arcade">
-              <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+            {rolling || result || gameResult ? (
+              <button 
+                onClick={resetToSetup}
+                className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+              >
                 BACK
               </button>
-            </Link>
+            ) : (
+              <Link href="/arcade">
+                <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+                  BACK
+                </button>
+              </Link>
+            )}
 
             <div className="text-center">
               <h1 className="text-3xl font-bold mb-1">
