@@ -382,9 +382,9 @@ function buildBoardGeometry(w, h) {
         offset = gapX * 0.05;
       }
       
-      // Special case: row 12 (index 11) shift right by 0.2
+      // Special case: row 12 (index 11) shift left by 0.4
       if (r === 11) { // row 12 (0-indexed)
-        offset = gapX * 0.2;
+        offset = -gapX * 0.4;
       }
       
       
