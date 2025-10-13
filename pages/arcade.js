@@ -183,6 +183,38 @@ export default function ArcadeHub() {
       href: "/crash",
       color: "#DC2626",
     },
+    {
+      title: "MLEO Racer",
+      emoji: "🏁",
+      description: "Bet on your favorite car and watch them race! Win up to ×6 multiplier!",
+      prize: "×6",
+      href: "/racer",
+      color: "#F97316",
+    },
+    {
+      title: "MLEO Darts",
+      emoji: "🎯",
+      description: "Throw darts and hit the bullseye for massive wins! Up to ×10 multiplier!",
+      prize: "×10",
+      href: "/darts",
+      color: "#EA580C",
+    },
+    {
+      title: "MLEO Tower",
+      emoji: "⚖️",
+      description: "Climb the tower and cash out before it collapses! Risk vs reward game!",
+      prize: "×10",
+      href: "/tower",
+      color: "#8B5CF6",
+    },
+    {
+      title: "MLEO Blackjack",
+      emoji: "🎰",
+      description: "Beat the dealer to 21! Classic card game with emoji cards.",
+      prize: "×2",
+      href: "/blackjack",
+      color: "#10B981",
+    },
   ];
 
   return (
@@ -363,6 +395,51 @@ export default function ArcadeHub() {
               <br />• Edge buckets: ×10, ×5 (rare but huge!)
               <br />• Center buckets: ×2, ×3 (wins) or ×0.5, ×0.2, ×0 (losses)
               <br />• Drop multiple balls simultaneously for more action!
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-lg font-bold text-white mb-2">🏁 MLEO Racer</h4>
+            <p>
+              Bet on your favorite car and watch them race! Choose from 5 different cars.
+              <br />• 1st place: ×6 multiplier (6,000 MLEO)
+              <br />• 2nd place: ×4 multiplier (4,000 MLEO)
+              <br />• 3rd place: ×2.5 multiplier (2,500 MLEO)
+              <br />• 4th & 5th place: Break even or small loss
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-lg font-bold text-white mb-2">🎯 MLEO Darts</h4>
+            <p>
+              Throw darts at a target board and hit different zones for prizes!
+              <br />• Bullseye: ×10 multiplier (10,000 MLEO)
+              <br />• Inner Ring: ×5 multiplier (5,000 MLEO)
+              <br />• Outer Ring: ×3 multiplier (3,000 MLEO)
+              <br />• Middle Ring: ×1.5 multiplier (1,500 MLEO)
+              <br />• Miss: Lose your bet
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-lg font-bold text-white mb-2">⚖️ MLEO Tower</h4>
+            <p>
+              Climb the tower floor by floor, but cash out before it collapses!
+              <br />• Each floor multiplies your bet by ×1.3
+              <br />• Higher floors = higher rewards but more collapse risk
+              <br />• Cash out anytime to secure your winnings
+              <br />• Tower collapse = lose everything
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-lg font-bold text-white mb-2">🎰 MLEO Blackjack</h4>
+            <p>
+              Classic 21 card game against the dealer! Beat the dealer without going over 21.
+              <br />• Get closer to 21 than dealer = Win ×2 your bet
+              <br />• Same value as dealer = Push (refund)
+              <br />• Dealer wins = Lose your bet
+              <br />• Hit for more cards or Stand with your hand
             </p>
           </section>
 
