@@ -341,25 +341,88 @@ export default function ArcadeHub() {
       href: "/three-card-poker",
       color: "#EC4899",
     },
-    // 8. Caribbean Stud
+    // 8. Multiplier Ladder - NEW!
     {
-      title: "Caribbean Stud",
-      emoji: "🃏",
-      description: "5 cards vs dealer - best hand wins with instant results.",
-      prize: "×100",
-      href: "/caribbean-stud",
-      color: "#14B8A6",
+      title: "Multiplier Ladder",
+      emoji: "🪜",
+      description: "Climb the ladder! Choose left or right to climb higher - cash out before you fall!",
+      prize: "×20",
+      href: "/ladder",
+      color: "#9333EA",
     },
-    // 9. Pai Gow Poker
+    // 9. Bomb Squad - NEW!
     {
-      title: "Pai Gow Poker",
-      emoji: "🃏",
-      description: "7 cards split into 5+2 - beat dealer on both hands!",
-      prize: "×2",
-      href: "/pai-gow",
+      title: "Bomb Squad",
+      emoji: "💣",
+      description: "Defuse the bomb! Cut the correct wire at each level - wrong wire = BOOM!",
+      prize: "×32",
+      href: "/bomb",
+      color: "#DC2626",
+    },
+    // 10. Mystery Box - NEW!
+    {
+      title: "Mystery Box",
+      emoji: "🎁",
+      description: "Choose 1 box from 10! Find the jackpot or walk away empty!",
+      prize: "×50",
+      href: "/mystery",
       color: "#F59E0B",
     },
-    // 10. Roulette
+    // 11. Lucky Chamber - NEW!
+    {
+      title: "Lucky Chamber",
+      emoji: "🎯",
+      description: "6 chambers, 1 danger! Pick wisely and cash out before it's too late!",
+      prize: "×7.5",
+      href: "/chamber",
+      color: "#64748B",
+    },
+    // 12. Horse Racing - NEW!
+    {
+      title: "Horse Racing",
+      emoji: "🏇",
+      description: "Bet on your favorite horse! Watch them race and win big!",
+      prize: "×5",
+      href: "/horse",
+      color: "#16A34A",
+    },
+    // 13. Target Shooter - NEW!
+    {
+      title: "Target Shooter",
+      emoji: "🎯",
+      description: "Hit all targets in 20 seconds! Fast clicks = big wins!",
+      prize: "×15",
+      href: "/shooter",
+      color: "#EA580C",
+    },
+    // 14. Sic Bo - NEW!
+    {
+      title: "Sic Bo",
+      emoji: "🎲",
+      description: "Ancient Chinese dice game! Bet on totals, triples, and more!",
+      prize: "×50",
+      href: "/sicbo",
+      color: "#B91C1C",
+    },
+    // 15. Gold Rush Digger - NEW!
+    {
+      title: "Gold Rush Digger",
+      emoji: "⛏️",
+      description: "Dig a 5×5 treasure map! Find gems and jackpots - avoid 6 skulls!",
+      prize: "×61",
+      href: "/goldrush",
+      color: "#D97706",
+    },
+    // 16. Limbo - NEW!
+    {
+      title: "Limbo",
+      emoji: "🎲",
+      description: "Set your target multiplier and roll! Higher risk = bigger rewards!",
+      prize: "Unlimited",
+      href: "/limbo",
+      color: "#6366F1",
+    },
+    // 17. Roulette
     {
       title: "Roulette",
       emoji: "🎰",
@@ -378,52 +441,12 @@ export default function ArcadeHub() {
       color: "#FBBF24",
     },
     {
-      title: "Dice Roller",
-      emoji: "🎲",
-      description: "Roll 3 dice and match combinations. Triple six wins big!",
-      prize: "×10",
-      href: "/dice",
-      color: "#EF4444",
-    },
-    {
       title: "Wheel of Fortune",
       emoji: "🎡",
       description: "Spin the wheel and land on prizes. Watch out for free spins!",
       prize: "×10",
       href: "/wheel",
       color: "#A855F7",
-    },
-    {
-      title: "Scratch Card",
-      emoji: "🎫",
-      description: "Scratch to reveal 9 symbols. Match 3 identical symbols to win!",
-      prize: "×10",
-      href: "/scratch",
-      color: "#06B6D4",
-    },
-    {
-      title: "Coin Flip",
-      emoji: "🪙",
-      description: "Classic 50/50! Choose heads or tails with random win multipliers up to ×10!",
-      prize: "×10",
-      href: "/coinflip",
-      color: "#D97706",
-    },
-    {
-      title: "Racer",
-      emoji: "🏎️",
-      description: "Bet on your favorite car and watch them race! Win up to ×6 multiplier!",
-      prize: "×6",
-      href: "/racer",
-      color: "#F97316",
-    },
-    {
-      title: "Darts",
-      emoji: "🎯",
-      description: "Throw darts and hit the bullseye for massive wins! Up to ×10 multiplier!",
-      prize: "×10",
-      href: "/darts",
-      color: "#BE123C",
     },
     {
       title: "Tower",
@@ -539,7 +562,7 @@ export default function ArcadeHub() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/40">
               <span className="text-2xl">🎮</span>
-              <span className="font-bold text-purple-300">20 Exciting Games to Play!</span>
+              <span className="font-bold text-purple-300">22 Exciting Games to Play!</span>
             </div>
           </div>
 
