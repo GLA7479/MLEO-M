@@ -116,7 +116,7 @@ export default function MLEOCrash() {
   // Game state
   const [phase, setPhase] = useState("betting"); // betting | running | crashed | revealing | intermission
   const [countdown, setCountdown] = useState(ROUND.bettingSeconds);
-  const [betAmount, setBetAmount] = useState("");
+  const [betAmount, setBetAmount] = useState("1000");
   const [playerBet, setPlayerBet] = useState(null); // { amount:number, accepted:boolean }
   const [canCashOut, setCanCashOut] = useState(false);
   const [cashedOutAt, setCashedOutAt] = useState(null); // multiplier at cashout
@@ -373,8 +373,8 @@ export default function MLEOCrash() {
 
   // ------------------------------- Actions ----------------------------------
   const placeBet = () => {
-    const amt = Number(betAmount);
-    if (!Number.isFinite(amt) || amt <= 0) return;
+    const amt = Number(betAmount) || 1000;
+    if (!Number.isFinite(amt) || amt < 1000) return;
     if (phase !== "betting") return;
     if (amt > vault) return;
 
@@ -641,23 +641,23 @@ export default function MLEOCrash() {
                   <label className="block text-sm text-zinc-400 mb-1">Amount (MLEO)</label>
                   <input
                     type="number"
-                    min="0"
+                    min="1000"
                     step="100"
                     value={betAmount}
                     onChange={(e) => setBetAmount(e.target.value)}
                     className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="e.g. 1000"
+                    placeholder="1000"
                     disabled={phase !== "betting"}
                   />
-                  <div className="flex gap-2 mt-2 flex-wrap">
-                    {[100, 500, 1000, 5000].map((v) => (
-                      <button
-                        key={v}
-                        onClick={() => setBetAmount(String(v))}
-                        disabled={phase !== "betting"}
+                  <div className="flex gap-2 mt-2 justify-center flex-wrap">
+                    {[1000, 2500, 5000, 10000].map((v) => (
+                      <button 
+                        key={v} 
+                        onClick={() => setBetAmount(String(v))} 
                         className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
+                        disabled={phase !== "betting"}
                       >
-                        {v}
+                        {v >= 1000 ? `${v/1000}K` : v}
                       </button>
                     ))}
                   </div>

@@ -11,7 +11,7 @@ import Link from "next/link";
 // CONFIG
 // ============================================================================
 const LS_KEY = "mleo_mines_v1";
-const GAME_COST = 1000;
+const MIN_BET = 1000; // Minimum bet amount
 const GRID_SIZE = 25; // 5x5 grid
 const MINE_COUNTS = [3, 5, 7]; // Easy, Medium, Hard
 
@@ -77,6 +77,7 @@ function calculateMultiplier(revealed, totalSafe, difficulty) {
 export default function MinesPage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
+  const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
   const [difficulty, setDifficulty] = useState(1); // 0=easy, 1=medium, 2=hard
   const [playing, setPlaying] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -84,8 +85,9 @@ export default function MinesPage() {
   const [mines, setMines] = useState([]);
   const [revealed, setRevealed] = useState([]);
   const [currentMultiplier, setCurrentMultiplier] = useState(1);
+  const [currentBet, setCurrentBet] = useState(MIN_BET); // Track current game bet
   const [stats, setStats] = useState(() => 
-    safeRead(LS_KEY, { totalGames: 0, totalWon: 0, biggestWin: 0, cashouts: 0 })
+    safeRead(LS_KEY, { totalGames: 0, totalBet: 0, totalWon: 0, biggestWin: 0, cashouts: 0, lastBet: MIN_BET })
   );
 
   const clickSound = useRef(null);
@@ -95,6 +97,12 @@ export default function MinesPage() {
   useEffect(() => {
     setMounted(true);
     setVaultState(getVault());
+    
+    // Load last bet amount
+    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
+    if (savedStats.lastBet) {
+      setBetAmount(String(savedStats.lastBet));
+    }
     
     if (typeof Audio !== "undefined") {
       clickSound.current = new Audio("/sounds/click.mp3");
@@ -112,15 +120,22 @@ export default function MinesPage() {
   };
 
   const startGame = () => {
+    const bet = Number(betAmount) || MIN_BET;
+    if (bet < MIN_BET) {
+      alert(`Minimum bet is ${MIN_BET} MLEO!`);
+      return;
+    }
+    
     const currentVault = getVault();
-    if (currentVault < GAME_COST) {
+    if (currentVault < bet) {
       alert("Not enough MLEO!");
       return;
     }
 
     // Deduct cost
-    setVault(currentVault - GAME_COST);
-    setVaultState(currentVault - GAME_COST);
+    setVault(currentVault - bet);
+    setVaultState(currentVault - bet);
+    setCurrentBet(bet); // Store bet amount for prize calculations
 
     // Initialize game
     const minePositions = generateMines(MINE_COUNTS[difficulty]);
@@ -157,7 +172,9 @@ export default function MinesPage() {
       
       setStats(s => ({
         ...s,
-        totalGames: s.totalGames + 1
+        totalGames: s.totalGames + 1,
+        totalBet: (s.totalBet || 0) + currentBet,
+        lastBet: currentBet
       }));
       
       return;
@@ -175,7 +192,7 @@ export default function MinesPage() {
         winSound.current.play().catch(() => {});
       }
       
-      const prize = Math.floor(GAME_COST * mult);
+      const prize = Math.floor(currentBet * mult);
       const newVault = getVault() + prize;
       setVault(newVault);
       setVaultState(newVault);
@@ -186,9 +203,11 @@ export default function MinesPage() {
       
       setStats(s => ({
         totalGames: s.totalGames + 1,
+        totalBet: (s.totalBet || 0) + currentBet,
         totalWon: s.totalWon + prize,
         biggestWin: Math.max(s.biggestWin, prize),
-        cashouts: s.cashouts + 1
+        cashouts: s.cashouts + 1,
+        lastBet: currentBet
       }));
     }
   };
@@ -201,7 +220,7 @@ export default function MinesPage() {
       winSound.current.play().catch(() => {});
     }
 
-    const prize = Math.floor(GAME_COST * currentMultiplier);
+    const prize = Math.floor(currentBet * currentMultiplier);
     const newVault = getVault() + prize;
     setVault(newVault);
     setVaultState(newVault);
@@ -212,9 +231,11 @@ export default function MinesPage() {
     
     setStats(s => ({
       totalGames: s.totalGames + 1,
+      totalBet: (s.totalBet || 0) + currentBet,
       totalWon: s.totalWon + prize,
       biggestWin: Math.max(s.biggestWin, prize),
-      cashouts: s.cashouts + 1
+      cashouts: s.cashouts + 1,
+      lastBet: currentBet
     }));
   };
 
@@ -291,15 +312,43 @@ export default function MinesPage() {
 
                 <button
                   onClick={startGame}
-                  disabled={vault < GAME_COST}
-                  className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl ${
-                    vault < GAME_COST
+                  disabled={vault < (Number(betAmount) || MIN_BET)}
+                  className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-4 ${
+                    vault < (Number(betAmount) || MIN_BET)
                       ? "bg-zinc-700 cursor-not-allowed opacity-50"
                       : "bg-gradient-to-r from-gray-600 via-zinc-500 to-slate-600 hover:from-gray-500 hover:via-zinc-400 hover:to-slate-500 hover:scale-105"
                   }`}
                 >
-                  💣 START ({fmt(GAME_COST)})
+                  💣 START ({fmt(Number(betAmount) || MIN_BET)})
                 </button>
+
+                {/* Bet Amount Input */}
+                <div className="max-w-sm mx-auto">
+                  <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
+                  <input 
+                    type="number" 
+                    min={MIN_BET} 
+                    step="100" 
+                    value={betAmount} 
+                    onChange={(e) => setBetAmount(e.target.value)} 
+                    className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-gray-500" 
+                    placeholder="1000" 
+                  />
+                  <div className="flex gap-2 mt-2 justify-center flex-wrap">
+                    {[1000, 2500, 5000, 10000].map((v) => (
+                      <button 
+                        key={v} 
+                        onClick={() => setBetAmount(String(v))} 
+                        className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
+                      >
+                        {v >= 1000 ? `${v/1000}K` : v}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-2 text-center">
+                    Max win: {((Number(betAmount) || MIN_BET) * 10).toLocaleString()} MLEO
+                  </div>
+                </div>
               </div>
             ) : (
               <>
@@ -307,7 +356,7 @@ export default function MinesPage() {
                 <div className="text-center mb-6">
                   <div className="text-sm opacity-70 mb-1">Current Prize</div>
                   <div className="text-4xl font-bold text-green-400">
-                    {fmt(Math.floor(GAME_COST * currentMultiplier))} MLEO
+                    {fmt(Math.floor(currentBet * currentMultiplier))} MLEO
                   </div>
                   <div className="text-lg opacity-70">×{currentMultiplier.toFixed(2)}</div>
                 </div>
@@ -350,7 +399,7 @@ export default function MinesPage() {
                       <>
                         <div className="text-2xl font-bold mb-2">💎 Success!</div>
                         <div className="text-3xl font-bold text-green-400">
-                          +{fmt(Math.floor(GAME_COST * currentMultiplier))} MLEO
+                          +{fmt(Math.floor(currentBet * currentMultiplier))} MLEO
                         </div>
                       </>
                     ) : (
@@ -369,21 +418,21 @@ export default function MinesPage() {
                       onClick={cashout}
                       className="px-8 py-3 rounded-xl font-bold text-lg text-white bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400"
                     >
-                      💰 Cash Out ({fmt(Math.floor(GAME_COST * currentMultiplier))})
+                      💰 Cash Out ({fmt(Math.floor(currentBet * currentMultiplier))})
                     </button>
                   )}
                   
                   {gameOver && (
                     <button
                       onClick={startGame}
-                      disabled={vault < GAME_COST}
+                      disabled={vault < (Number(betAmount) || MIN_BET)}
                       className={`px-8 py-3 rounded-xl font-bold text-lg text-white transition-all ${
-                        vault < GAME_COST
+                        vault < (Number(betAmount) || MIN_BET)
                           ? "bg-zinc-700 cursor-not-allowed opacity-50"
                           : "bg-gradient-to-r from-gray-600 to-zinc-500 hover:from-gray-500 hover:to-zinc-400"
                       }`}
                     >
-                      🔄 Play Again ({fmt(GAME_COST)})
+                      🔄 Play Again ({fmt(Number(betAmount) || MIN_BET)})
                     </button>
                   )}
                 </div>

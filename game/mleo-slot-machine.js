@@ -12,7 +12,7 @@ import Link from "next/link";
 // CONFIG
 // ============================================================================
 const LS_KEY = "mleo_slot_machine_v1";
-const SPIN_COST = 1000;
+const MIN_BET = 1000; // Minimum bet amount
 
 const SYMBOLS = ["💎", "🪙", "⭐", "🎁", "🔥", "🍀", "👑"];
 
@@ -104,10 +104,12 @@ function randomSymbol() {
 export default function SlotMachinePage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
+  const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
+  const [currentBet, setCurrentBet] = useState(MIN_BET); // Track current game bet
   const [spinning, setSpinning] = useState(false);
   const [reels, setReels] = useState([randomSymbol(), randomSymbol(), randomSymbol()]);
   const [result, setResult] = useState(null);
-  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalSpins: 0, totalWon: 0, biggestWin: 0 }));
+  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalSpins: 0, totalBet: 0, totalWon: 0, biggestWin: 0, lastBet: MIN_BET }));
   const [freeSpins, setFreeSpins] = useState(0);
   const [showPrizeTable, setShowPrizeTable] = useState(false);
 
@@ -117,6 +119,12 @@ export default function SlotMachinePage() {
   useEffect(() => {
     setMounted(true);
     setVaultState(getVault());
+    
+    // Load last bet amount
+    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
+    if (savedStats.lastBet) {
+      setBetAmount(String(savedStats.lastBet));
+    }
     
     // Preload sounds
     if (typeof Audio !== "undefined") {
@@ -136,7 +144,8 @@ export default function SlotMachinePage() {
   const spin = async () => {
     if (spinning) return;
 
-    const cost = freeSpins > 0 ? 0 : SPIN_COST;
+    const bet = Number(betAmount) || MIN_BET;
+    const cost = freeSpins > 0 ? 0 : bet;
     const currentVault = getVault();
 
     if (cost > 0 && currentVault < cost) {
@@ -148,6 +157,7 @@ export default function SlotMachinePage() {
     if (cost > 0) {
       setVault(currentVault - cost);
       setVaultState(currentVault - cost);
+      setCurrentBet(bet); // Store bet amount for prize calculations
     } else {
       setFreeSpins(freeSpins - 1);
     }
@@ -178,15 +188,17 @@ export default function SlotMachinePage() {
         setFreeSpins(f => f + 1);
         setResult({ win: true, message: win.label, prize: 0, freeSpin: true });
       } else {
-        const prize = Math.floor(SPIN_COST * win.mult);
+        const prize = Math.floor(currentBet * win.mult);
         const newVault = getVault() + prize;
         setVault(newVault);
         setVaultState(newVault);
         
         setStats(s => ({
           totalSpins: s.totalSpins + 1,
+          totalBet: (s.totalBet || 0) + currentBet,
           totalWon: s.totalWon + prize,
-          biggestWin: Math.max(s.biggestWin, prize)
+          biggestWin: Math.max(s.biggestWin, prize),
+          lastBet: currentBet
         }));
 
         setResult({ win: true, message: win.label, prize });
@@ -198,7 +210,7 @@ export default function SlotMachinePage() {
       }
     } else {
       setResult({ win: false, message: "Try Again!" });
-      setStats(s => ({ ...s, totalSpins: s.totalSpins + 1 }));
+      setStats(s => ({ ...s, totalSpins: s.totalSpins + 1, totalBet: (s.totalBet || 0) + currentBet, lastBet: currentBet }));
     }
 
     setSpinning(false);
@@ -284,22 +296,47 @@ export default function SlotMachinePage() {
             )}
 
             {/* SPIN BUTTON */}
-            <div className="text-center">
+            <div className="text-center mb-6">
               <button
                 onClick={spin}
-                disabled={spinning || (vault < SPIN_COST && freeSpins === 0)}
+                disabled={spinning || (vault < (Number(betAmount) || MIN_BET) && freeSpins === 0)}
                 className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl ${
                   spinning
                     ? "bg-zinc-700 cursor-wait"
-                    : vault < SPIN_COST && freeSpins === 0
+                    : vault < (Number(betAmount) || MIN_BET) && freeSpins === 0
                     ? "bg-zinc-700 cursor-not-allowed opacity-50"
                     : "bg-gradient-to-r from-yellow-600 via-amber-500 to-yellow-600 hover:from-yellow-500 hover:via-amber-400 hover:to-yellow-500 hover:scale-105"
                 }`}
               >
-                {spinning ? "🎰 SPINNING..." : freeSpins > 0 ? "🎁 FREE SPIN!" : `🎰 SPIN (${fmt(SPIN_COST)})`}
+                {spinning ? "🎰 SPINNING..." : freeSpins > 0 ? "🎁 FREE SPIN!" : `🎰 SPIN (${fmt(Number(betAmount) || MIN_BET)})`}
               </button>
               <div className="text-sm opacity-60 mt-3">
-                {freeSpins > 0 ? `${freeSpins} free spins available` : `${fmt(SPIN_COST)} MLEO per spin`}
+                {freeSpins > 0 ? `${freeSpins} free spins available` : `${fmt(Number(betAmount) || MIN_BET)} MLEO per spin`}
+              </div>
+            </div>
+
+            {/* Bet Amount Input */}
+            <div className="max-w-sm mx-auto">
+              <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
+              <input 
+                type="number" 
+                min={MIN_BET} 
+                step="100" 
+                value={betAmount} 
+                onChange={(e) => setBetAmount(e.target.value)} 
+                className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" 
+                placeholder="1000" 
+              />
+              <div className="flex gap-2 mt-2 justify-center flex-wrap">
+                {[1000, 2500, 5000, 10000].map((v) => (
+                  <button 
+                    key={v} 
+                    onClick={() => setBetAmount(String(v))} 
+                    className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
+                  >
+                    {v >= 1000 ? `${v/1000}K` : v}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -350,7 +387,7 @@ export default function SlotMachinePage() {
                   <div key={combo} className="grid grid-cols-3 gap-2 text-center text-sm py-2 border-b border-white/10">
                     <div className="text-2xl">{combo === "FREE_SPIN" ? "🎁🎁🎁" : combo}</div>
                     <div className="font-bold text-green-400">
-                      {data.freeSpin ? "FREE SPIN" : `${fmt(SPIN_COST * data.mult)}`}
+                      {data.freeSpin ? "FREE SPIN" : `${fmt((Number(betAmount) || MIN_BET) * data.mult)}`}
                     </div>
                     <div className="text-amber-400">{data.freeSpin ? "🎁" : `×${data.mult}`}</div>
                   </div>
@@ -382,7 +419,7 @@ export default function SlotMachinePage() {
               <div>
                 <div className="text-sm opacity-70">Win Rate</div>
                 <div className="text-2xl font-bold text-blue-400">
-                  {stats.totalSpins > 0 ? `${((stats.totalWon / (stats.totalSpins * SPIN_COST)) * 100).toFixed(1)}%` : "0%"}
+                  {stats.totalSpins > 0 ? `${((stats.totalWon / stats.totalBet) * 100).toFixed(1)}%` : "0%"}
                 </div>
               </div>
             </div>

@@ -11,7 +11,7 @@ import Link from "next/link";
 // CONFIG
 // ============================================================================
 const LS_KEY = "mleo_scratch_card_v1";
-const CARD_COST = 1000;
+const MIN_BET = 1000; // Minimum bet amount
 
 const SYMBOLS = ["💎", "🪙", "⭐", "🎁", "🔥", "👑", "🍀", "💰"];
 
@@ -145,12 +145,14 @@ function checkWin(revealed, cells) {
 export default function ScratchCardPage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
+  const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
+  const [currentBet, setCurrentBet] = useState(MIN_BET); // Track current game bet
   const [playing, setPlaying] = useState(false);
   const [cells, setCells] = useState([]);
   const [revealed, setRevealed] = useState([]);
   const [result, setResult] = useState(null);
   const [stats, setStats] = useState(() => 
-    safeRead(LS_KEY, { totalCards: 0, totalWon: 0, biggestWin: 0, wins: 0 })
+    safeRead(LS_KEY, { totalCards: 0, totalBet: 0, totalWon: 0, biggestWin: 0, wins: 0, lastBet: MIN_BET })
   );
   const [autoReveal, setAutoReveal] = useState(false);
 
@@ -160,6 +162,12 @@ export default function ScratchCardPage() {
   useEffect(() => {
     setMounted(true);
     setVaultState(getVault());
+    
+    // Load last bet amount
+    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
+    if (savedStats.lastBet) {
+      setBetAmount(String(savedStats.lastBet));
+    }
     
     if (typeof Audio !== "undefined") {
       scratchSound.current = new Audio("/sounds/click.mp3");
@@ -177,14 +185,21 @@ export default function ScratchCardPage() {
 
   const buyCard = () => {
     const currentVault = getVault();
-    if (currentVault < CARD_COST) {
+    const bet = Number(betAmount) || MIN_BET;
+    if (bet < MIN_BET) {
+      setResult({ error: true, message: `Minimum bet is ${MIN_BET} MLEO!` });
+      return;
+    }
+    
+    if (currentVault < bet) {
       setResult({ error: true, message: "Not enough MLEO!" });
       return;
     }
 
     // Deduct cost
-    setVault(currentVault - CARD_COST);
-    setVaultState(currentVault - CARD_COST);
+    setVault(currentVault - bet);
+    setVaultState(currentVault - bet);
+    setCurrentBet(bet); // Store bet amount for prize calculations
 
     // Generate new card
     const newCells = generateCard();
@@ -209,16 +224,18 @@ export default function ScratchCardPage() {
     const win = checkWin(newRevealed, cells);
     
     if (win) {
-      const prize = Math.floor(CARD_COST * win.mult);
+      const prize = Math.floor(currentBet * win.mult);
       const newVault = getVault() + prize;
       setVault(newVault);
       setVaultState(newVault);
       
       setStats(s => ({
         totalCards: s.totalCards + 1,
+        totalBet: (s.totalBet || 0) + currentBet,
         totalWon: s.totalWon + prize,
         biggestWin: Math.max(s.biggestWin, prize),
-        wins: s.wins + 1
+        wins: s.wins + 1,
+        lastBet: currentBet
       }));
 
       setResult({ 
@@ -241,7 +258,7 @@ export default function ScratchCardPage() {
       setTimeout(() => setRevealed([0,1,2,3,4,5,6,7,8]), 500);
     } else if (newRevealed.length === 9) {
       // All revealed, no win
-      setStats(s => ({ ...s, totalCards: s.totalCards + 1 }));
+      setStats(s => ({ ...s, totalCards: s.totalCards + 1, totalBet: (s.totalBet || 0) + currentBet, lastBet: currentBet }));
       setResult({ 
         win: false, 
         message: "No match. Try again!" 
@@ -258,16 +275,18 @@ export default function ScratchCardPage() {
     const win = checkWin([0,1,2,3,4,5,6,7,8], cells);
     
     if (win) {
-      const prize = Math.floor(CARD_COST * win.mult);
+      const prize = Math.floor(currentBet * win.mult);
       const newVault = getVault() + prize;
       setVault(newVault);
       setVaultState(newVault);
       
       setStats(s => ({
         totalCards: s.totalCards + 1,
+        totalBet: (s.totalBet || 0) + currentBet,
         totalWon: s.totalWon + prize,
         biggestWin: Math.max(s.biggestWin, prize),
-        wins: s.wins + 1
+        wins: s.wins + 1,
+        lastBet: currentBet
       }));
 
       setResult({ 
@@ -284,7 +303,7 @@ export default function ScratchCardPage() {
         winSound.current.play().catch(() => {});
       }
     } else {
-      setStats(s => ({ ...s, totalCards: s.totalCards + 1 }));
+      setStats(s => ({ ...s, totalCards: s.totalCards + 1, totalBet: (s.totalBet || 0) + currentBet, lastBet: currentBet }));
       setResult({ 
         win: false, 
         message: "No match. Try again!" 
@@ -342,19 +361,48 @@ export default function ScratchCardPage() {
                 <h2 className="text-2xl font-bold mb-4">Ready to play?</h2>
                 <p className="text-sm opacity-70 mb-6">
                   Scratch 3 matching symbols to win!<br/>
-                  Match 3 identical symbols for prizes up to 10,000 MLEO!
+                  Match 3 identical symbols for prizes up to ×10 multiplier!
                 </p>
+
                 <button
                   onClick={buyCard}
-                  disabled={vault < CARD_COST}
-                  className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl ${
-                    vault < CARD_COST
+                  disabled={vault < (Number(betAmount) || MIN_BET)}
+                  className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-6 ${
+                    vault < (Number(betAmount) || MIN_BET)
                       ? "bg-zinc-700 cursor-not-allowed opacity-50"
                       : "bg-gradient-to-r from-teal-600 via-cyan-500 to-blue-600 hover:from-teal-500 hover:via-cyan-400 hover:to-blue-500 hover:scale-105"
                   }`}
                 >
-                  🃏 BUY CARD ({fmt(CARD_COST)})
+                  🃏 BUY CARD ({fmt(Number(betAmount) || MIN_BET)})
                 </button>
+
+                {/* Bet Amount Input */}
+                <div className="max-w-sm mx-auto">
+                  <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
+                  <input 
+                    type="number" 
+                    min={MIN_BET} 
+                    step="100" 
+                    value={betAmount} 
+                    onChange={(e) => setBetAmount(e.target.value)} 
+                    className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-cyan-500" 
+                    placeholder="1000" 
+                  />
+                  <div className="flex gap-2 mt-2 justify-center flex-wrap">
+                    {[1000, 2500, 5000, 10000].map((v) => (
+                      <button 
+                        key={v} 
+                        onClick={() => setBetAmount(String(v))} 
+                        className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
+                      >
+                        {v >= 1000 ? `${v/1000}K` : v}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-2 text-center">
+                    Max win: {((Number(betAmount) || MIN_BET) * 10).toLocaleString()} MLEO
+                  </div>
+                </div>
               </div>
             ) : (
               <>
@@ -420,15 +468,43 @@ export default function ScratchCardPage() {
                   <div className="text-center mt-6">
                     <button
                       onClick={buyCard}
-                      disabled={vault < CARD_COST}
-                      className={`px-8 py-3 rounded-xl font-bold text-lg text-white transition-all ${
-                        vault < CARD_COST
+                      disabled={vault < (Number(betAmount) || MIN_BET)}
+                      className={`px-8 py-3 rounded-xl font-bold text-lg text-white transition-all mb-6 ${
+                        vault < (Number(betAmount) || MIN_BET)
                           ? "bg-zinc-700 cursor-not-allowed opacity-50"
                           : "bg-gradient-to-r from-teal-600 to-cyan-500 hover:from-teal-500 hover:to-cyan-400"
                       }`}
                     >
-                      🃏 New Card ({fmt(CARD_COST)})
+                      🃏 New Card ({fmt(Number(betAmount) || MIN_BET)})
                     </button>
+                    
+                    {/* Bet Amount Input */}
+                    <div className="max-w-sm mx-auto">
+                      <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
+                      <input 
+                        type="number" 
+                        min={MIN_BET} 
+                        step="100" 
+                        value={betAmount} 
+                        onChange={(e) => setBetAmount(e.target.value)} 
+                        className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-cyan-500" 
+                        placeholder="1000" 
+                      />
+                      <div className="flex gap-2 mt-2 justify-center flex-wrap">
+                        {[1000, 2500, 5000, 10000].map((v) => (
+                          <button 
+                            key={v} 
+                            onClick={() => setBetAmount(String(v))} 
+                            className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
+                          >
+                            {v >= 1000 ? `${v/1000}K` : v}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-2 text-center">
+                        Max win: {((Number(betAmount) || MIN_BET) * 10).toLocaleString()} MLEO
+                      </div>
+                    </div>
                   </div>
                 )}
               </>
@@ -474,7 +550,7 @@ export default function ScratchCardPage() {
                 <div key={symbol} className="grid grid-cols-4 gap-2 text-center text-sm py-2 border-b border-white/10 items-center">
                   <div className="text-3xl">{symbol}</div>
                   <div className="font-semibold">{data.label}</div>
-                  <div className="font-bold text-green-400">{fmt(CARD_COST * data.mult)}</div>
+                  <div className="font-bold text-green-400">{fmt((Number(betAmount) || MIN_BET) * data.mult)}</div>
                   <div className="text-amber-400">×{data.mult}</div>
                 </div>
               ))}

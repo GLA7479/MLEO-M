@@ -27,7 +27,7 @@ function GameCard({ title, emoji, description, prize, href, color }) {
         <div className="grid grid-cols-2 gap-2 mb-3">
           <div className="rounded-lg bg-black/30 border border-white/10 p-2.5 text-center">
             <div className="text-xs opacity-70 mb-1">Cost</div>
-            <div className="text-base font-bold text-amber-400">1,000</div>
+            <div className="text-base font-bold text-amber-400">1K+</div>
           </div>
           
           <div className="rounded-lg bg-black/30 border border-white/10 p-2.5 text-center">
@@ -115,7 +115,7 @@ export default function ArcadeHub() {
       title: "Slot Machine",
       emoji: "🎰",
       description: "Classic 3-reel slots with matching symbols. Land 3 diamonds for the JACKPOT!",
-      prize: "10,000 MLEO",
+      prize: "×10",
       href: "/slots",
       color: "#FBBF24",
     },
@@ -123,7 +123,7 @@ export default function ArcadeHub() {
       title: "Dice Roller",
       emoji: "🎲",
       description: "Roll 3 dice and match combinations. Triple six wins big!",
-      prize: "10,000 MLEO",
+      prize: "×10",
       href: "/dice",
       color: "#EF4444",
     },
@@ -131,7 +131,7 @@ export default function ArcadeHub() {
       title: "Wheel of Fortune",
       emoji: "🎡",
       description: "Spin the wheel and land on prizes. Watch out for free spins!",
-      prize: "10,000 MLEO",
+      prize: "×10",
       href: "/wheel",
       color: "#8B5CF6",
     },
@@ -139,7 +139,7 @@ export default function ArcadeHub() {
       title: "Scratch Card",
       emoji: "🃏",
       description: "Scratch to reveal 9 symbols. Match 3 identical symbols to win!",
-      prize: "10,000 MLEO",
+      prize: "×10",
       href: "/scratch",
       color: "#14B8A6",
     },
@@ -147,7 +147,7 @@ export default function ArcadeHub() {
       title: "Plinko",
       emoji: "🎯",
       description: "Drop the ball through pegs! Land on high multipliers for massive wins!",
-      prize: "10,000 MLEO",
+      prize: "×10",
       href: "/plinko",
       color: "#3B82F6",
     },
@@ -155,7 +155,7 @@ export default function ArcadeHub() {
       title: "Mines",
       emoji: "💣",
       description: "Minesweeper-style risk game. Find safe tiles and cash out before hitting a mine!",
-      prize: "10,000 MLEO",
+      prize: "×10",
       href: "/mines",
       color: "#DC2626",
     },
@@ -171,7 +171,7 @@ export default function ArcadeHub() {
       title: "Coin Flip",
       emoji: "🪙",
       description: "Classic 50/50! Choose heads or tails with random win multipliers up to ×10!",
-      prize: "10,000 MLEO",
+      prize: "×10",
       href: "/coinflip",
       color: "#F59E0B",
     },

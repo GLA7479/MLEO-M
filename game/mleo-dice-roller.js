@@ -11,7 +11,7 @@ import Link from "next/link";
 // CONFIG
 // ============================================================================
 const LS_KEY = "mleo_dice_roller_v1";
-const ROLL_COST = 1000;
+const MIN_BET = 1000; // Minimum bet amount
 
 const WIN_CONDITIONS = [
   { name: "Triple Six", check: (dice) => dice.every(d => d === 6), mult: 10, emoji: "💎" },
@@ -97,11 +97,13 @@ function getDiceFace(value) {
 export default function DiceRollerPage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
+  const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
+  const [currentBet, setCurrentBet] = useState(MIN_BET); // Track current game bet
   const [rolling, setRolling] = useState(false);
   const [dice, setDice] = useState([1, 1, 1]);
   const [result, setResult] = useState(null);
   const [stats, setStats] = useState(() => 
-    safeRead(LS_KEY, { totalRolls: 0, totalWon: 0, biggestWin: 0, tripleCount: 0 })
+    safeRead(LS_KEY, { totalRolls: 0, totalWon: 0, biggestWin: 0, tripleCount: 0, lastBet: MIN_BET })
   );
   const [showRules, setShowRules] = useState(false);
 
@@ -111,6 +113,12 @@ export default function DiceRollerPage() {
   useEffect(() => {
     setMounted(true);
     setVaultState(getVault());
+    
+    // Load last bet amount
+    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
+    if (savedStats.lastBet) {
+      setBetAmount(String(savedStats.lastBet));
+    }
     
     if (typeof Audio !== "undefined") {
       rollSound.current = new Audio("/sounds/click.mp3");
@@ -129,15 +137,22 @@ export default function DiceRollerPage() {
   const roll = async () => {
     if (rolling) return;
 
+    const bet = Number(betAmount) || MIN_BET;
+    if (bet < MIN_BET) {
+      setResult({ error: true, message: `Minimum bet is ${MIN_BET} MLEO!` });
+      return;
+    }
+
     const currentVault = getVault();
-    if (currentVault < ROLL_COST) {
+    if (currentVault < bet) {
       setResult({ error: true, message: "Not enough MLEO!" });
       return;
     }
 
     // Deduct cost
-    setVault(currentVault - ROLL_COST);
-    setVaultState(currentVault - ROLL_COST);
+    setVault(currentVault - bet);
+    setVaultState(currentVault - bet);
+    setCurrentBet(bet); // Store bet amount for prize calculations
 
     setRolling(true);
     setResult(null);
@@ -161,7 +176,7 @@ export default function DiceRollerPage() {
     const win = checkWin(finalDice);
     
     if (win) {
-      const prize = Math.floor(ROLL_COST * win.mult);
+      const prize = Math.floor(currentBet * win.mult);
       const newVault = getVault() + prize;
       setVault(newVault);
       setVaultState(newVault);
@@ -171,7 +186,8 @@ export default function DiceRollerPage() {
         totalRolls: s.totalRolls + 1,
         totalWon: s.totalWon + prize,
         biggestWin: Math.max(s.biggestWin, prize),
-        tripleCount: s.tripleCount + (isTriple ? 1 : 0)
+        tripleCount: s.tripleCount + (isTriple ? 1 : 0),
+        lastBet: currentBet
       }));
 
       setResult({ 
@@ -192,7 +208,7 @@ export default function DiceRollerPage() {
         message: "No match!", 
         sum: finalDice.reduce((a,b)=>a+b,0)
       });
-      setStats(s => ({ ...s, totalRolls: s.totalRolls + 1 }));
+      setStats(s => ({ ...s, totalRolls: s.totalRolls + 1, lastBet: currentBet }));
     }
 
     setRolling(false);
@@ -295,22 +311,47 @@ export default function DiceRollerPage() {
             )}
 
             {/* ROLL BUTTON */}
-            <div className="text-center">
+            <div className="text-center mb-6">
               <button
                 onClick={roll}
-                disabled={rolling || vault < ROLL_COST}
+                disabled={rolling || vault < (Number(betAmount) || MIN_BET)}
                 className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl ${
                   rolling
                     ? "bg-zinc-700 cursor-wait"
-                    : vault < ROLL_COST
+                    : vault < (Number(betAmount) || MIN_BET)
                     ? "bg-zinc-700 cursor-not-allowed opacity-50"
                     : "bg-gradient-to-r from-red-600 via-orange-500 to-amber-600 hover:from-red-500 hover:via-orange-400 hover:to-amber-500 hover:scale-105"
                 }`}
               >
-                {rolling ? "🎲 ROLLING..." : `🎲 ROLL (${fmt(ROLL_COST)})`}
+                {rolling ? "🎲 ROLLING..." : `🎲 ROLL (${fmt(Number(betAmount) || MIN_BET)})`}
               </button>
               <div className="text-sm opacity-60 mt-3">
-                {fmt(ROLL_COST)} MLEO per roll
+                Max win: {((Number(betAmount) || MIN_BET) * 10).toLocaleString()} MLEO
+              </div>
+            </div>
+
+            {/* Bet Amount Input */}
+            <div className="max-w-sm mx-auto">
+              <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
+              <input 
+                type="number" 
+                min={MIN_BET} 
+                step="100" 
+                value={betAmount} 
+                onChange={(e) => setBetAmount(e.target.value)} 
+                className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-red-500" 
+                placeholder="1000" 
+              />
+              <div className="flex gap-2 mt-2 justify-center flex-wrap">
+                {[1000, 2500, 5000, 10000].map((v) => (
+                  <button 
+                    key={v} 
+                    onClick={() => setBetAmount(String(v))} 
+                    className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
+                  >
+                    {v >= 1000 ? `${v/1000}K` : v}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -362,7 +403,7 @@ export default function DiceRollerPage() {
                   <div key={idx} className="grid grid-cols-4 gap-2 text-center text-sm py-2 border-b border-white/10 items-center">
                     <div className="text-2xl">{cond.emoji}</div>
                     <div className="font-semibold">{cond.name}</div>
-                    <div className="font-bold text-green-400">{fmt(ROLL_COST * cond.mult)}</div>
+                    <div className="font-bold text-green-400">{fmt((Number(betAmount) || MIN_BET) * cond.mult)}</div>
                     <div className="text-amber-400">×{cond.mult}</div>
                   </div>
                 ))}

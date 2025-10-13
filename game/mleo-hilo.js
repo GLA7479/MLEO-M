@@ -11,7 +11,7 @@ import Link from "next/link";
 // CONFIG
 // ============================================================================
 const LS_KEY = "mleo_hilo_v1";
-const GAME_COST = 1000;
+const MIN_BET = 1000; // Minimum bet amount
 
 const CARD_VALUES = {
   '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
@@ -74,6 +74,8 @@ function drawCard() {
 export default function HiLoPage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
+  const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
+  const [currentBet, setCurrentBet] = useState(MIN_BET); // Track current game bet
   const [playing, setPlaying] = useState(false);
   const [currentCard, setCurrentCard] = useState(null);
   const [nextCard, setNextCard] = useState(null);
@@ -81,7 +83,7 @@ export default function HiLoPage() {
   const [multiplier, setMultiplier] = useState(1);
   const [result, setResult] = useState(null);
   const [stats, setStats] = useState(() => 
-    safeRead(LS_KEY, { totalGames: 0, totalWon: 0, biggestWin: 0, longestStreak: 0 })
+    safeRead(LS_KEY, { totalGames: 0, totalBet: 0, totalWon: 0, biggestWin: 0, longestStreak: 0, lastBet: MIN_BET })
   );
 
   const correctSound = useRef(null);
@@ -91,6 +93,12 @@ export default function HiLoPage() {
   useEffect(() => {
     setMounted(true);
     setVaultState(getVault());
+    
+    // Load last bet amount
+    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
+    if (savedStats.lastBet) {
+      setBetAmount(String(savedStats.lastBet));
+    }
     
     if (typeof Audio !== "undefined") {
       correctSound.current = new Audio("/sounds/success.mp3");
@@ -108,15 +116,22 @@ export default function HiLoPage() {
   };
 
   const startGame = () => {
+    const bet = Number(betAmount) || MIN_BET;
+    if (bet < MIN_BET) {
+      setResult({ error: true, message: `Minimum bet is ${MIN_BET} MLEO!` });
+      return;
+    }
+    
     const currentVault = getVault();
-    if (currentVault < GAME_COST) {
+    if (currentVault < bet) {
       setResult({ error: true, message: "Not enough MLEO!" });
       return;
     }
 
     // Deduct cost
-    setVault(currentVault - GAME_COST);
-    setVaultState(currentVault - GAME_COST);
+    setVault(currentVault - bet);
+    setVaultState(currentVault - bet);
+    setCurrentBet(bet); // Store bet amount for prize calculations
 
     // Start game
     const card = drawCard();
@@ -184,7 +199,9 @@ export default function HiLoPage() {
       setStats(s => ({
         ...s,
         totalGames: s.totalGames + 1,
-        longestStreak: Math.max(s.longestStreak, streak)
+        totalBet: (s.totalBet || 0) + currentBet,
+        longestStreak: Math.max(s.longestStreak, streak),
+        lastBet: currentBet
       }));
     }
   };
@@ -197,7 +214,7 @@ export default function HiLoPage() {
       winSound.current.play().catch(() => {});
     }
 
-    const prize = Math.floor(GAME_COST * multiplier);
+    const prize = Math.floor(currentBet * multiplier);
     const newVault = getVault() + prize;
     setVault(newVault);
     setVaultState(newVault);
@@ -211,9 +228,11 @@ export default function HiLoPage() {
     
     setStats(s => ({
       totalGames: s.totalGames + 1,
+      totalBet: (s.totalBet || 0) + currentBet,
       totalWon: s.totalWon + prize,
       biggestWin: Math.max(s.biggestWin, prize),
-      longestStreak: Math.max(s.longestStreak, streak)
+      longestStreak: Math.max(s.longestStreak, streak),
+      lastBet: currentBet
     }));
   };
 
@@ -268,17 +287,46 @@ export default function HiLoPage() {
                   Guess if the next card is Higher or Lower!<br/>
                   Each correct guess increases your multiplier by 30%
                 </p>
+
                 <button
                   onClick={startGame}
-                  disabled={vault < GAME_COST}
-                  className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl ${
-                    vault < GAME_COST
+                  disabled={vault < (Number(betAmount) || MIN_BET)}
+                  className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-4 ${
+                    vault < (Number(betAmount) || MIN_BET)
                       ? "bg-zinc-700 cursor-not-allowed opacity-50"
                       : "bg-gradient-to-r from-green-600 via-emerald-500 to-teal-600 hover:from-green-500 hover:via-emerald-400 hover:to-teal-500 hover:scale-105"
                   }`}
                 >
-                  🃏 START ({fmt(GAME_COST)})
+                  🃏 START ({fmt(Number(betAmount) || MIN_BET)})
                 </button>
+
+                {/* Bet Amount Input */}
+                <div className="max-w-sm mx-auto">
+                  <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
+                  <input 
+                    type="number" 
+                    min={MIN_BET} 
+                    step="100" 
+                    value={betAmount} 
+                    onChange={(e) => setBetAmount(e.target.value)} 
+                    className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-green-500" 
+                    placeholder="1000" 
+                  />
+                  <div className="flex gap-2 mt-2 justify-center flex-wrap">
+                    {[1000, 2500, 5000, 10000].map((v) => (
+                      <button 
+                        key={v} 
+                        onClick={() => setBetAmount(String(v))} 
+                        className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
+                      >
+                        {v >= 1000 ? `${v/1000}K` : v}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-2 text-center">
+                    Max win: {((Number(betAmount) || MIN_BET) * 10).toLocaleString()} MLEO
+                  </div>
+                </div>
               </div>
             ) : (
               <>
@@ -286,7 +334,7 @@ export default function HiLoPage() {
                 <div className="text-center mb-6">
                   <div className="text-sm opacity-70 mb-1">Current Prize</div>
                   <div className="text-4xl font-bold text-green-400">
-                    {fmt(Math.floor(GAME_COST * multiplier))} MLEO
+                    {fmt(Math.floor(currentBet * multiplier))} MLEO
                   </div>
                   <div className="text-lg opacity-70">×{multiplier.toFixed(2)} • Streak: {streak}</div>
                 </div>
@@ -383,15 +431,43 @@ export default function HiLoPage() {
                   <div className="text-center">
                     <button
                       onClick={startGame}
-                      disabled={vault < GAME_COST}
-                      className={`px-8 py-3 rounded-xl font-bold text-lg text-white transition-all ${
-                        vault < GAME_COST
+                      disabled={vault < (Number(betAmount) || MIN_BET)}
+                      className={`px-8 py-3 rounded-xl font-bold text-lg text-white transition-all mb-6 ${
+                        vault < (Number(betAmount) || MIN_BET)
                           ? "bg-zinc-700 cursor-not-allowed opacity-50"
                           : "bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400"
                       }`}
                     >
-                      🔄 Play Again ({fmt(GAME_COST)})
+                      🔄 Play Again ({fmt(Number(betAmount) || MIN_BET)})
                     </button>
+                    
+                    {/* Bet Amount Input */}
+                    <div className="max-w-sm mx-auto">
+                      <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
+                      <input 
+                        type="number" 
+                        min={MIN_BET} 
+                        step="100" 
+                        value={betAmount} 
+                        onChange={(e) => setBetAmount(e.target.value)} 
+                        className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-green-500" 
+                        placeholder="1000" 
+                      />
+                      <div className="flex gap-2 mt-2 justify-center flex-wrap">
+                        {[1000, 2500, 5000, 10000].map((v) => (
+                          <button 
+                            key={v} 
+                            onClick={() => setBetAmount(String(v))} 
+                            className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
+                          >
+                            {v >= 1000 ? `${v/1000}K` : v}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-2 text-center">
+                        Max win: {((Number(betAmount) || MIN_BET) * 10).toLocaleString()} MLEO
+                      </div>
+                    </div>
                   </div>
                 )}
               </>

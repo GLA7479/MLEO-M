@@ -11,7 +11,7 @@ import Link from "next/link";
 // CONFIG
 // ============================================================================
 const LS_KEY = "mleo_wheel_fortune_v1";
-const SPIN_COST = 1000;
+const MIN_BET = 1000; // Minimum bet amount
 
 const WHEEL_SEGMENTS = [
   { label: "10,000", value: 10000, color: "#FFD700", mult: 10 },
@@ -71,11 +71,13 @@ function fmt(n) {
 export default function WheelFortunePage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
+  const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
+  const [currentBet, setCurrentBet] = useState(MIN_BET); // Track current game bet
   const [spinning, setSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [result, setResult] = useState(null);
   const [stats, setStats] = useState(() => 
-    safeRead(LS_KEY, { totalSpins: 0, totalWon: 0, biggestWin: 0, freeSpins: 0 })
+    safeRead(LS_KEY, { totalSpins: 0, totalBet: 0, totalWon: 0, biggestWin: 0, freeSpins: 0, lastBet: MIN_BET })
   );
   const [freeSpinsAvailable, setFreeSpinsAvailable] = useState(0);
 
@@ -86,6 +88,12 @@ export default function WheelFortunePage() {
   useEffect(() => {
     setMounted(true);
     setVaultState(getVault());
+    
+    // Load last bet amount
+    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
+    if (savedStats.lastBet) {
+      setBetAmount(String(savedStats.lastBet));
+    }
     
     if (typeof Audio !== "undefined") {
       spinSound.current = new Audio("/sounds/click.mp3");
@@ -104,7 +112,13 @@ export default function WheelFortunePage() {
   const spin = async () => {
     if (spinning) return;
 
-    const cost = freeSpinsAvailable > 0 ? 0 : SPIN_COST;
+    const bet = Number(betAmount) || MIN_BET;
+    if (bet < MIN_BET) {
+      setResult({ error: true, message: `Minimum bet is ${MIN_BET} MLEO!` });
+      return;
+    }
+    
+    const cost = freeSpinsAvailable > 0 ? 0 : bet;
     const currentVault = getVault();
 
     if (cost > 0 && currentVault < cost) {
@@ -116,6 +130,7 @@ export default function WheelFortunePage() {
     if (cost > 0) {
       setVault(currentVault - cost);
       setVaultState(currentVault - cost);
+      setCurrentBet(bet); // Store bet amount for prize calculations
     } else {
       setFreeSpinsAvailable(freeSpinsAvailable - 1);
     }
@@ -148,7 +163,7 @@ export default function WheelFortunePage() {
     
     if (winner.freeSpin) {
       setFreeSpinsAvailable(f => f + 1);
-      setStats(s => ({ ...s, totalSpins: s.totalSpins + 1, freeSpins: s.freeSpins + 1 }));
+      setStats(s => ({ ...s, totalSpins: s.totalSpins + 1, freeSpins: s.freeSpins + 1, lastBet: currentBet }));
       setResult({ 
         win: true, 
         message: "FREE SPIN!", 
@@ -156,15 +171,17 @@ export default function WheelFortunePage() {
         freeSpin: true 
       });
     } else if (winner.value > 0) {
-      const prize = winner.value;
+      const prize = Math.floor(currentBet * winner.mult);
       const newVault = getVault() + prize;
       setVault(newVault);
       setVaultState(newVault);
       
       setStats(s => ({
         totalSpins: s.totalSpins + 1,
+        totalBet: (s.totalBet || 0) + currentBet,
         totalWon: s.totalWon + prize,
-        biggestWin: Math.max(s.biggestWin, prize)
+        biggestWin: Math.max(s.biggestWin, prize),
+        lastBet: currentBet
       }));
 
       setResult({ 
@@ -179,7 +196,7 @@ export default function WheelFortunePage() {
         winSound.current.play().catch(() => {});
       }
     } else {
-      setStats(s => ({ ...s, totalSpins: s.totalSpins + 1 }));
+      setStats(s => ({ ...s, totalSpins: s.totalSpins + 1, lastBet: currentBet }));
       setResult({ 
         win: false, 
         message: "Better luck next time!" 
@@ -305,19 +322,47 @@ export default function WheelFortunePage() {
             {/* SPIN BUTTON */}
             <button
               onClick={spin}
-              disabled={spinning || (vault < SPIN_COST && freeSpinsAvailable === 0)}
-              className={`mt-6 px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl ${
+              disabled={spinning || (vault < (Number(betAmount) || MIN_BET) && freeSpinsAvailable === 0)}
+              className={`mb-6 px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl ${
                 spinning
                   ? "bg-zinc-700 cursor-wait"
-                  : vault < SPIN_COST && freeSpinsAvailable === 0
+                  : vault < (Number(betAmount) || MIN_BET) && freeSpinsAvailable === 0
                   ? "bg-zinc-700 cursor-not-allowed opacity-50"
                   : "bg-gradient-to-r from-pink-600 via-purple-500 to-indigo-600 hover:from-pink-500 hover:via-purple-400 hover:to-indigo-500 hover:scale-105"
               }`}
             >
-              {spinning ? "🎡 SPINNING..." : freeSpinsAvailable > 0 ? "🎁 FREE SPIN!" : `🎡 SPIN (${fmt(SPIN_COST)})`}
+              {spinning ? "🎡 SPINNING..." : freeSpinsAvailable > 0 ? "🎁 FREE SPIN!" : `🎡 SPIN (${fmt(Number(betAmount) || MIN_BET)})`}
             </button>
-            <div className="text-sm opacity-60 mt-3">
-              {freeSpinsAvailable > 0 ? `${freeSpinsAvailable} free spins available` : `${fmt(SPIN_COST)} MLEO per spin`}
+            <div className="text-sm opacity-60 mb-6">
+              {freeSpinsAvailable > 0 ? `${freeSpinsAvailable} free spins available` : `${fmt(Number(betAmount) || MIN_BET)} MLEO per spin`}
+            </div>
+
+            {/* Bet Amount Input */}
+            <div className="max-w-sm mx-auto">
+              <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
+              <input 
+                type="number" 
+                min={MIN_BET} 
+                step="100" 
+                value={betAmount} 
+                onChange={(e) => setBetAmount(e.target.value)} 
+                className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-pink-500" 
+                placeholder="1000" 
+              />
+              <div className="flex gap-2 mt-2 justify-center flex-wrap">
+                {[1000, 2500, 5000, 10000].map((v) => (
+                  <button 
+                    key={v} 
+                    onClick={() => setBetAmount(String(v))} 
+                    className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
+                  >
+                    {v >= 1000 ? `${v/1000}K` : v}
+                  </button>
+                ))}
+              </div>
+              <div className="text-xs text-zinc-500 mt-2 text-center">
+                Max win: {((Number(betAmount) || MIN_BET) * 10).toLocaleString()} MLEO
+              </div>
             </div>
             </div>
           </div>
@@ -393,15 +438,15 @@ export default function WheelFortunePage() {
               <div>
                 <div className="text-sm opacity-70">Win Rate</div>
                 <div className="text-2xl font-bold text-blue-400">
-                  {stats.totalSpins > 0 ? `${((stats.totalWon / (stats.totalSpins * SPIN_COST)) * 100).toFixed(1)}%` : "0%"}
+                  {stats.totalSpins > 0 ? `${((stats.totalWon / stats.totalBet) * 100).toFixed(1)}%` : "0%"}
                 </div>
               </div>
               <div>
                 <div className="text-sm opacity-70">Net Profit</div>
                 <div className={`text-2xl font-bold ${
-                  stats.totalWon - (stats.totalSpins * SPIN_COST) >= 0 ? "text-green-400" : "text-red-400"
+                  stats.totalWon - stats.totalBet >= 0 ? "text-green-400" : "text-red-400"
                 }`}>
-                  {fmt(stats.totalWon - (stats.totalSpins * SPIN_COST))}
+                  {fmt(stats.totalWon - stats.totalBet)}
                 </div>
               </div>
             </div>

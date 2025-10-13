@@ -12,7 +12,7 @@ import Link from "next/link";
 // CONFIG
 // ============================================================================
 const LS_KEY = "mleo_plinko_v2_physics";
-const DROP_COST = 1000;
+const MIN_BET = 1000; // Minimum bet amount
 
 // 15 buckets (13 original + 2 zero buckets at edges)
 const MULTIPLIERS = [0, 10, 1.5, 3, 1, 0.5, 0.2, 0, 0.2, 0.5, 1, 3, 1.5, 10, 0];
@@ -160,8 +160,9 @@ export default function PlinkoPage() {
 
   const [result, setResult] = useState(null);
   const [finalBuckets, setFinalBuckets] = useState([]); // recent landings visual
+  const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
   const [stats, setStats] = useState(() =>
-    safeRead(LS_KEY, { totalDrops: 0, totalWon: 0, biggestWin: 0, history: [] })
+    safeRead(LS_KEY, { totalDrops: 0, totalBet: 0, totalWon: 0, biggestWin: 0, history: [], lastBet: MIN_BET })
   );
 
   // Sounds
@@ -211,6 +212,12 @@ export default function PlinkoPage() {
   useEffect(() => {
     setMounted(true);
     setVaultState(getVault());
+
+    // Load last bet amount
+    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
+    if (savedStats.lastBet) {
+      setBetAmount(String(savedStats.lastBet));
+    }
 
     if (typeof Audio !== "undefined") {
       try {
@@ -498,22 +505,24 @@ function buildBoardGeometry(w, h) {
 
     // Prize
     const mult = MULTIPLIERS[idx] ?? 0;
-    const prize = Math.floor(DROP_COST * mult);
+    const prize = Math.floor(ball.betAmount * mult);
     if (prize > 0) {
       const newVault = getVault() + prize;
       setVault(newVault);
       setVaultState(newVault);
     }
 
-    setStats(s => ({
-      totalDrops: s.totalDrops + 1,
-      totalWon: s.totalWon + prize,
-      biggestWin: Math.max(s.biggestWin, prize),
-      history: [
-        { mult, prize, bucket: idx, timestamp: Date.now() },
-        ...s.history.slice(0, 9)
-      ]
-    }));
+      setStats(s => ({
+        totalDrops: s.totalDrops + 1,
+        totalBet: (s.totalBet || 0) + ball.betAmount,
+        totalWon: s.totalWon + prize,
+        biggestWin: Math.max(s.biggestWin, prize),
+        history: [
+          { mult, prize, bucket: idx, timestamp: Date.now() },
+          ...s.history.slice(0, 9)
+        ],
+        lastBet: ball.betAmount
+      }));
 
     setResult({
       win: mult >= 1,
@@ -667,14 +676,20 @@ function buildBoardGeometry(w, h) {
 
   // Drop ball
   function dropBall() {
+    const bet = Number(betAmount) || MIN_BET;
+    if (bet < MIN_BET) {
+      setResult({ error: true, message: `Minimum bet is ${fmt(MIN_BET)} MLEO!` });
+      return;
+    }
+    
     const currentVault = getVault();
-    if (currentVault < DROP_COST) {
-      setResult({ error: true, message: `Need ${fmt(DROP_COST)} MLEO!` });
+    if (currentVault < bet) {
+      setResult({ error: true, message: `Need ${fmt(bet)} MLEO!` });
       return;
     }
     // Deduct cost
-    setVault(currentVault - DROP_COST);
-    setVaultState(currentVault - DROP_COST);
+    setVault(currentVault - bet);
+    setVaultState(currentVault - bet);
 
     const board = boardRef.current;
     if (!board) return;
@@ -687,6 +702,7 @@ function buildBoardGeometry(w, h) {
       vx: (rand01() * 2 - 1) * 40,
       vy: PHYS.spawnVy + rand01() * 40,
       _landed: false,
+      betAmount: bet, // Store bet amount with ball
     };
     ballsRef.current.push(ball);
 
@@ -814,21 +830,45 @@ function buildBoardGeometry(w, h) {
               </div>
             </div>
 
-            {/* Drop Button */}
+            {/* Drop Button & Bet Amount */}
             <div className="text-center mb-6">
               <button
                 onClick={dropBall}
-                disabled={vault < DROP_COST}
-                className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl ${
-                  vault < DROP_COST
+                disabled={vault < (Number(betAmount) || MIN_BET)}
+                className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-6 ${
+                  vault < (Number(betAmount) || MIN_BET)
                     ? "bg-zinc-700 cursor-not-allowed opacity-50"
                     : "bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-600 hover:from-blue-500 hover:via-cyan-400 hover:to-teal-500 hover:scale-105 active:scale-95"
                 }`}
               >
-                🎯 DROP BALL ({fmt(DROP_COST)})
+                🎯 DROP BALL ({fmt(Number(betAmount) || MIN_BET)})
               </button>
-              <div className="text-sm opacity-70 mt-3">
-                Real physics • Multiple balls supported
+              <div className="text-sm opacity-70 mb-4">
+                Real physics • Multiple balls supported • Max win: {fmt((Number(betAmount) || MIN_BET) * 10)}
+              </div>
+              
+              <div className="max-w-sm mx-auto">
+                <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
+                <input 
+                  type="number" 
+                  min={MIN_BET} 
+                  step="100" 
+                  value={betAmount} 
+                  onChange={(e) => setBetAmount(e.target.value)} 
+                  className="rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                  placeholder="1000" 
+                />
+                <div className="flex gap-2 mt-2 justify-center flex-wrap">
+                  {[1000, 2500, 5000, 10000].map((v) => (
+                    <button 
+                      key={v} 
+                      onClick={() => setBetAmount(String(v))} 
+                      className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
+                    >
+                      {fmt(v)}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -959,16 +999,16 @@ function buildBoardGeometry(w, h) {
               <div>
                 <div className="text-sm opacity-70">Return Rate</div>
                 <div className="text-2xl font-bold text-blue-400">
-                  {stats.totalDrops > 0 ? `${((stats.totalWon / (stats.totalDrops * DROP_COST)) * 100).toFixed(1)}%` : "0%"}
+                  {stats.totalDrops > 0 ? `${((stats.totalWon / stats.totalBet) * 100).toFixed(1)}%` : "0%"}
                 </div>
               </div>
               <div className="col-span-2">
                 <div className="text-sm opacity-70">Net Profit/Loss</div>
                 <div className={`text-3xl font-bold ${
-                  stats.totalWon >= stats.totalDrops * DROP_COST ? "text-green-400" : "text-red-400"
+                  stats.totalWon >= stats.totalBet ? "text-green-400" : "text-red-400"
                 }`}>
                   {stats.totalDrops > 0
-                    ? `${stats.totalWon >= stats.totalDrops * DROP_COST ? "+" : ""}${fmt(stats.totalWon - (stats.totalDrops * DROP_COST))}`
+                    ? `${stats.totalWon >= stats.totalBet ? "+" : ""}${fmt(stats.totalWon - stats.totalBet)}`
                     : "0"}
                 </div>
               </div>
