@@ -74,7 +74,7 @@ const PHYS_NARROW = {  // Mobile/Narrow screens
 const BOARD_WIDE = {
   marginX: 20,
   marginTop: 20,
-  marginBottom: 40,
+  marginBottom: 15, // הקטנה דרמטית מ-40 ל-15 בנייח
   pegGapX: 42,        // Larger gaps for wide screens
   pegGapY: 44,        // Larger gaps for wide screens
 };
@@ -82,7 +82,7 @@ const BOARD_WIDE = {
 const BOARD_NARROW = {
   marginX: 15,        // Smaller margins for mobile
   marginTop: 15,
-  marginBottom: 25, // הקטנה מ-35 ל-25 במובייל
+  marginBottom: 10, // הקטנה דרמטית מ-35 ל-10 במובייל
   pegGapX: 28,        // Smaller gaps for mobile
   pegGapY: 32,        // Smaller gaps for mobile
 };
@@ -279,7 +279,7 @@ export default function PlinkoPage() {
     const resize = () => {
       const parent = canvas.parentElement;
       const w = Math.min(parent.clientWidth, 880);
-      const h = Math.max(isWideScreen ? 520 : 450, Math.floor(w * 0.9));
+      const h = Math.max(isWideScreen ? 420 : 380, Math.floor(w * 0.8));
 
       canvas.width = Math.floor(w * dpr);
       canvas.height = Math.floor(h * dpr);
@@ -321,8 +321,8 @@ function buildBoardGeometry(w, h) {
   const lastPegY = top + (totalRows - 1) * gapY + 24; // כמו בציור היתדות
   const baseBottom = h - BOARD.marginBottom;     // הרצפה הקבועה המקורית
   
-  // מרחק קטן יותר במובייל - במקום Math.max(48, gapY * 0.9)
-  const mobileGap = isWideScreen ? 48 : 24; 
+  // מרחק קטן מאוד בכל המכשירים - שינוי דרמטי
+  const mobileGap = isWideScreen ? 16 : 12; 
   const desiredBottom = lastPegY + PHYS.pegRadius + mobileGap;
 
   // הרצפה צריכה להיות מתחת לשורה האחרונה, אבל לא לצאת מהקנבס
@@ -857,7 +857,7 @@ function buildBoardGeometry(w, h) {
             </div>
 
             {/* Buckets display */}
-            <div className="relative -mt-2 sm:-mt-3" style={{ marginTop: isWideScreen ? '-0.75rem' : '-0.25rem' }}>
+            <div className="relative -mt-2 sm:-mt-3" style={{ marginTop: isWideScreen ? '-1rem' : '-0.75rem' }}>
               <div className="flex gap-0 sm:gap-0.5 mb-4 sm:mb-6 max-w-2xl mx-auto">
                 {MULTIPLIERS.map((mult, idx) => {
                   const landed = finalBuckets.filter(i => i === idx).length;
