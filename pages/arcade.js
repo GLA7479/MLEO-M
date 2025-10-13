@@ -290,7 +290,7 @@ export default function ArcadeHub() {
     // 2. Crash
     {
       title: "Crash",
-      emoji: "🚀",
+      emoji: "📈",
       description: "Watch the multiplier grow! Cash out before it crashes to win big!",
       prize: "Unlimited",
       href: "/crash",
@@ -299,7 +299,7 @@ export default function ArcadeHub() {
     // 3. Mines
     {
       title: "Mines",
-      emoji: "💣",
+      emoji: "💎",
       description: "Minesweeper-style risk game. Find safe tiles and cash out before hitting a mine!",
       prize: "×10",
       href: "/mines",
@@ -308,7 +308,7 @@ export default function ArcadeHub() {
     // 4. Blackjack
     {
       title: "Blackjack",
-      emoji: "🎰",
+      emoji: "🃏",
       description: "Beat the dealer to 21! Classic card game with emoji cards.",
       prize: "×2",
       href: "/blackjack",
@@ -362,7 +362,7 @@ export default function ArcadeHub() {
     // 10. Roulette
     {
       title: "Roulette",
-      emoji: "🎯",
+      emoji: "🎰",
       description: "Spin the wheel and win big! Classic casino wheel game with multiple betting options.",
       prize: "×36",
       href: "/roulette",
@@ -395,7 +395,7 @@ export default function ArcadeHub() {
     },
     {
       title: "Scratch Card",
-      emoji: "🃏",
+      emoji: "🎫",
       description: "Scratch to reveal 9 symbols. Match 3 identical symbols to win!",
       prize: "×10",
       href: "/scratch",
@@ -411,7 +411,7 @@ export default function ArcadeHub() {
     },
     {
       title: "Racer",
-      emoji: "🏁",
+      emoji: "🏎️",
       description: "Bet on your favorite car and watch them race! Win up to ×6 multiplier!",
       prize: "×6",
       href: "/racer",
@@ -427,7 +427,7 @@ export default function ArcadeHub() {
     },
     {
       title: "Tower",
-      emoji: "⚖️",
+      emoji: "🏗️",
       description: "Climb the tower and cash out before it collapses! Risk vs reward game!",
       prize: "×10",
       href: "/tower",

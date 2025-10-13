@@ -156,6 +156,7 @@ export default function MLEOBlackjackPage() {
   const [currentSplitHand, setCurrentSplitHand] = useState(0);
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
+  const [showResultPopup, setShowResultPopup] = useState(false);
   const [stats, setStats] = useState(() =>
     safeRead(LS_KEY, { totalHands: 0, totalBet: 0, wins: 0, totalWon: 0, totalLost: 0, biggestWin: 0, history: [], lastBet: MIN_BET })
   );
@@ -186,6 +187,17 @@ export default function MLEOBlackjackPage() {
     
     return () => clearInterval(interval);
   }, [router.query]);
+
+  // Auto-hide result popup after 4 seconds
+  useEffect(() => {
+    if (gameResult) {
+      setShowResultPopup(true);
+      const timer = setTimeout(() => {
+        setShowResultPopup(false);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [gameResult]);
 
   const refreshVault = () => {
     setVaultState(getVault());
@@ -464,6 +476,7 @@ export default function MLEOBlackjackPage() {
 
   const resetGame = () => {
     setGameResult(null);
+    setShowResultPopup(false);
     setPlayerHand([]);
     setDealerHand([]);
     setDeck([]);
@@ -475,7 +488,9 @@ export default function MLEOBlackjackPage() {
     setCurrentSplitHand(0);
     
     // Start new game immediately
-    startGame();
+    setTimeout(() => {
+      startGame();
+    }, 100);
   };
 
   if (!mounted) {
@@ -580,40 +595,6 @@ export default function MLEOBlackjackPage() {
               </div>
             </div>
 
-            {/* Result Display */}
-            {gameResult && (
-              <div className={`text-center mb-6 p-6 rounded-xl border-2 ${
-                gameResult.winner === "player"
-                  ? "bg-green-900/30 border-green-500"
-                  : gameResult.winner === "push"
-                  ? "bg-yellow-900/30 border-yellow-500"
-                  : "bg-red-900/30 border-red-500"
-              }`}>
-                <div className="text-3xl font-bold mb-2">
-                  {gameResult.winner === "player" ? 
-                    (gameResult.blackjack ? "🎉 BLACKJACK!" : "🎉 You Win!") : 
-                    gameResult.winner === "push" ? "🤝 Push!" : "💥 Dealer Wins!"}
-                </div>
-                <div className="text-xl mb-2">
-                  Player: {gameResult.playerValue} | Dealer: {gameResult.dealerValue}
-                </div>
-                {gameResult.winner === "player" && (
-                  <div className="text-3xl font-bold text-green-400">
-                    +{fmt(gameResult.prize)} MLEO ({gameResult.blackjack ? "3x BLACKJACK!" : doubledDown ? "4x" : "2x"})
-                  </div>
-                )}
-                {gameResult.winner === "push" && (
-                  <div className="text-xl text-yellow-400">
-                    Refund: {fmt(gameResult.prize)} MLEO
-                  </div>
-                )}
-                {gameResult.winner === "dealer" && (
-                  <div className="text-xl text-red-400">
-                    Lost {fmt(currentBet)} MLEO
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Game Controls */}
             <div className="text-center mb-6">
@@ -703,7 +684,7 @@ export default function MLEOBlackjackPage() {
               {gameResult && (
                 <button
                   onClick={resetGame}
-                  className="px-8 py-3 rounded-xl font-bold text-lg text-white bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 transition-all mb-6"
+                  className="px-8 py-3 rounded-xl font-bold text-lg text-white bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 transition-all mb-6 shadow-lg hover:scale-105 transform"
                 >
                   🔄 New Game ({fmt(Number(betAmount) || MIN_BET)})
                 </button>
@@ -787,6 +768,55 @@ export default function MLEOBlackjackPage() {
             </ul>
           </div>
         </div>
+
+        {/* FLOATING RESULT POPUP - Small compact display */}
+        {gameResult && showResultPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div 
+              className={`text-center p-4 rounded-xl border-2 transition-all duration-500 transform pointer-events-auto max-w-sm mx-4 ${
+                showResultPopup ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+              } ${
+                gameResult.winner === "player"
+                  ? "bg-gradient-to-br from-green-600 to-emerald-700 border-green-300 shadow-2xl shadow-green-500/70"
+                  : gameResult.winner === "push"
+                  ? "bg-gradient-to-br from-yellow-600 to-orange-600 border-yellow-300 shadow-2xl shadow-yellow-500/70"
+                  : "bg-gradient-to-br from-red-600 to-rose-700 border-red-300 shadow-2xl shadow-red-500/70"
+              }`}
+            >
+              <div className="text-2xl font-black mb-2 animate-pulse text-white drop-shadow-lg">
+                {gameResult.winner === "player" ? 
+                  (gameResult.blackjack ? "🎉 BLACKJACK! 🎉" : "🎉 You Win! 🎉") : 
+                  gameResult.winner === "push" ? "🤝 Push! 🤝" : "💥 Dealer Wins 💥"}
+              </div>
+              <div className="text-base mb-2 text-white/90 font-semibold">
+                Player: {gameResult.playerValue} | Dealer: {gameResult.dealerValue}
+              </div>
+              {gameResult.winner === "player" && (
+                <div className="space-y-1">
+                  <div className="text-3xl font-black text-white animate-bounce drop-shadow-2xl">
+                    +{fmt(gameResult.prize)} MLEO
+                  </div>
+                  <div className="text-sm font-bold text-white/80">
+                    ({gameResult.blackjack ? "3x BLACKJACK!" : doubledDown ? "4x" : "2x"})
+                  </div>
+                </div>
+              )}
+              {gameResult.winner === "push" && (
+                <div className="text-lg font-bold text-white">
+                  Refund: {fmt(gameResult.prize)} MLEO
+                </div>
+              )}
+              {gameResult.winner === "dealer" && (
+                <div className="text-lg font-bold text-white">
+                  Lost {fmt(currentBet)} MLEO
+                </div>
+              )}
+              <div className="mt-2 text-xs text-white/70 animate-pulse">
+                Auto-closing...
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );
