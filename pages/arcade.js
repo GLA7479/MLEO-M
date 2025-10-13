@@ -360,23 +360,6 @@ export default function ArcadeHub() {
               >
                 ← BACK
               </Link>
-              
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 border border-white/20 font-semibold text-sm">
-                <span>💰</span>
-                <span className="text-emerald-400">{fmt(vault)} MLEO</span>
-              </div>
-              
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600/20 to-orange-600/20 border border-amber-500/30 font-semibold text-sm">
-                <span>🎁</span>
-                <span className="text-amber-300">
-                  {freePlayStatus.tokens}/{freePlayStatus.maxTokens} Free
-                </span>
-                {freePlayStatus.tokens < freePlayStatus.maxTokens && (
-                  <span className="text-xs text-amber-400/70">
-                    {formatTimeRemaining(freePlayStatus.timeUntilNext)}
-                  </span>
-                )}
-              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -406,6 +389,26 @@ export default function ArcadeHub() {
               Play mini-games and win MLEO tokens! Each game costs 1,000 MLEO per round.
               Win prizes, free spins, and multipliers up to 10x!
             </p>
+            
+            {/* Vault and Free Play Status */}
+            <div className="flex items-center justify-center gap-4 mt-6">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 border border-white/20 font-semibold text-sm">
+                <span>💰</span>
+                <span className="text-emerald-400">{fmt(vault)} MLEO</span>
+              </div>
+              
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600/20 to-orange-600/20 border border-amber-500/30 font-semibold text-sm">
+                <span>🎁</span>
+                <span className="text-amber-300">
+                  {freePlayStatus.tokens}/{freePlayStatus.maxTokens} Free
+                </span>
+                {freePlayStatus.tokens < freePlayStatus.maxTokens && (
+                  <span className="text-xs text-amber-400/70">
+                    {formatTimeRemaining(freePlayStatus.timeUntilNext)}
+                  </span>
+                )}
+              </div>
+            </div>
           </header>
 
           {/* Games Grid */}
