@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Baccarat - Card Game
+// MLEO Poker (Texas Hold'em) - Card Game
 // Cost: 1000 MLEO per hand
 // ============================================================================
 
@@ -12,11 +12,39 @@ import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-syste
 // ============================================================================
 // CONFIG
 // ============================================================================
-const LS_KEY = "mleo_baccarat_v1";
+const LS_KEY = "mleo_poker_v1";
 const MIN_BET = 1000; // Minimum bet amount
 
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+
+// Poker hand rankings
+const HAND_RANKINGS = {
+  "Royal Flush": 10,
+  "Straight Flush": 9,
+  "Four of a Kind": 8,
+  "Full House": 7,
+  "Flush": 6,
+  "Straight": 5,
+  "Three of a Kind": 4,
+  "Two Pair": 3,
+  "One Pair": 2,
+  "High Card": 1
+};
+
+// Payout multipliers
+const PAYOUTS = {
+  "Royal Flush": 1000,
+  "Straight Flush": 200,
+  "Four of a Kind": 50,
+  "Full House": 20,
+  "Flush": 10,
+  "Straight": 8,
+  "Three of a Kind": 5,
+  "Two Pair": 3,
+  "One Pair": 2,
+  "High Card": 1
+};
 
 // ============================================================================
 // STORAGE
@@ -50,6 +78,7 @@ function setVault(amount) {
 }
 
 function fmt(n) {
+  if (isNaN(n) || n === null || n === undefined) return "0";
   if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
   if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
   return Math.floor(n).toString();
@@ -77,108 +106,116 @@ function shuffleDeck(deck) {
   return shuffled;
 }
 
-function getBaccaratValue(card) {
-  if (card.value === "A") return 1;
-  if (["J", "Q", "K"].includes(card.value)) return 0;
+function getCardValue(card) {
+  if (card.value === "A") return 14;
+  if (card.value === "K") return 13;
+  if (card.value === "Q") return 12;
+  if (card.value === "J") return 11;
   return parseInt(card.value);
 }
 
-function calculateBaccaratValue(hand) {
-  let value = 0;
-  for (const card of hand) {
-    value += getBaccaratValue(card);
+function evaluateHand(cards) {
+  if (cards.length !== 5) return { hand: "High Card", rank: 1, cards: cards };
+  
+  const values = cards.map(card => getCardValue(card)).sort((a, b) => b - a);
+  const suits = cards.map(card => card.suit);
+  const isFlush = suits.every(suit => suit === suits[0]);
+  const isStraight = values.every((val, i) => i === 0 || val === values[i-1] - 1);
+  
+  // Count occurrences of each value
+  const counts = {};
+  values.forEach(val => counts[val] = (counts[val] || 0) + 1);
+  const countsArray = Object.values(counts).sort((a, b) => b - a);
+  
+  // Royal Flush
+  if (isFlush && isStraight && values[0] === 14) {
+    return { hand: "Royal Flush", rank: 10, cards: cards };
   }
-  return value % 10; // Only the last digit counts
+  
+  // Straight Flush
+  if (isFlush && isStraight) {
+    return { hand: "Straight Flush", rank: 9, cards: cards };
+  }
+  
+  // Four of a Kind
+  if (countsArray[0] === 4) {
+    return { hand: "Four of a Kind", rank: 8, cards: cards };
+  }
+  
+  // Full House
+  if (countsArray[0] === 3 && countsArray[1] === 2) {
+    return { hand: "Full House", rank: 7, cards: cards };
+  }
+  
+  // Flush
+  if (isFlush) {
+    return { hand: "Flush", rank: 6, cards: cards };
+  }
+  
+  // Straight
+  if (isStraight) {
+    return { hand: "Straight", rank: 5, cards: cards };
+  }
+  
+  // Three of a Kind
+  if (countsArray[0] === 3) {
+    return { hand: "Three of a Kind", rank: 4, cards: cards };
+  }
+  
+  // Two Pair
+  if (countsArray[0] === 2 && countsArray[1] === 2) {
+    return { hand: "Two Pair", rank: 3, cards: cards };
+  }
+  
+  // One Pair
+  if (countsArray[0] === 2) {
+    return { hand: "One Pair", rank: 2, cards: cards };
+  }
+  
+  // High Card
+  return { hand: "High Card", rank: 1, cards: cards };
 }
 
-function dealInitialCards(deck) {
-  const newDeck = [...deck];
-  const playerHand = [newDeck.pop(), newDeck.pop()];
-  const bankerHand = [newDeck.pop(), newDeck.pop()];
+function getBestHand(playerCards, communityCards) {
+  const allCards = [...playerCards, ...communityCards];
+  let bestHand = { hand: "High Card", rank: 1, cards: [] };
   
-  return {
-    playerHand,
-    bankerHand,
-    deck: newDeck
-  };
-}
-
-function playBaccarat(playerHand, bankerHand, deck) {
-  let newPlayerHand = [...playerHand];
-  let newBankerHand = [...bankerHand];
-  let newDeck = [...deck];
-  
-  const playerValue = calculateBaccaratValue(newPlayerHand);
-  const bankerValue = calculateBaccaratValue(newBankerHand);
-  
-  // Natural win (8 or 9)
-  if (playerValue >= 8 || bankerValue >= 8) {
-    return { playerHand: newPlayerHand, bankerHand: newBankerHand, deck: newDeck };
-  }
-  
-  // Player draws third card if value is 0-5
-  if (playerValue <= 5) {
-    newPlayerHand.push(newDeck.pop());
-  }
-  
-  // Banker draws third card based on rules
-  const finalPlayerValue = calculateBaccaratValue(newPlayerHand);
-  const currentBankerValue = calculateBaccaratValue(newBankerHand);
-  
-  let shouldBankerDraw = false;
-  
-  if (newPlayerHand.length === 2) {
-    // Player didn't draw third card
-    shouldBankerDraw = currentBankerValue <= 5;
-  } else {
-    // Player drew third card
-    const playerThirdCard = getBaccaratValue(newPlayerHand[2]);
-    
-    if (currentBankerValue <= 2) {
-      shouldBankerDraw = true;
-    } else if (currentBankerValue === 3) {
-      shouldBankerDraw = playerThirdCard !== 8;
-    } else if (currentBankerValue === 4) {
-      shouldBankerDraw = [2, 3, 4, 5, 6, 7].includes(playerThirdCard);
-    } else if (currentBankerValue === 5) {
-      shouldBankerDraw = [4, 5, 6, 7].includes(playerThirdCard);
-    } else if (currentBankerValue === 6) {
-      shouldBankerDraw = [6, 7].includes(playerThirdCard);
+  // Generate all possible 5-card combinations
+  for (let i = 0; i < allCards.length; i++) {
+    for (let j = i + 1; j < allCards.length; j++) {
+      for (let k = j + 1; k < allCards.length; k++) {
+        for (let l = k + 1; l < allCards.length; l++) {
+          for (let m = l + 1; m < allCards.length; m++) {
+            const hand = [allCards[i], allCards[j], allCards[k], allCards[l], allCards[m]];
+            const evaluated = evaluateHand(hand);
+            if (evaluated.rank > bestHand.rank) {
+              bestHand = evaluated;
+            }
+          }
+        }
+      }
     }
   }
   
-  if (shouldBankerDraw) {
-    newBankerHand.push(newDeck.pop());
-  }
-  
-  return { playerHand: newPlayerHand, bankerHand: newBankerHand, deck: newDeck };
-}
-
-function determineWinner(playerHand, bankerHand) {
-  const playerValue = calculateBaccaratValue(playerHand);
-  const bankerValue = calculateBaccaratValue(bankerHand);
-  
-  if (playerValue > bankerValue) return "player";
-  if (bankerValue > playerValue) return "banker";
-  return "tie";
+  return bestHand;
 }
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
-export default function BaccaratPage() {
+export default function PokerPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
   const [currentBet, setCurrentBet] = useState(MIN_BET); // Track current game bet
   const [playing, setPlaying] = useState(false);
-  const [playerHand, setPlayerHand] = useState([]);
-  const [bankerHand, setBankerHand] = useState([]);
+  const [playerCards, setPlayerCards] = useState([]);
+  const [communityCards, setCommunityCards] = useState([]);
   const [deck, setDeck] = useState([]);
   const [gameActive, setGameActive] = useState(false);
   const [gameResult, setGameResult] = useState(null);
-  const [betType, setBetType] = useState("player"); // player, banker, tie
+  const [gamePhase, setGamePhase] = useState("preflop"); // preflop, flop, turn, river, showdown
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [stats, setStats] = useState(() => 
     safeRead(LS_KEY, { totalHands: 0, totalBet: 0, totalWon: 0, biggestWin: 0, wins: 0, lastBet: MIN_BET })
@@ -188,6 +225,7 @@ export default function BaccaratPage() {
     setMounted(true);
     setVaultState(getVault());
     
+    // Check if this is a free play
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
     
@@ -210,12 +248,13 @@ export default function BaccaratPage() {
     const currentVault = getVault();
     let bet = Number(betAmount) || MIN_BET;
     
+    // Check if this is a free play
     if (isFreePlay) {
       const result = consumeFreePlayToken();
       if (result.success) {
         bet = result.amount;
         setIsFreePlay(false);
-        router.replace('/baccarat', undefined, { shallow: true });
+        router.replace('/poker', undefined, { shallow: true });
       } else {
         alert('No free play tokens available!');
         setIsFreePlay(false);
@@ -232,6 +271,7 @@ export default function BaccaratPage() {
         return;
       }
 
+      // Deduct cost
       const newVault = currentVault - bet;
       setVault(newVault);
       setVaultState(newVault);
@@ -240,75 +280,76 @@ export default function BaccaratPage() {
     setCurrentBet(bet);
     setGameActive(true);
     setGameResult(null);
+    setPlayerCards([]);
+    setCommunityCards([]);
+    setGamePhase("preflop");
     
     // Create and shuffle deck
     const newDeck = shuffleDeck(createDeck());
     setDeck(newDeck);
     
     // Deal initial cards
-    const { playerHand: newPlayerHand, bankerHand: newBankerHand, deck: remainingDeck } = dealInitialCards(newDeck);
-    setPlayerHand(newPlayerHand);
-    setBankerHand(newBankerHand);
-    setDeck(remainingDeck);
+    const playerHand = [newDeck.pop(), newDeck.pop()];
+    setPlayerCards(playerHand);
     
-    // Play the game
+    // Deal flop (3 cards)
     setTimeout(() => {
-      const { playerHand: finalPlayerHand, bankerHand: finalBankerHand, deck: finalDeck } = playBaccarat(newPlayerHand, newBankerHand, remainingDeck);
-      setPlayerHand(finalPlayerHand);
-      setBankerHand(finalBankerHand);
-      setDeck(finalDeck);
+      const flop = [newDeck[newDeck.length-3], newDeck[newDeck.length-2], newDeck[newDeck.length-1]];
+      setCommunityCards(flop);
+      setGamePhase("flop");
       
-      const winner = determineWinner(finalPlayerHand, finalBankerHand);
-      endGame(winner, finalPlayerHand, finalBankerHand);
+      // Deal turn
+      setTimeout(() => {
+        const turn = newDeck[newDeck.length-4];
+        setCommunityCards([...flop, turn]);
+        setGamePhase("turn");
+        
+        // Deal river
+        setTimeout(() => {
+          const river = newDeck[newDeck.length-5];
+          const finalCommunity = [...flop, turn, river];
+          setCommunityCards(finalCommunity);
+          setGamePhase("river");
+          
+          // Evaluate final hand
+          setTimeout(() => {
+            const bestHand = getBestHand(playerHand, finalCommunity);
+            endGame(bestHand);
+          }, 1000);
+        }, 2000);
+      }, 2000);
     }, 2000);
   };
 
-  const endGame = (winner, finalPlayerHand, finalBankerHand) => {
+  const endGame = (bestHand) => {
     setGameActive(false);
+    setGamePhase("showdown");
     
-    const playerValue = calculateBaccaratValue(finalPlayerHand);
-    const bankerValue = calculateBaccaratValue(finalBankerHand);
+    const multiplier = PAYOUTS[bestHand.hand] || 1;
+    const prize = Math.floor(currentBet * multiplier);
+    const netProfit = prize - currentBet;
     
-    let prize = 0;
-    let isWin = false;
     let message = '';
-
-    if (winner === betType) {
-      if (winner === "player") {
-        prize = Math.floor(currentBet * 2);
-        isWin = true;
-        message = "🎉 Player Wins!";
-      } else if (winner === "banker") {
-        prize = Math.floor(currentBet * 1.95);
-        isWin = true;
-        message = "🎉 Banker Wins!";
-      } else if (winner === "tie") {
-        prize = Math.floor(currentBet * 8);
-        isWin = true;
-        message = "🎉 Tie!";
-      }
+    if (multiplier > 1) {
+      message = `🎉 ${bestHand.hand}! (${multiplier}x)`;
     } else {
-      if (winner === "tie" && betType !== "tie") {
-        message = "🤝 Tie - Bet Returned";
-        prize = currentBet; // Return bet
-      } else {
-        message = `💥 ${winner === "player" ? "Player" : "Banker"} Wins!`;
-      }
+      message = `💥 ${bestHand.hand} - No Win`;
     }
 
-    if (isWin || winner === "tie") {
+    if (prize > 0) {
       const newVault = getVault() + prize;
       setVault(newVault);
       setVaultState(newVault);
     }
 
     const resultData = {
-      win: isWin,
-      winner: winner,
-      playerValue: playerValue,
-      bankerValue: bankerValue,
+      win: multiplier > 1,
+      bestHand: bestHand,
       prize: prize,
-      betType: betType
+      netProfit: netProfit,
+      totalBet: currentBet,
+      message: message,
+      currentBet: currentBet
     };
 
     setGameResult(resultData);
@@ -318,9 +359,9 @@ export default function BaccaratPage() {
       ...stats,
       totalHands: stats.totalHands + 1,
       totalBet: stats.totalBet + currentBet,
-      wins: isWin ? stats.wins + 1 : stats.wins,
-      totalWon: isWin ? stats.totalWon + prize : stats.totalWon,
-      biggestWin: Math.max(stats.biggestWin, isWin ? prize : 0),
+      wins: multiplier > 1 ? stats.wins + 1 : stats.wins,
+      totalWon: multiplier > 1 ? stats.totalWon + netProfit : stats.totalWon,
+      biggestWin: Math.max(stats.biggestWin, multiplier > 1 ? netProfit : 0),
       lastBet: currentBet
     };
     setStats(newStats);
@@ -328,10 +369,11 @@ export default function BaccaratPage() {
 
   const resetGame = () => {
     setGameResult(null);
-    setPlayerHand([]);
-    setBankerHand([]);
+    setPlayerCards([]);
+    setCommunityCards([]);
     setDeck([]);
     setGameActive(false);
+    setGamePhase("preflop");
     
     // Start new game immediately
     startGame();
@@ -342,9 +384,6 @@ export default function BaccaratPage() {
       <div className="text-white text-xl">Loading...</div>
     </div>;
   }
-
-  const playerValue = calculateBaccaratValue(playerHand);
-  const bankerValue = calculateBaccaratValue(bankerHand);
 
   return (
     <Layout vault={vault} refreshVault={refreshVault}>
@@ -361,10 +400,10 @@ export default function BaccaratPage() {
             <div className="text-center">
               <h1 className="text-3xl font-bold mb-1">
                 🃏 {isFreePlay && <span className="text-amber-400">🎁 FREE PLAY - </span>}
-                MLEO Baccarat
+                MLEO Poker
               </h1>
               <p className="text-zinc-400 text-sm">
-                {isFreePlay ? "Playing with a free token - good luck!" : "Bet on Player, Banker, or Tie!"}
+                {isFreePlay ? "Playing with a free token - good luck!" : "Texas Hold'em - Best 5-card hand wins!"}
               </p>
             </div>
 
@@ -373,41 +412,56 @@ export default function BaccaratPage() {
 
           {/* GAME WINDOW */}
           <div className="rounded-2xl p-6 bg-white/5 border border-white/10 mb-6">
-            {/* Game Table */}
+            {/* Poker Table */}
             <div className="mb-8">
-              <h2 className="text-xl font-bold mb-4 text-center">🃏 Baccarat Table</h2>
+              <h2 className="text-xl font-bold mb-4 text-center">🃏 Poker Table</h2>
               
-              {/* Player Section */}
+              {/* Community Cards */}
               <div className="mb-8">
                 <div className="text-center mb-4">
-                  <h3 className="text-lg font-bold text-blue-400">Player</h3>
+                  <h3 className="text-lg font-bold text-blue-400">Community Cards</h3>
                   <div className="text-sm opacity-70">
-                    Value: {playerValue}
+                    {gamePhase === "preflop" && "Pre-flop"}
+                    {gamePhase === "flop" && "Flop (3 cards)"}
+                    {gamePhase === "turn" && "Turn (4 cards)"}
+                    {gamePhase === "river" && "River (5 cards)"}
+                    {gamePhase === "showdown" && "Showdown"}
                   </div>
                 </div>
                 <div className="flex justify-center gap-2 flex-wrap">
-                  {playerHand.map((card, index) => (
+                  {communityCards.map((card, index) => (
                     <div key={index} className="w-16 h-20 rounded-lg border-2 flex items-center justify-center text-2xl font-bold bg-gradient-to-br from-white to-gray-100 border-gray-300 text-black">
                       {card.emoji}
                     </div>
                   ))}
+                  {communityCards.length < 5 && (
+                    Array.from({ length: 5 - communityCards.length }).map((_, index) => (
+                      <div key={`empty-${index}`} className="w-16 h-20 rounded-lg border-2 border-dashed border-gray-500 flex items-center justify-center text-gray-500">
+                        ?
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
-              {/* Banker Section */}
+              {/* Player Cards */}
               <div className="mb-8">
                 <div className="text-center mb-4">
-                  <h3 className="text-lg font-bold text-red-400">Banker</h3>
-                  <div className="text-sm opacity-70">
-                    Value: {bankerValue}
-                  </div>
+                  <h3 className="text-lg font-bold text-green-400">Your Cards</h3>
                 </div>
                 <div className="flex justify-center gap-2 flex-wrap">
-                  {bankerHand.map((card, index) => (
+                  {playerCards.map((card, index) => (
                     <div key={index} className="w-16 h-20 rounded-lg border-2 flex items-center justify-center text-2xl font-bold bg-gradient-to-br from-white to-gray-100 border-gray-300 text-black">
                       {card.emoji}
                     </div>
                   ))}
+                  {playerCards.length < 2 && (
+                    Array.from({ length: 2 - playerCards.length }).map((_, index) => (
+                      <div key={`empty-${index}`} className="w-16 h-20 rounded-lg border-2 border-dashed border-gray-500 flex items-center justify-center text-gray-500">
+                        ?
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -417,31 +471,27 @@ export default function BaccaratPage() {
               <div className={`text-center mb-6 p-6 rounded-xl border-2 ${
                 gameResult.win
                   ? "bg-green-900/30 border-green-500"
-                  : gameResult.winner === "tie"
-                  ? "bg-yellow-900/30 border-yellow-500"
                   : "bg-red-900/30 border-red-500"
               }`}>
                 <div className="text-3xl font-bold mb-2">
-                  {gameResult.win ? "🎉 You Win!" : gameResult.winner === "tie" ? "🤝 Tie!" : "💥 You Lose!"}
+                  {gameResult.message}
                 </div>
                 <div className="text-xl mb-2">
-                  Player: {gameResult.playerValue} | Banker: {gameResult.bankerValue}
+                  Best Hand: {gameResult.bestHand.hand}
                 </div>
                 {gameResult.win && (
                   <div className="text-3xl font-bold text-green-400">
-                    +{fmt(gameResult.prize)} MLEO ({gameResult.betType === "tie" ? "8x" : gameResult.betType === "banker" ? "1.95x" : "2x"})
+                    +{fmt(gameResult.netProfit)} MLEO Profit
                   </div>
                 )}
-                {gameResult.winner === "tie" && !gameResult.win && (
-                  <div className="text-xl text-yellow-400">
-                    Bet Returned: {fmt(gameResult.prize)} MLEO
-                  </div>
-                )}
-                {!gameResult.win && gameResult.winner !== "tie" && (
+                {!gameResult.win && (
                   <div className="text-xl text-red-400">
-                    Lost {fmt(currentBet)} MLEO
+                    Lost {fmt(gameResult.totalBet)} MLEO
                   </div>
                 )}
+                <div className="text-sm text-gray-400 mt-2">
+                  Total Prize: {fmt(gameResult.prize)} MLEO | Net: {gameResult.netProfit >= 0 ? '+' : ''}{fmt(gameResult.netProfit)} MLEO
+                </div>
               </div>
             )}
 
@@ -449,43 +499,6 @@ export default function BaccaratPage() {
             <div className="text-center mb-6">
               {!gameActive && !gameResult && (
                 <>
-                  {/* Bet Type Selection */}
-                  <div className="mb-6">
-                    <div className="text-sm text-zinc-400 mb-3">Choose Your Bet</div>
-                    <div className="flex gap-3 justify-center flex-wrap">
-                      <button
-                        onClick={() => setBetType("player")}
-                        className={`px-6 py-3 rounded-xl font-bold text-lg transition-all ${
-                          betType === "player"
-                            ? "bg-blue-600 text-white"
-                            : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
-                        }`}
-                      >
-                        Player (×2)
-                      </button>
-                      <button
-                        onClick={() => setBetType("banker")}
-                        className={`px-6 py-3 rounded-xl font-bold text-lg transition-all ${
-                          betType === "banker"
-                            ? "bg-red-600 text-white"
-                            : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
-                        }`}
-                      >
-                        Banker (×1.95)
-                      </button>
-                      <button
-                        onClick={() => setBetType("tie")}
-                        className={`px-6 py-3 rounded-xl font-bold text-lg transition-all ${
-                          betType === "tie"
-                            ? "bg-yellow-600 text-white"
-                            : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
-                        }`}
-                      >
-                        Tie (×8)
-                      </button>
-                    </div>
-                  </div>
-
                   <button
                     onClick={startGame}
                     disabled={false}
@@ -518,7 +531,7 @@ export default function BaccaratPage() {
                       ))}
                     </div>
                     <div className="text-xs text-zinc-500 mt-2 text-center">
-                      Max win: {((Number(betAmount) || MIN_BET) * (betType === "tie" ? 8 : betType === "banker" ? 1.95 : 2)).toLocaleString()} MLEO
+                      Max win: {((Number(betAmount) || MIN_BET) * 1000).toLocaleString()} MLEO
                     </div>
                   </div>
                 </>
@@ -526,7 +539,12 @@ export default function BaccaratPage() {
 
               {gameActive && !gameResult && (
                 <div className="text-center">
-                  <div className="text-xl text-yellow-400 mb-4">Dealing cards...</div>
+                  <div className="text-xl text-yellow-400 mb-4">
+                    {gamePhase === "preflop" && "Dealing your cards..."}
+                    {gamePhase === "flop" && "Dealing flop..."}
+                    {gamePhase === "turn" && "Dealing turn..."}
+                    {gamePhase === "river" && "Dealing river..."}
+                  </div>
                 </div>
               )}
 
@@ -563,7 +581,7 @@ export default function BaccaratPage() {
                       ))}
                     </div>
                     <div className="text-xs text-zinc-500 mt-2 text-center">
-                      Max win: {((Number(betAmount) || MIN_BET) * (betType === "tie" ? 8 : betType === "banker" ? 1.95 : 2)).toLocaleString()} MLEO
+                      Max win: {((Number(betAmount) || MIN_BET) * 1000).toLocaleString()} MLEO
                     </div>
                   </div>
                 </>
@@ -600,15 +618,36 @@ export default function BaccaratPage() {
             </div>
           </div>
 
+          {/* PRIZES */}
+          <div className="rounded-2xl p-6 bg-white/5 border border-white/10 mb-6">
+            <h3 className="text-lg font-bold mb-4">🏆 Prize List</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+              {Object.entries(PAYOUTS).map(([hand, multiplier]) => (
+                <div 
+                  key={hand}
+                  className="rounded-lg p-3 border-2 text-center bg-gradient-to-br from-purple-600/20 to-indigo-600/20 border-purple-500/30"
+                >
+                  <div className="font-bold text-sm text-purple-300 mb-1">
+                    {hand}
+                  </div>
+                  <div className="text-lg font-bold text-white">
+                    ×{multiplier}
+                  </div>
+                  <div className="text-xs opacity-70 mt-1">
+                    {multiplier === 1000 ? 'Royal!' : multiplier >= 50 ? 'Rare!' : multiplier >= 10 ? 'Good!' : 'Common'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* HOW TO PLAY */}
           <div className="rounded-xl p-6 bg-gradient-to-br from-yellow-600/20 to-orange-600/20 border border-yellow-500/30">
             <h3 className="text-lg font-bold text-yellow-300 mb-4">How to Play</h3>
             <div className="text-sm text-zinc-300 space-y-2">
-              <p><strong>Player:</strong> Bet on player to win (×2 payout)</p>
-              <p><strong>Banker:</strong> Bet on banker to win (×1.95 payout)</p>
-              <p><strong>Tie:</strong> Bet on exact tie (×8 payout)</p>
-              <p><strong>Card Values:</strong> A=1, 2-9=face value, 10/J/Q/K=0</p>
-              <p><strong>Winning:</strong> Closest to 9 wins (only last digit counts)</p>
+              <p><strong>Texas Hold'em:</strong> Use your 2 cards + 5 community cards to make the best 5-card hand</p>
+              <p><strong>Hand Rankings:</strong> Royal Flush (1000x) &gt; Straight Flush (200x) &gt; Four of a Kind (50x) &gt; Full House (20x) &gt; Flush (10x) &gt; Straight (8x) &gt; Three of a Kind (5x) &gt; Two Pair (3x) &gt; One Pair (2x) &gt; High Card (1x)</p>
+              <p><strong>Winning:</strong> Get a pair or better to win your bet back plus bonus!</p>
             </div>
           </div>
         </div>

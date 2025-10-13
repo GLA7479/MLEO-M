@@ -3,50 +3,115 @@ import { useState, useEffect } from "react";
 import Layout from "../components/Layout";
 import Link from "next/link";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { getFreePlayStatus, formatTimeRemaining, debugAddTokens } from "../lib/free-play-system";
 
 const ARCADE_BG = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
 
-function GameCard({ title, emoji, description, prize, href, color }) {
+function GameCard({ title, emoji, description, prize, href, color, freePlayStatus }) {
+  const [showInfo, setShowInfo] = useState(false);
+  
   return (
-    <article 
-      className="rounded-xl border border-white/10 backdrop-blur-md shadow-lg p-5 flex flex-col h-full transition-all hover:scale-105 hover:border-white/30"
-      style={{
-        background: `linear-gradient(135deg, ${color}15 0%, ${color}05 100%)`,
-      }}
-    >
-      <div className="text-center mb-4">
-        <div className="text-5xl mb-3">{emoji}</div>
-        <h2 className="text-xl font-extrabold mb-2">{title}</h2>
-        <p className="text-sm text-zinc-300 leading-relaxed line-clamp-2">
-          {description}
-        </p>
-      </div>
-
-      <div className="mt-auto">
-        {/* Cost & Max Win in same row */}
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="rounded-lg bg-black/30 border border-white/10 p-2.5 text-center">
-            <div className="text-xs opacity-70 mb-1">Cost</div>
-            <div className="text-base font-bold text-amber-400">1K+</div>
+    <>
+      <article 
+        className="rounded-xl border border-white/10 backdrop-blur-md shadow-lg p-5 flex flex-col h-full transition-all hover:scale-105 hover:border-white/30"
+        style={{
+          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)',
+        }}
+      >
+        <div className="text-center mb-4">
+          <div className="flex justify-between items-start mb-2">
+            <div className="flex-1"></div>
+            <div className="text-5xl">{emoji}</div>
+            <div className="flex-1 flex justify-end">
+              <button
+                onClick={() => setShowInfo(true)}
+                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-sm transition-all"
+                title="Info"
+              >
+                ℹ️
+              </button>
+            </div>
           </div>
-          
-          <div className="rounded-lg bg-black/30 border border-white/10 p-2.5 text-center">
-            <div className="text-xs opacity-70 mb-1">Max Win</div>
-            <div className="text-base font-bold text-green-400">{prize}</div>
-          </div>
+          <h2 className="text-xl font-extrabold mb-2">{title}</h2>
+          <p className="text-sm text-zinc-300 leading-relaxed line-clamp-2">
+            {description}
+          </p>
         </div>
 
-        <Link
-          href={href}
-          className="block w-full text-center px-5 py-2.5 rounded-lg font-extrabold text-white text-base shadow-lg transition-all hover:scale-105"
-          style={{
-            background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
-          }}
-        >
-          PLAY NOW
-        </Link>
-      </div>
-    </article>
+        <div className="mt-auto">
+          {/* Cost & Max Win in same row */}
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="rounded-lg bg-black/30 border border-white/10 p-2.5 text-center">
+              <div className="text-xs opacity-70 mb-1">Cost</div>
+              <div className="text-base font-bold text-amber-400">1K+</div>
+            </div>
+            
+            <div className="rounded-lg bg-black/30 border border-white/10 p-2.5 text-center">
+              <div className="text-xs opacity-70 mb-1">Max Win</div>
+              <div className="text-base font-bold text-green-400">{prize}</div>
+            </div>
+          </div>
+
+          {/* Free Play Button (if tokens available) */}
+          {freePlayStatus && freePlayStatus.hasTokens && (
+            <Link
+              href={`${href}?freePlay=true`}
+              className="block w-full text-center px-5 py-2.5 rounded-lg font-extrabold text-white text-base shadow-lg transition-all hover:scale-105 mb-2 bg-gradient-to-r from-amber-500 to-orange-500"
+            >
+              🎁 FREE PLAY ({freePlayStatus.tokens}/{freePlayStatus.maxTokens})
+            </Link>
+          )}
+
+          {/* Regular Play Button */}
+          <Link
+            href={href}
+            className="block w-full text-center px-5 py-2.5 rounded-lg font-extrabold text-white text-base shadow-lg transition-all hover:scale-105"
+            style={{
+              background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
+            }}
+          >
+            PLAY NOW
+          </Link>
+          
+          {/* Timer display (if not full) */}
+          {freePlayStatus && !freePlayStatus.isFull && (
+            <div className="text-center mt-2 text-xs text-amber-400/70">
+              ⏰ Next free: {formatTimeRemaining(freePlayStatus.timeUntilNext)}
+            </div>
+          )}
+        </div>
+      </article>
+      
+      {/* Info Modal */}
+      {showInfo && (
+        <Modal open={showInfo} onClose={() => setShowInfo(false)}>
+          <div className="text-center mb-4">
+            <div className="text-6xl mb-3">{emoji}</div>
+            <h2 className="text-2xl font-bold mb-2">{title}</h2>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-bold text-lg mb-2">About This Game</h3>
+              <p className="text-zinc-300">{description}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-4 text-center">
+                <div className="text-sm opacity-70 mb-1">Cost per Round</div>
+                <div className="text-xl font-bold text-amber-400">1,000+ MLEO</div>
+              </div>
+              <div className="rounded-lg bg-green-500/10 border border-green-500/30 p-4 text-center">
+                <div className="text-sm opacity-70 mb-1">Max Win</div>
+                <div className="text-xl font-bold text-green-400">{prize}</div>
+              </div>
+            </div>
+            <div>
+              <h3 className="font-bold text-lg mb-2">How to Play</h3>
+              <p className="text-zinc-300">Click "PLAY NOW" to start the game. Each round costs 1,000 MLEO or more depending on your bet. Win multipliers and prizes based on the game outcome!</p>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }
 
@@ -79,8 +144,8 @@ function Modal({ open, onClose, children }) {
 }
 
 export default function ArcadeHub() {
-  const [infoModal, setInfoModal] = useState(false);
   const [vault, setVault] = useState(0);
+  const [freePlayStatus, setFreePlayStatus] = useState({ tokens: 0, timeUntilNext: 0, hasTokens: false });
   
   // Read vault from RUSH game
   function getVault() {
@@ -101,16 +166,117 @@ export default function ArcadeHub() {
     return Math.floor(n).toString();
   }
   
-  // Load vault on mount and refresh every 2 seconds
+  // Update free play status
+  function updateFreePlayStatus() {
+    const status = getFreePlayStatus();
+    setFreePlayStatus(status);
+  }
+  
+  // Load vault and free play status on mount and refresh every 2 seconds
   useEffect(() => {
     setVault(getVault());
+    updateFreePlayStatus();
+    
     const interval = setInterval(() => {
       setVault(getVault());
+      updateFreePlayStatus();
     }, 2000);
+    
     return () => clearInterval(interval);
   }, []);
 
   const games = [
+    // 1. Plinko
+    {
+      title: "Plinko",
+      emoji: "🎯",
+      description: "Drop the ball through pegs! Land on high multipliers for massive wins!",
+      prize: "×10",
+      href: "/plinko",
+      color: "#3B82F6",
+    },
+    // 2. Crash
+    {
+      title: "Crash",
+      emoji: "🚀",
+      description: "Watch the multiplier grow! Cash out before it crashes to win big!",
+      prize: "Unlimited",
+      href: "/crash",
+      color: "#DC2626",
+    },
+    // 3. Mines
+    {
+      title: "Mines",
+      emoji: "💣",
+      description: "Minesweeper-style risk game. Find safe tiles and cash out before hitting a mine!",
+      prize: "×10",
+      href: "/mines",
+      color: "#EA580C",
+    },
+    // 4. Blackjack
+    {
+      title: "Blackjack",
+      emoji: "🎰",
+      description: "Beat the dealer to 21! Classic card game with emoji cards.",
+      prize: "×2",
+      href: "/blackjack",
+      color: "#10B981",
+    },
+    // 5. Poker
+    {
+      title: "Poker",
+      emoji: "🃏",
+      description: "Texas Hold'em poker! Use your 2 cards + 5 community cards to make the best hand.",
+      prize: "×1000",
+      href: "/poker",
+      color: "#8B5CF6",
+    },
+    // 6. Hi-Lo Cards
+    {
+      title: "Hi-Lo Cards",
+      emoji: "🃏",
+      description: "Guess if the next card is higher or lower. Build streaks for huge multipliers!",
+      prize: "Unlimited",
+      href: "/hilo",
+      color: "#059669",
+    },
+    // 7. Three Card Poker
+    {
+      title: "Three Card Poker",
+      emoji: "🃏",
+      description: "Fast poker! 3 cards vs dealer - best hand wins with instant results.",
+      prize: "×100",
+      href: "/three-card-poker",
+      color: "#EC4899",
+    },
+    // 8. Caribbean Stud
+    {
+      title: "Caribbean Stud",
+      emoji: "🃏",
+      description: "5 cards vs dealer - best hand wins with instant results.",
+      prize: "×100",
+      href: "/caribbean-stud",
+      color: "#14B8A6",
+    },
+    // 9. Pai Gow Poker
+    {
+      title: "Pai Gow Poker",
+      emoji: "🃏",
+      description: "7 cards split into 5+2 - beat dealer on both hands!",
+      prize: "×2",
+      href: "/pai-gow",
+      color: "#F59E0B",
+    },
+    // 10. Roulette
+    {
+      title: "Roulette",
+      emoji: "🎯",
+      description: "Spin the wheel and win big! Classic casino wheel game with multiple betting options.",
+      prize: "×36",
+      href: "/roulette",
+      color: "#7C3AED",
+    },
+    // Additional games
     {
       title: "Slot Machine",
       emoji: "🎰",
@@ -133,7 +299,7 @@ export default function ArcadeHub() {
       description: "Spin the wheel and land on prizes. Watch out for free spins!",
       prize: "×10",
       href: "/wheel",
-      color: "#8B5CF6",
+      color: "#A855F7",
     },
     {
       title: "Scratch Card",
@@ -141,31 +307,7 @@ export default function ArcadeHub() {
       description: "Scratch to reveal 9 symbols. Match 3 identical symbols to win!",
       prize: "×10",
       href: "/scratch",
-      color: "#14B8A6",
-    },
-    {
-      title: "Plinko",
-      emoji: "🎯",
-      description: "Drop the ball through pegs! Land on high multipliers for massive wins!",
-      prize: "×10",
-      href: "/plinko",
-      color: "#3B82F6",
-    },
-    {
-      title: "Mines",
-      emoji: "💣",
-      description: "Minesweeper-style risk game. Find safe tiles and cash out before hitting a mine!",
-      prize: "×10",
-      href: "/mines",
-      color: "#DC2626",
-    },
-    {
-      title: "Hi-Lo Cards",
-      emoji: "🃏",
-      description: "Guess if the next card is higher or lower. Build streaks for huge multipliers!",
-      prize: "Unlimited",
-      href: "/hilo",
-      color: "#EC4899",
+      color: "#06B6D4",
     },
     {
       title: "Coin Flip",
@@ -173,18 +315,10 @@ export default function ArcadeHub() {
       description: "Classic 50/50! Choose heads or tails with random win multipliers up to ×10!",
       prize: "×10",
       href: "/coinflip",
-      color: "#F59E0B",
+      color: "#D97706",
     },
     {
-      title: "Crash",
-      emoji: "🚀",
-      description: "Watch the multiplier grow! Cash out before it crashes to win big!",
-      prize: "Unlimited",
-      href: "/crash",
-      color: "#DC2626",
-    },
-    {
-      title: "MLEO Racer",
+      title: "Racer",
       emoji: "🏁",
       description: "Bet on your favorite car and watch them race! Win up to ×6 multiplier!",
       prize: "×6",
@@ -192,52 +326,36 @@ export default function ArcadeHub() {
       color: "#F97316",
     },
     {
-      title: "MLEO Darts",
+      title: "Darts",
       emoji: "🎯",
       description: "Throw darts and hit the bullseye for massive wins! Up to ×10 multiplier!",
       prize: "×10",
       href: "/darts",
-      color: "#EA580C",
+      color: "#BE123C",
     },
     {
-      title: "MLEO Tower",
+      title: "Tower",
       emoji: "⚖️",
       description: "Climb the tower and cash out before it collapses! Risk vs reward game!",
       prize: "×10",
       href: "/tower",
-      color: "#8B5CF6",
+      color: "#6366F1",
     },
     {
-      title: "MLEO Blackjack",
-      emoji: "🎰",
-      description: "Beat the dealer to 21! Classic card game with emoji cards.",
-      prize: "×2",
-      href: "/blackjack",
-      color: "#10B981",
-    },
-    {
-      title: "MLEO Craps",
+      title: "Craps",
       emoji: "🎲",
       description: "Roll the dice and win big! Classic casino dice game with multiple betting options.",
       prize: "×31",
       href: "/craps",
-      color: "#059669",
+      color: "#16A34A",
     },
     {
-      title: "MLEO Baccarat",
+      title: "Baccarat",
       emoji: "🃏",
       description: "Bet on Player, Banker, or Tie! Classic card game with simple rules.",
       prize: "×8",
       href: "/baccarat",
-      color: "#7C3AED",
-    },
-    {
-      title: "MLEO Roulette",
-      emoji: "🎯",
-      description: "Spin the wheel and win big! Classic casino wheel game with multiple betting options.",
-      prize: "×36",
-      href: "/roulette",
-      color: "#DC2626",
+      color: "#9333EA",
     },
   ];
 
@@ -260,21 +378,37 @@ export default function ArcadeHub() {
                 ← BACK
               </Link>
               
-              <div className="rounded-xl px-4 py-2 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
-                <div className="text-xs opacity-70">Your Vault</div>
-                <div className="text-lg font-bold text-emerald-400">{fmt(vault)} MLEO</div>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 border border-white/20 font-semibold text-sm">
+                <span>💰</span>
+                <span className="text-emerald-400">{fmt(vault)} MLEO</span>
               </div>
+              
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600/20 to-orange-600/20 border border-amber-500/30 font-semibold text-sm">
+                <span>🎁</span>
+                <span className="text-amber-300">
+                  {freePlayStatus.tokens}/{freePlayStatus.maxTokens} Free
+                </span>
+                {freePlayStatus.tokens < freePlayStatus.maxTokens && (
+                  <span className="text-xs text-amber-400/70">
+                    {formatTimeRemaining(freePlayStatus.timeUntilNext)}
+                  </span>
+                )}
+              </div>
+              
+              {/* DEBUG BUTTON - Remove in production */}
+              <button
+                onClick={() => {
+                  debugAddTokens();
+                  updateFreePlayStatus();
+                }}
+                className="px-3 py-2 rounded-xl bg-red-600/20 border border-red-500/30 text-red-300 text-xs font-bold hover:bg-red-600/30"
+                title="Debug: Add 5 tokens"
+              >
+                🔧 DEBUG +5
+              </button>
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setInfoModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 font-semibold text-sm"
-              >
-                <span>ℹ️</span>
-                <span>How to Play</span>
-              </button>
-              
               <ConnectButton
                 chainStatus="none"
                 accountStatus="avatar"
@@ -304,14 +438,14 @@ export default function ArcadeHub() {
           {/* Games Grid */}
           <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {games.map((game, idx) => (
-              <GameCard key={idx} {...game} />
+              <GameCard key={idx} {...game} freePlayStatus={freePlayStatus} />
             ))}
           </section>
           
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/40">
               <span className="text-2xl">🎮</span>
-              <span className="font-bold text-purple-300">9 Exciting Games to Play!</span>
+              <span className="font-bold text-purple-300">20 Exciting Games to Play!</span>
             </div>
           </div>
 
@@ -322,11 +456,13 @@ export default function ArcadeHub() {
               <div>
                 <h3 className="text-xl font-bold text-yellow-300 mb-2">Important Information</h3>
                 <ul className="text-sm text-white/90 space-y-2">
-                  <li>• <strong>Cost:</strong> Each game costs 1,000 MLEO per play</li>
-                  <li>• <strong>Source:</strong> MLEO is deducted from your RUSH game vault</li>
-                  <li>• <strong>Prizes:</strong> All winnings are added back to your vault</li>
-                  <li>• <strong>Fair Play:</strong> All games use random outcomes with balanced odds</li>
-                  <li>• <strong>Statistics:</strong> Track your wins and losses in each game</li>
+                  <li>• <strong>🎁 Free Play:</strong> Earn 1 free play token every hour (max 5 tokens). Use tokens on any game without spending MLEO!</li>
+                  <li>• <strong>Minimum Bet:</strong> Each game has a minimum bet of 1,000 MLEO (some games allow higher bets)</li>
+                  <li>• <strong>Source:</strong> MLEO is deducted from your vault when you play (not for free plays)</li>
+                  <li>• <strong>Prizes:</strong> All winnings are automatically added back to your vault (including free play wins!)</li>
+                  <li>• <strong>Game Info:</strong> Click the ℹ️ button on each game card to learn how to play and see prize details</li>
+                  <li>• <strong>Fair Play:</strong> All games use random number generation for fair outcomes</li>
+                  <li>• <strong>Statistics:</strong> Each game tracks your personal stats (total plays, wins, biggest win, etc.)</li>
                 </ul>
               </div>
             </div>
@@ -355,189 +491,6 @@ export default function ArcadeHub() {
         </div>
       </main>
 
-      {/* Info Modal - Updated with all 8 games */}
-      <Modal open={infoModal} onClose={() => setInfoModal(false)}>
-        <div className="space-y-6">
-          <section>
-            <h4 className="text-lg font-bold text-white mb-2">💰 How It Works</h4>
-            <p>
-              Most arcade games cost <strong className="text-amber-400">1,000 MLEO</strong> per play
-              (Crash has variable betting). The MLEO is taken from your <strong>RUSH game vault</strong>. 
-              When you win, the prize is added back to your vault.
-            </p>
-          </section>
-
-          <section>
-            <h4 className="text-lg font-bold text-white mb-2">🎰 Slot Machine</h4>
-            <p>
-              Spin 3 reels and match symbols. Get 3 identical symbols for big wins!
-              <br />• Triple Diamond 💎 = 10,000 MLEO (×10)
-              <br />• Triple Crown 👑 = 8,000 MLEO (×8)
-              <br />• Two matching = smaller prizes
-              <br />• 5% chance for random free spin
-            </p>
-          </section>
-
-          <section>
-            <h4 className="text-lg font-bold text-white mb-2">🎲 Dice Roller</h4>
-            <p>
-              Roll 3 dice and match conditions:
-              <br />• Triple Six (666) = 10,000 MLEO (×10)
-              <br />• Any Triple = 6,000 MLEO (×6)
-              <br />• Sum 18, 17, 16, 15, 14... = various multipliers
-              <br />• All Even/Odd = 1,500 MLEO (×1.5)
-            </p>
-          </section>
-
-          <section>
-            <h4 className="text-lg font-bold text-white mb-2">🎡 Wheel of Fortune</h4>
-            <p>
-              Spin the wheel and land on a prize segment:
-              <br />• 10,000 MLEO jackpot segment
-              <br />• Various prize amounts (500-5,000)
-              <br />• Free spin segments
-              <br />• "LOSE" segments (try again!)
-            </p>
-          </section>
-
-          <section>
-            <h4 className="text-lg font-bold text-white mb-2">🃏 Scratch Card</h4>
-            <p>
-              Scratch 9 covered symbols. Match 3 identical symbols to win!
-              <br />• Diamond 💎 = 10,000 MLEO (×10)
-              <br />• Crown 👑 = 8,000 MLEO (×8)
-              <br />• Fire 🔥 = 6,000 MLEO (×6)
-              <br />• Various other symbols with smaller prizes
-            </p>
-          </section>
-
-          <section>
-            <h4 className="text-lg font-bold text-white mb-2">🎯 Plinko</h4>
-            <p>
-              Drop a ball through pegs with real physics! Click anytime to drop more balls.
-              <br />• Ball bounces through pegs randomly
-              <br />• Edge buckets: ×10, ×5 (rare but huge!)
-              <br />• Center buckets: ×2, ×3 (wins) or ×0.5, ×0.2, ×0 (losses)
-              <br />• Drop multiple balls simultaneously for more action!
-            </p>
-          </section>
-
-          <section>
-            <h4 className="text-lg font-bold text-white mb-2">🏁 MLEO Racer</h4>
-            <p>
-              Bet on your favorite car and watch them race! Choose from 5 different cars.
-              <br />• 1st place: ×6 multiplier (6,000 MLEO)
-              <br />• 2nd place: ×4 multiplier (4,000 MLEO)
-              <br />• 3rd place: ×2.5 multiplier (2,500 MLEO)
-              <br />• 4th & 5th place: Break even or small loss
-            </p>
-          </section>
-
-          <section>
-            <h4 className="text-lg font-bold text-white mb-2">🎯 MLEO Darts</h4>
-            <p>
-              Throw darts at a target board and hit different zones for prizes!
-              <br />• Bullseye: ×10 multiplier (10,000 MLEO)
-              <br />• Inner Ring: ×5 multiplier (5,000 MLEO)
-              <br />• Outer Ring: ×3 multiplier (3,000 MLEO)
-              <br />• Middle Ring: ×1.5 multiplier (1,500 MLEO)
-              <br />• Miss: Lose your bet
-            </p>
-          </section>
-
-          <section>
-            <h4 className="text-lg font-bold text-white mb-2">⚖️ MLEO Tower</h4>
-            <p>
-              Climb the tower floor by floor, but cash out before it collapses!
-              <br />• Each floor multiplies your bet by ×1.3
-              <br />• Higher floors = higher rewards but more collapse risk
-              <br />• Cash out anytime to secure your winnings
-              <br />• Tower collapse = lose everything
-            </p>
-          </section>
-
-          <section>
-            <h4 className="text-lg font-bold text-white mb-2">🎰 MLEO Blackjack</h4>
-            <p>
-              Classic 21 card game against the dealer! Beat the dealer without going over 21.
-              <br />• Get closer to 21 than dealer = Win ×2 your bet
-              <br />• Same value as dealer = Push (refund)
-              <br />• Dealer wins = Lose your bet
-              <br />• Hit for more cards or Stand with your hand
-            </p>
-          </section>
-
-          <section>
-            <h4 className="text-lg font-bold text-white mb-2">💣 Mines</h4>
-            <p>
-              Minesweeper-style risk game. Reveal safe tiles and cash out!
-              <br />• Choose difficulty: Easy (3 mines), Medium (5), Hard (7)
-              <br />• Each safe tile increases your multiplier
-              <br />• Cash out anytime to collect current prize
-              <br />• Hit a mine = lose everything!
-              <br />• Max prize: up to ×6 multiplier
-            </p>
-          </section>
-
-          <section>
-            <h4 className="text-lg font-bold text-white mb-2">🃏 Hi-Lo Cards</h4>
-            <p>
-              Guess if the next card is Higher or Lower!
-              <br />• Each correct guess: +30% multiplier
-              <br />• Equal cards = automatic win
-              <br />• Cash out anytime to collect
-              <br />• Wrong guess = lose everything
-              <br />• Build long streaks for unlimited prizes!
-            </p>
-          </section>
-
-          <section>
-            <h4 className="text-lg font-bold text-white mb-2">🪙 Coin Flip</h4>
-            <p>
-              Classic 50/50 game with random multipliers!
-              <br />• Choose HEADS 👑 or TAILS ⭐
-              <br />• Win = random multiplier (×1.5 to ×10!)
-              <br />• ×10 multiplier: 1% chance
-              <br />• ×5 multiplier: 5% chance
-              <br />• Build win streaks!
-            </p>
-          </section>
-
-          <section>
-            <h4 className="text-lg font-bold text-white mb-2">🚀 Crash</h4>
-            <p>
-              Multiplier betting game - cash out before it crashes!
-              <br />• Betting phase: 30 seconds to place your bet
-              <br />• Watch multiplier grow from 1.00× upward
-              <br />• Cash out anytime before crash
-              <br />• Crash: Random between 1.1× and 10.0×
-              <br />• Provably-fair with SHA256 hash
-              <br />• Unlimited win potential!
-            </p>
-          </section>
-
-          <section>
-            <h4 className="text-lg font-bold text-white mb-2">📊 Statistics</h4>
-            <p>
-              Each game tracks your personal stats:
-              <br />• Total plays
-              <br />• Total won
-              <br />• Biggest win
-              <br />• Win rate / Streaks
-              <br />• Net profit/loss
-            </p>
-          </section>
-
-          <section className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
-            <h4 className="text-lg font-bold text-amber-300 mb-2">⚠️ Fair Play Notice</h4>
-            <p className="text-sm">
-              All games use random number generation for fair outcomes. The house edge is balanced
-              to provide entertainment while maintaining the in-game economy. Play responsibly and
-              remember this is for fun with in-game tokens you've earned!
-            </p>
-          </section>
-        </div>
-      </Modal>
     </Layout>
   );
 }

@@ -4,8 +4,10 @@
 // ============================================================================
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
+import { useFreePlayToken as consumeFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -137,6 +139,7 @@ function determineWinner(playerValue, dealerValue, playerHand = [], dealerHand =
 // MAIN COMPONENT
 // ============================================================================
 export default function MLEOBlackjackPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000");
@@ -151,6 +154,7 @@ export default function MLEOBlackjackPage() {
   const [doubledDown, setDoubledDown] = useState(false);
   const [splitHands, setSplitHands] = useState([]);
   const [currentSplitHand, setCurrentSplitHand] = useState(0);
+  const [isFreePlay, setIsFreePlay] = useState(false);
   const [stats, setStats] = useState(() =>
     safeRead(LS_KEY, { totalHands: 0, totalBet: 0, wins: 0, totalWon: 0, totalLost: 0, biggestWin: 0, history: [], lastBet: MIN_BET })
   );
@@ -161,10 +165,14 @@ export default function MLEOBlackjackPage() {
     const currentVault = getVault();
     setVaultState(currentVault);
     
+    // Check if this is a free play
+    const isFree = router.query.freePlay === 'true';
+    setIsFreePlay(isFree);
+    
     // Load last bet amount
     const savedLastBet = safeRead(LS_KEY, { lastBet: MIN_BET }).lastBet;
     setBetAmount(savedLastBet.toString());
-  }, []);
+  }, [router.query]);
 
   const refreshVault = () => {
     setVaultState(getVault());
@@ -174,19 +182,40 @@ export default function MLEOBlackjackPage() {
     if (gameActive) return;
 
     const currentVault = getVault();
-    const bet = Number(betAmount) || MIN_BET;
-    if (bet < MIN_BET) {
-      alert(`Minimum bet is ${MIN_BET} MLEO`);
-      return;
+    let bet = Number(betAmount) || MIN_BET;
+    let usedFreePlay = false;
+    
+    // Check if this is a free play
+    if (isFreePlay) {
+      const result = consumeFreePlayToken();
+      if (result.success) {
+        bet = result.amount; // Use free play amount (1000 MLEO)
+        usedFreePlay = true;
+        setIsFreePlay(false); // Reset after using
+        
+        // Remove query parameter
+        router.replace('/blackjack', undefined, { shallow: true });
+      } else {
+        alert('No free play tokens available!');
+        setIsFreePlay(false);
+        return;
+      }
+    } else {
+      // Regular play - check balance
+      if (bet < MIN_BET) {
+        alert(`Minimum bet is ${MIN_BET} MLEO`);
+        return;
+      }
+      if (currentVault < bet) {
+        alert('Insufficient MLEO in vault');
+        return;
+      }
+      
+      // Deduct bet
+      setVault(currentVault - bet);
+      setVaultState(currentVault - bet);
     }
-    if (currentVault < bet) {
-      alert('Insufficient MLEO in vault');
-      return;
-    }
-
-    // Deduct bet
-    setVault(currentVault - bet);
-    setVaultState(currentVault - bet);
+    
     setCurrentBet(bet);
     setGameActive(true);
     setGameResult(null);
@@ -442,8 +471,13 @@ export default function MLEOBlackjackPage() {
             </Link>
 
             <div className="text-center">
-              <h1 className="text-3xl font-bold mb-1">🎰 MLEO Blackjack</h1>
-              <p className="text-zinc-400 text-sm">Beat the dealer to 21 and win big!</p>
+              <h1 className="text-3xl font-bold mb-1">
+                🎰 {isFreePlay && <span className="text-amber-400">🎁 FREE PLAY - </span>}
+                MLEO Blackjack
+              </h1>
+              <p className="text-zinc-400 text-sm">
+                {isFreePlay ? "Playing with a free token - good luck!" : "Beat the dealer to 21 and win big!"}
+              </p>
             </div>
 
             <div className="w-16"></div>

@@ -4,8 +4,10 @@
 // ============================================================================
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
+import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -96,6 +98,8 @@ export default function CoinFlipPage() {
     safeRead(LS_KEY, { totalFlips: 0, totalBet: 0, wins: 0, totalWon: 0, biggestWin: 0, streak: 0, bestStreak: 0, lastBet: MIN_BET })
   );
 
+  const [isFreePlay, setIsFreePlay] = useState(false);
+  
   const flipSound = useRef(null);
   const winSound = useRef(null);
   const loseSound = useRef(null);
@@ -103,6 +107,9 @@ export default function CoinFlipPage() {
   useEffect(() => {
     setMounted(true);
     setVaultState(getVault());
+    
+    const isFree = router.query.freePlay === 'true';
+    setIsFreePlay(isFree);
     
     // Load last bet amount
     const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
@@ -115,7 +122,7 @@ export default function CoinFlipPage() {
       winSound.current = new Audio("/sounds/success.mp3");
       loseSound.current = new Audio("/sounds/click.mp3");
     }
-  }, []);
+  }, [router.query]);
 
   useEffect(() => {
     safeWrite(LS_KEY, stats);
@@ -128,21 +135,36 @@ export default function CoinFlipPage() {
   const makeFlip = async (chosenSide) => {
     if (flipping) return;
 
-    const currentVault = getVault();
-    const bet = Number(betAmount) || MIN_BET;
-    if (bet < MIN_BET) {
-      setResult({ error: true, message: `Minimum bet is ${MIN_BET} MLEO!` });
-      return;
+    let bet = Number(betAmount) || MIN_BET;
+    
+    if (isFreePlay) {
+      const result = consumeFreePlayToken();
+      if (result.success) {
+        bet = result.amount;
+        setIsFreePlay(false);
+        router.replace('/coinflip', undefined, { shallow: true });
+      } else {
+        setResult({ error: true, message: 'No free play tokens available!' });
+        setIsFreePlay(false);
+        return;
+      }
+    } else {
+      const currentVault = getVault();
+      if (bet < MIN_BET) {
+        setResult({ error: true, message: `Minimum bet is ${MIN_BET} MLEO!` });
+        return;
+      }
+      
+      if (currentVault < bet) {
+        setResult({ error: true, message: "Not enough MLEO!" });
+        return;
+      }
+
+      // Deduct cost
+      setVault(currentVault - bet);
+      setVaultState(currentVault - bet);
     }
     
-    if (currentVault < bet) {
-      setResult({ error: true, message: "Not enough MLEO!" });
-      return;
-    }
-
-    // Deduct cost
-    setVault(currentVault - bet);
-    setVaultState(currentVault - bet);
     setCurrentBet(bet); // Store bet amount for prize calculations
 
     setChoice(chosenSide);

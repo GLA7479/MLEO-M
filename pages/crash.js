@@ -7,8 +7,10 @@
 // ============================================================================
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
+import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
 
 // ------------------------------- Config -------------------------------------
 const LS_KEY = "mleo_crash_v1";
@@ -111,7 +113,9 @@ function fmt(n) {
 
 // ------------------------------ Main Page -----------------------------------
 export default function MLEOCrash() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [isFreePlay, setIsFreePlay] = useState(false);
   
   // Game state
   const [phase, setPhase] = useState("betting"); // betting | running | crashed | revealing | intermission
@@ -155,13 +159,16 @@ export default function MLEOCrash() {
     setMounted(true);
     setVault(getVault());
     
+    const isFree = router.query.freePlay === 'true';
+    setIsFreePlay(isFree);
+    
     // Refresh vault every 2 seconds
     const interval = setInterval(() => {
       setVault(getVault());
     }, 2000);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [router.query]);
 
   function refreshVault() {
     setVault(getVault());
@@ -373,16 +380,31 @@ export default function MLEOCrash() {
 
   // ------------------------------- Actions ----------------------------------
   const placeBet = () => {
-    const amt = Number(betAmount) || 1000;
+    let amt = Number(betAmount) || 1000;
     if (!Number.isFinite(amt) || amt < 1000) return;
     if (phase !== "betting") return;
-    if (amt > vault) return;
+    
+    if (isFreePlay) {
+      const result = consumeFreePlayToken();
+      if (result.success) {
+        amt = result.amount;
+        setIsFreePlay(false);
+        router.replace('/crash', undefined, { shallow: true });
+        setPlayerBet({ amount: amt, accepted: false });
+      } else {
+        alert('No free play tokens available!');
+        setIsFreePlay(false);
+        return;
+      }
+    } else {
+      if (amt > vault) return;
 
-    // Deduct from vault
-    const newVault = vault - amt;
-    setVault(newVault);
-    setVaultAmount(newVault);
-    setPlayerBet({ amount: amt, accepted: false });
+      // Deduct from vault
+      const newVault = vault - amt;
+      setVault(newVault);
+      setVaultAmount(newVault);
+      setPlayerBet({ amount: amt, accepted: false });
+    }
   };
 
   const cashOut = () => {
@@ -498,10 +520,13 @@ export default function MLEOCrash() {
               <div className="flex items-center justify-center gap-3">
                 <span className="text-5xl">🚀</span>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-red-400 via-orange-400 to-yellow-300 bg-clip-text text-transparent">
+                  {isFreePlay && <span className="text-amber-400">🎁 </span>}
                   MLEO Crash
                 </h1>
               </div>
-              <div className="text-sm opacity-70 mt-1">Multiplier Betting Game</div>
+              <div className="text-sm opacity-70 mt-1">
+                {isFreePlay ? "Playing with a free token - good luck!" : "Multiplier Betting Game"}
+              </div>
             </div>
 
             <div className="w-[100px]"></div>

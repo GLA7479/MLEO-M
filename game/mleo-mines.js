@@ -4,8 +4,10 @@
 // ============================================================================
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
+import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -75,6 +77,7 @@ function calculateMultiplier(revealed, totalSafe, difficulty) {
 // MAIN COMPONENT
 // ============================================================================
 export default function MinesPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
@@ -86,6 +89,7 @@ export default function MinesPage() {
   const [revealed, setRevealed] = useState([]);
   const [currentMultiplier, setCurrentMultiplier] = useState(1);
   const [currentBet, setCurrentBet] = useState(MIN_BET); // Track current game bet
+  const [isFreePlay, setIsFreePlay] = useState(false);
   const [stats, setStats] = useState(() => 
     safeRead(LS_KEY, { totalGames: 0, totalBet: 0, totalWon: 0, biggestWin: 0, cashouts: 0, lastBet: MIN_BET })
   );
@@ -97,6 +101,9 @@ export default function MinesPage() {
   useEffect(() => {
     setMounted(true);
     setVaultState(getVault());
+    
+    const isFree = router.query.freePlay === 'true';
+    setIsFreePlay(isFree);
     
     // Load last bet amount
     const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
@@ -120,21 +127,36 @@ export default function MinesPage() {
   };
 
   const startGame = () => {
-    const bet = Number(betAmount) || MIN_BET;
-    if (bet < MIN_BET) {
-      alert(`Minimum bet is ${MIN_BET} MLEO!`);
-      return;
+    let bet = Number(betAmount) || MIN_BET;
+    
+    if (isFreePlay) {
+      const result = consumeFreePlayToken();
+      if (result.success) {
+        bet = result.amount;
+        setIsFreePlay(false);
+        router.replace('/mines', undefined, { shallow: true });
+      } else {
+        alert('No free play tokens available!');
+        setIsFreePlay(false);
+        return;
+      }
+    } else {
+      if (bet < MIN_BET) {
+        alert(`Minimum bet is ${MIN_BET} MLEO!`);
+        return;
+      }
+      
+      const currentVault = getVault();
+      if (currentVault < bet) {
+        alert("Not enough MLEO!");
+        return;
+      }
+
+      // Deduct cost
+      setVault(currentVault - bet);
+      setVaultState(currentVault - bet);
     }
     
-    const currentVault = getVault();
-    if (currentVault < bet) {
-      alert("Not enough MLEO!");
-      return;
-    }
-
-    // Deduct cost
-    setVault(currentVault - bet);
-    setVaultState(currentVault - bet);
     setCurrentBet(bet); // Store bet amount for prize calculations
 
     // Initialize game

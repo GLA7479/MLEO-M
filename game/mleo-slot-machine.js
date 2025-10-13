@@ -4,9 +4,11 @@
 // ============================================================================
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import { useAccount } from "wagmi";
 import Link from "next/link";
+import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -102,6 +104,7 @@ function randomSymbol() {
 // MAIN COMPONENT
 // ============================================================================
 export default function SlotMachinePage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
@@ -112,6 +115,7 @@ export default function SlotMachinePage() {
   const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalSpins: 0, totalBet: 0, totalWon: 0, biggestWin: 0, lastBet: MIN_BET }));
   const [freeSpins, setFreeSpins] = useState(0);
   const [showPrizeTable, setShowPrizeTable] = useState(false);
+  const [isFreePlay, setIsFreePlay] = useState(false);
 
   const spinSound = useRef(null);
   const winSound = useRef(null);
@@ -119,6 +123,9 @@ export default function SlotMachinePage() {
   useEffect(() => {
     setMounted(true);
     setVaultState(getVault());
+    
+    const isFree = router.query.freePlay === 'true';
+    setIsFreePlay(isFree);
     
     // Load last bet amount
     const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
@@ -144,22 +151,37 @@ export default function SlotMachinePage() {
   const spin = async () => {
     if (spinning) return;
 
-    const bet = Number(betAmount) || MIN_BET;
+    let bet = Number(betAmount) || MIN_BET;
     const cost = freeSpins > 0 ? 0 : bet;
-    const currentVault = getVault();
-
-    if (cost > 0 && currentVault < cost) {
-      setResult({ error: true, message: "Not enough MLEO!" });
-      return;
-    }
-
-    // Deduct cost
-    if (cost > 0) {
-      setVault(currentVault - cost);
-      setVaultState(currentVault - cost);
-      setCurrentBet(bet); // Store bet amount for prize calculations
+    
+    if (isFreePlay && cost > 0) {
+      const result = consumeFreePlayToken();
+      if (result.success) {
+        bet = result.amount;
+        setIsFreePlay(false);
+        router.replace('/slots', undefined, { shallow: true });
+        setCurrentBet(bet);
+      } else {
+        setResult({ error: true, message: 'No free play tokens available!' });
+        setIsFreePlay(false);
+        return;
+      }
     } else {
-      setFreeSpins(freeSpins - 1);
+      const currentVault = getVault();
+
+      if (cost > 0 && currentVault < cost) {
+        setResult({ error: true, message: "Not enough MLEO!" });
+        return;
+      }
+
+      // Deduct cost
+      if (cost > 0) {
+        setVault(currentVault - cost);
+        setVaultState(currentVault - cost);
+        setCurrentBet(bet); // Store bet amount for prize calculations
+      } else {
+        setFreeSpins(freeSpins - 1);
+      }
     }
 
     setSpinning(true);

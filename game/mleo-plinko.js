@@ -5,8 +5,10 @@
 // ============================================================================
 
 import { useEffect, useRef, useState, useMemo } from "react";
+import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
+import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -151,6 +153,7 @@ function rand01() {
 // MAIN COMPONENT
 // ============================================================================
 export default function PlinkoPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   
@@ -161,6 +164,7 @@ export default function PlinkoPage() {
   const [result, setResult] = useState(null);
   const [finalBuckets, setFinalBuckets] = useState([]); // recent landings visual
   const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
+  const [isFreePlay, setIsFreePlay] = useState(false);
   const [stats, setStats] = useState(() =>
     safeRead(LS_KEY, { totalDrops: 0, totalBet: 0, totalWon: 0, biggestWin: 0, history: [], lastBet: MIN_BET })
   );
@@ -212,6 +216,9 @@ export default function PlinkoPage() {
   useEffect(() => {
     setMounted(true);
     setVaultState(getVault());
+
+    const isFree = router.query.freePlay === 'true';
+    setIsFreePlay(isFree);
 
     // Load last bet amount
     const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
@@ -676,20 +683,34 @@ function buildBoardGeometry(w, h) {
 
   // Drop ball
   function dropBall() {
-    const bet = Number(betAmount) || MIN_BET;
-    if (bet < MIN_BET) {
-      setResult({ error: true, message: `Minimum bet is ${fmt(MIN_BET)} MLEO!` });
-      return;
-    }
+    let bet = Number(betAmount) || MIN_BET;
     
-    const currentVault = getVault();
-    if (currentVault < bet) {
-      setResult({ error: true, message: `Need ${fmt(bet)} MLEO!` });
-      return;
+    if (isFreePlay) {
+      const result = consumeFreePlayToken();
+      if (result.success) {
+        bet = result.amount;
+        setIsFreePlay(false);
+        router.replace('/plinko', undefined, { shallow: true });
+      } else {
+        setResult({ error: true, message: 'No free play tokens available!' });
+        setIsFreePlay(false);
+        return;
+      }
+    } else {
+      if (bet < MIN_BET) {
+        setResult({ error: true, message: `Minimum bet is ${fmt(MIN_BET)} MLEO!` });
+        return;
+      }
+      
+      const currentVault = getVault();
+      if (currentVault < bet) {
+        setResult({ error: true, message: `Need ${fmt(bet)} MLEO!` });
+        return;
+      }
+      // Deduct cost
+      setVault(currentVault - bet);
+      setVaultState(currentVault - bet);
     }
-    // Deduct cost
-    setVault(currentVault - bet);
-    setVaultState(currentVault - bet);
 
     const board = boardRef.current;
     if (!board) return;
@@ -765,11 +786,12 @@ function buildBoardGeometry(w, h) {
               <div className="flex items-center justify-center gap-3">
                 <span className="text-5xl">🎯</span>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-teal-400 bg-clip-text text-transparent">
+                  {isFreePlay && <span className="text-amber-400">🎁 </span>}
                   MLEO Plinko
                 </h1>
               </div>
               <div className="text-sm opacity-70 mt-1">
-                Real physics • Watch the ball dance on pegs
+                {isFreePlay ? "Playing with a free token - good luck!" : "Real physics • Watch the ball dance on pegs"}
                 <span className={`ml-2 px-2 py-1 rounded text-xs ${isWideScreen ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'}`}>
                   {isWideScreen ? '🖥️ Wide' : '📱 Narrow'}
                 </span>

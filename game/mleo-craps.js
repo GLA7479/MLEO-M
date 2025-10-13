@@ -4,8 +4,10 @@
 // ============================================================================
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
+import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -80,6 +82,7 @@ function isPoint(sum) {
 // MAIN COMPONENT
 // ============================================================================
 export default function CrapsPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
@@ -90,6 +93,7 @@ export default function CrapsPage() {
   const [point, setPoint] = useState(null);
   const [rollCount, setRollCount] = useState(0);
   const [result, setResult] = useState(null);
+  const [isFreePlay, setIsFreePlay] = useState(false);
   const [stats, setStats] = useState(() => 
     safeRead(LS_KEY, { totalRounds: 0, totalBet: 0, totalWon: 0, biggestWin: 0, wins: 0, lastBet: MIN_BET })
   );
@@ -98,12 +102,15 @@ export default function CrapsPage() {
     setMounted(true);
     setVaultState(getVault());
     
+    const isFree = router.query.freePlay === 'true';
+    setIsFreePlay(isFree);
+    
     // Load last bet amount
     const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
     if (savedStats.lastBet) {
       setBetAmount(String(savedStats.lastBet));
     }
-  }, []);
+  }, [router.query]);
 
   useEffect(() => {
     safeWrite(LS_KEY, stats);
@@ -115,21 +122,35 @@ export default function CrapsPage() {
 
   const startGame = () => {
     const currentVault = getVault();
-    const bet = Number(betAmount) || MIN_BET;
-    if (bet < MIN_BET) {
-      setResult({ error: true, message: `Minimum bet is ${MIN_BET} MLEO!` });
-      return;
+    let bet = Number(betAmount) || MIN_BET;
+    
+    if (isFreePlay) {
+      const result = consumeFreePlayToken();
+      if (result.success) {
+        bet = result.amount;
+        setIsFreePlay(false);
+        router.replace('/craps', undefined, { shallow: true });
+      } else {
+        alert('No free play tokens available!');
+        setIsFreePlay(false);
+        return;
+      }
+    } else {
+      if (bet < MIN_BET) {
+        setResult({ error: true, message: `Minimum bet is ${MIN_BET} MLEO!` });
+        return;
+      }
+      
+      if (currentVault < bet) {
+        setResult({ error: true, message: "Not enough MLEO!" });
+        return;
+      }
+
+      const newVault = currentVault - bet;
+      setVault(newVault);
+      setVaultState(newVault);
     }
     
-    if (currentVault < bet) {
-      setResult({ error: true, message: "Not enough MLEO!" });
-      return;
-    }
-
-    // Deduct cost
-    const newVault = currentVault - bet;
-    setVault(newVault);
-    setVaultState(newVault);
     setCurrentBet(bet);
     setPlaying(true);
     setResult(null);
@@ -252,8 +273,13 @@ export default function CrapsPage() {
             </Link>
 
             <div className="text-center">
-              <h1 className="text-3xl font-bold mb-1">🎲 MLEO Craps</h1>
-              <p className="text-zinc-400 text-sm">Roll the dice and win big!</p>
+              <h1 className="text-3xl font-bold mb-1">
+                🎲 {isFreePlay && <span className="text-amber-400">🎁 FREE PLAY - </span>}
+                MLEO Craps
+              </h1>
+              <p className="text-zinc-400 text-sm">
+                {isFreePlay ? "Playing with a free token - good luck!" : "Roll the dice and win big!"}
+              </p>
             </div>
 
             <div className="w-16"></div>

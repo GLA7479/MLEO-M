@@ -4,8 +4,10 @@
 // ============================================================================
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
+import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -72,6 +74,7 @@ function drawCard() {
 // MAIN COMPONENT
 // ============================================================================
 export default function HiLoPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
@@ -82,6 +85,7 @@ export default function HiLoPage() {
   const [streak, setStreak] = useState(0);
   const [multiplier, setMultiplier] = useState(1);
   const [result, setResult] = useState(null);
+  const [isFreePlay, setIsFreePlay] = useState(false);
   const [stats, setStats] = useState(() => 
     safeRead(LS_KEY, { totalGames: 0, totalBet: 0, totalWon: 0, biggestWin: 0, longestStreak: 0, lastBet: MIN_BET })
   );
@@ -94,6 +98,9 @@ export default function HiLoPage() {
     setMounted(true);
     setVaultState(getVault());
     
+    const isFree = router.query.freePlay === 'true';
+    setIsFreePlay(isFree);
+    
     // Load last bet amount
     const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
     if (savedStats.lastBet) {
@@ -105,7 +112,7 @@ export default function HiLoPage() {
       wrongSound.current = new Audio("/sounds/click.mp3");
       winSound.current = new Audio("/sounds/success.mp3");
     }
-  }, []);
+  }, [router.query]);
 
   useEffect(() => {
     safeWrite(LS_KEY, stats);
@@ -116,21 +123,36 @@ export default function HiLoPage() {
   };
 
   const startGame = () => {
-    const bet = Number(betAmount) || MIN_BET;
-    if (bet < MIN_BET) {
-      setResult({ error: true, message: `Minimum bet is ${MIN_BET} MLEO!` });
-      return;
+    let bet = Number(betAmount) || MIN_BET;
+    
+    if (isFreePlay) {
+      const result = consumeFreePlayToken();
+      if (result.success) {
+        bet = result.amount;
+        setIsFreePlay(false);
+        router.replace('/hilo', undefined, { shallow: true });
+      } else {
+        setResult({ error: true, message: 'No free play tokens available!' });
+        setIsFreePlay(false);
+        return;
+      }
+    } else {
+      if (bet < MIN_BET) {
+        setResult({ error: true, message: `Minimum bet is ${MIN_BET} MLEO!` });
+        return;
+      }
+      
+      const currentVault = getVault();
+      if (currentVault < bet) {
+        setResult({ error: true, message: "Not enough MLEO!" });
+        return;
+      }
+
+      // Deduct cost
+      setVault(currentVault - bet);
+      setVaultState(currentVault - bet);
     }
     
-    const currentVault = getVault();
-    if (currentVault < bet) {
-      setResult({ error: true, message: "Not enough MLEO!" });
-      return;
-    }
-
-    // Deduct cost
-    setVault(currentVault - bet);
-    setVaultState(currentVault - bet);
     setCurrentBet(bet); // Store bet amount for prize calculations
 
     // Start game

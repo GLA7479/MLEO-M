@@ -4,8 +4,10 @@
 // ============================================================================
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
+import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -95,6 +97,7 @@ function getDiceFace(value) {
 // MAIN COMPONENT
 // ============================================================================
 export default function DiceRollerPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
@@ -102,6 +105,7 @@ export default function DiceRollerPage() {
   const [rolling, setRolling] = useState(false);
   const [dice, setDice] = useState([1, 1, 1]);
   const [result, setResult] = useState(null);
+  const [isFreePlay, setIsFreePlay] = useState(false);
   const [stats, setStats] = useState(() => 
     safeRead(LS_KEY, { totalRolls: 0, totalWon: 0, biggestWin: 0, tripleCount: 0, lastBet: MIN_BET })
   );
@@ -113,6 +117,9 @@ export default function DiceRollerPage() {
   useEffect(() => {
     setMounted(true);
     setVaultState(getVault());
+    
+    const isFree = router.query.freePlay === 'true';
+    setIsFreePlay(isFree);
     
     // Load last bet amount
     const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
@@ -137,21 +144,36 @@ export default function DiceRollerPage() {
   const roll = async () => {
     if (rolling) return;
 
-    const bet = Number(betAmount) || MIN_BET;
-    if (bet < MIN_BET) {
-      setResult({ error: true, message: `Minimum bet is ${MIN_BET} MLEO!` });
-      return;
-    }
+    let bet = Number(betAmount) || MIN_BET;
+    
+    if (isFreePlay) {
+      const result = consumeFreePlayToken();
+      if (result.success) {
+        bet = result.amount;
+        setIsFreePlay(false);
+        router.replace('/dice', undefined, { shallow: true });
+      } else {
+        setResult({ error: true, message: 'No free play tokens available!' });
+        setIsFreePlay(false);
+        return;
+      }
+    } else {
+      if (bet < MIN_BET) {
+        setResult({ error: true, message: `Minimum bet is ${MIN_BET} MLEO!` });
+        return;
+      }
 
-    const currentVault = getVault();
-    if (currentVault < bet) {
-      setResult({ error: true, message: "Not enough MLEO!" });
-      return;
-    }
+      const currentVault = getVault();
+      if (currentVault < bet) {
+        setResult({ error: true, message: "Not enough MLEO!" });
+        return;
+      }
 
-    // Deduct cost
-    setVault(currentVault - bet);
-    setVaultState(currentVault - bet);
+      // Deduct cost
+      setVault(currentVault - bet);
+      setVaultState(currentVault - bet);
+    }
+    
     setCurrentBet(bet); // Store bet amount for prize calculations
 
     setRolling(true);

@@ -4,8 +4,10 @@
 // ============================================================================
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
+import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -69,6 +71,7 @@ function fmt(n) {
 // MAIN COMPONENT
 // ============================================================================
 export default function WheelFortunePage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
@@ -76,6 +79,7 @@ export default function WheelFortunePage() {
   const [spinning, setSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [result, setResult] = useState(null);
+  const [isFreePlay, setIsFreePlay] = useState(false);
   const [stats, setStats] = useState(() => 
     safeRead(LS_KEY, { totalSpins: 0, totalBet: 0, totalWon: 0, biggestWin: 0, freeSpins: 0, lastBet: MIN_BET })
   );
@@ -89,6 +93,9 @@ export default function WheelFortunePage() {
     setMounted(true);
     setVaultState(getVault());
     
+    const isFree = router.query.freePlay === 'true';
+    setIsFreePlay(isFree);
+    
     // Load last bet amount
     const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
     if (savedStats.lastBet) {
@@ -99,7 +106,7 @@ export default function WheelFortunePage() {
       spinSound.current = new Audio("/sounds/click.mp3");
       winSound.current = new Audio("/sounds/success.mp3");
     }
-  }, []);
+  }, [router.query]);
 
   useEffect(() => {
     safeWrite(LS_KEY, stats);
@@ -112,27 +119,42 @@ export default function WheelFortunePage() {
   const spin = async () => {
     if (spinning) return;
 
-    const bet = Number(betAmount) || MIN_BET;
-    if (bet < MIN_BET) {
-      setResult({ error: true, message: `Minimum bet is ${MIN_BET} MLEO!` });
-      return;
-    }
-    
+    let bet = Number(betAmount) || MIN_BET;
     const cost = freeSpinsAvailable > 0 ? 0 : bet;
-    const currentVault = getVault();
-
-    if (cost > 0 && currentVault < cost) {
-      setResult({ error: true, message: "Not enough MLEO!" });
-      return;
-    }
-
-    // Deduct cost
-    if (cost > 0) {
-      setVault(currentVault - cost);
-      setVaultState(currentVault - cost);
-      setCurrentBet(bet); // Store bet amount for prize calculations
+    
+    if (isFreePlay && cost > 0) {
+      const result = consumeFreePlayToken();
+      if (result.success) {
+        bet = result.amount;
+        setIsFreePlay(false);
+        router.replace('/wheel', undefined, { shallow: true });
+        setCurrentBet(bet);
+      } else {
+        setResult({ error: true, message: 'No free play tokens available!' });
+        setIsFreePlay(false);
+        return;
+      }
     } else {
-      setFreeSpinsAvailable(freeSpinsAvailable - 1);
+      if (bet < MIN_BET && cost > 0) {
+        setResult({ error: true, message: `Minimum bet is ${MIN_BET} MLEO!` });
+        return;
+      }
+      
+      const currentVault = getVault();
+
+      if (cost > 0 && currentVault < cost) {
+        setResult({ error: true, message: "Not enough MLEO!" });
+        return;
+      }
+
+      // Deduct cost
+      if (cost > 0) {
+        setVault(currentVault - cost);
+        setVaultState(currentVault - cost);
+        setCurrentBet(bet); // Store bet amount for prize calculations
+      } else {
+        setFreeSpinsAvailable(freeSpinsAvailable - 1);
+      }
     }
 
     setSpinning(true);

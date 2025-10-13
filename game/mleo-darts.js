@@ -4,8 +4,10 @@
 // ============================================================================
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
+import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -84,12 +86,14 @@ function calculatePrize(bet, zone) {
 // MAIN COMPONENT
 // ============================================================================
 export default function MLEODartsPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000");
   const [currentBet, setCurrentBet] = useState(MIN_BET);
   const [throwing, setThrowing] = useState(false);
   const [result, setResult] = useState(null);
+  const [isFreePlay, setIsFreePlay] = useState(false);
   const [stats, setStats] = useState(() =>
     safeRead(LS_KEY, { totalThrows: 0, totalBet: 0, wins: 0, totalWon: 0, totalLost: 0, biggestWin: 0, history: [], lastBet: MIN_BET })
   );
@@ -100,10 +104,13 @@ export default function MLEODartsPage() {
     const currentVault = getVault();
     setVaultState(currentVault);
     
+    const isFree = router.query.freePlay === 'true';
+    setIsFreePlay(isFree);
+    
     // Load last bet amount
     const savedLastBet = safeRead(LS_KEY, { lastBet: MIN_BET }).lastBet;
     setBetAmount(savedLastBet.toString());
-  }, []);
+  }, [router.query]);
 
   const refreshVault = () => {
     setVaultState(getVault());
@@ -112,20 +119,35 @@ export default function MLEODartsPage() {
   const throwDart = async () => {
     if (throwing) return;
 
-    const currentVault = getVault();
-    const bet = Number(betAmount) || MIN_BET;
-    if (bet < MIN_BET) {
-      alert(`Minimum bet is ${MIN_BET} MLEO`);
-      return;
-    }
-    if (currentVault < bet) {
-      alert('Insufficient MLEO in vault');
-      return;
-    }
+    let bet = Number(betAmount) || MIN_BET;
+    
+    if (isFreePlay) {
+      const result = consumeFreePlayToken();
+      if (result.success) {
+        bet = result.amount;
+        setIsFreePlay(false);
+        router.replace('/darts', undefined, { shallow: true });
+      } else {
+        alert('No free play tokens available!');
+        setIsFreePlay(false);
+        return;
+      }
+    } else {
+      const currentVault = getVault();
+      if (bet < MIN_BET) {
+        alert(`Minimum bet is ${MIN_BET} MLEO`);
+        return;
+      }
+      if (currentVault < bet) {
+        alert('Insufficient MLEO in vault');
+        return;
+      }
 
-    // Deduct bet
-    setVault(currentVault - bet);
-    setVaultState(currentVault - bet);
+      // Deduct bet
+      setVault(currentVault - bet);
+      setVaultState(currentVault - bet);
+    }
+    
     setCurrentBet(bet);
     setThrowing(true);
     setResult(null);
