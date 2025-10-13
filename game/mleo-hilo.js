@@ -176,6 +176,16 @@ export default function HiLoPage() {
     setResult(null);
   };
 
+  const resetToSetup = () => {
+    setPlaying(false);
+    setCurrentCard(null);
+    setNextCard(null);
+    setStreak(0);
+    setMultiplier(1);
+    setResult(null);
+    setShowResultPopup(false);
+  };
+
   const makeGuess = async (isHigher) => {
     if (!playing) return;
 
@@ -289,11 +299,20 @@ export default function HiLoPage() {
           
           {/* HEADER - Centered */}
           <header className="flex items-center justify-between mb-6">
-            <Link href="/arcade">
-              <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+            {playing || result ? (
+              <button 
+                onClick={resetToSetup}
+                className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+              >
                 BACK
               </button>
-            </Link>
+            ) : (
+              <Link href="/arcade">
+                <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+                  BACK
+                </button>
+              </Link>
+            )}
             
             <div className="text-center">
               <div className="flex items-center justify-center gap-3">

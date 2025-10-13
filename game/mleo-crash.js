@@ -364,6 +364,28 @@ export default function MLEOCrash() {
     setTimeout(() => startNextRound(), ROUND.intermissionMs);
   };
 
+  // Auto-hide result popup
+  useEffect(() => {
+    if (payout) {
+      setShowResultPopup(true);
+      const timer = setTimeout(() => {
+        setShowResultPopup(false);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [payout]);
+
+  const resetToSetup = () => {
+    setPayout(null);
+    setShowResultPopup(false);
+    setPhase("betting");
+    setCountdown(ROUND.bettingSeconds);
+    setMultiplier(1.0);
+    setCrashPoint(null);
+    setPlayerBet(null);
+    setCanCashOut(false);
+  };
+
   // ------------------------------- Derived ----------------------------------
   const chartData = dataRef.current;
   const maxY = useMemo(() => {
@@ -421,11 +443,20 @@ export default function MLEOCrash() {
       <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-zinc-900 to-black text-white">
         <div className="mx-auto max-w-5xl px-4 py-6 pb-20">
           <header className="flex items-center justify-between mb-6">
-            <Link href="/arcade">
-              <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+            {gameActive || payout ? (
+              <button 
+                onClick={resetToSetup}
+                className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+              >
                 BACK
               </button>
-            </Link>
+            ) : (
+              <Link href="/arcade">
+                <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+                  BACK
+                </button>
+              </Link>
+            )}
 
             <div className="text-center">
               <h1 className="text-3xl font-bold mb-1">
@@ -542,7 +573,7 @@ export default function MLEOCrash() {
                   onClick={cashOut}
                   disabled={!canCashOut || phase !== "running" || !playerBet?.accepted}
                   className={[
-                    "rounded-xl px-5 py-3 text-sm font-semibold shadow transition",
+                    "rounded-lg px-6 py-2 text-base font-semibold shadow transition",
                     canCashOut && phase === "running" && playerBet?.accepted
                       ? "bg-emerald-500 hover:bg-emerald-400 text-black"
                       : "bg-zinc-800 text-zinc-400 cursor-not-allowed",

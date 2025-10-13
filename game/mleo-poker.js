@@ -412,6 +412,16 @@ export default function PokerPage() {
     }, 100);
   };
 
+  const resetToSetup = () => {
+    setGameResult(null);
+    setShowResultPopup(false);
+    setPlayerCards([]);
+    setCommunityCards([]);
+    setDeck([]);
+    setGameActive(false);
+    setGamePhase("preflop");
+  };
+
   if (!mounted) {
     return <div className="min-h-screen bg-gradient-to-br from-green-900 via-black to-green-900 flex items-center justify-center">
       <div className="text-white text-xl">Loading...</div>
@@ -424,11 +434,20 @@ export default function PokerPage() {
         <div className="max-w-6xl mx-auto p-4 pb-20">
           {/* HEADER - Centered */}
           <header className="flex items-center justify-between mb-6">
-            <Link href="/arcade">
-              <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+            {gameActive || gameResult ? (
+              <button 
+                onClick={resetToSetup}
+                className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+              >
                 BACK
               </button>
-            </Link>
+            ) : (
+              <Link href="/arcade">
+                <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+                  BACK
+                </button>
+              </Link>
+            )}
 
             <div className="text-center">
               <h1 className="text-3xl font-bold mb-1">
