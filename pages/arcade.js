@@ -215,6 +215,30 @@ export default function ArcadeHub() {
       href: "/blackjack",
       color: "#10B981",
     },
+    {
+      title: "MLEO Craps",
+      emoji: "🎲",
+      description: "Roll the dice and win big! Classic casino dice game with multiple betting options.",
+      prize: "×31",
+      href: "/craps",
+      color: "#059669",
+    },
+    {
+      title: "MLEO Baccarat",
+      emoji: "🃏",
+      description: "Bet on Player, Banker, or Tie! Classic card game with simple rules.",
+      prize: "×8",
+      href: "/baccarat",
+      color: "#7C3AED",
+    },
+    {
+      title: "MLEO Roulette",
+      emoji: "🎯",
+      description: "Spin the wheel and win big! Classic casino wheel game with multiple betting options.",
+      prize: "×36",
+      href: "/roulette",
+      color: "#DC2626",
+    },
   ];
 
   return (
