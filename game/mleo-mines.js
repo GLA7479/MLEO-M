@@ -91,6 +91,7 @@ export default function MinesPage() {
   const [currentBet, setCurrentBet] = useState(MIN_BET); // Track current game bet
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
+  const [showResultPopup, setShowResultPopup] = useState(false);
   const [stats, setStats] = useState(() => 
     safeRead(LS_KEY, { totalGames: 0, totalBet: 0, totalWon: 0, biggestWin: 0, cashouts: 0, lastBet: MIN_BET })
   );
@@ -132,6 +133,17 @@ export default function MinesPage() {
   useEffect(() => {
     safeWrite(LS_KEY, stats);
   }, [stats]);
+
+  // Auto-hide result popup after 4 seconds
+  useEffect(() => {
+    if (gameOver) {
+      setShowResultPopup(true);
+      const timer = setTimeout(() => {
+        setShowResultPopup(false);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [gameOver]);
 
   const refreshVault = () => {
     setVaultState(getVault());
@@ -435,28 +447,6 @@ export default function MinesPage() {
                   })}
                 </div>
 
-                {/* Game Over Message */}
-                {gameOver && (
-                  <div className={`text-center mb-6 p-4 rounded-xl border-2 ${
-                    won
-                      ? "bg-green-900/30 border-green-500"
-                      : "bg-red-900/30 border-red-500"
-                  }`}>
-                    {won ? (
-                      <>
-                        <div className="text-2xl font-bold mb-2">💎 Success!</div>
-                        <div className="text-3xl font-bold text-green-400">
-                          +{fmt(Math.floor(currentBet * currentMultiplier))} MLEO
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-2xl font-bold mb-2">💣 Hit a Mine!</div>
-                        <div className="text-lg text-red-400">Better luck next time</div>
-                      </>
-                    )}
-                  </div>
-                )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-3 justify-center">
@@ -471,7 +461,10 @@ export default function MinesPage() {
                   
                   {gameOver && (
                     <button
-                      onClick={() => startGame(false)}
+                      onClick={() => {
+                        setShowResultPopup(false);
+                        setTimeout(() => startGame(false), 100);
+                      }}
                       disabled={vault < (Number(betAmount) || MIN_BET)}
                       className={`px-8 py-3 rounded-xl font-bold text-lg text-white transition-all ${
                         vault < (Number(betAmount) || MIN_BET)
@@ -547,6 +540,43 @@ export default function MinesPage() {
           </div>
 
         </div>
+
+        {/* FLOATING RESULT POPUP - Small compact display */}
+        {gameOver && showResultPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div 
+              className={`text-center p-4 rounded-xl border-2 transition-all duration-500 transform pointer-events-auto max-w-sm mx-4 ${
+                showResultPopup ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+              } ${
+                won
+                  ? "bg-gradient-to-br from-green-600 to-emerald-700 border-green-300 shadow-2xl shadow-green-500/70"
+                  : "bg-gradient-to-br from-red-600 to-rose-700 border-red-300 shadow-2xl shadow-red-500/70"
+              }`}
+            >
+              <div className="text-2xl font-black mb-2 animate-pulse text-white drop-shadow-lg">
+                {won ? "💎 Success! 💎" : "💣 Hit a Mine! 💣"}
+              </div>
+              {won && (
+                <div className="space-y-1">
+                  <div className="text-3xl font-black text-white animate-bounce drop-shadow-2xl">
+                    +{fmt(Math.floor(currentBet * currentMultiplier))} MLEO
+                  </div>
+                  <div className="text-sm font-bold text-white/80">
+                    (×{currentMultiplier.toFixed(2)})
+                  </div>
+                </div>
+              )}
+              {!won && (
+                <div className="text-lg font-bold text-white">
+                  Better luck next time
+                </div>
+              )}
+              <div className="mt-2 text-xs text-white/70 animate-pulse">
+                Auto-closing...
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </Layout>
   );

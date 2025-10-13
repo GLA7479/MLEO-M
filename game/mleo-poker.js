@@ -218,6 +218,7 @@ export default function PokerPage() {
   const [gamePhase, setGamePhase] = useState("preflop"); // preflop, flop, turn, river, showdown
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
+  const [showResultPopup, setShowResultPopup] = useState(false);
   const [stats, setStats] = useState(() => 
     safeRead(LS_KEY, { totalHands: 0, totalBet: 0, totalWon: 0, biggestWin: 0, wins: 0, lastBet: MIN_BET })
   );
@@ -252,6 +253,17 @@ export default function PokerPage() {
   useEffect(() => {
     safeWrite(LS_KEY, stats);
   }, [stats]);
+
+  // Auto-hide result popup after 4 seconds
+  useEffect(() => {
+    if (gameResult && !gameResult.error) {
+      setShowResultPopup(true);
+      const timer = setTimeout(() => {
+        setShowResultPopup(false);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [gameResult]);
 
   const refreshVault = () => {
     setVaultState(getVault());
@@ -387,6 +399,7 @@ export default function PokerPage() {
 
   const resetGame = () => {
     setGameResult(null);
+    setShowResultPopup(false);
     setPlayerCards([]);
     setCommunityCards([]);
     setDeck([]);
@@ -394,7 +407,9 @@ export default function PokerPage() {
     setGamePhase("preflop");
     
     // Start new game immediately
-    startGame();
+    setTimeout(() => {
+      startGame();
+    }, 100);
   };
 
   if (!mounted) {
@@ -484,34 +499,6 @@ export default function PokerPage() {
               </div>
             </div>
 
-            {/* Result Display */}
-            {gameResult && (
-              <div className={`text-center mb-6 p-6 rounded-xl border-2 ${
-                gameResult.win
-                  ? "bg-green-900/30 border-green-500"
-                  : "bg-red-900/30 border-red-500"
-              }`}>
-                <div className="text-3xl font-bold mb-2">
-                  {gameResult.message}
-                </div>
-                <div className="text-xl mb-2">
-                  Best Hand: {gameResult.bestHand.hand}
-                </div>
-                {gameResult.win && (
-                  <div className="text-3xl font-bold text-green-400">
-                    +{fmt(gameResult.netProfit)} MLEO Profit
-                  </div>
-                )}
-                {!gameResult.win && (
-                  <div className="text-xl text-red-400">
-                    Lost {fmt(gameResult.totalBet)} MLEO
-                  </div>
-                )}
-                <div className="text-sm text-gray-400 mt-2">
-                  Total Prize: {fmt(gameResult.prize)} MLEO | Net: {gameResult.netProfit >= 0 ? '+' : ''}{fmt(gameResult.netProfit)} MLEO
-                </div>
-              </div>
-            )}
 
             {/* Game Controls */}
             <div className="text-center mb-6">
@@ -679,6 +666,46 @@ export default function PokerPage() {
             </div>
           </div>
         </div>
+
+        {/* FLOATING RESULT POPUP - Small compact display */}
+        {gameResult && !gameResult.error && showResultPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div 
+              className={`text-center p-4 rounded-xl border-2 transition-all duration-500 transform pointer-events-auto max-w-sm mx-4 ${
+                showResultPopup ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+              } ${
+                gameResult.win
+                  ? "bg-gradient-to-br from-green-600 to-emerald-700 border-green-300 shadow-2xl shadow-green-500/70"
+                  : "bg-gradient-to-br from-red-600 to-rose-700 border-red-300 shadow-2xl shadow-red-500/70"
+              }`}
+            >
+              <div className="text-2xl font-black mb-2 animate-pulse text-white drop-shadow-lg">
+                {gameResult.message}
+              </div>
+              <div className="text-base mb-2 text-white/90 font-semibold">
+                {gameResult.bestHand.hand}
+              </div>
+              {gameResult.win && (
+                <div className="space-y-1">
+                  <div className="text-3xl font-black text-white animate-bounce drop-shadow-2xl">
+                    +{fmt(gameResult.netProfit)} MLEO
+                  </div>
+                  <div className="text-sm font-bold text-white/80">
+                    Profit
+                  </div>
+                </div>
+              )}
+              {!gameResult.win && (
+                <div className="text-lg font-bold text-white">
+                  Lost {fmt(gameResult.totalBet)} MLEO
+                </div>
+              )}
+              <div className="mt-2 text-xs text-white/70 animate-pulse">
+                Auto-closing...
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );
