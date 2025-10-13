@@ -296,14 +296,14 @@ export default function ArcadeHub() {
       href: "/crash",
       color: "#DC2626",
     },
-    // 3. Mines
+    // 3. Diamonds (Upgraded Mines)
     {
-      title: "Mines",
+      title: "Diamonds",
       emoji: "💎",
-      description: "Minesweeper-style risk game. Find safe tiles and cash out before hitting a mine!",
-      prize: "×10",
-      href: "/mines",
-      color: "#EA580C",
+      description: "Find diamonds, avoid bombs! 5 difficulty levels from Easy to Master!",
+      prize: "×150",
+      href: "/diamonds",
+      color: "#0EA5E9",
     },
     // 4. Blackjack
     {
@@ -422,7 +422,16 @@ export default function ArcadeHub() {
       href: "/limbo",
       color: "#6366F1",
     },
-    // 17. Roulette
+    // 17. Dice Over/Under - NEW!
+    {
+      title: "Dice Over/Under",
+      emoji: "🎲",
+      description: "Over or Under! Slide your target and roll - ultimate control!",
+      prize: "Unlimited",
+      href: "/dice-over-under",
+      color: "#14B8A6",
+    },
+    // 18. Roulette
     {
       title: "Roulette",
       emoji: "🎰",
@@ -431,29 +440,37 @@ export default function ArcadeHub() {
       href: "/roulette",
       color: "#7C3AED",
     },
-    // Additional games
+    // Additional upgraded games
     {
-      title: "Slot Machine",
+      title: "Dragon Tower",
+      emoji: "🐉",
+      description: "Climb 10 floors through the dragon's lair! 3 difficulty modes!",
+      prize: "×150",
+      href: "/dragon-tower",
+      color: "#DC2626",
+    },
+    {
+      title: "Slots Upgraded",
       emoji: "🎰",
-      description: "Classic 3-reel slots with matching symbols. Land 3 diamonds for the JACKPOT!",
-      prize: "×10",
-      href: "/slots",
+      description: "5-reel mega slots! Match symbols for huge wins - 💎×500 jackpot!",
+      prize: "×500",
+      href: "/slots-upgraded",
       color: "#FBBF24",
     },
     {
-      title: "Wheel of Fortune",
+      title: "Mega Wheel",
       emoji: "🎡",
-      description: "Spin the wheel and land on prizes. Watch out for free spins!",
-      prize: "×10",
-      href: "/wheel",
+      description: "40 segments of fortune! Spin for prizes up to ×50 jackpot!",
+      prize: "×50",
+      href: "/mega-wheel",
       color: "#A855F7",
     },
     {
-      title: "Tower",
-      emoji: "🏗️",
-      description: "Climb the tower and cash out before it collapses! Risk vs reward game!",
-      prize: "×10",
-      href: "/tower",
+      title: "Keno",
+      emoji: "🎱",
+      description: "Classic lottery! Pick 1-10 numbers - match them all for ×1000!",
+      prize: "×1000",
+      href: "/keno",
       color: "#6366F1",
     },
     {
@@ -562,7 +579,7 @@ export default function ArcadeHub() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/40">
               <span className="text-2xl">🎮</span>
-              <span className="font-bold text-purple-300">22 Exciting Games to Play!</span>
+              <span className="font-bold text-purple-300">24 Exciting Games to Play!</span>
             </div>
           </div>
 
