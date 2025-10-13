@@ -37,7 +37,7 @@ const BUCKET_COLORS = [
 ];
 
 // Peg grid
-const ROWS = 12;     // peg rows (triangle: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
+const ROWS = 13;     // peg rows (triangle: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
 const COLS = 15;     // peg columns (also number of buckets)
 const OFFSET_ROWS = true; // stagger every other row for zigzag pattern
 
@@ -363,9 +363,14 @@ function buildBoardGeometry(w, h) {
         pegsInRow += 1; // Add one peg on right side
       }
       
-      // Row 12 (index 11) - no extra pegs (fixed amount)
+      // Row 12 (index 11) - reduce by 1 peg
       if (r === 11) {
-        // No additional pegs - keep base amount
+        pegsInRow -= 1; // Reduce by 1 peg
+      }
+      
+      // Add one extra peg on right side for row 13 (index 12)
+      if (r === 12) {
+        pegsInRow += 1; // Add one peg on right side
       }
       
       
