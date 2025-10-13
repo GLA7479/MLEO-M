@@ -239,6 +239,15 @@ export default function BombPage() {
     }, 100);
   };
 
+  const resetToSetup = () => {
+    setGameResult(null);
+    setShowResultPopup(false);
+    setCurrentLevel(0);
+    setCorrectWire(null);
+    setCutWires([]);
+    setGameActive(false);
+  };
+
   if (!mounted) {
     return <div className="min-h-screen bg-gradient-to-br from-red-900 via-black to-red-900 flex items-center justify-center">
       <div className="text-white text-xl">Loading...</div>
@@ -253,11 +262,20 @@ export default function BombPage() {
         <div className="max-w-6xl mx-auto p-4 pb-20">
           {/* HEADER */}
           <header className="flex items-center justify-between mb-6">
-            <Link href="/arcade">
-              <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+            {gameActive || gameResult ? (
+              <button 
+                onClick={resetToSetup}
+                className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+              >
                 BACK
               </button>
-            </Link>
+            ) : (
+              <Link href="/arcade">
+                <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+                  BACK
+                </button>
+              </Link>
+            )}
 
             <div className="text-center">
               <h1 className="text-3xl font-bold mb-1">
@@ -279,10 +297,9 @@ export default function BombPage() {
               <div className="text-center mb-6">
                 <div className="text-6xl mb-3 animate-pulse">💣</div>
                 <div className="text-sm opacity-70 mb-2">Level {currentLevel + 1}/{TOTAL_LEVELS}</div>
-                <div className="text-3xl font-bold text-red-400">
-                  Current Prize: {fmt(Math.floor(currentBet * currentMultiplier))} MLEO
+                <div className="text-lg font-bold text-red-400">
+                  Current: {fmt(Math.floor(currentBet * currentMultiplier))} MLEO (×{currentMultiplier})
                 </div>
-                <div className="text-lg opacity-70">×{currentMultiplier}</div>
               </div>
             )}
 
@@ -326,9 +343,9 @@ export default function BombPage() {
                 <div className="mt-6 text-center">
                   <button
                     onClick={cashOut}
-                    className="px-12 py-3 rounded-xl font-bold text-lg text-white bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 transition-all hover:scale-105"
+                    className="px-6 py-2 rounded-lg font-bold text-base text-white bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 transition-all hover:scale-105"
                   >
-                    💰 Cash Out ({fmt(Math.floor(currentBet * Math.pow(2, currentLevel)))} MLEO)
+                    💰 Cash Out
                   </button>
                 </div>
               )}
