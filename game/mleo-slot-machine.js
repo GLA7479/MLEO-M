@@ -8,7 +8,7 @@ import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import { useAccount } from "wagmi";
 import Link from "next/link";
-import { useFreePlayToken as consumeFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -160,19 +160,18 @@ export default function SlotMachinePage() {
   };
 
   const startFreePlay = () => {
-    setIsFreePlay(true);
     setBetAmount("1000");
-    setTimeout(() => spin(), 100);
+    spin(true);
   };
 
-  const spin = async () => {
+  const spin = async (isFreePlayParam = false) => {
     if (spinning) return;
 
     let bet = Number(betAmount) || MIN_BET;
     const cost = freeSpins > 0 ? 0 : bet;
     
-    if (isFreePlay && cost > 0) {
-      const result = consumeFreePlayToken();
+    if ((isFreePlay || isFreePlayParam) && cost > 0) {
+      const result = useFreePlayToken();
       if (result.success) {
         bet = result.amount;
         setIsFreePlay(false);

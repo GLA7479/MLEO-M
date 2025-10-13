@@ -7,7 +7,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
-import { useFreePlayToken as consumeFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -150,19 +150,18 @@ export default function MLEORacerPage() {
   };
 
   const startFreePlay = () => {
-    setIsFreePlay(true);
     setBetAmount("1000");
     if (!selectedCar) setSelectedCar(0);
-    setTimeout(() => startRace(), 100);
+    startRace(true);
   };
 
-  const startRace = async () => {
+  const startRace = async (isFreePlayParam = false) => {
     if (playing || !selectedCar) return;
 
     let bet = Number(betAmount) || MIN_BET;
     
-    if (isFreePlay) {
-      const result = consumeFreePlayToken();
+    if (isFreePlay || isFreePlayParam) {
+      const result = useFreePlayToken();
       if (result.success) {
         bet = result.amount;
         setIsFreePlay(false);

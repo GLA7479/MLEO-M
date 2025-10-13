@@ -7,7 +7,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
-import { useFreePlayToken as consumeFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -192,12 +192,14 @@ export default function MLEOBlackjackPage() {
   };
 
   const startFreePlay = () => {
-    setIsFreePlay(true);
+    console.log('startFreePlay called - current tokens:', freePlayTokens);
     setBetAmount("1000");
-    setTimeout(() => startGame(), 100);
+    console.log('About to call startGame...');
+    startGame(true); // Pass true to indicate this is a free play
   };
 
-  const startGame = async () => {
+  const startGame = async (isFreePlayParam = false) => {
+    console.log('startGame called - gameActive:', gameActive, 'isFreePlay:', isFreePlay, 'isFreePlayParam:', isFreePlayParam);
     if (gameActive) return;
 
     const currentVault = getVault();
@@ -205,12 +207,20 @@ export default function MLEOBlackjackPage() {
     let usedFreePlay = false;
     
     // Check if this is a free play
-    if (isFreePlay) {
-      const result = consumeFreePlayToken();
+    if (isFreePlay || isFreePlayParam) {
+      console.log('Before useFreePlayToken - tokens:', freePlayTokens);
+      const result = useFreePlayToken();
+      console.log('useFreePlayToken result:', result);
+      
       if (result.success) {
         bet = result.amount; // Use free play amount (1000 MLEO)
         usedFreePlay = true;
         setIsFreePlay(false); // Reset after using
+        
+        // Update free play tokens count
+        const newStatus = getFreePlayStatus();
+        console.log('New status after use:', newStatus);
+        setFreePlayTokens(newStatus.tokens);
         
         // Remove query parameter
         router.replace('/blackjack', undefined, { shallow: true });

@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
-import { useFreePlayToken as consumeFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 
 // ------------------------------- Config -------------------------------------
 const LS_KEY = "mleo_crash_v1";
@@ -181,9 +181,8 @@ export default function MLEOCrash() {
   }
 
   const startFreePlay = () => {
-    setIsFreePlay(true);
     setBetAmount("1000");
-    setTimeout(() => placeBet(), 100);
+    placeBet(true);
   };
 
   // ----------------------- Lifecycle: start betting window -------------------
@@ -391,13 +390,13 @@ export default function MLEOCrash() {
   };
 
   // ------------------------------- Actions ----------------------------------
-  const placeBet = () => {
+  const placeBet = (isFreePlayParam = false) => {
     let amt = Number(betAmount) || 1000;
     if (!Number.isFinite(amt) || amt < 1000) return;
     if (phase !== "betting") return;
     
-    if (isFreePlay) {
-      const result = consumeFreePlayToken();
+    if (isFreePlay || isFreePlayParam) {
+      const result = useFreePlayToken();
       if (result.success) {
         amt = result.amount;
         setIsFreePlay(false);

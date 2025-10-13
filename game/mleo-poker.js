@@ -7,7 +7,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
-import { useFreePlayToken as consumeFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -258,18 +258,17 @@ export default function PokerPage() {
   };
 
   const startFreePlay = () => {
-    setIsFreePlay(true);
     setBetAmount("1000");
-    setTimeout(() => startGame(), 100);
+    startGame(true);
   };
 
-  const startGame = () => {
+  const startGame = (isFreePlayParam = false) => {
     const currentVault = getVault();
     let bet = Number(betAmount) || MIN_BET;
     
     // Check if this is a free play
-    if (isFreePlay) {
-      const result = consumeFreePlayToken();
+    if (isFreePlay || isFreePlayParam) {
+      const result = useFreePlayToken();
       if (result.success) {
         bet = result.amount;
         setIsFreePlay(false);
