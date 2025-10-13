@@ -362,7 +362,7 @@ export default function MLEORacerPage() {
               )}
               
               <button
-                onClick={startRace}
+                onClick={() => startRace(false)}
                 disabled={playing}
                 className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-6 ${
                   playing

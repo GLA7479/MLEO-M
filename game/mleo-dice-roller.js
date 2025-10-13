@@ -360,7 +360,7 @@ export default function DiceRollerPage() {
               )}
               
               <button
-                onClick={roll}
+                onClick={() => roll(false)}
                 disabled={rolling || vault < (Number(betAmount) || MIN_BET)}
                 className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl ${
                   rolling

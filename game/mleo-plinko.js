@@ -880,7 +880,7 @@ function buildBoardGeometry(w, h) {
               )}
               
               <button
-                onClick={dropBall}
+                onClick={() => dropBall(false)}
                 disabled={vault < (Number(betAmount) || MIN_BET)}
                 className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-6 ${
                   vault < (Number(betAmount) || MIN_BET)

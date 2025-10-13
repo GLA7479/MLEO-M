@@ -361,7 +361,7 @@ export default function CoinFlipPage() {
             
             <div className="flex gap-4 justify-center mb-6">
               <button
-                onClick={() => makeFlip('heads')}
+                onClick={() => makeFlip('heads', false)}
                 disabled={flipping || vault < (Number(betAmount) || MIN_BET)}
                 className={`px-12 py-6 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl ${
                   flipping || vault < (Number(betAmount) || MIN_BET)
@@ -375,7 +375,7 @@ export default function CoinFlipPage() {
               </button>
               
               <button
-                onClick={() => makeFlip('tails')}
+                onClick={() => makeFlip('tails', false)}
                 disabled={flipping || vault < (Number(betAmount) || MIN_BET)}
                 className={`px-12 py-6 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl ${
                   flipping || vault < (Number(betAmount) || MIN_BET)

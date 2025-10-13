@@ -369,7 +369,7 @@ export default function WheelFortunePage() {
               )}
               
               <button
-                onClick={spin}
+                onClick={() => spin(false)}
                 disabled={spinning || (vault < (Number(betAmount) || MIN_BET) && freeSpinsAvailable === 0)}
                 className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl ${
                   spinning

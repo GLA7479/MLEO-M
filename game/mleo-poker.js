@@ -528,7 +528,7 @@ export default function PokerPage() {
                   )}
                   
                   <button
-                    onClick={startGame}
+                    onClick={() => startGame(false)}
                     disabled={false}
                     className="px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-6 bg-gradient-to-r from-green-600 via-emerald-500 to-teal-600 hover:from-green-500 hover:via-emerald-400 hover:to-teal-500 hover:scale-105"
                   >

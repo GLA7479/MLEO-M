@@ -379,7 +379,7 @@ export default function MLEOTowerPage() {
                   )}
                   
                   <button
-                    onClick={startGame}
+                    onClick={() => startGame(false)}
                     disabled={false}
                     className="px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-6 bg-gradient-to-r from-purple-600 via-pink-500 to-indigo-600 hover:from-purple-500 hover:via-pink-400 hover:to-indigo-500 hover:scale-105"
                   >

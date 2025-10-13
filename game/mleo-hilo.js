@@ -311,7 +311,7 @@ export default function HiLoPage() {
                 </p>
 
                 <button
-                  onClick={startGame}
+                  onClick={() => startGame(false)}
                   disabled={vault < (Number(betAmount) || MIN_BET)}
                   className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-4 ${
                     vault < (Number(betAmount) || MIN_BET)
@@ -452,7 +452,7 @@ export default function HiLoPage() {
                 ) : (
                   <div className="text-center">
                     <button
-                      onClick={startGame}
+                      onClick={() => startGame(false)}
                       disabled={vault < (Number(betAmount) || MIN_BET)}
                       className={`px-8 py-3 rounded-xl font-bold text-lg text-white transition-all mb-6 ${
                         vault < (Number(betAmount) || MIN_BET)

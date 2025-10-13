@@ -698,7 +698,7 @@ export default function RoulettePage() {
                   )}
 
                   <button
-                    onClick={startGame}
+                    onClick={() => startGame(false)}
                     disabled={selectedBets.length === 0}
                     className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-6 ${
                       selectedBets.length === 0
@@ -899,7 +899,7 @@ export default function RoulettePage() {
                   </div>
 
                   <button
-                    onClick={startGame}
+                    onClick={() => startGame(false)}
                     disabled={selectedBets.length === 0}
                     className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-6 ${
                       selectedBets.length === 0
