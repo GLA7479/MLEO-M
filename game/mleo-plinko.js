@@ -363,14 +363,14 @@ function buildBoardGeometry(w, h) {
         pegsInRow += 1; // Add one peg on right side
       }
       
-      // Row 12 (index 11) - reduce by 1 peg
+      // Row 11 (index 11) - exactly 14 pegs
       if (r === 11) {
-        pegsInRow -= 1; // Reduce by 1 peg
+        pegsInRow = 14; // Fixed 14 pegs
       }
       
-      // Add one extra peg on right side for row 13 (index 12)
+      // Row 12 (index 12) - exactly 15 pegs
       if (r === 12) {
-        pegsInRow += 1; // Add one peg on right side
+        pegsInRow = 15; // Fixed 15 pegs
       }
       
       
@@ -864,7 +864,7 @@ function buildBoardGeometry(w, h) {
             </div>
 
             {/* קוביות הזכייה - מחוברות לקנבס */}
-            <div className="relative -mt-2 sm:-mt-3" style={{ marginTop: isWideScreen ? '0rem' : '0rem' }}>
+            <div className="relative -mt-2 sm:-mt-3" style={{ marginTop: isWideScreen ? '-1.5rem' : '-2rem' }}>
               <div className="flex gap-0 sm:gap-0.5 mb-4 sm:mb-6 max-w-2xl mx-auto">
                 {MULTIPLIERS.map((mult, idx) => {
                   const landed = finalBuckets.filter(i => i === idx).length;
