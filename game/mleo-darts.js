@@ -119,6 +119,7 @@ export default function MLEODartsPage() {
   const throwDart = async () => {
     if (throwing) return;
 
+    const currentVault = getVault();
     let bet = Number(betAmount) || MIN_BET;
     
     if (isFreePlay) {
@@ -133,7 +134,6 @@ export default function MLEODartsPage() {
         return;
       }
     } else {
-      const currentVault = getVault();
       if (bet < MIN_BET) {
         alert(`Minimum bet is ${MIN_BET} MLEO`);
         return;
@@ -159,7 +159,7 @@ export default function MLEODartsPage() {
       const isWin = hitZone.multiplier > 0;
 
       if (isWin) {
-        const newVault = currentVault - bet + prize;
+        const newVault = getVault() + prize;
         setVault(newVault);
         setVaultState(newVault);
       }
