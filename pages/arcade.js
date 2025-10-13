@@ -107,7 +107,7 @@ function Modal({ open, onClose, children }) {
         onClick={onClose}
       />
       <div className="absolute inset-0 flex items-center justify-center px-4">
-        <div className="w-full max-w-2xl rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl max-h-[80vh] overflow-auto">
+        <div className="w-full max-w-md rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl max-h-[85vh] overflow-auto">
           <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 sticky top-0 bg-zinc-900 z-10">
             <h3 className="text-xl font-bold text-white">🎮 How to Play</h3>
             <button
@@ -129,6 +129,12 @@ function Modal({ open, onClose, children }) {
 export default function ArcadeHub() {
   const [vault, setVault] = useState(0);
   const [freePlayStatus, setFreePlayStatus] = useState({ tokens: 0, timeUntilNext: 0, hasTokens: false });
+  const [showVaultModal, setShowVaultModal] = useState(false);
+  const [showFreePlayModal, setShowFreePlayModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [musicEnabled, setMusicEnabled] = useState(true);
+  const [collectAmount, setCollectAmount] = useState(1000);
   
   // Read vault from RUSH game
   function getVault() {
@@ -363,14 +369,17 @@ export default function ArcadeHub() {
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="scale-90 origin-right">
-                <ConnectButton
-                  chainStatus="none"
-                  accountStatus="avatar"
-                  showBalance={false}
-                  label="CONNECT"
-                />
-              </div>
+              <button
+                onClick={() => setShowSettingsModal(true)}
+                className="p-2 rounded-lg bg-white/10 border border-white/20 hover:bg-white/20 transition-all"
+                title="Settings"
+              >
+                <div className="flex flex-col gap-1">
+                  <div className="w-4 h-0.5 bg-white"></div>
+                  <div className="w-4 h-0.5 bg-white"></div>
+                  <div className="w-4 h-0.5 bg-white"></div>
+                </div>
+              </button>
             </div>
           </div>
 
@@ -392,12 +401,18 @@ export default function ArcadeHub() {
             
             {/* Vault and Free Play Status */}
             <div className="flex items-center justify-center gap-4 mt-6">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 border border-white/20 font-semibold text-sm">
+              <button
+                onClick={() => setShowVaultModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 border border-white/20 font-semibold text-sm hover:bg-white/20 transition-all cursor-pointer"
+              >
                 <span>💰</span>
                 <span className="text-emerald-400">{fmt(vault)} MLEO</span>
-              </div>
+              </button>
               
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600/20 to-orange-600/20 border border-amber-500/30 font-semibold text-sm">
+              <button
+                onClick={() => setShowFreePlayModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600/20 to-orange-600/20 border border-amber-500/30 font-semibold text-sm hover:bg-amber-500/30 transition-all cursor-pointer"
+              >
                 <span>🎁</span>
                 <span className="text-amber-300">
                   {freePlayStatus.tokens}/{freePlayStatus.maxTokens} Free
@@ -407,7 +422,7 @@ export default function ArcadeHub() {
                     {formatTimeRemaining(freePlayStatus.timeUntilNext)}
                   </span>
                 )}
-              </div>
+              </button>
             </div>
           </header>
 
@@ -478,6 +493,223 @@ export default function ArcadeHub() {
           </div>
         </div>
       </main>
+
+      {/* Vault Modal */}
+      {showVaultModal && (
+        <Modal open={showVaultModal} onClose={() => setShowVaultModal(false)}>
+          <div className="space-y-4">
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-4 text-center">
+              <h2 className="text-xl font-bold mb-3">Your MLEO Vault</h2>
+              <div className="text-sm opacity-70 mb-2">Current Balance</div>
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-3xl">💰</span>
+                <span className="text-2xl font-bold text-emerald-400">{fmt(vault)} MLEO</span>
+              </div>
+            </div>
+            <div>
+              <h3 className="font-bold text-lg mb-3">How to Get MLEO Tokens</h3>
+              <div className="space-y-3 text-sm text-zinc-300">
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">🎮</span>
+                  <div>
+                    <div className="font-semibold text-white">Play RUSH Game</div>
+                    <div>Earn MLEO by playing the main RUSH game. Your vault is shared between RUSH and Arcade games.</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">🏆</span>
+                  <div>
+                    <div className="font-semibold text-white">Win Arcade Games</div>
+                    <div>All winnings from arcade games are automatically added to your vault.</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">🎁</span>
+                  <div>
+                    <div className="font-semibold text-white">Free Play Wins</div>
+                    <div>Even free play games can win MLEO tokens that go to your vault!</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 p-4">
+              <div className="text-sm text-blue-300">
+                <strong>💡 Tip:</strong> Your vault is the same across all MLEO games. Play RUSH to earn more tokens for arcade games!
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Free Play Modal */}
+      {showFreePlayModal && (
+        <Modal open={showFreePlayModal} onClose={() => setShowFreePlayModal(false)}>
+          <div className="space-y-4">
+            <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-4 text-center">
+              <h2 className="text-xl font-bold mb-3">Free Play Tokens</h2>
+              <div className="text-sm opacity-70 mb-2">Current Tokens</div>
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-3xl">🎁</span>
+                <span className="text-2xl font-bold text-amber-400">
+                  {freePlayStatus.tokens}/{freePlayStatus.maxTokens} Free
+                </span>
+              </div>
+              {freePlayStatus.tokens < freePlayStatus.maxTokens && (
+                <div className="text-xs text-amber-300 mt-2">
+                  Next token in: {formatTimeRemaining(freePlayStatus.timeUntilNext)}
+                </div>
+              )}
+            </div>
+            <div>
+              <h3 className="font-bold text-lg mb-3">How Free Play Works</h3>
+              <div className="space-y-3 text-sm text-zinc-300">
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">⏰</span>
+                  <div>
+                    <div className="font-semibold text-white">Token Regeneration</div>
+                    <div>Earn 1 free play token every hour automatically. No need to be online!</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">📊</span>
+                  <div>
+                    <div className="font-semibold text-white">Maximum Storage</div>
+                    <div>You can store up to 5 free play tokens maximum. Tokens don't accumulate beyond this limit.</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">🎯</span>
+                  <div>
+                    <div className="font-semibold text-white">Token Value</div>
+                    <div>Each free play token is worth 1,000 MLEO and can be used on any arcade game.</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">🏆</span>
+                  <div>
+                    <div className="font-semibold text-white">Winnings</div>
+                    <div>Free play wins are added to your vault just like regular game wins!</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-lg bg-green-500/10 border border-green-500/30 p-4">
+              <div className="text-sm text-green-300">
+                <strong>💡 Pro Tip:</strong> Use free play tokens to try new games risk-free and build your vault!
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <Modal open={showSettingsModal} onClose={() => setShowSettingsModal(false)}>
+          <div className="w-96 space-y-5">
+            <div className="text-center mb-5">
+              <div className="text-3xl mb-3">⚙️</div>
+              <h2 className="text-xl font-bold">Settings</h2>
+            </div>
+
+            {/* Audio Settings + Wallet - 3 buttons in one row */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🔊</span>
+                  <span className="text-sm font-medium">Sound</span>
+                </div>
+                <button
+                  onClick={() => setSoundEnabled(!soundEnabled)}
+                  className={`w-8 h-4 rounded-full transition-all ${
+                    soundEnabled ? 'bg-emerald-500' : 'bg-zinc-600'
+                  }`}
+                >
+                  <div className={`w-3 h-3 bg-white rounded-full transition-transform ${
+                    soundEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}></div>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🎵</span>
+                  <span className="text-sm font-medium">Music</span>
+                </div>
+                <button
+                  onClick={() => setMusicEnabled(!musicEnabled)}
+                  className={`w-8 h-4 rounded-full transition-all ${
+                    musicEnabled ? 'bg-emerald-500' : 'bg-zinc-600'
+                  }`}
+                >
+                  <div className={`w-3 h-3 bg-white rounded-full transition-transform ${
+                    musicEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}></div>
+                </button>
+              </div>
+
+              <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">🔗</span>
+                  <span className="text-sm font-medium">Wallet</span>
+                </div>
+                <div className="scale-75 origin-left">
+                  <ConnectButton
+                    chainStatus="none"
+                    accountStatus="avatar"
+                    showBalance={false}
+                    label="CONNECT"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Token Collection */}
+            <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-lg">💰</span>
+                <span className="text-sm font-medium">Collect MLEO</span>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={collectAmount}
+                    onChange={(e) => setCollectAmount(Number(e.target.value))}
+                    className="flex-1 px-2 py-1 text-sm rounded bg-white/10 border border-white/20 text-white placeholder-zinc-400 focus:outline-none focus:border-emerald-500"
+                    placeholder="Amount"
+                    min="1"
+                    max={vault}
+                  />
+                  <button
+                    onClick={() => setCollectAmount(vault)}
+                    className="px-2 py-1 text-xs rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30"
+                  >
+                    MAX
+                  </button>
+                </div>
+                <div className="text-xs text-zinc-400">
+                  Available: {fmt(vault)} MLEO
+                </div>
+                <button
+                  onClick={() => {
+                    if (collectAmount > 0 && collectAmount <= vault) {
+                      alert(`Collecting ${fmt(collectAmount)} MLEO...`);
+                      setShowSettingsModal(false);
+                    } else {
+                      alert('Invalid amount!');
+                    }
+                  }}
+                  disabled={collectAmount <= 0 || collectAmount > vault}
+                  className="w-full py-2 text-sm rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Collect {fmt(collectAmount)} MLEO
+                </button>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
 
     </Layout>
   );
