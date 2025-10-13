@@ -857,7 +857,7 @@ function buildBoardGeometry(w, h) {
             </div>
 
             {/* Buckets display */}
-            <div className="relative -mt-2 sm:-mt-3" style={{ marginTop: isWideScreen ? '-1rem' : '-0.75rem' }}>
+            <div className="relative -mt-2 sm:-mt-3" style={{ marginTop: isWideScreen ? '-1.5rem' : '-2rem' }}>
               <div className="flex gap-0 sm:gap-0.5 mb-4 sm:mb-6 max-w-2xl mx-auto">
                 {MULTIPLIERS.map((mult, idx) => {
                   const landed = finalBuckets.filter(i => i === idx).length;
