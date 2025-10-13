@@ -276,6 +276,15 @@ export default function DragonTowerPage() {
     }, 100);
   };
 
+  const resetToSetup = () => {
+    setGameResult(null);
+    setShowResultPopup(false);
+    setCurrentFloor(0);
+    setFloorData([]);
+    setSelectedCard(null);
+    setGameActive(false);
+  };
+
   if (!mounted) {
     return <div className="min-h-screen bg-gradient-to-br from-red-900 via-black to-orange-900 flex items-center justify-center">
       <div className="text-white text-xl">Loading...</div>
@@ -292,11 +301,20 @@ export default function DragonTowerPage() {
         <div className="max-w-6xl mx-auto p-4 pb-20">
           {/* HEADER */}
           <header className="flex items-center justify-between mb-6">
-            <Link href="/arcade">
-              <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+            {gameActive || gameResult ? (
+              <button 
+                onClick={resetToSetup}
+                className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+              >
                 BACK
               </button>
-            </Link>
+            ) : (
+              <Link href="/arcade">
+                <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+                  BACK
+                </button>
+              </Link>
+            )}
 
             <div className="text-center">
               <h1 className="text-3xl font-bold mb-1">
@@ -313,16 +331,7 @@ export default function DragonTowerPage() {
 
           {/* GAME WINDOW */}
           <div className="rounded-2xl p-6 bg-white/5 border border-white/10 mb-6">
-            {/* Current Prize */}
-            {gameActive && !gameResult && currentFloor > 0 && (
-              <div className="text-center mb-6">
-                <div className="text-sm opacity-70 mb-2">Current Prize</div>
-                <div className="text-4xl font-bold text-orange-400">
-                  {fmt(currentPrize)} MLEO
-                </div>
-                <div className="text-lg opacity-70">Floor {currentFloor}/{TOTAL_FLOORS} | ×{currentMultiplier.toFixed(2)}</div>
-              </div>
-            )}
+            {/* Current Prize - removed from here to prevent layout shift */}
 
             {/* Tower Display */}
             {!gameActive && !gameResult && (
@@ -414,10 +423,14 @@ export default function DragonTowerPage() {
                   <div className="text-center mt-6">
                     <button
                       onClick={cashOut}
-                      className="px-12 py-3 rounded-xl font-bold text-xl text-white bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 transition-all hover:scale-105 shadow-lg"
+                      className="px-6 py-2 rounded-lg font-bold text-base text-white bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 transition-all hover:scale-105 shadow-lg"
                     >
-                      💰 Cash Out ({fmt(currentPrize)} MLEO)
+                      💰 Cash Out
                     </button>
+                    {/* Current Prize moved below button */}
+                    <div className="text-center mt-2 text-xs text-orange-400">
+                      Current: {fmt(currentPrize)} MLEO (×{currentMultiplier.toFixed(2)}) | Floor {currentFloor}/{TOTAL_FLOORS}
+                    </div>
                   </div>
                 )}
               </div>
