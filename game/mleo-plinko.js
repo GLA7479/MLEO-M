@@ -382,6 +382,11 @@ function buildBoardGeometry(w, h) {
         offset = gapX * 0.05;
       }
       
+      // Special case: row 12 (index 11) shift right by 0.2
+      if (r === 11) { // row 12 (0-indexed)
+        offset = gapX * 0.2;
+      }
+      
       
       // Special case: row 13 (old row 12) shift left by 0.4
       if (r === 12) { // row 13 (0-indexed)
@@ -668,15 +673,10 @@ function buildBoardGeometry(w, h) {
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
       if (glow) {
         ctx.fillStyle = "#f8d34b";
-        ctx.shadowColor = "rgba(250,204,21,0.9)";
-        ctx.shadowBlur = 20;
       } else {
         ctx.fillStyle = "#5aa3ff";
-        ctx.shadowColor = "rgba(59,130,246,0.5)";
-        ctx.shadowBlur = 8;
       }
       ctx.fill();
-      ctx.shadowBlur = 0;
     }
 
     // Balls
@@ -709,16 +709,7 @@ function buildBoardGeometry(w, h) {
       ctx.restore();
     }
 
-    // Bottom line
-    ctx.save();
-    ctx.strokeStyle = "rgba(148,163,184,0.5)";
-    ctx.setLineDash([6, 6]);
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(left, bottom);
-    ctx.lineTo(right, bottom);
-    ctx.stroke();
-    ctx.restore();
+    // Bottom line - removed
   }
 
   const startFreePlay = () => {
@@ -864,7 +855,7 @@ function buildBoardGeometry(w, h) {
             </div>
 
             {/* קוביות הזכייה - מחוברות לקנבס */}
-            <div className="relative -mt-2 sm:-mt-3" style={{ marginTop: isWideScreen ? '-1.5rem' : '-2rem' }}>
+            <div className="relative -mt-2 sm:-mt-3" style={{ marginTop: isWideScreen ? '-0.5rem' : '-1rem' }}>
               <div className="flex gap-0 sm:gap-0.5 mb-4 sm:mb-6 max-w-2xl mx-auto">
                 {MULTIPLIERS.map((mult, idx) => {
                   const landed = finalBuckets.filter(i => i === idx).length;
