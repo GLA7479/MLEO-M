@@ -7,7 +7,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
-import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
+import { useFreePlayToken as consumeFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -85,6 +85,7 @@ function getRandomMultiplier() {
 // MAIN COMPONENT
 // ============================================================================
 export default function CoinFlipPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
@@ -99,6 +100,7 @@ export default function CoinFlipPage() {
   );
 
   const [isFreePlay, setIsFreePlay] = useState(false);
+  const [freePlayTokens, setFreePlayTokens] = useState(0);
   
   const flipSound = useRef(null);
   const winSound = useRef(null);
@@ -111,17 +113,27 @@ export default function CoinFlipPage() {
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
     
+    const freePlayStatus = getFreePlayStatus();
+    setFreePlayTokens(freePlayStatus.tokens);
+    
     // Load last bet amount
     const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
     if (savedStats.lastBet) {
       setBetAmount(String(savedStats.lastBet));
     }
     
+    const interval = setInterval(() => {
+      const status = getFreePlayStatus();
+      setFreePlayTokens(status.tokens);
+    }, 2000);
+    
     if (typeof Audio !== "undefined") {
       flipSound.current = new Audio("/sounds/click.mp3");
       winSound.current = new Audio("/sounds/success.mp3");
       loseSound.current = new Audio("/sounds/click.mp3");
     }
+    
+    return () => clearInterval(interval);
   }, [router.query]);
 
   useEffect(() => {
@@ -130,6 +142,13 @@ export default function CoinFlipPage() {
 
   const refreshVault = () => {
     setVaultState(getVault());
+  };
+
+  const startFreePlay = () => {
+    setIsFreePlay(true);
+    setBetAmount("1000");
+    if (!choice) setChoice("heads");
+    setTimeout(() => makeFlip("heads"), 100);
   };
 
   const makeFlip = async (chosenSide) => {
@@ -330,6 +349,17 @@ export default function CoinFlipPage() {
             )}
 
             {/* Flip Buttons */}
+            {freePlayTokens > 0 && !flipping && (
+              <div className="text-center mb-4">
+                <button
+                  onClick={startFreePlay}
+                  className="px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:from-amber-400 hover:via-orange-400 hover:to-yellow-400 hover:scale-105"
+                >
+                  🎁 FREE PLAY ({freePlayTokens}/5)
+                </button>
+              </div>
+            )}
+            
             <div className="flex gap-4 justify-center mb-6">
               <button
                 onClick={() => makeFlip('heads')}

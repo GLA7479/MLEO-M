@@ -7,7 +7,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
-import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
+import { useFreePlayToken as consumeFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG

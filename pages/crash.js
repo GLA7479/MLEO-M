@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
-import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
+import { useFreePlayToken as consumeFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 
 // ------------------------------- Config -------------------------------------
 const LS_KEY = "mleo_crash_v1";
@@ -116,6 +116,7 @@ export default function MLEOCrash() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [isFreePlay, setIsFreePlay] = useState(false);
+  const [freePlayTokens, setFreePlayTokens] = useState(0);
   
   // Game state
   const [phase, setPhase] = useState("betting"); // betting | running | crashed | revealing | intermission
@@ -162,9 +163,14 @@ export default function MLEOCrash() {
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
     
-    // Refresh vault every 2 seconds
+    const freePlayStatus = getFreePlayStatus();
+    setFreePlayTokens(freePlayStatus.tokens);
+    
+    // Refresh vault and tokens every 2 seconds
     const interval = setInterval(() => {
       setVault(getVault());
+      const status = getFreePlayStatus();
+      setFreePlayTokens(status.tokens);
     }, 2000);
     
     return () => clearInterval(interval);
@@ -173,6 +179,12 @@ export default function MLEOCrash() {
   function refreshVault() {
     setVault(getVault());
   }
+
+  const startFreePlay = () => {
+    setIsFreePlay(true);
+    setBetAmount("1000");
+    setTimeout(() => placeBet(), 100);
+  };
 
   // ----------------------- Lifecycle: start betting window -------------------
   useEffect(() => {
@@ -688,6 +700,15 @@ export default function MLEOCrash() {
                   </div>
                 </div>
 
+                {freePlayTokens > 0 && phase === "betting" && (
+                  <button
+                    onClick={startFreePlay}
+                    className="w-full rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 px-4 py-2.5 font-semibold text-white shadow hover:from-amber-400 hover:via-orange-400 hover:to-yellow-400 mb-2"
+                  >
+                    🎁 FREE PLAY ({freePlayTokens}/5)
+                  </button>
+                )}
+                
                 <button
                   onClick={placeBet}
                   disabled={phase !== "betting" || !betAmount || Number(betAmount) <= 0 || Number(betAmount) > vault}

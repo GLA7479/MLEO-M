@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { getFreePlayStatus, formatTimeRemaining, debugAddTokens } from "../lib/free-play-system";
 
-const ARCADE_BG = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+const ARCADE_BG = "linear-gradient(135deg, #1a1a1a 0%, #3a2a0a 50%, #1a1a1a 100%)";
 
 function GameCard({ title, emoji, description, prize, href, color, freePlayStatus }) {
   const [showInfo, setShowInfo] = useState(false);
@@ -52,16 +52,6 @@ function GameCard({ title, emoji, description, prize, href, color, freePlayStatu
             </div>
           </div>
 
-          {/* Free Play Button (if tokens available) */}
-          {freePlayStatus && freePlayStatus.hasTokens && (
-            <Link
-              href={`${href}?freePlay=true`}
-              className="block w-full text-center px-5 py-2.5 rounded-lg font-extrabold text-white text-base shadow-lg transition-all hover:scale-105 mb-2 bg-gradient-to-r from-amber-500 to-orange-500"
-            >
-              🎁 FREE PLAY ({freePlayStatus.tokens}/{freePlayStatus.maxTokens})
-            </Link>
-          )}
-
           {/* Regular Play Button */}
           <Link
             href={href}
@@ -72,13 +62,6 @@ function GameCard({ title, emoji, description, prize, href, color, freePlayStatu
           >
             PLAY NOW
           </Link>
-          
-          {/* Timer display (if not full) */}
-          {freePlayStatus && !freePlayStatus.isFull && (
-            <div className="text-center mt-2 text-xs text-amber-400/70">
-              ⏰ Next free: {formatTimeRemaining(freePlayStatus.timeUntilNext)}
-            </div>
-          )}
         </div>
       </article>
       
@@ -394,27 +377,17 @@ export default function ArcadeHub() {
                   </span>
                 )}
               </div>
-              
-              {/* DEBUG BUTTON - Remove in production */}
-              <button
-                onClick={() => {
-                  debugAddTokens();
-                  updateFreePlayStatus();
-                }}
-                className="px-3 py-2 rounded-xl bg-red-600/20 border border-red-500/30 text-red-300 text-xs font-bold hover:bg-red-600/30"
-                title="Debug: Add 5 tokens"
-              >
-                🔧 DEBUG +5
-              </button>
             </div>
 
             <div className="flex items-center gap-3">
-              <ConnectButton
-                chainStatus="none"
-                accountStatus="avatar"
-                showBalance={false}
-                label="CONNECT"
-              />
+              <div className="scale-90 origin-right">
+                <ConnectButton
+                  chainStatus="none"
+                  accountStatus="avatar"
+                  showBalance={false}
+                  label="CONNECT"
+                />
+              </div>
             </div>
           </div>
 
@@ -479,7 +452,7 @@ export default function ArcadeHub() {
           </div>
 
           {/* Back to Main Games */}
-          <div className="mt-12 text-center">
+          <div className="mt-12 text-center flex items-center justify-center gap-4">
             <Link
               href="/mining"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-white shadow-lg"
@@ -487,6 +460,18 @@ export default function ArcadeHub() {
               <span>⬅️</span>
               <span>Back to Main Games</span>
             </Link>
+            
+            {/* DEBUG BUTTON - Remove in production */}
+            <button
+              onClick={() => {
+                debugAddTokens();
+                updateFreePlayStatus();
+              }}
+              className="px-4 py-3 rounded-xl bg-red-600/20 border border-red-500/30 text-red-300 text-sm font-bold hover:bg-red-600/30"
+              title="Debug: Add 5 tokens"
+            >
+              🔧 DEBUG +5
+            </button>
           </div>
         </div>
       </main>

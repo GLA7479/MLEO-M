@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
-import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
+import { useFreePlayToken as consumeFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -165,6 +165,7 @@ export default function PlinkoPage() {
   const [finalBuckets, setFinalBuckets] = useState([]); // recent landings visual
   const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
   const [isFreePlay, setIsFreePlay] = useState(false);
+  const [freePlayTokens, setFreePlayTokens] = useState(0);
   const [stats, setStats] = useState(() =>
     safeRead(LS_KEY, { totalDrops: 0, totalBet: 0, totalWon: 0, biggestWin: 0, history: [], lastBet: MIN_BET })
   );
@@ -219,12 +220,20 @@ export default function PlinkoPage() {
 
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
+    
+    const freePlayStatus = getFreePlayStatus();
+    setFreePlayTokens(freePlayStatus.tokens);
 
     // Load last bet amount
     const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
     if (savedStats.lastBet) {
       setBetAmount(String(savedStats.lastBet));
     }
+    
+    const interval = setInterval(() => {
+      const status = getFreePlayStatus();
+      setFreePlayTokens(status.tokens);
+    }, 2000);
 
     if (typeof Audio !== "undefined") {
       try {
@@ -233,7 +242,9 @@ export default function PlinkoPage() {
         bounceSound.current = new Audio(SOUND.bounce);
       } catch {}
     }
-  }, []);
+    
+    return () => clearInterval(interval);
+  }, [router.query]);
 
   // Persist stats
   useEffect(() => {
@@ -681,6 +692,12 @@ function buildBoardGeometry(w, h) {
     ctx.restore();
   }
 
+  const startFreePlay = () => {
+    setIsFreePlay(true);
+    setBetAmount("1000");
+    setTimeout(() => dropBall(), 100);
+  };
+
   // Drop ball
   function dropBall() {
     let bet = Number(betAmount) || MIN_BET;
@@ -854,6 +871,15 @@ function buildBoardGeometry(w, h) {
 
             {/* Drop Button & Bet Amount */}
             <div className="text-center mb-6">
+              {freePlayTokens > 0 && (
+                <button
+                  onClick={startFreePlay}
+                  className="px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-4 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:from-amber-400 hover:via-orange-400 hover:to-yellow-400 hover:scale-105"
+                >
+                  🎁 FREE PLAY ({freePlayTokens}/5)
+                </button>
+              )}
+              
               <button
                 onClick={dropBall}
                 disabled={vault < (Number(betAmount) || MIN_BET)}

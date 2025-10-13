@@ -7,7 +7,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
-import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
+import { useFreePlayToken as consumeFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -155,6 +155,7 @@ export default function ScratchCardPage() {
   const [revealed, setRevealed] = useState([]);
   const [result, setResult] = useState(null);
   const [isFreePlay, setIsFreePlay] = useState(false);
+  const [freePlayTokens, setFreePlayTokens] = useState(0);
   const [stats, setStats] = useState(() => 
     safeRead(LS_KEY, { totalCards: 0, totalBet: 0, totalWon: 0, biggestWin: 0, wins: 0, lastBet: MIN_BET })
   );
@@ -170,16 +171,26 @@ export default function ScratchCardPage() {
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
     
+    const freePlayStatus = getFreePlayStatus();
+    setFreePlayTokens(freePlayStatus.tokens);
+    
     // Load last bet amount
     const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
     if (savedStats.lastBet) {
       setBetAmount(String(savedStats.lastBet));
     }
     
+    const interval = setInterval(() => {
+      const status = getFreePlayStatus();
+      setFreePlayTokens(status.tokens);
+    }, 2000);
+    
     if (typeof Audio !== "undefined") {
       scratchSound.current = new Audio("/sounds/click.mp3");
       winSound.current = new Audio("/sounds/success.mp3");
     }
+    
+    return () => clearInterval(interval);
   }, [router.query]);
 
   useEffect(() => {
@@ -188,6 +199,12 @@ export default function ScratchCardPage() {
 
   const refreshVault = () => {
     setVaultState(getVault());
+  };
+
+  const startFreePlay = () => {
+    setIsFreePlay(true);
+    setBetAmount("1000");
+    setTimeout(() => buyCard(), 100);
   };
 
   const buyCard = () => {
@@ -385,6 +402,15 @@ export default function ScratchCardPage() {
                   Scratch 3 matching symbols to win!<br/>
                   Match 3 identical symbols for prizes up to ×10 multiplier!
                 </p>
+
+                {freePlayTokens > 0 && (
+                  <button
+                    onClick={startFreePlay}
+                    className="px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-4 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:from-amber-400 hover:via-orange-400 hover:to-yellow-400 hover:scale-105"
+                  >
+                    🎁 FREE PLAY ({freePlayTokens}/5)
+                  </button>
+                )}
 
                 <button
                   onClick={buyCard}

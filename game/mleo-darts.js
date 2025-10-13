@@ -7,7 +7,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
-import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
+import { useFreePlayToken as consumeFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -94,6 +94,7 @@ export default function MLEODartsPage() {
   const [throwing, setThrowing] = useState(false);
   const [result, setResult] = useState(null);
   const [isFreePlay, setIsFreePlay] = useState(false);
+  const [freePlayTokens, setFreePlayTokens] = useState(0);
   const [stats, setStats] = useState(() =>
     safeRead(LS_KEY, { totalThrows: 0, totalBet: 0, wins: 0, totalWon: 0, totalLost: 0, biggestWin: 0, history: [], lastBet: MIN_BET })
   );
@@ -107,13 +108,29 @@ export default function MLEODartsPage() {
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
     
+    const freePlayStatus = getFreePlayStatus();
+    setFreePlayTokens(freePlayStatus.tokens);
+    
     // Load last bet amount
     const savedLastBet = safeRead(LS_KEY, { lastBet: MIN_BET }).lastBet;
     setBetAmount(savedLastBet.toString());
+    
+    const interval = setInterval(() => {
+      const status = getFreePlayStatus();
+      setFreePlayTokens(status.tokens);
+    }, 2000);
+    
+    return () => clearInterval(interval);
   }, [router.query]);
 
   const refreshVault = () => {
     setVaultState(getVault());
+  };
+
+  const startFreePlay = () => {
+    setIsFreePlay(true);
+    setBetAmount("1000");
+    setTimeout(() => throwDart(), 100);
   };
 
   const throwDart = async () => {
@@ -286,6 +303,15 @@ export default function MLEODartsPage() {
 
             {/* THROW DART BUTTON */}
             <div className="text-center mb-6">
+              {freePlayTokens > 0 && !throwing && (
+                <button
+                  onClick={startFreePlay}
+                  className="px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-4 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:from-amber-400 hover:via-orange-400 hover:to-yellow-400 hover:scale-105"
+                >
+                  🎁 FREE PLAY ({freePlayTokens}/5)
+                </button>
+              )}
+              
               <button
                 onClick={throwDart}
                 disabled={throwing}

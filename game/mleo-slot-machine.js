@@ -8,7 +8,7 @@ import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import { useAccount } from "wagmi";
 import Link from "next/link";
-import { useFreePlayToken as consumeFreePlayToken } from "../lib/free-play-system";
+import { useFreePlayToken as consumeFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 
 // ============================================================================
 // CONFIG
@@ -116,6 +116,7 @@ export default function SlotMachinePage() {
   const [freeSpins, setFreeSpins] = useState(0);
   const [showPrizeTable, setShowPrizeTable] = useState(false);
   const [isFreePlay, setIsFreePlay] = useState(false);
+  const [freePlayTokens, setFreePlayTokens] = useState(0);
 
   const spinSound = useRef(null);
   const winSound = useRef(null);
@@ -127,18 +128,28 @@ export default function SlotMachinePage() {
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
     
+    const freePlayStatus = getFreePlayStatus();
+    setFreePlayTokens(freePlayStatus.tokens);
+    
     // Load last bet amount
     const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
     if (savedStats.lastBet) {
       setBetAmount(String(savedStats.lastBet));
     }
     
+    const interval = setInterval(() => {
+      const status = getFreePlayStatus();
+      setFreePlayTokens(status.tokens);
+    }, 2000);
+    
     // Preload sounds
     if (typeof Audio !== "undefined") {
       spinSound.current = new Audio("/sounds/click.mp3");
       winSound.current = new Audio("/sounds/success.mp3");
     }
-  }, []);
+    
+    return () => clearInterval(interval);
+  }, [router.query]);
 
   useEffect(() => {
     safeWrite(LS_KEY, stats);
@@ -146,6 +157,12 @@ export default function SlotMachinePage() {
 
   const refreshVault = () => {
     setVaultState(getVault());
+  };
+
+  const startFreePlay = () => {
+    setIsFreePlay(true);
+    setBetAmount("1000");
+    setTimeout(() => spin(), 100);
   };
 
   const spin = async () => {
@@ -319,6 +336,15 @@ export default function SlotMachinePage() {
 
             {/* SPIN BUTTON */}
             <div className="text-center mb-6">
+              {freePlayTokens > 0 && !spinning && freeSpins === 0 && (
+                <button
+                  onClick={startFreePlay}
+                  className="px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-4 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:from-amber-400 hover:via-orange-400 hover:to-yellow-400 hover:scale-105"
+                >
+                  🎁 FREE PLAY ({freePlayTokens}/5)
+                </button>
+              )}
+              
               <button
                 onClick={spin}
                 disabled={spinning || (vault < (Number(betAmount) || MIN_BET) && freeSpins === 0)}
