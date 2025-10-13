@@ -256,6 +256,14 @@ export default function DiamondsPage() {
     }, 100);
   };
 
+  const resetToDifficulty = () => {
+    setGameResult(null);
+    setShowResultPopup(false);
+    setRevealed([]);
+    setBombs([]);
+    setGameActive(false);
+  };
+
   if (!mounted) {
     return <div className="min-h-screen bg-gradient-to-br from-cyan-900 via-black to-blue-900 flex items-center justify-center">
       <div className="text-white text-xl">Loading...</div>
@@ -273,11 +281,20 @@ export default function DiamondsPage() {
         <div className="max-w-6xl mx-auto p-4 pb-20">
           {/* HEADER */}
           <header className="flex items-center justify-between mb-6">
-            <Link href="/arcade">
-              <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+            {gameActive || gameResult ? (
+              <button 
+                onClick={resetToDifficulty}
+                className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+              >
                 BACK
               </button>
-            </Link>
+            ) : (
+              <Link href="/arcade">
+                <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
+                  BACK
+                </button>
+              </Link>
+            )}
 
             <div className="text-center">
               <h1 className="text-3xl font-bold mb-1">
@@ -294,16 +311,7 @@ export default function DiamondsPage() {
 
           {/* GAME WINDOW */}
           <div className="rounded-2xl p-6 bg-white/5 border border-white/10 mb-6">
-            {/* Current Prize */}
-            {gameActive && !gameResult && revealed.length > 0 && (
-              <div className="text-center mb-6">
-                <div className="text-sm opacity-70 mb-2">Current Prize</div>
-                <div className="text-4xl font-bold text-cyan-400">
-                  {fmt(currentPrize)} MLEO
-                </div>
-                <div className="text-lg opacity-70">×{currentMultiplier.toFixed(2)} | {revealed.length}/{totalSafe} Diamonds</div>
-              </div>
-            )}
+            {/* Current Prize - removed from here to prevent layout shift */}
 
             {/* Difficulty Selection */}
             {!gameActive && !gameResult && (
@@ -334,7 +342,7 @@ export default function DiamondsPage() {
               <div className="mb-8">
                 <h2 className="text-xl font-bold mb-4 text-center">💎 Diamond Field</h2>
                 
-                <div className="grid grid-cols-5 gap-1.5 max-w-md mx-auto mb-6">
+                <div className="grid grid-cols-5 gap-1 max-w-xs mx-auto mb-4">
                   {[...Array(GRID_SIZE)].map((_, index) => {
                     const isRevealed = revealed.includes(index);
                     const isBomb = bombs.includes(index);
@@ -346,7 +354,7 @@ export default function DiamondsPage() {
                         key={index}
                         onClick={() => revealTile(index)}
                         disabled={isRevealed || gameResult}
-                        className={`aspect-square rounded-md font-bold text-xl border transition-all ${
+                        className={`aspect-square rounded-md font-bold text-base border transition-all ${
                           showBomb
                             ? 'bg-gradient-to-br from-red-900 to-black border-red-600 animate-pulse'
                             : showDiamond
@@ -367,10 +375,14 @@ export default function DiamondsPage() {
                   <div className="text-center">
                     <button
                       onClick={cashOut}
-                      className="px-12 py-3 rounded-xl font-bold text-xl text-white bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 transition-all hover:scale-105 shadow-lg"
+                      className="px-6 py-2 rounded-lg font-bold text-base text-white bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 transition-all hover:scale-105 shadow-lg"
                     >
-                      💰 Cash Out ({fmt(currentPrize)} MLEO)
+                      💰 Cash Out
                     </button>
+                    {/* Current Prize moved below button */}
+                    <div className="text-center mt-2 text-xs text-cyan-400">
+                      Current: {fmt(currentPrize)} MLEO (×{currentMultiplier.toFixed(2)})
+                    </div>
                   </div>
                 )}
               </div>
