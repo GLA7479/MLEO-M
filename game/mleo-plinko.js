@@ -332,7 +332,7 @@ function buildBoardGeometry(w, h) {
     // Pegs - Perfect triangle shape
     const pegs = [];
     
-    for (let r = 0; r < totalRows; r++) {
+    for (let r = 0; r < ROWS; r++) {
       // Calculate pegs in row - triangle that reaches bottom
       let pegsInRow;
       if (r === 0) {
@@ -363,9 +363,9 @@ function buildBoardGeometry(w, h) {
         pegsInRow += 1; // Add one peg on right side
       }
       
-      // Add one extra peg on right side for row 12 (index 11)
+      // Row 12 (index 11) - no extra pegs (fixed amount)
       if (r === 11) {
-        pegsInRow += 1; // Add one peg on right side
+        // No additional pegs - keep base amount
       }
       
       
@@ -859,7 +859,7 @@ function buildBoardGeometry(w, h) {
             </div>
 
             {/* קוביות הזכייה - מחוברות לקנבס */}
-            <div className="relative -mt-2 sm:-mt-3" style={{ marginTop: isWideScreen ? '-0.5rem' : '-0.75rem' }}>
+            <div className="relative -mt-2 sm:-mt-3" style={{ marginTop: isWideScreen ? '0rem' : '0rem' }}>
               <div className="flex gap-0 sm:gap-0.5 mb-4 sm:mb-6 max-w-2xl mx-auto">
                 {MULTIPLIERS.map((mult, idx) => {
                   const landed = finalBuckets.filter(i => i === idx).length;
