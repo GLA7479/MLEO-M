@@ -166,6 +166,7 @@ export default function PlinkoPage() {
   const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
+  const [showResultPopup, setShowResultPopup] = useState(false);
   const [stats, setStats] = useState(() =>
     safeRead(LS_KEY, { totalDrops: 0, totalBet: 0, totalWon: 0, biggestWin: 0, history: [], lastBet: MIN_BET })
   );
@@ -250,6 +251,17 @@ export default function PlinkoPage() {
   useEffect(() => {
     safeWrite(LS_KEY, stats);
   }, [stats]);
+
+  // Auto-hide result popup
+  useEffect(() => {
+    if (result) {
+      setShowResultPopup(true);
+      const timer = setTimeout(() => {
+        setShowResultPopup(false);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [result]);
 
   // Canvas init & resize
   useEffect(() => {
@@ -787,7 +799,7 @@ function buildBoardGeometry(w, h) {
 
 
   return (
-    <Layout isGame={true} title="MLEO Plinko 🎯">
+    <Layout vault={vault} refreshVault={refreshVault}>
       <main className="min-h-[100svh] bg-gradient-to-b from-blue-950 via-indigo-950 to-black text-zinc-100">
         <div className="max-w-6xl mx-auto p-4 pb-20">
           {/* HEADER - Centered */}
@@ -926,22 +938,6 @@ function buildBoardGeometry(w, h) {
                 <div className="text-3xl font-bold text-cyan-400">{activeCount}</div>
               </div>
 
-              {result && !result.error && (
-                <div className={`p-4 rounded-xl border-2 ${
-                  result.win ? "bg-green-900/30 border-green-500" : "bg-red-900/30 border-red-500"
-                }`}>
-                  <div className="text-sm font-bold mb-1">{result.message}</div>
-                  <div className={`text-2xl font-bold ${result.win && result.prize > 0 ? "text-green-400" : "text-red-400"}`}>
-                    {result.prize > 0 ? `+${fmt(result.prize)}` : "No Win"}
-                  </div>
-                </div>
-              )}
-
-              {result && result.error && (
-                <div className="p-4 rounded-xl border-2 bg-red-900/30 border-red-500">
-                  <div className="text-sm font-bold text-red-400">{result.message}</div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -1063,6 +1059,54 @@ function buildBoardGeometry(w, h) {
           </div>
 
         </div>
+
+        {/* FLOATING RESULT POPUP */}
+        {result && showResultPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div 
+              className={`text-center p-4 rounded-xl border-2 transition-all duration-500 transform pointer-events-auto max-w-sm mx-4 ${
+                showResultPopup ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+              } ${
+                result.error
+                  ? "bg-gradient-to-br from-red-600 to-rose-700 border-red-300 shadow-2xl shadow-red-500/70"
+                  : result.win && result.prize > 0
+                  ? "bg-gradient-to-br from-green-600 to-emerald-700 border-green-300 shadow-2xl shadow-green-500/70"
+                  : "bg-gradient-to-br from-zinc-600 to-zinc-700 border-zinc-300 shadow-2xl shadow-zinc-500/70"
+              }`}
+            >
+              <div className="text-2xl font-black mb-2 animate-pulse text-white drop-shadow-lg">
+                {result.error ? "⚠️ Error" : 
+                 result.win && result.prize > 0 ? "🎯 Winner! 🎯" : 
+                 "⚪ No Win"}
+              </div>
+              {result.multiplier !== undefined && (
+                <div className="text-base mb-2 text-white/90 font-semibold">
+                  Multiplier: ×{result.multiplier}
+                </div>
+              )}
+              {result.prize && result.prize > 0 && (
+                <div className="space-y-1">
+                  <div className="text-3xl font-black text-white animate-bounce drop-shadow-2xl">
+                    +{fmt(result.prize)} MLEO
+                  </div>
+                </div>
+              )}
+              {result.error && (
+                <div className="text-base font-bold text-white">
+                  {result.message}
+                </div>
+              )}
+              {!result.error && !result.win && (
+                <div className="text-lg font-bold text-white">
+                  Better luck next time!
+                </div>
+              )}
+              <div className="mt-2 text-xs text-white/70 animate-pulse">
+                Auto-closing...
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </Layout>
   );

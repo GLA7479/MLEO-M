@@ -86,6 +86,7 @@ export default function HiLoPage() {
   const [multiplier, setMultiplier] = useState(1);
   const [result, setResult] = useState(null);
   const [isFreePlay, setIsFreePlay] = useState(false);
+  const [showResultPopup, setShowResultPopup] = useState(false);
   const [stats, setStats] = useState(() => 
     safeRead(LS_KEY, { totalGames: 0, totalBet: 0, totalWon: 0, biggestWin: 0, longestStreak: 0, lastBet: MIN_BET })
   );
@@ -117,6 +118,16 @@ export default function HiLoPage() {
   useEffect(() => {
     safeWrite(LS_KEY, stats);
   }, [stats]);
+
+  useEffect(() => {
+    if (result && (result.cashout || result.error || result.correct === false)) {
+      setShowResultPopup(true);
+      const timer = setTimeout(() => {
+        setShowResultPopup(false);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [result]);
 
   const refreshVault = () => {
     setVaultState(getVault());
@@ -272,7 +283,7 @@ export default function HiLoPage() {
   }
 
   return (
-    <Layout isGame={true} title="MLEO Hi-Lo 🃏">
+    <Layout vault={vault} refreshVault={refreshVault}>
       <main className="min-h-[100svh] bg-gradient-to-b from-green-950 via-emerald-950 to-black text-zinc-100">
         <div className="max-w-4xl mx-auto p-4 pb-20">
           
@@ -398,30 +409,6 @@ export default function HiLoPage() {
                   </div>
                 </div>
 
-                {/* Result Message */}
-                {result && (
-                  <div className={`text-center mb-6 p-4 rounded-xl border-2 ${
-                    result.error
-                      ? "bg-red-900/30 border-red-500"
-                      : result.cashout
-                      ? "bg-green-900/30 border-green-500"
-                      : result.correct
-                      ? "bg-blue-900/30 border-blue-500"
-                      : "bg-red-900/30 border-red-500"
-                  }`}>
-                    <div className="text-2xl font-bold mb-2">{result.message}</div>
-                    {result.prize && (
-                      <div className="text-3xl font-bold text-green-400">
-                        +{fmt(result.prize)} MLEO
-                      </div>
-                    )}
-                    {result.finalStreak !== undefined && (
-                      <div className="text-sm opacity-70 mt-1">
-                        Final Streak: {result.finalStreak}
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Action Buttons */}
                 {playing ? (
@@ -557,6 +544,54 @@ export default function HiLoPage() {
           </div>
 
         </div>
+
+        {/* FLOATING RESULT POPUP */}
+        {result && showResultPopup && (result.cashout || result.error || result.correct === false) && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div 
+              className={`text-center p-4 rounded-xl border-2 transition-all duration-500 transform pointer-events-auto max-w-sm mx-4 ${
+                showResultPopup ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+              } ${
+                result.error
+                  ? "bg-gradient-to-br from-red-600 to-rose-700 border-red-300 shadow-2xl shadow-red-500/70"
+                  : result.cashout || result.win
+                  ? "bg-gradient-to-br from-green-600 to-emerald-700 border-green-300 shadow-2xl shadow-green-500/70"
+                  : "bg-gradient-to-br from-red-600 to-rose-700 border-red-300 shadow-2xl shadow-red-500/70"
+              }`}
+            >
+              <div className="text-2xl font-black mb-2 animate-pulse text-white drop-shadow-lg">
+                {result.error ? "⚠️ Error" : 
+                 result.cashout ? "💰 Cashed Out! 💰" :
+                 result.correct === false ? "❌ Wrong Guess" : "🎉 Game Over"}
+              </div>
+              {result.finalStreak !== undefined && (
+                <div className="text-base mb-2 text-white/90 font-semibold">
+                  Streak: {result.finalStreak}
+                </div>
+              )}
+              {result.prize && result.prize > 0 && (
+                <div className="space-y-1">
+                  <div className="text-3xl font-black text-white animate-bounce drop-shadow-2xl">
+                    +{fmt(result.prize)} MLEO
+                  </div>
+                </div>
+              )}
+              {result.error && (
+                <div className="text-base font-bold text-white">
+                  {result.message}
+                </div>
+              )}
+              {!result.error && !result.prize && (
+                <div className="text-lg font-bold text-white">
+                  Game Over
+                </div>
+              )}
+              <div className="mt-2 text-xs text-white/70 animate-pulse">
+                Auto-closing...
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </Layout>
   );

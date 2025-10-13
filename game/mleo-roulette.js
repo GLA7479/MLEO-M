@@ -168,6 +168,7 @@ export default function RoulettePage() {
   const [selectedBets, setSelectedBets] = useState([]); // Array of selected bets
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
+  const [showResultPopup, setShowResultPopup] = useState(false);
   const [stats, setStats] = useState(() => 
     safeRead(LS_KEY, { totalSpins: 0, totalBet: 0, totalWon: 0, biggestWin: 0, wins: 0, lastBet: MIN_BET })
   );
@@ -199,6 +200,16 @@ export default function RoulettePage() {
   useEffect(() => {
     safeWrite(LS_KEY, stats);
   }, [stats]);
+
+  useEffect(() => {
+    if (gameResult) {
+      setShowResultPopup(true);
+      const timer = setTimeout(() => {
+        setShowResultPopup(false);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [gameResult]);
 
   const refreshVault = () => {
     setVaultState(getVault());
@@ -266,8 +277,12 @@ export default function RoulettePage() {
         setGameResult({ error: true, message: `Minimum bet is ${MIN_BET} MLEO!` });
         return;
       }
-      
-      const totalBet = bet * selectedBets.length;
+    }
+
+    // Calculate total bet
+    const totalBet = bet * selectedBets.length;
+    
+    if (!isFreePlay) {
       if (currentVault < totalBet) {
         setGameResult({ error: true, message: `Not enough MLEO! Need ${totalBet} MLEO for ${selectedBets.length} bets.` });
         return;
@@ -284,10 +299,12 @@ export default function RoulettePage() {
       }
     }
 
-    // Deduct cost
-    const newVault = currentVault - totalBet;
-    setVault(newVault);
-    setVaultState(newVault);
+    // Deduct cost (only if not free play)
+    if (!isFreePlay) {
+      const newVault = currentVault - totalBet;
+      setVault(newVault);
+      setVaultState(newVault);
+    }
     setCurrentBet(bet);
     setGameActive(true);
     setGameResult(null);
@@ -495,46 +512,6 @@ export default function RoulettePage() {
               </div>
             </div>
 
-            {/* Result Display */}
-            {gameResult && (
-              <div className={`text-center mb-6 p-6 rounded-xl border-2 ${
-                gameResult.win
-                  ? "bg-green-900/30 border-green-500"
-                  : "bg-red-900/30 border-red-500"
-              }`}>
-                <div className="text-3xl font-bold mb-2">
-                  {gameResult.message}
-                </div>
-                <div className="text-xl mb-2">
-                  Total Bet: {fmt(gameResult.totalBet)} MLEO ({selectedBets.length} bets)
-                </div>
-                {gameResult.winningBets && gameResult.winningBets.length > 0 && (
-                  <div className="text-lg mb-2">
-                    Winning Bets: {gameResult.winningBets.map(bet => 
-                      `${bet.type}${bet.value ? `(${bet.value})` : ''}`
-                    ).join(', ')}
-                  </div>
-                )}
-                {gameResult.win && gameResult.netProfit > 0 && (
-                  <div className="text-3xl font-bold text-green-400">
-                    +{fmt(gameResult.netProfit)} MLEO Profit
-                  </div>
-                )}
-                {gameResult.win && gameResult.netProfit === 0 && (
-                  <div className="text-2xl font-bold text-yellow-400">
-                    Break Even - {fmt(gameResult.prize)} MLEO Returned
-                  </div>
-                )}
-                {!gameResult.win && (
-                  <div className="text-xl text-red-400">
-                    Lost {fmt(gameResult.totalBet)} MLEO
-                  </div>
-                )}
-                <div className="text-sm text-gray-400 mt-2">
-                  Total Prize: {fmt(gameResult.prize)} MLEO | Net: {gameResult.netProfit >= 0 ? '+' : ''}{fmt(gameResult.netProfit)} MLEO
-                </div>
-              </div>
-            )}
 
             {/* Game Controls */}
             <div className="text-center mb-6">
@@ -986,6 +963,55 @@ export default function RoulettePage() {
             </div>
           </div>
         </div>
+
+        {/* FLOATING RESULT POPUP */}
+        {gameResult && showResultPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div 
+              className={`text-center p-4 rounded-xl border-2 transition-all duration-500 transform pointer-events-auto max-w-sm mx-4 ${
+                showResultPopup ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+              } ${
+                gameResult.win && gameResult.netProfit > 0
+                  ? "bg-gradient-to-br from-green-600 to-emerald-700 border-green-300 shadow-2xl shadow-green-500/70"
+                  : gameResult.win && gameResult.netProfit === 0
+                  ? "bg-gradient-to-br from-yellow-600 to-orange-600 border-yellow-300 shadow-2xl shadow-yellow-500/70"
+                  : "bg-gradient-to-br from-red-600 to-rose-700 border-red-300 shadow-2xl shadow-red-500/70"
+              }`}
+            >
+              <div className="text-2xl font-black mb-2 animate-pulse text-white drop-shadow-lg">
+                {gameResult.win && gameResult.netProfit > 0 ? "🎉 You Win! 🎉" : 
+                 gameResult.win && gameResult.netProfit === 0 ? "🤝 Break Even! 🤝" : 
+                 "🎰 House Wins"}
+              </div>
+              <div className="text-base mb-2 text-white/90 font-semibold">
+                Number: {gameResult.winningNumber?.number} ({gameResult.winningNumber?.color})
+              </div>
+              {gameResult.win && gameResult.netProfit > 0 && (
+                <div className="space-y-1">
+                  <div className="text-3xl font-black text-white animate-bounce drop-shadow-2xl">
+                    +{fmt(gameResult.netProfit)} MLEO
+                  </div>
+                  <div className="text-sm font-bold text-white/80">
+                    {gameResult.winningBets?.length}/{selectedBets.length} Bets Won
+                  </div>
+                </div>
+              )}
+              {gameResult.win && gameResult.netProfit === 0 && (
+                <div className="text-lg font-bold text-white">
+                  Returned: {fmt(gameResult.prize)} MLEO
+                </div>
+              )}
+              {!gameResult.win && (
+                <div className="text-lg font-bold text-white">
+                  Lost {fmt(gameResult.totalBet)} MLEO
+                </div>
+              )}
+              <div className="mt-2 text-xs text-white/70 animate-pulse">
+                Auto-closing...
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );
