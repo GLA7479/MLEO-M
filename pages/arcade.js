@@ -2,10 +2,34 @@
 import { useState, useEffect } from "react";
 import Layout from "../components/Layout";
 import Link from "next/link";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { ConnectButton, useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
+import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
+import { parseUnits } from "viem";
 import { getFreePlayStatus, formatTimeRemaining, debugAddTokens } from "../lib/free-play-system";
 
 const ARCADE_BG = "linear-gradient(135deg, #1a1a1a 0%, #3a2a0a 50%, #1a1a1a 100%)";
+
+// ==== On-chain Claim (TBNB) config ====
+const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
+const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || process.env.NEXT_PUBLIC_CLAIM_ADDRESS || "").trim();
+const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
+const CLAIM_FN = process.env.NEXT_PUBLIC_MLEO_CLAIM_FN || "claim";
+
+// ABI מינימלי של V3: claim(gameId, amount)
+const MINING_CLAIM_ABI = [{
+  type: "function",
+  name: "claim",
+  stateMutability: "nonpayable",
+  inputs: [
+    { name: "gameId", type: "uint256" },
+    { name: "amount", type: "uint256" }
+  ],
+  outputs: []
+}];
+
+const ALLOW_TESTNET_WALLET_FLAG =
+  (process.env.NEXT_PUBLIC_ALLOW_TESTNET_WALLET || "").toLowerCase() === "1" ||
+  (process.env.NEXT_PUBLIC_ALLOW_TESTNET_WALLET || "").toLowerCase() === "true";
 
 function GameCard({ title, emoji, description, prize, href, color, freePlayStatus }) {
   const [showInfo, setShowInfo] = useState(false);
@@ -135,6 +159,15 @@ export default function ArcadeHub() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [collectAmount, setCollectAmount] = useState(1000);
+  const [claiming, setClaiming] = useState(false);
+
+  // Wagmi hooks
+  const { openConnectModal } = useConnectModal();
+  const { address, isConnected } = useAccount();
+  const { switchChain } = useSwitchChain();
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
+  const chainId = useChainId();
   
   // Read vault from RUSH game
   function getVault() {
@@ -159,6 +192,76 @@ export default function ArcadeHub() {
   function updateFreePlayStatus() {
     const status = getFreePlayStatus();
     setFreePlayStatus(status);
+  }
+
+  // Collect MLEO to wallet
+  async function collectToWallet() {
+    if (!isConnected) {
+      openConnectModal?.();
+      return;
+    }
+
+    if (chainId !== CLAIM_CHAIN_ID) {
+      try {
+        await switchChain?.({ chainId: CLAIM_CHAIN_ID });
+      } catch {
+        alert("Switch to BSC Testnet (TBNB)");
+        return;
+      }
+    }
+
+    if (!CLAIM_ADDRESS) {
+      alert("Missing CLAIM address");
+      return;
+    }
+
+    if (collectAmount <= 0 || collectAmount > vault) {
+      alert("Invalid amount!");
+      return;
+    }
+
+    setClaiming(true);
+    try {
+      const amountUnits = parseUnits(
+        Number(collectAmount).toFixed(Math.min(2, MLEO_DECIMALS)),
+        MLEO_DECIMALS
+      );
+
+      const hash = await writeContractAsync({
+        address: CLAIM_ADDRESS,
+        abi: MINING_CLAIM_ABI,
+        functionName: "claim",
+        args: [BigInt(1), amountUnits], // GameId = 1 for Arcade
+        chainId: CLAIM_CHAIN_ID,
+        account: address,
+      });
+
+      await publicClient.waitForTransactionReceipt({ hash });
+
+      // Update local vault
+      const newVault = Math.max(0, vault - collectAmount);
+      setVault(newVault);
+      
+      // Update RUSH game vault
+      try {
+        const rushData = localStorage.getItem("mleo_rush_core_v4");
+        if (rushData) {
+          const data = JSON.parse(rushData);
+          data.vault = newVault;
+          localStorage.setItem("mleo_rush_core_v4", JSON.stringify(data));
+        }
+      } catch (e) {
+        console.error("Failed to update RUSH vault:", e);
+      }
+
+      alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
+      setShowSettingsModal(false);
+    } catch (err) {
+      console.error(err);
+      alert("Claim failed or rejected");
+    } finally {
+      setClaiming(false);
+    }
   }
   
   // Load vault and free play status on mount and refresh every 2 seconds
@@ -691,18 +794,11 @@ export default function ArcadeHub() {
                   Available: {fmt(vault)} MLEO
                 </div>
                 <button
-                  onClick={() => {
-                    if (collectAmount > 0 && collectAmount <= vault) {
-                      alert(`Collecting ${fmt(collectAmount)} MLEO...`);
-                      setShowSettingsModal(false);
-                    } else {
-                      alert('Invalid amount!');
-                    }
-                  }}
-                  disabled={collectAmount <= 0 || collectAmount > vault}
+                  onClick={collectToWallet}
+                  disabled={collectAmount <= 0 || collectAmount > vault || claiming}
                   className="w-full py-2 text-sm rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Collect {fmt(collectAmount)} MLEO
+                  {claiming ? "Collecting..." : `Collect ${fmt(collectAmount)} MLEO`}
                 </button>
               </div>
             </div>
