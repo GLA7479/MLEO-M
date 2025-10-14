@@ -1,6 +1,6 @@
 // ============================================================================
-// MLEO Blackjack - Full-Screen Card Game
-// Classic 21! Beat the dealer!
+// MLEO Blackjack - Full Professional Blackjack
+// Complete with Double Down, Split, Insurance, Surrender
 // ============================================================================
 
 import { useEffect, useRef, useState } from "react";
@@ -36,7 +36,7 @@ function useIOSViewportFix() {
   }, []);
 }
 
-const LS_KEY = "mleo_blackjack_v2";
+const LS_KEY = "mleo_blackjack_v3";
 const MIN_BET = 1000;
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
@@ -95,6 +95,13 @@ function calculateHandValue(hand) {
   return value;
 }
 
+function canSplitCards(hand) {
+  if (hand.length !== 2) return false;
+  const val1 = getCardValue(hand[0]);
+  const val2 = getCardValue(hand[1]);
+  return val1 === val2;
+}
+
 function PlayingCard({ card, hidden = false }) {
   if (hidden) {
     return (
@@ -138,7 +145,7 @@ export default function BlackjackPage() {
   const [deck, setDeck] = useState([]);
   const [playerHand, setPlayerHand] = useState([]);
   const [dealerHand, setDealerHand] = useState([]);
-  const [gameState, setGameState] = useState("betting"); // betting, playing, dealer, finished
+  const [gameState, setGameState] = useState("betting");
   const [gameResult, setGameResult] = useState(null);
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
@@ -155,7 +162,23 @@ export default function BlackjackPage() {
   const clickSound = useRef(null);
   const winSound = useRef(null);
 
-  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalHands: 0, wins: 0, losses: 0, pushes: 0, totalBet: 0, totalWon: 0, biggestWin: 0, blackjacks: 0, lastBet: MIN_BET }));
+  // Professional Blackjack Features
+  const [canDouble, setCanDouble] = useState(false);
+  const [canSplit, setCanSplit] = useState(false);
+  const [canSurrender, setCanSurrender] = useState(false);
+  const [showInsurance, setShowInsurance] = useState(false);
+  const [insuranceBet, setInsuranceBet] = useState(0);
+  const [hasDoubled, setHasDoubled] = useState(false);
+  const [hasSurrendered, setHasSurrendered] = useState(false);
+  const [splitHands, setSplitHands] = useState([]);
+  const [currentSplitIndex, setCurrentSplitIndex] = useState(0);
+  const [isSplitGame, setIsSplitGame] = useState(false);
+
+  const [stats, setStats] = useState(() => safeRead(LS_KEY, { 
+    totalHands: 0, wins: 0, losses: 0, pushes: 0, totalBet: 0, totalWon: 0, 
+    biggestWin: 0, blackjacks: 0, doubles: 0, splits: 0, surrenders: 0, 
+    insuranceWins: 0, insuranceLosses: 0, lastBet: MIN_BET 
+  }));
 
   const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
 
@@ -200,6 +223,31 @@ export default function BlackjackPage() {
     } catch (err) { console.error(err); alert("Claim failed or rejected"); } finally { setClaiming(false); }
   };
 
+  const checkDealerBlackjack = (dealer, player, bet) => {
+    const dealerVal = calculateHandValue(dealer);
+    if (dealerVal === 21) {
+      const playerVal = calculateHandValue(player);
+      if (playerVal === 21) {
+        // Both have blackjack - push
+        const newVault = getVault() + bet;
+        setVault(newVault); setVaultState(newVault);
+        setGameResult({ win: false, push: true, playerValue: 21, dealerValue: 21, prize: bet, profit: 0, blackjack: false });
+        const newStats = { ...stats, totalHands: stats.totalHands + 1, pushes: stats.pushes + 1, totalBet: stats.totalBet + bet, totalWon: stats.totalWon + bet, lastBet: bet };
+        setStats(newStats);
+        setGameState("finished");
+        return true;
+      } else {
+        // Dealer has blackjack, player doesn't - dealer wins
+        setGameResult({ win: false, push: false, playerValue: playerVal, dealerValue: 21, prize: 0, profit: -bet, blackjack: false });
+        const newStats = { ...stats, totalHands: stats.totalHands + 1, losses: stats.losses + 1, totalBet: stats.totalBet + bet, lastBet: bet };
+        setStats(newStats);
+        setGameState("finished");
+        return true;
+    }
+    }
+    return false;
+  };
+
   const dealCards = (isFreePlayParam = false) => {
     if (gameState !== "betting") return;
     playSfx(clickSound.current);
@@ -216,6 +264,15 @@ export default function BlackjackPage() {
     }
     setBetAmount(String(bet));
 
+    // Reset all states
+    setHasDoubled(false);
+    setHasSurrendered(false);
+    setShowInsurance(false);
+    setInsuranceBet(0);
+    setIsSplitGame(false);
+    setSplitHands([]);
+    setCurrentSplitIndex(0);
+
     const newDeck = shuffleDeck(createDeck());
     const player = [newDeck[0], newDeck[2]];
     const dealer = [newDeck[1], newDeck[3]];
@@ -225,17 +282,134 @@ export default function BlackjackPage() {
     setGameResult(null);
 
     const playerValue = calculateHandValue(player);
+    const dealerUpCard = dealer[0];
+
+    // Check for natural blackjack
     if (playerValue === 21) {
+      // Check if dealer also has blackjack
+      if (checkDealerBlackjack(dealer, player, bet)) {
+        return;
+      }
+      // Player blackjack wins
       setTimeout(() => finishGame(player, dealer, bet, true), 500);
       setGameState("finished");
-    } else {
-      setGameState("playing");
+      return;
     }
+
+    // Check if dealer has Ace showing - offer insurance
+    if (dealerUpCard.value === "A") {
+      setShowInsurance(true);
+      setGameState("insurance");
+      return;
+    }
+
+    // Check if dealer has 10/J/Q/K - check for blackjack immediately
+    if (getCardValue(dealerUpCard) === 10) {
+      if (checkDealerBlackjack(dealer, player, bet)) {
+        return;
+      }
+    }
+
+    // Enable player options
+    setCanDouble(true);
+    setCanSplit(canSplitCards(player));
+    setCanSurrender(true);
+    setGameState("playing");
   };
 
-  const hit = () => {
-    if (gameState !== "playing") return;
+  const takeInsurance = () => {
     playSfx(clickSound.current);
+    const bet = Number(betAmount);
+    const insuranceAmount = Math.floor(bet / 2);
+    const currentVault = getVault();
+    
+    if (currentVault < insuranceAmount) {
+      alert('Insufficient MLEO for insurance!');
+      setShowInsurance(false);
+      setGameState("playing");
+      setCanDouble(true);
+      setCanSplit(canSplitCards(playerHand));
+      setCanSurrender(true);
+      return;
+    }
+
+    setVault(currentVault - insuranceAmount);
+    setVaultState(currentVault - insuranceAmount);
+    setInsuranceBet(insuranceAmount);
+    setShowInsurance(false);
+
+    // Check for dealer blackjack
+    const dealerVal = calculateHandValue(dealerHand);
+    if (dealerVal === 21) {
+      // Insurance pays 2:1
+      const insurancePayout = insuranceAmount * 3; // bet + 2x win
+      const newVault = getVault() + insurancePayout;
+      setVault(newVault); setVaultState(newVault);
+      
+      // Player loses main bet but wins insurance
+      const playerVal = calculateHandValue(playerHand);
+      setGameResult({ 
+        win: false, 
+        push: false, 
+        playerValue: playerVal, 
+        dealerValue: 21, 
+        prize: insurancePayout, 
+        profit: insuranceAmount - bet, // Insurance win - main bet loss
+        blackjack: false,
+        insurance: true
+      });
+      const newStats = { ...stats, totalHands: stats.totalHands + 1, losses: stats.losses + 1, totalBet: stats.totalBet + bet + insuranceAmount, totalWon: stats.totalWon + insurancePayout, insuranceWins: stats.insuranceWins + 1, lastBet: bet };
+      setStats(newStats);
+      setGameState("finished");
+      return;
+    } else {
+      // No blackjack - insurance lost
+      const newStats = { ...stats, insuranceLosses: stats.insuranceLosses + 1 };
+      setStats(newStats);
+    }
+
+    setGameState("playing");
+    setCanDouble(true);
+    setCanSplit(canSplitCards(playerHand));
+    setCanSurrender(true);
+  };
+
+  const declineInsurance = () => {
+    playSfx(clickSound.current);
+    setShowInsurance(false);
+    
+    // Check for dealer blackjack anyway
+    if (checkDealerBlackjack(dealerHand, playerHand, Number(betAmount))) {
+      return;
+    }
+
+    setGameState("playing");
+    setCanDouble(true);
+    setCanSplit(canSplitCards(playerHand));
+    setCanSurrender(true);
+  };
+
+  const doubleDown = () => {
+    if (!canDouble || gameState !== "playing") return;
+    playSfx(clickSound.current);
+    
+    const bet = Number(betAmount);
+    const currentVault = getVault();
+    
+    if (currentVault < bet) {
+      alert('Insufficient MLEO to double down!');
+      return;
+    }
+
+    setVault(currentVault - bet);
+    setVaultState(currentVault - bet);
+    setBetAmount(String(bet * 2));
+    setHasDoubled(true);
+    setCanDouble(false);
+    setCanSplit(false);
+    setCanSurrender(false);
+
+    // Draw one card and stand
     const newCard = deck[0];
     const newHand = [...playerHand, newCard];
     setPlayerHand(newHand);
@@ -244,17 +418,267 @@ export default function BlackjackPage() {
     const value = calculateHandValue(newHand);
     if (value > 21) {
       setGameState("finished");
-      finishGame(newHand, dealerHand, Number(betAmount), false);
-    } else if (value === 21) {
-      stand(newHand);
+      finishGame(newHand, dealerHand, bet * 2, false);
+    } else {
+      // Automatically stand after double down
+      stand(newHand, bet * 2);
+    }
+
+    const newStats = { ...stats, doubles: stats.doubles + 1 };
+    setStats(newStats);
+  };
+
+  const split = () => {
+    if (!canSplit || gameState !== "playing") return;
+    playSfx(clickSound.current);
+    
+    const bet = Number(betAmount);
+    const currentVault = getVault();
+    
+    if (currentVault < bet) {
+      alert('Insufficient MLEO to split!');
+      return;
+    }
+
+    setVault(currentVault - bet);
+    setVaultState(currentVault - bet);
+    setCanDouble(false);
+    setCanSplit(false);
+    setCanSurrender(false);
+    setIsSplitGame(true);
+
+    // Split into two hands
+    const card1 = playerHand[0];
+    const card2 = playerHand[1];
+    const newCard1 = deck[0];
+    const newCard2 = deck[1];
+    
+    const hand1 = [card1, newCard1];
+    const hand2 = [card2, newCard2];
+    
+    setSplitHands([
+      { cards: hand1, bet: bet, finished: false, result: null },
+      { cards: hand2, bet: bet, finished: false, result: null }
+    ]);
+    setCurrentSplitIndex(0);
+    setPlayerHand(hand1);
+    setDeck(deck.slice(2));
+
+    // Check if split aces - only one card each
+    if (card1.value === "A") {
+      // Split aces get only one card each - finish both hands
+      setTimeout(() => finishSplitHands([
+        { cards: hand1, bet: bet, finished: true, result: null },
+        { cards: hand2, bet: bet, finished: true, result: null }
+      ], bet), 500);
+    }
+
+    const newStats = { ...stats, splits: stats.splits + 1 };
+    setStats(newStats);
+  };
+
+  const finishSplitHands = (hands, individualBet) => {
+    setGameState("dealer");
+    let currentDealerHand = [...dealerHand];
+    let currentDeck = [...deck];
+
+    // Dealer plays
+    let dealerValue = calculateHandValue(currentDealerHand);
+    while (dealerValue < 17) {
+      currentDealerHand.push(currentDeck[0]);
+      currentDeck = currentDeck.slice(1);
+      dealerValue = calculateHandValue(currentDealerHand);
+    }
+    setDealerHand(currentDealerHand);
+    setDeck(currentDeck);
+
+    // Evaluate each hand
+    let totalPrize = 0;
+    let wins = 0;
+    let losses = 0;
+    let pushes = 0;
+
+    hands.forEach(hand => {
+      const playerValue = calculateHandValue(hand.cards);
+      let win = false;
+      let push = false;
+      let prize = 0;
+
+      if (playerValue > 21) {
+        win = false;
+      } else if (dealerValue > 21) {
+        win = true;
+        prize = individualBet * 2;
+      } else if (playerValue > dealerValue) {
+        win = true;
+        prize = individualBet * 2;
+      } else if (playerValue === dealerValue) {
+        push = true;
+        prize = individualBet;
+      }
+
+      if (win) wins++;
+      else if (push) pushes++;
+      else losses++;
+
+      totalPrize += prize;
+    });
+
+    if (totalPrize > 0) {
+      const newVault = getVault() + totalPrize;
+      setVault(newVault); setVaultState(newVault);
+      if (wins > 0) playSfx(winSound.current);
+    }
+
+    const totalBet = individualBet * 2;
+    const profit = totalPrize - totalBet;
+
+    setGameResult({ 
+      win: wins > losses, 
+      push: wins === 0 && losses === 0, 
+      prize: totalPrize, 
+      profit: profit,
+      split: true,
+      splitWins: wins,
+      splitLosses: losses,
+      splitPushes: pushes
+    });
+
+    const newStats = { 
+      ...stats, 
+      totalHands: stats.totalHands + 2, // Split counts as 2 hands
+      wins: stats.wins + wins,
+      losses: stats.losses + losses,
+      pushes: stats.pushes + pushes,
+      totalBet: stats.totalBet + totalBet,
+      totalWon: stats.totalWon + totalPrize,
+      biggestWin: Math.max(stats.biggestWin, totalPrize),
+      lastBet: individualBet
+    };
+    setStats(newStats);
+    setGameState("finished");
+  };
+
+  const surrender = () => {
+    if (!canSurrender || gameState !== "playing") return;
+    playSfx(clickSound.current);
+    
+    const bet = Number(betAmount);
+    const refund = Math.floor(bet / 2);
+    
+    // Refund half the bet
+    const newVault = getVault() + refund;
+    setVault(newVault); setVaultState(newVault);
+    
+    setHasSurrendered(true);
+    setCanDouble(false);
+    setCanSplit(false);
+    setCanSurrender(false);
+
+    setGameResult({ 
+      win: false, 
+      push: false, 
+      playerValue: calculateHandValue(playerHand), 
+      dealerValue: 0, 
+      prize: refund, 
+      profit: -Math.floor(bet / 2),
+      surrender: true
+    });
+
+    const newStats = { 
+      ...stats, 
+      totalHands: stats.totalHands + 1, 
+      losses: stats.losses + 1,
+      surrenders: stats.surrenders + 1,
+      totalBet: stats.totalBet + bet,
+      totalWon: stats.totalWon + refund,
+      lastBet: bet
+    };
+    setStats(newStats);
+    setGameState("finished");
+  };
+
+  const hit = () => {
+    if (gameState !== "playing") return;
+    playSfx(clickSound.current);
+    
+    // Disable special actions after first hit
+    setCanDouble(false);
+    setCanSurrender(false);
+
+    if (isSplitGame) {
+      const currentHand = splitHands[currentSplitIndex];
+      const newCard = deck[0];
+      const newCards = [...currentHand.cards, newCard];
+      const newHands = [...splitHands];
+      newHands[currentSplitIndex].cards = newCards;
+      setSplitHands(newHands);
+      setPlayerHand(newCards);
+      setDeck(deck.slice(1));
+
+      const value = calculateHandValue(newCards);
+      if (value > 21) {
+        // This hand busted, move to next
+        newHands[currentSplitIndex].finished = true;
+        if (currentSplitIndex < splitHands.length - 1) {
+          const nextIndex = currentSplitIndex + 1;
+          setCurrentSplitIndex(nextIndex);
+          setPlayerHand(splitHands[nextIndex].cards);
+        } else {
+          // All hands finished
+          finishSplitHands(newHands, splitHands[0].bet);
+        }
+      } else if (value === 21) {
+        // Stand automatically on 21
+        standSplitHand();
+      }
+    } else {
+      const newCard = deck[0];
+      const newHand = [...playerHand, newCard];
+      setPlayerHand(newHand);
+      setDeck(deck.slice(1));
+
+      const value = calculateHandValue(newHand);
+      if (value > 21) {
+        setGameState("finished");
+        finishGame(newHand, dealerHand, Number(betAmount), false);
+      } else if (value === 21) {
+        stand(newHand);
+      }
     }
   };
 
-  const stand = (hand = null) => {
+  const standSplitHand = () => {
+    const newHands = [...splitHands];
+    newHands[currentSplitIndex].finished = true;
+    setSplitHands(newHands);
+
+    if (currentSplitIndex < splitHands.length - 1) {
+      const nextIndex = currentSplitIndex + 1;
+      setCurrentSplitIndex(nextIndex);
+      setPlayerHand(splitHands[nextIndex].cards);
+    } else {
+      // All hands finished
+      finishSplitHands(newHands, splitHands[0].bet);
+    }
+  };
+
+  const stand = (hand = null, customBet = null) => {
     if (gameState !== "playing") return;
     playSfx(clickSound.current);
+    
+    if (isSplitGame) {
+      standSplitHand();
+      return;
+    }
+
     setGameState("dealer");
+    setCanDouble(false);
+    setCanSplit(false);
+    setCanSurrender(false);
+
     const currentPlayerHand = hand || playerHand;
+    const bet = customBet || Number(betAmount);
     let currentDealerHand = [...dealerHand];
     let currentDeck = [...deck];
 
@@ -268,7 +692,7 @@ export default function BlackjackPage() {
       setDealerHand(currentDealerHand);
       setDeck(currentDeck);
       setGameState("finished");
-      setTimeout(() => finishGame(currentPlayerHand, currentDealerHand, Number(betAmount), false), 500);
+      setTimeout(() => finishGame(currentPlayerHand, currentDealerHand, bet, false), 500);
     };
 
     setTimeout(dealerPlay, 500);
@@ -310,7 +734,24 @@ export default function BlackjackPage() {
     setStats(newStats);
   };
 
-  const newHand = () => { setGameState("betting"); setPlayerHand([]); setDealerHand([]); setGameResult(null); setShowResultPopup(false); };
+  const newHand = () => { 
+    setGameState("betting"); 
+    setPlayerHand([]); 
+    setDealerHand([]); 
+    setGameResult(null); 
+    setShowResultPopup(false);
+    setCanDouble(false);
+    setCanSplit(false);
+    setCanSurrender(false);
+    setShowInsurance(false);
+    setInsuranceBet(0);
+    setHasDoubled(false);
+    setHasSurrendered(false);
+    setIsSplitGame(false);
+    setSplitHands([]);
+    setCurrentSplitIndex(0);
+  };
+
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-red-900 via-black to-green-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -332,29 +773,29 @@ export default function BlackjackPage() {
             <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
               <button onClick={() => { playSfx(clickSound.current); const el = wrapRef.current || document.documentElement; if (!document.fullscreenElement) { el.requestFullscreen?.().catch(() => {}); } else { document.exitFullscreen?.().catch(() => {}); } }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFullscreen ? "EXIT" : "FULL"}</button>
               <button onClick={() => { playSfx(clickSound.current); setMenuOpen(true); }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">MENU</button>
-                  </div>
-                </div>
-              </div>
+            </div>
+          </div>
+        </div>
 
         <div className="relative h-full flex flex-col items-center justify-center px-4 pb-16 pt-14 overflow-y-auto" style={{ minHeight: '100%' }}>
-          <div className="text-center mb-3"><h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">♠️ Blackjack</h1><p className="text-white/70 text-sm">Get 21 • Beat the dealer!</p></div>
+          <div className="text-center mb-3"><h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">♠️ Blackjack Pro</h1><p className="text-white/70 text-sm">Professional Blackjack • All Features!</p></div>
           <div className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Vault</div><div className="text-lg font-bold text-emerald-400">{fmt(vault)}</div></div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Bet</div><div className="text-lg font-bold text-amber-400">{fmt(Number(betAmount))}</div></div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Win</div><div className="text-lg font-bold text-green-400">{fmt(potentialWin)}</div></div>
-                </div>
+          </div>
                 
           <div className="mb-3 w-full max-w-md" style={{ minHeight: '280px' }}>
             <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2" style={{ minHeight: '90px' }}>
-              <div className="text-xs text-white/60 mb-1">Dealer {gameState !== "betting" && `(${dealerValue})`}</div>
+              <div className="text-xs text-white/60 mb-1">Dealer {gameState !== "betting" && gameState !== "insurance" && `(${dealerValue})`}</div>
               <div className="flex gap-1 flex-wrap min-h-[60px]">
                 {dealerHand.map((card, i) => (
-                  <PlayingCard key={i} card={card} hidden={gameState === "playing" && i === 1} />
+                  <PlayingCard key={i} card={card} hidden={(gameState === "playing" || gameState === "insurance") && i === 1} />
                 ))}
               </div>
             </div>
             <div className="bg-black/20 border border-white/10 rounded-lg p-3" style={{ minHeight: '90px' }}>
-              <div className="text-xs text-white/60 mb-1">You {gameState !== "betting" && `(${playerValue})`}</div>
+              <div className="text-xs text-white/60 mb-1">You {gameState !== "betting" && gameState !== "insurance" && `(${playerValue})`} {isSplitGame && `- Hand ${currentSplitIndex + 1}/2`}</div>
               <div className="flex gap-1 flex-wrap min-h-[60px]">
                 {playerHand.map((card, i) => (
                   <PlayingCard key={i} card={card} />
@@ -363,10 +804,28 @@ export default function BlackjackPage() {
             </div>
             <div className="text-center mt-2" style={{ height: '28px' }}>
               <div className={`text-base font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : gameResult?.push ? 'text-yellow-400' : 'text-red-400'}`}>
-                {gameResult ? (gameResult.blackjack ? 'BLACKJACK!' : gameResult.push ? 'PUSH' : gameResult.win ? 'YOU WIN!' : 'DEALER WINS') : 'waiting'}
+                {gameResult ? (
+                  gameResult.surrender ? 'SURRENDERED' :
+                  gameResult.split ? `${gameResult.splitWins}W ${gameResult.splitLosses}L ${gameResult.splitPushes}P` :
+                  gameResult.blackjack ? 'BLACKJACK!' : 
+                  gameResult.push ? 'PUSH' : 
+                  gameResult.win ? 'YOU WIN!' : 
+                  'DEALER WINS'
+                ) : 'waiting'}
               </div>
             </div>
           </div>
+
+          {showInsurance && (
+            <div className="mb-3 w-full max-w-md bg-yellow-500/10 border-2 border-yellow-500/50 rounded-xl p-4 text-center animate-pulse">
+              <div className="text-lg font-bold text-yellow-300 mb-2">🛡️ Insurance?</div>
+              <div className="text-sm text-white/80 mb-3">Dealer has Ace. Protect against Blackjack?</div>
+              <div className="flex gap-2">
+                <button onClick={takeInsurance} className="flex-1 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold">YES ({fmt(Math.floor(Number(betAmount) / 2))})</button>
+                <button onClick={declineInsurance} className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold">NO</button>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center gap-2 mb-3" style={{ minHeight: '48px' }}>
             {gameState === "betting" && (
@@ -378,14 +837,22 @@ export default function BlackjackPage() {
             )}
           </div>
 
-          <div className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            {gameState === "playing" ? (
-              <div className="flex gap-2" style={{ minHeight: '48px' }}>
-                <button onClick={hit} className="flex-1 py-3 rounded-lg font-bold text-base bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:brightness-110 transition-all">HIT</button>
-                <button onClick={() => stand()} className="flex-1 py-3 rounded-lg font-bold text-base bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:brightness-110 transition-all">STAND</button>
+          <div className="flex flex-col gap-2 w-full max-w-sm" style={{ minHeight: '140px' }}>
+            {gameState === "playing" && (
+              <div className="flex gap-2">
+                <button onClick={hit} className="flex-1 py-2 rounded-lg font-bold text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:brightness-110">HIT</button>
+                <button onClick={() => stand()} className="flex-1 py-2 rounded-lg font-bold text-sm bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:brightness-110">STAND</button>
               </div>
-            ) : (
-              <button onClick={gameState === "betting" ? () => dealCards(false) : newHand} disabled={gameState === "dealer"} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50" style={{ minHeight: '48px' }}>
+            )}
+            {gameState === "playing" && (canDouble || canSplit || canSurrender) && (
+              <div className="flex gap-2">
+                {canDouble && <button onClick={doubleDown} className="flex-1 py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:brightness-110">DOUBLE</button>}
+                {canSplit && <button onClick={split} className="flex-1 py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-lg hover:brightness-110">SPLIT</button>}
+                {canSurrender && <button onClick={surrender} className="flex-1 py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg hover:brightness-110">SURRENDER</button>}
+              </div>
+            )}
+            {(gameState === "betting" || gameState === "finished" || gameState === "dealer") && (
+              <button onClick={gameState === "betting" ? () => dealCards(false) : newHand} disabled={gameState === "dealer"} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
                 {gameState === "dealer" ? "Dealing..." : gameState === "finished" ? "NEW HAND" : "DEAL"}
               </button>
             )}
@@ -394,16 +861,24 @@ export default function BlackjackPage() {
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>
               <button onClick={() => { setShowVaultModal(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all">💰 Vault</button>
             </div>
-              </div>
-            </div>
+          </div>
+        </div>
 
         {showResultPopup && gameResult && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
             <div className={`${gameResult.win ? 'bg-green-500' : gameResult.push ? 'bg-yellow-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
-              <div className="text-4xl mb-2">{gameResult.blackjack ? '💎' : gameResult.win ? '🎉' : gameResult.push ? '🤝' : '😔'}</div>
-              <div className="text-2xl font-bold mb-1">{gameResult.blackjack ? 'BLACKJACK!' : gameResult.win ? 'YOU WIN!' : gameResult.push ? 'PUSH' : 'DEALER WINS'}</div>
-              <div className="text-lg">{gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : gameResult.push ? 'Money Returned' : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div>
-              <div className="text-sm opacity-80 mt-2">You: {gameResult.playerValue} • Dealer: {gameResult.dealerValue}</div>
+              <div className="text-4xl mb-2">{gameResult.blackjack ? '💎' : gameResult.surrender ? '🏳️' : gameResult.split ? '✂️' : gameResult.win ? '🎉' : gameResult.push ? '🤝' : '😔'}</div>
+              <div className="text-2xl font-bold mb-1">
+                {gameResult.surrender ? 'SURRENDERED' : 
+                 gameResult.split ? `SPLIT: ${gameResult.splitWins}W ${gameResult.splitLosses}L` :
+                 gameResult.blackjack ? 'BLACKJACK!' : 
+                 gameResult.win ? 'YOU WIN!' : 
+                 gameResult.push ? 'PUSH' : 
+                 'DEALER WINS'}
+              </div>
+              <div className="text-lg">{gameResult.win || gameResult.push ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div>
+              {!gameResult.surrender && !gameResult.split && <div className="text-sm opacity-80 mt-2">You: {gameResult.playerValue} • Dealer: {gameResult.dealerValue}</div>}
+              {gameResult.insurance && <div className="text-sm opacity-80 mt-1">🛡️ Insurance Paid!</div>}
             </div>
           </div>
         )}
@@ -414,7 +889,7 @@ export default function BlackjackPage() {
               <div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div>
               <div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div>
               <div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div>
-              <div className="mt-4 text-xs opacity-70"><p>Blackjack v2.0</p></div>
+              <div className="mt-4 text-xs opacity-70"><p>Blackjack Pro v3.0</p></div>
             </div>
           </div>
         )}
@@ -424,23 +899,30 @@ export default function BlackjackPage() {
             <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
               <h2 className="text-2xl font-extrabold mb-4">♠️ How to Play</h2>
               <div className="space-y-3 text-sm">
-                <p><strong>1. Place Bet:</strong> Min {MIN_BET} MLEO</p>
-                <p><strong>2. Get Cards:</strong> You and dealer get 2 cards</p>
-                <p><strong>3. Hit or Stand:</strong> Get close to 21 without going over</p>
-                <p><strong>4. Win:</strong> Beat the dealer!</p>
+                <p><strong>Basic Rules:</strong></p>
+                <p>• Get closer to 21 than dealer without busting</p>
+                <p>• Dealer hits until 17+</p>
+                <p><strong>Actions:</strong></p>
+                <p>• <strong>HIT:</strong> Take another card</p>
+                <p>• <strong>STAND:</strong> Keep your hand</p>
+                <p>• <strong>DOUBLE:</strong> Double bet, get 1 card</p>
+                <p>• <strong>SPLIT:</strong> Split pairs into 2 hands</p>
+                <p>• <strong>SURRENDER:</strong> Forfeit & get ½ bet back</p>
+                <p>• <strong>INSURANCE:</strong> Protect vs dealer Ace</p>
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
                   <p className="text-red-300 font-semibold">Payouts:</p>
                   <div className="text-xs text-white/80 mt-2 space-y-1">
-                    <p>• Blackjack (21): ×2.5 💎</p>
+                    <p>• Blackjack: ×2.5 💎</p>
                     <p>• Win: ×2</p>
-                    <p>• Push (tie): Money back</p>
-          </div>
-        </div>
-              </div>
-              <button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
+                    <p>• Push: Money back</p>
+                    <p>• Insurance: ×2 (if dealer BJ)</p>
                   </div>
                 </div>
-              )}
+              </div>
+              <button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
+            </div>
+          </div>
+        )}
 
         {showStats && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
@@ -450,17 +932,27 @@ export default function BlackjackPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Hands</div><div className="text-xl font-bold">{stats.totalHands}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalHands > 0 ? ((stats.wins / stats.totalHands) * 100).toFixed(1) : 0}%</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Blackjacks</div><div className="text-lg font-bold text-yellow-400">{stats.blackjacks} 💎</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Doubles</div><div className="text-lg font-bold text-purple-400">{stats.doubles}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Splits</div><div className="text-lg font-bold text-pink-400">{stats.splits}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Surrenders</div><div className="text-lg font-bold text-gray-400">{stats.surrenders}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Bet</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalBet)}</div></div>
                 </div>
-                <div className="bg-gradient-to-r from-red-500/10 to-green-500/10 border border-red-500/30 rounded-lg p-4"><div className="text-sm font-semibold mb-2">💎 Blackjacks</div><div className="text-center"><div className="text-3xl font-bold text-yellow-300">{stats.blackjacks}</div><div className="text-xs text-white/60 mt-1">Natural 21s!</div></div></div>
+                <div className="bg-gradient-to-r from-blue-500/10 to-yellow-500/10 border border-blue-500/30 rounded-lg p-4">
+                  <div className="text-sm font-semibold mb-2">🛡️ Insurance</div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-300">{stats.insuranceWins}W / {stats.insuranceLosses}L</div>
+                    <div className="text-xs text-white/60 mt-1">Insurance Bets</div>
+                  </div>
+                </div>
               </div>
               <button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
             </div>
-                </div>
-              )}
+          </div>
+        )}
 
         {showVaultModal && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
