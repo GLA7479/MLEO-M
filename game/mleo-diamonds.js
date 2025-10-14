@@ -533,7 +533,7 @@ useEffect(() => {
 
         {/* MAIN BODY (ללא גלילה; הגריד מתכווץ אוטומטית) */}
         <div
-  className="relative h-full flex flex-col items-center justify-center px-4 pb-16"
+  className="relative h-full flex flex-col items-center justify-center px-4 pb-16 mt-8"
   style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}
 >
 
