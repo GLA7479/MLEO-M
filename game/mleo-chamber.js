@@ -613,7 +613,7 @@ export default function ChamberPage() {
                     setBetAmount(String(newBet));
                     playSfx(clickSound.current);
                   }}
-                  className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold"
+                  className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold"
                 >
                   −
                 </button>
@@ -621,7 +621,7 @@ export default function ChamberPage() {
                   type="number"
                   value={betAmount}
                   onChange={(e) => setBetAmount(e.target.value)}
-                  className="w-28 h-10 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-sm"
+                  className="w-32 h-12 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-sm"
                   min={MIN_BET}
                 />
                 <button
@@ -631,7 +631,7 @@ export default function ChamberPage() {
                     setBetAmount(String(newBet));
                     playSfx(clickSound.current);
                   }}
-                  className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold"
+                  className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold"
                 >
                   +
                 </button>

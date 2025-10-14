@@ -565,40 +565,40 @@ export default function MysteryBoxPage() {
 
           {/* Bet Controls */}
           <div style={{ minHeight: '48px', marginBottom: '16px' }}>
-              {!gameActive && !gameResult && (
-            <div className="flex items-center gap-2">
-                    <button
-                onClick={() => {
-                  const current = Number(betAmount) || MIN_BET;
-                  const newBet = Math.max(MIN_BET, current - 1000);
-                  setBetAmount(String(newBet));
-                  playSfx(clickSound.current);
-                }}
-                className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold"
-              >
-                −
-                  </button>
-                    <input 
-                      type="number" 
-                      value={betAmount} 
-                      onChange={(e) => setBetAmount(e.target.value)} 
-                className="w-28 h-10 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-sm"
-                min={MIN_BET}
-                    />
-                        <button 
-                onClick={() => {
-                  const current = Number(betAmount) || MIN_BET;
-                  const newBet = Math.min(vault, current + 1000);
-                  setBetAmount(String(newBet));
-                  playSfx(clickSound.current);
-                }}
-                className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold"
-              >
-                +
-                        </button>
-                    </div>
-          )}
-                    </div>
+            {!gameActive && !gameResult && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const current = Number(betAmount) || MIN_BET;
+                    const newBet = Math.max(MIN_BET, current - 1000);
+                    setBetAmount(String(newBet));
+                    playSfx(clickSound.current);
+                  }}
+                  className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold"
+                >
+                  −
+                </button>
+                <input 
+                  type="number" 
+                  value={betAmount} 
+                  onChange={(e) => setBetAmount(e.target.value)} 
+                  className="w-32 h-12 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-sm"
+                  min={MIN_BET}
+                />
+                <button 
+                  onClick={() => {
+                    const current = Number(betAmount) || MIN_BET;
+                    const newBet = Math.min(vault, current + 1000);
+                    setBetAmount(String(newBet));
+                    playSfx(clickSound.current);
+                  }}
+                  className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold"
+                >
+                  +
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Action Buttons */}
           <div className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '100px' }}>

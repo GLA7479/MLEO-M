@@ -295,9 +295,9 @@ export default function CrapsPage() {
         <div className="relative h-full flex flex-col items-center justify-center px-4 pb-16 pt-14 overflow-y-auto" style={{ minHeight: '100%' }}>
           <div className="text-center mb-3"><h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">🎲 Craps</h1><p className="text-white/70 text-sm">Classic dice game • Multiple betting options!</p></div>
           <div className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md">
-            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center"><div className="text-xs text-white/60 mb-1">Vault</div><div className="text-base font-bold text-emerald-400">{fmt(vault)}</div></div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center"><div className="text-xs text-white/60 mb-1">Bet</div><div className="text-base font-bold text-amber-400">{fmt(Number(betAmount))}</div></div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center"><div className="text-xs text-white/60 mb-1">Win</div><div className="text-base font-bold text-green-400">{fmt(potentialWin)}</div></div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Vault</div><div className="text-lg font-bold text-emerald-400">{fmt(vault)}</div></div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Bet</div><div className="text-lg font-bold text-amber-400">{fmt(Number(betAmount))}</div></div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Win</div><div className="text-lg font-bold text-green-400">{fmt(potentialWin)}</div></div>
           </div>
 
           <div className="mb-3" style={{ minHeight: '120px' }}>
@@ -319,9 +319,9 @@ export default function CrapsPage() {
           </div>
 
           <div className="flex items-center gap-2 mb-3">
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50">−</button>
-            <input type="number" value={betAmount} onChange={(e) => setBetAmount(e.target.value)} disabled={rolling} className="w-28 h-10 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-sm" min={MIN_BET} />
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50">+</button>
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50">−</button>
+            <input type="number" value={betAmount} onChange={(e) => setBetAmount(e.target.value)} disabled={rolling} className="w-32 h-12 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-sm" min={MIN_BET} />
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50">+</button>
           </div>
 
           <div className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '100px' }}>

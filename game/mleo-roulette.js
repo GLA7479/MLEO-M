@@ -174,7 +174,7 @@ export default function RoulettePage() {
     setSpinning(true);
     setGameResult(null);
     setResult(null);
-
+    
     setTimeout(() => {
       const resultNum = ROULETTE_NUMBERS[Math.floor(Math.random() * ROULETTE_NUMBERS.length)];
       setResult(resultNum);
@@ -221,55 +221,56 @@ export default function RoulettePage() {
             <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
               <button onClick={() => { playSfx(clickSound.current); const el = wrapRef.current || document.documentElement; if (!document.fullscreenElement) { el.requestFullscreen?.().catch(() => {}); } else { document.exitFullscreen?.().catch(() => {}); } }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFullscreen ? "EXIT" : "FULL"}</button>
               <button onClick={() => { playSfx(clickSound.current); setMenuOpen(true); }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">MENU</button>
-            </div>
-          </div>
-        </div>
-
+                      </div>
+                    </div>
+                  </div>
+                  
         <div className="relative h-full flex flex-col items-center justify-center px-4 pb-16 pt-14 overflow-y-auto" style={{ minHeight: '100%' }}>
           <div className="text-center mb-3"><h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">🎰 Roulette</h1><p className="text-white/70 text-sm">Pick your bet • Spin the wheel!</p></div>
           <div className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md">
-            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center"><div className="text-xs text-white/60 mb-1">Vault</div><div className="text-base font-bold text-emerald-400">{fmt(vault)}</div></div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center"><div className="text-xs text-white/60 mb-1">Bet</div><div className="text-base font-bold text-amber-400">{fmt(Number(betAmount))}</div></div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center"><div className="text-xs text-white/60 mb-1">Win</div><div className="text-base font-bold text-green-400">{fmt(potentialWin)}</div></div>
-          </div>
-
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Vault</div><div className="text-lg font-bold text-emerald-400">{fmt(vault)}</div></div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Bet</div><div className="text-lg font-bold text-amber-400">{fmt(Number(betAmount))}</div></div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Win</div><div className="text-lg font-bold text-green-400">{fmt(potentialWin)}</div></div>
+                </div>
+                
           <div className="mb-3" style={{ minHeight: '150px' }}>
             <div className={`w-32 h-32 rounded-full ${result ? (result.color === 'red' ? 'bg-red-600' : result.color === 'black' ? 'bg-black' : 'bg-green-600') : 'bg-gradient-to-br from-red-600 via-black to-green-600'} shadow-2xl flex items-center justify-center text-white text-5xl font-bold border-4 border-white/20 ${spinning ? 'animate-spin' : ''}`}>
               {result ? result.number : '🎰'}
-            </div>
+                    </div>
             <div className="text-center mt-2" style={{ height: '28px' }}>
               <div className={`text-base font-bold transition-opacity ${result && !spinning ? 'opacity-100' : 'opacity-0'} ${result?.color === 'red' ? 'text-red-400' : result?.color === 'black' ? 'text-white' : 'text-green-400'}`}>
                 {result ? `${result.number} ${result.color.toUpperCase()}` : 'waiting'}
               </div>
             </div>
-          </div>
-
+                    </div>
+                    
           <div className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md" style={{ minHeight: '80px' }}>
             {Object.entries(BET_TYPES).map(([key, bet]) => (
               <button key={key} onClick={() => { setSelectedBet(key); playSfx(clickSound.current); }} disabled={spinning}
                 className={`py-2 rounded-lg font-bold text-xs transition-all ${selectedBet === key ? (key === 'red' ? 'bg-red-500 text-white ring-2 ring-red-300' : key === 'black' ? 'bg-black text-white ring-2 ring-white' : 'bg-gradient-to-r from-red-500 to-green-500 text-white ring-2 ring-yellow-300') : 'bg-white/10 text-white hover:bg-white/20'} disabled:opacity-50`}>
                 <div>{bet.name}</div><div className="text-yellow-400 text-xs">×{bet.payout}</div>
-              </button>
-            ))}
-          </div>
+                        </button>
+                      ))}
+                    </div>
 
           <div className="flex items-center gap-2 mb-3">
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50">−</button>
-            <input type="number" value={betAmount} onChange={(e) => setBetAmount(e.target.value)} disabled={spinning} className="w-28 h-10 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-sm" min={MIN_BET} />
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50">+</button>
-          </div>
-
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50">−</button>
+            <input type="number" value={betAmount} onChange={(e) => setBetAmount(e.target.value)} disabled={spinning} className="w-32 h-12 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-sm" min={MIN_BET} />
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50">+</button>
+                    </div>
+                    
           <div className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '100px' }}>
-            {!gameResult && <button onClick={() => spinWheel(false)} disabled={spinning} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">{spinning ? "Spinning..." : "SPIN"}</button>}
-            {gameResult && <button onClick={resetGame} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all">SPIN AGAIN</button>}
+            <button onClick={gameResult ? resetGame : () => spinWheel(false)} disabled={spinning} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
+              {spinning ? "Spinning..." : gameResult ? "SPIN AGAIN" : "SPIN"}
+                        </button>
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>
               <button onClick={() => { setShowVaultModal(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all">💰 Vault</button>
             </div>
           </div>
-        </div>
-
+            </div>
+            
         {showResultPopup && gameResult && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
             <div className={`${gameResult.win ? 'bg-green-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
@@ -278,7 +279,7 @@ export default function RoulettePage() {
               <div className="text-lg">{gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div>
               <div className="text-sm opacity-80 mt-2">Result: {gameResult.result} ({gameResult.color})</div>
             </div>
-          </div>
+            </div>
         )}
 
         {menuOpen && (
@@ -326,12 +327,12 @@ export default function RoulettePage() {
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalBet)}</div></div>
-                </div>
+              </div>
               </div>
               <button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
-            </div>
-          </div>
-        )}
+                  </div>
+                </div>
+              )}
 
         {showVaultModal && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
@@ -344,7 +345,7 @@ export default function RoulettePage() {
                   <div className="flex gap-2 mb-2">
                     <input type="number" value={collectAmount} onChange={(e) => setCollectAmount(Number(e.target.value))} className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white" min="1" max={vault} />
                     <button onClick={() => setCollectAmount(vault)} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold">MAX</button>
-                  </div>
+                </div>
                   <button onClick={collectToWallet} disabled={collectAmount <= 0 || collectAmount > vault || claiming} className="w-full py-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed">{claiming ? "Collecting..." : `Collect ${fmt(collectAmount)} MLEO`}</button>
                 </div>
                 <div className="text-xs text-white/60"><p>• Your vault is shared across all MLEO games</p><p>• Collect earnings to your wallet anytime</p><p>• Network: BSC Testnet (TBNB)</p></div>

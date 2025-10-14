@@ -239,13 +239,17 @@ export default function HiLoPage() {
         <div className="relative h-full flex flex-col items-center justify-center px-4 pb-16 pt-14 overflow-y-auto" style={{ minHeight: '100%' }}>
           <div className="text-center mb-3"><h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">🃏 Hi-Lo Cards</h1><p className="text-white/70 text-sm">Higher or Lower? Build your streak!</p></div>
           <div className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md">
-            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center"><div className="text-xs text-white/60 mb-1">Vault</div><div className="text-base font-bold text-emerald-400">{fmt(vault)}</div></div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center"><div className="text-xs text-white/60 mb-1">Bet</div><div className="text-base font-bold text-amber-400">{fmt(Number(betAmount))}</div></div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center"><div className="text-xs text-white/60 mb-1">Win</div><div className="text-base font-bold text-green-400">{fmt(potentialWin)}</div></div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Vault</div><div className="text-lg font-bold text-emerald-400">{fmt(vault)}</div></div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Bet</div><div className="text-lg font-bold text-amber-400">{fmt(Number(betAmount))}</div></div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Win</div><div className="text-lg font-bold text-green-400">{fmt(potentialWin)}</div></div>
           </div>
 
-          <div className="mb-3 w-full max-w-md" style={{ minHeight: '180px' }}>
-            {gameActive && (<div className="text-center mb-2"><div className="text-xs text-white/60">Streak: <span className="text-yellow-400 font-bold">{streak}</span> • Multiplier: <span className="text-green-400 font-bold">×{currentMultiplier.toFixed(1)}</span></div></div>)}
+          <div className="mb-3 w-full max-w-md" style={{ minHeight: '200px' }}>
+            <div className="text-center mb-2" style={{ minHeight: '20px' }}>
+              <div className={`text-xs text-white/60 transition-opacity ${gameActive ? 'opacity-100' : 'opacity-0'}`}>
+                Streak: <span className="text-yellow-400 font-bold">{streak || 0}</span> • Multiplier: <span className="text-green-400 font-bold">×{(gameActive ? currentMultiplier : 1).toFixed(1)}</span>
+              </div>
+            </div>
             <div className="flex justify-center gap-4 mb-2">
               {currentCard && (
                 <div className={`w-24 h-32 rounded-lg flex items-center justify-center text-3xl font-bold ${SUIT_COLORS[currentCard.suit] === 'red' ? 'bg-red-500' : 'bg-black'} text-white border-2 border-white/20`}>
@@ -265,24 +269,36 @@ export default function HiLoPage() {
             </div>
           </div>
 
-          {!gameActive && !gameResult && (
-            <div className="flex items-center gap-2 mb-3">
-              <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold">−</button>
-              <input type="number" value={betAmount} onChange={(e) => setBetAmount(e.target.value)} className="w-28 h-10 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-sm" min={MIN_BET} />
-              <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold">+</button>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '100px' }}>
-            {!gameActive && !gameResult && <button onClick={() => startGame(false)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all">START</button>}
-            {gameActive && (
-              <div className="flex gap-2">
-                <button onClick={() => guess("higher")} className="flex-1 py-3 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all">HIGHER</button>
-                <button onClick={() => guess("lower")} className="flex-1 py-3 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:brightness-110 transition-all">LOWER</button>
-              </div>
+          <div className="flex items-center gap-2 mb-3" style={{ minHeight: '48px' }}>
+            {!gameActive && !gameResult && (
+              <>
+                <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold">−</button>
+                <input type="number" value={betAmount} onChange={(e) => setBetAmount(e.target.value)} className="w-32 h-12 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-sm" min={MIN_BET} />
+                <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold">+</button>
+              </>
             )}
-            {gameActive && streak > 0 && <button onClick={cashOut} className="w-full py-2 rounded-lg font-bold text-sm bg-yellow-500 text-black hover:brightness-110 transition-all">💰 CASH OUT {fmt(totalPrize)} MLEO</button>}
-            {gameResult && <button onClick={resetGame} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all">PLAY AGAIN</button>}
+          </div>
+
+          <div className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
+            <div style={{ minHeight: '48px' }}>
+              {gameActive ? (
+                <div className="flex gap-2">
+                  <button onClick={() => guess("higher")} className="flex-1 py-3 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all">HIGHER</button>
+                  <button onClick={() => guess("lower")} className="flex-1 py-3 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:brightness-110 transition-all">LOWER</button>
+                </div>
+              ) : (
+                <button onClick={gameResult ? resetGame : () => startGame(false)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all">
+                  {gameResult ? "PLAY AGAIN" : "START"}
+                </button>
+              )}
+            </div>
+            <div style={{ minHeight: '40px' }}>
+              {gameActive && streak > 0 && (
+                <button onClick={cashOut} className="w-full py-2 rounded-lg font-bold text-sm bg-yellow-500 text-black hover:brightness-110 transition-all">
+                  💰 CASH OUT {fmt(totalPrize)} MLEO
+                </button>
+              )}
+            </div>
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>

@@ -581,7 +581,7 @@ export default function LimboPage() {
                 playSfx(clickSound.current);
               }}
               disabled={rolling}
-              className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
+              className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
             >
               −
             </button>
@@ -590,7 +590,7 @@ export default function LimboPage() {
               value={betAmount}
               onChange={(e) => setBetAmount(e.target.value)}
               disabled={rolling}
-              className="w-28 h-10 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-sm"
+              className="w-32 h-12 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-sm"
               min={MIN_BET}
             />
             <button
@@ -601,7 +601,7 @@ export default function LimboPage() {
                 playSfx(clickSound.current);
               }}
               disabled={rolling}
-              className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
+              className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
             >
               +
             </button>
