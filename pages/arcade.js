@@ -37,54 +37,38 @@ function GameCard({ title, emoji, description, prize, href, color, freePlayStatu
   return (
     <>
       <article 
-        className="rounded-xl border border-white/10 backdrop-blur-md shadow-lg p-5 flex flex-col h-full transition-all hover:scale-105 hover:border-white/30"
+        className="rounded-lg border border-white/10 backdrop-blur-md shadow-lg p-3 flex flex-col h-full transition-all hover:scale-105 hover:border-white/30"
         style={{
           background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)',
+          minHeight: '140px',
         }}
       >
-        <div className="text-center mb-4">
-          <div className="flex justify-between items-start mb-2">
+        <div className="text-center flex-1 flex flex-col justify-center">
+          <div className="flex justify-between items-center mb-2">
             <div className="flex-1"></div>
-            <div className="text-5xl">{emoji}</div>
+            <div className="text-4xl">{emoji}</div>
             <div className="flex-1 flex justify-end">
               <button
                 onClick={() => setShowInfo(true)}
-                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-sm transition-all"
+                className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-sm transition-all"
                 title="Info"
               >
                 ℹ️
               </button>
             </div>
           </div>
-          <h2 className="text-xl font-extrabold mb-2">{title}</h2>
-          <p className="text-sm text-zinc-300 leading-relaxed line-clamp-2">
-            {description}
-          </p>
+          <h2 className="text-sm font-bold mb-3">{title}</h2>
         </div>
 
         <div className="mt-auto">
-          {/* Cost & Max Win in same row */}
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <div className="rounded-lg bg-black/30 border border-white/10 p-2.5 text-center">
-              <div className="text-xs opacity-70 mb-1">Cost</div>
-              <div className="text-base font-bold text-amber-400">1K+</div>
-            </div>
-            
-            <div className="rounded-lg bg-black/30 border border-white/10 p-2.5 text-center">
-              <div className="text-xs opacity-70 mb-1">Max Win</div>
-              <div className="text-base font-bold text-green-400">{prize}</div>
-            </div>
-          </div>
-
-          {/* Regular Play Button */}
           <Link
             href={href}
-            className="block w-full text-center px-5 py-2.5 rounded-lg font-extrabold text-white text-base shadow-lg transition-all hover:scale-105"
+            className="block w-full text-center px-3 py-2 rounded text-xs font-bold text-white shadow-lg transition-all hover:scale-105"
             style={{
               background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
             }}
           >
-            PLAY NOW
+            PLAY
           </Link>
         </div>
       </article>
@@ -570,7 +554,7 @@ export default function ArcadeHub() {
           </header>
 
           {/* Games Grid */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <section className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 mb-8">
             {games.map((game, idx) => (
               <GameCard key={idx} {...game} freePlayStatus={freePlayStatus} />
             ))}
