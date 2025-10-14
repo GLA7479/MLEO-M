@@ -1,617 +1,261 @@
 // ============================================================================
-// MLEO Dragon Tower - Climb the Dragon's Lair!
-// Cost: 1000 MLEO per game
+// MLEO Dragon Tower - Full-Screen Game Template
+// Climb the dragon's tower! Choose safe cards!
 // ============================================================================
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
-import Link from "next/link";
+import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
+import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
+import { parseUnits } from "viem";
 import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 
-// ============================================================================
-// CONFIG
-// ============================================================================
-const LS_KEY = "mleo_dragon_tower_v1";
+function useIOSViewportFix() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const vv = window.visualViewport;
+    const setVH = () => {
+      const h = vv ? vv.height : window.innerHeight;
+      root.style.setProperty("--app-100vh", `${Math.round(h)}px`);
+    };
+    const onOrient = () => requestAnimationFrame(() => setTimeout(setVH, 250));
+    setVH();
+    if (vv) {
+      vv.addEventListener("resize", setVH);
+      vv.addEventListener("scroll", setVH);
+    }
+    window.addEventListener("orientationchange", onOrient);
+    return () => {
+      if (vv) {
+        vv.removeEventListener("resize", setVH);
+        vv.removeEventListener("scroll", setVH);
+      }
+      window.removeEventListener("orientationchange", onOrient);
+    };
+  }, []);
+}
+
+const LS_KEY = "mleo_dragon_tower_v2";
 const MIN_BET = 1000;
-const TOTAL_FLOORS = 10;
-const CARDS_PER_FLOOR = 4;
+const TOTAL_FLOORS = 8;
+const CARDS_PER_FLOOR = 3;
+const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
+const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
+const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
+const GAME_ID = 18;
+const MINING_CLAIM_ABI = [{ type: "function", name: "claim", stateMutability: "nonpayable", inputs: [{ name: "gameId", type: "uint256" }, { name: "amount", type: "uint256" }], outputs: [] }];
+const S_CLICK = "/sounds/click.mp3";
+const S_WIN = "/sounds/gift.mp3";
 
-// Difficulty modes
-const DIFFICULTY = {
-  easy: { name: "Easy", dangerCards: 1, maxMultiplier: 20 },
-  medium: { name: "Medium", dangerCards: 2, maxMultiplier: 50 },
-  hard: { name: "Hard", dangerCards: 3, maxMultiplier: 150 }
-};
+function safeRead(key, fallback = {}) { if (typeof window === "undefined") return fallback; try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
+function safeWrite(key, val) { if (typeof window === "undefined") return; try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+function getVault() { const rushData = safeRead("mleo_rush_core_v4", {}); return rushData.vault || 0; }
+function setVault(amount) { const rushData = safeRead("mleo_rush_core_v4", {}); rushData.vault = amount; safeWrite("mleo_rush_core_v4", rushData); }
+function fmt(n) { if (n >= 1e9) return (n / 1e9).toFixed(2) + "B"; if (n >= 1e6) return (n / 1e6).toFixed(2) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(2) + "K"; return Math.floor(n).toString(); }
+function shortAddr(addr) { if (!addr || addr.length < 10) return addr || ""; return `${addr.slice(0, 6)}...${addr.slice(-4)}`; }
 
-// ============================================================================
-// STORAGE
-// ============================================================================
-function safeRead(key, fallback = {}) {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function safeWrite(key, val) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(val));
-  } catch {}
-}
-
-function getVault() {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  return rushData.vault || 0;
-}
-
-function setVault(amount) {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  rushData.vault = amount;
-  safeWrite("mleo_rush_core_v4", rushData);
-}
-
-function fmt(n) {
-  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
-  if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
-  return Math.floor(n).toString();
-}
-
-// Calculate multiplier based on floor and difficulty
-function calculateMultiplier(floor, difficulty) {
-  const diff = DIFFICULTY[difficulty];
-  const safeCards = CARDS_PER_FLOOR - diff.dangerCards;
-  const baseChance = safeCards / CARDS_PER_FLOOR;
-  const chanceToReachFloor = Math.pow(baseChance, floor);
-  return Math.min((0.98 / chanceToReachFloor), diff.maxMultiplier);
-}
-
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
 export default function DragonTowerPage() {
+  useIOSViewportFix();
   const router = useRouter();
+  const wrapRef = useRef(null);
+  const { openConnectModal } = useConnectModal();
+  const { openAccountModal } = useAccountModal();
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const { switchChain } = useSwitchChain();
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
+  const chainId = useChainId();
+
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000");
-  const [currentBet, setCurrentBet] = useState(MIN_BET);
-  const [difficulty, setDifficulty] = useState("medium");
+  const [floor, setFloor] = useState(0);
+  const [safeCards, setSafeCards] = useState([]);
   const [gameActive, setGameActive] = useState(false);
-  const [currentFloor, setCurrentFloor] = useState(0);
-  const [floorData, setFloorData] = useState([]); // Which cards are safe/danger
-  const [selectedCard, setSelectedCard] = useState(null);
   const [gameResult, setGameResult] = useState(null);
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
   const [showResultPopup, setShowResultPopup] = useState(false);
-  const [stats, setStats] = useState(() =>
-    safeRead(LS_KEY, { totalGames: 0, totalBet: 0, wins: 0, totalWon: 0, totalLost: 0, biggestWin: 0, topFloor: 0, lastBet: MIN_BET })
-  );
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [copiedAddr, setCopiedAddr] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [collectAmount, setCollectAmount] = useState(1000);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [showVaultModal, setShowVaultModal] = useState(false);
+  const [sfxMuted, setSfxMuted] = useState(false);
+  const clickSound = useRef(null);
+  const winSound = useRef(null);
+
+  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalGames: 0, wins: 0, losses: 0, totalBet: 0, totalWon: 0, biggestWin: 0, maxFloor: 0, lastBet: MIN_BET }));
+
+  const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
 
   useEffect(() => {
     setMounted(true);
-    const currentVault = getVault();
-    setVaultState(currentVault);
-    
+    setVaultState(getVault());
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-    
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
-    
-    const savedLastBet = safeRead(LS_KEY, { lastBet: MIN_BET }).lastBet;
-    setBetAmount(savedLastBet.toString());
-    
-    const interval = setInterval(() => {
-      const status = getFreePlayStatus();
-      setFreePlayTokens(status.tokens);
-    }, 2000);
-    
-    return () => clearInterval(interval);
+    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
+    if (savedStats.lastBet) setBetAmount(String(savedStats.lastBet));
+    const interval = setInterval(() => { const status = getFreePlayStatus(); setFreePlayTokens(status.tokens); setVaultState(getVault()); }, 2000);
+    if (typeof Audio !== "undefined") {
+      try { clickSound.current = new Audio(S_CLICK); winSound.current = new Audio(S_WIN); } catch {}
+    }
+    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => { clearInterval(interval); document.removeEventListener("fullscreenchange", handleFullscreenChange); };
   }, [router.query]);
 
-  useEffect(() => {
-    if (gameResult) {
-      setShowResultPopup(true);
-      const timer = setTimeout(() => {
-        setShowResultPopup(false);
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [gameResult]);
+  useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
+  useEffect(() => { if (gameResult) { setShowResultPopup(true); const timer = setTimeout(() => setShowResultPopup(false), 4000); return () => clearTimeout(timer); } }, [gameResult]);
 
-  const refreshVault = () => {
-    setVaultState(getVault());
-  };
+  const openWalletModalUnified = () => isConnected ? openAccountModal?.() : openConnectModal?.();
+  const hardDisconnect = () => { disconnect?.(); setMenuOpen(false); };
 
-  const startFreePlay = () => {
-    setBetAmount("1000");
-    startGame(true);
+  const collectToWallet = async () => {
+    if (!isConnected) { openConnectModal?.(); return; }
+    if (chainId !== CLAIM_CHAIN_ID) { try { await switchChain?.({ chainId: CLAIM_CHAIN_ID }); } catch { alert("Switch to BSC Testnet"); return; } }
+    if (!CLAIM_ADDRESS) { alert("Missing CLAIM address"); return; }
+    if (collectAmount <= 0 || collectAmount > vault) { alert("Invalid amount!"); return; }
+    setClaiming(true);
+    try {
+      const amountUnits = parseUnits(Number(collectAmount).toFixed(Math.min(2, MLEO_DECIMALS)), MLEO_DECIMALS);
+      const hash = await writeContractAsync({ address: CLAIM_ADDRESS, abi: MINING_CLAIM_ABI, functionName: "claim", args: [BigInt(GAME_ID), amountUnits], chainId: CLAIM_CHAIN_ID, account: address });
+      await publicClient.waitForTransactionReceipt({ hash });
+      const newVault = Math.max(0, vault - collectAmount);
+      setVault(newVault); setVaultState(newVault);
+      alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
+      setShowVaultModal(false);
+    } catch (err) { console.error(err); alert("Claim failed or rejected"); } finally { setClaiming(false); }
   };
 
   const startGame = (isFreePlayParam = false) => {
-    if (gameActive) return;
-
+    playSfx(clickSound.current);
     const currentVault = getVault();
     let bet = Number(betAmount) || MIN_BET;
-    
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
-      if (result.success) {
-        bet = result.amount;
-        setIsFreePlay(false);
-        router.replace('/dragon-tower', undefined, { shallow: true });
-      } else {
-        alert('No free play tokens available!');
-        setIsFreePlay(false);
-        return;
-      }
+      if (result.success) { bet = result.amount; setIsFreePlay(false); router.replace('/dragon-tower', undefined, { shallow: true }); }
+      else { alert('No free play tokens available!'); setIsFreePlay(false); return; }
     } else {
-      if (bet < MIN_BET) {
-        alert(`Minimum bet is ${MIN_BET} MLEO`);
-        return;
-      }
-      if (currentVault < bet) {
-        alert('Insufficient MLEO in vault');
-        return;
-      }
-      
-      setVault(currentVault - bet);
-      setVaultState(currentVault - bet);
+      if (bet < MIN_BET) { alert(`Minimum bet is ${MIN_BET} MLEO`); return; }
+      if (currentVault < bet) { alert('Insufficient MLEO in vault'); return; }
+      setVault(currentVault - bet); setVaultState(currentVault - bet);
     }
-    
-    setCurrentBet(bet);
-    setGameActive(true);
+    setBetAmount(String(bet));
     setGameResult(null);
-    setCurrentFloor(0);
-    setFloorData([]);
-    setSelectedCard(null);
-    generateNewFloor(0);
+    setFloor(0);
+    const safe = Array(TOTAL_FLOORS).fill(null).map(() => Math.floor(Math.random() * CARDS_PER_FLOOR));
+    setSafeCards(safe);
+    setGameActive(true);
   };
 
-  const generateNewFloor = (floor) => {
-    const dangerCount = DIFFICULTY[difficulty].dangerCards;
-    const dangerPositions = [];
-    
-    // Randomly place danger cards
-    while (dangerPositions.length < dangerCount) {
-      const pos = Math.floor(Math.random() * CARDS_PER_FLOOR);
-      if (!dangerPositions.includes(pos)) {
-        dangerPositions.push(pos);
-      }
-    }
-    
-    const newFloorData = [...floorData];
-    newFloorData[floor] = dangerPositions;
-    setFloorData(newFloorData);
-    setSelectedCard(null);
-  };
-
-  const chooseCard = (cardIndex) => {
-    if (!gameActive || gameResult || selectedCard !== null) return;
-
-    setSelectedCard(cardIndex);
-
-    setTimeout(() => {
-      const dangerCards = floorData[currentFloor] || [];
-      const isDanger = dangerCards.includes(cardIndex);
-
-      if (isDanger) {
-        // Hit danger - fall from tower
-        endGame(false, currentFloor);
-      } else {
-        // Safe card - climb up
-        const newFloor = currentFloor + 1;
-        
+  const selectCard = (cardIndex) => {
+    if (!gameActive) return;
+    playSfx(clickSound.current);
+    if (safeCards[floor] === cardIndex) {
+      const newFloor = floor + 1;
         if (newFloor >= TOTAL_FLOORS) {
-          // Reached the top!
           endGame(true, newFloor);
         } else {
-          setTimeout(() => {
-            setCurrentFloor(newFloor);
-            generateNewFloor(newFloor);
-          }, 800);
-        }
+        setFloor(newFloor);
       }
-    }, 600);
+    } else {
+      endGame(false, floor);
+    }
   };
 
-  const cashOut = () => {
-    if (!gameActive || gameResult || currentFloor === 0) return;
-    endGame(true, currentFloor);
-  };
-
-  const endGame = (win, floor) => {
-    setGameActive(false);
-
-    const multiplier = win ? calculateMultiplier(floor, difficulty) : 0;
-    const prize = win ? Math.floor(currentBet * multiplier) : 0;
+  const endGame = (win, finalFloor) => {
+    const bet = Number(betAmount);
+    const multiplier = 1 + (finalFloor * 1.5);
+    const prize = win ? Math.floor(bet * multiplier) : 0;
 
     if (win && prize > 0) {
       const newVault = getVault() + prize;
-      setVault(newVault);
-      setVaultState(newVault);
+      setVault(newVault); setVaultState(newVault);
+      playSfx(winSound.current);
     }
 
-    const resultData = {
-      win: win,
-      floor: floor,
-      multiplier: multiplier,
-      prize: prize,
-      profit: win ? prize - currentBet : -currentBet,
-      reachedTop: floor >= TOTAL_FLOORS
-    };
-
+    const resultData = { win, floor: finalFloor, multiplier, prize, profit: win ? prize - bet : -bet, complete: finalFloor >= TOTAL_FLOORS };
     setGameResult(resultData);
-
-    const newStats = {
-      ...stats,
-      totalGames: stats.totalGames + 1,
-      totalBet: stats.totalBet + currentBet,
-      wins: win ? stats.wins + 1 : stats.wins,
-      totalWon: win ? stats.totalWon + prize : stats.totalWon,
-      totalLost: !win ? stats.totalLost + currentBet : stats.totalLost,
-      biggestWin: Math.max(stats.biggestWin, win ? prize : 0),
-      topFloor: Math.max(stats.topFloor, floor),
-      lastBet: currentBet
-    };
-    setStats(newStats);
-    safeWrite(LS_KEY, newStats);
-  };
-
-  const resetGame = () => {
-    setGameResult(null);
-    setShowResultPopup(false);
-    setCurrentFloor(0);
-    setFloorData([]);
-    setSelectedCard(null);
     setGameActive(false);
     
-    setTimeout(() => {
-      startGame();
-    }, 100);
+    const newStats = { ...stats, totalGames: stats.totalGames + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalBet: stats.totalBet + bet, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), maxFloor: Math.max(stats.maxFloor, finalFloor), lastBet: bet };
+    setStats(newStats);
   };
 
-  const resetToSetup = () => {
-    setGameResult(null);
-    setShowResultPopup(false);
-    setCurrentFloor(0);
-    setFloorData([]);
-    setSelectedCard(null);
-    setGameActive(false);
-  };
+  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setFloor(0); setSafeCards([]); setGameActive(false); };
+  const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
-  if (!mounted) {
-    return <div className="min-h-screen bg-gradient-to-br from-red-900 via-black to-orange-900 flex items-center justify-center">
-      <div className="text-white text-xl">Loading...</div>
-    </div>;
-  }
+  if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-red-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
 
-  const currentMultiplier = currentFloor > 0 ? calculateMultiplier(currentFloor, difficulty) : 1;
-  const currentPrize = Math.floor(currentBet * currentMultiplier);
-  const dangerCards = floorData[currentFloor] || [];
+  const currentMultiplier = 1 + (floor * 1.5);
+  const potentialWin = Math.floor(Number(betAmount) * currentMultiplier);
 
   return (
-    <Layout vault={vault} refreshVault={refreshVault}>
-      <div className="min-h-screen bg-gradient-to-br from-red-900 via-black to-orange-900 text-white">
-        <div className="max-w-6xl mx-auto p-4 pb-20">
-          {/* HEADER */}
-          <header className="flex items-center justify-between mb-6">
-            {gameActive || gameResult ? (
-              <button 
-                onClick={resetToSetup}
-                className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
-              >
-                BACK
-              </button>
-            ) : (
-              <Link href="/arcade">
-                <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
-                  BACK
-                </button>
-              </Link>
-            )}
-
-            <div className="text-center">
-              <h1 className="text-3xl font-bold mb-1">
-                🐉 {isFreePlay && <span className="text-amber-400">🎁 FREE PLAY - </span>}
-                Dragon Tower
-              </h1>
-              <p className="text-zinc-400 text-sm">
-                {isFreePlay ? "Playing with a free token - good luck!" : "Climb the dragon's tower - choose wisely!"}
-              </p>
+    <Layout>
+      <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-red-900" style={{ height: 'var(--app-100vh, 100vh)' }}>
+        <div className="absolute inset-0 opacity-10"><div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} /></div>
+        <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+          <div className="relative px-2 py-3">
+            <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
+              <button onClick={backSafe} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">BACK</button>
+              {freePlayTokens > 0 && (<button onClick={() => startGame(true)} disabled={gameActive} className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50" title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}><span className="text-base">🎁</span><span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">{freePlayTokens}</span></button>)}
             </div>
-
-            <div className="w-16"></div>
-          </header>
-
-          {/* GAME WINDOW */}
-          <div className="rounded-2xl p-6 bg-white/5 border border-white/10 mb-6">
-            {/* Current Prize - removed from here to prevent layout shift */}
-
-            {/* Tower Display */}
-            {!gameActive && !gameResult && (
-              <div className="mb-8 text-center">
-                <div className="text-8xl mb-4">🐉</div>
-                <h2 className="text-2xl font-bold mb-6">Choose Your Difficulty</h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto mb-6">
-                  {Object.entries(DIFFICULTY).map(([key, diff]) => (
-                    <button
-                      key={key}
-                      onClick={() => setDifficulty(key)}
-                      className={`p-6 rounded-xl font-bold text-lg border-2 transition-all ${
-                        difficulty === key
-                          ? 'bg-orange-600/30 border-orange-400 scale-105'
-                          : 'bg-white/5 border-white/10 hover:bg-white/10'
-                      }`}
-                    >
-                      <div className="text-2xl mb-2">
-                        {key === 'easy' ? '🟢' : key === 'medium' ? '🟡' : '🔴'}
-                      </div>
-                      <div>{diff.name}</div>
-                      <div className="text-sm opacity-70 mt-2">
-                        {diff.dangerCards}/{CARDS_PER_FLOOR} Danger Cards
-                      </div>
-                      <div className="text-xs opacity-60 mt-1">
-                        Max: ×{diff.maxMultiplier}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Cards Selection */}
-            {gameActive && !gameResult && (
-              <div className="mb-8">
-                <h2 className="text-xl font-bold mb-4 text-center">
-                  🏰 Floor {currentFloor + 1}/{TOTAL_FLOORS}
-                </h2>
-                
-                <div className="grid grid-cols-4 gap-3 max-w-2xl mx-auto mb-6">
-                  {[...Array(CARDS_PER_FLOOR)].map((_, index) => {
-                    const isSelected = selectedCard === index;
-                    const showResult = selectedCard !== null;
-                    const isDanger = dangerCards.includes(index);
-                    const isSafe = showResult && !isDanger && isSelected;
-                    const showDanger = showResult && isDanger;
-                    
-                    return (
-                      <button
-                        key={index}
-                        onClick={() => chooseCard(index)}
-                        disabled={selectedCard !== null}
-                        className={`aspect-square rounded-xl font-bold text-4xl border-2 transition-all ${
-                          showDanger && isSelected
-                            ? 'bg-gradient-to-br from-red-600 to-black border-red-400 animate-pulse'
-                            : isSafe
-                            ? 'bg-gradient-to-br from-green-600 to-emerald-700 border-green-400'
-                            : isSelected
-                            ? 'bg-gradient-to-br from-blue-600 to-indigo-700 border-blue-400'
-                            : 'bg-gradient-to-br from-orange-700 to-red-800 border-orange-500 hover:scale-105 cursor-pointer'
-                        }`}
-                      >
-                        {showDanger && isSelected ? '🐉' : isSafe ? '✅' : '🃏'}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Floor Progress */}
-                {currentFloor > 0 && (
-                  <div className="text-center mb-4">
-                    <div className="text-sm opacity-70 mb-2">Floors Climbed:</div>
-                    <div className="flex justify-center gap-1">
-                      {[...Array(TOTAL_FLOORS)].map((_, idx) => (
-                        <div key={idx} className={`w-8 h-8 rounded-lg border ${
-                          idx < currentFloor ? 'bg-green-600 border-green-400' : 
-                          idx === currentFloor ? 'bg-orange-600 border-orange-400 animate-pulse' :
-                          'bg-zinc-800 border-zinc-600'
-                        }`} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Cash Out Button */}
-                {currentFloor > 0 && selectedCard === null && (
-                  <div className="text-center mt-6">
-                    <button
-                      onClick={cashOut}
-                      className="px-6 py-2 rounded-lg font-bold text-base text-white bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 transition-all hover:scale-105 shadow-lg"
-                    >
-                      💰 Cash Out
-                    </button>
-                    {/* Current Prize moved below button */}
-                    <div className="text-center mt-2 text-xs text-orange-400">
-                      Current: {fmt(currentPrize)} MLEO (×{currentMultiplier.toFixed(2)}) | Floor {currentFloor}/{TOTAL_FLOORS}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Game Controls */}
-            <div className="text-center mb-6">
-              {!gameActive && !gameResult && (
-                <>
-                  {freePlayTokens > 0 && (
-                    <button
-                      onClick={startFreePlay}
-                      className="px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-4 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:from-amber-400 hover:via-orange-400 hover:to-yellow-400 hover:scale-105"
-                    >
-                      🎁 FREE PLAY ({freePlayTokens}/5)
-                    </button>
-                  )}
-                  
-                  <button
-                    onClick={() => startGame(false)}
-                    disabled={false}
-                    className="px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-6 bg-gradient-to-r from-orange-600 via-red-500 to-orange-600 hover:from-orange-500 hover:via-red-400 hover:to-orange-500 hover:scale-105"
-                  >
-                    🐉 START CLIMBING ({fmt(Number(betAmount) || MIN_BET)})
-                  </button>
-                  
-                  {/* Bet Amount Input */}
-                  <div className="max-w-sm mx-auto">
-                    <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
-                    <input 
-                      type="number" 
-                      min={MIN_BET} 
-                      step="100" 
-                      value={betAmount} 
-                      onChange={(e) => setBetAmount(e.target.value)} 
-                      className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-orange-500" 
-                      placeholder="1000" 
-                    />
-                    <div className="flex gap-2 mt-2 justify-center flex-wrap">
-                      {[1000, 2500, 5000, 10000].map((v) => (
-                        <button 
-                          key={v} 
-                          onClick={() => setBetAmount(String(v))} 
-                          className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
-                        >
-                          {v >= 1000 ? `${v/1000}K` : v}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="text-xs text-zinc-500 mt-2 text-center">
-                      Max win ({difficulty}): {((Number(betAmount) || MIN_BET) * DIFFICULTY[difficulty].maxMultiplier).toLocaleString()} MLEO
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {gameResult && (
-                <button
-                  onClick={resetGame}
-                  className="px-8 py-3 rounded-xl font-bold text-lg text-white bg-gradient-to-r from-orange-600 to-red-500 hover:from-orange-500 hover:to-red-400 transition-all mb-6 shadow-lg hover:scale-105 transform"
-                >
-                  🔄 New Game ({fmt(Number(betAmount) || MIN_BET)})
-                </button>
-              )}
-
-              <div className="text-sm opacity-70 mb-4">
-                Choose safe cards • Avoid the dragon • Cash out anytime!
-              </div>
+            <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
+              <button onClick={() => { playSfx(clickSound.current); const el = wrapRef.current || document.documentElement; if (!document.fullscreenElement) { el.requestFullscreen?.().catch(() => {}); } else { document.exitFullscreen?.().catch(() => {}); } }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFullscreen ? "EXIT" : "FULL"}</button>
+              <button onClick={() => { playSfx(clickSound.current); setMenuOpen(true); }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">MENU</button>
             </div>
-
-            {/* Bet Amount Input after game */}
-            {gameResult && (
-              <div className="max-w-sm mx-auto">
-                <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
-                <input 
-                  type="number" 
-                  min={MIN_BET} 
-                  step="100" 
-                  value={betAmount} 
-                  onChange={(e) => setBetAmount(e.target.value)} 
-                  className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-orange-500" 
-                  placeholder="1000" 
-                />
-                <div className="flex gap-2 mt-2 justify-center flex-wrap">
-                  {[1000, 2500, 5000, 10000].map((v) => (
-                    <button 
-                      key={v} 
-                      onClick={() => setBetAmount(String(v))} 
-                      className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
-                    >
-                      {v >= 1000 ? `${v/1000}K` : v}
-                    </button>
-                  ))}
                 </div>
               </div>
-            )}
+
+        <div className="relative h-full flex flex-col items-center justify-center px-4 pb-16 pt-14 overflow-y-auto" style={{ minHeight: '100%' }}>
+          <div className="text-center mb-3"><h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">🐉 Dragon Tower</h1><p className="text-white/70 text-sm">Climb the tower • Avoid dragons!</p></div>
+          <div className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Vault</div><div className="text-lg font-bold text-emerald-400">{fmt(vault)}</div></div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Bet</div><div className="text-lg font-bold text-amber-400">{fmt(Number(betAmount))}</div></div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Prize</div><div className="text-lg font-bold text-green-400">{fmt(potentialWin)}</div></div>
           </div>
 
-          {/* STATS */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <div className="rounded-xl p-3 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
-              <div className="text-xs opacity-70 mb-1">Your Vault</div>
-              <div className="text-xl font-bold text-emerald-400">{fmt(vault)}</div>
-              <button onClick={refreshVault} className="text-xs opacity-60 hover:opacity-100 mt-1">↻ Refresh</button>
-            </div>
-            
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Total Games</div>
-              <div className="text-lg font-bold">{stats.totalGames.toLocaleString()}</div>
+          <div className="mb-2 text-center text-xs text-white/70">Floor {floor + 1}/{TOTAL_FLOORS} • ×{currentMultiplier.toFixed(1)}</div>
+
+          <div className="mb-3 w-full max-w-xs" style={{ minHeight: '200px' }}>
+            {gameActive && (<div className="flex gap-2 justify-center">{[...Array(CARDS_PER_FLOOR)].map((_, i) => (<button key={i} onClick={() => selectCard(i)} className="w-20 h-24 rounded-lg bg-gradient-to-br from-purple-600 to-purple-800 border-2 border-white/20 text-white text-3xl font-bold hover:brightness-110 transition-all">🃏</button>))}</div>)}
+            {!gameActive && (<div className="text-center text-5xl mb-2">🐉</div>)}
             </div>
 
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Total Won</div>
-              <div className="text-lg font-bold text-green-400">{fmt(stats.totalWon)}</div>
+          <div className="flex items-center gap-2 mb-3">
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50">−</button>
+            <input type="number" value={betAmount} onChange={(e) => setBetAmount(e.target.value)} disabled={gameActive} className="w-32 h-12 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-sm" min={MIN_BET} />
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50">+</button>
             </div>
 
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">🏰 Top Floor</div>
-              <div className="text-lg font-bold text-amber-400">{stats.topFloor}/{TOTAL_FLOORS}</div>
+          <div className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '100px' }}>
+            <button onClick={gameResult ? resetGame : () => startGame(false)} disabled={gameActive} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-purple-500 to-red-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">{gameResult ? "PLAY AGAIN" : "START"}</button>
+            <div className="flex gap-2">
+              <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
+              <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>
+              <button onClick={() => { setShowVaultModal(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all">💰 Vault</button>
             </div>
-          </div>
-
-          {/* HOW TO PLAY */}
-          <div className="rounded-2xl p-6 bg-white/5 border border-white/10 mb-6">
-            <h3 className="text-lg font-bold mb-4">📖 How to Play</h3>
-            <ul className="text-sm space-y-2 text-zinc-300">
-              <li>• <strong>Dragon Tower:</strong> Climb 10 floors to reach the top</li>
-              <li>• <strong>Each Floor:</strong> 4 cards - some safe, some have dragons!</li>
-              <li>• <strong>🟢 Easy Mode:</strong> 1 danger card per floor (75% safe) - Max ×20</li>
-              <li>• <strong>🟡 Medium Mode:</strong> 2 danger cards per floor (50% safe) - Max ×50</li>
-              <li>• <strong>🔴 Hard Mode:</strong> 3 danger cards per floor (25% safe) - Max ×150</li>
-              <li>• <strong>Choose Wisely:</strong> Pick a safe card to climb to next floor</li>
-              <li>• <strong>Dragon Card:</strong> Pick a danger card and fall from the tower!</li>
-              <li>• <strong>Cash Out:</strong> Take your winnings anytime after floor 1</li>
-              <li>• <strong>Multiplier Grows:</strong> Higher you climb = bigger multiplier!</li>
-              <li>• <strong>Reach Top:</strong> Climb all 10 floors for maximum prize!</li>
-              <li>• <strong>Minimum bet:</strong> {MIN_BET.toLocaleString()} MLEO per game</li>
-            </ul>
           </div>
         </div>
 
-        {/* FLOATING RESULT POPUP */}
-        {gameResult && showResultPopup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-            <div 
-              className={`text-center p-4 rounded-xl border-2 transition-all duration-500 transform pointer-events-auto max-w-sm mx-4 ${
-                showResultPopup ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
-              } ${
-                gameResult.reachedTop
-                  ? "bg-gradient-to-br from-yellow-500 to-amber-600 border-yellow-300 shadow-2xl shadow-yellow-500/70"
-                  : gameResult.win
-                  ? "bg-gradient-to-br from-green-600 to-emerald-700 border-green-300 shadow-2xl shadow-green-500/70"
-                  : "bg-gradient-to-br from-red-600 to-rose-700 border-red-300 shadow-2xl shadow-red-500/70"
-              }`}
-            >
-              <div className="text-2xl font-black mb-2 animate-pulse text-white drop-shadow-lg">
-                {gameResult.reachedTop ? "🏆 Reached Top! 🏆" : gameResult.win ? "🐉 Success! 🐉" : "🐉 Dragon! 🐉"}
-              </div>
-              <div className="text-base mb-2 text-white/90 font-semibold">
-                Floor {gameResult.floor}/{TOTAL_FLOORS} | ×{gameResult.multiplier.toFixed(2)}
-              </div>
-              {gameResult.win && (
-                <div className="space-y-1">
-                  <div className="text-3xl font-black text-white animate-bounce drop-shadow-2xl">
-                    +{fmt(gameResult.prize)} MLEO
-                  </div>
-                </div>
-              )}
-              {!gameResult.win && (
-                <div className="text-lg font-bold text-white">
-                  Lost {fmt(currentBet)} MLEO
-                </div>
-              )}
-              <div className="mt-2 text-xs text-white/70 animate-pulse">
-                Auto-closing...
-              </div>
-            </div>
-          </div>
-        )}
+        {showResultPopup && gameResult && (<div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none"><div className={`${gameResult.win ? 'bg-green-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}><div className="text-4xl mb-2">{gameResult.complete ? '👑' : gameResult.win ? '✅' : '🐉'}</div><div className="text-2xl font-bold mb-1">{gameResult.complete ? 'TOWER COMPLETE!' : gameResult.win ? 'ESCAPED!' : 'DRAGON!'}</div><div className="text-lg">{gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div><div className="text-sm opacity-80 mt-2">Floor {gameResult.floor}/{TOTAL_FLOORS}</div></div></div>)}
+
+        {menuOpen && (<div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}><div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div><div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div><div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div><div className="mt-4 text-xs opacity-70"><p>Dragon Tower v2.0</p></div></div></div>)}
+
+        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">🐉 How to Play</h2><div className="space-y-3 text-sm"><p><strong>1. Start:</strong> Min {MIN_BET} MLEO</p><p><strong>2. Pick Cards:</strong> Only 1 safe card per floor!</p><p><strong>3. Climb 8 Floors:</strong> Win big!</p><div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3"><p className="text-purple-300 font-semibold">Each floor: ×1.5 multiplier!</p></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+
+        {showStats && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2><div className="space-y-3"><div className="grid grid-cols-2 gap-3"><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Games</div><div className="text-xl font-bold">{stats.totalGames}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalGames > 0 ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : 0}%</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Bet</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Max Floor</div><div className="text-lg font-bold text-purple-400">{stats.maxFloor}/{TOTAL_FLOORS}</div></div></div></div><button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+
+        {showVaultModal && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">💰 MLEO Vault</h2><div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-6 text-center"><div className="text-sm text-white/60 mb-1">Current Balance</div><div className="text-3xl font-bold text-emerald-400">{fmt(vault)} MLEO</div></div><div className="space-y-4"><div><label className="text-sm text-white/70 mb-2 block">Collect to Wallet</label><div className="flex gap-2 mb-2"><input type="number" value={collectAmount} onChange={(e) => setCollectAmount(Number(e.target.value))} className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white" min="1" max={vault} /><button onClick={() => setCollectAmount(vault)} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold">MAX</button></div><button onClick={collectToWallet} disabled={collectAmount <= 0 || collectAmount > vault || claiming} className="w-full py-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed">{claiming ? "Collecting..." : `Collect ${fmt(collectAmount)} MLEO`}</button></div><div className="text-xs text-white/60"><p>• Your vault is shared across all MLEO games</p><p>• Collect earnings to your wallet anytime</p><p>• Network: BSC Testnet (TBNB)</p></div></div><button onClick={() => setShowVaultModal(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
       </div>
     </Layout>
   );
 }
-
