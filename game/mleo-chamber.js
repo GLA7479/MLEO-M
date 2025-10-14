@@ -159,7 +159,7 @@ export default function ChamberPage() {
     if (index === DANGER_CHAMBER) {
       endGame(false, newSelected.length);
     } else if (newSelected.length >= TOTAL_CHAMBERS - 1) {
-      endGame(true, newSelected.length);
+        endGame(true, newSelected.length);
     }
   };
 
@@ -183,7 +183,7 @@ export default function ChamberPage() {
     const resultData = { win, chambers, prize, profit: win ? prize - bet : -bet, perfect: chambers === TOTAL_CHAMBERS - 1 };
     setGameResult(resultData);
     setGameActive(false);
-
+    
     const newStats = { ...stats, totalGames: stats.totalGames + 1, totalBet: stats.totalBet + bet, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), chambersOpened: stats.chambersOpened + chambers, lastBet: bet };
     setStats(newStats);
   };
@@ -210,7 +210,7 @@ export default function ChamberPage() {
               <button onClick={() => { playSfx(clickSound.current); setMenuOpen(true); }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">MENU</button>
             </div>
           </div>
-        </div>
+            </div>
 
         <div className="relative h-full flex flex-col items-center justify-center px-4 pb-16 pt-14 overflow-y-auto" style={{ minHeight: '100%' }}>
           <div className="text-center mb-3"><h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">🔫 Lucky Chamber</h1><p className="text-white/70 text-sm">6 chambers • 1 danger • Cash out before boom!</p></div>
@@ -220,38 +220,132 @@ export default function ChamberPage() {
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Prize</div><div className="text-lg font-bold text-green-400">{fmt(currentPrize)}</div></div>
           </div>
 
+          {/* Chambers Display - Fixed Height */}
           <div className="mb-4" style={{ minHeight: '220px' }}>
+            {/* Chamber Grid */}
             <div className="mb-3" style={{ minHeight: '180px' }}>
               <div className={`flex gap-2 justify-center mb-2 transition-opacity ${gameActive || gameResult ? 'opacity-100' : 'opacity-0'}`}>
-                {[...Array(TOTAL_CHAMBERS)].map((_, index) => {
-                  const isSelected = selectedChambers.includes(index);
+                  {[...Array(TOTAL_CHAMBERS)].map((_, index) => {
+                    const isSelected = selectedChambers.includes(index);
                   const isDanger = index === DANGER_CHAMBER;
                   const isSafe = isSelected && !isDanger;
-                  return (<button key={index} onClick={() => selectChamber(index)} disabled={selectedChambers.includes(index) || gameResult || !gameActive} className={`w-14 h-14 rounded-lg font-bold text-xl transition-all ${isDanger ? 'bg-red-500/20 border-2 border-red-500/40 text-red-300' : isSafe ? 'bg-green-500 text-white' : gameResult ? 'bg-white/10 text-white/30' : 'bg-slate-700 hover:bg-slate-600 text-white cursor-pointer'} disabled:cursor-not-allowed`}>{isDanger ? '☠️' : isSafe ? '✓' : index + 1}</button>);
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => selectChamber(index)}
+                      disabled={selectedChambers.includes(index) || gameResult || !gameActive}
+                      className={`w-14 h-14 rounded-lg font-bold text-xl transition-all ${
+                          isDanger
+                          ? 'bg-red-500/20 border-2 border-red-500/40 text-red-300'
+                            : isSafe
+                          ? 'bg-green-500 text-white'
+                          : gameResult
+                          ? 'bg-white/10 text-white/30'
+                          : 'bg-slate-700 hover:bg-slate-600 text-white cursor-pointer'
+                      } disabled:cursor-not-allowed`}
+                    >
+                      {isDanger ? '☠️' : isSafe ? '✓' : index + 1}
+                    </button>
+                  );
                 })}
               </div>
+              {/* Always present result text - just opacity */}
               <div className="text-center" style={{ height: '28px' }}>
-                <div className={`text-base font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-red-400'}`}>{gameResult ? (gameResult.perfect ? 'PERFECT!' : gameResult.win ? 'SAFE!' : 'BOOM!') : 'waiting'}</div>
+                <div className={`text-base font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-red-400'}`}>
+                  {gameResult ? (gameResult.perfect ? 'PERFECT!' : gameResult.win ? 'SAFE!' : 'BOOM!') : 'waiting'}
+                </div>
               </div>
             </div>
-
+            
+            {/* Cash Out Button - Fixed Height with opacity */}
             <div className="text-center mb-3" style={{ minHeight: '48px' }}>
-              <button onClick={cashOut} disabled={!gameActive || selectedChambers.length === 0 || gameResult !== null} className={`px-6 py-3 rounded-lg font-bold text-sm bg-gradient-to-r from-yellow-500 to-amber-600 text-black shadow-lg hover:brightness-110 transition-all ${gameActive && selectedChambers.length > 0 && !gameResult ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>💰 Cash Out ({fmt(currentPrize)} MLEO)</button>
+              <button
+                onClick={cashOut}
+                disabled={!gameActive || selectedChambers.length === 0 || gameResult !== null}
+                className={`px-6 py-3 rounded-lg font-bold text-sm bg-gradient-to-r from-yellow-500 to-amber-600 text-black shadow-lg hover:brightness-110 transition-all ${
+                  gameActive && selectedChambers.length > 0 && !gameResult
+                    ? 'opacity-100'
+                    : 'opacity-0 pointer-events-none'
+                }`}
+              >
+                💰 Cash Out ({fmt(currentPrize)} MLEO)
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 mb-3">
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50">−</button>
-            <input type="number" value={betAmount} onChange={(e) => setBetAmount(e.target.value)} disabled={gameActive || gameResult} className="w-32 h-12 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-sm" min={MIN_BET} />
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50">+</button>
+          {/* Bet Controls */}
+          <div className="flex items-center gap-2 mb-3" style={{ minHeight: '48px' }}>
+            <button
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                const newBet = Math.max(MIN_BET, current - 1000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              disabled={gameActive || gameResult}
+              className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
+            >
+              −
+            </button>
+            <input
+              type="number"
+              value={betAmount}
+              onChange={(e) => setBetAmount(e.target.value)}
+              disabled={gameActive || gameResult}
+              className="w-32 h-12 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-sm"
+              min={MIN_BET}
+            />
+            <button
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                const newBet = Math.min(vault, current + 1000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              disabled={gameActive || gameResult}
+              className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
+            >
+              +
+            </button>
           </div>
 
+          {/* Action Buttons */}
           <div className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            <button onClick={gameActive ? cashOut : (gameResult ? resetGame : () => startGame(false))} disabled={(gameActive && selectedChambers.length === 0) || (!gameActive && !gameResult && false)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-slate-600 to-slate-700 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">{gameActive ? `💰 CASH OUT ${fmt(currentPrize)}` : gameResult ? "PLAY AGAIN" : "START"}</button>
+            <button
+              onClick={gameActive ? cashOut : (gameResult ? resetGame : () => startGame(false))}
+              disabled={(gameActive && selectedChambers.length === 0) || (!gameActive && !gameResult && false)}
+              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-slate-600 to-slate-700 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
+            >
+              {gameActive ? `💰 CASH OUT ${fmt(currentPrize)}` : gameResult ? "PLAY AGAIN" : "START"}
+            </button>
             <div className="flex gap-2">
-              <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
-              <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>
-              <button onClick={() => { setShowVaultModal(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all">💰 Vault</button>
+              <button
+                onClick={() => {
+                  setShowHowToPlay(true);
+                  playSfx(clickSound.current);
+                }}
+                className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all"
+              >
+                How to Play
+              </button>
+              <button
+                onClick={() => {
+                  setShowStats(true);
+                  playSfx(clickSound.current);
+                }}
+                className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all"
+              >
+                Stats
+              </button>
+              <button
+                onClick={() => {
+                  setShowVaultModal(true);
+                  playSfx(clickSound.current);
+                }}
+                className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all"
+              >
+                💰 Vault
+              </button>
             </div>
           </div>
         </div>
