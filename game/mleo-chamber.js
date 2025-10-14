@@ -509,17 +509,17 @@ export default function ChamberPage() {
         </div>
 
         {/* Main Content */}
-        <div className="relative h-full flex flex-col items-center justify-center px-4 pb-20 pt-16" style={{ minHeight: '600px' }}>
+        <div className="relative h-full flex flex-col items-center justify-center px-4 pb-16 pt-14 overflow-y-auto" style={{ minHeight: '100%' }}>
           {/* Game Title */}
-          <div className="text-center mb-4">
-            <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-2">
+          <div className="text-center mb-3">
+            <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">
               🔫 Lucky Chamber
             </h1>
-            <p className="text-white/70">6 chambers, 1 danger! Pick wisely or cash out</p>
+            <p className="text-white/70 text-sm">6 chambers, 1 danger! Pick wisely or cash out</p>
           </div>
 
           {/* Stats Display */}
-          <div className="grid grid-cols-3 gap-3 mb-4 w-full max-w-md">
+          <div className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center">
               <div className="text-xs text-white/60 mb-1">Vault</div>
               <div className="text-base font-bold text-emerald-400">{fmt(vault)}</div>
@@ -644,7 +644,7 @@ export default function ChamberPage() {
             {!gameActive && !gameResult && (
               <button
                 onClick={() => startGame(false)}
-                className="w-full py-3 rounded-lg font-bold text-lg bg-gradient-to-r from-slate-500 to-slate-600 text-white shadow-lg hover:brightness-110 transition-all"
+                className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-slate-500 to-slate-600 text-white shadow-lg hover:brightness-110 transition-all"
               >
                 START GAME
               </button>
@@ -653,7 +653,7 @@ export default function ChamberPage() {
             {gameResult && (
               <button
                 onClick={resetGame}
-                className="w-full py-3 rounded-lg font-bold text-lg bg-gradient-to-r from-slate-500 to-slate-600 text-white shadow-lg hover:brightness-110 transition-all"
+                className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-slate-500 to-slate-600 text-white shadow-lg hover:brightness-110 transition-all"
               >
                 PLAY AGAIN
               </button>

@@ -510,17 +510,17 @@ export default function DicePage() {
         </div>
 
         {/* Main Content */}
-        <div className="relative h-full flex flex-col items-center justify-center px-4 pb-20 pt-16" style={{ minHeight: '600px' }}>
+        <div className="relative h-full flex flex-col items-center justify-center px-4 pb-16 pt-14 overflow-y-auto" style={{ minHeight: '100%' }}>
           {/* Game Title */}
-          <div className="text-center mb-4">
-            <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-2">
+          <div className="text-center mb-3">
+            <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">
               ⚄ Dice Over/Under
             </h1>
-            <p className="text-white/70">Set your target • Over or Under • Win up to ×99!</p>
+            <p className="text-white/70 text-sm">Set your target • Over or Under • Win up to ×99!</p>
           </div>
 
           {/* Stats Display */}
-          <div className="grid grid-cols-3 gap-3 mb-4 w-full max-w-md">
+          <div className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center">
               <div className="text-xs text-white/60 mb-1">Vault</div>
               <div className="text-base font-bold text-emerald-400">{fmt(vault)}</div>
@@ -536,8 +536,8 @@ export default function DicePage() {
           </div>
 
             {/* Result Display */}
-          <div className="mb-4" style={{ minHeight: '180px' }}>
-            <div className={`text-7xl font-black transition-all duration-200 ${
+          <div className="mb-3" style={{ minHeight: '150px' }}>
+            <div className={`text-6xl font-black transition-all duration-200 ${
               rolling ? 'animate-pulse text-teal-400' :
               result && gameResult ?
                 gameResult.win ? 'text-green-400' : 'text-red-400'
@@ -557,11 +557,11 @@ export default function DicePage() {
           </div>
               
               {/* Over/Under Toggle */}
-          <div className="flex gap-2 mb-4" style={{ minHeight: '48px' }}>
+          <div className="flex gap-2 mb-3" style={{ minHeight: '48px' }}>
               <button
                 onClick={() => { setIsOver(true); playSfx(clickSound.current); }}
                 disabled={rolling}
-                className={`px-6 py-2 rounded-lg font-bold transition-all ${
+                className={`px-5 py-2 rounded-lg font-bold text-sm transition-all ${
                   isOver
                     ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white ring-2 ring-green-300'
                     : 'bg-white/10 text-white/60 hover:bg-white/20'
@@ -572,7 +572,7 @@ export default function DicePage() {
               <button
                 onClick={() => { setIsOver(false); playSfx(clickSound.current); }}
                 disabled={rolling}
-                className={`px-6 py-2 rounded-lg font-bold transition-all ${
+                className={`px-5 py-2 rounded-lg font-bold text-sm transition-all ${
                   !isOver
                     ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white ring-2 ring-cyan-300'
                     : 'bg-white/10 text-white/60 hover:bg-white/20'
@@ -583,7 +583,7 @@ export default function DicePage() {
               </div>
 
               {/* Slider */}
-          <div className="w-full max-w-md mb-4">
+          <div className="w-full max-w-md mb-3">
             <div className="relative mb-2">
               <div className="h-12 rounded-lg overflow-hidden border-2 border-white/20 relative bg-black/20">
                 <div
@@ -621,7 +621,7 @@ export default function DicePage() {
                 </div>
 
           {/* Bet Controls */}
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-3">
                   <button
               onClick={() => {
                 const current = Number(betAmount) || MIN_BET;
@@ -661,7 +661,7 @@ export default function DicePage() {
             <button
               onClick={() => playDice(false)}
               disabled={rolling}
-              className="w-full py-3 rounded-lg font-bold text-lg bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
+              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
             >
               {rolling ? "Rolling..." : "ROLL DICE"}
             </button>

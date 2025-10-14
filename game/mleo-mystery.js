@@ -189,24 +189,24 @@ export default function MysteryBoxPage() {
   useEffect(() => {
     setMounted(true);
     setVaultState(getVault());
-
+    
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-
+    
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
-
+    
     const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
     if (savedStats.lastBet) {
       setBetAmount(String(savedStats.lastBet));
     }
-
+    
     const interval = setInterval(() => {
       const status = getFreePlayStatus();
       setFreePlayTokens(status.tokens);
       setVaultState(getVault());
     }, 2000);
-
+    
     if (typeof Audio !== "undefined") {
       try {
         clickSound.current = new Audio(S_CLICK);
@@ -320,7 +320,7 @@ export default function MysteryBoxPage() {
 
     const currentVault = getVault();
     let bet = Number(betAmount) || MIN_BET;
-
+    
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
       if (result.success) {
@@ -341,16 +341,16 @@ export default function MysteryBoxPage() {
         alert('Insufficient MLEO in vault');
         return;
       }
-
+      
       setVault(currentVault - bet);
       setVaultState(currentVault - bet);
     }
-
+    
     setBetAmount(String(bet));
     setGameActive(true);
     setGameResult(null);
     setSelectedBox(null);
-
+    
     // Shuffle prizes into boxes
     const shuffledPrizes = [...PRIZES].sort(() => Math.random() - 0.5);
     setBoxes(shuffledPrizes);
@@ -414,7 +414,7 @@ export default function MysteryBoxPage() {
   if (!mounted) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-900 via-black to-yellow-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <div className="text-white text-xl">Loading...</div>
       </div>
     );
   }
@@ -441,7 +441,7 @@ export default function MysteryBoxPage() {
           <div className="relative px-2 py-3">
             {/* Left: Back + Free Play */}
             <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
-              <button
+              <button 
                 onClick={backSafe}
                 className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
                 title="Back to Arcade"
@@ -495,17 +495,17 @@ export default function MysteryBoxPage() {
         </div>
 
         {/* Main Content */}
-        <div className="relative h-full flex flex-col items-center justify-center px-4 pb-20 pt-16" style={{ minHeight: '600px' }}>
+        <div className="relative h-full flex flex-col items-center justify-center px-4 pb-16 pt-14 overflow-y-auto" style={{ minHeight: '100%' }}>
           {/* Game Title */}
-          <div className="text-center mb-4">
-            <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-2">
+          <div className="text-center mb-3">
+            <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">
               🎁 Mystery Box
             </h1>
-            <p className="text-white/70">Choose 1 box from 10 • Find the jackpot!</p>
+            <p className="text-white/70 text-sm">Choose 1 box from 10 • Find the jackpot!</p>
           </div>
 
           {/* Stats Display */}
-          <div className="grid grid-cols-3 gap-3 mb-4 w-full max-w-md">
+          <div className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center">
               <div className="text-xs text-white/60 mb-1">Vault</div>
               <div className="text-base font-bold text-emerald-400">{fmt(vault)}</div>
@@ -522,13 +522,13 @@ export default function MysteryBoxPage() {
 
           {/* Mystery Boxes Grid */}
           <div style={{ minHeight: '220px' }}>
-          {gameActive && (
+              {gameActive && (
             <div className="grid grid-cols-5 gap-3 mb-4">
               {boxes.map((prize, index) => (
-                  <button
-                    key={index}
-                    onClick={() => chooseBox(index)}
-                    disabled={selectedBox !== null}
+                      <button
+                        key={index}
+                        onClick={() => chooseBox(index)}
+                        disabled={selectedBox !== null}
                     className={`w-16 h-16 rounded-lg font-bold text-2xl transition-all ${
                       selectedBox === index
                         ? prize >= 1
@@ -540,33 +540,34 @@ export default function MysteryBoxPage() {
                     } disabled:cursor-not-allowed`}
                   >
                     {selectedBox === index ? (prize === 50 ? '💎' : prize >= 5 ? '🎁' : prize >= 1 ? '🪙' : '💔') : '🎁'}
-                  </button>
+                      </button>
               ))}
-            </div>
-          )}
+                </div>
+              )}
+          </div>
 
           {/* Result Display */}
           <div style={{ minHeight: '120px' }}>
-          {gameResult && (
+              {gameResult && (
             <div className="mb-4 text-center">
               <div className="text-6xl mb-2">
                 {gameResult.jackpot ? '💎' : gameResult.win ? '🎉' : '💔'}
               </div>
               <div className={`text-2xl font-bold ${gameResult.win ? 'text-green-400' : 'text-red-400'}`}>
                 {gameResult.jackpot ? 'JACKPOT!' : gameResult.win ? 'YOU WIN!' : 'BETTER LUCK NEXT TIME'}
-              </div>
+                      </div>
               <div className="text-lg mt-2">
                 ×{gameResult.multiplier} = {fmt(gameResult.prize)} MLEO
-              </div>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-          </div>
 
           {/* Bet Controls */}
           <div style={{ minHeight: '48px', marginBottom: '16px' }}>
-          {!gameActive && !gameResult && (
+              {!gameActive && !gameResult && (
             <div className="flex items-center gap-2">
-              <button
+                    <button
                 onClick={() => {
                   const current = Number(betAmount) || MIN_BET;
                   const newBet = Math.max(MIN_BET, current - 1000);
@@ -576,15 +577,15 @@ export default function MysteryBoxPage() {
                 className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold"
               >
                 −
-              </button>
-              <input
-                type="number"
-                value={betAmount}
-                onChange={(e) => setBetAmount(e.target.value)}
+                  </button>
+                    <input 
+                      type="number" 
+                      value={betAmount} 
+                      onChange={(e) => setBetAmount(e.target.value)} 
                 className="w-28 h-10 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-sm"
                 min={MIN_BET}
-              />
-              <button
+                    />
+                        <button 
                 onClick={() => {
                   const current = Number(betAmount) || MIN_BET;
                   const newBet = Math.min(vault, current + 1000);
@@ -594,30 +595,30 @@ export default function MysteryBoxPage() {
                 className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold"
               >
                 +
-              </button>
-            </div>
+                        </button>
+                    </div>
           )}
-          </div>
+                    </div>
 
           {/* Action Buttons */}
           <div className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '100px' }}>
             {!gameActive && !gameResult && (
               <button
                 onClick={() => startGame(false)}
-                className="w-full py-3 rounded-lg font-bold text-lg bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg hover:brightness-110 transition-all"
+                className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg hover:brightness-110 transition-all"
               >
                 START GAME
               </button>
-            )}
+              )}
 
-            {gameResult && (
-              <button
-                onClick={resetGame}
-                className="w-full py-3 rounded-lg font-bold text-lg bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg hover:brightness-110 transition-all"
+              {gameResult && (
+                <button
+                  onClick={resetGame}
+                className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg hover:brightness-110 transition-all"
               >
                 PLAY AGAIN
-              </button>
-            )}
+                </button>
+              )}
 
             <div className="flex gap-2">
               <button
@@ -696,7 +697,7 @@ export default function MysteryBoxPage() {
                   </button>
 
                   {isConnected && (
-                    <button
+                    <button 
                       onClick={hardDisconnect}
                       className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white"
                     >
@@ -736,7 +737,7 @@ export default function MysteryBoxPage() {
                 >
                   SFX: {sfxMuted ? "Off" : "On"}
                 </button>
-              </div>
+          </div>
 
               <div className="mt-4 text-xs opacity-70">
                 <p>Mystery Box v2.0</p>
@@ -765,8 +766,8 @@ export default function MysteryBoxPage() {
                     <p>• 2 boxes: ×1 (break even)</p>
                     <p>• 1 box: ×0 💔 (lose all)</p>
                   </div>
-                </div>
-              </div>
+            </div>
+            </div>
               <button
                 onClick={() => setShowHowToPlay(false)}
                 className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold"
@@ -811,8 +812,8 @@ export default function MysteryBoxPage() {
                     <div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                       {fmt(stats.totalWon - stats.totalBet)}
                     </div>
-                  </div>
-                </div>
+          </div>
+        </div>
 
                 <div className="bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border border-yellow-500/30 rounded-lg p-4">
                   <div className="text-sm font-semibold mb-2">💎 Jackpots Hit</div>
