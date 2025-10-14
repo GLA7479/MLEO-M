@@ -445,7 +445,7 @@ export default function CoinFlipPage() {
             <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
               <button
                 onClick={backSafe}
-                className="px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+                className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
                 title="Back to Arcade"
               >
                 BACK
@@ -479,7 +479,7 @@ export default function CoinFlipPage() {
                     document.exitFullscreen?.().catch(() => {});
                   }
                 }}
-                className="px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+                className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
                 title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
               >
                 {isFullscreen ? "EXIT" : "FULL"}
@@ -487,7 +487,7 @@ export default function CoinFlipPage() {
 
               <button
                 onClick={() => { playSfx(clickSound.current); setMenuOpen(true); }}
-                className="px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+                className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
                 title="Menu"
               >
                 MENU
