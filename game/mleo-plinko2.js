@@ -51,26 +51,11 @@ function useIOSViewportFix() {
 const LS_KEY = "mleo_plinko2_v1";
 const MIN_BET = 1000;
 
-// Risk levels with different multipliers
-const RISK_LEVELS = {
-  low: {
-    name: "Low Risk",
-    multipliers: [1.1, 1.3, 1, 0.7, 0.5, 0.3, 0.2, 0.1, 0.2, 0.3, 0.5, 0.7, 1, 1.3, 1.1],
-    colors: ["from-blue-500 to-cyan-500", "from-green-400 to-emerald-500", "from-blue-400 to-blue-500", "from-purple-400 to-purple-500", "from-gray-500 to-gray-600", "from-gray-600 to-gray-700", "from-gray-700 to-gray-800", "from-gray-800 to-black", "from-gray-700 to-gray-800", "from-gray-600 to-gray-700", "from-gray-500 to-gray-600", "from-purple-400 to-purple-500", "from-blue-400 to-blue-500", "from-green-400 to-emerald-500", "from-blue-500 to-cyan-500"],
-  },
-  medium: {
-    name: "Medium Risk",
-    multipliers: [3, 1.5, 1.1, 1, 0.5, 0.3, 0.2, 0, 0.2, 0.3, 0.5, 1, 1.1, 1.5, 3],
-    colors: ["from-yellow-400 to-amber-500", "from-orange-500 to-orange-600", "from-green-500 to-green-600", "from-blue-500 to-cyan-500", "from-purple-400 to-purple-500", "from-gray-500 to-gray-600", "from-red-500 to-red-600", "from-gray-800 to-black", "from-red-500 to-red-600", "from-gray-500 to-gray-600", "from-purple-400 to-purple-500", "from-blue-500 to-cyan-500", "from-green-500 to-green-600", "from-orange-500 to-orange-600", "from-yellow-400 to-amber-500"],
-  },
-  high: {
-    name: "High Risk",
-    multipliers: [10, 3, 1.5, 1, 0.5, 0.3, 0.1, 0, 0.1, 0.3, 0.5, 1, 1.5, 3, 10],
-    colors: ["from-yellow-300 to-yellow-500", "from-orange-400 to-orange-600", "from-green-500 to-emerald-500", "from-blue-500 to-cyan-500", "from-purple-500 to-purple-600", "from-gray-600 to-gray-700", "from-red-600 to-red-700", "from-black to-gray-900", "from-red-600 to-red-700", "from-gray-600 to-gray-700", "from-purple-500 to-purple-600", "from-blue-500 to-cyan-500", "from-green-500 to-emerald-500", "from-orange-400 to-orange-600", "from-yellow-300 to-yellow-500"],
-  },
-};
+// High Risk only - maximum multipliers
+const MULTIPLIERS = [10, 3, 1.5, 1, 0.5, 0.3, 0.1, 0, 0.1, 0.3, 0.5, 1, 1.5, 3, 10];
+const BUCKET_COLORS = ["from-yellow-300 to-yellow-500", "from-orange-400 to-orange-600", "from-green-500 to-emerald-500", "from-blue-500 to-cyan-500", "from-purple-500 to-purple-600", "from-gray-600 to-gray-700", "from-red-600 to-red-700", "from-black to-gray-900", "from-red-600 to-red-700", "from-gray-600 to-gray-700", "from-purple-500 to-purple-600", "from-blue-500 to-cyan-500", "from-green-500 to-emerald-500", "from-orange-400 to-orange-600", "from-yellow-300 to-yellow-500"];
 
-const ROWS = 13;
+const ROWS = 16;
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -149,7 +134,6 @@ export default function Plinko2Page() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000");
-  const [riskLevel, setRiskLevel] = useState("medium");
   const [ballsDropping, setBallsDropping] = useState(0);
 
   // Game state
@@ -246,35 +230,34 @@ export default function Plinko2Page() {
     const buildBoard = () => {
       const w = canvas.width;
       const h = canvas.height;
-      const multipliers = RISK_LEVELS[riskLevel].multipliers;
-      const bucketCount = multipliers.length;
+      const bucketCount = MULTIPLIERS.length;
 
-      // Build pegs
+      // Build pegs - more rows, tighter spacing
       const pegs = [];
       const pegGapX = (w - 40) / (ROWS + 2);
-      const pegGapY = (h - 100) / (ROWS + 2);
+      const pegGapY = (h - 50) / (ROWS + 2);
 
       for (let row = 0; row < ROWS; row++) {
         const pegCount = row + 2;
-        const rowY = 60 + row * pegGapY;
+        const rowY = 40 + row * pegGapY;
         for (let col = 0; col < pegCount; col++) {
           const rowWidth = pegCount * pegGapX;
           const startX = (w - rowWidth) / 2 + pegGapX / 2;
           const pegX = startX + col * pegGapX;
-          pegs.push({ x: pegX, y: rowY, r: 4 });
+          pegs.push({ x: pegX, y: rowY, r: 3 });
         }
       }
 
-      // Build buckets
+      // Build buckets - 50% smaller height
       const buckets = [];
       const bucketWidth = (w - 40) / bucketCount;
       for (let i = 0; i < bucketCount; i++) {
         buckets.push({
           x: 20 + i * bucketWidth,
-          y: h - 60,
+          y: h - 30,
           w: bucketWidth,
-          h: 40,
-          multiplier: multipliers[i],
+          h: 20,
+          multiplier: MULTIPLIERS[i],
           index: i,
         });
       }
@@ -307,7 +290,6 @@ export default function Plinko2Page() {
       });
 
       // Draw buckets
-      const colors = RISK_LEVELS[riskLevel].colors;
       bucketsRef.current.forEach((bucket, i) => {
         const grad = ctx.createLinearGradient(
           bucket.x,
@@ -315,7 +297,7 @@ export default function Plinko2Page() {
           bucket.x,
           bucket.y + bucket.h
         );
-        const colorClass = colors[i] || "from-gray-700 to-gray-800";
+        const colorClass = BUCKET_COLORS[i] || "from-gray-700 to-gray-800";
         // Simple color extraction (not perfect but works)
         if (colorClass.includes("yellow")) {
           grad.addColorStop(0, "#facc15");
@@ -342,14 +324,14 @@ export default function Plinko2Page() {
         ctx.fillStyle = grad;
         ctx.fillRect(bucket.x, bucket.y, bucket.w, bucket.h);
 
-        // Multiplier text
+        // Multiplier text - smaller for smaller buckets
         ctx.fillStyle = "white";
-        ctx.font = "bold 12px sans-serif";
+        ctx.font = "bold 10px sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(
           `${bucket.multiplier}x`,
           bucket.x + bucket.w / 2,
-          bucket.y + bucket.h / 2 + 4
+          bucket.y + bucket.h / 2 + 3
         );
       });
 
@@ -419,7 +401,7 @@ export default function Plinko2Page() {
           }
         });
 
-        // Draw ball
+        // Draw ball - smaller for better physics
         if (!landed) {
           ctx.fillStyle = "#fbbf24";
           ctx.beginPath();
@@ -438,7 +420,7 @@ export default function Plinko2Page() {
       cancelAnimationFrame(rafRef.current);
       window.removeEventListener("resize", resize);
     };
-  }, [mounted, riskLevel]);
+  }, [mounted]);
 
   const landInBucket = (ball, bucket) => {
     const bet = ball.bet;
@@ -516,7 +498,7 @@ export default function Plinko2Page() {
       y: 20,
       vx: (Math.random() - 0.5) * 50,
       vy: 50,
-      r: 5,
+      r: 3,
       bet,
     };
 
@@ -681,7 +663,7 @@ export default function Plinko2Page() {
               🎯 Plinko
             </h1>
             <p className="text-white/70 text-sm">
-              Balls Dropping: {ballsDropping}
+              High Risk • Max Multipliers!
             </p>
           </div>
 
@@ -702,9 +684,9 @@ export default function Plinko2Page() {
               </div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
-              <div className="text-xs text-white/60 mb-1">Risk</div>
+              <div className="text-xs text-white/60 mb-1">Balls</div>
               <div className="text-lg font-bold text-purple-400">
-                {RISK_LEVELS[riskLevel].name}
+                {ballsDropping}
               </div>
             </div>
           </div>
@@ -721,30 +703,7 @@ export default function Plinko2Page() {
             />
           </div>
 
-          {/* RISK SELECTOR */}
-          <div className="mb-3 w-full max-w-md">
-            <div className="flex gap-2 justify-center">
-              {Object.entries(RISK_LEVELS).map(([key, data]) => (
-                <button
-                  key={key}
-                  onClick={() => {
-                    setRiskLevel(key);
-                    playSfx(clickSound.current);
-                  }}
-                  disabled={ballsDropping > 0}
-                  className={`px-3 py-2 rounded text-xs font-bold transition-all ${
-                    riskLevel === key
-                      ? "bg-purple-500 text-white ring-2 ring-purple-300"
-                      : "bg-white/10 text-white hover:bg-white/20"
-                  } disabled:opacity-50`}
-                >
-                  {data.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div ref={betRef} className="flex items-center gap-2 mb-3">
+          <div ref={betRef} className="flex items-center justify-center gap-2 mb-3">
             <button
               onClick={() => {
                 const current = Number(betAmount) || MIN_BET;
