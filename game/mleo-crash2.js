@@ -148,6 +148,7 @@ export default function Crash2Page() {
   const wrapRef = useRef(null);
   const headerRef = useRef(null);
   const metersRef = useRef(null);
+  const infoRef = useRef(null);
   const betRef = useRef(null);
   const ctaRef = useRef(null);
 
@@ -286,6 +287,7 @@ export default function Crash2Page() {
       const used =
         headH +
         (metersRef.current?.offsetHeight || 0) +
+        (infoRef.current?.offsetHeight || 0) +
         (betRef.current?.offsetHeight || 0) +
         (ctaRef.current?.offsetHeight || 0) +
         topPad +
@@ -651,11 +653,11 @@ export default function Crash2Page() {
             paddingTop: "calc(var(--head-h, 56px) + 8px)",
           }}
         >
-          <div className="text-center mb-3">
+          <div className="text-center mb-3" style={{ minHeight: "80px" }}>
             <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">
               🚀 Crash
             </h1>
-            <p className="text-white/70 text-sm">
+            <p className="text-white/70 text-sm" style={{ minHeight: "20px" }}>
               {phase === "betting"
                 ? `Betting ${countdown}s`
                 : phase === "running"
@@ -690,45 +692,55 @@ export default function Crash2Page() {
             </div>
           </div>
 
+          <div
+            ref={infoRef}
+            className="mb-2 text-center text-xs text-white/70"
+            style={{ minHeight: "20px" }}
+          >
+            Round #{nonce} • {phase === "betting" ? "Placing bets..." : phase === "running" ? `Flying ${multiplier.toFixed(2)}x` : `Crashed @ ${crashPoint?.toFixed(2)}x`}
+          </div>
+
           {/* CHART */}
           <div
             id="crash-chart-wrap"
             className="mb-3 w-full max-w-md"
-            style={{ height: "var(--chart-h, 200px)" }}
+            style={{ height: "var(--chart-h, 200px)", minHeight: "200px" }}
           >
             <div className="relative w-full h-full bg-black/30 border border-white/10 rounded-lg p-4 flex items-center justify-center">
-              {phase === "betting" ? (
-                <div className="text-white/50 text-sm">
+              <div className="relative w-full h-full">
+                <div 
+                  className="absolute top-2 left-2 z-10 text-4xl font-bold text-white"
+                  style={{ opacity: phase === "betting" ? 0 : 1, transition: "opacity 0.3s" }}
+                >
+                  {multiplier.toFixed(2)}x
+                </div>
+                <div 
+                  className="absolute inset-0 flex items-center justify-center text-white/50 text-sm"
+                  style={{ opacity: phase === "betting" ? 1 : 0, transition: "opacity 0.3s" }}
+                >
                   Waiting for round to start...
                 </div>
-              ) : (
-                <div className="relative w-full h-full">
-                  <div className="absolute top-2 left-2 z-10 text-4xl font-bold text-white">
-                    {multiplier.toFixed(2)}x
-                  </div>
-                  <svg
-                    viewBox="0 0 300 200"
-                    className="w-full h-full"
-                    preserveAspectRatio="xMidYMid meet"
-                  >
-                    <path
-                      d={chart || "M0,180 L300,180"}
-                      stroke={
-                        phase === "crashed" ? "#ef4444" : "#10b981"
-                      }
-                      strokeWidth="3"
-                      fill="none"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-              )}
+                <svg
+                  viewBox="0 0 300 200"
+                  className="w-full h-full"
+                  preserveAspectRatio="xMidYMid meet"
+                  style={{ opacity: phase === "betting" ? 0 : 1, transition: "opacity 0.3s" }}
+                >
+                  <path
+                    d={chart || "M0,180 L300,180"}
+                    stroke={phase === "crashed" ? "#ef4444" : "#10b981"}
+                    strokeWidth="3"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
             </div>
           </div>
 
-          <div ref={betRef} className="w-full max-w-md mb-3 space-y-2">
-            <div className="flex items-center gap-2">
+          <div ref={betRef} className="w-full max-w-md mb-3 space-y-2" style={{ minHeight: "100px" }}>
+            <div className="flex items-center justify-center gap-2">
               <button
                 onClick={() => {
                   const current = Number(betAmount) || MIN_BET;
@@ -762,7 +774,7 @@ export default function Crash2Page() {
                 +
               </button>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center gap-2">
               <input
                 type="checkbox"
                 checked={enableAutoCashOut}
@@ -787,24 +799,24 @@ export default function Crash2Page() {
             className="flex flex-col gap-3 w-full max-w-sm"
             style={{ minHeight: "140px" }}
           >
-            {phase === "running" && canCashOut && (
-              <button
-                onClick={cashOut}
-                className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg hover:brightness-110 transition-all"
-              >
-                💰 CASH OUT {fmt(potentialWin)}
-              </button>
-            )}
             <button
-              onClick={() => placeBet(false)}
+              onClick={
+                phase === "running" && canCashOut
+                  ? cashOut
+                  : () => placeBet(false)
+              }
               disabled={
-                phase !== "betting" ||
-                playerBet ||
-                Number(betAmount) < MIN_BET
+                (phase === "betting" && (playerBet || Number(betAmount) < MIN_BET)) ||
+                (phase === "running" && !canCashOut) ||
+                (phase !== "betting" && phase !== "running")
               }
               className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
             >
-              {playerBet ? "✅ BET PLACED" : `🎲 JOIN ROUND`}
+              {phase === "running" && canCashOut
+                ? `💰 CASH OUT ${fmt(potentialWin)}`
+                : playerBet
+                ? "✅ BET PLACED"
+                : `🎲 JOIN ROUND`}
             </button>
             <div className="flex gap-2">
               <button
@@ -1025,7 +1037,7 @@ export default function Crash2Page() {
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
                     <div className="text-xs text-white/60">Best Multi</div>
                     <div className="text-lg font-bold text-purple-400">
-                      {stats.biggestMultiplier.toFixed(2)}x
+                      {(stats.biggestMultiplier || 0).toFixed(2)}x
                     </div>
                   </div>
                 </div>
