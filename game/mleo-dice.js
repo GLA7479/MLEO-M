@@ -665,31 +665,28 @@ export default function DicePage() {
               {rolling ? "Rolling..." : "ROLL DICE"}
             </button>
 
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <button
                 onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }}
-                className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-sm"
+                className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs"
               >
                 How to Play
-                  </button>
-                  <button
+              </button>
+              <button
                 onClick={() => { setShowStats(true); playSfx(clickSound.current); }}
-                className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-sm"
-                  >
+                className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs"
+              >
                 Stats
-                  </button>
-                </div>
+              </button>
+              <button
+                onClick={() => { setShowVaultModal(true); playSfx(clickSound.current); }}
+                className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs"
+              >
+                💰 Vault
+              </button>
+            </div>
                     </div>
                   </div>
-
-        {/* MLEO Vault Button (Floating) */}
-        <button
-          onClick={() => setShowVaultModal(true)}
-          className="fixed bottom-6 right-6 z-40 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold shadow-2xl hover:scale-105 transition-all flex items-center gap-2"
-        >
-          <span>💰</span>
-          <span>{fmt(vault)} MLEO</span>
-        </button>
 
         {/* Result Popup */}
         {showResultPopup && gameResult && (
@@ -896,16 +893,8 @@ export default function DicePage() {
         {/* MLEO Vault Modal */}
         {showVaultModal && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
-            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-extrabold">💰 MLEO Vault</h2>
-                <button
-                  onClick={() => setShowVaultModal(false)}
-                  className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center"
-                >
-                  ✕
-                </button>
-              </div>
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+              <h2 className="text-2xl font-extrabold mb-4">💰 MLEO Vault</h2>
 
               <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-6 text-center">
                 <div className="text-sm text-white/60 mb-1">Current Balance</div>
@@ -946,6 +935,13 @@ export default function DicePage() {
                   <p>• Network: BSC Testnet (TBNB)</p>
                 </div>
               </div>
+
+              <button
+                onClick={() => setShowVaultModal(false)}
+                className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold"
+              >
+                Close
+              </button>
             </div>
           </div>
         )}
