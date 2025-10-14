@@ -76,6 +76,29 @@ const TEXT = {
       "Progress may be adjusted to address bugs, exploits or abuse.",
       "This is a testnet version. Data may be wiped or reset during development.",
       "Connect your wallet to claim MLEO tokens on-chain when available."
+    ],
+    arcadeWhat: "What is MLEO Arcade?",
+    arcadeWhatDesc: "MLEO Arcade is a collection of 24 exciting mini-games where you can win MLEO tokens! Each game has unique mechanics and multipliers.",
+    arcadeHowToPlay: "How to Play",
+    arcadeSteps: [
+      "Choose any game from the arcade",
+      "Each game costs 1,000 MLEO per round (deducted from your vault)",
+      "Follow the game-specific instructions",
+      "Win prizes and multipliers up to 10,000 MLEO!",
+      "All winnings are automatically added to your vault"
+    ],
+    arcadeFreePlay: "Free Play Tokens",
+    arcadeFreePlayList: [
+      "Earn 1 free play token every hour (max 5 tokens)",
+      "Use tokens to play any game without spending MLEO",
+      "Free play wins are still added to your vault!"
+    ],
+    arcadeGoodToKnow: "Good to Know",
+    arcadeGoodToKnowList: [
+      "Your vault is shared between all MLEO games",
+      "Each game tracks your personal statistics",
+      "All games use fair random number generation",
+      "Click the ℹ️ button on each game for specific rules"
     ]
   },
   ar: {
@@ -145,6 +168,29 @@ const TEXT = {
       "قد يتم تعديل التقدم لمعالجة الأخطاء أو الاستغلال أو الإساءة.",
       "هذه نسخة شبكة اختبار. قد تُمسح البيانات أو تُعاد أثناء التطوير.",
       "اتصل بمحفظتك للمطالبة برموز MLEO على السلسلة عند التوفر."
+    ],
+    arcadeWhat: "ما هو MLEO Arcade؟",
+    arcadeWhatDesc: "MLEO Arcade هي مجموعة من 24 لعبة صغيرة مثيرة حيث يمكنك الفوز برموز MLEO! كل لعبة لها آليات ومضاعفات فريدة.",
+    arcadeHowToPlay: "كيف تلعب",
+    arcadeSteps: [
+      "اختر أي لعبة من الأركيد",
+      "كل لعبة تكلف 1,000 MLEO لكل جولة (يُخصم من خزنتك)",
+      "اتبع تعليمات اللعبة المحددة",
+      "اربح جوائز ومضاعفات تصل إلى 10,000 MLEO!",
+      "جميع الأرباح تُضاف تلقائيًا إلى خزنتك"
+    ],
+    arcadeFreePlay: "رموز اللعب المجاني",
+    arcadeFreePlayList: [
+      "احصل على رمز لعب مجاني واحد كل ساعة (بحد أقصى 5 رموز)",
+      "استخدم الرموز للعب أي لعبة دون إنفاق MLEO",
+      "أرباح اللعب المجاني لا تزال تُضاف إلى خزنتك!"
+    ],
+    arcadeGoodToKnow: "جيد أن تعرف",
+    arcadeGoodToKnowList: [
+      "خزنتك مشتركة بين جميع ألعاب MLEO",
+      "كل لعبة تتبع إحصائياتك الشخصية",
+      "جميع الألعاب تستخدم توليد أرقام عشوائية عادلة",
+      "انقر على زر ℹ️ في كل لعبة للقواعد المحددة"
     ]
   },
   ru: {
@@ -214,7 +260,30 @@ const TEXT = {
       "Прогресс может быть скорректирован для устранения ошибок, эксплойтов или злоупотреблений.",
       "Это версия тестовой сети. Данные могут быть стерты или сброшены во время разработки.",
       "Подключите свой кошелек, чтобы забрать токены MLEO в блокчейне, когда они станут доступны."
-    ]
+    ],
+    arcadeWhat: "Что такое MLEO Arcade?",
+    arcadeWhatDesc: "MLEO Arcade - это коллекция из 24 увлекательных мини-игр, в которых вы можете выиграть токены MLEO! Каждая игра имеет уникальную механику и множители.",
+    arcadeHowToPlay: "Как играть",
+    arcadeSteps: [
+      "Выберите любую игру из аркады",
+      "Каждая игра стоит 1,000 MLEO за раунд (вычитается из вашего хранилища)",
+      "Следуйте инструкциям для конкретной игры",
+      "Выигрывайте призы и множители до 10,000 MLEO!",
+      "Все выигрыши автоматически добавляются в ваше хранилище"
+    ],
+    arcadeFreePlay: "Токены бесплатной игры",
+    arcadeFreePlayList: [
+      "Получайте 1 токен бесплатной игры каждый час (максимум 5 токенов)",
+      "Используйте токены для игры в любую игру без траты MLEO",
+      "Выигрыши в бесплатной игре все равно добавляются в ваше хранилище!"
+    ],
+    arcadeGoodToKnow: "Хорошо знать",
+    arcadeGoodToKnowList: [
+      "Ваше хранилище общее для всех игр MLEO",
+      "Каждая игра отслеживает вашу личную статистику",
+      "Все игры используют справедливую генерацию случайных чисел",
+      "Нажмите кнопку ℹ️ в каждой игре для конкретных правил"
+    ],
   },
   es: {
     name: "Español", dir: "ltr", code: "es",
@@ -283,7 +352,30 @@ const TEXT = {
       "El progreso puede ajustarse para abordar bugs, exploits o abuso.",
       "Esta es una versión de testnet. Los datos pueden borrarse o reiniciarse durante desarrollo.",
       "Conecta tu wallet para reclamar tokens MLEO on-chain cuando estén disponibles."
-    ]
+    ],
+    arcadeWhat: "¿Qué es MLEO Arcade?",
+    arcadeWhatDesc: "MLEO Arcade es una colección de 24 emocionantes minijuegos donde puedes ganar tokens MLEO! Cada juego tiene mecánicas y multiplicadores únicos.",
+    arcadeHowToPlay: "Cómo jugar",
+    arcadeSteps: [
+      "Elige cualquier juego del arcade",
+      "Cada juego cuesta 1,000 MLEO por ronda (deducido de tu bóveda)",
+      "Sigue las instrucciones específicas del juego",
+      "¡Gana premios y multiplicadores de hasta 10,000 MLEO!",
+      "Todas las ganancias se agregan automáticamente a tu bóveda"
+    ],
+    arcadeFreePlay: "Tokens de juego gratis",
+    arcadeFreePlayList: [
+      "Gana 1 token de juego gratis cada hora (máx 5 tokens)",
+      "Usa tokens para jugar cualquier juego sin gastar MLEO",
+      "¡Las ganancias de juego gratis aún se agregan a tu bóveda!"
+    ],
+    arcadeGoodToKnow: "Bueno saber",
+    arcadeGoodToKnowList: [
+      "Tu bóveda se comparte entre todos los juegos MLEO",
+      "Cada juego rastrea tus estadísticas personales",
+      "Todos los juegos usan generación de números aleatorios justos",
+      "Haz clic en el botón ℹ️ en cada juego para reglas específicas"
+    ],
   },
   fr: {
     name: "Français", dir: "ltr", code: "fr",
@@ -352,7 +444,30 @@ const TEXT = {
       "Le progrès peut être ajusté pour adresser bugs, exploits ou abus.",
       "Ceci est une version testnet. Les données peuvent être effacées ou réinitialisées pendant développement.",
       "Connectez votre wallet pour réclamer tokens MLEO on-chain quand disponibles."
-    ]
+    ],
+    arcadeWhat: "Qu'est-ce que MLEO Arcade?",
+    arcadeWhatDesc: "MLEO Arcade est une collection de 24 mini-jeux excitants où vous pouvez gagner des tokens MLEO! Chaque jeu a des mécaniques et multiplicateurs uniques.",
+    arcadeHowToPlay: "Comment jouer",
+    arcadeSteps: [
+      "Choisissez n'importe quel jeu de l'arcade",
+      "Chaque jeu coûte 1,000 MLEO par partie (déduit de votre coffre)",
+      "Suivez les instructions spécifiques du jeu",
+      "Gagnez des prix et multiplicateurs jusqu'à 10,000 MLEO!",
+      "Tous les gains sont automatiquement ajoutés à votre coffre"
+    ],
+    arcadeFreePlay: "Tokens de jeu gratuit",
+    arcadeFreePlayList: [
+      "Gagnez 1 token de jeu gratuit chaque heure (max 5 tokens)",
+      "Utilisez les tokens pour jouer à n'importe quel jeu sans dépenser de MLEO",
+      "Les gains de jeu gratuit sont toujours ajoutés à votre coffre!"
+    ],
+    arcadeGoodToKnow: "Bon à savoir",
+    arcadeGoodToKnowList: [
+      "Votre coffre est partagé entre tous les jeux MLEO",
+      "Chaque jeu suit vos statistiques personnelles",
+      "Tous les jeux utilisent une génération de nombres aléatoires équitable",
+      "Cliquez sur le bouton ℹ️ sur chaque jeu pour les règles spécifiques"
+    ],
   },
   de: {
     name: "Deutsch", dir: "ltr", code: "de",
@@ -421,7 +536,30 @@ const TEXT = {
       "Fortschritt kann angepasst werden um Bugs, Exploits oder Missbrauch zu beheben.",
       "Dies ist eine Testnet-Version. Daten können während Entwicklung gelöscht oder zurückgesetzt werden.",
       "Verbinde deine Wallet um MLEO-Token on-chain zu claimen wenn verfügbar."
-    ]
+    ],
+    arcadeWhat: "Was ist MLEO Arcade?",
+    arcadeWhatDesc: "MLEO Arcade ist eine Sammlung von 24 spannenden Mini-Spielen, bei denen Sie MLEO-Token gewinnen können! Jedes Spiel hat einzigartige Mechaniken und Multiplikatoren.",
+    arcadeHowToPlay: "Wie man spielt",
+    arcadeSteps: [
+      "Wählen Sie ein beliebiges Spiel aus der Arcade",
+      "Jedes Spiel kostet 1.000 MLEO pro Runde (von Ihrer Tresor abgezogen)",
+      "Folgen Sie den spielspezifischen Anweisungen",
+      "Gewinnen Sie Preise und Multiplikatoren bis zu 10.000 MLEO!",
+      "Alle Gewinne werden automatisch zu Ihrem Tresor hinzugefügt"
+    ],
+    arcadeFreePlay: "Kostenlose Spiel-Token",
+    arcadeFreePlayList: [
+      "Verdienen Sie 1 kostenloses Spiel-Token jede Stunde (max 5 Token)",
+      "Verwenden Sie Token, um jedes Spiel zu spielen, ohne MLEO auszugeben",
+      "Kostenlose Spielgewinne werden trotzdem zu Ihrem Tresor hinzugefügt!"
+    ],
+    arcadeGoodToKnow: "Gut zu wissen",
+    arcadeGoodToKnowList: [
+      "Ihr Tresor wird von allen MLEO-Spielen geteilt",
+      "Jedes Spiel verfolgt Ihre persönlichen Statistiken",
+      "Alle Spiele verwenden faire Zufallszahlengenerierung",
+      "Klicken Sie auf die ℹ️-Schaltfläche bei jedem Spiel für spezifische Regeln"
+    ],
   },
   zh: {
     name: "中文", dir: "ltr", code: "zh",
@@ -490,7 +628,30 @@ const TEXT = {
       "进度可能调整以解决错误、利用或滥用。",
       "这是测试网版本。数据可能在开发期间被擦除或重置。",
       "连接你的钱包以在可用时链上提取MLEO代币。"
-    ]
+    ],
+    arcadeWhat: "MLEO街机是什么？",
+    arcadeWhatDesc: "MLEO街机是24款激动人心的迷你游戏合集，您可以赢取MLEO代币！每款游戏都有独特的机制和倍数。",
+    arcadeHowToPlay: "如何游玩",
+    arcadeSteps: [
+      "从街机中选择任何游戏",
+      "每款游戏每轮花费1,000 MLEO（从您的金库中扣除）",
+      "遵循游戏特定的说明",
+      "赢取最高10,000 MLEO的奖品和倍数！",
+      "所有奖金自动添加到您的金库"
+    ],
+    arcadeFreePlay: "免费游玩代币",
+    arcadeFreePlayList: [
+      "每小时获得1个免费游玩代币（最多5个代币）",
+      "使用代币玩任何游戏而无需花费MLEO",
+      "免费游玩的奖金仍然添加到您的金库！"
+    ],
+    arcadeGoodToKnow: "须知",
+    arcadeGoodToKnowList: [
+      "您的金库在所有MLEO游戏中共享",
+      "每款游戏跟踪您的个人统计",
+      "所有游戏使用公平的随机数生成",
+      "点击每款游戏的ℹ️按钮查看具体规则"
+    ],
   },
   ja: {
     name: "日本語", dir: "ltr", code: "ja",
@@ -559,7 +720,30 @@ const TEXT = {
       "バグ、エクスプロイト、アビューズ対応のため進歩が調整される可能性。",
       "これはテストネット版。開発中にデータが消去またはリセットされる可能性。",
       "利用可能時にオンチェーンでMLEOトークンをクレームするためウォレット接続。"
-    ]
+    ],
+    arcadeWhat: "MLEO Arcadeとは？",
+    arcadeWhatDesc: "MLEO Arcadeは、MLEOトークンを獲得できる24種類のエキサイティングなミニゲームのコレクションです！各ゲームはユニークなメカニクスとマルチプライヤーがあります。",
+    arcadeHowToPlay: "プレイ方法",
+    arcadeSteps: [
+      "アーケードから任意のゲームを選択",
+      "各ゲームは1ラウンド1,000 MLEOかかります（ボールトから差し引かれます）",
+      "ゲーム固有の指示に従う",
+      "最大10,000 MLEOの賞品とマルチプライヤーを獲得！",
+      "すべての賞金は自動的にボールトに追加されます"
+    ],
+    arcadeFreePlay: "無料プレイトークン",
+    arcadeFreePlayList: [
+      "1時間ごとに1つの無料プレイトークンを獲得（最大5トークン）",
+      "トークンを使用してMLEOを使わずに任意のゲームをプレイ",
+      "無料プレイの賞金もボールトに追加されます！"
+    ],
+    arcadeGoodToKnow: "知っておくと良いこと",
+    arcadeGoodToKnowList: [
+      "ボールトはすべてのMLEOゲーム間で共有されます",
+      "各ゲームは個人統計を追跡します",
+      "すべてのゲームは公平な乱数生成を使用",
+      "各ゲームのℹ️ボタンをクリックして特定のルールを確認"
+    ],
   },
   ko: {
     name: "한국어", dir: "ltr", code: "ko",
@@ -628,7 +812,30 @@ const TEXT = {
       "버그, 악용 또는 남용을 해결하기 위해 진행이 조정될 수 있습니다.",
       "이는 테스트넷 버전입니다. 개발 중에 데이터가 삭제되거나 리셋될 수 있습니다.",
       "사용 가능할 때 온체인에서 MLEO 토큰을 청구하려면 지갑을 연결하세요."
-    ]
+    ],
+    arcadeWhat: "MLEO Arcade란?",
+    arcadeWhatDesc: "MLEO Arcade는 MLEO 토큰을 획득할 수 있는 24개의 흥미진진한 미니 게임 모음입니다! 각 게임은 고유한 메커니즘과 배수를 가지고 있습니다.",
+    arcadeHowToPlay: "플레이 방법",
+    arcadeSteps: [
+      "아케이드에서 원하는 게임 선택",
+      "각 게임은 라운드당 1,000 MLEO가 소요됩니다(금고에서 차감)",
+      "게임별 지침 따르기",
+      "최대 10,000 MLEO의 상금과 배수 획득!",
+      "모든 상금은 자동으로 금고에 추가됩니다"
+    ],
+    arcadeFreePlay: "무료 플레이 토큰",
+    arcadeFreePlayList: [
+      "매시간 1개의 무료 플레이 토큰 획득(최대 5개 토큰)",
+      "토큰을 사용하여 MLEO를 소비하지 않고 모든 게임 플레이",
+      "무료 플레이 상금도 금고에 추가됩니다!"
+    ],
+    arcadeGoodToKnow: "알아두면 좋은 정보",
+    arcadeGoodToKnowList: [
+      "금고는 모든 MLEO 게임에서 공유됩니다",
+      "각 게임은 개인 통계를 추적합니다",
+      "모든 게임은 공정한 난수 생성 사용",
+      "특정 규칙은 각 게임의 ℹ️ 버튼 클릭"
+    ],
   },
   tr: {
     name: "Türkçe", dir: "ltr", code: "tr",
@@ -697,7 +904,30 @@ const TEXT = {
       "İlerleme, hataları, sömürüleri veya kötüye kullanımı ele almak için ayarlanabilir.",
       "Bu bir testnet versiyonudur. Veriler geliştirme sırasında silinebilir veya sıfırlanabilir.",
       "MLEO tokenlerini zincir üzerinde talep etmek için cüzdanınızı bağlayın."
-    ]
+    ],
+    arcadeWhat: "MLEO Arcade nedir?",
+    arcadeWhatDesc: "MLEO Arcade, MLEO tokenleri kazanabileceğiniz 24 heyecan verici mini oyun koleksiyonudur! Her oyunun benzersiz mekanikleri ve çarpanları vardır.",
+    arcadeHowToPlay: "Nasıl oynanır",
+    arcadeSteps: [
+      "Arcade'dan herhangi bir oyun seçin",
+      "Her oyun tur başına 1,000 MLEO maliyetlidir (kasanızdan düşülür)",
+      "Oyuna özel talimatları izleyin",
+      "10,000 MLEO'ya kadar ödüller ve çarpanlar kazanın!",
+      "Tüm kazançlar otomatik olarak kasanıza eklenir"
+    ],
+    arcadeFreePlay: "Ücretsiz oyun tokenleri",
+    arcadeFreePlayList: [
+      "Her saat 1 ücretsiz oyun tokeni kazanın (maksimum 5 token)",
+      "MLEO harcamadan herhangi bir oyunu oynamak için token kullanın",
+      "Ücretsiz oyun kazançları yine de kasanıza eklenir!"
+    ],
+    arcadeGoodToKnow: "Bilmekte fayda var",
+    arcadeGoodToKnowList: [
+      "Kasanız tüm MLEO oyunları arasında paylaşılır",
+      "Her oyun kişisel istatistiklerinizi izler",
+      "Tüm oyunlar adil rastgele sayı üretimi kullanır",
+      "Özel kurallar için her oyundaki ℹ️ düğmesine tıklayın"
+    ],
   },
   it: {
     name: "Italiano", dir: "ltr", code: "it",
@@ -766,7 +996,30 @@ const TEXT = {
       "Il progresso può essere aggiustato per affrontare bug, exploit o abuso.",
       "Questa è una versione testnet. I dati possono essere cancellati o resettati durante lo sviluppo.",
       "Connetti il tuo wallet per richiedere token MLEO on-chain quando disponibili."
-    ]
+    ],
+    arcadeWhat: "Cos'è MLEO Arcade?",
+    arcadeWhatDesc: "MLEO Arcade è una collezione di 24 entusiasmanti mini-giochi dove puoi vincere token MLEO! Ogni gioco ha meccaniche e moltiplicatori unici.",
+    arcadeHowToPlay: "Come giocare",
+    arcadeSteps: [
+      "Scegli qualsiasi gioco dall'arcade",
+      "Ogni gioco costa 1.000 MLEO per round (dedotto dalla tua cassaforte)",
+      "Segui le istruzioni specifiche del gioco",
+      "Vinci premi e moltiplicatori fino a 10.000 MLEO!",
+      "Tutte le vincite vengono automaticamente aggiunte alla tua cassaforte"
+    ],
+    arcadeFreePlay: "Token gioco gratuito",
+    arcadeFreePlayList: [
+      "Guadagna 1 token gioco gratuito ogni ora (massimo 5 token)",
+      "Usa i token per giocare a qualsiasi gioco senza spendere MLEO",
+      "Le vincite di gioco gratuito vengono comunque aggiunte alla tua cassaforte!"
+    ],
+    arcadeGoodToKnow: "Buono a sapersi",
+    arcadeGoodToKnowList: [
+      "La tua cassaforte è condivisa tra tutti i giochi MLEO",
+      "Ogni gioco tiene traccia delle tue statistiche personali",
+      "Tutti i giochi utilizzano generazione di numeri casuali equa",
+      "Fai clic sul pulsante ℹ️ su ogni gioco per le regole specifiche"
+    ],
   },
   ka: {
     name: "ქართული", dir: "ltr", code: "ka",
@@ -835,7 +1088,30 @@ const TEXT = {
       "პროგრესი შეიძლება დარეგულირდეს ბაგების, ექსპლოიტების ან ბოროტად გამოყენების გადასაჭრელად.",
       "ეს არის ტესტნეტის ვერსია. მონაცემები შეიძლება წაიშალოს ან გადატვირთოს განვითარების დროს.",
       "დაუკავშირდი შენს საფულეს MLEO ტოკენების ონჩეინ მოთხოვნისთვის, როცა ხელმისაწვდომი იქნება."
-    ]
+    ],
+    arcadeWhat: "რა არის MLEO Arcade?",
+    arcadeWhatDesc: "MLEO Arcade არის 24 საინტერესო მინი-თამაშის კოლექცია, სადაც შეგიძლია მოიგო MLEO ტოკენები! თითოეულ თამაშს აქვს უნიკალური მექანიზმები და მულტიპლიკატორები.",
+    arcadeHowToPlay: "როგორ ვითამაშოთ",
+    arcadeSteps: [
+      "აირჩიე ნებისმიერი თამაში არკადიდან",
+      "თითოეული თამაში ჯდება 1,000 MLEO რაუნდზე (გაიქვითება შენი საცავიდან)",
+      "მიჰყევი თამაშის სპეციფიურ ინსტრუქციებს",
+      "მოიგე პრიზები და მულტიპლიკატორები 10,000 MLEO-მდე!",
+      "ყველა მოგება ავტომატურად ემატება შენს საცავს"
+    ],
+    arcadeFreePlay: "უფასო თამაშის ტოკენები",
+    arcadeFreePlayList: [
+      "მიიღე 1 უფასო თამაშის ტოკენი ყოველ საათში (მაქს 5 ტოკენი)",
+      "გამოიყენე ტოკენები ნებისმიერი თამაშის სათამაშოდ MLEO-ს დახარჯვის გარეშე",
+      "უფასო თამაშის მოგებები მაინც ემატება შენს საცავს!"
+    ],
+    arcadeGoodToKnow: "კარგი იცოდე",
+    arcadeGoodToKnowList: [
+      "შენი საცავი გაზიარებულია ყველა MLEO თამაშს შორის",
+      "თითოეული თამაში ადევნებს შენ პირად სტატისტიკას",
+      "ყველა თამაში იყენებს სამართლიან შემთხვევითი რიცხვების გენერირებას",
+      "დააწკაპუნე ℹ️ ღილაკზე თითოეულ თამაშზე სპეციფიური წესებისთვის"
+    ],
   },
   pl: {
     name: "Polski", dir: "ltr", code: "pl",
@@ -904,7 +1180,30 @@ const TEXT = {
       "Postęp może być dostosowany aby rozwiązać błędy, eksploity lub nadużycia.",
       "To jest wersja testnet. Dane mogą być usunięte lub zresetowane podczas rozwoju.",
       "Połącz swój portfel aby rościć tokeny MLEO on-chain gdy będą dostępne."
-    ]
+    ],
+    arcadeWhat: "Co to jest MLEO Arcade?",
+    arcadeWhatDesc: "MLEO Arcade to kolekcja 24 ekscytujących mini-gier, w których możesz wygrać tokeny MLEO! Każda gra ma unikalne mechaniki i multiplikatory.",
+    arcadeHowToPlay: "Jak grać",
+    arcadeSteps: [
+      "Wybierz dowolną grę z arcade",
+      "Każda gra kosztuje 1,000 MLEO za rundę (odliczone od twojego skarbca)",
+      "Postępuj zgodnie z instrukcjami specyficznymi dla gry",
+      "Wygrywaj nagrody i multiplikatory do 10,000 MLEO!",
+      "Wszystkie wygrane są automatycznie dodawane do twojego skarbca"
+    ],
+    arcadeFreePlay: "Tokeny darmowej gry",
+    arcadeFreePlayList: [
+      "Zdobądź 1 token darmowej gry co godzinę (maksimum 5 tokenów)",
+      "Użyj tokenów do grania w dowolną grę bez wydawania MLEO",
+      "Wygrane z darmowej gry nadal są dodawane do twojego skarbca!"
+    ],
+    arcadeGoodToKnow: "Dobrze wiedzieć",
+    arcadeGoodToKnowList: [
+      "Twój skarbiec jest wspólny dla wszystkich gier MLEO",
+      "Każda gra śledzi twoje osobiste statystyki",
+      "Wszystkie gry używają uczciwej generacji liczb losowych",
+      "Kliknij przycisk ℹ️ w każdej grze, aby zobaczyć konkretne zasady"
+    ],
   },
   ro: {
     name: "Română", dir: "ltr", code: "ro",
@@ -973,7 +1272,30 @@ const TEXT = {
       "Progresul poate fi ajustat pentru a aborda bug-uri, exploit-uri sau abuz.",
       "Aceasta este o versiune testnet. Datele pot fi șterse sau resetate în timpul dezvoltării.",
       "Conectează-ți portofelul pentru a cere token-uri MLEO on-chain când sunt disponibile."
-    ]
+    ],
+    arcadeWhat: "Ce este MLEO Arcade?",
+    arcadeWhatDesc: "MLEO Arcade este o colecție de 24 mini-jocuri interesante unde poți câștiga token-uri MLEO! Fiecare joc are mecanici și multiplicatori unici.",
+    arcadeHowToPlay: "Cum să joci",
+    arcadeSteps: [
+      "Alege orice joc din arcade",
+      "Fiecare joc costă 1,000 MLEO pe rundă (dedus din seiful tău)",
+      "Urmează instrucțiunile specifice jocului",
+      "Câștigă premii și multiplicatori până la 10,000 MLEO!",
+      "Toate câștigurile sunt adăugate automat în seiful tău"
+    ],
+    arcadeFreePlay: "Token-uri joc gratuit",
+    arcadeFreePlayList: [
+      "Câștigă 1 token joc gratuit în fiecare oră (maximum 5 token-uri)",
+      "Folosește token-uri pentru a juca orice joc fără a cheltui MLEO",
+      "Câștigurile de joc gratuit sunt tot adăugate în seiful tău!"
+    ],
+    arcadeGoodToKnow: "Bine de știut",
+    arcadeGoodToKnowList: [
+      "Seiful tău este partajat între toate jocurile MLEO",
+      "Fiecare joc urmărește statisticile tale personale",
+      "Toate jocurile folosesc generare echitabilă de numere aleatoare",
+      "Apasă butonul ℹ️ pe fiecare joc pentru reguli specifice"
+    ],
   },
   cs: {
     name: "Čeština", dir: "ltr", code: "cs",
@@ -1042,7 +1364,30 @@ const TEXT = {
       "Pokrok může být upraven pro řešení chyb, exploitů nebo zneužití.",
       "Toto je testnet verze. Data mohou být vymazána nebo resetována během vývoje.",
       "Připojte svou peněženku pro nárok na MLEO tokeny on-chain, když budou dostupné."
-    ]
+    ],
+    arcadeWhat: "Co je MLEO Arcade?",
+    arcadeWhatDesc: "MLEO Arcade je kolekce 24 vzrušujících mini-her, kde můžete vyhrát MLEO tokeny! Každá hra má unikátní mechaniky a multiplikátory.",
+    arcadeHowToPlay: "Jak hrát",
+    arcadeSteps: [
+      "Vyberte jakoukoliv hru z arkády",
+      "Každá hra stojí 1,000 MLEO za kolo (odečte se z vašeho trezoru)",
+      "Postupujte podle specifických pokynů hry",
+      "Vyhrávejte ceny a multiplikátory až do 10,000 MLEO!",
+      "Všechny výhry se automaticky přidají do vašeho trezoru"
+    ],
+    arcadeFreePlay: "Tokeny zdarma",
+    arcadeFreePlayList: [
+      "Získejte 1 token zdarma každou hodinu (maximum 5 tokenů)",
+      "Použijte tokeny k hraní jakékoliv hry bez utrácení MLEO",
+      "Výhry zdarma se stále přidávají do vašeho trezoru!"
+    ],
+    arcadeGoodToKnow: "Dobré vědět",
+    arcadeGoodToKnowList: [
+      "Váš trezor je sdílen mezi všemi MLEO hrami",
+      "Každá hra sleduje vaše osobní statistiky",
+      "Všechny hry používají spravedlivou generaci náhodných čísel",
+      "Klikněte na tlačítko ℹ️ u každé hry pro specifická pravidla"
+    ],
   },
   nl: {
     name: "Nederlands", dir: "ltr", code: "nl",
@@ -1111,7 +1456,30 @@ const TEXT = {
       "Voortgang kan worden aangepast om bugs, exploits of misbruik aan te pakken.",
       "Dit is een testnet versie. Data kan worden gewist of gereset tijdens ontwikkeling.",
       "Verbind je wallet om MLEO tokens on-chain te claimen wanneer beschikbaar."
-    ]
+    ],
+    arcadeWhat: "Wat is MLEO Arcade?",
+    arcadeWhatDesc: "MLEO Arcade is een collectie van 24 spannende mini-games waar je MLEO tokens kunt winnen! Elk spel heeft unieke mechanica en vermenigvuldigers.",
+    arcadeHowToPlay: "Hoe te spelen",
+    arcadeSteps: [
+      "Kies een willekeurig spel uit de arcade",
+      "Elk spel kost 1,000 MLEO per ronde (afgetrokken van je kluis)",
+      "Volg de spelspecifieke instructies",
+      "Win prijzen en vermenigvuldigers tot 10,000 MLEO!",
+      "Alle winsten worden automatisch toegevoegd aan je kluis"
+    ],
+    arcadeFreePlay: "Gratis speel tokens",
+    arcadeFreePlayList: [
+      "Verdien 1 gratis speel token elk uur (max 5 tokens)",
+      "Gebruik tokens om elk spel te spelen zonder MLEO uit te geven",
+      "Gratis speel winsten worden nog steeds toegevoegd aan je kluis!"
+    ],
+    arcadeGoodToKnow: "Goed om te weten",
+    arcadeGoodToKnowList: [
+      "Je kluis wordt gedeeld tussen alle MLEO spellen",
+      "Elk spel volgt je persoonlijke statistieken",
+      "Alle spellen gebruiken eerlijke willekeurige getalsgeneratie",
+      "Klik op de ℹ️ knop bij elk spel voor specifieke regels"
+    ],
   },
   el: {
     name: "Ελληνικά", dir: "ltr", code: "el",
@@ -1180,7 +1548,30 @@ const TEXT = {
       "Η πρόοδος μπορεί να προσαρμοστεί για να αντιμετωπίσει bugs, exploits ή κατάχρηση.",
       "Αυτή είναι μια testnet έκδοση. Τα δεδομένα μπορούν να διαγραφούν ή να επαναφερθούν κατά την ανάπτυξη.",
       "Συνδέσε το πορτοφόλι σου για να αξιώσεις MLEO tokens on-chain όταν είναι διαθέσιμα."
-    ]
+    ],
+    arcadeWhat: "Τι είναι το MLEO Arcade;",
+    arcadeWhatDesc: "Το MLEO Arcade είναι μια συλλογή από 24 συναρπαστικά mini-games όπου μπορείτε να κερδίσετε MLEO tokens! Κάθε παιχνίδι έχει μοναδικούς μηχανισμούς και πολλαπλασιαστές.",
+    arcadeHowToPlay: "Πώς να παίξετε",
+    arcadeSteps: [
+      "Επιλέξτε οποιοδήποτε παιχνίδι από το arcade",
+      "Κάθε παιχνίδι κοστίζει 1,000 MLEO ανά γύρο (αφαιρείται από το θησαυροφυλάκιό σας)",
+      "Ακολουθήστε τις οδηγίες του παιχνιδιού",
+      "Κερδίστε βραβεία και πολλαπλασιαστές έως 10,000 MLEO!",
+      "Όλα τα κέρδη προστίθενται αυτόματα στο θησαυροφυλάκιό σας"
+    ],
+    arcadeFreePlay: "Δωρεάν παιχνίδι tokens",
+    arcadeFreePlayList: [
+      "Κερδίστε 1 δωρεάν παιχνίδι token κάθε ώρα (max 5 tokens)",
+      "Χρησιμοποιήστε tokens για να παίξετε οποιοδήποτε παιχνίδι χωρίς να ξοδέψετε MLEO",
+      "Τα κέρδη από δωρεάν παιχνίδι προστίθενται ακόμα στο θησαυροφυλάκιό σας!"
+    ],
+    arcadeGoodToKnow: "Καλό να ξέρετε",
+    arcadeGoodToKnowList: [
+      "Το θησαυροφυλάκιό σας είναι κοινό σε όλα τα MLEO παιχνίδια",
+      "Κάθε παιχνίδι παρακολουθεί τα προσωπικά σας στατιστικά",
+      "Όλα τα παιχνίδια χρησιμοποιούν δίκαιη γέννηση τυχαίων αριθμών",
+      "Κάντε κλικ στο κουμπί ℹ️ σε κάθε παιχνίδι για συγκεκριμένους κανόνες"
+    ],
   },
   he: {
     name: "עברית", dir: "rtl", code: "he",
@@ -1249,7 +1640,30 @@ const TEXT = {
       "התקדמות עשויה להיות מותאמת לטיפול בבאגים, ניצול לרעה או התעללות.",
       "זוהי גרסת רשת בדיקה. נתונים עשויים להימחק או להתאפס במהלך הפיתוח.",
       "חבר את הארנק שלך לתביעת מטבעות MLEO על השרשרת כשהם זמינים."
-    ]
+    ],
+    arcadeWhat: "מה זה MLEO Arcade?",
+    arcadeWhatDesc: "MLEO Arcade הוא אוסף של 24 משחקוני מיני מרגשים שבהם אפשר לזכות בטוקנים של MLEO! לכל משחק יש מכניקות ומכפילים ייחודיים.",
+    arcadeHowToPlay: "איך משחקים",
+    arcadeSteps: [
+      "בחר כל משחק מהארקייד",
+      "כל משחק עולה 1,000 MLEO לסיבוב (מנוכה מהכספת שלך)",
+      "עקוב אחר הוראות המשחק הספציפיות",
+      "זכה בפרסים ומכפילים עד 10,000 MLEO!",
+      "כל הזכיות מתווספות אוטומטית לכספת שלך"
+    ],
+    arcadeFreePlay: "טוקנים של משחק חינם",
+    arcadeFreePlayList: [
+      "קבל טוקן משחק חינם אחד כל שעה (מקסימום 5 טוקנים)",
+      "השתמש בטוקנים כדי לשחק בכל משחק מבלי להוציא MLEO",
+      "זכיות במשחק חינם עדיין מתווספות לכספת שלך!"
+    ],
+    arcadeGoodToKnow: "טוב לדעת",
+    arcadeGoodToKnowList: [
+      "הכספת שלך משותפת בין כל משחקי MLEO",
+      "כל משחק עוקב אחר הסטטיסטיקות האישיות שלך",
+      "כל המשחקים משתמשים ביצירת מספרים אקראיים הוגנת",
+      "לחץ על כפתור ℹ️ בכל משחק לכללים ספציפיים"
+    ],
   }
 };
 
@@ -1321,6 +1735,46 @@ function HowToPlay({ lang, onClose, gameType = "miners" }) {
     );
   }
   
+  if (gameType === "arcade") {
+    return (
+      <div>
+        <h2 className="text-2xl font-bold mb-4">{text.howToPlayTitle} - Arcade</h2>
+        
+        <section className="mb-6">
+          <h3 className="font-bold text-lg mb-2">{text.arcadeWhat}</h3>
+          <p className="text-gray-700">{text.arcadeWhatDesc}</p>
+        </section>
+        
+        <section className="mb-6">
+          <h3 className="font-bold text-lg mb-2">{text.arcadeHowToPlay}</h3>
+          <ol className="list-decimal ml-5 space-y-2">
+            {text.arcadeSteps.map((step, index) => (
+              <li key={index} className="text-gray-700">{step}</li>
+            ))}
+          </ol>
+        </section>
+        
+        <section className="mb-6">
+          <h3 className="font-bold text-lg mb-2">{text.arcadeFreePlay}</h3>
+          <ul className="list-disc ml-5 space-y-2">
+            {text.arcadeFreePlayList.map((item, index) => (
+              <li key={index} className="text-gray-700">{item}</li>
+            ))}
+          </ul>
+        </section>
+        
+        <section>
+          <h3 className="font-bold text-lg mb-2">{text.arcadeGoodToKnow}</h3>
+          <ul className="list-disc ml-5 space-y-2">
+            {text.arcadeGoodToKnowList.map((item, index) => (
+              <li key={index} className="text-gray-700">{item}</li>
+            ))}
+          </ul>
+        </section>
+      </div>
+    );
+  }
+  
   return (
     <div>
       <h2 className="text-2xl font-bold mb-4">{text.howToPlayTitle} - Miners</h2>
@@ -1376,6 +1830,44 @@ function Terms({ onAccept, onDecline }) {
       <h2 className="text-2xl font-bold mb-4">Terms & Conditions</h2>
       
       <div className="space-y-4 text-sm">
+        <section className="bg-yellow-50 border-2 border-yellow-400 p-4 rounded-lg">
+          <h3 className="font-bold text-black mb-2 text-lg">⚠️ IMPORTANT: Entertainment Only - NO Real Money Gambling</h3>
+          <ul className="list-disc ml-5 space-y-2 text-black">
+            <li><strong>This is a FREE entertainment game platform.</strong> All games use in-game tokens (MLEO) for gameplay purposes only.</li>
+            <li><strong>NO REAL MONEY GAMBLING:</strong> This platform does NOT support, facilitate, or allow gambling with real money, cryptocurrencies, or any assets of monetary value.</li>
+            <li><strong>NO REAL MONEY DEPOSITS:</strong> You cannot and will never be able to deposit real money, cryptocurrency, or any assets for the purpose of gambling on this platform.</li>
+            <li><strong>NO REAL MONEY WITHDRAWALS:</strong> You cannot and will never be able to withdraw real money or convert in-game tokens to real money or cryptocurrency for monetary gain.</li>
+            <li><strong>WE ARE AGAINST GAMBLING:</strong> This platform is designed purely for entertainment and skill-based gaming. We do not support, endorse, or facilitate any form of real money gambling, betting, or wagering.</li>
+            <li><strong>MLEO TOKENS:</strong> MLEO tokens earned in-game are virtual utility tokens for gameplay mechanics only. They have NO monetary value, cannot be sold, traded, or exchanged for real money or cryptocurrency.</li>
+            <li><strong>FUTURE POLICY:</strong> This platform will NEVER introduce real money gambling features. Any future cryptocurrency integration will be strictly limited to non-gambling use cases (e.g., rewards, collectibles, or utility) and will never involve betting, wagering, or gambling with cryptocurrency.</li>
+          </ul>
+        </section>
+        
+        <section className="bg-blue-50 border-2 border-blue-400 p-4 rounded-lg">
+          <h3 className="font-bold text-black mb-2 text-lg">🔞 Age Requirement & Legal Compliance</h3>
+          <ul className="list-disc ml-5 space-y-2 text-black">
+            <li><strong>MINIMUM AGE:</strong> You must be at least 18 years old to use this platform. In certain jurisdictions, the minimum age may be 21 years or higher as required by local law.</li>
+            <li><strong>AGE VERIFICATION:</strong> By using this platform, you represent and warrant that you meet the minimum age requirement in your jurisdiction.</li>
+            <li><strong>PARENTAL RESPONSIBILITY:</strong> If you are a parent or guardian and become aware that your child has accessed this platform without meeting the age requirement, please contact us immediately.</li>
+            <li><strong>LOCAL LAW COMPLIANCE:</strong> You are solely responsible for ensuring that your use of this platform complies with all applicable laws, regulations, and restrictions in your jurisdiction, including age restrictions, gambling laws, and cryptocurrency regulations.</li>
+            <li><strong>PROHIBITED JURISDICTIONS:</strong> If online gaming, cryptocurrency usage, or any feature of this platform is restricted or prohibited in your jurisdiction, you are prohibited from accessing or using this platform.</li>
+            <li><strong>NO LIABILITY FOR VIOLATIONS:</strong> We are not responsible for any violations of local laws by users. You agree to indemnify us against any claims arising from your violation of applicable laws.</li>
+          </ul>
+        </section>
+        
+        <section className="bg-green-50 border-2 border-green-400 p-4 rounded-lg">
+          <h3 className="font-bold text-black mb-2 text-lg">🔒 Privacy, Data Protection & Third-Party Disclosure</h3>
+          <ul className="list-disc ml-5 space-y-2 text-black">
+            <li><strong>DATA COLLECTION:</strong> We may collect limited personal information such as wallet addresses, gameplay statistics, and device information solely for the purpose of providing and improving our services.</li>
+            <li><strong>NO THIRD-PARTY SALES:</strong> We do NOT sell, rent, lease, or transfer your personal information to third parties for commercial purposes.</li>
+            <li><strong>NO MARKETING DISCLOSURES:</strong> Your data will NOT be shared with third parties for marketing, advertising, or promotional purposes without your explicit consent.</li>
+            <li><strong>LIMITED DISCLOSURES:</strong> We may only disclose your information: (a) to service providers who assist in operating the platform under strict confidentiality agreements, (b) when required by law, legal process, or government authorities, (c) to protect our rights, safety, or property, or (d) in connection with a business transfer or acquisition.</li>
+            <li><strong>DATA SECURITY:</strong> We implement reasonable security measures to protect your data. However, no method of transmission or storage is 100% secure, and we cannot guarantee absolute security.</li>
+            <li><strong>DATA RETENTION:</strong> We retain your data only as long as necessary to provide services or as required by law. You may request deletion of your data subject to legal and operational requirements.</li>
+            <li><strong>COOKIES & TRACKING:</strong> We may use cookies and similar technologies for functionality and analytics. You can control cookie settings through your browser, but disabling cookies may affect functionality.</li>
+            <li><strong>YOUR RIGHTS:</strong> Depending on your jurisdiction, you may have rights to access, correct, delete, or export your personal data. Contact us to exercise these rights.</li>
+          </ul>
+        </section>
         <section>
           <h3 className="font-bold text-black mb-1">1) Acceptance</h3>
           <p>By playing, you agree to these terms. If you disagree, please do not play.</p>
@@ -1430,20 +1922,88 @@ function Terms({ onAccept, onDecline }) {
           <p>You are solely responsible for any taxes related to your use of the game and any rewards you may receive.</p>
         </section>
         <section>
-          <h3 className="font-bold text-black mb-1">10) Limitation of Liability</h3>
-          <p>To the maximum extent permitted by law, we are not liable for indirect/special/consequential damages or loss of data/tokens/profits/opportunities.</p>
+          <h3 className="font-bold text-black mb-1">10) Limitation of Liability & Disclaimers</h3>
+          <ul className="list-disc ml-5 space-y-1">
+            <li><strong>NO WARRANTIES:</strong> This platform and all services are provided "AS IS" and "AS AVAILABLE" without warranties of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, title, or non-infringement.</li>
+            <li><strong>NO GUARANTEE OF AVAILABILITY:</strong> We do not guarantee that the platform will be uninterrupted, timely, secure, error-free, or free from viruses or other harmful components.</li>
+            <li><strong>NO GUARANTEE OF VALUE:</strong> We make no representations or warranties that MLEO tokens, rewards, or any in-game assets will have any present or future value, utility, or transferability.</li>
+            <li><strong>LIMITATION OF LIABILITY:</strong> To the maximum extent permitted by law, we and our affiliates, officers, directors, employees, agents, and licensors shall NOT be liable for any indirect, incidental, special, consequential, punitive, or exemplary damages, including but not limited to: loss of profits, revenue, data, goodwill, or other intangible losses; cost of substitute services; business interruption; personal injury; emotional distress; or any damages arising from your use or inability to use the platform.</li>
+            <li><strong>MAXIMUM LIABILITY CAP:</strong> In no event shall our total aggregate liability exceed the greater of (a) $100 USD or (b) the amount you paid to us (if any) in the 12 months preceding the claim.</li>
+            <li><strong>THIRD-PARTY SERVICES:</strong> We are not responsible for any losses, damages, or issues arising from third-party services, wallets, blockchain networks, smart contracts, or external websites linked from this platform.</li>
+            <li><strong>USER RESPONSIBILITY:</strong> You acknowledge that your use of this platform is at your sole risk, and you are solely responsible for any damage to your device, loss of data, or any other consequences of your use.</li>
+          </ul>
         </section>
         <section>
-          <h3 className="font-bold text-black mb-1">11) Indemnity</h3>
-          <p>You agree to indemnify and hold us harmless from claims or expenses arising from your use of the game or violation of these Terms.</p>
+          <h3 className="font-bold text-black mb-1">11) Indemnification</h3>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>You agree to indemnify, defend, and hold harmless the platform, its owners, operators, affiliates, officers, directors, employees, agents, licensors, and service providers from and against any and all claims, liabilities, damages, losses, costs, expenses, fees (including reasonable attorneys' fees) arising from or relating to:</li>
+            <li>(a) Your use or misuse of the platform;</li>
+            <li>(b) Your violation of these Terms or any applicable law;</li>
+            <li>(c) Your violation of any rights of any third party;</li>
+            <li>(d) Any content or information you submit or transmit through the platform;</li>
+            <li>(e) Your representations that you meet age requirements and comply with local laws;</li>
+            <li>(f) Any dispute you have with another user;</li>
+            <li>(g) Your negligence, willful misconduct, or fraud.</li>
+          </ul>
         </section>
         <section>
-          <h3 className="font-bold text-black mb-1">12) Governing Law & Disputes</h3>
-          <p>These Terms are governed by the laws of <b>[insert jurisdiction]</b>. Disputes resolved exclusively in <b>[insert venue]</b>.</p>
+          <h3 className="font-bold text-black mb-1">12) Representations & Warranties by User</h3>
+          <p>By using this platform, you represent and warrant that:</p>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>You meet the minimum age requirement (18 years or as required by your jurisdiction);</li>
+            <li>You have the legal capacity to enter into these Terms;</li>
+            <li>Your use of the platform does not violate any applicable laws, regulations, or restrictions in your jurisdiction;</li>
+            <li>You are not located in, residing in, or a citizen of any jurisdiction where access to this platform is prohibited;</li>
+            <li>You will not use the platform for any illegal, fraudulent, or unauthorized purpose;</li>
+            <li>All information you provide is accurate, current, and complete;</li>
+            <li>You acknowledge that MLEO tokens have no monetary value and are for entertainment purposes only;</li>
+            <li>You understand that this is NOT a gambling platform and no real money gambling occurs on this platform.</li>
+          </ul>
         </section>
         <section>
-          <h3 className="font-bold text-black mb-1">13) Contact</h3>
-          <p>Questions? <b>[insert contact email]</b>.</p>
+          <h3 className="font-bold text-black mb-1">13) Intellectual Property</h3>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>All content, features, functionality, trademarks, logos, designs, text, graphics, software, and other materials on this platform are owned by us or our licensors and are protected by copyright, trademark, and other intellectual property laws.</li>
+            <li>You are granted a limited, non-exclusive, non-transferable, revocable license to access and use the platform for personal, non-commercial entertainment purposes only.</li>
+            <li>You may NOT copy, reproduce, distribute, modify, create derivative works, reverse engineer, decompile, or attempt to extract source code from any part of the platform without our express written permission.</li>
+          </ul>
+        </section>
+        <section>
+          <h3 className="font-bold text-black mb-1">14) Modification & Termination</h3>
+          <ul className="list-disc ml-5 space-y-1">
+            <li><strong>MODIFICATIONS:</strong> We reserve the right to modify, suspend, or discontinue any aspect of the platform, including these Terms, at any time without prior notice. Continued use after modifications constitutes acceptance of the modified Terms.</li>
+            <li><strong>ACCOUNT TERMINATION:</strong> We may suspend, restrict, or terminate your access to the platform at any time, with or without cause, with or without notice, for any reason including but not limited to violation of these Terms, suspicious activity, or legal compliance.</li>
+            <li><strong>EFFECT OF TERMINATION:</strong> Upon termination, your right to use the platform ceases immediately. We may delete your account, data, and any in-game assets without liability to you.</li>
+          </ul>
+        </section>
+        <section>
+          <h3 className="font-bold text-black mb-1">15) Severability & Entire Agreement</h3>
+          <ul className="list-disc ml-5 space-y-1">
+            <li><strong>SEVERABILITY:</strong> If any provision of these Terms is found to be invalid, illegal, or unenforceable, the remaining provisions shall continue in full force and effect.</li>
+            <li><strong>ENTIRE AGREEMENT:</strong> These Terms constitute the entire agreement between you and us regarding the use of this platform and supersede all prior agreements, understandings, and communications.</li>
+            <li><strong>NO WAIVER:</strong> Our failure to enforce any provision of these Terms shall not constitute a waiver of that provision or our right to enforce it in the future.</li>
+          </ul>
+        </section>
+        <section>
+          <h3 className="font-bold text-black mb-1">16) Force Majeure</h3>
+          <p>We shall not be liable for any failure or delay in performance due to causes beyond our reasonable control, including but not limited to acts of God, natural disasters, war, terrorism, riots, embargoes, government actions, labor disputes, network outages, blockchain network failures, or any other force majeure event.</p>
+        </section>
+        <section>
+          <h3 className="font-bold text-black mb-1">17) Governing Law & Dispute Resolution</h3>
+          <ul className="list-disc ml-5 space-y-1">
+            <li><strong>GOVERNING LAW:</strong> These Terms are governed by and construed in accordance with the laws of <b>[insert jurisdiction]</b>, without regard to its conflict of law provisions.</li>
+            <li><strong>DISPUTE RESOLUTION:</strong> Any dispute arising from these Terms or your use of the platform shall be resolved through binding arbitration in accordance with <b>[insert arbitration rules]</b>, except where prohibited by law.</li>
+            <li><strong>CLASS ACTION WAIVER:</strong> You agree to resolve disputes on an individual basis only and waive any right to participate in a class action lawsuit or class-wide arbitration.</li>
+            <li><strong>VENUE:</strong> If arbitration is not permitted, disputes shall be resolved exclusively in the courts of <b>[insert jurisdiction]</b>.</li>
+          </ul>
+        </section>
+        <section>
+          <h3 className="font-bold text-black mb-1">18) Contact & Reporting</h3>
+          <p>For questions, concerns, copyright claims, privacy requests, or to report violations of these Terms, please contact us at: <b>[insert contact email]</b>.</p>
+        </section>
+        <section>
+          <h3 className="font-bold text-black mb-1">19) Acknowledgment</h3>
+          <p className="font-bold">BY CLICKING "ACCEPT" OR BY USING THIS PLATFORM, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND AGREE TO BE BOUND BY THESE TERMS & CONDITIONS IN THEIR ENTIRETY.</p>
         </section>
           </div>
       
@@ -1782,12 +2342,20 @@ export default function GamesHub() {
     </div>
 
                   <div className="mt-auto">
-                    <div className="flex flex-wrap gap-2 justify-center mb-3">
-                      <div className="text-2xl">🎰</div>
-                      <div className="text-2xl">🎲</div>
-                      <div className="text-2xl">🎡</div>
-                      <div className="text-2xl">🃏</div>
-        </div>
+                    <div className="flex flex-wrap gap-2 mb-3 justify-center">
+                      <button
+                        onClick={() => open("arcade-how")}
+                        className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-4 py-2 rounded-lg text-sm font-bold border border-blue-500/30 transition-colors"
+                      >
+                        {text.howToPlay}
+                      </button>
+                      <button
+                        onClick={() => open("terms")}
+                        className="bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 px-4 py-2 rounded-lg text-sm font-bold border border-gray-500/30 transition-colors"
+                      >
+                        {text.terms}
+                      </button>
+                    </div>
 
                   <Link href="/arcade">
                     <button className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
@@ -1814,6 +2382,10 @@ export default function GamesHub() {
 
       <Modal isOpen={modal === "rush-how"} onClose={close}>
         <HowToPlay lang={lang} onClose={close} gameType="rush" />
+        </Modal>
+
+      <Modal isOpen={modal === "arcade-how"} onClose={close}>
+        <HowToPlay lang={lang} onClose={close} gameType="arcade" />
         </Modal>
 
       <Modal isOpen={modal === "terms"} onClose={close}>

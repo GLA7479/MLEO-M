@@ -834,7 +834,7 @@ function buildBoardGeometry(w, h) {
             </div>
 
             {/* קוביות הזכייה - מחוברות לקנבס */}
-            <div className="relative -mt-2 sm:-mt-3" style={{ marginTop: isWideScreen ? '-0.5rem' : '-1rem' }}>
+            <div className="relative -mt-2 sm:-mt-3" style={{ marginTop: isWideScreen ? '-0.25rem' : '-0.5rem' }}>
               <div className="flex gap-0 sm:gap-0.5 mb-4 sm:mb-6 max-w-2xl mx-auto">
                 {MULTIPLIERS.map((mult, idx) => {
                   const landed = finalBuckets.filter(i => i === idx).length;
