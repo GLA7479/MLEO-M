@@ -440,20 +440,35 @@ export default function CoinFlipPage() {
 
         {/* Top HUD Bar */}
         <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
-          <div className="relative px-2 py-2">
-            {/* Left: Back */}
-            <div className="absolute left-2 top-0 flex gap-2 pointer-events-auto">
+          <div className="relative px-2 py-3">
+            {/* Left: Back + Free Play */}
+            <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
               <button
                 onClick={backSafe}
-                className="h-10 w-10 rounded-xl bg-black/40 hover:bg-black/60 text-white grid place-items-center shadow"
+                className="px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
                 title="Back to Arcade"
               >
-                ←
+                BACK
               </button>
+
+              {/* Free Play Indicator - Small Icon */}
+              {freePlayTokens > 0 && (
+                <button
+                  onClick={() => flipCoin(true)}
+                  disabled={flipping}
+                  className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50"
+                  title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}
+                >
+                  <span className="text-base">🎁</span>
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                    {freePlayTokens}
+                  </span>
+                </button>
+              )}
             </div>
 
             {/* Right: Fullscreen + Menu */}
-            <div className="absolute right-2 top-0 flex gap-2 pointer-events-auto">
+            <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
               <button
                 onClick={() => {
                   playSfx(clickSound.current);
@@ -464,19 +479,18 @@ export default function CoinFlipPage() {
                     document.exitFullscreen?.().catch(() => {});
                   }
                 }}
-                className="h-10 px-3 rounded-xl bg-black/40 hover:bg-black/60 text-white flex items-center gap-2 shadow"
+                className="px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
                 title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
               >
-                <span className="text-base">⤢</span>
-                <span className="text-xs opacity-80">{isFullscreen ? "Exit" : "Full"}</span>
+                {isFullscreen ? "EXIT" : "FULL"}
               </button>
 
               <button
                 onClick={() => { playSfx(clickSound.current); setMenuOpen(true); }}
-                className="h-10 w-10 rounded-xl bg-black/40 hover:bg-black/60 text-white grid place-items-center shadow"
+                className="px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
                 title="Menu"
               >
-                ≡
+                MENU
               </button>
             </div>
           </div>
@@ -591,16 +605,6 @@ export default function CoinFlipPage() {
             >
               {flipping ? "Flipping..." : "FLIP COIN"}
             </button>
-
-            {isFreePlay && freePlayTokens > 0 && (
-              <button
-                onClick={() => flipCoin(true)}
-                disabled={flipping}
-                className="w-full py-3 rounded-lg font-bold bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg hover:scale-105 transition-all disabled:opacity-50"
-              >
-                🎁 Use Free Play ({freePlayTokens} left)
-              </button>
-            )}
 
             <div className="flex gap-3">
               <button
