@@ -301,7 +301,7 @@ export default function ArcadeHub() {
     // 4. Blackjack
     {
       title: "Blackjack",
-      emoji: "🃏",
+      emoji: "♠️",
       description: "Beat the dealer to 21! Classic card game with emoji cards.",
       prize: "×2",
       href: "/blackjack",
@@ -310,7 +310,7 @@ export default function ArcadeHub() {
     // 5. Poker
     {
       title: "Poker",
-      emoji: "🃏",
+      emoji: "🎴",
       description: "Texas Hold'em poker! Use your 2 cards + 5 community cards to make the best hand.",
       prize: "×1000",
       href: "/poker",
@@ -319,7 +319,7 @@ export default function ArcadeHub() {
     // 6. Hi-Lo Cards
     {
       title: "Hi-Lo Cards",
-      emoji: "🃏",
+      emoji: "📊",
       description: "Guess if the next card is higher or lower. Build streaks for huge multipliers!",
       prize: "Unlimited",
       href: "/hilo",
@@ -328,7 +328,7 @@ export default function ArcadeHub() {
     // 7. Three Card Poker
     {
       title: "Three Card Poker",
-      emoji: "🃏",
+      emoji: "♦️",
       description: "Fast poker! 3 cards vs dealer - best hand wins with instant results.",
       prize: "×100",
       href: "/three-card-poker",
@@ -364,7 +364,7 @@ export default function ArcadeHub() {
     // 11. Lucky Chamber - NEW!
     {
       title: "Lucky Chamber",
-      emoji: "🎯",
+      emoji: "🔫",
       description: "6 chambers, 1 danger! Pick wisely and cash out before it's too late!",
       prize: "×7.5",
       href: "/chamber",
@@ -382,7 +382,7 @@ export default function ArcadeHub() {
     // 13. Target Shooter - NEW!
     {
       title: "Target Shooter",
-      emoji: "🎯",
+      emoji: "🏹",
       description: "Hit all targets in 20 seconds! Fast clicks = big wins!",
       prize: "×15",
       href: "/shooter",
@@ -391,7 +391,7 @@ export default function ArcadeHub() {
     // 14. Sic Bo - NEW!
     {
       title: "Sic Bo",
-      emoji: "🎲",
+      emoji: "🀄",
       description: "Ancient Chinese dice game! Bet on totals, triples, and more!",
       prize: "×50",
       href: "/sicbo",
@@ -409,7 +409,7 @@ export default function ArcadeHub() {
     // 16. Limbo - NEW!
     {
       title: "Limbo",
-      emoji: "🎲",
+      emoji: "🔥",
       description: "Set your target multiplier and roll! Higher risk = bigger rewards!",
       prize: "Unlimited",
       href: "/limbo",
@@ -418,7 +418,7 @@ export default function ArcadeHub() {
     // 17. Dice Over/Under - NEW!
     {
       title: "Dice Over/Under",
-      emoji: "🎲",
+      emoji: "⚄",
       description: "Over or Under! Slide your target and roll - ultimate control!",
       prize: "Unlimited",
       href: "/dice-over-under",
@@ -427,7 +427,7 @@ export default function ArcadeHub() {
     // 18. Roulette
     {
       title: "Roulette",
-      emoji: "🎰",
+      emoji: "🔴",
       description: "Spin the wheel and win big! Classic casino wheel game with multiple betting options.",
       prize: "×36",
       href: "/roulette",
@@ -444,7 +444,7 @@ export default function ArcadeHub() {
     },
     {
       title: "Slots Upgraded",
-      emoji: "🎰",
+      emoji: "💰",
       description: "5-reel mega slots! Match symbols for huge wins - 💎×500 jackpot!",
       prize: "×500",
       href: "/slots-upgraded",
@@ -476,11 +476,20 @@ export default function ArcadeHub() {
     },
     {
       title: "Baccarat",
-      emoji: "🃏",
+      emoji: "♥️",
       description: "Bet on Player, Banker, or Tie! Classic card game with simple rules.",
       prize: "×8",
       href: "/baccarat",
       color: "#9333EA",
+    },
+    // 25. Coin Flip - TEMPLATE GAME
+    {
+      title: "Coin Flip",
+      emoji: "🪙",
+      description: "Choose Heads or Tails! Simple 50/50 chance with instant results and big wins!",
+      prize: "×1.95",
+      href: "/coin-flip",
+      color: "#F59E0B",
     },
   ];
 
@@ -572,7 +581,7 @@ export default function ArcadeHub() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/40">
               <span className="text-2xl">🎮</span>
-              <span className="font-bold text-purple-300">24 Exciting Games to Play!</span>
+              <span className="font-bold text-purple-300">25 Exciting Games to Play!</span>
             </div>
           </div>
 
