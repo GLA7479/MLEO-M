@@ -214,6 +214,41 @@ export default function Plinko2Page() {
     safeWrite(LS_KEY, stats);
   }, [stats]);
 
+  // Dynamic canvas scaling
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    const calc = () => {
+      const rootH = window.visualViewport?.height ?? window.innerHeight;
+      const safeBottom =
+        Number(
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--satb")
+            .replace("px", "")
+        ) || 0;
+      const headH = headerRef.current?.offsetHeight || 0;
+      document.documentElement.style.setProperty("--head-h", headH + "px");
+      const topPad = headH + 8;
+      const used =
+        headH +
+        (metersRef.current?.offsetHeight || 0) +
+        (betRef.current?.offsetHeight || 0) +
+        (ctaRef.current?.offsetHeight || 0) +
+        topPad +
+        48 +
+        safeBottom +
+        24;
+      const freeH = Math.max(200, rootH - used);
+      document.documentElement.style.setProperty("--chart-h", freeH + "px");
+    };
+    calc();
+    window.addEventListener("resize", calc);
+    window.visualViewport?.addEventListener("resize", calc);
+    return () => {
+      window.removeEventListener("resize", calc);
+      window.visualViewport?.removeEventListener("resize", calc);
+    };
+  }, [mounted]);
+
   // Canvas setup and physics
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -652,17 +687,17 @@ export default function Plinko2Page() {
 
         {/* MAIN BODY */}
         <div
-          className="relative h-full flex flex-col items-center justify-center px-4 pb-16 mt-8"
+          className="relative h-full flex flex-col items-center justify-start px-4 pb-4"
           style={{
             minHeight: "100%",
             paddingTop: "calc(var(--head-h, 56px) + 8px)",
           }}
         >
-          <div className="text-center mb-3">
-            <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">
+          <div className="text-center mb-1">
+            <h1 className="text-2xl font-extrabold text-white mb-0.5">
               🎯 Plinko
             </h1>
-            <p className="text-white/70 text-sm">
+            <p className="text-white/70 text-xs">
               High Risk • Max Multipliers!
             </p>
           </div>
