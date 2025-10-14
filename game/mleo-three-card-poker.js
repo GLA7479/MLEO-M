@@ -106,6 +106,22 @@ function compareHands(playerHand, dealerHand) {
   return "tie";
 }
 
+function PlayingCard({ card }) {
+  const isRed = card.suit === "♥️" || card.suit === "♦️";
+  const color = isRed ? "text-red-600" : "text-black";
+  
+  return (
+    <div className="w-10 h-14 rounded bg-white border border-gray-400 shadow p-0.5 relative">
+      <div className={`text-[7px] font-bold ${color} absolute top-0 left-0.5 leading-tight`}>
+        {card.value}
+      </div>
+      <div className={`text-base ${color} flex items-center justify-center h-full`}>
+        {card.suit}
+      </div>
+    </div>
+  );
+}
+
 export default function ThreeCardPokerPage() {
   useIOSViewportFix();
   const router = useRouter();
@@ -278,20 +294,20 @@ export default function ThreeCardPokerPage() {
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Win</div><div className="text-lg font-bold text-green-400">{fmt(potentialWin)}</div></div>
           </div>
 
-          <div className="mb-3 w-full max-w-md" style={{ minHeight: '200px' }}>
-            <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2">
+          <div className="mb-3 w-full max-w-md" style={{ minHeight: '260px' }}>
+            <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2" style={{ minHeight: '90px' }}>
               <div className="text-xs text-white/60 mb-1">Dealer {dealerHand && `(${dealerHand.hand})`}</div>
-              <div className="flex gap-1 flex-wrap min-h-[50px]">
+              <div className="flex gap-1 flex-wrap min-h-[60px]">
                 {dealerCards.map((card, i) => (
-                  <div key={i} className={`px-2 py-1 rounded text-sm font-bold ${card.suit === "♥️" || card.suit === "♦️" ? 'bg-red-500' : 'bg-black'} text-white border border-white/20`}>{card.display}</div>
+                  <PlayingCard key={i} card={card} />
                 ))}
               </div>
             </div>
-            <div className="bg-black/20 border border-white/10 rounded-lg p-3">
+            <div className="bg-black/20 border border-white/10 rounded-lg p-3" style={{ minHeight: '90px' }}>
               <div className="text-xs text-white/60 mb-1">You {playerHand && `(${playerHand.hand})`}</div>
-              <div className="flex gap-1 flex-wrap min-h-[50px]">
+              <div className="flex gap-1 flex-wrap min-h-[60px]">
                 {playerCards.map((card, i) => (
-                  <div key={i} className={`px-2 py-1 rounded text-sm font-bold ${card.suit === "♥️" || card.suit === "♦️" ? 'bg-red-500' : 'bg-black'} text-white border border-white/20`}>{card.display}</div>
+                  <PlayingCard key={i} card={card} />
                 ))}
               </div>
             </div>

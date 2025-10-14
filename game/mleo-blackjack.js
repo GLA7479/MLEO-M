@@ -95,6 +95,30 @@ function calculateHandValue(hand) {
   return value;
 }
 
+function PlayingCard({ card, hidden = false }) {
+  if (hidden) {
+    return (
+      <div className="w-10 h-14 rounded bg-gradient-to-br from-blue-600 to-blue-800 border border-white/30 flex items-center justify-center shadow">
+        <span className="text-lg">🂠</span>
+      </div>
+    );
+  }
+  
+  const isRed = card.suit === "♥️" || card.suit === "♦️";
+  const color = isRed ? "text-red-600" : "text-black";
+  
+  return (
+    <div className="w-10 h-14 rounded bg-white border border-gray-400 shadow p-0.5 relative">
+      <div className={`text-[7px] font-bold ${color} absolute top-0 left-0.5 leading-tight`}>
+        {card.value}
+      </div>
+      <div className={`text-base ${color} flex items-center justify-center h-full`}>
+        {card.suit}
+      </div>
+    </div>
+  );
+}
+
 export default function BlackjackPage() {
   useIOSViewportFix();
   const router = useRouter();
@@ -318,26 +342,22 @@ export default function BlackjackPage() {
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Vault</div><div className="text-lg font-bold text-emerald-400">{fmt(vault)}</div></div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Bet</div><div className="text-lg font-bold text-amber-400">{fmt(Number(betAmount))}</div></div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Win</div><div className="text-lg font-bold text-green-400">{fmt(potentialWin)}</div></div>
-          </div>
+                </div>
                 
-          <div className="mb-3 w-full max-w-md" style={{ minHeight: '220px' }}>
-            <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2">
+          <div className="mb-3 w-full max-w-md" style={{ minHeight: '280px' }}>
+            <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2" style={{ minHeight: '90px' }}>
               <div className="text-xs text-white/60 mb-1">Dealer {gameState !== "betting" && `(${dealerValue})`}</div>
-              <div className="flex gap-1 flex-wrap min-h-[50px]">
+              <div className="flex gap-1 flex-wrap min-h-[60px]">
                 {dealerHand.map((card, i) => (
-                  <div key={i} className={`px-2 py-1 rounded text-sm font-bold ${card.suit === "♥️" || card.suit === "♦️" ? 'bg-red-500' : 'bg-black'} text-white border border-white/20`}>
-                    {gameState === "playing" && i === 1 ? "🂠" : card.display}
-                  </div>
+                  <PlayingCard key={i} card={card} hidden={gameState === "playing" && i === 1} />
                 ))}
               </div>
             </div>
-            <div className="bg-black/20 border border-white/10 rounded-lg p-3">
+            <div className="bg-black/20 border border-white/10 rounded-lg p-3" style={{ minHeight: '90px' }}>
               <div className="text-xs text-white/60 mb-1">You {gameState !== "betting" && `(${playerValue})`}</div>
-              <div className="flex gap-1 flex-wrap min-h-[50px]">
+              <div className="flex gap-1 flex-wrap min-h-[60px]">
                 {playerHand.map((card, i) => (
-                  <div key={i} className={`px-2 py-1 rounded text-sm font-bold ${card.suit === "♥️" || card.suit === "♦️" ? 'bg-red-500' : 'bg-black'} text-white border border-white/20`}>
-                    {card.display}
-                  </div>
+                  <PlayingCard key={i} card={card} />
                 ))}
               </div>
             </div>
@@ -374,7 +394,7 @@ export default function BlackjackPage() {
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>
               <button onClick={() => { setShowVaultModal(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all">💰 Vault</button>
             </div>
-          </div>
+              </div>
             </div>
 
         {showResultPopup && gameResult && (
@@ -414,8 +434,8 @@ export default function BlackjackPage() {
                     <p>• Blackjack (21): ×2.5 💎</p>
                     <p>• Win: ×2</p>
                     <p>• Push (tie): Money back</p>
-                  </div>
-                </div>
+          </div>
+        </div>
               </div>
               <button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
                   </div>

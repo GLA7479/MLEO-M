@@ -104,6 +104,22 @@ function evaluateHand(cards) {
   return { hand: "High Card", rank: 1 };
 }
 
+function PlayingCard({ card }) {
+  const isRed = card.suit === "♥️" || card.suit === "♦️";
+  const color = isRed ? "text-red-600" : "text-black";
+  
+  return (
+    <div className="w-10 h-14 rounded bg-white border border-gray-400 shadow p-0.5 relative">
+      <div className={`text-[7px] font-bold ${color} absolute top-0 left-0.5 leading-tight`}>
+        {card.value}
+      </div>
+      <div className={`text-base ${color} flex items-center justify-center h-full`}>
+        {card.suit}
+      </div>
+    </div>
+  );
+}
+
 export default function PokerPage() {
   useIOSViewportFix();
   const router = useRouter();
@@ -259,9 +275,9 @@ export default function PokerPage() {
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Max</div><div className="text-lg font-bold text-green-400">{fmt(potentialWin)}</div></div>
           </div>
 
-          <div className="mb-3 w-full max-w-md" style={{ minHeight: '180px' }}>
-            <div className="mb-2"><div className="text-xs text-white/60 mb-1 text-center">Community Cards</div><div className="flex gap-1 justify-center flex-wrap min-h-[50px]">{communityCards.map((card, i) => (<div key={i} className={`px-2 py-1 rounded text-sm font-bold ${card.suit === "♥️" || card.suit === "♦️" ? 'bg-red-500' : 'bg-black'} text-white border border-white/20`}>{card.display}</div>))}</div></div>
-            <div className="mb-2"><div className="text-xs text-white/60 mb-1 text-center">Your Cards</div><div className="flex gap-1 justify-center flex-wrap min-h-[50px]">{playerCards.map((card, i) => (<div key={i} className={`px-2 py-1 rounded text-sm font-bold ${card.suit === "♥️" || card.suit === "♦️" ? 'bg-red-500' : 'bg-black'} text-white border border-white/20`}>{card.display}</div>))}</div></div>
+          <div className="mb-3 w-full max-w-md" style={{ minHeight: '240px' }}>
+            <div className="mb-2" style={{ minHeight: '85px' }}><div className="text-xs text-white/60 mb-1 text-center">Community Cards</div><div className="flex gap-1 justify-center flex-wrap min-h-[60px]">{communityCards.map((card, i) => (<PlayingCard key={i} card={card} />))}</div></div>
+            <div className="mb-2" style={{ minHeight: '85px' }}><div className="text-xs text-white/60 mb-1 text-center">Your Cards</div><div className="flex gap-1 justify-center flex-wrap min-h-[60px]">{playerCards.map((card, i) => (<PlayingCard key={i} card={card} />))}</div></div>
             <div className="text-center" style={{ height: '28px' }}><div className={`text-base font-bold transition-opacity ${playerHand ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-yellow-400'}`}>{playerHand ? playerHand.hand : 'waiting'}</div></div>
           </div>
 

@@ -62,6 +62,22 @@ function drawCard() {
   return { rank, suit, value: CARD_VALUES[rank] };
 }
 
+function PlayingCard({ card }) {
+  const isRed = card.suit === "♥️" || card.suit === "♦️";
+  const color = isRed ? "text-red-600" : "text-black";
+  
+  return (
+    <div className="w-16 h-24 rounded-lg bg-white border-2 border-gray-400 shadow-lg p-1 relative flex items-center justify-center">
+      <div className={`text-[9px] font-bold ${color} absolute top-0.5 left-1 leading-tight`}>
+        {card.rank}
+      </div>
+      <div className={`text-2xl ${color}`}>
+        {card.suit}
+      </div>
+    </div>
+  );
+}
+
 export default function HiLoPage() {
   useIOSViewportFix();
   const router = useRouter();
@@ -219,8 +235,8 @@ export default function HiLoPage() {
   const currentMultiplier = gameActive ? 1 + (streak * 0.2) : 1;
   const potentialWin = gameActive ? Math.floor(Number(betAmount) * currentMultiplier) : Math.floor(Number(betAmount) * 2);
 
-  return (
-    <Layout>
+    return (
+      <Layout>
       <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-blue-900 via-black to-purple-900" style={{ height: 'var(--app-100vh, 100vh)' }}>
         <div className="absolute inset-0 opacity-10"><div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} /></div>
         <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
@@ -244,30 +260,22 @@ export default function HiLoPage() {
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Win</div><div className="text-lg font-bold text-green-400">{fmt(potentialWin)}</div></div>
           </div>
 
-          <div className="mb-3 w-full max-w-md" style={{ minHeight: '200px' }}>
+          <div className="mb-3 w-full max-w-md" style={{ minHeight: '280px' }}>
             <div className="text-center mb-2" style={{ minHeight: '20px' }}>
               <div className={`text-xs text-white/60 transition-opacity ${gameActive ? 'opacity-100' : 'opacity-0'}`}>
                 Streak: <span className="text-yellow-400 font-bold">{streak || 0}</span> • Multiplier: <span className="text-green-400 font-bold">×{(gameActive ? currentMultiplier : 1).toFixed(1)}</span>
               </div>
             </div>
-            <div className="flex justify-center gap-4 mb-2">
-              {currentCard && (
-                <div className={`w-24 h-32 rounded-lg flex items-center justify-center text-3xl font-bold ${SUIT_COLORS[currentCard.suit] === 'red' ? 'bg-red-500' : 'bg-black'} text-white border-2 border-white/20`}>
-                  {currentCard.rank}{currentCard.suit}
-                </div>
-              )}
-              {nextCard && (
-                <div className={`w-24 h-32 rounded-lg flex items-center justify-center text-3xl font-bold ${SUIT_COLORS[nextCard.suit] === 'red' ? 'bg-red-500' : 'bg-black'} text-white border-2 border-white/20`}>
-                  {nextCard.rank}{nextCard.suit}
-                </div>
-              )}
+            <div className="flex justify-center gap-4 mb-2" style={{ minHeight: '100px' }}>
+              {currentCard && <PlayingCard card={currentCard} />}
+              {nextCard && <PlayingCard card={nextCard} />}
             </div>
             <div className="text-center" style={{ height: '28px' }}>
               <div className={`text-base font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-red-400'}`}>
                 {gameResult ? (gameResult.win ? `${gameResult.streak} STREAK!` : 'LOSE') : 'waiting'}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
           <div className="flex items-center gap-2 mb-3" style={{ minHeight: '48px' }}>
             {!gameActive && !gameResult && (
@@ -305,7 +313,7 @@ export default function HiLoPage() {
               <button onClick={() => { setShowVaultModal(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all">💰 Vault</button>
             </div>
           </div>
-        </div>
+            </div>
 
         {showResultPopup && gameResult && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
@@ -343,8 +351,8 @@ export default function HiLoPage() {
                     <p>• Streak 1: ×1.2</p>
                     <p>• Streak 5: ×2.0</p>
                     <p>• Streak 10: ×3.0</p>
-                  </div>
-                </div>
+              </div>
+              </div>
               </div>
               <button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
             </div>
@@ -363,12 +371,12 @@ export default function HiLoPage() {
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Max Streak</div><div className="text-lg font-bold text-purple-400">{stats.maxStreak}</div></div>
-                </div>
+        </div>
               </div>
               <button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
             </div>
-          </div>
-        )}
+                </div>
+              )}
 
         {showVaultModal && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
