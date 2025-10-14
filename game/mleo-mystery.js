@@ -506,119 +506,95 @@ export default function MysteryBoxPage() {
 
           {/* Stats Display */}
           <div className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md">
-            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
               <div className="text-xs text-white/60 mb-1">Vault</div>
-              <div className="text-base font-bold text-emerald-400">{fmt(vault)}</div>
+              <div className="text-lg font-bold text-emerald-400">{fmt(vault)}</div>
             </div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
               <div className="text-xs text-white/60 mb-1">Bet</div>
-              <div className="text-base font-bold text-amber-400">{fmt(Number(betAmount))}</div>
+              <div className="text-lg font-bold text-amber-400">{fmt(Number(betAmount))}</div>
             </div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
               <div className="text-xs text-white/60 mb-1">Max Win</div>
-              <div className="text-base font-bold text-green-400">{fmt(potentialWin)}</div>
+              <div className="text-lg font-bold text-green-400">{fmt(potentialWin)}</div>
             </div>
           </div>
 
           {/* Mystery Boxes Grid */}
-          <div style={{ minHeight: '220px' }}>
-              {gameActive && (
-            <div className="grid grid-cols-5 gap-3 mb-4">
+          <div className="mb-3" style={{ minHeight: '140px' }}>
+            <div className={`grid grid-cols-5 gap-3 transition-opacity ${gameActive ? 'opacity-100' : 'opacity-0'}`}>
               {boxes.map((prize, index) => (
-                      <button
-                        key={index}
-                        onClick={() => chooseBox(index)}
-                        disabled={selectedBox !== null}
-                    className={`w-16 h-16 rounded-lg font-bold text-2xl transition-all ${
-                      selectedBox === index
-                        ? prize >= 1
-                          ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-black ring-2 ring-yellow-300 shadow-xl'
-                          : 'bg-gradient-to-br from-gray-600 to-gray-700 text-white ring-2 ring-gray-500'
-                        : selectedBox !== null
-                        ? 'bg-white/5 text-white/30 opacity-50'
-                        : 'bg-gradient-to-br from-orange-500 to-amber-600 hover:brightness-110 shadow-lg cursor-pointer text-white'
-                    } disabled:cursor-not-allowed`}
-                  >
-                    {selectedBox === index ? (prize === 50 ? '💎' : prize >= 5 ? '🎁' : prize >= 1 ? '🪙' : '💔') : '🎁'}
-                      </button>
+                <button
+                  key={index}
+                  onClick={() => chooseBox(index)}
+                  disabled={selectedBox !== null || !gameActive}
+                  className={`w-14 h-14 rounded-lg font-bold text-2xl transition-all ${
+                    selectedBox === index
+                      ? prize >= 1
+                        ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-black ring-2 ring-yellow-300 shadow-xl'
+                        : 'bg-gradient-to-br from-gray-600 to-gray-700 text-white ring-2 ring-gray-500'
+                      : selectedBox !== null
+                      ? 'bg-white/5 text-white/30 opacity-50'
+                      : 'bg-gradient-to-br from-orange-500 to-amber-600 hover:brightness-110 shadow-lg cursor-pointer text-white'
+                  } disabled:cursor-not-allowed`}
+                >
+                  {selectedBox === index ? (prize === 50 ? '💎' : prize >= 5 ? '🎁' : prize >= 1 ? '🪙' : '💔') : '🎁'}
+                </button>
               ))}
-                </div>
-              )}
+            </div>
+            {/* Always present result text - just opacity */}
+            <div className="text-center mt-3" style={{ height: '28px' }}>
+              <div className={`text-base font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-red-400'}`}>
+                {gameResult ? (gameResult.jackpot ? 'JACKPOT!' : gameResult.win ? 'YOU WIN!' : 'LOSE') : 'waiting'}
+              </div>
+            </div>
           </div>
 
-          {/* Result Display */}
-          <div style={{ minHeight: '120px' }}>
-              {gameResult && (
-            <div className="mb-4 text-center">
-              <div className="text-6xl mb-2">
-                {gameResult.jackpot ? '💎' : gameResult.win ? '🎉' : '💔'}
-              </div>
-              <div className={`text-2xl font-bold ${gameResult.win ? 'text-green-400' : 'text-red-400'}`}>
-                {gameResult.jackpot ? 'JACKPOT!' : gameResult.win ? 'YOU WIN!' : 'BETTER LUCK NEXT TIME'}
-                      </div>
-              <div className="text-lg mt-2">
-                ×{gameResult.multiplier} = {fmt(gameResult.prize)} MLEO
-                  </div>
-                </div>
-              )}
-            </div>
-
           {/* Bet Controls */}
-          <div style={{ minHeight: '48px', marginBottom: '16px' }}>
-            {!gameActive && !gameResult && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const current = Number(betAmount) || MIN_BET;
-                    const newBet = Math.max(MIN_BET, current - 1000);
-                    setBetAmount(String(newBet));
-                    playSfx(clickSound.current);
-                  }}
-                  className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold"
-                >
-                  −
-                </button>
-                <input 
-                  type="number" 
-                  value={betAmount} 
-                  onChange={(e) => setBetAmount(e.target.value)} 
-                  className="w-32 h-12 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-sm"
-                  min={MIN_BET}
-                />
-                <button 
-                  onClick={() => {
-                    const current = Number(betAmount) || MIN_BET;
-                    const newBet = Math.min(vault, current + 1000);
-                    setBetAmount(String(newBet));
-                    playSfx(clickSound.current);
-                  }}
-                  className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold"
-                >
-                  +
-                </button>
-              </div>
-            )}
+          <div className="flex items-center gap-2 mb-3">
+            <button
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                const newBet = Math.max(MIN_BET, current - 1000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              disabled={gameActive || gameResult}
+              className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
+            >
+              −
+            </button>
+            <input 
+              type="number" 
+              value={betAmount} 
+              onChange={(e) => setBetAmount(e.target.value)}
+              disabled={gameActive || gameResult}
+              className="w-32 h-12 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-sm"
+              min={MIN_BET}
+            />
+            <button 
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                const newBet = Math.min(vault, current + 1000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              disabled={gameActive || gameResult}
+              className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
+            >
+              +
+            </button>
           </div>
 
           {/* Action Buttons */}
           <div className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '100px' }}>
-            {!gameActive && !gameResult && (
-              <button
-                onClick={() => startGame(false)}
-                className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg hover:brightness-110 transition-all"
-              >
-                START GAME
-              </button>
-              )}
-
-              {gameResult && (
-                <button
-                  onClick={resetGame}
-                className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg hover:brightness-110 transition-all"
-              >
-                PLAY AGAIN
-                </button>
-              )}
+            <button
+              onClick={gameResult ? resetGame : () => startGame(false)}
+              disabled={gameActive}
+              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
+            >
+              {gameActive ? "Choose a box..." : gameResult ? "PLAY AGAIN" : "START GAME"}
+            </button>
 
             <div className="flex gap-2">
               <button
