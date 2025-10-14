@@ -510,7 +510,7 @@ export default function DicePage() {
         </div>
 
         {/* Main Content */}
-        <div className="relative h-full flex flex-col items-center justify-center px-4 pb-20 pt-16">
+        <div className="relative h-full flex flex-col items-center justify-center px-4 pb-20 pt-16" style={{ minHeight: '600px' }}>
           {/* Game Title */}
           <div className="text-center mb-4">
             <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-2">
@@ -691,7 +691,7 @@ export default function DicePage() {
         {/* Result Popup */}
         {showResultPopup && gameResult && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
-            <div className={`${gameResult.win ? 'bg-green-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto transform scale-110`}>
+            <div className={`${gameResult.win ? 'bg-green-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
               <div className="text-4xl mb-2">{gameResult.win ? '🎉' : '😔'}</div>
               <div className="text-2xl font-bold mb-1">
                 {gameResult.win ? 'YOU WIN!' : 'YOU LOSE'}

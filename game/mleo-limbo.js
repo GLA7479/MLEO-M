@@ -1,28 +1,83 @@
 // ============================================================================
-// MLEO Limbo - How High Can You Go?
-// Cost: 1000 MLEO per game
+// MLEO Limbo - Full-Screen Game Template
+// How High Can You Go? Set multiplier and roll!
 // ============================================================================
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
-import Link from "next/link";
+import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
+import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
+import { parseUnits } from "viem";
 import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+
+// ============================================================================
+// iOS 100vh FIX
+// ============================================================================
+function useIOSViewportFix() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const vv = window.visualViewport;
+
+    const setVH = () => {
+      const h = vv ? vv.height : window.innerHeight;
+      root.style.setProperty("--app-100vh", `${Math.round(h)}px`);
+    };
+
+    const onOrient = () => requestAnimationFrame(() => setTimeout(setVH, 250));
+
+    setVH();
+    if (vv) {
+      vv.addEventListener("resize", setVH);
+      vv.addEventListener("scroll", setVH);
+    }
+    window.addEventListener("orientationchange", onOrient);
+
+    return () => {
+      if (vv) {
+        vv.removeEventListener("resize", setVH);
+        vv.removeEventListener("scroll", setVH);
+      }
+      window.removeEventListener("orientationchange", onOrient);
+    };
+  }, []);
+}
 
 // ============================================================================
 // CONFIG
 // ============================================================================
-const LS_KEY = "mleo_limbo_v1";
+const LS_KEY = "mleo_limbo_v2";
 const MIN_BET = 1000;
 const HOUSE_EDGE = 0.02; // 2% house edge
 
+// On-chain Claim Config
+const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
+const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
+const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
+const GAME_ID = 16; // Limbo game ID
+
+const MINING_CLAIM_ABI = [{
+  type: "function",
+  name: "claim",
+  stateMutability: "nonpayable",
+  inputs: [
+    { name: "gameId", type: "uint256" },
+    { name: "amount", type: "uint256" }
+  ],
+  outputs: []
+}];
+
+// Sounds
+const S_CLICK = "/sounds/click.mp3";
+const S_WIN = "/sounds/gift.mp3";
+
 // ============================================================================
-// STORAGE
+// STORAGE HELPERS
 // ============================================================================
 function safeRead(key, fallback = {}) {
   if (typeof window === "undefined") return fallback;
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch {
     return fallback;
@@ -32,7 +87,7 @@ function safeRead(key, fallback = {}) {
 function safeWrite(key, val) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(key, JSON.stringify(val));
+    localStorage.setItem(key, JSON.stringify(val));
   } catch {}
 }
 
@@ -48,9 +103,15 @@ function setVault(amount) {
 }
 
 function fmt(n) {
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
   if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
   if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
   return Math.floor(n).toString();
+}
+
+function shortAddr(addr) {
+  if (!addr || addr.length < 10) return addr || "";
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
 // Calculate win chance based on target multiplier
@@ -60,7 +121,6 @@ function calculateWinChance(targetMultiplier) {
 
 // Generate random result
 function generateResult() {
-  // Generate number between 1.00 and 1000.00
   const random = Math.random();
   const result = (1 - HOUSE_EDGE) / random;
   return Math.min(result, 1000); // Cap at 1000x
@@ -70,11 +130,24 @@ function generateResult() {
 // MAIN COMPONENT
 // ============================================================================
 export default function LimboPage() {
+  useIOSViewportFix();
   const router = useRouter();
+  const wrapRef = useRef(null);
+
+  // Wallet
+  const { openConnectModal } = useConnectModal();
+  const { openAccountModal } = useAccountModal();
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const { switchChain } = useSwitchChain();
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
+  const chainId = useChainId();
+
+  // State
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000");
-  const [currentBet, setCurrentBet] = useState(MIN_BET);
   const [targetMultiplier, setTargetMultiplier] = useState(2);
   const [rolling, setRolling] = useState(false);
   const [result, setResult] = useState(null);
@@ -82,32 +155,91 @@ export default function LimboPage() {
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
   const [showResultPopup, setShowResultPopup] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [copiedAddr, setCopiedAddr] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [collectAmount, setCollectAmount] = useState(1000);
+
+  // Modals
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [showVaultModal, setShowVaultModal] = useState(false);
+
+  // Sound
+  const [sfxMuted, setSfxMuted] = useState(false);
+  const clickSound = useRef(null);
+  const winSound = useRef(null);
+
+  // Stats
   const [stats, setStats] = useState(() =>
-    safeRead(LS_KEY, { totalGames: 0, totalBet: 0, wins: 0, totalWon: 0, totalLost: 0, biggestWin: 0, highestMultiplier: 0, lastBet: MIN_BET })
+    safeRead(LS_KEY, {
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      totalBet: 0,
+      totalWon: 0,
+      biggestWin: 0,
+      highestMultiplier: 0,
+      lastBet: MIN_BET
+    })
   );
 
+  // Play sound helper
+  const playSfx = (sound) => {
+    if (sfxMuted || !sound) return;
+    try {
+      sound.currentTime = 0;
+      sound.play().catch(() => {});
+    } catch {}
+  };
+
+  // Init
   useEffect(() => {
     setMounted(true);
-    const currentVault = getVault();
-    setVaultState(currentVault);
-    
+    setVaultState(getVault());
+
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-    
+
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
-    
-    const savedLastBet = safeRead(LS_KEY, { lastBet: MIN_BET }).lastBet;
-    setBetAmount(savedLastBet.toString());
-    
+
+    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
+    if (savedStats.lastBet) {
+      setBetAmount(String(savedStats.lastBet));
+    }
+
     const interval = setInterval(() => {
       const status = getFreePlayStatus();
       setFreePlayTokens(status.tokens);
+      setVaultState(getVault());
     }, 2000);
-    
-    return () => clearInterval(interval);
+
+    if (typeof Audio !== "undefined") {
+      try {
+        clickSound.current = new Audio(S_CLICK);
+        winSound.current = new Audio(S_WIN);
+      } catch {}
+    }
+
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
   }, [router.query]);
 
+  // Persist stats
+  useEffect(() => {
+    safeWrite(LS_KEY, stats);
+  }, [stats]);
+
+  // Auto-hide result popup
   useEffect(() => {
     if (gameResult) {
       setShowResultPopup(true);
@@ -118,21 +250,86 @@ export default function LimboPage() {
     }
   }, [gameResult]);
 
-  const refreshVault = () => {
-    setVaultState(getVault());
+  // Wallet actions
+  const openWalletModalUnified = () => {
+    if (isConnected) {
+      openAccountModal?.();
+    } else {
+      openConnectModal?.();
+    }
   };
 
-  const startFreePlay = () => {
-    setBetAmount("1000");
-    playLimbo(true);
+  const hardDisconnect = () => {
+    disconnect?.();
+    setMenuOpen(false);
   };
 
+  // Claim to wallet
+  const collectToWallet = async () => {
+    if (!isConnected) {
+      openConnectModal?.();
+      return;
+    }
+
+    if (chainId !== CLAIM_CHAIN_ID) {
+      try {
+        await switchChain?.({ chainId: CLAIM_CHAIN_ID });
+      } catch {
+        alert("Switch to BSC Testnet");
+        return;
+      }
+    }
+
+    if (!CLAIM_ADDRESS) {
+      alert("Missing CLAIM address");
+      return;
+    }
+
+    if (collectAmount <= 0 || collectAmount > vault) {
+      alert("Invalid amount!");
+      return;
+    }
+
+    setClaiming(true);
+    try {
+      const amountUnits = parseUnits(
+        Number(collectAmount).toFixed(Math.min(2, MLEO_DECIMALS)),
+        MLEO_DECIMALS
+      );
+
+      const hash = await writeContractAsync({
+        address: CLAIM_ADDRESS,
+        abi: MINING_CLAIM_ABI,
+        functionName: "claim",
+        args: [BigInt(GAME_ID), amountUnits],
+        chainId: CLAIM_CHAIN_ID,
+        account: address,
+      });
+
+      await publicClient.waitForTransactionReceipt({ hash });
+
+      const newVault = Math.max(0, vault - collectAmount);
+      setVault(newVault);
+      setVaultState(newVault);
+
+      alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
+      setShowVaultModal(false);
+    } catch (err) {
+      console.error(err);
+      alert("Claim failed or rejected");
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  // Game logic
   const playLimbo = (isFreePlayParam = false) => {
     if (rolling) return;
+    playSfx(clickSound.current);
 
     const currentVault = getVault();
     let bet = Number(betAmount) || MIN_BET;
-    
+
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
       if (result.success) {
@@ -153,12 +350,11 @@ export default function LimboPage() {
         alert('Insufficient MLEO in vault');
         return;
       }
-      
+
       setVault(currentVault - bet);
       setVaultState(currentVault - bet);
     }
-    
-    setCurrentBet(bet);
+
     setRolling(true);
     setGameResult(null);
     setResult(null);
@@ -168,25 +364,26 @@ export default function LimboPage() {
     const rollInterval = setInterval(() => {
       setResult((Math.random() * 100 + 1).toFixed(2));
       count++;
-      
+
       if (count >= 15) {
         clearInterval(rollInterval);
         const finalResult = generateResult();
         setResult(finalResult.toFixed(2));
         setRolling(false);
-        checkWin(finalResult);
+        checkWin(finalResult, bet);
       }
     }, 50);
   };
 
-  const checkWin = (finalResult) => {
+  const checkWin = (finalResult, bet) => {
     const won = finalResult >= targetMultiplier;
-    const prize = won ? Math.floor(currentBet * targetMultiplier) : 0;
+    const prize = won ? Math.floor(bet * targetMultiplier) : 0;
 
     if (won && prize > 0) {
       const newVault = getVault() + prize;
       setVault(newVault);
       setVaultState(newVault);
+      playSfx(winSound.current);
     }
 
     const resultData = {
@@ -194,7 +391,7 @@ export default function LimboPage() {
       result: finalResult,
       target: targetMultiplier,
       prize: prize,
-      profit: won ? prize - currentBet : -currentBet
+      profit: won ? prize - bet : -bet
     };
 
     setGameResult(resultData);
@@ -202,355 +399,502 @@ export default function LimboPage() {
     const newStats = {
       ...stats,
       totalGames: stats.totalGames + 1,
-      totalBet: stats.totalBet + currentBet,
       wins: won ? stats.wins + 1 : stats.wins,
+      losses: won ? stats.losses : stats.losses + 1,
+      totalBet: stats.totalBet + bet,
       totalWon: won ? stats.totalWon + prize : stats.totalWon,
-      totalLost: !won ? stats.totalLost + currentBet : stats.totalLost,
       biggestWin: Math.max(stats.biggestWin, won ? prize : 0),
-      highestMultiplier: Math.max(stats.highestMultiplier, won ? finalResult : 0),
-      lastBet: currentBet
+      highestMultiplier: Math.max(stats.highestMultiplier, finalResult),
+      lastBet: bet
     };
     setStats(newStats);
-    safeWrite(LS_KEY, newStats);
   };
 
-  const resetGame = () => {
-    setGameResult(null);
-    setShowResultPopup(false);
-    setResult(null);
-    setRolling(false);
-    
-    setTimeout(() => {
-      playLimbo();
-    }, 100);
-  };
-
-  const resetToSetup = () => {
-    setGameResult(null);
-    setShowResultPopup(false);
-    setResult(null);
-    setRolling(false);
+  const backSafe = () => {
+    playSfx(clickSound.current);
+    router.push('/arcade');
   };
 
   if (!mounted) {
-    return <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-black to-purple-900 flex items-center justify-center">
-      <div className="text-white text-xl">Loading...</div>
-    </div>;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-black to-purple-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
   }
 
   const winChance = calculateWinChance(targetMultiplier);
-  const potentialWin = Math.floor(currentBet * targetMultiplier);
+  const potentialWin = Math.floor(Number(betAmount) * targetMultiplier);
 
   return (
-    <Layout vault={vault} refreshVault={refreshVault}>
-      <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-black to-purple-900 text-white">
-        <div className="max-w-6xl mx-auto p-4 pb-20">
-          {/* HEADER */}
-          <header className="flex items-center justify-between mb-6">
-            {rolling || result || gameResult ? (
-              <button 
-                onClick={resetToSetup}
-                className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+    <Layout>
+      <div
+        ref={wrapRef}
+        className="relative w-full overflow-hidden bg-gradient-to-br from-indigo-900 via-black to-purple-900"
+        style={{ height: 'var(--app-100vh, 100vh)' }}
+      >
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)',
+            backgroundSize: '30px 30px'
+          }} />
+        </div>
+
+        {/* Top HUD Bar */}
+        <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+          <div className="relative px-2 py-3">
+            {/* Left: Back + Free Play */}
+            <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
+              <button
+                onClick={backSafe}
+                className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+                title="Back to Arcade"
               >
                 BACK
               </button>
-            ) : (
-              <Link href="/arcade">
-                <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
-                  BACK
-                </button>
-              </Link>
-            )}
 
-            <div className="text-center">
-              <h1 className="text-3xl font-bold mb-1">
-                🎰 {isFreePlay && <span className="text-amber-400">🎁 FREE PLAY - </span>}
-                LIMBO
-              </h1>
-              <p className="text-zinc-400 text-sm">
-                {isFreePlay ? "Playing with a free token - good luck!" : "Go big or go home - unlimited multipliers!"}
-              </p>
-            </div>
-
-            <div className="w-16"></div>
-          </header>
-
-          {/* GAME WINDOW */}
-          <div className="rounded-2xl p-6 bg-white/5 border border-white/10 mb-6">
-            {/* Result Display */}
-            <div className="text-center mb-8">
-              <h2 className="text-xl font-bold mb-6">🎲 Result</h2>
-              
-              <div className={`text-8xl font-black mb-4 transition-all duration-300 ${
-                rolling ? 'animate-pulse text-purple-400' :
-                result && gameResult ? 
-                  gameResult.win ? 'text-green-400' : 'text-red-400'
-                : 'text-zinc-600'
-              }`}>
-                {result ? `${result}×` : '0.00×'}
-              </div>
-
-              {gameResult && (
-                <div className={`text-2xl font-bold ${gameResult.win ? 'text-green-400' : 'text-red-400'}`}>
-                  {gameResult.win ? `✅ WIN! Target: ${targetMultiplier}×` : `❌ LOSE! Target: ${targetMultiplier}×`}
-                </div>
-              )}
-            </div>
-
-            {/* Target Multiplier Selection */}
-            <div className="mb-8">
-              <h2 className="text-xl font-bold mb-4 text-center">🎯 Target Multiplier</h2>
-              
-              <div className="max-w-2xl mx-auto mb-4">
-                <div className="flex items-center gap-4">
-                  <div className="text-6xl font-black text-purple-400">
-                    {targetMultiplier.toFixed(2)}×
-                  </div>
-                  <div className="flex-1">
-                    <input
-                      type="range"
-                      min="1.01"
-                      max="100"
-                      step="0.01"
-                      value={targetMultiplier}
-                      onChange={(e) => setTargetMultiplier(parseFloat(e.target.value))}
-                      className="w-full h-3 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
-                      disabled={rolling}
-                    />
-                    <div className="flex justify-between text-xs opacity-60 mt-1">
-                      <span>1.01×</span>
-                      <span>100×</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quick Select Buttons */}
-                <div className="flex gap-2 mt-4 justify-center flex-wrap">
-                  {[1.5, 2, 5, 10, 25, 50, 100].map((mult) => (
-                    <button
-                      key={mult}
-                      onClick={() => setTargetMultiplier(mult)}
-                      disabled={rolling}
-                      className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
-                        targetMultiplier === mult
-                          ? 'bg-purple-600 border-2 border-purple-400'
-                          : 'bg-zinc-800 border border-zinc-600 hover:bg-zinc-700'
-                      }`}
-                    >
-                      {mult}×
-                    </button>
-                  ))}
-                </div>
-
-                {/* Win Chance Display */}
-                <div className="mt-4 p-4 rounded-xl bg-white/5 border border-white/10">
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div>
-                      <div className="text-sm opacity-70 mb-1">Win Chance</div>
-                      <div className="text-2xl font-bold text-green-400">
-                        {winChance.toFixed(2)}%
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm opacity-70 mb-1">Potential Win</div>
-                      <div className="text-2xl font-bold text-amber-400">
-                        {fmt(potentialWin)}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Probability Bar */}
-                  <div className="mt-3">
-                    <div className="h-2 bg-red-900/30 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-to-r from-green-500 to-emerald-400 transition-all duration-300"
-                        style={{ width: `${Math.min(winChance, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Game Controls */}
-            <div className="text-center mb-6">
-              {!rolling && !gameResult && (
-                <>
-                  {freePlayTokens > 0 && (
-                    <button
-                      onClick={startFreePlay}
-                      className="px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-4 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:from-amber-400 hover:via-orange-400 hover:to-yellow-400 hover:scale-105"
-                    >
-                      🎁 FREE PLAY ({freePlayTokens}/5)
-                    </button>
-                  )}
-                  
-                  <button
-                    onClick={() => playLimbo(false)}
-                    disabled={false}
-                    className="px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-6 bg-gradient-to-r from-indigo-600 via-purple-500 to-indigo-600 hover:from-indigo-500 hover:via-purple-400 hover:to-indigo-500 hover:scale-105"
-                  >
-                    🎲 PLAY LIMBO ({fmt(Number(betAmount) || MIN_BET)})
-                  </button>
-                  
-                  {/* Bet Amount Input */}
-                  <div className="max-w-sm mx-auto">
-                    <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
-                    <input 
-                      type="number" 
-                      min={MIN_BET} 
-                      step="100" 
-                      value={betAmount} 
-                      onChange={(e) => setBetAmount(e.target.value)} 
-                      className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-purple-500" 
-                      placeholder="1000" 
-                    />
-                    <div className="flex gap-2 mt-2 justify-center flex-wrap">
-                      {[1000, 2500, 5000, 10000].map((v) => (
-                        <button 
-                          key={v} 
-                          onClick={() => setBetAmount(String(v))} 
-                          className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
-                        >
-                          {v >= 1000 ? `${v/1000}K` : v}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="text-xs text-zinc-500 mt-2 text-center">
-                      Potential: {potentialWin.toLocaleString()} MLEO
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {rolling && (
-                <div className="text-2xl font-bold text-purple-400 animate-pulse">
-                  Rolling...
-                </div>
-              )}
-
-              {gameResult && (
+              {/* Free Play Indicator */}
+              {freePlayTokens > 0 && (
                 <button
-                  onClick={resetGame}
-                  className="px-8 py-3 rounded-xl font-bold text-lg text-white bg-gradient-to-r from-indigo-600 to-purple-500 hover:from-indigo-500 hover:to-purple-400 transition-all mb-6 shadow-lg hover:scale-105 transform"
+                  onClick={() => playLimbo(true)}
+                  disabled={rolling}
+                  className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50"
+                  title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}
                 >
-                  🔄 New Game ({fmt(Number(betAmount) || MIN_BET)})
+                  <span className="text-base">🎁</span>
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                    {freePlayTokens}
+                  </span>
                 </button>
               )}
-
-              <div className="text-sm opacity-70 mb-4">
-                Set target multiplier • Higher target = lower chance • Unlimited potential!
-              </div>
             </div>
 
-            {/* Bet Amount Input after game */}
-            {gameResult && (
-              <div className="max-w-sm mx-auto">
-                <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
-                <input 
-                  type="number" 
-                  min={MIN_BET} 
-                  step="100" 
-                  value={betAmount} 
-                  onChange={(e) => setBetAmount(e.target.value)} 
-                  className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-purple-500" 
-                  placeholder="1000" 
-                />
-                <div className="flex gap-2 mt-2 justify-center flex-wrap">
-                  {[1000, 2500, 5000, 10000].map((v) => (
-                    <button 
-                      key={v} 
-                      onClick={() => setBetAmount(String(v))} 
-                      className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
-                    >
-                      {v >= 1000 ? `${v/1000}K` : v}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+            {/* Right: Fullscreen + Menu */}
+            <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
+              <button
+                onClick={() => {
+                  playSfx(clickSound.current);
+                  const el = wrapRef.current || document.documentElement;
+                  if (!document.fullscreenElement) {
+                    el.requestFullscreen?.().catch(() => {});
+                  } else {
+                    document.exitFullscreen?.().catch(() => {});
+                  }
+                }}
+                className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+              >
+                {isFullscreen ? "EXIT" : "FULL"}
+              </button>
 
-          {/* STATS */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <div className="rounded-xl p-3 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
-              <div className="text-xs opacity-70 mb-1">Your Vault</div>
-              <div className="text-xl font-bold text-emerald-400">{fmt(vault)}</div>
-              <button onClick={refreshVault} className="text-xs opacity-60 hover:opacity-100 mt-1">↻ Refresh</button>
+              <button
+                onClick={() => { playSfx(clickSound.current); setMenuOpen(true); }}
+                className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+                title="Menu"
+              >
+                MENU
+              </button>
             </div>
-            
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Total Games</div>
-              <div className="text-lg font-bold">{stats.totalGames.toLocaleString()}</div>
-            </div>
-
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Total Won</div>
-              <div className="text-lg font-bold text-green-400">{fmt(stats.totalWon)}</div>
-            </div>
-
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">🔥 Highest ×</div>
-              <div className="text-lg font-bold text-amber-400">×{stats.highestMultiplier.toFixed(2)}</div>
-            </div>
-          </div>
-
-          {/* HOW TO PLAY */}
-          <div className="rounded-2xl p-6 bg-white/5 border border-white/10 mb-6">
-            <h3 className="text-lg font-bold mb-4">📖 How to Play</h3>
-            <ul className="text-sm space-y-2 text-zinc-300">
-              <li>• <strong>Choose Target:</strong> Set your target multiplier (1.01× to 100×+)</li>
-              <li>• <strong>Place Bet:</strong> Decide how much to bet</li>
-              <li>• <strong>Roll:</strong> Game generates a random multiplier</li>
-              <li>• <strong>Win If:</strong> Result is EQUAL or HIGHER than your target!</li>
-              <li>• <strong>Examples:</strong></li>
-              <li className="ml-4">- Target 2× = 49% chance (easy win, low payout)</li>
-              <li className="ml-4">- Target 10× = 9.8% chance (harder, bigger payout)</li>
-              <li className="ml-4">- Target 100× = 0.98% chance (very rare, huge payout!)</li>
-              <li>• <strong>Strategy:</strong> Higher target = bigger prize but lower chance</li>
-              <li>• <strong>House Edge:</strong> 2% (fair odds)</li>
-              <li>• <strong>Unlimited:</strong> No maximum multiplier - go for 1000× if you dare!</li>
-              <li>• <strong>Minimum bet:</strong> {MIN_BET.toLocaleString()} MLEO per game</li>
-            </ul>
           </div>
         </div>
 
-        {/* FLOATING RESULT POPUP */}
-        {gameResult && showResultPopup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-            <div 
-              className={`text-center p-4 rounded-xl border-2 transition-all duration-500 transform pointer-events-auto max-w-sm mx-4 ${
-                showResultPopup ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
-              } ${
-                gameResult.win
-                  ? "bg-gradient-to-br from-green-600 to-emerald-700 border-green-300 shadow-2xl shadow-green-500/70"
-                  : "bg-gradient-to-br from-red-600 to-rose-700 border-red-300 shadow-2xl shadow-red-500/70"
-              }`}
+        {/* Main Content */}
+        <div className="relative h-full flex flex-col items-center justify-center px-4 pb-20 pt-16" style={{ minHeight: '600px' }}>
+          {/* Game Title */}
+          <div className="text-center mb-4">
+            <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-2">
+              🔥 Limbo
+            </h1>
+            <p className="text-white/70">Set your multiplier • Higher risk, higher reward!</p>
+          </div>
+
+          {/* Stats Display */}
+          <div className="grid grid-cols-3 gap-3 mb-4 w-full max-w-md">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center">
+              <div className="text-xs text-white/60 mb-1">Vault</div>
+              <div className="text-base font-bold text-emerald-400">{fmt(vault)}</div>
+            </div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center">
+              <div className="text-xs text-white/60 mb-1">Bet</div>
+              <div className="text-base font-bold text-amber-400">{fmt(Number(betAmount))}</div>
+            </div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center">
+              <div className="text-xs text-white/60 mb-1">Win</div>
+              <div className="text-base font-bold text-green-400">{fmt(potentialWin)}</div>
+            </div>
+          </div>
+
+          {/* Result Display */}
+          <div className="mb-4">
+            <div className={`text-7xl font-black transition-all duration-200 ${
+              rolling ? 'animate-pulse text-purple-400' :
+              result && gameResult ?
+                gameResult.win ? 'text-green-400' : 'text-red-400'
+              : 'text-zinc-600'
+            }`}>
+              ×{result || '0.00'}
+            </div>
+            {gameResult && (
+              <div className={`text-center text-lg font-bold mt-2 ${gameResult.win ? 'text-green-400' : 'text-red-400'}`}>
+                {gameResult.win ?
+                  `✅ WIN! ×${gameResult.result.toFixed(2)} ≥ ×${gameResult.target}` :
+                  `❌ LOSE! ×${gameResult.result.toFixed(2)} < ×${gameResult.target}`
+                }
+              </div>
+            )}
+          </div>
+
+          {/* Target Multiplier Controls */}
+          <div className="w-full max-w-sm mb-4">
+            <div className="mb-3">
+              <label className="block text-sm text-white/70 mb-2">Target Multiplier: ×{targetMultiplier.toFixed(2)}</label>
+              <input
+                type="range"
+                min="1.01"
+                max="100"
+                step="0.01"
+                value={targetMultiplier}
+                onChange={(e) => setTargetMultiplier(Number(e.target.value))}
+                disabled={rolling}
+                className="w-full h-2 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg appearance-none cursor-pointer disabled:opacity-50"
+              />
+              <div className="flex justify-between text-xs text-white/50 mt-1">
+                <span>×1.01</span>
+                <span>×100</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs text-white/60 bg-black/20 rounded-lg p-2">
+              <div>Win Chance: {winChance.toFixed(2)}%</div>
+              <div className="text-right">Payout: ×{targetMultiplier.toFixed(2)}</div>
+            </div>
+          </div>
+
+          {/* Bet Controls */}
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                const newBet = Math.max(MIN_BET, current - 1000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              disabled={rolling}
+              className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
             >
-              <div className="text-2xl font-black mb-2 animate-pulse text-white drop-shadow-lg">
-                {gameResult.win ? "🎉 You Win! 🎉" : "😞 You Lose"}
+              −
+            </button>
+            <input
+              type="number"
+              value={betAmount}
+              onChange={(e) => setBetAmount(e.target.value)}
+              disabled={rolling}
+              className="w-28 h-10 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-sm"
+              min={MIN_BET}
+            />
+            <button
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                const newBet = Math.min(vault, current + 1000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              disabled={rolling}
+              className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
+            >
+              +
+            </button>
+          </div>
+
+          {/* Quick Select Multipliers */}
+          <div className="flex gap-2 mb-4">
+            {[1.5, 2, 5, 10, 50].map((multi) => (
+              <button
+                key={multi}
+                onClick={() => { setTargetMultiplier(multi); playSfx(clickSound.current); }}
+                disabled={rolling}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                  targetMultiplier === multi
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-white/10 text-white/70 hover:bg-white/20'
+                } disabled:opacity-50`}
+              >
+                ×{multi}
+              </button>
+            ))}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-3 w-full max-w-sm">
+            <button
+              onClick={() => playLimbo(false)}
+              disabled={rolling}
+              className="w-full py-3 rounded-lg font-bold text-lg bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
+            >
+              {rolling ? "Rolling..." : "ROLL"}
+            </button>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }}
+                className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs"
+              >
+                How to Play
+              </button>
+              <button
+                onClick={() => { setShowStats(true); playSfx(clickSound.current); }}
+                className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs"
+              >
+                Stats
+              </button>
+              <button
+                onClick={() => { setShowVaultModal(true); playSfx(clickSound.current); }}
+                className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs"
+              >
+                💰 Vault
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Result Popup */}
+        {showResultPopup && gameResult && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
+            <div className={`${gameResult.win ? 'bg-green-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
+              <div className="text-4xl mb-2">{gameResult.win ? '🎉' : '😔'}</div>
+              <div className="text-2xl font-bold mb-1">
+                {gameResult.win ? 'YOU WIN!' : 'YOU LOSE'}
               </div>
-              <div className="text-base mb-2 text-white/90 font-semibold">
-                Result: {gameResult.result}× | Target: {gameResult.target}×
+              <div className="text-lg">
+                {gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}
               </div>
-              {gameResult.win && (
-                <div className="space-y-1">
-                  <div className="text-3xl font-black text-white animate-bounce drop-shadow-2xl">
-                    +{fmt(gameResult.prize)} MLEO
+              <div className="text-sm opacity-80 mt-2">
+                Result: ×{gameResult.result.toFixed(2)}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Menu Modal */}
+        {menuOpen && (
+          <div
+            className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3"
+            onClick={() => setMenuOpen(false)}
+          >
+            <div
+              className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-2 md:mb-3">
+                <h2 className="text-xl font-extrabold">Settings</h2>
+                <button
+                  onClick={() => setMenuOpen(false)}
+                  className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Wallet */}
+              <div className="mb-3 space-y-2">
+                <h3 className="text-sm font-semibold opacity-80">Wallet</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={openWalletModalUnified}
+                    className={`px-3 py-2 rounded-md text-sm font-semibold ${
+                      isConnected
+                        ? "bg-emerald-500/90 hover:bg-emerald-500 text-white"
+                        : "bg-rose-500/90 hover:bg-rose-500 text-white"
+                    }`}
+                  >
+                    {isConnected ? "Connected" : "Disconnected"}
+                  </button>
+
+                  {isConnected && (
+                    <button
+                      onClick={hardDisconnect}
+                      className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white"
+                    >
+                      Disconnect
+                    </button>
+                  )}
+                </div>
+
+                {isConnected && address && (
+                  <button
+                    onClick={() => {
+                      try {
+                        navigator.clipboard.writeText(address).then(() => {
+                          setCopiedAddr(true);
+                          setTimeout(() => setCopiedAddr(false), 1500);
+                        });
+                      } catch {}
+                    }}
+                    className="mt-1 text-xs text-gray-300 hover:text-white transition underline"
+                  >
+                    {shortAddr(address)}
+                    {copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}
+                  </button>
+                )}
+              </div>
+
+              {/* Sound */}
+              <div className="mb-4 space-y-2">
+                <h3 className="text-sm font-semibold opacity-80">Sound</h3>
+                <button
+                  onClick={() => setSfxMuted(v => !v)}
+                  className={`px-3 py-2 rounded-lg text-sm font-semibold ${
+                    sfxMuted
+                      ? "bg-rose-500/90 hover:bg-rose-500 text-white"
+                      : "bg-emerald-500/90 hover:bg-emerald-500 text-white"
+                  }`}
+                >
+                  SFX: {sfxMuted ? "Off" : "On"}
+                </button>
+              </div>
+
+              <div className="mt-4 text-xs opacity-70">
+                <p>Limbo v2.0</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* How to Play Modal */}
+        {showHowToPlay && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+              <h2 className="text-2xl font-extrabold mb-4">🔥 How to Play</h2>
+              <div className="space-y-3 text-sm">
+                <p><strong>1. Set Target Multiplier:</strong> Choose your target from ×1.01 to ×100</p>
+                <p><strong>2. Set Bet:</strong> Minimum bet is {MIN_BET} MLEO. Use +/- to adjust.</p>
+                <p><strong>3. Roll:</strong> Click "ROLL" to generate a random multiplier</p>
+                <p><strong>4. Win:</strong> If the result is ≥ your target, you win your bet × target multiplier!</p>
+                <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-lg p-3 mt-4">
+                  <p className="text-indigo-300 font-semibold">💡 Strategy Tips</p>
+                  <p className="text-xs text-white/80 mt-1">• Higher target = Lower win chance but bigger prize</p>
+                  <p className="text-xs text-white/80">• ×2 target = ~49% win chance</p>
+                  <p className="text-xs text-white/80">• ×100 target = ~0.98% win chance</p>
+                  <p className="text-xs text-white/80">• Use quick select buttons for popular multipliers</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowHowToPlay(false)}
+                className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Stats Modal */}
+        {showStats && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+              <h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Total Games</div>
+                    <div className="text-xl font-bold">{stats.totalGames}</div>
                   </div>
-                  <div className="text-sm font-bold text-white/80">
-                    (×{gameResult.target})
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Win Rate</div>
+                    <div className="text-xl font-bold text-green-400">
+                      {stats.totalGames > 0 ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : 0}%
+                    </div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Total Bet</div>
+                    <div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Total Won</div>
+                    <div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Biggest Win</div>
+                    <div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Net Profit</div>
+                    <div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {fmt(stats.totalWon - stats.totalBet)}
+                    </div>
                   </div>
                 </div>
-              )}
-              {!gameResult.win && (
-                <div className="text-lg font-bold text-white">
-                  Lost {fmt(currentBet)} MLEO
+
+                <div className="bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border border-purple-500/30 rounded-lg p-4">
+                  <div className="text-sm font-semibold mb-2">🔥 Best Result</div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-purple-400">×{stats.highestMultiplier.toFixed(2)}</div>
+                    <div className="text-xs text-white/60 mt-1">Highest Multiplier Hit</div>
+                  </div>
                 </div>
-              )}
-              <div className="mt-2 text-xs text-white/70 animate-pulse">
-                Auto-closing...
               </div>
+              <button
+                onClick={() => setShowStats(false)}
+                className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* MLEO Vault Modal */}
+        {showVaultModal && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+              <h2 className="text-2xl font-extrabold mb-4">💰 MLEO Vault</h2>
+
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-6 text-center">
+                <div className="text-sm text-white/60 mb-1">Current Balance</div>
+                <div className="text-3xl font-bold text-emerald-400">{fmt(vault)} MLEO</div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-white/70 mb-2 block">Collect to Wallet</label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="number"
+                      value={collectAmount}
+                      onChange={(e) => setCollectAmount(Number(e.target.value))}
+                      className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white"
+                      min="1"
+                      max={vault}
+                    />
+                    <button
+                      onClick={() => setCollectAmount(vault)}
+                      className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold"
+                    >
+                      MAX
+                    </button>
+                  </div>
+                  <button
+                    onClick={collectToWallet}
+                    disabled={collectAmount <= 0 || collectAmount > vault || claiming}
+                    className="w-full py-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {claiming ? "Collecting..." : `Collect ${fmt(collectAmount)} MLEO`}
+                  </button>
+                </div>
+
+                <div className="text-xs text-white/60">
+                  <p>• Your vault is shared across all MLEO games</p>
+                  <p>• Collect earnings to your wallet anytime</p>
+                  <p>• Network: BSC Testnet (TBNB)</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowVaultModal(false)}
+                className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold"
+              >
+                Close
+              </button>
             </div>
           </div>
         )}
@@ -558,4 +902,3 @@ export default function LimboPage() {
     </Layout>
   );
 }
-

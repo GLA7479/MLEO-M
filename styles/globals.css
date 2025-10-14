@@ -121,3 +121,16 @@ body {
   animation: bounce-in 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55) both; 
 }
 
+/* Fade-in animation for result popups */
+@keyframes fadeIn {
+  from { 
+    opacity: 0; 
+  }
+  to { 
+    opacity: 1; 
+  }
+}
+.animate-fade-in { 
+  animation: fadeIn 0.3s ease-in-out; 
+}
+
