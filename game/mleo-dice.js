@@ -520,18 +520,18 @@ export default function DicePage() {
           </div>
 
           {/* Stats Display */}
-          <div className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md">
-            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center">
-              <div className="text-xs text-white/60 mb-1">Vault</div>
-              <div className="text-base font-bold text-emerald-400">{fmt(vault)}</div>
+          <div className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Vault</div>
+              <div className="text-sm font-bold text-emerald-400">{fmt(vault)}</div>
             </div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center">
-              <div className="text-xs text-white/60 mb-1">Bet</div>
-              <div className="text-base font-bold text-amber-400">{fmt(Number(betAmount))}</div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Bet</div>
+              <div className="text-sm font-bold text-amber-400">{fmt(Number(betAmount))}</div>
             </div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center">
-              <div className="text-xs text-white/60 mb-1">Win</div>
-              <div className="text-base font-bold text-green-400">{fmt(potentialWin)}</div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Win</div>
+              <div className="text-sm font-bold text-green-400">{fmt(potentialWin)}</div>
             </div>
           </div>
 

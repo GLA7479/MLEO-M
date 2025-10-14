@@ -241,7 +241,7 @@ useEffect(() => {
       24;
 
     const freeH = Math.max(200, rootH - used);
-    const ladderWrap = wrapRef.current.querySelector("#ladder-steps-wrap");
+    const ladderWrap = wrapRef.current?.querySelector("#ladder-steps-wrap");
     const freeW = Math.max(
       160,
       (ladderWrap?.clientWidth || window.innerWidth) - 4
