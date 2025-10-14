@@ -37,33 +37,36 @@ function GameCard({ title, emoji, description, prize, href, color, freePlayStatu
   return (
     <>
       <article 
-        className="rounded-lg border border-white/10 backdrop-blur-md shadow-lg p-3 flex flex-col h-full transition-all hover:scale-105 hover:border-white/30"
+        className="rounded-lg border border-white/10 backdrop-blur-md shadow-lg p-4 flex flex-col transition-all hover:scale-105 hover:border-white/30 relative"
         style={{
           background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)',
-          minHeight: '140px',
+          minHeight: '170px',
         }}
       >
-        <div className="text-center flex-1 flex flex-col justify-center">
-          <div className="flex justify-between items-center mb-2">
-            <div className="flex-1"></div>
-            <div className="text-4xl">{emoji}</div>
-            <div className="flex-1 flex justify-end">
-              <button
-                onClick={() => setShowInfo(true)}
-                className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-sm transition-all"
-                title="Info"
-              >
-                ℹ️
-              </button>
-            </div>
-          </div>
-          <h2 className="text-sm font-bold mb-3">{title}</h2>
+        {/* Info button - fixed position top right */}
+        <button
+          onClick={() => setShowInfo(true)}
+          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-base transition-all z-10"
+          title="Info"
+        >
+          ℹ️
+        </button>
+
+        {/* Icon - fixed position */}
+        <div className="text-center mt-6 mb-2">
+          <div className="text-5xl">{emoji}</div>
         </div>
 
+        {/* Title - fixed position */}
+        <div className="text-center mb-3">
+          <h2 className="text-base font-bold">{title}</h2>
+        </div>
+
+        {/* Play button - bottom */}
         <div className="mt-auto">
           <Link
             href={href}
-            className="block w-full text-center px-3 py-2 rounded text-xs font-bold text-white shadow-lg transition-all hover:scale-105"
+            className="block w-full text-center px-4 py-2.5 rounded text-sm font-bold text-white shadow-lg transition-all hover:scale-105"
             style={{
               background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
             }}
