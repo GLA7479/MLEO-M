@@ -491,6 +491,24 @@ export default function ArcadeHub() {
       href: "/coin-flip",
       color: "#F59E0B",
     },
+    // 26. Plinko2 - NEW WITH PHYSICS!
+    {
+      title: "Plinko2",
+      emoji: "🎯",
+      description: "Drop balls with real physics! Watch them bounce through pegs to win big multipliers!",
+      prize: "×10",
+      href: "/plinko2",
+      color: "#3B82F6",
+    },
+    // 27. Crash2 - NEW WITH LIVE CHART!
+    {
+      title: "Crash2",
+      emoji: "📈",
+      description: "Watch the multiplier grow! Cash out before it crashes to win your bet times the multiplier!",
+      prize: "×10",
+      href: "/crash2",
+      color: "#EF4444",
+    },
   ];
 
   return (
@@ -581,7 +599,7 @@ export default function ArcadeHub() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/40">
               <span className="text-2xl">🎮</span>
-              <span className="font-bold text-purple-300">25 Exciting Games to Play!</span>
+              <span className="font-bold text-purple-300">27 Exciting Games to Play!</span>
             </div>
           </div>
 

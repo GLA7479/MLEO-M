@@ -1,7 +1,1 @@
-import MLEOCraps from '../game/mleo-craps';
-
-export default function CrapsPage() {
-  return <MLEOCraps />;
-}
-
-
+export { default } from "../game/mleo-craps";
