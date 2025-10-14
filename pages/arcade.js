@@ -37,10 +37,10 @@ function GameCard({ title, emoji, description, prize, href, color, freePlayStatu
   return (
     <>
       <article 
-        className="rounded-lg border border-white/10 backdrop-blur-md shadow-lg p-4 flex flex-col transition-all hover:scale-105 hover:border-white/30 relative"
+        className="rounded-lg border border-white/10 backdrop-blur-md shadow-lg p-4 flex flex-col transition-all hover:scale-105 hover:border-white/30 relative overflow-hidden"
         style={{
           background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)',
-          minHeight: '170px',
+          height: '187px',
         }}
       >
         {/* Info button - fixed position top right */}
@@ -53,17 +53,23 @@ function GameCard({ title, emoji, description, prize, href, color, freePlayStatu
         </button>
 
         {/* Icon - fixed position */}
-        <div className="text-center mt-6 mb-2">
-          <div className="text-5xl">{emoji}</div>
+        <div className="text-center absolute left-0 right-0" style={{ top: '15px' }}>
+          <div className="text-5xl leading-none">{emoji}</div>
         </div>
 
-        {/* Title - fixed position */}
-        <div className="text-center mb-3">
-          <h2 className="text-base font-bold">{title}</h2>
+        {/* Title - fixed position with fixed height for 2 lines */}
+        <div 
+          className="text-center absolute left-0 right-0 px-2 flex items-center justify-center" 
+          style={{ 
+            top: '80px',
+            height: '45px'
+          }}
+        >
+          <h2 className="text-base font-bold line-clamp-2 leading-tight">{title}</h2>
         </div>
 
-        {/* Play button - bottom */}
-        <div className="mt-auto">
+        {/* Play button - fixed position bottom */}
+        <div className="absolute left-4 right-4" style={{ bottom: '12px' }}>
           <Link
             href={href}
             className="block w-full text-center px-4 py-2.5 rounded text-sm font-bold text-white shadow-lg transition-all hover:scale-105"
