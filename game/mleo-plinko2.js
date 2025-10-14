@@ -669,23 +669,23 @@ export default function Plinko2Page() {
 
           <div
             ref={metersRef}
-            className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md"
+            className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md"
           >
-            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
-              <div className="text-xs text-white/60 mb-1">Vault</div>
-              <div className="text-lg font-bold text-emerald-400">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Vault</div>
+              <div className="text-sm font-bold text-emerald-400">
                 {fmt(vault)}
               </div>
             </div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
-              <div className="text-xs text-white/60 mb-1">Bet</div>
-              <div className="text-lg font-bold text-amber-400">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Bet</div>
+              <div className="text-sm font-bold text-amber-400">
                 {fmt(Number(betAmount))}
               </div>
             </div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
-              <div className="text-xs text-white/60 mb-1">Balls</div>
-              <div className="text-lg font-bold text-purple-400">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Balls</div>
+              <div className="text-sm font-bold text-purple-400">
                 {ballsDropping}
               </div>
             </div>
@@ -694,7 +694,7 @@ export default function Plinko2Page() {
           {/* CANVAS */}
           <div
             id="plinko-canvas-wrap"
-            className="mb-3 w-full max-w-md"
+            className="mb-1 w-full max-w-md"
             style={{ height: "var(--chart-h, 300px)" }}
           >
             <canvas
@@ -703,7 +703,7 @@ export default function Plinko2Page() {
             />
           </div>
 
-          <div ref={betRef} className="flex items-center justify-center gap-2 mb-3">
+          <div ref={betRef} className="flex items-center justify-center gap-2 mb-1">
             <button
               onClick={() => {
                 const current = Number(betAmount) || MIN_BET;
@@ -711,7 +711,7 @@ export default function Plinko2Page() {
                 setBetAmount(String(newBet));
                 playSfx(clickSound.current);
               }}
-              className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
+              className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
             >
               −
             </button>
@@ -719,7 +719,7 @@ export default function Plinko2Page() {
               type="number"
               value={betAmount}
               onChange={(e) => setBetAmount(e.target.value)}
-              className="w-32 h-12 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-sm"
+              className="w-24 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs"
               min={MIN_BET}
             />
             <button
@@ -729,7 +729,7 @@ export default function Plinko2Page() {
                 setBetAmount(String(newBet));
                 playSfx(clickSound.current);
               }}
-              className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
+              className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
             >
               +
             </button>
