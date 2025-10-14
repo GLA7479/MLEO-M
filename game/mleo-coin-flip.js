@@ -497,17 +497,17 @@ export default function CoinFlipPage() {
         </div>
 
         {/* Main Content */}
-        <div className="relative h-full flex flex-col items-center justify-center px-4 pb-20 pt-16" style={{ minHeight: '600px' }}>
+        <div className="relative h-full flex flex-col items-center justify-center px-4 pb-16 pt-14 overflow-y-auto" style={{ minHeight: '100%' }}>
           {/* Game Title */}
-          <div className="text-center mb-6">
-            <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-2">
+          <div className="text-center mb-3">
+            <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">
               🪙 Coin Flip
             </h1>
-            <p className="text-white/70">Choose Heads or Tails • Win ×{WIN_MULTIPLIER}</p>
+            <p className="text-white/70 text-sm">Choose Heads or Tails • Win ×{WIN_MULTIPLIER}</p>
           </div>
 
           {/* Stats Display */}
-          <div className="grid grid-cols-3 gap-3 mb-6 w-full max-w-md">
+          <div className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
               <div className="text-xs text-white/60 mb-1">Vault</div>
               <div className="text-lg font-bold text-emerald-400">{fmt(vault)}</div>
@@ -523,24 +523,24 @@ export default function CoinFlipPage() {
           </div>
 
           {/* Coin Display */}
-          <div className="mb-6" style={{ minHeight: '180px' }}>
-            <div className={`w-32 h-32 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 shadow-2xl flex items-center justify-center text-6xl transition-transform duration-200 ${flipping ? 'animate-spin' : ''}`}>
+          <div className="mb-3" style={{ minHeight: '150px' }}>
+            <div className={`w-24 h-24 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 shadow-2xl flex items-center justify-center text-5xl transition-transform duration-200 ${flipping ? 'animate-spin' : ''}`}>
               {result ? (result === "heads" ? "👑" : "⚡") : "🪙"}
             </div>
             {/* Always present - just opacity changes */}
-            <div className="text-center mt-3" style={{ height: '32px' }}>
-              <div className={`text-xl font-bold text-white capitalize transition-opacity duration-300 ${result && !flipping ? 'opacity-100' : 'opacity-0'}`}>
+            <div className="text-center mt-2" style={{ height: '28px' }}>
+              <div className={`text-lg font-bold text-white capitalize transition-opacity duration-300 ${result && !flipping ? 'opacity-100' : 'opacity-0'}`}>
                 {result || 'waiting'}
               </div>
             </div>
           </div>
 
           {/* Choice Selector */}
-          <div className="flex gap-2 mb-6" style={{ minHeight: '56px' }}>
+          <div className="flex gap-2 mb-3" style={{ minHeight: '48px' }}>
             <button
               onClick={() => { setChoice("heads"); playSfx(clickSound.current); }}
               disabled={flipping}
-              className={`px-6 py-3 rounded-lg font-bold transition-all ${
+              className={`px-5 py-2 rounded-lg font-bold text-sm transition-all ${
                 choice === "heads"
                   ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
                   : 'bg-white/10 text-white hover:bg-white/20'
@@ -551,7 +551,7 @@ export default function CoinFlipPage() {
             <button
               onClick={() => { setChoice("tails"); playSfx(clickSound.current); }}
               disabled={flipping}
-              className={`px-6 py-3 rounded-lg font-bold transition-all ${
+              className={`px-5 py-2 rounded-lg font-bold text-sm transition-all ${
                 choice === "tails"
                   ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
                   : 'bg-white/10 text-white hover:bg-white/20'
@@ -562,7 +562,7 @@ export default function CoinFlipPage() {
           </div>
 
           {/* Bet Controls */}
-          <div className="flex items-center gap-2 mb-6">
+          <div className="flex items-center gap-2 mb-3">
             <button
               onClick={() => {
                 const current = Number(betAmount) || MIN_BET;
@@ -602,7 +602,7 @@ export default function CoinFlipPage() {
             <button
               onClick={() => flipCoin(false)}
               disabled={flipping}
-              className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
+              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
             >
               {flipping ? "Flipping..." : "FLIP COIN"}
             </button>

@@ -536,49 +536,50 @@ export default function DicePage() {
           </div>
 
             {/* Result Display */}
-          <div className="mb-4">
+          <div className="mb-4" style={{ minHeight: '180px' }}>
             <div className={`text-7xl font-black transition-all duration-200 ${
               rolling ? 'animate-pulse text-teal-400' :
-                result && gameResult ? 
-                  gameResult.win ? 'text-green-400' : 'text-red-400'
-                : 'text-zinc-600'
-              }`}>
-                {result || '0.00'}
-              </div>
-              {gameResult && (
-              <div className={`text-center text-lg font-bold mt-2 ${gameResult.win ? 'text-green-400' : 'text-red-400'}`}>
-                  {gameResult.win ? 
-                    `✅ WIN! ${gameResult.isOver ? 'OVER' : 'UNDER'} ${gameResult.target}` : 
-                    `❌ LOSE! ${gameResult.isOver ? 'OVER' : 'UNDER'} ${gameResult.target}`
-                  }
-                </div>
-              )}
+              result && gameResult ?
+                gameResult.win ? 'text-green-400' : 'text-red-400'
+              : 'text-zinc-600'
+            }`}>
+              {result || '0.00'}
             </div>
+            {/* Always present - opacity changes */}
+            <div className="text-center mt-2" style={{ height: '32px' }}>
+              <div className={`text-lg font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-red-400'}`}>
+                {gameResult ? (gameResult.win ?
+                  `✅ WIN! ${gameResult.isOver ? 'OVER' : 'UNDER'} ${gameResult.target}` :
+                  `❌ LOSE! ${gameResult.isOver ? 'OVER' : 'UNDER'} ${gameResult.target}`)
+                : 'waiting'}
+              </div>
+            </div>
+          </div>
               
               {/* Over/Under Toggle */}
-          <div className="flex gap-3 mb-4">
-                <button
-              onClick={() => { setIsOver(true); playSfx(clickSound.current); }}
-                  disabled={rolling}
-              className={`px-6 py-2 rounded-lg font-bold transition-all ${
-                    isOver
-                      ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white scale-105'
-                  : 'bg-white/10 text-white/60 hover:bg-white/20'
-              } disabled:opacity-50`}
-                >
-                  🔼 OVER {target}
-                </button>
-                <button
-              onClick={() => { setIsOver(false); playSfx(clickSound.current); }}
-                  disabled={rolling}
-              className={`px-6 py-2 rounded-lg font-bold transition-all ${
-                    !isOver
-                      ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white scale-105'
-                  : 'bg-white/10 text-white/60 hover:bg-white/20'
-              } disabled:opacity-50`}
-                >
-                  🔽 UNDER {target}
-                </button>
+          <div className="flex gap-2 mb-4" style={{ minHeight: '48px' }}>
+              <button
+                onClick={() => { setIsOver(true); playSfx(clickSound.current); }}
+                disabled={rolling}
+                className={`px-6 py-2 rounded-lg font-bold transition-all ${
+                  isOver
+                    ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white ring-2 ring-green-300'
+                    : 'bg-white/10 text-white/60 hover:bg-white/20'
+                } disabled:opacity-50`}
+              >
+                🔼 OVER {target}
+              </button>
+              <button
+                onClick={() => { setIsOver(false); playSfx(clickSound.current); }}
+                disabled={rolling}
+                className={`px-6 py-2 rounded-lg font-bold transition-all ${
+                  !isOver
+                    ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white ring-2 ring-cyan-300'
+                    : 'bg-white/10 text-white/60 hover:bg-white/20'
+                } disabled:opacity-50`}
+              >
+                🔽 UNDER {target}
+              </button>
               </div>
 
               {/* Slider */}
@@ -657,10 +658,10 @@ export default function DicePage() {
 
           {/* Action Buttons */}
           <div className="flex flex-col gap-3 w-full max-w-sm">
-                  <button
+            <button
               onClick={() => playDice(false)}
-                    disabled={rolling}
-              className="w-full py-3 rounded-lg font-bold text-lg bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
+              disabled={rolling}
+              className="w-full py-3 rounded-lg font-bold text-lg bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
             >
               {rolling ? "Rolling..." : "ROLL DICE"}
             </button>

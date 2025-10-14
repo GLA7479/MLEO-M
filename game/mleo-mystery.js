@@ -521,33 +521,35 @@ export default function MysteryBoxPage() {
           </div>
 
           {/* Mystery Boxes Grid */}
+          <div style={{ minHeight: '220px' }}>
           {gameActive && (
             <div className="grid grid-cols-5 gap-3 mb-4">
               {boxes.map((prize, index) => (
-                <button
-                  key={index}
-                  onClick={() => chooseBox(index)}
-                  disabled={selectedBox !== null}
-                  className={`w-16 h-16 rounded-lg font-bold text-2xl transition-all ${
-                    selectedBox === index
-                      ? prize >= 1
-                        ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-black scale-110 shadow-xl'
-                        : 'bg-gradient-to-br from-gray-600 to-gray-700 text-white scale-110'
-                      : selectedBox !== null
-                      ? 'bg-white/5 text-white/30 opacity-50'
-                      : 'bg-gradient-to-br from-orange-500 to-amber-600 hover:scale-110 shadow-lg cursor-pointer text-white'
-                  } disabled:cursor-not-allowed`}
-                >
-                  {selectedBox === index ? (prize === 50 ? '💎' : prize >= 5 ? '🎁' : prize >= 1 ? '🪙' : '💔') : '🎁'}
-                </button>
+                  <button
+                    key={index}
+                    onClick={() => chooseBox(index)}
+                    disabled={selectedBox !== null}
+                    className={`w-16 h-16 rounded-lg font-bold text-2xl transition-all ${
+                      selectedBox === index
+                        ? prize >= 1
+                          ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-black ring-2 ring-yellow-300 shadow-xl'
+                          : 'bg-gradient-to-br from-gray-600 to-gray-700 text-white ring-2 ring-gray-500'
+                        : selectedBox !== null
+                        ? 'bg-white/5 text-white/30 opacity-50'
+                        : 'bg-gradient-to-br from-orange-500 to-amber-600 hover:brightness-110 shadow-lg cursor-pointer text-white'
+                    } disabled:cursor-not-allowed`}
+                  >
+                    {selectedBox === index ? (prize === 50 ? '💎' : prize >= 5 ? '🎁' : prize >= 1 ? '🪙' : '💔') : '🎁'}
+                  </button>
               ))}
             </div>
           )}
 
           {/* Result Display */}
+          <div style={{ minHeight: '120px' }}>
           {gameResult && (
             <div className="mb-4 text-center">
-              <div className={`text-6xl mb-2 ${gameResult.jackpot ? 'animate-bounce' : ''}`}>
+              <div className="text-6xl mb-2">
                 {gameResult.jackpot ? '💎' : gameResult.win ? '🎉' : '💔'}
               </div>
               <div className={`text-2xl font-bold ${gameResult.win ? 'text-green-400' : 'text-red-400'}`}>
@@ -558,10 +560,12 @@ export default function MysteryBoxPage() {
               </div>
             </div>
           )}
+          </div>
 
           {/* Bet Controls */}
-          {!gameActive && (
-            <div className="flex items-center gap-2 mb-4">
+          <div style={{ minHeight: '48px', marginBottom: '16px' }}>
+          {!gameActive && !gameResult && (
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => {
                   const current = Number(betAmount) || MIN_BET;
@@ -593,13 +597,14 @@ export default function MysteryBoxPage() {
               </button>
             </div>
           )}
+          </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col gap-3 w-full max-w-sm">
+          <div className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '100px' }}>
             {!gameActive && !gameResult && (
               <button
                 onClick={() => startGame(false)}
-                className="w-full py-3 rounded-lg font-bold text-lg bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg hover:scale-105 transition-all"
+                className="w-full py-3 rounded-lg font-bold text-lg bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg hover:brightness-110 transition-all"
               >
                 START GAME
               </button>
@@ -608,7 +613,7 @@ export default function MysteryBoxPage() {
             {gameResult && (
               <button
                 onClick={resetGame}
-                className="w-full py-3 rounded-lg font-bold text-lg bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg hover:scale-105 transition-all"
+                className="w-full py-3 rounded-lg font-bold text-lg bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg hover:brightness-110 transition-all"
               >
                 PLAY AGAIN
               </button>

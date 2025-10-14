@@ -526,7 +526,7 @@ export default function LimboPage() {
           </div>
 
           {/* Result Display */}
-          <div className="mb-4">
+          <div className="mb-4" style={{ minHeight: '180px' }}>
             <div className={`text-7xl font-black transition-all duration-200 ${
               rolling ? 'animate-pulse text-purple-400' :
               result && gameResult ?
@@ -535,14 +535,15 @@ export default function LimboPage() {
             }`}>
               ×{result || '0.00'}
             </div>
-            {gameResult && (
-              <div className={`text-center text-lg font-bold mt-2 ${gameResult.win ? 'text-green-400' : 'text-red-400'}`}>
-                {gameResult.win ?
+            {/* Always present - opacity changes */}
+            <div className="text-center mt-2" style={{ height: '32px' }}>
+              <div className={`text-lg font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-red-400'}`}>
+                {gameResult ? (gameResult.win ?
                   `✅ WIN! ×${gameResult.result.toFixed(2)} ≥ ×${gameResult.target}` :
-                  `❌ LOSE! ×${gameResult.result.toFixed(2)} < ×${gameResult.target}`
-                }
+                  `❌ LOSE! ×${gameResult.result.toFixed(2)} < ×${gameResult.target}`)
+                : 'waiting'}
               </div>
-            )}
+            </div>
           </div>
 
           {/* Target Multiplier Controls */}
@@ -607,7 +608,7 @@ export default function LimboPage() {
           </div>
 
           {/* Quick Select Multipliers */}
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-2 mb-4" style={{ minHeight: '32px' }}>
             {[1.5, 2, 5, 10, 50].map((multi) => (
               <button
                 key={multi}
@@ -625,11 +626,11 @@ export default function LimboPage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col gap-3 w-full max-w-sm">
+          <div className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '100px' }}>
             <button
               onClick={() => playLimbo(false)}
               disabled={rolling}
-              className="w-full py-3 rounded-lg font-bold text-lg bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
+              className="w-full py-3 rounded-lg font-bold text-lg bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
             >
               {rolling ? "Rolling..." : "ROLL"}
             </button>
