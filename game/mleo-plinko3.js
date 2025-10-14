@@ -55,7 +55,7 @@ const MIN_BET = 1000;
 const MULTIPLIERS = [10, 3, 1.5, 1, 0.5, 0.3, 0.1, 0, 0.1, 0.3, 0.5, 1, 1.5, 3, 10];
 const BUCKET_COLORS = ["from-yellow-300 to-yellow-500", "from-orange-400 to-orange-600", "from-green-500 to-emerald-500", "from-blue-500 to-cyan-500", "from-purple-500 to-purple-600", "from-gray-600 to-gray-700", "from-red-600 to-red-700", "from-black to-gray-900", "from-red-600 to-red-700", "from-gray-600 to-gray-700", "from-purple-500 to-purple-600", "from-blue-500 to-cyan-500", "from-green-500 to-emerald-500", "from-orange-400 to-orange-600", "from-yellow-300 to-yellow-500"];
 
-const ROWS = 16;
+const ROWS = 17;
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -393,14 +393,12 @@ export default function Plinko2Page() {
         ball.x += ball.vx * dt;
         ball.y += ball.vy * dt;
 
-        // Wall collision
-        if (ball.x - ball.r < 0) {
-          ball.x = ball.r;
-          ball.vx *= -0.5;
-        }
-        if (ball.x + ball.r > canvas.width) {
-          ball.x = canvas.width - ball.r;
-          ball.vx *= -0.5;
+        // Wall collision - REMOVE ball if hits walls (0x multiplier)
+        if (ball.x - ball.r < 0 || ball.x + ball.r > canvas.width) {
+          const zeroBucket = { multiplier: 0, index: -1 };
+          landInBucket(ball, zeroBucket);
+          balls.splice(i, 1);
+          continue;
         }
 
         // Peg collision
