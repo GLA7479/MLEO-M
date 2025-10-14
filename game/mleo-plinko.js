@@ -358,40 +358,19 @@ function buildBoardGeometry(w, h) {
         pegsInRow += 2; // Add one peg on each side
       }
       
-      // Add one extra peg on right side for row 11 (old row 10, index 10)
-      if (r === 10) {
-        pegsInRow += 1; // Add one peg on right side
-      }
-      
-      // Row 11 (index 11) - exactly 14 pegs
-      if (r === 11) {
-        pegsInRow = 14; // Fixed 14 pegs
-      }
-      
-      // Row 12 (index 12) - exactly 15 pegs
-      if (r === 12) {
-        pegsInRow = 15; // Fixed 15 pegs
-      }
+      // Fixed pegs for last 3 rows
+      if (r === 10) pegsInRow = 13;
+      if (r === 11) pegsInRow = 14;
+      if (r === 12) pegsInRow = 15;
       
       
       // Perfect staggering offset for zigzag pattern - shift even rows right slightly
       let offset = (r % 2 === 1) ? gapX * 0.05 : 0;
       
-      // Special case: row 11 (old row 10) shift right by 0.05
-      if (r === 10) { // row 11 (0-indexed)
-        offset = gapX * 0.05;
-      }
-      
-      // Special case: row 12 (index 11) shift left by 0.4
-      if (r === 11) { // row 12 (0-indexed)
-        offset = -gapX * 0.4;
-      }
-      
-      
-      // Special case: row 13 (old row 12) shift left by 0.4
-      if (r === 12) { // row 13 (0-indexed)
-        offset = -gapX * 0.4;
-      }
+      // Fixed offsets for last 3 rows
+      if (r === 10) offset = 0;           // שורה 10: 0
+      if (r === 11) offset = gapX * 0.05; // שורה 11: +0.05
+      if (r === 12) offset = 0;           // שורה 12: 0
       
       // Global shift: move all rows 0.1 to the left
       offset -= gapX * 0.1;
