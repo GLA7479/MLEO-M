@@ -1,3 +1,5 @@
-// pages/coin-flip.js
-export { default } from "../game/mleo-coin-flip";
+import CoinFlipGame from '../game/mleo-coin-flip';
 
+export default function CoinFlipPage() {
+  return <CoinFlipGame />;
+}
