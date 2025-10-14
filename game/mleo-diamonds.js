@@ -222,54 +222,63 @@ export default function DiamondsPage() {
   }, [gameResult]);
 
   // --- Auto-scale grid so everything fits on 1 screen (no scroll) ---
-  useEffect(() => {
-    if (!wrapRef.current) return;
+useEffect(() => {
+  if (!wrapRef.current) return;
 
-    const calc = () => {
-      const rootH = window.visualViewport?.height ?? window.innerHeight;
-      const safeBottom =
-        Number(
-          getComputedStyle(document.documentElement)
-            .getPropertyValue("--satb")
-            .replace("px", "")
-        ) || 0;
+  const calc = () => {
+    const rootH = window.visualViewport?.height ?? window.innerHeight;
+    const safeBottom =
+      Number(
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--satb")
+          .replace("px", "")
+      ) || 0;
 
-      const used =
-        (headerRef.current?.offsetHeight || 0) +
-        (metersRef.current?.offsetHeight || 0) +
-        (diffRef.current?.offsetHeight || 0) +
-        (infoRef.current?.offsetHeight || 0) +
-        (betRef.current?.offsetHeight || 0) +
-        (ctaRef.current?.offsetHeight || 0) +
-        48 + // מרווחי ביניים
-        safeBottom +
-        24;
+    // גובה ההדר בפועל + שמירה למשתנה גלובלי ל-padding top
+    const headH = headerRef.current?.offsetHeight || 0;
+    document.documentElement.style.setProperty("--head-h", headH + "px");
+    const topPad = headH + 8; // תואם ל-paddingTop ב־MAIN BODY
 
-      const freeH = Math.max(120, rootH - used);
-      const gridWrap = wrapRef.current.querySelector("#diamonds-grid-wrap");
-      const freeW =
-        Math.max(160, (gridWrap?.clientWidth || window.innerWidth) - 4);
+    const used =
+      headH + // ההדר עצמו
+      (metersRef.current?.offsetHeight || 0) +
+      (diffRef.current?.offsetHeight || 0) +
+      (infoRef.current?.offsetHeight || 0) +
+      (betRef.current?.offsetHeight || 0) +
+      (ctaRef.current?.offsetHeight || 0) +
+      topPad + // הריווח העליון של גוף העמוד
+      48 + // מרווחי ביניים קלים
+      safeBottom +
+      24;
 
-      const GAP = 6;
-      const cellByH = Math.floor((freeH - GAP * 4) / 5);
-      const cellByW = Math.floor((freeW - GAP * 4) / 5);
-      const cell = Math.max(36, Math.min(cellByH, cellByW, 84));
+    const freeH = Math.max(120, rootH - used);
+    const gridWrap = wrapRef.current.querySelector("#diamonds-grid-wrap");
+    const freeW = Math.max(
+      160,
+      (gridWrap?.clientWidth || window.innerWidth) - 4
+    );
 
-      document.documentElement.style.setProperty("--cell", `${cell}px`);
-      document.documentElement.style.setProperty("--gap", `${GAP}px`);
-    };
+    const GAP = 6;
+    const cellByH = Math.floor((freeH - GAP * 4) / 5);
+    const cellByW = Math.floor((freeW - GAP * 4) / 5);
+    const cell = Math.max(36, Math.min(cellByH, cellByW, 84));
 
-    calc();
-    const ro = new ResizeObserver(calc);
-    ro.observe(document.body);
-    window.addEventListener("resize", calc);
-    window.addEventListener("orientationchange", calc);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", calc);
-      window.removeEventListener("orientationchange", calc);
-    };
-  }, []);
+    document.documentElement.style.setProperty("--cell", `${cell}px`);
+    document.documentElement.style.setProperty("--gap", `${GAP}px`);
+  };
+
+  calc();
+  const ro = new ResizeObserver(calc);
+  ro.observe(document.body);
+  window.addEventListener("resize", calc);
+  window.addEventListener("orientationchange", calc);
+  return () => {
+    ro.disconnect();
+    window.removeEventListener("resize", calc);
+    window.removeEventListener("orientationchange", calc);
+  };
+}, []);
+
 
   const openWalletModalUnified = () =>
     isConnected ? openAccountModal?.() : openConnectModal?.();
@@ -467,64 +476,67 @@ export default function DiamondsPage() {
         </div>
 
         {/* HEADER */}
-        <div ref={headerRef} className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
-          <div className="relative px-2 py-3">
-            <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
-              <button
-                onClick={backSafe}
-                className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
-              >
-                BACK
-              </button>
-              {freePlayTokens > 0 && (
-                <button
-                  onClick={() => startGame(true)}
-                  disabled={gameActive}
-                  className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50"
-                  title={`${freePlayTokens} Free Play${
-                    freePlayTokens > 1 ? "s" : ""
-                  } Available`}
-                >
-                  <span className="text-base">🎁</span>
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                    {freePlayTokens}
-                  </span>
-                </button>
-              )}
-            </div>
-            <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
-              <button
-                onClick={() => {
-                  playSfx(clickSound.current);
-                  const el = wrapRef.current || document.documentElement;
-                  if (!document.fullscreenElement) {
-                    el.requestFullscreen?.().catch(() => {});
-                  } else {
-                    document.exitFullscreen?.().catch(() => {});
-                  }
-                }}
-                className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
-              >
-                {isFullscreen ? "EXIT" : "FULL"}
-              </button>
-              <button
-                onClick={() => {
-                  playSfx(clickSound.current);
-                  setMenuOpen(true);
-                }}
-                className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
-              >
-                MENU
-              </button>
-            </div>
-          </div>
-        </div>
+<div ref={headerRef} className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+  <div
+    className="relative px-2 py-4"
+    style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)' }}
+  >
+    <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
+      <button
+        onClick={backSafe}
+        className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+      >
+        BACK
+      </button>
+      {freePlayTokens > 0 && (
+        <button
+          onClick={() => startGame(true)}
+          disabled={gameActive}
+          className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50"
+          title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? "s" : ""} Available`}
+        >
+          <span className="text-base">🎁</span>
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">
+            {freePlayTokens}
+          </span>
+        </button>
+      )}
+    </div>
+    <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
+      <button
+        onClick={() => {
+          playSfx(clickSound.current);
+          const el = wrapRef.current || document.documentElement;
+          if (!document.fullscreenElement) {
+            el.requestFullscreen?.().catch(() => {});
+          } else {
+            document.exitFullscreen?.().catch(() => {});
+          }
+        }}
+        className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+      >
+        {isFullscreen ? "EXIT" : "FULL"}
+      </button>
+      <button
+        onClick={() => {
+          playSfx(clickSound.current);
+          setMenuOpen(true);
+        }}
+        className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+      >
+        MENU
+      </button>
+    </div>
+  </div>
+</div>
+
 
         {/* MAIN BODY (ללא גלילה; הגריד מתכווץ אוטומטית) */}
         <div
-          className="relative h-full flex flex-col items-center justify-center px-4 pb-16 pt-14"
-          style={{ minHeight: "100%" }}
-        >
+  className="relative h-full flex flex-col items-center justify-center px-4 pb-16"
+  style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}
+>
+
           <div className="text-center mb-3">
             <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">
               💎 Diamonds
