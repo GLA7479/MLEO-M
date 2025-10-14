@@ -1,18 +1,52 @@
 // ============================================================================
-// MLEO Sic Bo - Ancient Chinese Dice Game
-// Cost: 1000 MLEO per game
+// MLEO Sic Bo - Full-Screen Game Template
+// Ancient Chinese Dice Game - Bet on dice combinations!
 // ============================================================================
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
-import Link from "next/link";
+import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
+import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
+import { parseUnits } from "viem";
 import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+
+// ============================================================================
+// iOS 100vh FIX
+// ============================================================================
+function useIOSViewportFix() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const vv = window.visualViewport;
+
+    const setVH = () => {
+      const h = vv ? vv.height : window.innerHeight;
+      root.style.setProperty("--app-100vh", `${Math.round(h)}px`);
+    };
+
+    const onOrient = () => requestAnimationFrame(() => setTimeout(setVH, 250));
+
+    setVH();
+    if (vv) {
+      vv.addEventListener("resize", setVH);
+      vv.addEventListener("scroll", setVH);
+    }
+    window.addEventListener("orientationchange", onOrient);
+
+    return () => {
+      if (vv) {
+        vv.removeEventListener("resize", setVH);
+        vv.removeEventListener("scroll", setVH);
+      }
+      window.removeEventListener("orientationchange", onOrient);
+    };
+  }, []);
+}
 
 // ============================================================================
 // CONFIG
 // ============================================================================
-const LS_KEY = "mleo_sicbo_v1";
+const LS_KEY = "mleo_sicbo_v2";
 const MIN_BET = 1000;
 
 // Bet types and their payouts
@@ -21,17 +55,36 @@ const BET_TYPES = {
   big: { name: "Big (11-17)", payout: 2, check: (sum) => sum >= 11 && sum <= 17 },
   triple: { name: "Any Triple", payout: 30, check: (dice) => dice[0] === dice[1] && dice[1] === dice[2] },
   specific_triple_6: { name: "Triple 6s", payout: 50, check: (dice) => dice.every(d => d === 6) },
-  total_11: { name: "Total 11", payout: 10, check: (sum) => sum === 11 },
-  total_10: { name: "Total 10", payout: 12, check: (sum) => sum === 10 }
 };
 
+// On-chain Claim Config
+const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
+const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
+const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
+const GAME_ID = 14; // Sic Bo game ID
+
+const MINING_CLAIM_ABI = [{
+  type: "function",
+  name: "claim",
+  stateMutability: "nonpayable",
+  inputs: [
+    { name: "gameId", type: "uint256" },
+    { name: "amount", type: "uint256" }
+  ],
+  outputs: []
+}];
+
+// Sounds
+const S_CLICK = "/sounds/click.mp3";
+const S_WIN = "/sounds/gift.mp3";
+
 // ============================================================================
-// STORAGE
+// STORAGE HELPERS
 // ============================================================================
 function safeRead(key, fallback = {}) {
   if (typeof window === "undefined") return fallback;
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch {
     return fallback;
@@ -41,7 +94,7 @@ function safeRead(key, fallback = {}) {
 function safeWrite(key, val) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(key, JSON.stringify(val));
+    localStorage.setItem(key, JSON.stringify(val));
   } catch {}
 }
 
@@ -57,20 +110,39 @@ function setVault(amount) {
 }
 
 function fmt(n) {
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
   if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
   if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
   return Math.floor(n).toString();
+}
+
+function shortAddr(addr) {
+  if (!addr || addr.length < 10) return addr || "";
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 export default function SicBoPage() {
+  useIOSViewportFix();
   const router = useRouter();
+  const wrapRef = useRef(null);
+
+  // Wallet
+  const { openConnectModal } = useConnectModal();
+  const { openAccountModal } = useAccountModal();
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const { switchChain } = useSwitchChain();
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
+  const chainId = useChainId();
+
+  // State
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000");
-  const [currentBet, setCurrentBet] = useState(MIN_BET);
   const [selectedBet, setSelectedBet] = useState(null);
   const [rolling, setRolling] = useState(false);
   const [dice, setDice] = useState([1, 1, 1]);
@@ -78,32 +150,91 @@ export default function SicBoPage() {
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
   const [showResultPopup, setShowResultPopup] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [copiedAddr, setCopiedAddr] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [collectAmount, setCollectAmount] = useState(1000);
+
+  // Modals
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [showVaultModal, setShowVaultModal] = useState(false);
+
+  // Sound
+  const [sfxMuted, setSfxMuted] = useState(false);
+  const clickSound = useRef(null);
+  const winSound = useRef(null);
+
+  // Stats
   const [stats, setStats] = useState(() =>
-    safeRead(LS_KEY, { totalGames: 0, totalBet: 0, wins: 0, totalWon: 0, totalLost: 0, biggestWin: 0, triples: 0, lastBet: MIN_BET })
+    safeRead(LS_KEY, {
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      totalBet: 0,
+      totalWon: 0,
+      biggestWin: 0,
+      triples: 0,
+      lastBet: MIN_BET
+    })
   );
 
+  // Play sound helper
+  const playSfx = (sound) => {
+    if (sfxMuted || !sound) return;
+    try {
+      sound.currentTime = 0;
+      sound.play().catch(() => {});
+    } catch {}
+  };
+
+  // Init
   useEffect(() => {
     setMounted(true);
-    const currentVault = getVault();
-    setVaultState(currentVault);
-    
+    setVaultState(getVault());
+
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-    
+
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
-    
-    const savedLastBet = safeRead(LS_KEY, { lastBet: MIN_BET }).lastBet;
-    setBetAmount(savedLastBet.toString());
-    
+
+    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
+    if (savedStats.lastBet) {
+      setBetAmount(String(savedStats.lastBet));
+    }
+
     const interval = setInterval(() => {
       const status = getFreePlayStatus();
       setFreePlayTokens(status.tokens);
+      setVaultState(getVault());
     }, 2000);
-    
-    return () => clearInterval(interval);
+
+    if (typeof Audio !== "undefined") {
+      try {
+        clickSound.current = new Audio(S_CLICK);
+        winSound.current = new Audio(S_WIN);
+      } catch {}
+    }
+
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
   }, [router.query]);
 
+  // Persist stats
+  useEffect(() => {
+    safeWrite(LS_KEY, stats);
+  }, [stats]);
+
+  // Auto-hide result popup
   useEffect(() => {
     if (gameResult) {
       setShowResultPopup(true);
@@ -114,15 +245,79 @@ export default function SicBoPage() {
     }
   }, [gameResult]);
 
-  const refreshVault = () => {
-    setVaultState(getVault());
+  // Wallet actions
+  const openWalletModalUnified = () => {
+    if (isConnected) {
+      openAccountModal?.();
+    } else {
+      openConnectModal?.();
+    }
   };
 
-  const startFreePlay = () => {
-    setBetAmount("1000");
-    rollDice(true);
+  const hardDisconnect = () => {
+    disconnect?.();
+    setMenuOpen(false);
   };
 
+  // Claim to wallet
+  const collectToWallet = async () => {
+    if (!isConnected) {
+      openConnectModal?.();
+      return;
+    }
+
+    if (chainId !== CLAIM_CHAIN_ID) {
+      try {
+        await switchChain?.({ chainId: CLAIM_CHAIN_ID });
+      } catch {
+        alert("Switch to BSC Testnet");
+        return;
+      }
+    }
+
+    if (!CLAIM_ADDRESS) {
+      alert("Missing CLAIM address");
+      return;
+    }
+
+    if (collectAmount <= 0 || collectAmount > vault) {
+      alert("Invalid amount!");
+      return;
+    }
+
+    setClaiming(true);
+    try {
+      const amountUnits = parseUnits(
+        Number(collectAmount).toFixed(Math.min(2, MLEO_DECIMALS)),
+        MLEO_DECIMALS
+      );
+
+      const hash = await writeContractAsync({
+        address: CLAIM_ADDRESS,
+        abi: MINING_CLAIM_ABI,
+        functionName: "claim",
+        args: [BigInt(GAME_ID), amountUnits],
+        chainId: CLAIM_CHAIN_ID,
+        account: address,
+      });
+
+      await publicClient.waitForTransactionReceipt({ hash });
+
+      const newVault = Math.max(0, vault - collectAmount);
+      setVault(newVault);
+      setVaultState(newVault);
+
+      alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
+      setShowVaultModal(false);
+    } catch (err) {
+      console.error(err);
+      alert("Claim failed or rejected");
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  // Game logic
   const rollDice = (isFreePlayParam = false) => {
     if (!selectedBet) {
       alert('Please select a bet type first!');
@@ -130,10 +325,11 @@ export default function SicBoPage() {
     }
 
     if (rolling) return;
+    playSfx(clickSound.current);
 
     const currentVault = getVault();
     let bet = Number(betAmount) || MIN_BET;
-    
+
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
       if (result.success) {
@@ -154,12 +350,12 @@ export default function SicBoPage() {
         alert('Insufficient MLEO in vault');
         return;
       }
-      
+
       setVault(currentVault - bet);
       setVaultState(currentVault - bet);
     }
-    
-    setCurrentBet(bet);
+
+    setBetAmount(String(bet));
     setRolling(true);
     setGameResult(null);
 
@@ -172,10 +368,9 @@ export default function SicBoPage() {
         Math.floor(Math.random() * 6) + 1
       ]);
       rollCount++;
-      
+
       if (rollCount >= 10) {
         clearInterval(rollInterval);
-        // Final roll
         const finalDice = [
           Math.floor(Math.random() * 6) + 1,
           Math.floor(Math.random() * 6) + 1,
@@ -183,15 +378,15 @@ export default function SicBoPage() {
         ];
         setDice(finalDice);
         setRolling(false);
-        checkResult(finalDice);
+        checkResult(finalDice, bet);
       }
     }, 100);
   };
 
-  const checkResult = (finalDice) => {
+  const checkResult = (finalDice, bet) => {
     const sum = finalDice.reduce((a, b) => a + b, 0);
     const betType = BET_TYPES[selectedBet];
-    
+
     let win = false;
     if (selectedBet === 'triple' || selectedBet === 'specific_triple_6') {
       win = betType.check(finalDice);
@@ -199,12 +394,13 @@ export default function SicBoPage() {
       win = betType.check(sum);
     }
 
-    const prize = win ? currentBet * betType.payout : 0;
+    const prize = win ? bet * betType.payout : 0;
 
     if (win && prize > 0) {
       const newVault = getVault() + prize;
       setVault(newVault);
       setVaultState(newVault);
+      playSfx(winSound.current);
     }
 
     const isTriple = finalDice[0] === finalDice[1] && finalDice[1] === finalDice[2];
@@ -216,7 +412,7 @@ export default function SicBoPage() {
       betType: betType.name,
       payout: betType.payout,
       prize: prize,
-      profit: win ? prize - currentBet : -currentBet,
+      profit: win ? prize - bet : -bet,
       triple: isTriple
     };
 
@@ -225,16 +421,15 @@ export default function SicBoPage() {
     const newStats = {
       ...stats,
       totalGames: stats.totalGames + 1,
-      totalBet: stats.totalBet + currentBet,
       wins: win ? stats.wins + 1 : stats.wins,
+      losses: win ? stats.losses : stats.losses + 1,
+      totalBet: stats.totalBet + bet,
       totalWon: win ? stats.totalWon + prize : stats.totalWon,
-      totalLost: !win ? stats.totalLost + currentBet : stats.totalLost,
       biggestWin: Math.max(stats.biggestWin, win ? prize : 0),
       triples: isTriple ? stats.triples + 1 : stats.triples,
-      lastBet: currentBet
+      lastBet: bet
     };
     setStats(newStats);
-    safeWrite(LS_KEY, newStats);
   };
 
   const resetGame = () => {
@@ -245,275 +440,465 @@ export default function SicBoPage() {
     setDice([1, 1, 1]);
   };
 
-  const resetToSetup = () => {
-    setGameResult(null);
-    setShowResultPopup(false);
-    setSelectedBet(null);
-    setRolling(false);
-    setDice([1, 1, 1]);
+  const backSafe = () => {
+    playSfx(clickSound.current);
+    router.push('/arcade');
   };
 
   if (!mounted) {
-    return <div className="min-h-screen bg-gradient-to-br from-red-900 via-black to-red-900 flex items-center justify-center">
-      <div className="text-white text-xl">Loading...</div>
-    </div>;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-900 via-black to-red-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
   }
 
+  const potentialWin = selectedBet ? Math.floor(Number(betAmount) * BET_TYPES[selectedBet].payout) : 0;
+
   return (
-    <Layout vault={vault} refreshVault={refreshVault}>
-      <div className="min-h-screen bg-gradient-to-br from-red-900 via-black to-red-900 text-white">
-        <div className="max-w-6xl mx-auto p-4 pb-20">
-          {/* HEADER */}
-          <header className="flex items-center justify-between mb-6">
-            {selectedBet || rolling || gameResult ? (
-              <button 
-                onClick={resetToSetup}
-                className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+    <Layout>
+      <div
+        ref={wrapRef}
+        className="relative w-full overflow-hidden bg-gradient-to-br from-red-900 via-black to-red-900"
+        style={{ height: 'var(--app-100vh, 100vh)' }}
+      >
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)',
+            backgroundSize: '30px 30px'
+          }} />
+        </div>
+
+        {/* Top HUD Bar */}
+        <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+          <div className="relative px-2 py-3">
+            {/* Left: Back + Free Play */}
+            <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
+              <button
+                onClick={backSafe}
+                className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+                title="Back to Arcade"
               >
                 BACK
               </button>
-            ) : (
-              <Link href="/arcade">
-                <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
-                  BACK
-                </button>
-              </Link>
-            )}
 
-            <div className="text-center">
-              <h1 className="text-3xl font-bold mb-1">
-                🎲 {isFreePlay && <span className="text-amber-400">🎁 FREE PLAY - </span>}
-                Sic Bo
-              </h1>
-              <p className="text-zinc-400 text-sm">
-                {isFreePlay ? "Playing with a free token - good luck!" : "Ancient Chinese dice game - bet and roll!"}
-              </p>
-            </div>
-
-            <div className="w-16"></div>
-          </header>
-
-          {/* GAME WINDOW */}
-          <div className="rounded-2xl p-6 bg-white/5 border border-white/10 mb-6">
-            {/* Dice Display */}
-            <div className="text-center mb-8">
-              <h2 className="text-xl font-bold mb-4">🎲 Three Dice</h2>
-              <div className="flex justify-center gap-3 mb-4">
-                {dice.map((die, index) => (
-                  <div key={index} className={`w-20 h-20 rounded-xl border-2 border-white/20 bg-white flex items-center justify-center text-4xl font-bold text-black ${
-                    rolling ? 'animate-spin' : ''
-                  }`}>
-                    {die}
-                  </div>
-                ))}
-              </div>
-              {!rolling && gameResult && (
-                <div className="text-lg font-bold">
-                  Total: {dice.reduce((a, b) => a + b, 0)}
-                </div>
-              )}
-            </div>
-
-            {/* Bet Selection */}
-            {!rolling && !gameResult && (
-              <div className="mb-8">
-                <h2 className="text-xl font-bold mb-4 text-center">Choose Your Bet</h2>
-                <div className="grid grid-cols-2 gap-3 max-w-2xl mx-auto">
-                  {Object.entries(BET_TYPES).map(([key, bet]) => (
-                    <button
-                      key={key}
-                      onClick={() => setSelectedBet(key)}
-                      className={`p-4 rounded-xl font-bold text-base border-2 transition-all ${
-                        selectedBet === key
-                          ? 'bg-red-600/30 border-red-400 scale-105'
-                          : 'bg-white/5 border-white/10 hover:bg-white/10'
-                      }`}
-                    >
-                      <div>{bet.name}</div>
-                      <div className="text-sm opacity-70 mt-1">×{bet.payout}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Game Controls */}
-            <div className="text-center mb-6">
-              {!rolling && !gameResult && (
-                <>
-                  {freePlayTokens > 0 && (
-                    <button
-                      onClick={startFreePlay}
-                      className="px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-4 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:from-amber-400 hover:via-orange-400 hover:to-yellow-400 hover:scale-105"
-                    >
-                      🎁 FREE PLAY ({freePlayTokens}/5)
-                    </button>
-                  )}
-                  
-                  <button
-                    onClick={() => rollDice(false)}
-                    disabled={!selectedBet}
-                    className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-2xl mb-6 ${
-                      !selectedBet
-                        ? 'bg-zinc-700 cursor-not-allowed opacity-50'
-                        : 'bg-gradient-to-r from-red-600 via-orange-500 to-red-600 hover:from-red-500 hover:via-orange-400 hover:to-red-500 hover:scale-105'
-                    }`}
-                  >
-                    🎲 ROLL DICE ({fmt(Number(betAmount) || MIN_BET)})
-                  </button>
-                  
-                  {/* Bet Amount Input */}
-                  <div className="max-w-sm mx-auto">
-                    <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
-                    <input 
-                      type="number" 
-                      min={MIN_BET} 
-                      step="100" 
-                      value={betAmount} 
-                      onChange={(e) => setBetAmount(e.target.value)} 
-                      className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-red-500" 
-                      placeholder="1000" 
-                    />
-                    <div className="flex gap-2 mt-2 justify-center flex-wrap">
-                      {[1000, 2500, 5000, 10000].map((v) => (
-                        <button 
-                          key={v} 
-                          onClick={() => setBetAmount(String(v))} 
-                          className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
-                        >
-                          {v >= 1000 ? `${v/1000}K` : v}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="text-xs text-zinc-500 mt-2 text-center">
-                      Max win: {((Number(betAmount) || MIN_BET) * 50).toLocaleString()} MLEO (Triple 6s!)
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {gameResult && (
+              {/* Free Play Indicator */}
+              {freePlayTokens > 0 && (
                 <button
-                  onClick={resetGame}
-                  className="px-8 py-3 rounded-xl font-bold text-lg text-white bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 transition-all mb-6 shadow-lg hover:scale-105 transform"
+                  onClick={() => rollDice(true)}
+                  disabled={rolling}
+                  className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50"
+                  title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}
                 >
-                  🔄 New Game ({fmt(Number(betAmount) || MIN_BET)})
+                  <span className="text-base">🎁</span>
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                    {freePlayTokens}
+                  </span>
                 </button>
               )}
-
-              <div className="text-sm opacity-70 mb-4">
-                Choose bet type • Roll 3 dice • Match your bet to win!
-              </div>
             </div>
 
-            {/* Bet Amount Input after game */}
-            {gameResult && (
-              <div className="max-w-sm mx-auto">
-                <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
-                <input 
-                  type="number" 
-                  min={MIN_BET} 
-                  step="100" 
-                  value={betAmount} 
-                  onChange={(e) => setBetAmount(e.target.value)} 
-                  className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-4 py-2 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-red-500" 
-                  placeholder="1000" 
-                />
-                <div className="flex gap-2 mt-2 justify-center flex-wrap">
-                  {[1000, 2500, 5000, 10000].map((v) => (
-                    <button 
-                      key={v} 
-                      onClick={() => setBetAmount(String(v))} 
-                      className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700"
-                    >
-                      {v >= 1000 ? `${v/1000}K` : v}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+            {/* Right: Fullscreen + Menu */}
+            <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
+              <button
+                onClick={() => {
+                  playSfx(clickSound.current);
+                  const el = wrapRef.current || document.documentElement;
+                  if (!document.fullscreenElement) {
+                    el.requestFullscreen?.().catch(() => {});
+                  } else {
+                    document.exitFullscreen?.().catch(() => {});
+                  }
+                }}
+                className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+              >
+                {isFullscreen ? "EXIT" : "FULL"}
+              </button>
 
-          {/* STATS */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <div className="rounded-xl p-3 bg-gradient-to-br from-emerald-600/20 to-green-600/20 border border-emerald-500/30">
-              <div className="text-xs opacity-70 mb-1">Your Vault</div>
-              <div className="text-xl font-bold text-emerald-400">{fmt(vault)}</div>
-              <button onClick={refreshVault} className="text-xs opacity-60 hover:opacity-100 mt-1">↻ Refresh</button>
+              <button
+                onClick={() => { playSfx(clickSound.current); setMenuOpen(true); }}
+                className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+                title="Menu"
+              >
+                MENU
+              </button>
             </div>
-            
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Total Games</div>
-              <div className="text-lg font-bold">{stats.totalGames.toLocaleString()}</div>
-            </div>
-
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">Total Won</div>
-              <div className="text-lg font-bold text-green-400">{fmt(stats.totalWon)}</div>
-            </div>
-
-            <div className="rounded-xl p-3 bg-white/5 border border-white/10">
-              <div className="text-xs opacity-70 mb-1">🎲 Triples</div>
-              <div className="text-lg font-bold text-amber-400">{stats.triples}</div>
-            </div>
-          </div>
-
-          {/* HOW TO PLAY */}
-          <div className="rounded-2xl p-6 bg-white/5 border border-white/10 mb-6">
-            <h3 className="text-lg font-bold mb-4">📖 How to Play</h3>
-            <ul className="text-sm space-y-2 text-zinc-300">
-              <li>• <strong>Choose Bet:</strong> Select what you're betting on before rolling</li>
-              <li>• <strong>Small (4-10):</strong> Total of 3 dice is 4-10 = ×2 payout</li>
-              <li>• <strong>Big (11-17):</strong> Total of 3 dice is 11-17 = ×2 payout</li>
-              <li>• <strong>Total 10/11:</strong> Exact total of 10 or 11 = ×12 or ×10 payout</li>
-              <li>• <strong>Any Triple:</strong> All 3 dice show same number = ×30 payout</li>
-              <li>• <strong>Triple 6s:</strong> All three 6s = ×50 JACKPOT!</li>
-              <li>• <strong>Minimum bet:</strong> {MIN_BET.toLocaleString()} MLEO per game</li>
-            </ul>
           </div>
         </div>
 
-        {/* FLOATING RESULT POPUP */}
-        {gameResult && showResultPopup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-            <div 
-              className={`text-center p-4 rounded-xl border-2 transition-all duration-500 transform pointer-events-auto max-w-sm mx-4 ${
-                showResultPopup ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
-              } ${
-                gameResult.triple && gameResult.win
-                  ? "bg-gradient-to-br from-yellow-500 to-amber-600 border-yellow-300 shadow-2xl shadow-yellow-500/70"
-                  : gameResult.win
-                  ? "bg-gradient-to-br from-green-600 to-emerald-700 border-green-300 shadow-2xl shadow-green-500/70"
-                  : "bg-gradient-to-br from-red-600 to-rose-700 border-red-300 shadow-2xl shadow-red-500/70"
-              }`}
+        {/* Main Content */}
+        <div className="relative h-full flex flex-col items-center justify-center px-4 pb-16 pt-14 overflow-y-auto" style={{ minHeight: '100%' }}>
+          {/* Game Title */}
+          <div className="text-center mb-3">
+            <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">
+              🀄 Sic Bo
+            </h1>
+            <p className="text-white/70 text-sm">Ancient Chinese dice • Multiple betting options!</p>
+          </div>
+
+          {/* Stats Display */}
+          <div className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center">
+              <div className="text-xs text-white/60 mb-1">Vault</div>
+              <div className="text-base font-bold text-emerald-400">{fmt(vault)}</div>
+            </div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center">
+              <div className="text-xs text-white/60 mb-1">Bet</div>
+              <div className="text-base font-bold text-amber-400">{fmt(Number(betAmount))}</div>
+            </div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-2 text-center">
+              <div className="text-xs text-white/60 mb-1">Win</div>
+              <div className="text-base font-bold text-green-400">{fmt(potentialWin)}</div>
+            </div>
+          </div>
+
+          {/* Dice Display */}
+          <div className="mb-3" style={{ minHeight: '120px' }}>
+            <div className="flex gap-2 justify-center mb-2">
+              {dice.map((d, i) => (
+                <div key={i} className={`w-16 h-16 rounded-lg bg-white text-black flex items-center justify-center text-3xl font-bold shadow-lg ${rolling ? 'animate-bounce' : ''}`}>
+                  {d}
+                </div>
+              ))}
+            </div>
+            {/* Result text - always present */}
+            <div className="text-center" style={{ height: '28px' }}>
+              <div className={`text-base font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-red-400'}`}>
+                {gameResult ? `Sum: ${gameResult.sum}` : 'waiting'}
+              </div>
+            </div>
+          </div>
+
+          {/* Bet Type Selection */}
+          <div className="grid grid-cols-2 gap-2 mb-3 w-full max-w-md" style={{ minHeight: '120px' }}>
+            {Object.entries(BET_TYPES).map(([key, bet]) => (
+              <button
+                key={key}
+                onClick={() => { setSelectedBet(key); playSfx(clickSound.current); }}
+                disabled={rolling}
+                className={`p-2 rounded-lg font-bold text-xs transition-all ${
+                  selectedBet === key
+                    ? 'bg-gradient-to-r from-red-600 to-red-500 text-white ring-2 ring-red-300'
+                    : 'bg-white/10 text-white hover:bg-white/20'
+                } disabled:opacity-50`}
+              >
+                <div>{bet.name}</div>
+                <div className="text-yellow-400">×{bet.payout}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* Bet Controls */}
+          <div className="flex items-center gap-2 mb-3">
+            <button
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                const newBet = Math.max(MIN_BET, current - 1000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              disabled={rolling}
+              className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
             >
-              <div className="text-2xl font-black mb-2 animate-pulse text-white drop-shadow-lg">
-                {gameResult.triple && gameResult.win ? "🎉 TRIPLE! 🎉" : gameResult.win ? "✅ You Win! ✅" : "❌ You Lose"}
+              −
+            </button>
+            <input
+              type="number"
+              value={betAmount}
+              onChange={(e) => setBetAmount(e.target.value)}
+              disabled={rolling}
+              className="w-28 h-10 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-sm"
+              min={MIN_BET}
+            />
+            <button
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                const newBet = Math.min(vault, current + 1000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              disabled={rolling}
+              className="h-10 w-10 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
+            >
+              +
+            </button>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '100px' }}>
+            <button
+              onClick={() => rollDice(false)}
+              disabled={rolling || !selectedBet}
+              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
+            >
+              {rolling ? "Rolling..." : "ROLL DICE"}
+            </button>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }}
+                className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all"
+              >
+                How to Play
+              </button>
+              <button
+                onClick={() => { setShowStats(true); playSfx(clickSound.current); }}
+                className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all"
+              >
+                Stats
+              </button>
+              <button
+                onClick={() => { setShowVaultModal(true); playSfx(clickSound.current); }}
+                className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all"
+              >
+                💰 Vault
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Result Popup */}
+        {showResultPopup && gameResult && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
+            <div className={`${gameResult.win ? 'bg-green-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
+              <div className="text-4xl mb-2">{gameResult.triple ? '🎲🎲🎲' : gameResult.win ? '🎉' : '😔'}</div>
+              <div className="text-2xl font-bold mb-1">
+                {gameResult.triple ? 'TRIPLE!' : gameResult.win ? 'YOU WIN!' : 'YOU LOSE'}
               </div>
-              <div className="text-base mb-2 text-white/90 font-semibold">
-                🎲 {gameResult.dice.join(' + ')} = {gameResult.sum}
+              <div className="text-lg">
+                {gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}
               </div>
-              <div className="text-sm mb-2 text-white/80">
-                Bet: {gameResult.betType}
+              <div className="text-sm opacity-80 mt-2">
+                {gameResult.betType} • Sum: {gameResult.sum}
               </div>
-              {gameResult.win && (
-                <div className="space-y-1">
-                  <div className="text-3xl font-black text-white animate-bounce drop-shadow-2xl">
-                    +{fmt(gameResult.prize)} MLEO
-                  </div>
-                  <div className="text-sm font-bold text-white/80">
-                    (×{gameResult.payout})
+            </div>
+          </div>
+        )}
+
+        {/* Menu Modal */}
+        {menuOpen && (
+          <div
+            className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3"
+            onClick={() => setMenuOpen(false)}
+          >
+            <div
+              className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-2 md:mb-3">
+                <h2 className="text-xl font-extrabold">Settings</h2>
+                <button
+                  onClick={() => setMenuOpen(false)}
+                  className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Wallet */}
+              <div className="mb-3 space-y-2">
+                <h3 className="text-sm font-semibold opacity-80">Wallet</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={openWalletModalUnified}
+                    className={`px-3 py-2 rounded-md text-sm font-semibold ${
+                      isConnected
+                        ? "bg-emerald-500/90 hover:bg-emerald-500 text-white"
+                        : "bg-rose-500/90 hover:bg-rose-500 text-white"
+                    }`}
+                  >
+                    {isConnected ? "Connected" : "Disconnected"}
+                  </button>
+
+                  {isConnected && (
+                    <button
+                      onClick={hardDisconnect}
+                      className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white"
+                    >
+                      Disconnect
+                    </button>
+                  )}
+                </div>
+
+                {isConnected && address && (
+                  <button
+                    onClick={() => {
+                      try {
+                        navigator.clipboard.writeText(address).then(() => {
+                          setCopiedAddr(true);
+                          setTimeout(() => setCopiedAddr(false), 1500);
+                        });
+                      } catch {}
+                    }}
+                    className="mt-1 text-xs text-gray-300 hover:text-white transition underline"
+                  >
+                    {shortAddr(address)}
+                    {copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}
+                  </button>
+                )}
+              </div>
+
+              {/* Sound */}
+              <div className="mb-4 space-y-2">
+                <h3 className="text-sm font-semibold opacity-80">Sound</h3>
+                <button
+                  onClick={() => setSfxMuted(v => !v)}
+                  className={`px-3 py-2 rounded-lg text-sm font-semibold ${
+                    sfxMuted
+                      ? "bg-rose-500/90 hover:bg-rose-500 text-white"
+                      : "bg-emerald-500/90 hover:bg-emerald-500 text-white"
+                  }`}
+                >
+                  SFX: {sfxMuted ? "Off" : "On"}
+                </button>
+              </div>
+
+              <div className="mt-4 text-xs opacity-70">
+                <p>Sic Bo v2.0</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* How to Play Modal */}
+        {showHowToPlay && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+              <h2 className="text-2xl font-extrabold mb-4">🀄 How to Play</h2>
+              <div className="space-y-3 text-sm">
+                <p><strong>1. Select Bet Type:</strong> Choose from Small, Big, Triple, etc.</p>
+                <p><strong>2. Set Bet:</strong> Minimum {MIN_BET} MLEO. Use +/- to adjust.</p>
+                <p><strong>3. Roll:</strong> Click "ROLL DICE" to roll 3 dice</p>
+                <p><strong>4. Win:</strong> If your bet wins, you get paid according to the payout!</p>
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mt-4">
+                  <p className="text-red-300 font-semibold">🎲 Bet Types</p>
+                  <div className="text-xs text-white/80 mt-2 space-y-1">
+                    <p>• Small (4-10): ×2</p>
+                    <p>• Big (11-17): ×2</p>
+                    <p>• Any Triple: ×30</p>
+                    <p>• Triple 6s: ×50 🎰</p>
                   </div>
                 </div>
-              )}
-              {!gameResult.win && (
-                <div className="text-lg font-bold text-white">
-                  Lost {fmt(currentBet)} MLEO
-                </div>
-              )}
-              <div className="mt-2 text-xs text-white/70 animate-pulse">
-                Auto-closing...
               </div>
+              <button
+                onClick={() => setShowHowToPlay(false)}
+                className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Stats Modal */}
+        {showStats && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+              <h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Total Games</div>
+                    <div className="text-xl font-bold">{stats.totalGames}</div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Win Rate</div>
+                    <div className="text-xl font-bold text-green-400">
+                      {stats.totalGames > 0 ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : 0}%
+                    </div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Total Bet</div>
+                    <div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Total Won</div>
+                    <div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Biggest Win</div>
+                    <div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Net Profit</div>
+                    <div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {fmt(stats.totalWon - stats.totalBet)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-red-500/10 to-red-600/10 border border-red-500/30 rounded-lg p-4">
+                  <div className="text-sm font-semibold mb-2">🎲 Triples Hit</div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-red-300">{stats.triples}</div>
+                    <div className="text-xs text-white/60 mt-1">All Three Dice Match</div>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowStats(false)}
+                className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* MLEO Vault Modal */}
+        {showVaultModal && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+              <h2 className="text-2xl font-extrabold mb-4">💰 MLEO Vault</h2>
+
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-6 text-center">
+                <div className="text-sm text-white/60 mb-1">Current Balance</div>
+                <div className="text-3xl font-bold text-emerald-400">{fmt(vault)} MLEO</div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-white/70 mb-2 block">Collect to Wallet</label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="number"
+                      value={collectAmount}
+                      onChange={(e) => setCollectAmount(Number(e.target.value))}
+                      className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white"
+                      min="1"
+                      max={vault}
+                    />
+                    <button
+                      onClick={() => setCollectAmount(vault)}
+                      className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold"
+                    >
+                      MAX
+                    </button>
+                  </div>
+                  <button
+                    onClick={collectToWallet}
+                    disabled={collectAmount <= 0 || collectAmount > vault || claiming}
+                    className="w-full py-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {claiming ? "Collecting..." : `Collect ${fmt(collectAmount)} MLEO`}
+                  </button>
+                </div>
+
+                <div className="text-xs text-white/60">
+                  <p>• Your vault is shared across all MLEO games</p>
+                  <p>• Collect earnings to your wallet anytime</p>
+                  <p>• Network: BSC Testnet (TBNB)</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowVaultModal(false)}
+                className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold"
+              >
+                Close
+              </button>
             </div>
           </div>
         )}
@@ -521,4 +906,3 @@ export default function SicBoPage() {
     </Layout>
   );
 }
-
