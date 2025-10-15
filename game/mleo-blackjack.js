@@ -103,10 +103,16 @@ function canSplitCards(hand) {
   return val1 === val2;
 }
 
-function PlayingCard({ card, hidden = false }) {
+function PlayingCard({ card, hidden = false, delay = 0 }) {
   if (hidden) {
     return (
-      <div className="w-14 h-20 rounded bg-gradient-to-br from-blue-600 to-blue-800 border border-white/30 flex items-center justify-center shadow">
+      <div 
+        className="w-14 h-20 rounded bg-gradient-to-br from-blue-600 to-blue-800 border border-white/30 flex items-center justify-center shadow"
+        style={{
+          animation: `slideInCard 0.4s ease-out ${delay}ms both`,
+          opacity: 0
+        }}
+      >
         <span className="text-2xl">🂠</span>
       </div>
     );
@@ -116,7 +122,13 @@ function PlayingCard({ card, hidden = false }) {
   const color = isRed ? "text-red-600" : "text-black";
   
   return (
-    <div className="w-14 h-20 rounded bg-white border border-gray-400 shadow p-1 relative">
+    <div 
+      className="w-14 h-20 rounded bg-white border border-gray-400 shadow p-1 relative"
+      style={{
+        animation: `slideInCard 0.4s ease-out ${delay}ms both`,
+        opacity: 0
+      }}
+    >
       <div className={`text-xl font-bold ${color} absolute top-1 left-2 leading-tight`}>
         {card.value}
       </div>
@@ -284,44 +296,60 @@ export default function BlackjackPage() {
     const player = [newDeck[0], newDeck[2]];
     const dealer = [newDeck[1], newDeck[3]];
     setDeck(newDeck.slice(4));
-    setPlayerHand(player);
-    setDealerHand(dealer);
+    
+    // Clear cards first
+    setPlayerHand([]);
+    setDealerHand([]);
     setGameResult(null);
-
-    const playerValue = calculateHandValue(player);
-    const dealerUpCard = dealer[0];
-
-    // Check for natural blackjack
-    if (playerValue === 21) {
-      // Check if dealer also has blackjack
-      if (checkDealerBlackjack(dealer, player, bet)) {
-        return;
-      }
-      // Player blackjack wins
-      setTimeout(() => finishGame(player, dealer, bet, true), 500);
-      setGameState("finished");
-        return;
-      }
-
-    // Check if dealer has Ace showing - offer insurance
-    if (dealerUpCard.value === "A") {
-      setShowInsurance(true);
-      setGameState("insurance");
-        return;
-      }
+    
+    // Deal cards one by one - Dealer → Player → Dealer (hidden) → Player
+    setTimeout(() => setDealerHand([dealer[0]]), 400);
+    setTimeout(() => setPlayerHand([player[0]]), 800);
+    setTimeout(() => {
+      setDealerHand(dealer);
+      setGameState("dealing"); // Temporary state to keep second card hidden
+    }, 1200);
+    setTimeout(() => {
+      setPlayerHand(player);
       
-    // Check if dealer has 10/J/Q/K - check for blackjack immediately
-    if (getCardValue(dealerUpCard) === 10) {
-      if (checkDealerBlackjack(dealer, player, bet)) {
-        return;
-      }
-    }
-
-    // Enable player options
-    setCanDouble(true);
-    setCanSplit(canSplitCards(player));
-    setCanSurrender(true);
-    setGameState("playing");
+      // Wait for last card animation (card delay 200ms + animation 400ms = 600ms) + extra pause to see cards (800ms)
+      setTimeout(() => {
+        // Check for blackjack/insurance after all cards dealt AND animated AND visible
+        const playerValue = calculateHandValue(player);
+        const dealerUpCard = dealer[0];
+        
+        if (playerValue === 21) {
+          // Player has blackjack - check if dealer also has it
+          setTimeout(() => {
+            if (checkDealerBlackjack(dealer, player, bet)) {
+              return;
+            }
+            // Player blackjack wins
+            const prize = Math.floor(bet * 2.5);
+            const newVault = getVault() + prize;
+            setVault(newVault); 
+            setVaultState(newVault);
+            playSfx(winSound.current);
+            setGameResult({ win: true, push: false, playerValue: 21, dealerValue: calculateHandValue(dealer), prize, profit: prize - bet, blackjack: true });
+            const newStats = { ...stats, totalHands: stats.totalHands + 1, wins: stats.wins + 1, totalBet: stats.totalBet + bet, totalWon: stats.totalWon + prize, biggestWin: Math.max(stats.biggestWin, prize), blackjacks: stats.blackjacks + 1, lastBet: bet };
+            setStats(newStats);
+            setGameState("finished");
+          }, 700);
+          return;
+        }
+        
+        if (dealerUpCard.value === "A") {
+          setShowInsurance(true);
+        }
+        
+        // Enable player options
+        setCanDouble(true);
+        setCanSplit(canSplitCards(player));
+        setCanSurrender(true);
+        
+        setGameState("playing");
+      }, 1400);
+    }, 1600);
   };
 
   const takeInsurance = () => {
@@ -422,14 +450,17 @@ export default function BlackjackPage() {
     setPlayerHand(newHand);
     setDeck(deck.slice(1));
 
-    const value = calculateHandValue(newHand);
-    if (value > 21) {
-      setGameState("finished");
-      finishGame(newHand, dealerHand, bet * 2, false);
-    } else {
-      // Automatically stand after double down
-      stand(newHand, bet * 2);
-    }
+    // Wait for card animation before checking
+    setTimeout(() => {
+      const value = calculateHandValue(newHand);
+      if (value > 21) {
+        setGameState("finished");
+        setTimeout(() => finishGame(newHand, dealerHand, bet * 2, false), 800);
+      } else {
+        // Automatically stand after double down
+        stand(newHand, bet * 2);
+      }
+    }, 600);
 
     const newStats = { ...stats, doubles: stats.doubles + 1 };
     setStats(newStats);
@@ -489,15 +520,41 @@ export default function BlackjackPage() {
     let currentDealerHand = [...dealerHand];
     let currentDeck = [...deck];
 
-    // Dealer plays
-    let dealerValue = calculateHandValue(currentDealerHand);
-    while (dealerValue < 17) {
-      currentDealerHand.push(currentDeck[0]);
-      currentDeck = currentDeck.slice(1);
-      dealerValue = calculateHandValue(currentDealerHand);
-    }
-    setDealerHand(currentDealerHand);
-    setDeck(currentDeck);
+    // Dealer plays - one card at a time
+    const dealerPlay = () => {
+      let dealerValue = calculateHandValue(currentDealerHand);
+      
+      const drawNextCard = () => {
+        if (dealerValue >= 17) {
+          // Dealer done - evaluate split hands
+          setDealerHand([...currentDealerHand]);
+          setDeck(currentDeck);
+          
+          setTimeout(() => {
+            evaluateSplitResults(hands, currentDealerHand, individualBet);
+          }, 1200);
+          return;
+        }
+        
+        // Draw one card
+        currentDealerHand.push(currentDeck[0]);
+        currentDeck = currentDeck.slice(1);
+        setDealerHand([...currentDealerHand]);
+        setDeck(currentDeck);
+        dealerValue = calculateHandValue(currentDealerHand);
+        
+        // Wait for card animation, then draw next
+        setTimeout(drawNextCard, 800);
+      };
+      
+      drawNextCard();
+    };
+    
+    setTimeout(dealerPlay, 500);
+  };
+  
+  const evaluateSplitResults = (hands, dealer, individualBet) => {
+    const dealerValue = calculateHandValue(dealer);
 
     // Evaluate each hand
     let totalPrize = 0;
@@ -623,35 +680,43 @@ export default function BlackjackPage() {
       setPlayerHand(newCards);
       setDeck(deck.slice(1));
 
-      const value = calculateHandValue(newCards);
-      if (value > 21) {
-        // This hand busted, move to next
-        newHands[currentSplitIndex].finished = true;
-        if (currentSplitIndex < splitHands.length - 1) {
-          const nextIndex = currentSplitIndex + 1;
-          setCurrentSplitIndex(nextIndex);
-          setPlayerHand(splitHands[nextIndex].cards);
-        } else {
-          // All hands finished
-          finishSplitHands(newHands, splitHands[0].bet);
+      // Wait for card animation before checking bust
+      setTimeout(() => {
+        const value = calculateHandValue(newCards);
+        if (value > 21) {
+          // This hand busted, move to next
+          newHands[currentSplitIndex].finished = true;
+          setTimeout(() => {
+            if (currentSplitIndex < splitHands.length - 1) {
+              const nextIndex = currentSplitIndex + 1;
+              setCurrentSplitIndex(nextIndex);
+              setPlayerHand(splitHands[nextIndex].cards);
+            } else {
+              // All hands finished
+              finishSplitHands(newHands, splitHands[0].bet);
+            }
+          }, 800);
+        } else if (value === 21) {
+          // Stand automatically on 21
+          standSplitHand();
         }
-      } else if (value === 21) {
-        // Stand automatically on 21
-        standSplitHand();
-      }
+      }, 600);
     } else {
       const newCard = deck[0];
       const newHand = [...playerHand, newCard];
       setPlayerHand(newHand);
       setDeck(deck.slice(1));
 
-      const value = calculateHandValue(newHand);
-      if (value > 21) {
-        setGameState("finished");
-        finishGame(newHand, dealerHand, Number(betAmount), false);
-      } else if (value === 21) {
-        stand(newHand);
-      }
+      // Wait for card animation before checking bust
+      setTimeout(() => {
+        const value = calculateHandValue(newHand);
+        if (value > 21) {
+          setGameState("finished");
+          setTimeout(() => finishGame(newHand, dealerHand, Number(betAmount), false), 800);
+        } else if (value === 21) {
+          stand(newHand);
+        }
+      }, 600);
     }
   };
 
@@ -691,15 +756,29 @@ export default function BlackjackPage() {
 
     const dealerPlay = () => {
       let dealerValue = calculateHandValue(currentDealerHand);
-      while (dealerValue < 17) {
+      
+      const drawNextCard = () => {
+        if (dealerValue >= 17) {
+          // Dealer done - wait for last card animation + pause
+          setDealerHand([...currentDealerHand]);
+          setDeck(currentDeck);
+          setGameState("finished");
+          setTimeout(() => finishGame(currentPlayerHand, currentDealerHand, bet, false), 1200);
+          return;
+        }
+        
+        // Draw one card
         currentDealerHand.push(currentDeck[0]);
         currentDeck = currentDeck.slice(1);
+        setDealerHand([...currentDealerHand]);
+        setDeck(currentDeck);
         dealerValue = calculateHandValue(currentDealerHand);
-      }
-      setDealerHand(currentDealerHand);
-      setDeck(currentDeck);
-      setGameState("finished");
-      setTimeout(() => finishGame(currentPlayerHand, currentDealerHand, bet, false), 500);
+        
+        // Wait for card animation, then draw next
+        setTimeout(drawNextCard, 800);
+      };
+      
+      drawNextCard();
     };
 
     setTimeout(dealerPlay, 500);
@@ -769,6 +848,18 @@ export default function BlackjackPage() {
 
   return (
     <Layout>
+      <style jsx>{`
+        @keyframes slideInCard {
+          from {
+            opacity: 0;
+            transform: translateX(-50px) scale(0.8);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+          }
+        }
+      `}</style>
       <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-red-900 via-black to-green-900" style={{ height: '100svh' }}>
         <div className="absolute inset-0 opacity-10"><div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} /></div>
         <div ref={headerRef} className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
@@ -806,18 +897,18 @@ export default function BlackjackPage() {
 
           <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
             <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2" style={{ minHeight: '110px' }}>
-              <div className="text-xs text-white/60 mb-1">Dealer {gameState !== "betting" && gameState !== "insurance" && `(${dealerValue})`}</div>
+              <div className="text-xs text-white/60 mb-1">Dealer {gameState === "finished" && `(${dealerValue})`}</div>
               <div className="flex gap-1 flex-wrap min-h-[80px]">
                 {dealerHand.map((card, i) => (
-                  <PlayingCard key={i} card={card} hidden={(gameState === "playing" || gameState === "insurance") && i === 1} />
+                  <PlayingCard key={i} card={card} hidden={(gameState === "playing" || gameState === "insurance" || gameState === "dealing") && i === 1} delay={i * 200} />
                 ))}
               </div>
             </div>
             <div className="bg-black/20 border border-white/10 rounded-lg p-3" style={{ minHeight: '110px' }}>
-              <div className="text-xs text-white/60 mb-1">You {gameState !== "betting" && gameState !== "insurance" && `(${playerValue})`} {isSplitGame && `- Hand ${currentSplitIndex + 1}/2`}</div>
+              <div className="text-xs text-white/60 mb-1">You {gameState !== "betting" && gameState !== "insurance" && gameState !== "dealing" && `(${playerValue})`} {isSplitGame && `- Hand ${currentSplitIndex + 1}/2`}</div>
               <div className="flex gap-1 flex-wrap min-h-[80px]">
                 {playerHand.map((card, i) => (
-                  <PlayingCard key={i} card={card} />
+                  <PlayingCard key={i} card={card} delay={i * 200} />
                 ))}
               </div>
             </div>

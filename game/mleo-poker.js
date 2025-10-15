@@ -105,12 +105,18 @@ function evaluateHand(cards) {
   return { hand: "High Card", rank: 1 };
 }
 
-function PlayingCard({ card }) {
+function PlayingCard({ card, delay = 0 }) {
   const isRed = card.suit === "♥️" || card.suit === "♦️";
   const color = isRed ? "text-red-600" : "text-black";
   
   return (
-    <div className="w-14 h-20 rounded bg-white border border-gray-400 shadow p-1 relative">
+    <div 
+      className="w-14 h-20 rounded bg-white border border-gray-400 shadow p-1 relative"
+      style={{
+        animation: `slideInCard 0.4s ease-out ${delay}ms both`,
+        opacity: 0
+      }}
+    >
       <div className={`text-xl font-bold ${color} absolute top-1 left-2 leading-tight`}>
         {card.value}
       </div>
@@ -226,28 +232,55 @@ export default function PokerPage() {
     const deck = shuffleDeck(createDeck());
     const player = [deck[0], deck[2]];
     const community = [deck[4], deck[6], deck[8], deck[10], deck[12]];
-    setPlayerCards(player);
-    setCommunityCards(community);
-
-    const allCards = [...player, ...community];
-    const hand = evaluateHand(allCards);
-    setPlayerHand(hand);
-
-    const multiplier = PAYOUTS[hand.hand] || 0;
-    const prize = multiplier > 0 ? bet * multiplier : 0;
-    const win = prize > 0;
-
-    if (win && prize > 0) {
-      const newVault = getVault() + prize;
-      setVault(newVault); setVaultState(newVault);
-      playSfx(winSound.current);
-    }
-
-    const resultData = { win, hand: hand.hand, multiplier, prize, profit: win ? prize - bet : -bet, isRoyal: hand.hand === "Royal Flush" };
-    setGameResult(resultData);
-
-    const newStats = { ...stats, totalHands: stats.totalHands + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalBet: stats.totalBet + bet, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), royalFlushes: resultData.isRoyal ? stats.royalFlushes + 1 : stats.royalFlushes, lastBet: bet };
-    setStats(newStats);
+    
+    // Clear previous cards
+    setPlayerCards([]);
+    setCommunityCards([]);
+    setPlayerHand(null);
+    
+    // Player cards - one by one
+    setTimeout(() => setPlayerCards([deck[0]]), 200);
+    setTimeout(() => setPlayerCards([deck[0], deck[2]]), 400);
+    
+    // FLOP - 3 cards one by one
+    setTimeout(() => setCommunityCards([deck[4]]), 800);
+    setTimeout(() => setCommunityCards([deck[4], deck[6]]), 1000);
+    setTimeout(() => setCommunityCards([deck[4], deck[6], deck[8]]), 1200);
+    
+    // TURN - 4th card
+    setTimeout(() => {
+      setCommunityCards([deck[4], deck[6], deck[8], deck[10]]);
+    }, 1800);
+    
+    // RIVER - 5th card
+    setTimeout(() => {
+      setCommunityCards(community);
+      
+      // Wait for the last card animation to complete (card delay 4*200ms + animation 400ms = 1200ms) + extra pause to see the card (700ms)
+      setTimeout(() => {
+        // Evaluate hand after all cards shown AND animated AND visible
+        const allCards = [...player, ...community];
+        const hand = evaluateHand(allCards);
+        setPlayerHand(hand);
+        
+        const multiplier = PAYOUTS[hand.hand] || 0;
+        const prize = multiplier > 0 ? bet * multiplier : 0;
+        const win = prize > 0;
+        
+        if (win && prize > 0) {
+          const newVault = getVault() + prize;
+          setVault(newVault); 
+          setVaultState(newVault);
+          playSfx(winSound.current);
+        }
+        
+        const resultData = { win, hand: hand.hand, multiplier, prize, profit: win ? prize - bet : -bet, isRoyal: hand.hand === "Royal Flush" };
+        setGameResult(resultData);
+        
+        const newStats = { ...stats, totalHands: stats.totalHands + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalBet: stats.totalBet + bet, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), royalFlushes: resultData.isRoyal ? stats.royalFlushes + 1 : stats.royalFlushes, lastBet: bet };
+        setStats(newStats);
+      }, 1900);
+    }, 2400);
   };
 
   const resetGame = () => { setGameResult(null); setShowResultPopup(false); setPlayerCards([]); setCommunityCards([]); setPlayerHand(null); };
@@ -259,6 +292,18 @@ export default function PokerPage() {
 
   return (
     <Layout>
+      <style jsx>{`
+        @keyframes slideInCard {
+          from {
+            opacity: 0;
+            transform: translateX(-50px) scale(0.8);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+          }
+        }
+      `}</style>
       <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-green-900 via-black to-blue-900" style={{ height: '100svh' }}>
         <div className="absolute inset-0 opacity-10"><div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} /></div>
         <div ref={headerRef} className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
@@ -295,8 +340,8 @@ export default function PokerPage() {
           </div>
 
           <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
-            <div className="mb-2" style={{ minHeight: '105px' }}><div className="text-xs text-white/60 mb-1 text-center">Community Cards</div><div className="flex gap-1 justify-center flex-wrap min-h-[80px]">{communityCards.map((card, i) => (<PlayingCard key={i} card={card} />))}</div></div>
-            <div className="mb-2" style={{ minHeight: '105px' }}><div className="text-xs text-white/60 mb-1 text-center">Your Cards</div><div className="flex gap-1 justify-center flex-wrap min-h-[80px]">{playerCards.map((card, i) => (<PlayingCard key={i} card={card} />))}</div></div>
+            <div className="mb-2" style={{ minHeight: '105px' }}><div className="text-xs text-white/60 mb-1 text-center">Community Cards</div><div className="flex gap-1 justify-center flex-wrap min-h-[80px]">{communityCards.map((card, i) => (<PlayingCard key={i} card={card} delay={i * 200} />))}</div></div>
+            <div className="mb-2" style={{ minHeight: '105px' }}><div className="text-xs text-white/60 mb-1 text-center">Your Cards</div><div className="flex gap-1 justify-center flex-wrap min-h-[80px]">{playerCards.map((card, i) => (<PlayingCard key={i} card={card} delay={i * 200} />))}</div></div>
             <div className="text-center" style={{ height: '28px' }}><div className={`text-base font-bold transition-opacity ${playerHand ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-yellow-400'}`}>{playerHand ? playerHand.hand : 'waiting'}</div></div>
           </div>
 
