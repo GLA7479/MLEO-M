@@ -107,6 +107,12 @@ function fmt(n) {
   if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
   return Math.floor(n).toString();
 }
+function formatBetDisplay(n) {
+  const num = Number(n) || 0;
+  if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M";
+  if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K";
+  return num.toString();
+}
 function shortAddr(addr) {
   if (!addr || addr.length < 10) return addr || "";
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -137,6 +143,7 @@ export default function DiamondsPage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000");
+  const [isEditingBet, setIsEditingBet] = useState(false);
   const [difficulty, setDifficulty] = useState(0);
   const [grid, setGrid] = useState([]);
   const [revealed, setRevealed] = useState([]);
@@ -212,6 +219,27 @@ export default function DiamondsPage() {
   useEffect(() => {
     safeWrite(LS_KEY, stats);
   }, [stats]);
+
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    const calc = () => {
+      const rootH = window.visualViewport?.height ?? window.innerHeight;
+      const safeBottom = Number(getComputedStyle(document.documentElement).getPropertyValue("--satb").replace("px", "")) || 0;
+      const headH = headerRef.current?.offsetHeight || 0;
+      document.documentElement.style.setProperty("--head-h", headH + "px");
+      const topPad = headH + 8;
+      const used = headH + (metersRef.current?.offsetHeight || 0) + (diffRef.current?.offsetHeight || 0) + (betRef.current?.offsetHeight || 0) + (ctaRef.current?.offsetHeight || 0) + topPad + 48 + safeBottom + 24;
+      const freeH = Math.max(200, rootH - used);
+      document.documentElement.style.setProperty("--chart-h", freeH + "px");
+    };
+    calc();
+    window.addEventListener("resize", calc);
+    window.visualViewport?.addEventListener("resize", calc);
+    return () => {
+      window.removeEventListener("resize", calc);
+      window.visualViewport?.removeEventListener("resize", calc);
+    };
+  }, [mounted]);
 
   useEffect(() => {
     if (gameResult) {
@@ -533,42 +561,33 @@ useEffect(() => {
 
         {/* MAIN BODY (ללא גלילה; הגריד מתכווץ אוטומטית) */}
         <div
-  className="relative h-full flex flex-col items-center justify-center px-4 pb-16 mt-8"
+  className="relative h-full flex flex-col items-center justify-start px-4 pb-4"
   style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}
 >
 
-          <div className="text-center mb-3">
-            <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">
+          <div className="text-center mb-1">
+            <h1 className="text-2xl font-extrabold text-white mb-0.5">
               💎 Diamonds
             </h1>
-            <p className="text-white/70 text-sm">Find gems • Avoid bombs!</p>
+            <p className="text-white/70 text-xs">Find gems • Avoid bombs!</p>
           </div>
 
-          <div
-            ref={metersRef}
-            className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md"
-          >
-            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
-              <div className="text-xs text-white/60 mb-1">Vault</div>
-              <div className="text-lg font-bold text-emerald-400">
-                {fmt(vault)}
-              </div>
+          <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Vault</div>
+              <div className="text-sm font-bold text-emerald-400">{fmt(vault)}</div>
             </div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
-              <div className="text-xs text-white/60 mb-1">Bet</div>
-              <div className="text-lg font-bold text-amber-400">
-                {fmt(Number(betAmount))}
-              </div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Bet</div>
+              <div className="text-sm font-bold text-amber-400">{fmt(Number(betAmount))}</div>
             </div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
-              <div className="text-xs text-white/60 mb-1">Prize</div>
-              <div className="text-lg font-bold text-green-400">
-                {fmt(potentialWin)}
-              </div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Prize</div>
+              <div className="text-sm font-bold text-green-400">{fmt(potentialWin)}</div>
             </div>
           </div>
 
-          <div ref={diffRef} className="mb-2">
+          <div ref={diffRef} className="mb-1">
             <div className="flex gap-2 justify-center">
               {DIFFICULTIES.map((diff, i) => (
                 <button
@@ -631,39 +650,15 @@ useEffect(() => {
             </div>
           </div>
 
-          <div ref={betRef} className="flex items-center gap-2 mb-3">
-            <button
-              onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                const newBet = Math.max(MIN_BET, current - 1000);
-                setBetAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              disabled={gameActive}
-              className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
-            >
-              −
-            </button>
-            <input
-              type="number"
-              value={betAmount}
-              onChange={(e) => setBetAmount(e.target.value)}
-              disabled={gameActive}
-              className="w-32 h-12 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-sm"
-              min={MIN_BET}
-            />
-            <button
-              onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                const newBet = Math.min(vault, current + 1000);
-                setBetAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              disabled={gameActive}
-              className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
-            >
-              +
-            </button>
+          <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
+            <input type="text" value={isEditingBet ? betAmount : formatBetDisplay(betAmount)} onFocus={() => setIsEditingBet(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setBetAmount(val || '0'); }} onBlur={() => { setIsEditingBet(false); const current = Number(betAmount) || MIN_BET; setBetAmount(String(Math.max(MIN_BET, current))); }} disabled={gameActive} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs" />
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
+            <button onClick={() => { setBetAmount(String(MIN_BET)); playSfx(clickSound.current); }} disabled={gameActive} className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50" title="Reset to minimum bet">↺</button>
           </div>
 
           <div
