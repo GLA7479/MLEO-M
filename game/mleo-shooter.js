@@ -249,9 +249,10 @@ export default function ShooterPage() {
 
           <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
             <div className="w-full relative bg-black/20 border border-white/10 rounded-lg" style={{ height: '100%' }}>
-            {gameActive && (<button onClick={hitTarget} className="absolute w-12 h-12 rounded-full bg-red-500 text-white text-2xl font-bold hover:brightness-110 transition-all" style={{ left: `${targetPos.x}%`, top: `${targetPos.y}%`, transform: 'translate(-50%, -50%)' }}>🎯</button>)}
-            <div className="absolute top-2 left-2 text-white text-sm font-bold">Score: {score}/{TOTAL_TARGETS}</div>
-            <div className="absolute top-2 right-2 text-white text-sm font-bold">Time: {timeLeft}s</div>
+              {gameActive && (<button onClick={hitTarget} className="absolute w-12 h-12 rounded-full bg-red-500 text-white text-2xl font-bold hover:brightness-110 transition-all" style={{ left: `${targetPos.x}%`, top: `${targetPos.y}%`, transform: 'translate(-50%, -50%)' }}>🎯</button>)}
+              <div className="absolute top-2 left-2 text-white text-sm font-bold">Score: {score}/{TOTAL_TARGETS}</div>
+              <div className="absolute top-2 right-2 text-white text-sm font-bold">Time: {timeLeft}s</div>
+            </div>
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">

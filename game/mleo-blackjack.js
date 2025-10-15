@@ -991,8 +991,8 @@ export default function BlackjackPage() {
               </div>
               <button onClick={() => setShowVaultModal(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
             </div>
-                </div>
-              )}
+          </div>
+        )}
 
         {showInsurance && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
