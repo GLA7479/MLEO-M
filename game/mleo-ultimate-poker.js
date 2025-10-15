@@ -608,7 +608,7 @@ export default function UltimatePokerPage() {
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-black to-purple-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
 
-  const totalBetAmount = anteBet + blindBet + playBet;
+  const totalBetAmount = anteBet + playBet;
   const potentialWin = Math.floor(totalBetAmount * 6);
 
   return (
@@ -652,9 +652,9 @@ export default function UltimatePokerPage() {
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">Bet</div>
-              <div className="text-sm font-bold text-amber-400">
-                {anteBet > 0 ? fmt(anteBet) : fmt(Number(betAmount))}
-              </div>
+          <div className="text-sm font-bold text-amber-400">
+            {gameState !== "betting" && totalBetAmount > 0 ? fmt(totalBetAmount) : "0"}
+          </div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">Pot Win</div>
