@@ -848,32 +848,30 @@ export default function BlackjackPage() {
             </div>
           )}
 
-          <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            <div style={{ minHeight: '88px' }} className="flex flex-col gap-2">
-              {gameState === "playing" ? (
-                <>
-                  <div className="flex gap-2">
-                    <button onClick={hit} className="flex-1 py-2 rounded-lg font-bold text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:brightness-110">HIT</button>
-                    <button onClick={() => stand()} className="flex-1 py-2 rounded-lg font-bold text-sm bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:brightness-110">STAND</button>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={doubleDown} disabled={!canDouble} className="flex-1 py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed">DOUBLE</button>
-                    <button onClick={split} disabled={!canSplit} className="flex-1 py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed">SPLIT</button>
-                    <button onClick={surrender} disabled={!canSurrender} className="flex-1 py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed">SURRENDER</button>
-                  </div>
-                </>
-              ) : (
-                <button onClick={gameState === "betting" ? () => dealCards(false) : newHand} disabled={gameState === "dealer"} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
-                  {gameState === "dealer" ? "Dealing..." : gameState === "finished" ? "NEW HAND" : "DEAL"}
-                </button>
-              )}
-            </div>
-            
-            <div className="flex gap-2">
-              <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
-              <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>
-              <button onClick={() => { setShowVaultModal(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all">💰 Vault</button>
-            </div>
+          <div ref={ctaRef} className="mb-1" style={{ minHeight: '88px' }}>
+            {gameState === "playing" ? (
+              <div className="flex flex-col gap-2 w-full max-w-sm">
+                <div className="flex gap-2">
+                  <button onClick={hit} className="flex-1 py-2 rounded-lg font-bold text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:brightness-110">HIT</button>
+                  <button onClick={() => stand()} className="flex-1 py-2 rounded-lg font-bold text-sm bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:brightness-110">STAND</button>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={doubleDown} disabled={!canDouble} className="flex-1 py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed">DOUBLE</button>
+                  <button onClick={split} disabled={!canSplit} className="flex-1 py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed">SPLIT</button>
+                  <button onClick={surrender} disabled={!canSurrender} className="flex-1 py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed">SURRENDER</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={gameState === "betting" ? () => dealCards(false) : newHand} disabled={gameState === "dealer"} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
+                {gameState === "dealer" ? "Dealing..." : gameState === "finished" ? "NEW HAND" : "DEAL"}
+              </button>
+            )}
+          </div>
+
+          <div className="flex gap-2 w-full max-w-sm">
+            <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
+            <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>
+            <button onClick={() => { setShowVaultModal(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all">💰 Vault</button>
           </div>
         </div>
 
