@@ -883,17 +883,208 @@ export default function BlackjackPage() {
           </div>
         </div>
 
-        {showResultPopup && gameResult && (<div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none"><div className={`${gameResult.win ? 'bg-green-500' : gameResult.push ? 'bg-yellow-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}><div className="text-4xl mb-2">{gameResult.blackjack ? '💎' : gameResult.surrender ? '🏳️' : gameResult.split ? '✂️' : gameResult.win ? '🎉' : gameResult.push ? '🤝' : '😔'}</div><div className="text-2xl font-bold mb-1">{gameResult.surrender ? 'SURRENDERED' : gameResult.split ? `SPLIT: ${gameResult.splitWins}W ${gameResult.splitLosses}L` : gameResult.blackjack ? 'BLACKJACK!' : gameResult.win ? 'YOU WIN!' : gameResult.push ? 'PUSH' : 'DEALER WINS'}</div><div className="text-lg">{gameResult.win || gameResult.push ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div>{!gameResult.surrender && !gameResult.split && <div className="text-sm opacity-80 mt-2">You: {gameResult.playerValue} • Dealer: {gameResult.dealerValue}</div>}{gameResult.insurance && <div className="text-sm opacity-80 mt-1">🛡️ Insurance Paid!</div>}</div></div>)}
+        {showResultPopup && gameResult && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
+            <div className={`${gameResult.win ? 'bg-green-500' : gameResult.push ? 'bg-yellow-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
+              <div className="text-4xl mb-2">
+                {gameResult.blackjack ? '💎' : gameResult.surrender ? '🏳️' : gameResult.split ? '✂️' : gameResult.win ? '🎉' : gameResult.push ? '🤝' : '😔'}
+              </div>
+              <div className="text-2xl font-bold mb-1">
+                {gameResult.surrender ? 'SURRENDERED' : gameResult.split ? `SPLIT: ${gameResult.splitWins}W ${gameResult.splitLosses}L` : gameResult.blackjack ? 'BLACKJACK!' : gameResult.win ? 'YOU WIN!' : gameResult.push ? 'PUSH' : 'DEALER WINS'}
+              </div>
+              <div className="text-lg">
+                {gameResult.win || gameResult.push ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}
+              </div>
+              {!gameResult.surrender && !gameResult.split && (
+                <div className="text-sm opacity-80 mt-2">You: {gameResult.playerValue} • Dealer: {gameResult.dealerValue}</div>
+              )}
+              {gameResult.insurance && <div className="text-sm opacity-80 mt-1">🛡️ Insurance Paid!</div>}
+            </div>
+          </div>
+        )}
 
-        {menuOpen && (<div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}><div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div><div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div><div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div><div className="mt-4 text-xs opacity-70"><p>Blackjack Pro v3.0</p></div></div></div>)}
+        {menuOpen && (
+          <div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}>
+            <div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-2 md:mb-3">
+                <h2 className="text-xl font-extrabold">Settings</h2>
+                <button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button>
+              </div>
+              <div className="mb-3 space-y-2">
+                <h3 className="text-sm font-semibold opacity-80">Wallet</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>
+                    {isConnected ? "Connected" : "Disconnected"}
+                  </button>
+                  {isConnected && (
+                    <button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>
+                  )}
+                </div>
+                {isConnected && address && (
+                  <button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">
+                    {shortAddr(address)}
+                    {copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}
+                  </button>
+                )}
+              </div>
+              <div className="mb-4 space-y-2">
+                <h3 className="text-sm font-semibold opacity-80">Sound</h3>
+                <button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>
+                  SFX: {sfxMuted ? "Off" : "On"}
+                </button>
+              </div>
+              <div className="mt-4 text-xs opacity-70">
+                <p>Blackjack Pro v3.0</p>
+              </div>
+            </div>
+          </div>
+        )}
 
-        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">♠️ How to Play</h2><div className="space-y-3 text-sm"><p><strong>Basic Rules:</strong></p><p>• Get closer to 21 than dealer without busting</p><p>• Dealer hits until 17+</p><p><strong>Actions:</strong></p><p>• <strong>HIT:</strong> Take another card</p><p>• <strong>STAND:</strong> Keep your hand</p><p>• <strong>DOUBLE:</strong> Double bet, get 1 card</p><p>• <strong>SPLIT:</strong> Split pairs into 2 hands</p><p>• <strong>SURRENDER:</strong> Forfeit & get ½ bet back</p><p>• <strong>INSURANCE:</strong> Protect vs dealer Ace</p><div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3"><p className="text-red-300 font-semibold">Payouts:</p><div className="text-xs text-white/80 mt-2 space-y-1"><p>• Blackjack: ×2.5 💎</p><p>• Win: ×2</p><p>• Push: Money back</p><p>• Insurance: ×2 (if dealer BJ)</p></div></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+        {showHowToPlay && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+              <h2 className="text-2xl font-extrabold mb-4">♠️ How to Play</h2>
+              <div className="space-y-3 text-sm">
+                <p><strong>Basic Rules:</strong></p>
+                <p>• Get closer to 21 than dealer without busting</p>
+                <p>• Dealer hits until 17+</p>
+                <p><strong>Actions:</strong></p>
+                <p>• <strong>HIT:</strong> Take another card</p>
+                <p>• <strong>STAND:</strong> Keep your hand</p>
+                <p>• <strong>DOUBLE:</strong> Double bet, get 1 card</p>
+                <p>• <strong>SPLIT:</strong> Split pairs into 2 hands</p>
+                <p>• <strong>SURRENDER:</strong> Forfeit & get ½ bet back</p>
+                <p>• <strong>INSURANCE:</strong> Protect vs dealer Ace</p>
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                  <p className="text-red-300 font-semibold">Payouts:</p>
+                  <div className="text-xs text-white/80 mt-2 space-y-1">
+                    <p>• Blackjack: ×2.5 💎</p>
+                    <p>• Win: ×2</p>
+                    <p>• Push: Money back</p>
+                    <p>• Insurance: ×2 (if dealer BJ)</p>
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
+            </div>
+          </div>
+        )}
 
-        {showStats && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2><div className="space-y-3"><div className="grid grid-cols-2 gap-3"><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Hands</div><div className="text-xl font-bold">{stats.totalHands}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalHands > 0 ? ((stats.wins / stats.totalHands) * 100).toFixed(1) : 0}%</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Blackjacks</div><div className="text-lg font-bold text-yellow-400">{stats.blackjacks} 💎</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Doubles</div><div className="text-lg font-bold text-purple-400">{stats.doubles}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Splits</div><div className="text-lg font-bold text-pink-400">{stats.splits}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Surrenders</div><div className="text-lg font-bold text-gray-400">{stats.surrenders}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Bet</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalBet)}</div></div></div><div className="bg-gradient-to-r from-blue-500/10 to-yellow-500/10 border border-blue-500/30 rounded-lg p-4"><div className="text-sm font-semibold mb-2">🛡️ Insurance</div><div className="text-center"><div className="text-2xl font-bold text-blue-300">{stats.insuranceWins}W / {stats.insuranceLosses}L</div><div className="text-xs text-white/60 mt-1">Insurance Bets</div></div></div></div><button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+        {showStats && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+              <h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Total Hands</div>
+                    <div className="text-xl font-bold">{stats.totalHands}</div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Win Rate</div>
+                    <div className="text-xl font-bold text-green-400">
+                      {stats.totalHands > 0 ? ((stats.wins / stats.totalHands) * 100).toFixed(1) : 0}%
+                    </div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Blackjacks</div>
+                    <div className="text-lg font-bold text-yellow-400">{stats.blackjacks} 💎</div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Doubles</div>
+                    <div className="text-lg font-bold text-purple-400">{stats.doubles}</div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Splits</div>
+                    <div className="text-lg font-bold text-pink-400">{stats.splits}</div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Surrenders</div>
+                    <div className="text-lg font-bold text-gray-400">{stats.surrenders}</div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Total Bet</div>
+                    <div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Total Won</div>
+                    <div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Biggest Win</div>
+                    <div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div>
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3">
+                    <div className="text-xs text-white/60">Net Profit</div>
+                    <div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {fmt(stats.totalWon - stats.totalBet)}
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-r from-blue-500/10 to-yellow-500/10 border border-blue-500/30 rounded-lg p-4">
+                  <div className="text-sm font-semibold mb-2">🛡️ Insurance</div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-300">{stats.insuranceWins}W / {stats.insuranceLosses}L</div>
+                    <div className="text-xs text-white/60 mt-1">Insurance Bets</div>
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
+            </div>
+          </div>
+        )}
 
-        {showVaultModal && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">💰 MLEO Vault</h2><div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-6 text-center"><div className="text-sm text-white/60 mb-1">Current Balance</div><div className="text-3xl font-bold text-emerald-400">{fmt(vault)} MLEO</div></div><div className="space-y-4"><div><label className="text-sm text-white/70 mb-2 block">Collect to Wallet</label><div className="flex gap-2 mb-2"><input type="number" value={collectAmount} onChange={(e) => setCollectAmount(Number(e.target.value))} className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white" min="1" max={vault} /><button onClick={() => setCollectAmount(vault)} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold">MAX</button></div><button onClick={collectToWallet} disabled={collectAmount <= 0 || collectAmount > vault || claiming} className="w-full py-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed">{claiming ? "Collecting..." : `Collect ${fmt(collectAmount)} MLEO`}</button></div><div className="text-xs text-white/60"><p>• Your vault is shared across all MLEO games</p><p>• Collect earnings to your wallet anytime</p><p>• Network: BSC Testnet (TBNB)</p></div></div><button onClick={() => setShowVaultModal(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+        {showVaultModal && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+              <h2 className="text-2xl font-extrabold mb-4">💰 MLEO Vault</h2>
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-6 text-center">
+                <div className="text-sm text-white/60 mb-1">Current Balance</div>
+                <div className="text-3xl font-bold text-emerald-400">{fmt(vault)} MLEO</div>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-white/70 mb-2 block">Collect to Wallet</label>
+                  <div className="flex gap-2 mb-2">
+                    <input type="number" value={collectAmount} onChange={(e) => setCollectAmount(Number(e.target.value))} className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white" min="1" max={vault} />
+                    <button onClick={() => setCollectAmount(vault)} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold">MAX</button>
+                  </div>
+                  <button onClick={collectToWallet} disabled={collectAmount <= 0 || collectAmount > vault || claiming} className="w-full py-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+                    {claiming ? "Collecting..." : `Collect ${fmt(collectAmount)} MLEO`}
+                  </button>
+                </div>
+                <div className="text-xs text-white/60">
+                  <p>• Your vault is shared across all MLEO games</p>
+                  <p>• Collect earnings to your wallet anytime</p>
+                  <p>• Network: BSC Testnet (TBNB)</p>
+                </div>
+              </div>
+              <button onClick={() => setShowVaultModal(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
+            </div>
+          </div>
+        )}
 
-        {showInsurance && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-yellow-500/20 border-2 border-yellow-500/50 rounded-xl p-6 text-center max-w-md w-full shadow-2xl animate-pulse"><div className="text-2xl font-bold text-yellow-300 mb-3">🛡️ Insurance?</div><div className="text-base text-white/90 mb-3">Dealer has Ace. Protect against Blackjack?</div><div className="text-sm text-white/70 mb-4">Cost: {fmt(Math.floor(Number(betAmount) / 2))} MLEO</div><div className="flex gap-3"><button onClick={takeInsurance} className="flex-1 py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold">YES</button><button onClick={declineInsurance} className="flex-1 py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold">NO</button></div></div></div>)}
+        {showInsurance && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-yellow-500/20 border-2 border-yellow-500/50 rounded-xl p-6 text-center max-w-md w-full shadow-2xl animate-pulse">
+              <div className="text-2xl font-bold text-yellow-300 mb-3">🛡️ Insurance?</div>
+              <div className="text-base text-white/90 mb-3">
+                Dealer has Ace. Protect against Blackjack?
+              </div>
+              <div className="text-sm text-white/70 mb-4">
+                Cost: {fmt(Math.floor(Number(betAmount) / 2))} MLEO
+              </div>
+              <div className="flex gap-3">
+                <button onClick={takeInsurance} className="flex-1 py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold">
+                  YES
+                </button>
+                <button onClick={declineInsurance} className="flex-1 py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold">
+                  NO
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );
