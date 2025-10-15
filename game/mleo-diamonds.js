@@ -587,37 +587,37 @@ useEffect(() => {
             </div>
           </div>
 
-          <div ref={diffRef} className="mb-1">
-            <div className="flex gap-2 justify-center">
-              {DIFFICULTIES.map((diff, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    setDifficulty(i);
-                    playSfx(clickSound.current);
-                  }}
-                  disabled={gameActive}
-                  className={`px-3 py-1 rounded text-xs font-bold transition-all ${
-                    difficulty === i
-                      ? "bg-purple-500 text-white ring-2 ring-purple-300"
-                      : "bg-white/10 text-white hover:bg-white/20"
-                  } disabled:opacity-50`}
-                >
-                  {diff.emoji} {diff.name}
-                </button>
-              ))}
+          {/* GAME AREA - Everything inside --chart-h */}
+          <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
+            {/* Difficulty Selector */}
+            <div className="mb-1">
+              <div className="flex gap-1 justify-center">
+                {DIFFICULTIES.map((diff, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setDifficulty(i);
+                      playSfx(clickSound.current);
+                    }}
+                    disabled={gameActive}
+                    className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${
+                      difficulty === i
+                        ? "bg-purple-500 text-white ring-2 ring-purple-300"
+                        : "bg-white/10 text-white hover:bg-white/20"
+                    } disabled:opacity-50`}
+                  >
+                    {diff.emoji} {diff.name}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div
-            ref={infoRef}
-            className="mb-2 text-center text-xs text-white/70"
-          >
-            Gems: {revealed.length} • Bombs: {DIFFICULTIES[difficulty].bombs}
-          </div>
+            <div className="mb-1 text-center text-[10px] text-white/70">
+              Gems: {revealed.length} • Bombs: {DIFFICULTIES[difficulty].bombs}
+            </div>
 
-          {/* GRID — מתכונן לפי --cell/--gap */}
-          <div id="diamonds-grid-wrap" className="mb-2 w-full max-w-xs">
+            {/* GRID */}
+            <div id="diamonds-grid-wrap" className="w-full max-w-xs">
             <div
               className="grid grid-cols-5"
               style={{ gap: "var(--gap, 6px)", justifyContent: "center" }}
@@ -647,6 +647,7 @@ useEffect(() => {
                   </button>
                 );
               })}
+            </div>
             </div>
           </div>
 

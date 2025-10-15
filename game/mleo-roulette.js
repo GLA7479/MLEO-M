@@ -550,61 +550,64 @@ export default function RoulettePage() {
             </div>
           </div>
 
-          {/* WHEEL — מתכונן לפי --wheel-size */}
-          <div id="roulette-wheel-wrap" className="mb-3" style={{ minHeight: '200px' }}>
-            <div
-              className="relative rounded-full border-8 border-yellow-500 bg-gradient-to-br from-green-800 to-red-800 flex items-center justify-center"
-              style={{
-                width: "var(--wheel-size, 200px)",
-                height: "var(--wheel-size, 200px)",
-                animation: spinning ? "spin 2s linear" : "none",
-              }}
-            >
-              <div className="text-center">
-                {result ? (
-                  <>
-                    <div className="text-4xl font-bold text-white mb-1">
-                      {result.number}
-                    </div>
-                    <div
-                      className={`text-sm font-semibold px-3 py-1 rounded-full ${
-                        result.color === "green"
-                          ? "bg-green-500 text-white"
-                          : result.color === "red"
-                          ? "bg-red-500 text-white"
-                          : "bg-black text-white"
-                      }`}
-                    >
-                      {result.color.toUpperCase()}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-white/50 text-sm">SPIN</div>
-                )}
+          {/* GAME AREA - Everything inside --chart-h */}
+          <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
+            {/* WHEEL */}
+            <div id="roulette-wheel-wrap" className="mb-2">
+              <div
+                className="relative rounded-full border-8 border-yellow-500 bg-gradient-to-br from-green-800 to-red-800 flex items-center justify-center"
+                style={{
+                  width: "var(--wheel-size, 200px)",
+                  height: "var(--wheel-size, 200px)",
+                  animation: spinning ? "spin 2s linear" : "none",
+                }}
+              >
+                <div className="text-center">
+                  {result ? (
+                    <>
+                      <div className="text-4xl font-bold text-white mb-1">
+                        {result.number}
+                      </div>
+                      <div
+                        className={`text-sm font-semibold px-3 py-1 rounded-full ${
+                          result.color === "green"
+                            ? "bg-green-500 text-white"
+                            : result.color === "red"
+                            ? "bg-red-500 text-white"
+                            : "bg-black text-white"
+                        }`}
+                      >
+                        {result.color.toUpperCase()}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-white/50 text-sm">SPIN</div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* BET TYPE SELECTOR */}
-          <div className="mb-3 w-full max-w-md">
-            <div className="grid grid-cols-3 gap-2">
-              {Object.entries(BET_TYPES).map(([key, data]) => (
-                <button
-                  key={key}
-                  onClick={() => {
-                    setBetType(key);
-                    playSfx(clickSound.current);
-                  }}
-                  disabled={spinning}
-                  className={`px-2 py-2 rounded text-xs font-bold transition-all ${
-                    betType === key
-                      ? "bg-yellow-500 text-black ring-2 ring-yellow-300"
-                      : "bg-white/10 text-white hover:bg-white/20"
-                  } disabled:opacity-50`}
-                >
-                  {data.name}
-                </button>
-              ))}
+            {/* BET TYPE SELECTOR */}
+            <div className="w-full">
+              <div className="grid grid-cols-3 gap-1">
+                {Object.entries(BET_TYPES).map(([key, data]) => (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      setBetType(key);
+                      playSfx(clickSound.current);
+                    }}
+                    disabled={spinning}
+                    className={`px-1 py-1 rounded text-[10px] font-bold transition-all ${
+                      betType === key
+                        ? "bg-yellow-500 text-black ring-2 ring-yellow-300"
+                        : "bg-white/10 text-white hover:bg-white/20"
+                    } disabled:opacity-50`}
+                  >
+                    {data.name}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

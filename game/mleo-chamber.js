@@ -267,15 +267,14 @@ export default function ChamberPage() {
                   })}
                 </div>
             {/* Always present result text - just opacity */}
-            <div className="text-center mt-3" style={{ height: '28px' }}>
+            <div className="text-center mt-2" style={{ height: '28px' }}>
               <div className={`text-base font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-red-400'}`}>
                 {gameResult ? (gameResult.perfect ? 'PERFECT!' : gameResult.win ? 'SAFE!' : 'BOOM!') : 'waiting'}
               </div>
             </div>
-            </div>
 
-          {/* Cash Out Button */}
-          <div className="text-center mb-3" style={{ minHeight: '48px' }}>
+            {/* Cash Out Button - inside wrapper */}
+            <div className="text-center mt-1" style={{ minHeight: '36px' }}>
                     <button
               onClick={cashOut}
               disabled={!gameActive || selectedChambers.length === 0 || gameResult !== null}
@@ -286,7 +285,8 @@ export default function ChamberPage() {
               }`}
             >
               💰 Cash Out ({fmt(currentPrize)} MLEO)
-                    </button>
+            </button>
+            </div>
           </div>
                   
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">

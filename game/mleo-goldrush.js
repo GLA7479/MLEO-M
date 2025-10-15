@@ -553,39 +553,35 @@ useEffect(() => {
             <p className="text-white/70 text-sm">Dig for treasures • Avoid skulls!</p>
           </div>
 
-          <div
-            ref={metersRef}
-            className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md"
-          >
-            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
-              <div className="text-xs text-white/60 mb-1">Vault</div>
-              <div className="text-lg font-bold text-emerald-400">
+          <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Vault</div>
+              <div className="text-sm font-bold text-emerald-400">
                 {fmt(vault)}
               </div>
             </div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
-              <div className="text-xs text-white/60 mb-1">Bet</div>
-              <div className="text-lg font-bold text-amber-400">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Bet</div>
+              <div className="text-sm font-bold text-amber-400">
                 {fmt(Number(betAmount))}
               </div>
             </div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
-              <div className="text-xs text-white/60 mb-1">Prize</div>
-              <div className="text-lg font-bold text-green-400">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Prize</div>
+              <div className="text-sm font-bold text-green-400">
                 {fmt(totalPrize)}
               </div>
             </div>
           </div>
 
-          <div
-            ref={infoRef}
-            className="mb-2 text-center text-xs text-white/70"
-          >
-            Dug: {dug.length}/{GRID_SIZE} • Treasures: {dug.filter(i => map[i] !== 'skull').length}
-          </div>
+          {/* GAME AREA - Everything inside --chart-h */}
+          <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
+            <div className="mb-1 text-center text-[10px] text-white/70">
+              Dug: {dug.length}/{GRID_SIZE} • Treasures: {dug.filter(i => map[i] !== 'skull').length}
+            </div>
 
-          {/* GRID — מתכונן לפי --cell/--gap */}
-          <div id="goldrush-grid-wrap" className="mb-2 w-full max-w-xs">
+            {/* GRID */}
+            <div id="goldrush-grid-wrap" className="w-full max-w-xs">
             <div
               className="grid grid-cols-5"
               style={{ gap: "var(--gap, 6px)", justifyContent: "center" }}
@@ -616,6 +612,7 @@ useEffect(() => {
                   </button>
                 );
               })}
+            </div>
             </div>
           </div>
 
