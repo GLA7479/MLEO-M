@@ -110,11 +110,11 @@ function PlayingCard({ card }) {
   const color = isRed ? "text-red-600" : "text-black";
   
   return (
-    <div className="w-10 h-14 rounded bg-white border border-gray-400 shadow p-0.5 relative">
-      <div className={`text-[7px] font-bold ${color} absolute top-0 left-0.5 leading-tight`}>
+    <div className="w-14 h-20 rounded bg-white border border-gray-400 shadow p-1 relative">
+      <div className={`text-xl font-bold ${color} absolute top-1 left-2 leading-tight`}>
         {card.value}
       </div>
-      <div className={`text-base ${color} flex items-center justify-center h-full`}>
+      <div className={`text-2xl ${color} flex items-center justify-center h-full`}>
         {card.suit}
       </div>
     </div>
@@ -295,8 +295,8 @@ export default function PokerPage() {
           </div>
 
           <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
-            <div className="mb-2" style={{ minHeight: '85px' }}><div className="text-xs text-white/60 mb-1 text-center">Community Cards</div><div className="flex gap-1 justify-center flex-wrap min-h-[60px]">{communityCards.map((card, i) => (<PlayingCard key={i} card={card} />))}</div></div>
-            <div className="mb-2" style={{ minHeight: '85px' }}><div className="text-xs text-white/60 mb-1 text-center">Your Cards</div><div className="flex gap-1 justify-center flex-wrap min-h-[60px]">{playerCards.map((card, i) => (<PlayingCard key={i} card={card} />))}</div></div>
+            <div className="mb-2" style={{ minHeight: '105px' }}><div className="text-xs text-white/60 mb-1 text-center">Community Cards</div><div className="flex gap-1 justify-center flex-wrap min-h-[80px]">{communityCards.map((card, i) => (<PlayingCard key={i} card={card} />))}</div></div>
+            <div className="mb-2" style={{ minHeight: '105px' }}><div className="text-xs text-white/60 mb-1 text-center">Your Cards</div><div className="flex gap-1 justify-center flex-wrap min-h-[80px]">{playerCards.map((card, i) => (<PlayingCard key={i} card={card} />))}</div></div>
             <div className="text-center" style={{ height: '28px' }}><div className={`text-base font-bold transition-opacity ${playerHand ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-yellow-400'}`}>{playerHand ? playerHand.hand : 'waiting'}</div></div>
           </div>
 

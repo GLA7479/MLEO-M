@@ -106,8 +106,8 @@ function canSplitCards(hand) {
 function PlayingCard({ card, hidden = false }) {
   if (hidden) {
     return (
-      <div className="w-10 h-14 rounded bg-gradient-to-br from-blue-600 to-blue-800 border border-white/30 flex items-center justify-center shadow">
-        <span className="text-lg">🂠</span>
+      <div className="w-14 h-20 rounded bg-gradient-to-br from-blue-600 to-blue-800 border border-white/30 flex items-center justify-center shadow">
+        <span className="text-2xl">🂠</span>
       </div>
     );
   }
@@ -116,11 +116,11 @@ function PlayingCard({ card, hidden = false }) {
   const color = isRed ? "text-red-600" : "text-black";
   
   return (
-    <div className="w-10 h-14 rounded bg-white border border-gray-400 shadow p-0.5 relative">
-      <div className={`text-[7px] font-bold ${color} absolute top-0 left-0.5 leading-tight`}>
+    <div className="w-14 h-20 rounded bg-white border border-gray-400 shadow p-1 relative">
+      <div className={`text-xl font-bold ${color} absolute top-1 left-2 leading-tight`}>
         {card.value}
       </div>
-      <div className={`text-base ${color} flex items-center justify-center h-full`}>
+      <div className={`text-2xl ${color} flex items-center justify-center h-full`}>
         {card.suit}
       </div>
     </div>
@@ -805,17 +805,17 @@ export default function BlackjackPage() {
           </div>
 
           <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
-            <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2" style={{ minHeight: '90px' }}>
+            <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2" style={{ minHeight: '110px' }}>
               <div className="text-xs text-white/60 mb-1">Dealer {gameState !== "betting" && gameState !== "insurance" && `(${dealerValue})`}</div>
-              <div className="flex gap-1 flex-wrap min-h-[60px]">
+              <div className="flex gap-1 flex-wrap min-h-[80px]">
                 {dealerHand.map((card, i) => (
                   <PlayingCard key={i} card={card} hidden={(gameState === "playing" || gameState === "insurance") && i === 1} />
                 ))}
               </div>
             </div>
-            <div className="bg-black/20 border border-white/10 rounded-lg p-3" style={{ minHeight: '90px' }}>
+            <div className="bg-black/20 border border-white/10 rounded-lg p-3" style={{ minHeight: '110px' }}>
               <div className="text-xs text-white/60 mb-1">You {gameState !== "betting" && gameState !== "insurance" && `(${playerValue})`} {isSplitGame && `- Hand ${currentSplitIndex + 1}/2`}</div>
-              <div className="flex gap-1 flex-wrap min-h-[60px]">
+              <div className="flex gap-1 flex-wrap min-h-[80px]">
                 {playerHand.map((card, i) => (
                   <PlayingCard key={i} card={card} />
                 ))}

@@ -68,11 +68,11 @@ function PlayingCard({ card }) {
   const color = isRed ? "text-red-600" : "text-black";
   
   return (
-    <div className="w-16 h-24 rounded-lg bg-white border-2 border-gray-400 shadow-lg p-1 relative flex items-center justify-center">
-      <div className={`text-[9px] font-bold ${color} absolute top-0.5 left-1 leading-tight`}>
+    <div className="w-24 h-36 rounded-lg bg-white border-2 border-gray-400 shadow-lg p-2 relative flex items-center justify-center">
+      <div className={`text-3xl font-bold ${color} absolute top-2 left-3 leading-tight`}>
         {card.rank}
       </div>
-      <div className={`text-2xl ${color}`}>
+      <div className={`text-6xl ${color}`}>
         {card.suit}
       </div>
     </div>
@@ -285,7 +285,7 @@ export default function HiLoPage() {
                 Streak: <span className="text-yellow-400 font-bold">{streak || 0}</span> • Multiplier: <span className="text-green-400 font-bold">×{(gameActive ? currentMultiplier : 1).toFixed(1)}</span>
               </div>
             </div>
-            <div className="flex justify-center gap-4 mb-2" style={{ minHeight: '100px' }}>
+            <div className="flex justify-center gap-4 mb-2" style={{ minHeight: '160px' }}>
               {currentCard && <PlayingCard card={currentCard} />}
               {nextCard && <PlayingCard card={nextCard} />}
             </div>
