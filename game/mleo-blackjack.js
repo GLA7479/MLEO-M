@@ -943,7 +943,35 @@ export default function BlackjackPage() {
           </div>
         )}
 
-        {showStats && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2><div className="space-y-3"><div className="grid grid-cols-2 gap-3"><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Hands</div><div className="text-xl font-bold">{stats.totalHands}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalHands > 0 ? ((stats.wins / stats.totalHands) * 100).toFixed(1) : 0}%</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Blackjacks</div><div className="text-lg font-bold text-yellow-400">{stats.blackjacks} 💎</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Doubles</div><div className="text-lg font-bold text-purple-400">{stats.doubles}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Splits</div><div className="text-lg font-bold text-pink-400">{stats.splits}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Surrenders</div><div className="text-lg font-bold text-gray-400">{stats.surrenders}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Bet</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalBet)}</div></div></div><div className="bg-gradient-to-r from-blue-500/10 to-yellow-500/10 border border-blue-500/30 rounded-lg p-4"><div className="text-sm font-semibold mb-2">🛡️ Insurance</div><div className="text-center"><div className="text-2xl font-bold text-blue-300">{stats.insuranceWins}W / {stats.insuranceLosses}L</div><div className="text-xs text-white/60 mt-1">Insurance Bets</div></div></div></div><button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+        {showStats && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+              <h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Hands</div><div className="text-xl font-bold">{stats.totalHands}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalHands > 0 ? ((stats.wins / stats.totalHands) * 100).toFixed(1) : 0}%</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Blackjacks</div><div className="text-lg font-bold text-yellow-400">{stats.blackjacks} 💎</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Doubles</div><div className="text-lg font-bold text-purple-400">{stats.doubles}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Splits</div><div className="text-lg font-bold text-pink-400">{stats.splits}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Surrenders</div><div className="text-lg font-bold text-gray-400">{stats.surrenders}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Bet</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalBet)}</div></div>
+                </div>
+                <div className="bg-gradient-to-r from-blue-500/10 to-yellow-500/10 border border-blue-500/30 rounded-lg p-4">
+                  <div className="text-sm font-semibold mb-2">🛡️ Insurance</div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-300">{stats.insuranceWins}W / {stats.insuranceLosses}L</div>
+                    <div className="text-xs text-white/60 mt-1">Insurance Bets</div>
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
+            </div>
+          </div>
+        )}
 
         {showVaultModal && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
