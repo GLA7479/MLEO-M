@@ -755,7 +755,7 @@ export default function Plinko2Page() {
                 setBetAmount(String(newBet));
                 playSfx(clickSound.current);
               }}
-              className="w-12 h-8 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold text-xs shadow-md transition-all"
+              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
             >
               1K
             </button>
@@ -769,7 +769,7 @@ export default function Plinko2Page() {
                 setBetAmount(String(newBet));
                 playSfx(clickSound.current);
               }}
-              className="w-12 h-8 rounded-lg bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-bold text-xs shadow-md transition-all"
+              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
             >
               10K
             </button>
@@ -783,7 +783,7 @@ export default function Plinko2Page() {
                 setBetAmount(String(newBet));
                 playSfx(clickSound.current);
               }}
-              className="w-12 h-8 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold text-xs shadow-md transition-all"
+              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
             >
               100K
             </button>
@@ -797,7 +797,7 @@ export default function Plinko2Page() {
                 setBetAmount(String(newBet));
                 playSfx(clickSound.current);
               }}
-              className="w-12 h-8 rounded-lg bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-bold text-xs shadow-md transition-all"
+              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
             >
               1M
             </button>
@@ -837,6 +837,16 @@ export default function Plinko2Page() {
               className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
             >
               +
+            </button>
+            <button
+              onClick={() => {
+                setBetAmount(String(MIN_BET));
+                playSfx(clickSound.current);
+              }}
+              className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50"
+              title="Reset to minimum bet"
+            >
+              ↺
             </button>
           </div>
 

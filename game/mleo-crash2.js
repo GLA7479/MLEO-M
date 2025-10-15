@@ -112,6 +112,14 @@ function fmt(n) {
   if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
   return Math.floor(n).toString();
 }
+
+function formatBetDisplay(n) {
+  const num = Number(n) || 0;
+  if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M";
+  if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K";
+  return num.toString();
+}
+
 function shortAddr(addr) {
   if (!addr || addr.length < 10) return addr || "";
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -148,7 +156,6 @@ export default function Crash2Page() {
   const wrapRef = useRef(null);
   const headerRef = useRef(null);
   const metersRef = useRef(null);
-  const infoRef = useRef(null);
   const betRef = useRef(null);
   const ctaRef = useRef(null);
 
@@ -164,6 +171,7 @@ export default function Crash2Page() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000");
+  const [isEditingBet, setIsEditingBet] = useState(false);
   const [autoCashOut, setAutoCashOut] = useState("2.00");
   const [enableAutoCashOut, setEnableAutoCashOut] = useState(false);
 
@@ -287,7 +295,6 @@ export default function Crash2Page() {
       const used =
         headH +
         (metersRef.current?.offsetHeight || 0) +
-        (infoRef.current?.offsetHeight || 0) +
         (betRef.current?.offsetHeight || 0) +
         (ctaRef.current?.offsetHeight || 0) +
         topPad +
@@ -647,17 +654,17 @@ export default function Crash2Page() {
 
         {/* MAIN BODY */}
         <div
-          className="relative h-full flex flex-col items-center justify-center px-4 pb-16 mt-8"
+          className="relative h-full flex flex-col items-center justify-start px-4 pb-4"
           style={{
             minHeight: "100%",
             paddingTop: "calc(var(--head-h, 56px) + 8px)",
           }}
         >
-          <div className="text-center mb-3" style={{ minHeight: "80px" }}>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">
+          <div className="text-center mb-1">
+            <h1 className="text-2xl font-extrabold text-white mb-0.5">
               🚀 Crash
             </h1>
-            <p className="text-white/70 text-sm" style={{ minHeight: "20px" }}>
+            <p className="text-white/70 text-xs">
               {phase === "betting"
                 ? `Betting ${countdown}s`
                 : phase === "running"
@@ -670,44 +677,36 @@ export default function Crash2Page() {
 
           <div
             ref={metersRef}
-            className="grid grid-cols-3 gap-2 mb-3 w-full max-w-md"
+            className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md"
           >
-            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
-              <div className="text-xs text-white/60 mb-1">Vault</div>
-              <div className="text-lg font-bold text-emerald-400">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Vault</div>
+              <div className="text-sm font-bold text-emerald-400">
                 {fmt(vault)}
               </div>
             </div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
-              <div className="text-xs text-white/60 mb-1">Bet</div>
-              <div className="text-lg font-bold text-amber-400">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Bet</div>
+              <div className="text-sm font-bold text-amber-400">
                 {fmt(playerBet ? playerBet.amount : Number(betAmount))}
               </div>
             </div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center">
-              <div className="text-xs text-white/60 mb-1">Win</div>
-              <div className="text-lg font-bold text-green-400">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Win</div>
+              <div className="text-sm font-bold text-green-400">
                 {fmt(payoutAmount || potentialWin)}
               </div>
             </div>
           </div>
 
-          <div
-            ref={infoRef}
-            className="mb-2 text-center text-xs text-white/70"
-            style={{ minHeight: "20px" }}
-          >
-            Round #{nonce} • {phase === "betting" ? "Placing bets..." : phase === "running" ? `Flying ${multiplier.toFixed(2)}x` : `Crashed @ ${crashPoint?.toFixed(2)}x`}
-          </div>
-
           {/* CHART */}
           <div
             id="crash-chart-wrap"
-            className="mb-3 w-full max-w-md"
-            style={{ height: "var(--chart-h, 200px)", minHeight: "200px" }}
+            className="mb-1 w-full max-w-md"
+            style={{ height: "var(--chart-h, 200px)" }}
           >
-            <div className="relative w-full h-full bg-black/30 border border-white/10 rounded-lg p-4 flex items-center justify-center">
-              <div className="relative w-full h-full">
+            <div className="relative w-full h-full bg-black/30 border border-white/10 rounded-lg p-2 pb-1 flex flex-col">
+              <div className="relative flex-1 w-full">
                 <div 
                   className="absolute top-2 left-2 z-10 text-4xl font-bold text-white"
                   style={{ opacity: phase === "betting" ? 0 : 1, transition: "opacity 0.3s" }}
@@ -736,11 +735,70 @@ export default function Crash2Page() {
                   />
                 </svg>
               </div>
+              <div className="text-center text-xs text-white/60 -mt-4">
+                Round #{nonce} • {phase === "betting" ? "Placing bets..." : phase === "running" ? `Flying ${multiplier.toFixed(2)}x` : `Crashed @ ${crashPoint?.toFixed(2)}x`}
+              </div>
             </div>
           </div>
 
-          <div ref={betRef} className="w-full max-w-md mb-3 space-y-2" style={{ minHeight: "100px" }}>
-            <div className="flex items-center justify-center gap-2">
+          <div ref={betRef} className="w-full max-w-md mb-1 space-y-2">
+            <div className="flex items-center justify-center gap-1 flex-wrap">
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = current === MIN_BET 
+                    ? Math.min(vault, 1000)
+                    : Math.min(vault, current + 1000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              >
+                1K
+              </button>
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = current === MIN_BET 
+                    ? Math.min(vault, 10000)
+                    : Math.min(vault, current + 10000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              >
+                10K
+              </button>
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = current === MIN_BET 
+                    ? Math.min(vault, 100000)
+                    : Math.min(vault, current + 100000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              >
+                100K
+              </button>
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = current === MIN_BET 
+                    ? Math.min(vault, 1000000)
+                    : Math.min(vault, current + 1000000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              >
+                1M
+              </button>
               <button
                 onClick={() => {
                   const current = Number(betAmount) || MIN_BET;
@@ -749,17 +807,25 @@ export default function Crash2Page() {
                   playSfx(clickSound.current);
                 }}
                 disabled={phase !== "betting" || playerBet}
-                className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
+                className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
               >
                 −
               </button>
               <input
-                type="number"
-                value={betAmount}
-                onChange={(e) => setBetAmount(e.target.value)}
+                type="text"
+                value={isEditingBet ? betAmount : formatBetDisplay(betAmount)}
+                onFocus={() => setIsEditingBet(true)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  setBetAmount(val || '0');
+                }}
+                onBlur={() => {
+                  setIsEditingBet(false);
+                  const current = Number(betAmount) || MIN_BET;
+                  setBetAmount(String(Math.max(MIN_BET, current)));
+                }}
                 disabled={phase !== "betting" || playerBet}
-                className="w-32 h-12 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-sm"
-                min={MIN_BET}
+                className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs"
               />
               <button
                 onClick={() => {
@@ -769,9 +835,20 @@ export default function Crash2Page() {
                   playSfx(clickSound.current);
                 }}
                 disabled={phase !== "betting" || playerBet}
-                className="h-12 w-12 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-50"
+                className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
               >
                 +
+              </button>
+              <button
+                onClick={() => {
+                  setBetAmount(String(MIN_BET));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50"
+                title="Reset to minimum bet"
+              >
+                ↺
               </button>
             </div>
             <div className="flex items-center justify-center gap-2">
