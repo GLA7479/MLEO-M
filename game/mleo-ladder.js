@@ -548,7 +548,7 @@ useEffect(() => {
 
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">
-              🪜 Multiplier Ladder
+              🪜 Ladder
             </h1>
             <p className="text-white/70 text-xs">Climb higher • Win bigger!</p>
           </div>
@@ -577,12 +577,7 @@ useEffect(() => {
             </div>
           </div>
 
-          <div
-            ref={infoRef}
-            className="mb-2 text-center text-xs text-white/70"
-          >
-            Step: {currentStep}/{MULTIPLIERS.length} • Multiplier: {currentStep > 0 ? `×${MULTIPLIERS[currentStep - 1]}` : '×1'}
-          </div>
+          <div ref={infoRef} style={{ display: 'none' }}></div>
 
           {/* LADDER STEPS — מתכוננים לפי --step-h/--step-w/--step-gap */}
           <div id="ladder-steps-wrap" className="mb-1 w-full max-w-xs flex flex-col-reverse items-center" style={{ gap: "var(--step-gap, 4px)" }}>
@@ -613,14 +608,14 @@ useEffect(() => {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
-            <input type="text" value={isEditingBet ? betAmount : formatBetDisplay(betAmount)} onFocus={() => setIsEditingBet(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setBetAmount(val || '0'); }} onBlur={() => { setIsEditingBet(false); const current = Number(betAmount) || MIN_BET; setBetAmount(String(Math.max(MIN_BET, current))); }} disabled={gameActive} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs" />
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
-            <button onClick={() => { setBetAmount(String(MIN_BET)); playSfx(clickSound.current); }} disabled={gameActive} className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50" title="Reset to minimum bet">↺</button>
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
+            <input type="text" value={isEditingBet ? betAmount : formatBetDisplay(betAmount)} onFocus={() => setIsEditingBet(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setBetAmount(val || '0'); }} onBlur={() => { setIsEditingBet(false); const current = Number(betAmount) || MIN_BET; setBetAmount(String(Math.max(MIN_BET, current))); }} disabled={gameActive || gameResult} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs" />
+            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
+            <button onClick={() => { setBetAmount(String(MIN_BET)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50" title="Reset to minimum bet">↺</button>
           </div>
 
           <div
@@ -628,29 +623,16 @@ useEffect(() => {
             className="flex flex-col gap-3 w-full max-w-sm"
             style={{ minHeight: "140px" }}
           >
-            {gameActive && currentStep > 0 && currentStep < MULTIPLIERS.length && (
-              <button
-                onClick={cashOut}
-                className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg hover:brightness-110 transition-all"
-              >
-                💰 CASH OUT {fmt(currentPrize)}
+            {gameActive ? (
+              <div className="w-full flex gap-1">
+                <button onClick={cashOut} disabled={currentStep === 0 || currentStep >= MULTIPLIERS.length} className="flex-1 h-12 rounded-lg font-bold text-xs bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30">CASH OUT</button>
+                <button onClick={climbStep} disabled={currentStep >= MULTIPLIERS.length} className="flex-1 h-12 rounded-lg font-bold text-xs bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30">CLIMB</button>
+              </div>
+            ) : (
+              <button onClick={gameResult ? resetGame : () => startGame(false)} className="w-full h-12 rounded-lg font-bold text-base bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all">
+                {gameResult ? "PLAY AGAIN" : "START"}
               </button>
             )}
-            <button
-              onClick={
-                gameActive ? climbStep : gameResult ? resetGame : () => startGame(false)
-              }
-              disabled={gameActive && currentStep >= MULTIPLIERS.length}
-              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
-            >
-              {gameActive
-                ? currentStep >= MULTIPLIERS.length
-                  ? "MAX REACHED!"
-                  : `🪜 CLIMB (${Math.round((0.65 - currentStep * 0.05) * 100)}%)`
-                : gameResult
-                ? "PLAY AGAIN"
-                : "START"}
-            </button>
             <div className="flex gap-2">
               <button
                 onClick={() => {

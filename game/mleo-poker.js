@@ -125,6 +125,10 @@ export default function PokerPage() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);
+  const headerRef = useRef(null);
+  const metersRef = useRef(null);
+  const betRef = useRef(null);
+  const ctaRef = useRef(null);
   const { openConnectModal } = useConnectModal();
   const { openAccountModal } = useAccountModal();
   const { address, isConnected } = useAccount();
