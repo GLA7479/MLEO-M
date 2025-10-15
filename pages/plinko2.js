@@ -4,3 +4,4 @@ export default function Plinko2Page() {
   return <Plinko2Game />;
 }
 
+

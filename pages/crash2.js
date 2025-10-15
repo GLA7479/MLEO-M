@@ -4,3 +4,4 @@ export default function Crash2Page() {
   return <Crash2Game />;
 }
 
+
