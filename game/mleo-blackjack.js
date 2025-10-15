@@ -293,16 +293,16 @@ export default function BlackjackPage() {
       // Player blackjack wins
       setTimeout(() => finishGame(player, dealer, bet, true), 500);
       setGameState("finished");
-      return;
-    }
+        return;
+      }
 
     // Check if dealer has Ace showing - offer insurance
     if (dealerUpCard.value === "A") {
       setShowInsurance(true);
       setGameState("insurance");
-      return;
-    }
-
+        return;
+      }
+      
     // Check if dealer has 10/J/Q/K - check for blackjack immediately
     if (getCardValue(dealerUpCard) === 10) {
       if (checkDealerBlackjack(dealer, player, bet)) {
@@ -392,7 +392,7 @@ export default function BlackjackPage() {
   const doubleDown = () => {
     if (!canDouble || gameState !== "playing") return;
     playSfx(clickSound.current);
-    
+
     const bet = Number(betAmount);
     const currentVault = getVault();
     
@@ -431,7 +431,7 @@ export default function BlackjackPage() {
   const split = () => {
     if (!canSplit || gameState !== "playing") return;
     playSfx(clickSound.current);
-    
+
     const bet = Number(betAmount);
     const currentVault = getVault();
     
@@ -585,9 +585,9 @@ export default function BlackjackPage() {
       surrender: true
     });
 
-    const newStats = { 
-      ...stats, 
-      totalHands: stats.totalHands + 1, 
+    const newStats = {
+      ...stats,
+      totalHands: stats.totalHands + 1,
       losses: stats.losses + 1,
       surrenders: stats.surrenders + 1,
       totalBet: stats.totalBet + bet,
@@ -736,8 +736,8 @@ export default function BlackjackPage() {
 
   const newHand = () => { 
     setGameState("betting"); 
-    setPlayerHand([]); 
-    setDealerHand([]); 
+    setPlayerHand([]);
+    setDealerHand([]);
     setGameResult(null); 
     setShowResultPopup(false);
     setCanDouble(false);
@@ -773,9 +773,9 @@ export default function BlackjackPage() {
             <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
               <button onClick={() => { playSfx(clickSound.current); const el = wrapRef.current || document.documentElement; if (!document.fullscreenElement) { el.requestFullscreen?.().catch(() => {}); } else { document.exitFullscreen?.().catch(() => {}); } }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFullscreen ? "EXIT" : "FULL"}</button>
               <button onClick={() => { playSfx(clickSound.current); setMenuOpen(true); }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">MENU</button>
-            </div>
-          </div>
-        </div>
+                  </div>
+                </div>
+              </div>
 
         <div className="relative h-full flex flex-col items-center justify-center px-4 pb-16 pt-14 overflow-y-auto" style={{ minHeight: '100%' }}>
           <div className="text-center mb-3"><h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">♠️ Blackjack Pro</h1><p className="text-white/70 text-sm">Professional Blackjack • All Features!</p></div>
@@ -783,7 +783,7 @@ export default function BlackjackPage() {
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Vault</div><div className="text-lg font-bold text-emerald-400">{fmt(vault)}</div></div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Bet</div><div className="text-lg font-bold text-amber-400">{fmt(Number(betAmount))}</div></div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 text-center"><div className="text-xs text-white/60 mb-1">Win</div><div className="text-lg font-bold text-green-400">{fmt(potentialWin)}</div></div>
-          </div>
+                  </div>
                 
           <div className="mb-3 w-full max-w-md" style={{ minHeight: '280px' }}>
             <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2" style={{ minHeight: '90px' }}>
@@ -791,17 +791,17 @@ export default function BlackjackPage() {
               <div className="flex gap-1 flex-wrap min-h-[60px]">
                 {dealerHand.map((card, i) => (
                   <PlayingCard key={i} card={card} hidden={(gameState === "playing" || gameState === "insurance") && i === 1} />
-                ))}
-              </div>
-            </div>
+                  ))}
+                </div>
+                            </div>
             <div className="bg-black/20 border border-white/10 rounded-lg p-3" style={{ minHeight: '90px' }}>
               <div className="text-xs text-white/60 mb-1">You {gameState !== "betting" && gameState !== "insurance" && `(${playerValue})`} {isSplitGame && `- Hand ${currentSplitIndex + 1}/2`}</div>
               <div className="flex gap-1 flex-wrap min-h-[60px]">
                 {playerHand.map((card, i) => (
                   <PlayingCard key={i} card={card} />
-                ))}
-              </div>
-            </div>
+                          ))}
+                          </div>
+                        </div>
             <div className="text-center mt-2" style={{ height: '28px' }}>
               <div className={`text-base font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : gameResult?.push ? 'text-yellow-400' : 'text-red-400'}`}>
                 {gameResult ? (
@@ -812,20 +812,10 @@ export default function BlackjackPage() {
                   gameResult.win ? 'YOU WIN!' : 
                   'DEALER WINS'
                 ) : 'waiting'}
+                  </div>
               </div>
             </div>
-          </div>
 
-          {showInsurance && (
-            <div className="mb-3 w-full max-w-md bg-yellow-500/10 border-2 border-yellow-500/50 rounded-xl p-4 text-center animate-pulse">
-              <div className="text-lg font-bold text-yellow-300 mb-2">🛡️ Insurance?</div>
-              <div className="text-sm text-white/80 mb-3">Dealer has Ace. Protect against Blackjack?</div>
-              <div className="flex gap-2">
-                <button onClick={takeInsurance} className="flex-1 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold">YES ({fmt(Math.floor(Number(betAmount) / 2))})</button>
-                <button onClick={declineInsurance} className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold">NO</button>
-              </div>
-            </div>
-          )}
 
           <div className="flex items-center gap-2 mb-3" style={{ minHeight: '48px' }}>
             {gameState === "betting" && (
@@ -842,27 +832,27 @@ export default function BlackjackPage() {
               <div className="flex gap-2">
                 <button onClick={hit} className="flex-1 py-2 rounded-lg font-bold text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:brightness-110">HIT</button>
                 <button onClick={() => stand()} className="flex-1 py-2 rounded-lg font-bold text-sm bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:brightness-110">STAND</button>
-              </div>
+                    </div>
             )}
             {gameState === "playing" && (canDouble || canSplit || canSurrender) && (
               <div className="flex gap-2">
                 {canDouble && <button onClick={doubleDown} className="flex-1 py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:brightness-110">DOUBLE</button>}
                 {canSplit && <button onClick={split} className="flex-1 py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-lg hover:brightness-110">SPLIT</button>}
                 {canSurrender && <button onClick={surrender} className="flex-1 py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg hover:brightness-110">SURRENDER</button>}
-              </div>
-            )}
+                </div>
+              )}
             {(gameState === "betting" || gameState === "finished" || gameState === "dealer") && (
               <button onClick={gameState === "betting" ? () => dealCards(false) : newHand} disabled={gameState === "dealer"} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
                 {gameState === "dealer" ? "Dealing..." : gameState === "finished" ? "NEW HAND" : "DEAL"}
-              </button>
-            )}
+                </button>
+              )}
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>
               <button onClick={() => { setShowVaultModal(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all">💰 Vault</button>
             </div>
-          </div>
-        </div>
+              </div>
+            </div>
 
         {showResultPopup && gameResult && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
@@ -875,13 +865,13 @@ export default function BlackjackPage() {
                  gameResult.win ? 'YOU WIN!' : 
                  gameResult.push ? 'PUSH' : 
                  'DEALER WINS'}
-              </div>
+                </div>
               <div className="text-lg">{gameResult.win || gameResult.push ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div>
               {!gameResult.surrender && !gameResult.split && <div className="text-sm opacity-80 mt-2">You: {gameResult.playerValue} • Dealer: {gameResult.dealerValue}</div>}
               {gameResult.insurance && <div className="text-sm opacity-80 mt-1">🛡️ Insurance Paid!</div>}
-            </div>
-          </div>
-        )}
+                </div>
+              </div>
+            )}
 
         {menuOpen && (
           <div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}>
@@ -891,7 +881,7 @@ export default function BlackjackPage() {
               <div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div>
               <div className="mt-4 text-xs opacity-70"><p>Blackjack Pro v3.0</p></div>
             </div>
-          </div>
+              </div>
         )}
 
         {showHowToPlay && (
@@ -916,12 +906,12 @@ export default function BlackjackPage() {
                     <p>• Win: ×2</p>
                     <p>• Push: Money back</p>
                     <p>• Insurance: ×2 (if dealer BJ)</p>
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
+            </div>
             </div>
           </div>
+              <button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
+          </div>
+        </div>
         )}
 
         {showStats && (
@@ -940,19 +930,19 @@ export default function BlackjackPage() {
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalBet)}</div></div>
-                </div>
+              </div>
                 <div className="bg-gradient-to-r from-blue-500/10 to-yellow-500/10 border border-blue-500/30 rounded-lg p-4">
                   <div className="text-sm font-semibold mb-2">🛡️ Insurance</div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-blue-300">{stats.insuranceWins}W / {stats.insuranceLosses}L</div>
                     <div className="text-xs text-white/60 mt-1">Insurance Bets</div>
-                  </div>
-                </div>
               </div>
+                  </div>
+                  </div>
               <button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
-            </div>
-          </div>
-        )}
+                </div>
+                </div>
+              )}
 
         {showVaultModal && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
@@ -971,6 +961,20 @@ export default function BlackjackPage() {
                 <div className="text-xs text-white/60"><p>• Your vault is shared across all MLEO games</p><p>• Collect earnings to your wallet anytime</p><p>• Network: BSC Testnet (TBNB)</p></div>
               </div>
               <button onClick={() => setShowVaultModal(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
+            </div>
+                </div>
+              )}
+
+        {showInsurance && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-yellow-500/20 border-2 border-yellow-500/50 rounded-xl p-6 text-center max-w-md w-full shadow-2xl animate-pulse">
+              <div className="text-2xl font-bold text-yellow-300 mb-3">🛡️ Insurance?</div>
+              <div className="text-base text-white/90 mb-3">Dealer has Ace. Protect against Blackjack?</div>
+              <div className="text-sm text-white/70 mb-4">Cost: {fmt(Math.floor(Number(betAmount) / 2))} MLEO</div>
+              <div className="flex gap-3">
+                <button onClick={takeInsurance} className="flex-1 py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold">YES</button>
+                <button onClick={declineInsurance} className="flex-1 py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold">NO</button>
+              </div>
             </div>
           </div>
         )}
