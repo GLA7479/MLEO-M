@@ -105,6 +105,13 @@ function fmt(n) {
   if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
   return Math.floor(n).toString();
 }
+
+function formatBetDisplay(n) {
+  const num = Number(n) || 0;
+  if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M";
+  if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K";
+  return num.toString();
+}
 function shortAddr(addr) {
   if (!addr || addr.length < 10) return addr || "";
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -134,6 +141,7 @@ export default function Plinko2Page() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000");
+  const [isEditingBet, setIsEditingBet] = useState(false);
   const [ballsDropping, setBallsDropping] = useState(0);
 
   // Game state
@@ -736,7 +744,63 @@ export default function Plinko2Page() {
             />
           </div>
 
-          <div ref={betRef} className="flex items-center justify-center gap-2 mb-1">
+          <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
+            <button
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                // If at default (1000), SET the amount. Otherwise ADD to it.
+                const newBet = current === MIN_BET 
+                  ? Math.min(vault, 1000)
+                  : Math.min(vault, current + 1000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              className="w-12 h-8 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold text-xs shadow-md transition-all"
+            >
+              1K
+            </button>
+            <button
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                // If at default (1000), SET the amount. Otherwise ADD to it.
+                const newBet = current === MIN_BET 
+                  ? Math.min(vault, 10000)
+                  : Math.min(vault, current + 10000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              className="w-12 h-8 rounded-lg bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-bold text-xs shadow-md transition-all"
+            >
+              10K
+            </button>
+            <button
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                // If at default (1000), SET the amount. Otherwise ADD to it.
+                const newBet = current === MIN_BET 
+                  ? Math.min(vault, 100000)
+                  : Math.min(vault, current + 100000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              className="w-12 h-8 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold text-xs shadow-md transition-all"
+            >
+              100K
+            </button>
+            <button
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                // If at default (1000), SET the amount. Otherwise ADD to it.
+                const newBet = current === MIN_BET 
+                  ? Math.min(vault, 1000000)
+                  : Math.min(vault, current + 1000000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              className="w-12 h-8 rounded-lg bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-bold text-xs shadow-md transition-all"
+            >
+              1M
+            </button>
             <button
               onClick={() => {
                 const current = Number(betAmount) || MIN_BET;
@@ -749,11 +813,19 @@ export default function Plinko2Page() {
               −
             </button>
             <input
-              type="number"
-              value={betAmount}
-              onChange={(e) => setBetAmount(e.target.value)}
-              className="w-24 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs"
-              min={MIN_BET}
+              type="text"
+              value={isEditingBet ? betAmount : formatBetDisplay(betAmount)}
+              onFocus={() => setIsEditingBet(true)}
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                setBetAmount(val || '0');
+              }}
+              onBlur={() => {
+                setIsEditingBet(false);
+                const current = Number(betAmount) || MIN_BET;
+                setBetAmount(String(Math.max(MIN_BET, current)));
+              }}
+              className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs"
             />
             <button
               onClick={() => {
