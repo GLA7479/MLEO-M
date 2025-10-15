@@ -805,7 +805,7 @@ export default function BlackjackPage() {
           </div>
 
           <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
-            <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2" style={{ minHeight: '120px' }}>
+            <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2" style={{ minHeight: '90px' }}>
               <div className="text-xs text-white/60 mb-1">Dealer {gameState !== "betting" && gameState !== "insurance" && `(${dealerValue})`}</div>
               <div className="flex gap-1 flex-wrap min-h-[60px]">
                 {dealerHand.map((card, i) => (
@@ -813,7 +813,7 @@ export default function BlackjackPage() {
                 ))}
               </div>
             </div>
-            <div className="bg-black/20 border border-white/10 rounded-lg p-3" style={{ minHeight: '120px' }}>
+            <div className="bg-black/20 border border-white/10 rounded-lg p-3" style={{ minHeight: '90px' }}>
               <div className="text-xs text-white/60 mb-1">You {gameState !== "betting" && gameState !== "insurance" && `(${playerValue})`} {isSplitGame && `- Hand ${currentSplitIndex + 1}/2`}</div>
               <div className="flex gap-1 flex-wrap min-h-[60px]">
                 {playerHand.map((card, i) => (
