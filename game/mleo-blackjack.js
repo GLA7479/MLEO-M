@@ -849,14 +849,14 @@ export default function BlackjackPage() {
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: "140px" }}>
             {gameState === "playing" ? (
               <div className="w-full flex gap-1">
-                <button onClick={hit} className="flex-1 py-3 rounded-lg font-bold text-xs bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:brightness-110">HIT</button>
-                <button onClick={() => stand()} className="flex-1 py-3 rounded-lg font-bold text-xs bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:brightness-110">STAND</button>
-                <button onClick={doubleDown} disabled={!canDouble} className="flex-1 py-3 rounded-lg font-bold text-[10px] bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed">DOUBLE</button>
-                <button onClick={split} disabled={!canSplit} className="flex-1 py-3 rounded-lg font-bold text-[10px] bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed">SPLIT</button>
-                <button onClick={surrender} disabled={!canSurrender} className="flex-1 py-3 rounded-lg font-bold text-[10px] bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed">SURR</button>
+                <button onClick={hit} className="flex-1 h-12 rounded-lg font-bold text-xs bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:brightness-110">HIT</button>
+                <button onClick={() => stand()} className="flex-1 h-12 rounded-lg font-bold text-xs bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:brightness-110">STAND</button>
+                <button onClick={doubleDown} disabled={!canDouble} className="flex-1 h-12 rounded-lg font-bold text-[10px] bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed">DOUBLE</button>
+                <button onClick={split} disabled={!canSplit} className="flex-1 h-12 rounded-lg font-bold text-[10px] bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed">SPLIT</button>
+                <button onClick={surrender} disabled={!canSurrender} className="flex-1 h-12 rounded-lg font-bold text-[10px] bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed">SURR</button>
               </div>
             ) : (
-              <button onClick={gameState === "betting" ? () => dealCards(false) : newHand} disabled={gameState === "dealer"} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
+              <button onClick={gameState === "betting" ? () => dealCards(false) : newHand} disabled={gameState === "dealer"} className="w-full h-12 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
                 {gameState === "dealer" ? "Dealing..." : gameState === "finished" ? "NEW HAND" : "DEAL"}
               </button>
             )}
