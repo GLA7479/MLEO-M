@@ -107,12 +107,18 @@ function compareHands(playerHand, dealerHand) {
   return "tie";
 }
 
-function PlayingCard({ card }) {
+function PlayingCard({ card, delay = 0 }) {
   const isRed = card.suit === "♥️" || card.suit === "♦️";
   const color = isRed ? "text-red-600" : "text-black";
   
   return (
-    <div className="w-14 h-20 rounded bg-white border border-gray-400 shadow p-1 relative">
+    <div 
+      className="w-14 h-20 rounded bg-white border border-gray-400 shadow p-1 relative"
+      style={{
+        animation: `slideInCard 0.4s ease-out ${delay}ms both`,
+        opacity: 0
+      }}
+    >
       <div className={`text-xl font-bold ${color} absolute top-1 left-2 leading-tight`}>
         {card.value}
       </div>
@@ -230,16 +236,33 @@ export default function ThreeCardPokerPage() {
     const deck = shuffleDeck(createDeck());
     const player = [deck[0], deck[2], deck[4]];
     const dealer = [deck[1], deck[3], deck[5]];
-    setPlayerCards(player);
-    setDealerCards(dealer);
+    
+    // Clear cards first
+    setPlayerCards([]);
+    setDealerCards([]);
+    setPlayerHand(null);
+    setDealerHand(null);
     setGameState("showdown");
-
-    const playerEval = evaluateHand(player);
-    const dealerEval = evaluateHand(dealer);
-    setPlayerHand(playerEval);
-    setDealerHand(dealerEval);
-
-    setTimeout(() => finishGame(playerEval, dealerEval, bet), 500);
+    
+    // Deal cards one by one: Dealer → Player → Dealer → Player → Dealer → Player
+    setTimeout(() => setDealerCards([dealer[0]]), 400);
+    setTimeout(() => setPlayerCards([player[0]]), 800);
+    setTimeout(() => setDealerCards([dealer[0], dealer[1]]), 1200);
+    setTimeout(() => setPlayerCards([player[0], player[1]]), 1600);
+    setTimeout(() => setDealerCards(dealer), 2000);
+    setTimeout(() => {
+      setPlayerCards(player);
+      
+      // Wait for last card animation + pause
+      setTimeout(() => {
+        const playerEval = evaluateHand(player);
+        const dealerEval = evaluateHand(dealer);
+        setPlayerHand(playerEval);
+        setDealerHand(dealerEval);
+        
+        setTimeout(() => finishGame(playerEval, dealerEval, bet), 800);
+      }, 1400);
+    }, 2400);
   };
 
   const finishGame = (playerEval, dealerEval, bet) => {
@@ -278,6 +301,18 @@ export default function ThreeCardPokerPage() {
 
   return (
     <Layout>
+      <style jsx>{`
+        @keyframes slideInCard {
+          from {
+            opacity: 0;
+            transform: translateX(-50px) scale(0.8);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+          }
+        }
+      `}</style>
       <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-pink-900" style={{ height: '100svh' }}>
         <div className="absolute inset-0 opacity-10"><div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} /></div>
         <div ref={headerRef} className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
@@ -318,7 +353,7 @@ export default function ThreeCardPokerPage() {
               <div className="text-xs text-white/60 mb-1">Dealer {dealerHand && `(${dealerHand.hand})`}</div>
               <div className="flex gap-1 flex-wrap min-h-[80px]">
                 {dealerCards.map((card, i) => (
-                  <PlayingCard key={i} card={card} />
+                  <PlayingCard key={i} card={card} delay={i * 200} />
                 ))}
               </div>
             </div>
@@ -326,7 +361,7 @@ export default function ThreeCardPokerPage() {
               <div className="text-xs text-white/60 mb-1">You {playerHand && `(${playerHand.hand})`}</div>
               <div className="flex gap-1 flex-wrap min-h-[80px]">
                 {playerCards.map((card, i) => (
-                  <PlayingCard key={i} card={card} />
+                  <PlayingCard key={i} card={card} delay={i * 200} />
                 ))}
               </div>
             </div>

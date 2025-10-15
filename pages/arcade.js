@@ -334,16 +334,25 @@ export default function ArcadeHub() {
       href: "/three-card-poker",
       color: "#EC4899",
     },
-    // 8. Multiplier Ladder - NEW!
+    // 8. Ultimate Texas Hold'em - NEW!
     {
-      title: "Multiplier Ladder",
+      title: "Ultimate Poker",
+      emoji: "🃏",
+      description: "Texas Hold'em strategy! Raise 4X, 2X, or 1X at different stages. Beat the dealer!",
+      prize: "×500",
+      href: "/ultimate-poker",
+      color: "#6366F1",
+    },
+    // 9. Multiplier Ladder
+    {
+      title: "Ladder",
       emoji: "🪜",
       description: "Climb the ladder! Choose left or right to climb higher - cash out before you fall!",
       prize: "×20",
       href: "/ladder",
       color: "#9333EA",
     },
-    // 9. Bomb Squad - NEW!
+    // 10. Bomb Squad - NEW!
     {
       title: "Bomb Squad",
       emoji: "💣",
@@ -352,7 +361,7 @@ export default function ArcadeHub() {
       href: "/bomb",
       color: "#DC2626",
     },
-    // 10. Mystery Box - NEW!
+    // 11. Mystery Box - NEW!
     {
       title: "Mystery Box",
       emoji: "🎁",
@@ -361,7 +370,7 @@ export default function ArcadeHub() {
       href: "/mystery",
       color: "#F59E0B",
     },
-    // 11. Lucky Chamber - NEW!
+    // 12. Lucky Chamber - NEW!
     {
       title: "Lucky Chamber",
       emoji: "🔫",
@@ -370,7 +379,7 @@ export default function ArcadeHub() {
       href: "/chamber",
       color: "#64748B",
     },
-    // 12. Horse Racing - NEW!
+    // 13. Horse Racing - NEW!
     {
       title: "Horse Racing",
       emoji: "🏇",
@@ -379,7 +388,7 @@ export default function ArcadeHub() {
       href: "/horse",
       color: "#16A34A",
     },
-    // 13. Target Shooter - NEW!
+    // 14. Target Shooter - NEW!
     {
       title: "Target Shooter",
       emoji: "🏹",
@@ -388,7 +397,7 @@ export default function ArcadeHub() {
       href: "/shooter",
       color: "#EA580C",
     },
-    // 14. Sic Bo - NEW!
+    // 15. Sic Bo - NEW!
     {
       title: "Sic Bo",
       emoji: "🀄",
@@ -397,7 +406,7 @@ export default function ArcadeHub() {
       href: "/sicbo",
       color: "#B91C1C",
     },
-    // 15. Gold Rush Digger - NEW!
+    // 16. Gold Rush Digger - NEW!
     {
       title: "Gold Rush Digger",
       emoji: "⛏️",
@@ -406,7 +415,7 @@ export default function ArcadeHub() {
       href: "/goldrush",
       color: "#D97706",
     },
-    // 16. Limbo - NEW!
+    // 17. Limbo - NEW!
     {
       title: "Limbo",
       emoji: "🔥",
@@ -415,7 +424,7 @@ export default function ArcadeHub() {
       href: "/limbo",
       color: "#6366F1",
     },
-    // 17. Dice Over/Under - NEW!
+    // 18. Dice Over/Under - NEW!
     {
       title: "Dice Over/Under",
       emoji: "⚄",
