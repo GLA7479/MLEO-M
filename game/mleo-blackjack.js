@@ -880,8 +880,8 @@ export default function BlackjackPage() {
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>
               <button onClick={() => { setShowVaultModal(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all">💰 Vault</button>
             </div>
-              </div>
-            </div>
+          </div>
+        </div>
 
         {showResultPopup && gameResult && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
@@ -898,9 +898,9 @@ export default function BlackjackPage() {
               <div className="text-lg">{gameResult.win || gameResult.push ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div>
               {!gameResult.surrender && !gameResult.split && <div className="text-sm opacity-80 mt-2">You: {gameResult.playerValue} • Dealer: {gameResult.dealerValue}</div>}
               {gameResult.insurance && <div className="text-sm opacity-80 mt-1">🛡️ Insurance Paid!</div>}
-                </div>
-              </div>
-            )}
+            </div>
+          </div>
+        )}
 
         {menuOpen && (
           <div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}>
@@ -910,7 +910,7 @@ export default function BlackjackPage() {
               <div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div>
               <div className="mt-4 text-xs opacity-70"><p>Blackjack Pro v3.0</p></div>
             </div>
-              </div>
+          </div>
         )}
 
         {showHowToPlay && (
