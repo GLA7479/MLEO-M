@@ -299,7 +299,7 @@ export default function UltimatePokerPage() {
     }
     
     setAnteBet(bet);
-    setBlindBet(bet);
+    setBlindBet(0);
     setPlayBet(0);
     setGameResult(null);
     
@@ -401,13 +401,13 @@ export default function UltimatePokerPage() {
       totalHands: stats.totalHands + 1,
       losses: stats.losses + 1,
       folds: stats.folds + 1,
-      totalBet: stats.totalBet + anteBet + blindBet
+      totalBet: stats.totalBet + anteBet + playBet
     };
     setStats(newStats);
     setGameResult({ 
       win: false, 
       fold: true,
-      profit: -(anteBet + blindBet),
+      profit: -(anteBet + playBet),
       message: "FOLDED"
     });
   };
@@ -471,38 +471,14 @@ export default function UltimatePokerPage() {
         const dealerQualifies = dealerBest.rank >= 2;
         
         if (!dealerQualifies) {
-          // Dealer doesn't qualify - Ante pushes, Play wins 1:1, Blind pushes unless player has bonus hand
-          if (playBet > 0) {
-            totalPrize += playBet * 2; // Play wins 1:1
-          }
-          totalPrize += anteBet; // Ante pushes
-          
-          // Blind bonus
-          const blindBonus = BLIND_BONUS[playerBest.hand] || 0;
-          if (blindBonus > 0) {
-            totalPrize += blindBet * (1 + blindBonus);
-          } else {
-            totalPrize += blindBet; // Blind pushes
-          }
-          
+          // Dealer doesn't qualify - Player wins
+          totalPrize = (anteBet + playBet) * 2;
           win = true;
         } else {
           // Dealer qualifies - compare hands
           if (playerBest.rank > dealerBest.rank) {
             // Player wins
-            totalPrize += anteBet * 2; // Ante wins 1:1
-            if (playBet > 0) {
-              totalPrize += playBet * 2; // Play wins 1:1
-            }
-            
-            // Blind bonus
-            const blindBonus = BLIND_BONUS[playerBest.hand] || 0;
-            if (blindBonus > 0) {
-              totalPrize += blindBet * (1 + blindBonus);
-            } else {
-              totalPrize += blindBet * 2; // Blind wins 1:1
-            }
-            
+            totalPrize = (anteBet + playBet) * 2;
             win = true;
           } else if (playerBest.rank === dealerBest.rank) {
             // Same rank - compare high cards
@@ -526,32 +502,21 @@ export default function UltimatePokerPage() {
             
             if (playerWins) {
               // Player wins on high card comparison
-              totalPrize += anteBet * 2; // Ante wins 1:1
-              if (playBet > 0) {
-                totalPrize += playBet * 2; // Play wins 1:1
-              }
-              
-              // Blind bonus
-              const blindBonus = BLIND_BONUS[playerBest.hand] || 0;
-              if (blindBonus > 0) {
-                totalPrize += blindBet * (1 + blindBonus);
-              } else {
-                totalPrize += blindBet * 2; // Blind wins 1:1
-              }
-              
+              totalPrize = (anteBet + playBet) * 2;
               win = true;
             } else if (dealerWins) {
               // Dealer wins on high card comparison - no prize
             } else {
               // Complete tie - all bets push
-              totalPrize += anteBet + blindBet + playBet;
+              totalPrize = anteBet + playBet;
               tie = true;
             }
           }
           // else: Player loses - totalPrize stays 0
         }
         
-        profit = totalPrize - (anteBet + blindBet + playBet);
+        profit = totalPrize - (anteBet + playBet);
+        const totalBetAmount = anteBet + playBet;
         
         if (totalPrize > 0) {
           const newVault = getVault() + totalPrize;
@@ -578,6 +543,7 @@ export default function UltimatePokerPage() {
           tie,
           profit,
           totalPrize,
+          totalBetAmount,
           playerHand: playerBest.hand,
           dealerHand: dealerBest.hand,
           dealerQualifies,
@@ -609,7 +575,7 @@ export default function UltimatePokerPage() {
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-black to-purple-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
 
   const totalBetAmount = anteBet + playBet;
-  const potentialWin = Math.floor(totalBetAmount * 6);
+  const potentialWin = totalBetAmount * 2;
 
   return (
     <Layout>
