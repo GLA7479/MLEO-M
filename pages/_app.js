@@ -13,11 +13,15 @@ const queryClient = new QueryClient();
 
 export default function App({ Component, pageProps }) {
   useEffect(() => {
-    // --- Register Service Worker (PWA install) ---
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
+    // --- Service Worker: disable in dev, enable in prod ---
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      if (process.env.NODE_ENV !== "production") {
+        navigator.serviceWorker.getRegistrations?.()
+          .then(regs => regs.forEach(r => r.unregister()))
+          .catch(() => {});
+      } else {
         navigator.serviceWorker.register("/sw.js").catch(() => {});
-      });
+      }
     }
 
     // --- iOS 100vh fix (שיהיה גובה מלא גם בספארי) ---
