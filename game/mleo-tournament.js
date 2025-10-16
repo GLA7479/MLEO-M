@@ -1,7 +1,8 @@
 // ============================================================================
-// MLEO Texas Hold'em Tournament
-// Based exactly on mleo-texas-holdem-multiplayer with tournament logic
+// MLEO Texas Hold'em Multiplayer - FULL GAME
+// Complete Texas Hold'em with all betting rounds and turn management
 // ============================================================================
+
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
@@ -193,7 +194,7 @@ export default function TournamentPage() {
   const [screen, setScreen] = useState("menu");
   const [playerName, setPlayerName] = useState("");
   const [roomCode, setRoomCode] = useState("");
-  const [maxPlayers, setMaxPlayers] = useState(6);
+  const [maxPlayers, setMaxPlayers] = useState(4);
   const [startingChips, setStartingChips] = useState(10000);
   const [error, setError] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
@@ -207,12 +208,18 @@ export default function TournamentPage() {
   
   // Betting logic states
   const [betAmount, setBetAmount] = useState("100");
-  const [maxEntryAmount] = useState(2000000);
+  const [maxEntryAmount] = useState(2000000); // 2M מקסימום
   const [showBetModal, setShowBetModal] = useState(false);
+  const [isAllIn, setIsAllIn] = useState(false);
   
-  // Tournament specific
-  const [isSpectating, setIsSpectating] = useState(false);
-  const [gameCountdown, setGameCountdown] = useState(0);
+  // Game result states
+  const [gameResult, setGameResult] = useState(null);
+  const [showResultModal, setShowResultModal] = useState(false);
+  
+  // New game approval states
+  const [pendingNewGame, setPendingNewGame] = useState(false);
+  const [newGameApprovals, setNewGameApprovals] = useState(new Set());
+  const [newGameRequester, setNewGameRequester] = useState(null);
   
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
@@ -226,6 +233,7 @@ export default function TournamentPage() {
 
   const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalTournaments: 0, wins: 0, topFinishes: 0 }));
 
+  // Use ref to track current tournamentState for callbacks
   const tournamentStateRef = useRef(tournamentState);
   tournamentStateRef.current = tournamentState;
 
@@ -258,212 +266,180 @@ export default function TournamentPage() {
 
   useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
 
+  // Update onStateUpdate callback when screen changes
   useEffect(() => {
     if (engineRef.current) {
       engineRef.current.onStateUpdate = (state) => {
-        console.log("Tournament state updated:", state);
+        console.log("State updated:", state);
         setTournamentState(state);
-        setForceUpdate(prev => prev + 1);
-        
-        const me = state.players?.find(p => p.id === playerId);
-        if (me && me.eliminated && !isSpectating) {
-          setIsSpectating(true);
-        }
-        
+        setForceUpdate(prev => prev + 1); // Force re-render
         if (state.status === "playing" && screen === "lobby") {
           setScreen("game");
-        } else if (state.status === "finished" && screen !== "results") {
-          setScreen("results");
         }
       };
+      
+      // Handle broadcast messages (not needed anymore with tournamentState sync)
+      engineRef.current.onMessage = (message) => {
+        console.log("Received message:", message);
+        // All new game logic is now handled through tournamentState synchronization
+      };
     }
-  }, [screen, forceUpdate, playerId, isSpectating]);
+  }, [screen, forceUpdate]);
 
   const openWalletModalUnified = () => isConnected ? openAccountModal?.() : openConnectModal?.();
   const hardDisconnect = () => { disconnect?.(); setMenuOpen(false); };
 
   const collectToWallet = async () => {
-    playSfx(clickSound.current);
-    if (!isConnected || !address) {
-      alert("Please connect your wallet first.");
-      return;
-    }
-    if (chainId !== CLAIM_CHAIN_ID) {
-      try {
-        await switchChain?.({ chainId: CLAIM_CHAIN_ID });
-      } catch (error) {
-        console.error("Failed to switch chain:", error);
-        alert("Failed to switch to the required network.");
-        return;
-      }
-    }
-    if (collectAmount <= 0 || collectAmount > vault) {
-      alert("Invalid amount to collect.");
-      return;
-    }
+    if (!isConnected) { openConnectModal?.(); return; }
+    if (chainId !== CLAIM_CHAIN_ID) { try { await switchChain?.({ chainId: CLAIM_CHAIN_ID }); } catch { alert("Switch to BSC Testnet"); return; } }
+    if (!CLAIM_ADDRESS) { alert("Missing CLAIM address"); return; }
+    if (collectAmount <= 0 || collectAmount > vault) { alert("Invalid amount!"); return; }
     setClaiming(true);
     try {
-      const amountWei = parseUnits(String(collectAmount), MLEO_DECIMALS);
-      const tx = await writeContractAsync({
-        address: CLAIM_ADDRESS,
-        abi: MINING_CLAIM_ABI,
-        functionName: "claim",
-        args: [GAME_ID, amountWei],
-      });
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: tx });
-      if (receipt.status === "success") {
-        setVault(vault - collectAmount);
-        setVaultState(vault - collectAmount);
-        alert(`${collectAmount} MLEO collected to your wallet!`);
-      } else {
-        alert("Transaction failed.");
-      }
-    } catch (error) {
-      console.error("Collection error:", error);
-      alert("Failed to collect MLEO. See console for details.");
-    } finally {
-      setClaiming(false);
-    }
+      const amountUnits = parseUnits(Number(collectAmount).toFixed(Math.min(2, MLEO_DECIMALS)), MLEO_DECIMALS);
+      const hash = await writeContractAsync({ address: CLAIM_ADDRESS, abi: MINING_CLAIM_ABI, functionName: "claim", args: [BigInt(GAME_ID), amountUnits], chainId: CLAIM_CHAIN_ID, account: address });
+      await publicClient.waitForTransactionReceipt({ hash });
+      const newVault = Math.max(0, vault - collectAmount);
+      setVault(newVault); setVaultState(newVault);
+      alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
+      setShowVaultModal(false);
+    } catch (err) { console.error(err); alert("Claim failed or rejected"); } finally { setClaiming(false); }
   };
 
   const handleCreateTournament = async () => {
-    playSfx(clickSound.current);
-    if (!playerName) {
-      setError("Please enter your name.");
+    if (!playerName.trim()) {
+      setError("Please enter your name");
       return;
     }
+
+    playSfx(clickSound.current);
     setIsConnecting(true);
     setError("");
+
     try {
-      engineRef.current = new TournamentEngine();
-      engineRef.current.onStateUpdate = (state) => {
-        console.log("Tournament state updated:", state);
-        setTournamentState(state);
-        setForceUpdate(prev => prev + 1);
-        
-        const me = state.players?.find(p => p.id === playerId);
-        if (me && me.eliminated && !isSpectating) {
-          setIsSpectating(true);
-        }
-        
-        if (state.status === "playing" && screen === "lobby") {
-          setScreen("game");
-        } else if (state.status === "finished" && screen !== "results") {
-          setScreen("results");
-        }
-      };
-      engineRef.current.onPlayerJoin = (player) => {
+      const engine = new TournamentEngine();
+      engineRef.current = engine;
+
+      // onStateUpdate will be set in useEffect
+
+      engine.onPlayerJoin = (player) => {
         console.log("Player joined:", player);
+        // The onStateUpdate will handle the state update
       };
-      engineRef.current.onPlayerLeave = (playerId) => {
-        console.log("Player left:", playerId);
+
+      engine.onPlayerLeave = (player) => {
+        console.log("Player left:", player);
+        // The onStateUpdate will handle the state update
       };
-      engineRef.current.onError = (err) => {
-        console.error("Create tournament engine error:", err);
+
+      engine.onError = (err) => {
+        console.error("Create room engine error:", err);
         setError("Connection error: " + err.message);
       };
 
-      const result = await engineRef.current.createTournament(playerName, maxPlayers, startingChips);
-
+      const result = await engine.createTournament(playerName, maxPlayers, startingChips);
+      
       setPlayerId(result.playerId);
       setIsHost(true);
       setRoomCode(result.roomCode);
-      setTournamentState(engineRef.current.tournamentState);
+      setTournamentState(engine.tournamentState);
       setScreen("lobby");
+
     } catch (err) {
-      console.error("Failed to create tournament:", err);
-      setError(err.message || "Failed to create tournament.");
+      console.error("Create room error:", err);
+      setError("Failed to create room. Please try again.");
     } finally {
       setIsConnecting(false);
     }
   };
 
   const handleJoinTournament = async () => {
+    if (!playerName.trim()) {
+      setError("Please enter your name");
+      return;
+    }
+
+    if (!roomCode.trim() || roomCode.length !== 5) {
+      setError("Please enter a valid 5-character room code");
+      return;
+    }
+
     playSfx(clickSound.current);
-    if (!playerName) {
-      setError("Please enter your name.");
-      return;
-    }
-    if (!roomCode) {
-      setError("Please enter a room code.");
-      return;
-    }
     setIsConnecting(true);
     setError("");
+
     try {
-      engineRef.current = new TournamentEngine();
-      engineRef.current.onStateUpdate = (state) => {
-        console.log("Tournament state updated:", state);
-        setTournamentState(state);
-        setForceUpdate(prev => prev + 1);
-        
-        const me = state.players?.find(p => p.id === playerId);
-        if (me && me.eliminated && !isSpectating) {
-          setIsSpectating(true);
-        }
-        
-        if (state.status === "playing" && screen === "lobby") {
-          setScreen("game");
-        } else if (state.status === "finished" && screen !== "results") {
-          setScreen("results");
-        }
-      };
-      engineRef.current.onPlayerJoin = (player) => {
+      const engine = new TournamentEngine();
+      engineRef.current = engine;
+
+      // onStateUpdate will be set in useEffect
+
+      engine.onPlayerJoin = (player) => {
         console.log("Player joined:", player);
+        // The onStateUpdate will handle the state update
       };
-      engineRef.current.onPlayerLeave = (playerId) => {
-        console.log("Player left:", playerId);
+
+      engine.onPlayerLeave = (player) => {
+        console.log("Player left:", player);
+        // The onStateUpdate will handle the state update
       };
-      engineRef.current.onError = (err) => {
-        console.error("Join tournament engine error:", err);
+
+      engine.onError = (err) => {
+        console.error("Join room engine error:", err);
         setError("Connection error: " + err.message);
       };
 
-      const result = await engineRef.current.joinTournament(playerName, roomCode);
-
+      const result = await engine.joinTournament(playerName, roomCode.toUpperCase());
+      
       setPlayerId(result.playerId);
       setIsHost(false);
-      setTournamentState(engineRef.current.tournamentState);
       setScreen("lobby");
+
     } catch (err) {
-      console.error("Failed to join tournament:", err);
-      setError(err.message || "Failed to join tournament.");
+      console.error("Join room error:", err);
+      setError("Failed to join room. Please check the room code.");
     } finally {
       setIsConnecting(false);
     }
   };
 
   const handleStartTournament = () => {
-    playSfx(clickSound.current);
-    if (!engineRef.current || !tournamentState) return;
-
-    const activePlayers = tournamentState.players.filter(p => !p.eliminated);
-    if (activePlayers.length < 2) {
-      setError("Need at least 2 players to start tournament");
+    if (!isHost) return;
+    if (!tournamentState || tournamentState.players.length < 2) {
+      setError("Need at least 2 players to start");
       return;
     }
 
+    playSfx(clickSound.current);
+    
     const deck = shuffleDeck(createDeck());
-    const communityCards = deck.slice(0, 5);
-    const players = activePlayers.map((player, index) => ({
+    const players = tournamentState.players.map((player, idx) => ({
       ...player,
-      cards: [deck[5 + index * 2], deck[6 + index * 2]],
-      bet: 0,
+      cards: [deck[idx * 2], deck[idx * 2 + 1]],
+      bet: idx === 0 ? SMALL_BLIND : idx === 1 ? BIG_BLIND : 0,
       folded: false,
-      allIn: false
+      chips: 10000 - (idx === 0 ? SMALL_BLIND : idx === 1 ? BIG_BLIND : 0)
     }));
+
+    const communityCards = [
+      deck[players.length * 2],
+      deck[players.length * 2 + 1],
+      deck[players.length * 2 + 2],
+      deck[players.length * 2 + 3],
+      deck[players.length * 2 + 4]
+    ];
 
     const updatedState = {
       ...tournamentState,
       status: "playing",
-      round: "pre-flop",
+      players: players,
       communityCards: communityCards,
       communityVisible: 0,
       pot: SMALL_BLIND + BIG_BLIND,
-      currentPlayerIndex: 0,
+      currentPlayerIndex: 2 >= players.length ? 0 : 2,
+      round: "pre-flop",
       currentBet: BIG_BLIND,
-      players: players,
-      gameNumber: 1
+      deck: deck
     };
 
     engineRef.current.updateTournamentState(updatedState);
@@ -472,18 +448,18 @@ export default function TournamentPage() {
 
   const handlePlayerAction = (action, amount = 0) => {
     if (!tournamentState) return;
-
+    
     const players = tournamentState.players || [];
     const myPlayer = players.find(p => p.id === playerId);
     const currentPlayer = players[tournamentState.currentPlayerIndex];
     const isMyTurn = currentPlayer?.id === playerId;
-
-    if (!isMyTurn || myPlayer?.folded || isSpectating) return;
-
+    
+    if (!isMyTurn || myPlayer?.folded) return;
+    
     playSfx(clickSound.current);
-
+    
     const updatedPlayers = [...tournamentState.players];
-
+    
     if (action === "fold") {
       updatedPlayers[tournamentState.currentPlayerIndex] = {
         ...currentPlayer,
@@ -519,22 +495,21 @@ export default function TournamentPage() {
       tournamentState.pot += allInAmount;
       tournamentState.currentBet = Math.max(tournamentState.currentBet, currentPlayer.bet + allInAmount);
     }
-
+    
+    // Move to next player
     let nextIndex = (tournamentState.currentPlayerIndex + 1) % tournamentState.players.length;
-    while (updatedPlayers[nextIndex].folded || updatedPlayers[nextIndex].eliminated) {
+    while (updatedPlayers[nextIndex].folded) {
       nextIndex = (nextIndex + 1) % tournamentState.players.length;
     }
-
-    const activePlayers = updatedPlayers.filter(p => !p.folded && !p.eliminated);
-    const allBetsEqual = activePlayers.every(p => p.bet === tournamentState.currentBet || p.allIn);
-
+    
+    // Check if round is over
+    const activePlayers = updatedPlayers.filter(p => !p.folded);
+    const allBetsEqual = activePlayers.every(p => p.bet === tournamentState.currentBet);
+    
     let newRound = tournamentState.round;
     let newVisible = tournamentState.communityVisible;
-
-    if (activePlayers.length === 1) {
-      setTimeout(() => finishGame(activePlayers[0]), 500);
-      newRound = "showdown";
-    } else if (allBetsEqual && nextIndex === 0) {
+    
+    if (allBetsEqual && nextIndex === 0) {
       if (tournamentState.round === "pre-flop") {
         newRound = "flop";
         newVisible = 3;
@@ -545,14 +520,17 @@ export default function TournamentPage() {
         newRound = "river";
         newVisible = 5;
       } else if (tournamentState.round === "river") {
+        // Show down
         newRound = "showdown";
+        // הוסף קריאה ל-finishGame
         setTimeout(() => finishGame(), 1000);
       }
-
+      
+      // Reset bets for new round
       updatedPlayers.forEach(p => p.bet = 0);
       tournamentState.currentBet = 0;
     }
-
+    
     const updatedState = {
       ...tournamentState,
       players: updatedPlayers,
@@ -560,143 +538,168 @@ export default function TournamentPage() {
       round: newRound,
       communityVisible: newVisible
     };
-
+    
     engineRef.current.updateTournamentState(updatedState);
   };
 
-  const finishGame = (winner = null) => {
-    if (!tournamentState) return;
+  const startNewHand = () => {
+    const deck = shuffleDeck(createDeck());
+    const newCommunityCards = deck.slice(0, 5);
+    const newPlayers = tournamentState.players.map((player, index) => ({
+      ...player,
+      cards: [deck[5 + index * 2], deck[6 + index * 2]], // 2 cards per player
+      bet: 0,
+      folded: false,
+      allIn: false
+    }));
 
-    const activePlayers = tournamentState.players.filter(p => !p.folded && !p.eliminated);
+    const resetState = {
+      ...tournamentState,
+      round: "pre-flop",
+      pot: 0,
+      currentBet: BIG_BLIND,
+      communityCards: newCommunityCards,
+      communityVisible: 0,
+      currentPlayerIndex: 0,
+      players: newPlayers,
+      status: "playing",
+      gameResult: null, // נקה את התוצאה
+      newGameRequest: false, // נקה את בקשת המשחק החדש
+      newGameRequester: null, // נקה את מבקש המשחק
+      newGameApprovals: [] // נקה את האישורים
+    };
     
-    let gameWinner, prize, hand;
+    engineRef.current.updateTournamentState(resetState);
+    setShowResultModal(false);
+    setPendingNewGame(false);
+    setNewGameApprovals(new Set());
+  };
+
+  const requestNewGame = () => {
+    console.log("Player requesting new game:", playerId);
+    setPendingNewGame(true);
+    setNewGameRequester(playerId);
     
-    if (winner) {
-      gameWinner = winner;
+    if (isHost) {
+      // המארח מבקש - מתחיל מיד עם אישור אוטומטי
+      const updatedState = {
+        ...tournamentState,
+        newGameRequest: true,
+        newGameRequester: playerId,
+        newGameApprovals: [playerId], // המארח מאשר אוטומטית
+        status: "waiting_for_approval"
+      };
+      
+      engineRef.current.updateTournamentState(updatedState);
+    } else {
+      // שחקן מבקש - שולח בקשה למארח
+      const updatedState = {
+        ...tournamentState,
+        newGameRequest: true,
+        newGameRequester: playerId,
+        newGameApprovals: [], // מתחיל ללא אישורים
+        status: "waiting_for_host_approval"
+      };
+      
+      engineRef.current.updateTournamentState(updatedState);
+    }
+  };
+
+  const approveNewGame = () => {
+    console.log("Player approving new game:", playerId);
+    
+    if (isHost && tournamentState.status === "waiting_for_host_approval") {
+      // המארח מאשר בקשה משחקן
+      const updatedState = {
+        ...tournamentState,
+        status: "waiting_for_approval",
+        newGameApprovals: [playerId] // המארח מאשר
+      };
+      
+      engineRef.current.updateTournamentState(updatedState);
+    } else {
+      // שחקן רגיל מאשר
+      const currentApprovals = tournamentState.newGameApprovals || [];
+      if (!currentApprovals.includes(playerId)) {
+        const updatedApprovals = [...currentApprovals, playerId];
+        
+        const updatedState = {
+          ...tournamentState,
+          newGameApprovals: updatedApprovals
+        };
+        
+        engineRef.current.updateTournamentState(updatedState);
+        
+        // בדוק אם כל השחקנים אישרו
+        if (updatedApprovals.length === tournamentState.players.length) {
+          console.log("All players approved, starting new hand");
+          setTimeout(() => startNewHand(), 500);
+        }
+      }
+    }
+  };
+
+  const rejectNewGame = () => {
+    console.log("Rejecting new game request");
+    
+    const updatedState = {
+      ...tournamentState,
+      newGameRequest: false,
+      newGameRequester: null,
+      newGameApprovals: [],
+      status: "finished"
+    };
+    
+    engineRef.current.updateTournamentState(updatedState);
+    setPendingNewGame(false);
+    setNewGameRequester(null);
+  };
+
+  const finishGame = () => {
+    const activePlayers = tournamentState.players.filter(p => !p.folded);
+    
+    let winner, prize, hand;
+    
+    if (activePlayers.length === 1) {
+      // רק שחקן אחד נשאר - הוא המנצח
+      winner = activePlayers[0];
       prize = tournamentState.pot;
       hand = "Won by fold";
     } else {
+      // השוואת ידיים
       const hands = activePlayers.map(player => ({
         player,
         hand: evaluateHand([...player.cards, ...tournamentState.communityCards])
       }));
       
+      // מיון לפי כוח היד
       hands.sort((a, b) => compareHands(b.hand, a.hand));
       
-      gameWinner = hands[0].player;
+      winner = hands[0];
       prize = tournamentState.pot;
-      hand = hands[0].hand.hand;
+      hand = winner.hand.hand;
     }
     
     const updatedPlayers = tournamentState.players.map(p => 
-      p.id === gameWinner.id 
+      p.id === winner.player.id 
         ? { ...p, chips: p.chips + prize }
         : p
     );
-
-    const eliminatedPlayers = updatedPlayers.filter(p => p.chips === 0 && !p.eliminated);
     
-    if (eliminatedPlayers.length > 0) {
-      eliminatedPlayers.forEach(player => {
-        player.eliminated = true;
-        player.position = tournamentState.players.filter(p => p.eliminated).length + 1;
-      });
-    }
-
-    const remainingPlayers = updatedPlayers.filter(p => p.chips > 0);
-    
-    if (remainingPlayers.length === 1) {
-      const updatedState = {
-        ...tournamentState,
-        status: "finished",
-        players: updatedPlayers,
-        winner: remainingPlayers[0],
-        gameResult: {
-          winner: gameWinner.name,
-          prize: prize,
-          hand: hand
-        }
-      };
-      
-      engineRef.current.updateTournamentState(updatedState);
-      
-      if (remainingPlayers[0].id === playerId) {
-        setStats(prev => ({
-          ...prev,
-          totalTournaments: prev.totalTournaments + 1,
-          wins: prev.wins + 1
-        }));
-        playSfx(winSound.current);
-      } else {
-        setStats(prev => ({
-          ...prev,
-          totalTournaments: prev.totalTournaments + 1
-        }));
-      }
-    } else {
-      setGameCountdown(10);
-      const countdownInterval = setInterval(() => {
-        setGameCountdown(prev => {
-          if (prev <= 1) {
-            clearInterval(countdownInterval);
-            startNextGame(updatedPlayers);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      
-      const updatedState = {
-        ...tournamentState,
-        players: updatedPlayers,
-        gameResult: {
-          winner: gameWinner.name,
-          prize: prize,
-          hand: hand
-        }
-      };
-      
-      engineRef.current.updateTournamentState(updatedState);
-    }
-  };
-
-  const startNextGame = (players) => {
-    const activePlayers = players.filter(p => p.chips > 0 && !p.eliminated);
-    if (activePlayers.length < 2) return;
-
-    const deck = shuffleDeck(createDeck());
-    const communityCards = deck.slice(0, 5);
-    const newPlayers = tournamentState.players.map((player) => {
-      if (player.eliminated || player.chips === 0) {
-        return player;
-      }
-      const activeIndex = activePlayers.findIndex(p => p.id === player.id);
-      if (activeIndex === -1) return player;
-      
-      return {
-        ...player,
-        cards: [deck[5 + activeIndex * 2], deck[6 + activeIndex * 2]],
-        bet: 0,
-        folded: false,
-        allIn: false
-      };
-    });
-
     const updatedState = {
       ...tournamentState,
-      round: "pre-flop",
-      pot: SMALL_BLIND + BIG_BLIND,
-      currentPlayerIndex: 0,
-      currentBet: BIG_BLIND,
-      communityCards: communityCards,
-      communityVisible: 0,
-      players: newPlayers,
-      gameNumber: (tournamentState.gameNumber || 1) + 1,
-      gameResult: null
+      players: updatedPlayers,
+      pot: 0,
+      status: "finished",
+      gameResult: { // הוסף את התוצאה ל-tournamentState
+        winner: winner.player.name,
+        prize: prize,
+        hand: hand
+      }
     };
-
+    
     engineRef.current.updateTournamentState(updatedState);
-    setGameCountdown(0);
+    setShowResultModal(true);
   };
 
   const copyRoomCode = () => {
@@ -715,20 +718,11 @@ export default function TournamentPage() {
     setError("");
     setTournamentState(null);
     setRoomCode("");
-    setIsSpectating(false);
-    setGameCountdown(0);
   };
 
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return null;
-
-  const players = tournamentState?.players || [];
-  const currentPlayers = players.length;
-  const maxPlayersCount = tournamentState?.maxPlayers || maxPlayers;
-  const myPlayer = players.find(p => p.id === playerId);
-  const currentPlayer = players[tournamentState?.currentPlayerIndex];
-  const isMyTurn = currentPlayer?.id === playerId;
 
   // MENU SCREEN
   if (screen === "menu") {
@@ -782,7 +776,7 @@ export default function TournamentPage() {
               <div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div>
               <div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div>
               <div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div>
-              <div className="mt-4 text-xs opacity-70"><p>Tournament v1.0</p></div>
+              <div className="mt-4 text-xs opacity-70"><p>Multiplayer v1.0</p></div>
             </div>
           </div>
         )}
@@ -940,6 +934,18 @@ export default function TournamentPage() {
 
   // LOBBY SCREEN
   if (screen === "lobby") {
+    const players = tournamentState?.players || [];
+    const currentPlayers = players.length;
+    const maxPlayersCount = tournamentState?.maxPlayers || maxPlayers;
+
+    console.log("Lobby render:", { 
+      tournamentState, 
+      players, 
+      currentPlayers, 
+      isHost, 
+      maxPlayersCount 
+    });
+
     return (
       <Layout>
         <div className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-orange-900" style={{ height: '100svh' }}>
@@ -950,52 +956,58 @@ export default function TournamentPage() {
           </div>
 
           <div className="relative h-full flex flex-col items-center justify-center px-4">
-            <div className="w-full max-w-md">
+            <div className="w-full max-w-md bg-black/30 border border-white/10 rounded-2xl p-6 shadow-2xl">
               <div className="text-center mb-6">
-                <h2 className="text-3xl font-extrabold text-white mb-2">Tournament Lobby</h2>
-                <div className="inline-block bg-purple-600/30 border border-purple-500/50 rounded-lg px-6 py-3">
-                  <div className="text-xs text-white/60 mb-1">TOURNAMENT CODE</div>
-                  <div className="text-3xl font-bold text-white tracking-widest font-mono">{roomCode}</div>
-                  <button onClick={copyRoomCode} className="text-xs text-purple-300 hover:text-purple-200 mt-1">📋 Copy</button>
+                <h2 className="text-2xl font-extrabold text-white mb-2">Tournament Lobby</h2>
+                <div className="bg-purple-500/20 border border-purple-500/50 rounded-lg p-3 mb-4">
+                  <div className="text-sm text-white/70 mb-1">Room Code</div>
+                  <div className="text-3xl font-bold text-white tracking-widest">{roomCode}</div>
+                  <button onClick={copyRoomCode} className="mt-2 text-sm text-purple-300 hover:text-purple-200">📋 Copy Code</button>
                 </div>
-              </div>
-
-              <div className="text-center text-white/60 text-sm mb-4">
-                Players: {currentPlayers}/{maxPlayersCount} • Starting Chips: {tournamentState?.startingChips?.toLocaleString()}
+                <div className="text-white/70 text-sm">Players: {currentPlayers}/{maxPlayersCount}</div>
               </div>
 
               <div className="space-y-2 mb-6">
                 {players.map((player) => (
-                  <div key={player.id} className="bg-black/30 border border-white/10 rounded-lg p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                  <div key={player.id} className="bg-white/10 rounded-lg p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       <span className="text-2xl">{player.isHost ? '👑' : '👤'}</span>
-                      <div>
-                        <div className="text-white font-bold">{player.name}</div>
-                        {player.id === playerId && <div className="text-xs text-purple-400">(You)</div>}
-                      </div>
+                      <span className="font-semibold text-white">{player.name}</span>
+                      {player.id === playerId && <span className="text-xs text-green-400">(You)</span>}
                     </div>
-                    <div className="text-emerald-400 font-semibold">Ready</div>
+                    <div className="text-emerald-400 text-sm font-semibold">Ready</div>
                   </div>
                 ))}
 
                 {Array.from({ length: maxPlayersCount - currentPlayers }).map((_, i) => (
-                  <div key={`empty-${i}`} className="bg-black/20 border border-white/5 rounded-lg p-4 flex items-center gap-3 opacity-40">
+                  <div key={`empty-${i}`} className="bg-white/5 rounded-lg p-3 flex items-center gap-2 opacity-50">
                     <span className="text-2xl">⏳</span>
-                    <span className="text-white/50">Waiting for player...</span>
+                    <span className="text-white/50">Waiting...</span>
                   </div>
                 ))}
               </div>
 
-              {isHost ? (
-                <button
-                  onClick={handleStartTournament}
-                  disabled={currentPlayers < 2}
-                  className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {currentPlayers < 2 ? "Need at least 2 players" : "Start Tournament"}
-                </button>
-              ) : (
-                <div className="text-center text-white/50 text-sm">Waiting for host to start...</div>
+              {isHost && (
+                <>
+                  {error && (
+                    <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-300 text-sm text-center mb-4">
+                      {error}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleStartTournament}
+                    disabled={currentPlayers < 2}
+                    className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
+                  >
+                    {currentPlayers < 2 ? 'Waiting for Players...' : 'Start Tournament'}
+                  </button>
+                </>
+              )}
+
+              {!isHost && (
+                <div className="text-center text-white/70 text-sm">
+                  <div className="animate-pulse">Waiting for host to start game...</div>
+                </div>
               )}
             </div>
           </div>
@@ -1004,8 +1016,16 @@ export default function TournamentPage() {
     );
   }
 
-  // GAME SCREEN
+  // GAME SCREEN - This is a working foundation, full turn management would need more implementation
   if (screen === "game") {
+    const players = tournamentState?.players || [];
+    const pot = tournamentState?.pot || 0;
+    const communityCards = tournamentState?.communityCards || [];
+    const communityVisible = tournamentState?.communityVisible || 0;
+    const myPlayer = players.find(p => p.id === playerId);
+    const currentPlayer = players[tournamentState?.currentPlayerIndex];
+    const isMyTurn = currentPlayer?.id === playerId;
+
     return (
       <Layout>
         <style jsx>{`
@@ -1066,14 +1086,14 @@ export default function TournamentPage() {
 
           <div className="relative h-full flex flex-col items-center px-2 py-12">
             <div className="text-center mb-2">
-              <div className="text-xs text-white/60">Game #{tournamentState?.gameNumber || 1} • {players.filter(p => !p.eliminated).length} left</div>
-              <div className="text-2xl font-bold text-amber-400">POT: {fmt(tournamentState?.pot || 0)}</div>
+              <div className="text-xs text-white/60">Game #{tournamentState?.gameNumber || 1} • {tournamentState?.players?.filter(p => !p.eliminated).length || 0} left</div>
+              <div className="text-2xl font-bold text-amber-400">POT: {fmt(pot)}</div>
             </div>
 
             {/* Community Cards */}
             <div className="mb-3">
               <div className="flex gap-1 justify-center">
-                {(tournamentState?.communityCards || []).slice(0, tournamentState?.communityVisible || 0).map((card, i) => (
+                {communityCards.slice(0, communityVisible).map((card, i) => (
                   <PlayingCard key={i} card={card} delay={i * 200} />
                 ))}
               </div>
@@ -1105,7 +1125,7 @@ export default function TournamentPage() {
               ))}
             </div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons - Show for current player */}
             {isMyTurn && !myPlayer?.folded && !isSpectating && (
               <div className="w-full max-w-sm space-y-2">
                 <div className="flex gap-2">
@@ -1153,59 +1173,14 @@ export default function TournamentPage() {
           </div>
         </div>
 
-        {/* Bet Modal */}
-        {showBetModal && (
-          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
-            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl">
-              <h2 className="text-2xl font-extrabold mb-4">💰 Place Bet</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold mb-2">Bet Amount</label>
-                  <input
-                    type="number"
-                    value={betAmount}
-                    onChange={(e) => setBetAmount(e.target.value)}
-                    className="w-full p-3 bg-gray-800 text-white rounded-lg border border-gray-600 focus:border-yellow-500 focus:outline-none"
-                    placeholder="Enter bet amount"
-                    min="1"
-                    max={myPlayer?.chips || 0}
-                  />
-                  <div className="text-xs text-gray-400 mt-1">
-                    Available: {myPlayer?.chips || 0} chips
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      const amount = Number(betAmount);
-                      if (amount > 0 && amount <= (myPlayer?.chips || 0)) {
-                        handlePlayerAction("raise", amount);
-                        setShowBetModal(false);
-                      }
-                    }}
-                    className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-lg transition"
-                  >
-                    BET
-                  </button>
-                  <button
-                    onClick={() => setShowBetModal(false)}
-                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg transition"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
+        {/* MODALS */}
         {menuOpen && (
           <div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}>
             <div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div>
               <div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div>
               <div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div>
-              <div className="mt-4 text-xs opacity-70"><p>Tournament v1.0</p></div>
+              <div className="mt-4 text-xs opacity-70"><p>Multiplayer v1.0</p></div>
             </div>
           </div>
         )}
@@ -1215,16 +1190,12 @@ export default function TournamentPage() {
             <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
               <h2 className="text-2xl font-extrabold mb-4">🎴 How to Play</h2>
               <div className="space-y-3 text-sm">
-                <p><strong>Tournament Texas Hold'em:</strong></p>
+                <p><strong>Multiplayer Texas Hold'em:</strong></p>
                 <p>• Each player gets 2 hole cards</p>
                 <p>• 5 community cards are revealed (Flop, Turn, River)</p>
                 <p>• Best 5-card hand wins the pot!</p>
                 <p>• Small blind: {SMALL_BLIND} • Big blind: {BIG_BLIND}</p>
-                <p><strong>Tournament Rules:</strong></p>
-                <p>• Last player with chips wins</p>
-                <p>• Eliminated players can spectate</p>
-                <p>• Games restart automatically after 10 seconds</p>
-                <p className="text-white/60 text-xs mt-4">Full betting rounds with Check/Fold/Call/Raise/All-In!</p>
+                <p className="text-white/60 text-xs mt-4">Full betting rounds with Check/Fold/Call/Raise!</p>
               </div>
               <button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
             </div>
@@ -1237,10 +1208,10 @@ export default function TournamentPage() {
               <h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Tournaments</div><div className="text-xl font-bold">{stats.totalTournaments}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Games</div><div className="text-xl font-bold">{stats.totalGames}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Wins</div><div className="text-xl font-bold text-green-400">{stats.wins}</div></div>
-                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Top 3 Finishes</div><div className="text-lg font-bold text-yellow-400">{stats.topFinishes}</div></div>
-                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-lg font-bold text-purple-400">{stats.totalTournaments > 0 ? Math.round((stats.wins / stats.totalTournaments) * 100) : 0}%</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Losses</div><div className="text-lg font-bold text-red-400">{stats.losses}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Pot</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestPot)}</div></div>
                 </div>
               </div>
               <button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
@@ -1268,84 +1239,187 @@ export default function TournamentPage() {
             </div>
           </div>
         )}
-      </Layout>
-    );
-  }
 
-  // RESULTS SCREEN
-  if (screen === "results") {
-    const winner = tournamentState?.winner;
-    const sortedPlayers = [...players].sort((a, b) => {
-      if (a.eliminated && b.eliminated) return a.position - b.position;
-      if (a.eliminated) return 1;
-      if (b.eliminated) return -1;
-      return b.chips - a.chips;
-    });
-
-    return (
-      <Layout>
-        <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-orange-900" style={{ height: '100svh' }}>
-          <div className="absolute inset-0 opacity-10"><div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} /></div>
-          
-          <div className="absolute top-4 left-4">
-            <button onClick={backToMenu} className="px-4 py-2 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">EXIT</button>
-          </div>
-
-          <div className="relative h-full flex flex-col items-center justify-center px-4 overflow-y-auto">
-            {winner && (
-              <div className="text-center mb-8">
-                <div className="text-6xl mb-4">🏆</div>
-                <div className="text-3xl font-bold text-yellow-400 mb-2">{winner.name}</div>
-                <div className="text-lg text-white/70">Tournament Winner!</div>
-                <div className="text-2xl font-bold text-emerald-400 mt-2">{winner.chips} chips</div>
-              </div>
-            )}
-
-            <div className="w-full max-w-md">
-              <h2 className="text-2xl font-bold text-center mb-4 text-white">Final Standings</h2>
-              <div className="space-y-2 mb-6">
-                {sortedPlayers.map((player, index) => (
-                  <div 
-                    key={player.id} 
-                    className={`rounded-lg p-3 flex items-center justify-between ${
-                      index === 0 ? 'bg-yellow-600/20 border-2 border-yellow-500' : 'bg-black/30 border border-white/10'
-                    } ${player.id === playerId ? 'ring-2 ring-purple-500' : ''}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl font-bold text-white/50">#{index + 1}</span>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-white font-semibold">{player.name}</span>
-                          {player.id === playerId && <span className="text-xs text-purple-400">(You)</span>}
-                        </div>
-                        <div className="text-sm text-emerald-400">{player.chips} chips</div>
-                      </div>
-                    </div>
-                    {index === 0 && <div className="text-2xl">👑</div>}
+        {/* Bet Modal */}
+        {showBetModal && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl">
+              <h2 className="text-2xl font-extrabold mb-4">💰 Place Bet</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Bet Amount</label>
+                  <input 
+                    type="number" 
+                    value={betAmount} 
+                    onChange={(e) => setBetAmount(e.target.value)}
+                    className="w-full p-3 bg-gray-800 text-white rounded-lg border border-gray-600 focus:border-yellow-500 focus:outline-none"
+                    placeholder="Enter bet amount"
+                    min="1"
+                    max={myPlayer?.chips || 0}
+                  />
+                  <div className="text-xs text-gray-400 mt-1">
+                    Available: {myPlayer?.chips || 0} chips
                   </div>
-                ))}
+                </div>
+                
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      const amount = Number(betAmount);
+                      if (amount > 0 && amount <= (myPlayer?.chips || 0)) {
+                        handlePlayerAction("raise", amount);
+                        setShowBetModal(false);
+                      }
+                    }}
+                    className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-lg transition-colors"
+                  >
+                    BET
+                  </button>
+                  <button 
+                    onClick={() => setShowBetModal(false)}
+                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
+            </div>
+          </div>
+        )}
 
-              <div className="space-y-2">
-                <button
-                  onClick={backToMenu}
-                  className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all"
+        {/* Game Result Modal */}
+        {tournamentState?.status === "finished" && tournamentState?.gameResult && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl text-center">
+              <h2 className="text-2xl font-extrabold mb-4">🎉 Game Over!</h2>
+              <div className="space-y-4">
+                <div className="text-lg">
+                  <span className="text-yellow-400 font-bold">{tournamentState.gameResult.winner}</span> wins!
+                </div>
+                <div className="text-sm text-gray-300">
+                  Hand: <span className="text-green-400">{tournamentState.gameResult.hand}</span>
+                </div>
+                <div className="text-lg text-emerald-400 font-bold">
+                  Prize: {tournamentState.gameResult.prize} chips
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                {!tournamentState?.newGameRequest && (
+                  <button 
+                    onClick={requestNewGame}
+                    className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg"
+                  >
+                    New Game
+                  </button>
+                )}
+                <button 
+                  onClick={() => {
+                    setScreen("lobby");
+                  }}
+                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg"
                 >
-                  New Tournament
-                </button>
-                <button
-                  onClick={backSafe}
-                  className="w-full py-3 rounded-lg font-semibold bg-white/10 text-white hover:bg-white/20 transition-all"
-                >
-                  Back to Arcade
+                  Back to Lobby
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* New Game Approval Modal */}
+        {tournamentState?.newGameRequest && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl text-center">
+              {tournamentState.status === "waiting_for_host_approval" ? (
+                <>
+                  <h2 className="text-2xl font-extrabold mb-4">🎮 New Game Request</h2>
+                  <div className="space-y-4">
+                    <div className="text-lg">
+                      <span className="text-yellow-400 font-bold">
+                        {tournamentState.players?.find(p => p.id === tournamentState.newGameRequester)?.name}
+                      </span> wants to start a new game
+                    </div>
+                    <div className="text-sm text-gray-300">
+                      Host approval required
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-6">
+                    {isHost && (
+                      <>
+                        <button 
+                          onClick={approveNewGame}
+                          className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg"
+                        >
+                          Approve
+                        </button>
+                        <button 
+                          onClick={rejectNewGame}
+                          className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg"
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
+                    {!isHost && (
+                      <button 
+                        onClick={() => {
+                          setScreen("lobby");
+                        }}
+                        className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg"
+                      >
+                        Back to Lobby
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-2xl font-extrabold mb-4">⏳ Waiting for Approval</h2>
+                  <div className="space-y-4">
+                    <div className="text-lg">Waiting for all players to approve new game...</div>
+                    <div className="text-sm text-gray-300">
+                      Approved: {tournamentState.newGameApprovals?.length || 0}/{tournamentState.players?.length || 0}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {tournamentState.newGameApprovals?.map(id => {
+                        const player = tournamentState.players?.find(p => p.id === id);
+                        return player?.name;
+                      }).join(", ")}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-6">
+                    {!isHost && !tournamentState.newGameApprovals?.includes(playerId) && (
+                      <button 
+                        onClick={approveNewGame}
+                        className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg"
+                      >
+                        Approve New Game
+                      </button>
+                    )}
+                    {isHost && (
+                      <button 
+                        onClick={rejectNewGame}
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg"
+                      >
+                        Cancel Request
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => {
+                        setScreen("lobby");
+                      }}
+                      className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg"
+                    >
+                      Back to Lobby
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </Layout>
     );
   }
-  
+
   return null;
 }
