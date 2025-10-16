@@ -277,21 +277,10 @@ export default function TexasHoldemMultiplayerPage() {
         }
       };
       
-      // Handle broadcast messages
+      // Handle broadcast messages (not needed anymore with gameState sync)
       engineRef.current.onMessage = (message) => {
-        if (message.type === 'new_game_request') {
-          setPendingNewGame(true);
-          setNewGameApprovals(new Set());
-        } else if (message.type === 'new_game_approval') {
-          const newApprovals = new Set(newGameApprovals);
-          newApprovals.add(message.playerId);
-          setNewGameApprovals(newApprovals);
-          
-          // Check if all players approved
-          if (newApprovals.size === gameState.players.length) {
-            startNewHand();
-          }
-        }
+        console.log("Received message:", message);
+        // All new game logic is now handled through gameState synchronization
       };
     }
   }, [screen, forceUpdate]);
@@ -573,7 +562,9 @@ export default function TexasHoldemMultiplayerPage() {
       currentPlayerIndex: 0,
       players: newPlayers,
       status: "playing",
-      gameResult: null // נקה את התוצאה
+      gameResult: null, // נקה את התוצאה
+      newGameRequest: false, // נקה את בקשת המשחק החדש
+      newGameApprovals: [] // נקה את האישורים
     };
     
     engineRef.current.updateGameState(resetState);
@@ -585,30 +576,40 @@ export default function TexasHoldemMultiplayerPage() {
   const requestNewGame = () => {
     if (!isHost) return;
     
+    console.log("Host requesting new game");
     setPendingNewGame(true);
-    setNewGameApprovals(new Set([playerId])); // המארח מאשר אוטומטית
     
-    // שלח בקשה לכל השחקנים
-    engineRef.current.broadcast({
-      type: 'new_game_request',
-      from: playerId
-    });
+    // עדכן את gameState עם בקשה למשחק חדש
+    const updatedState = {
+      ...gameState,
+      newGameRequest: true,
+      newGameApprovals: [playerId], // המארח מאשר אוטומטית
+      status: "waiting_for_approval"
+    };
+    
+    engineRef.current.updateGameState(updatedState);
   };
 
   const approveNewGame = () => {
-    const newApprovals = new Set(newGameApprovals);
-    newApprovals.add(playerId);
-    setNewGameApprovals(newApprovals);
+    console.log("Player approving new game:", playerId);
     
-    // שלח אישור למארח
-    engineRef.current.broadcast({
-      type: 'new_game_approval',
-      playerId: playerId
-    });
-    
-    // בדוק אם כל השחקנים אישרו
-    if (newApprovals.size === gameState.players.length) {
-      startNewHand();
+    // הוסף את השחקן לרשימת האישורים
+    const currentApprovals = gameState.newGameApprovals || [];
+    if (!currentApprovals.includes(playerId)) {
+      const updatedApprovals = [...currentApprovals, playerId];
+      
+      const updatedState = {
+        ...gameState,
+        newGameApprovals: updatedApprovals
+      };
+      
+      engineRef.current.updateGameState(updatedState);
+      
+      // בדוק אם כל השחקנים אישרו
+      if (updatedApprovals.length === gameState.players.length) {
+        console.log("All players approved, starting new hand");
+        setTimeout(() => startNewHand(), 500);
+      }
     }
   };
 
@@ -1212,7 +1213,7 @@ export default function TexasHoldemMultiplayerPage() {
         )}
 
         {/* Game Result Modal */}
-        {gameState?.status === "finished" && gameState?.gameResult && (
+        {gameState?.status === "finished" && gameState?.gameResult && !gameState?.newGameRequest && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
             <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl text-center">
               <h2 className="text-2xl font-extrabold mb-4">🎉 Game Over!</h2>
@@ -1256,16 +1257,56 @@ export default function TexasHoldemMultiplayerPage() {
           </div>
         )}
 
-        {/* Pending New Game Modal */}
-        {pendingNewGame && (
+        {/* New Game Approval Modal */}
+        {gameState?.newGameRequest && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
             <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl text-center">
               <h2 className="text-2xl font-extrabold mb-4">⏳ Waiting for Approval</h2>
               <div className="space-y-4">
                 <div className="text-lg">Waiting for all players to approve new game...</div>
                 <div className="text-sm text-gray-300">
-                  Approved: {newGameApprovals.size}/{gameState.players.length}
+                  Approved: {gameState.newGameApprovals?.length || 0}/{gameState.players?.length || 0}
                 </div>
+                <div className="text-xs text-gray-400">
+                  {gameState.newGameApprovals?.map(id => {
+                    const player = gameState.players?.find(p => p.id === id);
+                    return player?.name;
+                  }).join(", ")}
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                {!isHost && !gameState.newGameApprovals?.includes(playerId) && (
+                  <button 
+                    onClick={approveNewGame}
+                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg"
+                  >
+                    Approve New Game
+                  </button>
+                )}
+                {isHost && (
+                  <button 
+                    onClick={() => {
+                      const updatedState = {
+                        ...gameState,
+                        newGameRequest: false,
+                        newGameApprovals: [],
+                        status: "finished"
+                      };
+                      engineRef.current.updateGameState(updatedState);
+                    }}
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg"
+                  >
+                    Cancel Request
+                  </button>
+                )}
+                <button 
+                  onClick={() => {
+                    setScreen("lobby");
+                  }}
+                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg"
+                >
+                  Back to Lobby
+                </button>
               </div>
             </div>
           </div>
