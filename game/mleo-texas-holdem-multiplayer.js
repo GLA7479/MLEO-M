@@ -216,6 +216,10 @@ export default function TexasHoldemMultiplayerPage() {
   const [gameResult, setGameResult] = useState(null);
   const [showResultModal, setShowResultModal] = useState(false);
   
+  // New game approval states
+  const [pendingNewGame, setPendingNewGame] = useState(false);
+  const [newGameApprovals, setNewGameApprovals] = useState(new Set());
+  
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -270,6 +274,23 @@ export default function TexasHoldemMultiplayerPage() {
         setForceUpdate(prev => prev + 1); // Force re-render
         if (state.status === "playing" && screen === "lobby") {
           setScreen("game");
+        }
+      };
+      
+      // Handle broadcast messages
+      engineRef.current.onMessage = (message) => {
+        if (message.type === 'new_game_request') {
+          setPendingNewGame(true);
+          setNewGameApprovals(new Set());
+        } else if (message.type === 'new_game_approval') {
+          const newApprovals = new Set(newGameApprovals);
+          newApprovals.add(message.playerId);
+          setNewGameApprovals(newApprovals);
+          
+          // Check if all players approved
+          if (newApprovals.size === gameState.players.length) {
+            startNewHand();
+          }
         }
       };
     }
@@ -531,35 +552,76 @@ export default function TexasHoldemMultiplayerPage() {
     engineRef.current.updateGameState(updatedState);
   };
 
+  const startNewHand = () => {
+    const deck = shuffleDeck(createDeck());
+    const newCommunityCards = deck.slice(0, 5);
+    const newPlayers = gameState.players.map((player, index) => ({
+      ...player,
+      cards: [deck[5 + index * 2], deck[6 + index * 2]], // 2 cards per player
+      bet: 0,
+      folded: false,
+      allIn: false
+    }));
+
+    const resetState = {
+      ...gameState,
+      round: "pre-flop",
+      pot: 0,
+      currentBet: BIG_BLIND,
+      communityCards: newCommunityCards,
+      communityVisible: 0,
+      currentPlayerIndex: 0,
+      players: newPlayers,
+      status: "playing",
+      gameResult: null // נקה את התוצאה
+    };
+    
+    engineRef.current.updateGameState(resetState);
+    setShowResultModal(false);
+    setPendingNewGame(false);
+    setNewGameApprovals(new Set());
+  };
+
+  const requestNewGame = () => {
+    if (!isHost) return;
+    
+    setPendingNewGame(true);
+    setNewGameApprovals(new Set([playerId])); // המארח מאשר אוטומטית
+    
+    // שלח בקשה לכל השחקנים
+    engineRef.current.broadcast({
+      type: 'new_game_request',
+      from: playerId
+    });
+  };
+
+  const approveNewGame = () => {
+    const newApprovals = new Set(newGameApprovals);
+    newApprovals.add(playerId);
+    setNewGameApprovals(newApprovals);
+    
+    // שלח אישור למארח
+    engineRef.current.broadcast({
+      type: 'new_game_approval',
+      playerId: playerId
+    });
+    
+    // בדוק אם כל השחקנים אישרו
+    if (newApprovals.size === gameState.players.length) {
+      startNewHand();
+    }
+  };
+
   const finishGame = () => {
     const activePlayers = gameState.players.filter(p => !p.folded);
     
+    let winner, prize, hand;
+    
     if (activePlayers.length === 1) {
       // רק שחקן אחד נשאר - הוא המנצח
-      const winner = activePlayers[0];
-      const prize = gameState.pot;
-      
-      const updatedPlayers = gameState.players.map(p => 
-        p.id === winner.id 
-          ? { ...p, chips: p.chips + prize }
-          : p
-      );
-      
-      setGameResult({
-        winner: winner.name,
-        prize: prize,
-        hand: "Won by fold"
-      });
-      
-      const updatedState = {
-        ...gameState,
-        players: updatedPlayers,
-        pot: 0,
-        status: "finished"
-      };
-      
-      engineRef.current.updateGameState(updatedState);
-      setShowResultModal(true);
+      winner = activePlayers[0];
+      prize = gameState.pot;
+      hand = "Won by fold";
     } else {
       // השוואת ידיים
       const hands = activePlayers.map(player => ({
@@ -570,31 +632,31 @@ export default function TexasHoldemMultiplayerPage() {
       // מיון לפי כוח היד
       hands.sort((a, b) => compareHands(b.hand, a.hand));
       
-      const winner = hands[0];
-      const prize = gameState.pot;
-      
-      const updatedPlayers = gameState.players.map(p => 
-        p.id === winner.player.id 
-          ? { ...p, chips: p.chips + prize }
-          : p
-      );
-      
-      setGameResult({
+      winner = hands[0];
+      prize = gameState.pot;
+      hand = winner.hand.hand;
+    }
+    
+    const updatedPlayers = gameState.players.map(p => 
+      p.id === winner.player.id 
+        ? { ...p, chips: p.chips + prize }
+        : p
+    );
+    
+    const updatedState = {
+      ...gameState,
+      players: updatedPlayers,
+      pot: 0,
+      status: "finished",
+      gameResult: { // הוסף את התוצאה ל-gameState
         winner: winner.player.name,
         prize: prize,
-        hand: winner.hand.hand
-      });
-      
-      const updatedState = {
-        ...gameState,
-        players: updatedPlayers,
-        pot: 0,
-        status: "finished"
-      };
-      
-      engineRef.current.updateGameState(updatedState);
-      setShowResultModal(true);
-    }
+        hand: hand
+      }
+    };
+    
+    engineRef.current.updateGameState(updatedState);
+    setShowResultModal(true);
   };
 
   const copyRoomCode = () => {
@@ -1150,56 +1212,60 @@ export default function TexasHoldemMultiplayerPage() {
         )}
 
         {/* Game Result Modal */}
-        {showResultModal && gameResult && (
+        {gameState?.status === "finished" && gameState?.gameResult && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
             <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl text-center">
               <h2 className="text-2xl font-extrabold mb-4">🎉 Game Over!</h2>
               <div className="space-y-4">
                 <div className="text-lg">
-                  <span className="text-yellow-400 font-bold">{gameResult.winner}</span> wins!
+                  <span className="text-yellow-400 font-bold">{gameState.gameResult.winner}</span> wins!
                 </div>
                 <div className="text-sm text-gray-300">
-                  Hand: <span className="text-green-400">{gameResult.hand}</span>
+                  Hand: <span className="text-green-400">{gameState.gameResult.hand}</span>
                 </div>
                 <div className="text-lg text-emerald-400 font-bold">
-                  Prize: {gameResult.prize} chips
+                  Prize: {gameState.gameResult.prize} chips
                 </div>
               </div>
               <div className="flex gap-2 mt-6">
+                {isHost ? (
+                  <button 
+                    onClick={requestNewGame}
+                    className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg"
+                  >
+                    New Game
+                  </button>
+                ) : (
+                  <button 
+                    onClick={approveNewGame}
+                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg"
+                  >
+                    Approve New Game
+                  </button>
+                )}
                 <button 
                   onClick={() => {
-                    setShowResultModal(false);
-                    // Reset game for new hand
-                    const resetState = {
-                      ...gameState,
-                      round: "pre-flop",
-                      pot: 0,
-                      currentBet: 0,
-                      communityCards: [],
-                      communityVisible: 0,
-                      players: gameState.players.map(p => ({
-                        ...p,
-                        bet: 0,
-                        folded: false,
-                        allIn: false,
-                        cards: []
-                      }))
-                    };
-                    engineRef.current.updateGameState(resetState);
-                  }}
-                  className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg"
-                >
-                  New Hand
-                </button>
-                <button 
-                  onClick={() => {
-                    setShowResultModal(false);
                     setScreen("lobby");
                   }}
                   className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg"
                 >
                   Back to Lobby
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Pending New Game Modal */}
+        {pendingNewGame && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl text-center">
+              <h2 className="text-2xl font-extrabold mb-4">⏳ Waiting for Approval</h2>
+              <div className="space-y-4">
+                <div className="text-lg">Waiting for all players to approve new game...</div>
+                <div className="text-sm text-gray-300">
+                  Approved: {newGameApprovals.size}/{gameState.players.length}
+                </div>
               </div>
             </div>
           </div>
