@@ -4,3 +4,10 @@ export default function TexasHoldemMultiplayerGamePage() {
   return <TexasHoldemMultiplayerPage />;
 }
 
+// Add getStaticProps to fix Next.js error
+export async function getStaticProps() {
+  return {
+    props: {},
+  };
+}
+
