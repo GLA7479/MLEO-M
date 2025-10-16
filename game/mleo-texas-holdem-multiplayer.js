@@ -1390,3 +1390,5 @@ export default function TexasHoldemMultiplayerPage() {
 
   return null;
 }
+
+export default TexasHoldemMultiplayerPage;
