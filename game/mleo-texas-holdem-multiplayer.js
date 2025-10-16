@@ -459,10 +459,10 @@ function TexasHoldemMultiplayerPage() {
       });
 
       engineRef.current = guest;
-      await guest.joinFromInvite(answerCode);
+      const generatedAnswer = await guest.joinFromInvite(answerCode);
       
-      setAnswerCode("");
-      setShowAnswerModal(false);
+      setAnswerCode(generatedAnswer);
+      setShowAnswerModal(true);
 
     } catch (err) {
       console.error("Join room error:", err);
@@ -523,7 +523,13 @@ function TexasHoldemMultiplayerPage() {
       deck: deck
     };
 
-    engineRef.current.updateGameState(updatedState);
+    // Send game state to all players
+    sendGameMessage({
+      type: 'game_state_update',
+      gameState: updatedState
+    });
+    
+    setGameState(updatedState);
     setScreen("game");
   };
 
@@ -620,7 +626,13 @@ function TexasHoldemMultiplayerPage() {
       communityVisible: newVisible
     };
     
-    engineRef.current.updateGameState(updatedState);
+    // Send game state to all players
+    sendGameMessage({
+      type: 'game_state_update',
+      gameState: updatedState
+    });
+    
+    setGameState(updatedState);
   };
 
   const startNewHand = () => {
@@ -650,7 +662,13 @@ function TexasHoldemMultiplayerPage() {
       newGameApprovals: [] // נקה את האישורים
     };
     
-    engineRef.current.updateGameState(resetState);
+    // Send game state to all players
+    sendGameMessage({
+      type: 'game_state_update',
+      gameState: resetState
+    });
+    
+    setGameState(resetState);
     setShowResultModal(false);
     setPendingNewGame(false);
     setNewGameApprovals(new Set());
@@ -671,7 +689,13 @@ function TexasHoldemMultiplayerPage() {
         status: "waiting_for_approval"
       };
       
-      engineRef.current.updateGameState(updatedState);
+      // Send game state to all players
+    sendGameMessage({
+      type: 'game_state_update',
+      gameState: updatedState
+    });
+    
+    setGameState(updatedState);
     } else {
       // שחקן מבקש - שולח בקשה למארח
       const updatedState = {
@@ -682,7 +706,13 @@ function TexasHoldemMultiplayerPage() {
         status: "waiting_for_host_approval"
       };
       
-      engineRef.current.updateGameState(updatedState);
+      // Send game state to all players
+    sendGameMessage({
+      type: 'game_state_update',
+      gameState: updatedState
+    });
+    
+    setGameState(updatedState);
     }
   };
 
@@ -697,7 +727,13 @@ function TexasHoldemMultiplayerPage() {
         newGameApprovals: [playerId] // המארח מאשר
       };
       
-      engineRef.current.updateGameState(updatedState);
+      // Send game state to all players
+    sendGameMessage({
+      type: 'game_state_update',
+      gameState: updatedState
+    });
+    
+    setGameState(updatedState);
     } else {
       // שחקן רגיל מאשר
       const currentApprovals = gameState.newGameApprovals || [];
@@ -709,7 +745,13 @@ function TexasHoldemMultiplayerPage() {
           newGameApprovals: updatedApprovals
         };
         
-        engineRef.current.updateGameState(updatedState);
+        // Send game state to all players
+    sendGameMessage({
+      type: 'game_state_update',
+      gameState: updatedState
+    });
+    
+    setGameState(updatedState);
         
         // בדוק אם כל השחקנים אישרו
         if (updatedApprovals.length === gameState.players.length) {
@@ -731,7 +773,13 @@ function TexasHoldemMultiplayerPage() {
       status: "finished"
     };
     
-    engineRef.current.updateGameState(updatedState);
+    // Send game state to all players
+    sendGameMessage({
+      type: 'game_state_update',
+      gameState: updatedState
+    });
+    
+    setGameState(updatedState);
     setPendingNewGame(false);
     setNewGameRequester(null);
   };
@@ -779,7 +827,13 @@ function TexasHoldemMultiplayerPage() {
       }
     };
     
-    engineRef.current.updateGameState(updatedState);
+    // Send game state to all players
+    sendGameMessage({
+      type: 'game_state_update',
+      gameState: updatedState
+    });
+    
+    setGameState(updatedState);
     setShowResultModal(true);
   };
 
@@ -979,15 +1033,48 @@ function TexasHoldemMultiplayerPage() {
                     Share this code with other players to join your game
                   </div>
                 </div>
+                <div className="mt-4">
+                  <label className="text-sm text-white/70 mb-2 block">Answer Code from Guest</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={answerCode}
+                      onChange={(e) => setAnswerCode(e.target.value)}
+                      placeholder="Paste guest's answer code here..."
+                      className="flex-1 px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white font-mono text-center placeholder-white/40"
+                    />
+                    <button
+                      onClick={async () => {
+                        if (answerCode.trim()) {
+                          try {
+                            await engineRef.current.acceptAnswer(answerCode);
+                            setShowInviteModal(false);
+                            setScreen("lobby");
+                          } catch (err) {
+                            console.error("Error accepting answer:", err);
+                            setError("Failed to accept answer. Please check the code.");
+                          }
+                        }
+                      }}
+                      className="px-4 py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold"
+                    >
+                      Accept
+                    </button>
+                  </div>
+                  <div className="text-xs text-white/60 mt-2">
+                    Wait for guest to send their answer code, then paste it here
+                  </div>
+                </div>
+                
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
                       setShowInviteModal(false);
                       setScreen("lobby");
                     }}
-                    className="flex-1 py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold"
+                    className="flex-1 py-3 rounded-lg bg-gray-500 hover:bg-gray-600 text-white font-bold"
                   >
-                    Continue to Lobby
+                    Skip (No Guest)
                   </button>
                 </div>
               </div>
@@ -1027,14 +1114,13 @@ function TexasHoldemMultiplayerPage() {
                 </div>
 
                 <div>
-                  <label className="text-sm text-white/70 mb-2 block">Room Code</label>
+                  <label className="text-sm text-white/70 mb-2 block">Answer Code</label>
                   <input
                     type="text"
-                    value={roomCode}
-                    onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                    maxLength={5}
-                    placeholder="XXXXX"
-                    className="w-full px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white text-center text-2xl font-bold tracking-widest placeholder-white/40"
+                    value={answerCode}
+                    onChange={(e) => setAnswerCode(e.target.value)}
+                    placeholder="Paste the invite code here..."
+                    className="w-full px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white font-mono text-center placeholder-white/40"
                   />
                 </div>
 
@@ -1055,6 +1141,51 @@ function TexasHoldemMultiplayerPage() {
             </div>
           </div>
         </div>
+
+        {/* Answer Modal */}
+        {showAnswerModal && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl">
+              <h2 className="text-2xl font-extrabold mb-4 text-center">🔗 Join Game</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-white/70 mb-2 block">Answer Code</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={answerCode}
+                      readOnly
+                      className="flex-1 px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white font-mono text-center"
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(answerCode);
+                        alert("Copied to clipboard!");
+                      }}
+                      className="px-4 py-3 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <div className="text-xs text-white/60 mt-2">
+                    Send this code back to the host to complete the connection
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setShowAnswerModal(false);
+                      setScreen("game");
+                    }}
+                    className="flex-1 py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold"
+                  >
+                    Continue to Game
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </Layout>
     );
   }
