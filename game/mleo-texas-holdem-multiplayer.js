@@ -186,6 +186,7 @@ export default function TexasHoldemMultiplayerPage() {
   const [playerName, setPlayerName] = useState("");
   const [roomCode, setRoomCode] = useState("");
   const [maxPlayers, setMaxPlayers] = useState(4);
+  const [startingChips, setStartingChips] = useState(10000);
   const [error, setError] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -195,6 +196,12 @@ export default function TexasHoldemMultiplayerPage() {
   const [playerId, setPlayerId] = useState(null);
   const [isHost, setIsHost] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
+  
+  // Betting logic states
+  const [betAmount, setBetAmount] = useState("100");
+  const [maxEntryAmount] = useState(2000000); // 2M מקסימום
+  const [showBetModal, setShowBetModal] = useState(false);
+  const [isAllIn, setIsAllIn] = useState(false);
   
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
@@ -306,7 +313,7 @@ export default function TexasHoldemMultiplayerPage() {
         setError("Connection error: " + err.message);
       };
 
-      const result = await engine.createRoom(playerName, maxPlayers);
+      const result = await engine.createRoom(playerName, maxPlayers, startingChips);
       
       setPlayerId(result.playerId);
       setIsHost(true);
@@ -445,13 +452,24 @@ export default function TexasHoldemMultiplayerPage() {
     } else if (action === "check") {
       // No change needed
     } else if (action === "raise") {
+      const raiseAmount = Math.min(amount, currentPlayer.chips);
       updatedPlayers[gameState.currentPlayerIndex] = {
         ...currentPlayer,
-        bet: currentPlayer.bet + amount,
-        chips: currentPlayer.chips - amount
+        bet: currentPlayer.bet + raiseAmount,
+        chips: currentPlayer.chips - raiseAmount
       };
-      gameState.pot += amount;
-      gameState.currentBet = currentPlayer.bet + amount;
+      gameState.pot += raiseAmount;
+      gameState.currentBet = currentPlayer.bet + raiseAmount;
+    } else if (action === "allin") {
+      const allInAmount = currentPlayer.chips;
+      updatedPlayers[gameState.currentPlayerIndex] = {
+        ...currentPlayer,
+        bet: currentPlayer.bet + allInAmount,
+        chips: 0,
+        allIn: true
+      };
+      gameState.pot += allInAmount;
+      gameState.currentBet = Math.max(gameState.currentBet, currentPlayer.bet + allInAmount);
     }
     
     // Move to next player
@@ -624,6 +642,25 @@ export default function TexasHoldemMultiplayerPage() {
                         {num}
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm text-white/70 mb-2 block">Starting Chips (Max: {maxEntryAmount.toLocaleString()})</label>
+                  <input
+                    type="number"
+                    value={startingChips}
+                    onChange={(e) => {
+                      const value = Math.min(Number(e.target.value), maxEntryAmount);
+                      setStartingChips(value);
+                    }}
+                    min="1000"
+                    max={maxEntryAmount}
+                    placeholder="10000"
+                    className="w-full px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white placeholder-white/40"
+                  />
+                  <div className="text-xs text-white/50 mt-1">
+                    Each player starts with this amount
                   </div>
                 </div>
 
@@ -874,8 +911,37 @@ export default function TexasHoldemMultiplayerPage() {
               <div className="w-full max-w-sm space-y-2">
                 <div className="flex gap-2">
                   <button onClick={() => handlePlayerAction("fold")} className="flex-1 h-10 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 font-semibold text-xs">FOLD</button>
-                  <button onClick={() => handlePlayerAction("check")} className="flex-1 h-10 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs">CHECK</button>
-                  <button onClick={() => handlePlayerAction("call")} className="flex-1 h-10 rounded-lg bg-green-500/20 border border-green-500/30 text-green-300 hover:bg-green-500/30 font-semibold text-xs">CALL</button>
+                  <button 
+                    onClick={() => handlePlayerAction("check")} 
+                    disabled={gameState.currentBet > myPlayer.bet}
+                    className="flex-1 h-10 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    CHECK
+                  </button>
+                  <button 
+                    onClick={() => handlePlayerAction("call")} 
+                    disabled={gameState.currentBet <= myPlayer.bet || myPlayer.chips < (gameState.currentBet - myPlayer.bet)}
+                    className="flex-1 h-10 rounded-lg bg-green-500/20 border border-green-500/30 text-green-300 hover:bg-green-500/30 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    CALL {gameState.currentBet > myPlayer.bet ? `(${gameState.currentBet - myPlayer.bet})` : ''}
+                  </button>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setShowBetModal(true)} 
+                    disabled={myPlayer.chips === 0}
+                    className="flex-1 h-10 rounded-lg bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    BET/RAISE
+                  </button>
+                  <button 
+                    onClick={() => handlePlayerAction("allin")} 
+                    disabled={myPlayer.chips === 0 || myPlayer.allIn}
+                    className="flex-1 h-10 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ALL-IN
+                  </button>
                 </div>
                 
                 <div className="flex gap-2">
@@ -951,6 +1017,53 @@ export default function TexasHoldemMultiplayerPage() {
                 <div className="text-xs text-white/60"><p>• Your vault is shared across all MLEO games</p><p>• Collect earnings to your wallet anytime</p><p>• Network: BSC Testnet (TBNB)</p></div>
               </div>
               <button onClick={() => setShowVaultModal(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
+            </div>
+          </div>
+        )}
+
+        {/* Bet Modal */}
+        {showBetModal && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl">
+              <h2 className="text-2xl font-extrabold mb-4">💰 Place Bet</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Bet Amount</label>
+                  <input 
+                    type="number" 
+                    value={betAmount} 
+                    onChange={(e) => setBetAmount(e.target.value)}
+                    className="w-full p-3 bg-gray-800 text-white rounded-lg border border-gray-600 focus:border-yellow-500 focus:outline-none"
+                    placeholder="Enter bet amount"
+                    min="1"
+                    max={myPlayer?.chips || 0}
+                  />
+                  <div className="text-xs text-gray-400 mt-1">
+                    Available: {myPlayer?.chips || 0} chips
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      const amount = Number(betAmount);
+                      if (amount > 0 && amount <= (myPlayer?.chips || 0)) {
+                        handlePlayerAction("raise", amount);
+                        setShowBetModal(false);
+                      }
+                    }}
+                    className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-lg transition-colors"
+                  >
+                    BET
+                  </button>
+                  <button 
+                    onClick={() => setShowBetModal(false)}
+                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
