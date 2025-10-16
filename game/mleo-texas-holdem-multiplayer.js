@@ -1,8 +1,7 @@
 // ============================================================================
-// MLEO Texas Hold'em Multiplayer - FULL GAME
-// Complete Texas Hold'em with all betting rounds and turn management
+// MLEO Texas Hold'em Multiplayer - NEW VERSION
+// Simple and working multiplayer Texas Hold'em
 // ============================================================================
-
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
@@ -37,7 +36,7 @@ function useIOSViewportFix() {
   }, []);
 }
 
-const LS_KEY = "mleo_texas_holdem_multiplayer_v1";
+const LS_KEY = "mleo_texas_holdem_multiplayer_v2";
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
@@ -74,14 +73,6 @@ function shuffleDeck(deck) {
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;
-}
-
-function compareHands(playerHand, dealerHand) {
-  if (playerHand.rank > dealerHand.rank) return 1;
-  if (dealerHand.rank > playerHand.rank) return -1;
-  if (playerHand.highCard > dealerHand.highCard) return 1;
-  if (dealerHand.highCard > playerHand.highCard) return -1;
-  return 0;
 }
 
 function getCardValue(card) {
@@ -201,10 +192,10 @@ function TexasHoldemMultiplayerPage() {
   const [mounted, setMounted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
+  // Game state
   const [gameState, setGameState] = useState(null);
   const [playerId, setPlayerId] = useState(null);
   const [isHost, setIsHost] = useState(false);
-  const [forceUpdate, setForceUpdate] = useState(0);
   
   // WebRTC states
   const [inviteCode, setInviteCode] = useState("");
@@ -212,25 +203,12 @@ function TexasHoldemMultiplayerPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAnswerModal, setShowAnswerModal] = useState(false);
   
-  // Raise modal state
-  const [showRaiseModal, setShowRaiseModal] = useState(false);
-  const [raiseAmount, setRaiseAmount] = useState(0);
-  
-  // Betting logic states
+  // Betting states
   const [betAmount, setBetAmount] = useState("100");
-  const [maxEntryAmount] = useState(2000000); // 2M מקסימום
+  const [maxEntryAmount] = useState(2000000);
   const [showBetModal, setShowBetModal] = useState(false);
-  const [isAllIn, setIsAllIn] = useState(false);
   
-  // Game result states
-  const [gameResult, setGameResult] = useState(null);
-  const [showResultModal, setShowResultModal] = useState(false);
-  
-  // New game approval states
-  const [pendingNewGame, setPendingNewGame] = useState(false);
-  const [newGameApprovals, setNewGameApprovals] = useState(new Set());
-  const [newGameRequester, setNewGameRequester] = useState(null);
-  
+  // UI states
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -242,10 +220,6 @@ function TexasHoldemMultiplayerPage() {
   const [vault, setVaultState] = useState(0);
 
   const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalGames: 0, wins: 0, losses: 0, biggestPot: 0 }));
-
-  // Use ref to track current gameState for callbacks
-  const gameStateRef = useRef(gameState);
-  gameStateRef.current = gameState;
 
   const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
 
@@ -275,26 +249,6 @@ function TexasHoldemMultiplayerPage() {
   }, []);
 
   useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
-
-  // Update onStateUpdate callback when screen changes
-  useEffect(() => {
-    if (engineRef.current) {
-      engineRef.current.onStateUpdate = (state) => {
-        console.log("State updated:", state);
-        setGameState(state);
-        setForceUpdate(prev => prev + 1); // Force re-render
-        if (state.status === "playing" && screen === "lobby") {
-          setScreen("game");
-        }
-      };
-      
-      // Handle broadcast messages (not needed anymore with gameState sync)
-      engineRef.current.onMessage = (message) => {
-        console.log("Received message:", message);
-        // All new game logic is now handled through gameState synchronization
-      };
-    }
-  }, [screen, forceUpdate]);
 
   const openWalletModalUnified = () => isConnected ? openAccountModal?.() : openConnectModal?.();
   const hardDisconnect = () => { disconnect?.(); setMenuOpen(false); };
@@ -330,7 +284,6 @@ function TexasHoldemMultiplayerPage() {
       const host = new DirectHost({
         onPeerOpen: (peerId) => {
           console.log("Player joined:", peerId);
-          // Add player to game state
           const newPlayer = {
             id: peerId,
             name: `Player ${peerId}`,
@@ -338,27 +291,25 @@ function TexasHoldemMultiplayerPage() {
             chips: 10000,
             status: 'ready'
           };
+          
           setGameState(prev => {
-            if (!prev) {
-              // Initialize game state if it doesn't exist
-              return {
-                roomCode: "DIRECT",
-                maxPlayers,
-                players: [{
-                  id: "host",
-                  name: playerName,
-                  isHost: true,
-                  chips: 10000,
-                  status: 'ready'
-                }, newPlayer],
-                status: 'waiting',
-                hostId: "host"
-              };
-            }
-            return {
+            const updatedState = {
               ...prev,
-              players: [...prev.players, newPlayer]
+              players: [...(prev?.players || []), newPlayer],
+              status: 'waiting'
             };
+            
+            // Send game state to guest
+            setTimeout(() => {
+              if (engineRef.current) {
+                engineRef.current.broadcast({
+                  type: 'game_state_update',
+                  gameState: updatedState
+                });
+              }
+            }, 100);
+            
+            return updatedState;
           });
         },
         onPeerClose: (peerId) => {
@@ -372,16 +323,11 @@ function TexasHoldemMultiplayerPage() {
           });
         },
         onMessage: (peerId, data) => {
-          console.log("Message from", peerId, ":", data);
-          // Handle game messages
+          console.log("Host received message:", data);
           try {
             const message = typeof data === 'string' ? JSON.parse(data) : data;
             if (message.type === 'game_action') {
-              console.log("Host received game action:", message);
-              handleGameMessage(message);
-            } else if (message.type === 'game_state_update') {
-              console.log("Host received game state update:", message);
-              setGameState(message.gameState);
+              handlePlayerAction(message.action, message.amount);
             }
           } catch (e) {
             console.error("Error parsing message:", e);
@@ -396,7 +342,6 @@ function TexasHoldemMultiplayerPage() {
       setPlayerId("host");
       setIsHost(true);
       setInviteCode(inviteCode);
-      console.log("Setting showInviteModal to true");
       setShowInviteModal(true);
       
       // Initialize game state
@@ -444,13 +389,31 @@ function TexasHoldemMultiplayerPage() {
           console.log("Guest connected to host");
           setPlayerId("guest");
           setIsHost(false);
-          setScreen("game");
+          
+          // Request game state
+          setTimeout(() => {
+            if (engineRef.current) {
+              engineRef.current.send({
+                type: 'request_game_state'
+              });
+            }
+          }, 200);
         },
         onMessage: (data) => {
           console.log("Guest received message:", data);
           try {
             const message = typeof data === 'string' ? JSON.parse(data) : data;
-            handleGameMessage(message);
+            if (message.type === 'game_state_update') {
+              console.log("Guest received game state:", message.gameState);
+              setGameState(message.gameState);
+              
+              // Switch to appropriate screen
+              if (message.gameState.status === "playing") {
+                setScreen("game");
+              } else if (message.gameState.status === "waiting") {
+                setScreen("lobby");
+              }
+            }
           } catch (e) {
             console.error("Error parsing message:", e);
           }
@@ -475,10 +438,8 @@ function TexasHoldemMultiplayerPage() {
   const sendGameMessage = (message) => {
     if (engineRef.current) {
       if (isHost) {
-        // Host broadcasts to all guests
         engineRef.current.broadcast(message);
       } else {
-        // Guest sends to host
         engineRef.current.send(message);
       }
     }
@@ -499,7 +460,8 @@ function TexasHoldemMultiplayerPage() {
       cards: [deck[idx * 2], deck[idx * 2 + 1]],
       bet: idx === 0 ? SMALL_BLIND : idx === 1 ? BIG_BLIND : 0,
       folded: false,
-      chips: 10000 - (idx === 0 ? SMALL_BLIND : idx === 1 ? BIG_BLIND : 0)
+      chips: 10000 - (idx === 0 ? SMALL_BLIND : idx === 1 ? BIG_BLIND : 0),
+      allIn: false
     }));
 
     const communityCards = [
@@ -523,6 +485,8 @@ function TexasHoldemMultiplayerPage() {
       deck: deck
     };
 
+    console.log("Starting game with state:", updatedState);
+    
     // Send game state to all players
     sendGameMessage({
       type: 'game_state_update',
@@ -537,9 +501,17 @@ function TexasHoldemMultiplayerPage() {
     if (!gameState) return;
     
     const players = gameState.players || [];
-    const myPlayer = players.find(p => p.id === playerId);
+    const myPlayer = players.find(p => {
+      if (playerId === "host" && p.isHost) return true;
+      if (playerId === "guest" && !p.isHost) return true;
+      return p.id === playerId;
+    });
     const currentPlayer = players[gameState.currentPlayerIndex];
-    const isMyTurn = currentPlayer?.id === playerId;
+    const isMyTurn = currentPlayer && (
+      (playerId === "host" && currentPlayer.isHost) ||
+      (playerId === "guest" && !currentPlayer.isHost) ||
+      (currentPlayer.id === playerId)
+    );
     
     if (!isMyTurn || myPlayer?.folded) return;
     
@@ -589,41 +561,11 @@ function TexasHoldemMultiplayerPage() {
       nextIndex = (nextIndex + 1) % gameState.players.length;
     }
     
-    // Check if round is over
-    const activePlayers = updatedPlayers.filter(p => !p.folded);
-    const allBetsEqual = activePlayers.every(p => p.bet === gameState.currentBet);
-    
-    let newRound = gameState.round;
-    let newVisible = gameState.communityVisible;
-    
-    if (allBetsEqual && nextIndex === 0) {
-      if (gameState.round === "pre-flop") {
-        newRound = "flop";
-        newVisible = 3;
-      } else if (gameState.round === "flop") {
-        newRound = "turn";
-        newVisible = 4;
-      } else if (gameState.round === "turn") {
-        newRound = "river";
-        newVisible = 5;
-      } else if (gameState.round === "river") {
-        // Show down
-        newRound = "showdown";
-        // הוסף קריאה ל-finishGame
-        setTimeout(() => finishGame(), 1000);
-      }
-      
-      // Reset bets for new round
-      updatedPlayers.forEach(p => p.bet = 0);
-      gameState.currentBet = 0;
-    }
-    
     const updatedState = {
       ...gameState,
       players: updatedPlayers,
       currentPlayerIndex: nextIndex,
-      round: newRound,
-      communityVisible: newVisible
+      pot: gameState.pot
     };
     
     // Send game state to all players
@@ -633,215 +575,6 @@ function TexasHoldemMultiplayerPage() {
     });
     
     setGameState(updatedState);
-  };
-
-  const startNewHand = () => {
-    const deck = shuffleDeck(createDeck());
-    const newCommunityCards = deck.slice(0, 5);
-    const newPlayers = gameState.players.map((player, index) => ({
-      ...player,
-      cards: [deck[5 + index * 2], deck[6 + index * 2]], // 2 cards per player
-      bet: 0,
-      folded: false,
-      allIn: false
-    }));
-
-    const resetState = {
-      ...gameState,
-      round: "pre-flop",
-      pot: 0,
-      currentBet: BIG_BLIND,
-      communityCards: newCommunityCards,
-      communityVisible: 0,
-      currentPlayerIndex: 0,
-      players: newPlayers,
-      status: "playing",
-      gameResult: null, // נקה את התוצאה
-      newGameRequest: false, // נקה את בקשת המשחק החדש
-      newGameRequester: null, // נקה את מבקש המשחק
-      newGameApprovals: [] // נקה את האישורים
-    };
-    
-    // Send game state to all players
-    sendGameMessage({
-      type: 'game_state_update',
-      gameState: resetState
-    });
-    
-    setGameState(resetState);
-    setShowResultModal(false);
-    setPendingNewGame(false);
-    setNewGameApprovals(new Set());
-  };
-
-  const requestNewGame = () => {
-    console.log("Player requesting new game:", playerId);
-    setPendingNewGame(true);
-    setNewGameRequester(playerId);
-    
-    if (isHost) {
-      // המארח מבקש - מתחיל מיד עם אישור אוטומטי
-      const updatedState = {
-        ...gameState,
-        newGameRequest: true,
-        newGameRequester: playerId,
-        newGameApprovals: [playerId], // המארח מאשר אוטומטית
-        status: "waiting_for_approval"
-      };
-      
-      // Send game state to all players
-    sendGameMessage({
-      type: 'game_state_update',
-      gameState: updatedState
-    });
-    
-    setGameState(updatedState);
-    } else {
-      // שחקן מבקש - שולח בקשה למארח
-      const updatedState = {
-        ...gameState,
-        newGameRequest: true,
-        newGameRequester: playerId,
-        newGameApprovals: [], // מתחיל ללא אישורים
-        status: "waiting_for_host_approval"
-      };
-      
-      // Send game state to all players
-    sendGameMessage({
-      type: 'game_state_update',
-      gameState: updatedState
-    });
-    
-    setGameState(updatedState);
-    }
-  };
-
-  const approveNewGame = () => {
-    console.log("Player approving new game:", playerId);
-    
-    if (isHost && gameState.status === "waiting_for_host_approval") {
-      // המארח מאשר בקשה משחקן
-      const updatedState = {
-        ...gameState,
-        status: "waiting_for_approval",
-        newGameApprovals: [playerId] // המארח מאשר
-      };
-      
-      // Send game state to all players
-    sendGameMessage({
-      type: 'game_state_update',
-      gameState: updatedState
-    });
-    
-    setGameState(updatedState);
-    } else {
-      // שחקן רגיל מאשר
-      const currentApprovals = gameState.newGameApprovals || [];
-      if (!currentApprovals.includes(playerId)) {
-        const updatedApprovals = [...currentApprovals, playerId];
-        
-        const updatedState = {
-          ...gameState,
-          newGameApprovals: updatedApprovals
-        };
-        
-        // Send game state to all players
-    sendGameMessage({
-      type: 'game_state_update',
-      gameState: updatedState
-    });
-    
-    setGameState(updatedState);
-        
-        // בדוק אם כל השחקנים אישרו
-        if (updatedApprovals.length === gameState.players.length) {
-          console.log("All players approved, starting new hand");
-          setTimeout(() => startNewHand(), 500);
-        }
-      }
-    }
-  };
-
-  const rejectNewGame = () => {
-    console.log("Rejecting new game request");
-    
-    const updatedState = {
-      ...gameState,
-      newGameRequest: false,
-      newGameRequester: null,
-      newGameApprovals: [],
-      status: "finished"
-    };
-    
-    // Send game state to all players
-    sendGameMessage({
-      type: 'game_state_update',
-      gameState: updatedState
-    });
-    
-    setGameState(updatedState);
-    setPendingNewGame(false);
-    setNewGameRequester(null);
-  };
-
-  const finishGame = () => {
-    const activePlayers = gameState.players.filter(p => !p.folded);
-    
-    let winner, prize, hand;
-    
-    if (activePlayers.length === 1) {
-      // רק שחקן אחד נשאר - הוא המנצח
-      winner = activePlayers[0];
-      prize = gameState.pot;
-      hand = "Won by fold";
-    } else {
-      // השוואת ידיים
-      const hands = activePlayers.map(player => ({
-        player,
-        hand: evaluateHand([...player.cards, ...gameState.communityCards])
-      }));
-      
-      // מיון לפי כוח היד
-      hands.sort((a, b) => compareHands(b.hand, a.hand));
-      
-      winner = hands[0];
-      prize = gameState.pot;
-      hand = winner.hand.hand;
-    }
-    
-    const updatedPlayers = gameState.players.map(p => 
-      p.id === winner.player.id 
-        ? { ...p, chips: p.chips + prize }
-        : p
-    );
-    
-    const updatedState = {
-      ...gameState,
-      players: updatedPlayers,
-      pot: 0,
-      status: "finished",
-      gameResult: { // הוסף את התוצאה ל-gameState
-        winner: winner.player.name,
-        prize: prize,
-        hand: hand
-      }
-    };
-    
-    // Send game state to all players
-    sendGameMessage({
-      type: 'game_state_update',
-      gameState: updatedState
-    });
-    
-    setGameState(updatedState);
-    setShowResultModal(true);
-  };
-
-  const copyRoomCode = () => {
-    if (roomCode) {
-      navigator.clipboard.writeText(roomCode);
-      alert("Room code copied!");
-    }
   };
 
   const backToMenu = () => {
@@ -858,7 +591,6 @@ function TexasHoldemMultiplayerPage() {
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return null;
-
 
   // MENU SCREEN
   if (screen === "menu") {
@@ -879,7 +611,7 @@ function TexasHoldemMultiplayerPage() {
           <div className="relative h-full flex flex-col items-center justify-center px-4">
             <div className="text-center mb-8">
               <h1 className="text-4xl font-extrabold text-white mb-2">🎴 Texas Hold'em</h1>
-              <p className="text-white/70 text-lg">Multiplayer</p>
+              <p className="text-white/70 text-lg">Multiplayer v2.0</p>
             </div>
 
             <div className="w-full max-w-md space-y-4">
@@ -900,7 +632,7 @@ function TexasHoldemMultiplayerPage() {
               <div className="text-center text-white/60 text-sm mt-8">
                 <p>• Play with 2-6 players</p>
                 <p>• Real-time peer-to-peer</p>
-                <p>• No server required!</p>
+                <p>• Simple and working!</p>
               </div>
             </div>
           </div>
@@ -912,7 +644,7 @@ function TexasHoldemMultiplayerPage() {
               <div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div>
               <div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div>
               <div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div>
-              <div className="mt-4 text-xs opacity-70"><p>Multiplayer v1.0</p></div>
+              <div className="mt-4 text-xs opacity-70"><p>Multiplayer v2.0</p></div>
             </div>
           </div>
         )}
@@ -1175,11 +907,11 @@ function TexasHoldemMultiplayerPage() {
                   <button
                     onClick={() => {
                       setShowAnswerModal(false);
-                      setScreen("game");
+                      setScreen("lobby");
                     }}
                     className="flex-1 py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold"
                   >
-                    Continue to Game
+                    Continue to Lobby
                   </button>
                 </div>
               </div>
@@ -1195,14 +927,6 @@ function TexasHoldemMultiplayerPage() {
     const players = gameState?.players || [];
     const currentPlayers = players.length;
     const maxPlayersCount = gameState?.maxPlayers || maxPlayers;
-
-    console.log("Lobby render:", { 
-      gameState, 
-      players, 
-      currentPlayers, 
-      isHost, 
-      maxPlayersCount 
-    });
 
     return (
       <Layout>
@@ -1220,22 +944,25 @@ function TexasHoldemMultiplayerPage() {
                 <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-3 mb-4">
                   <div className="text-sm text-white/70 mb-1">Room Code</div>
                   <div className="text-3xl font-bold text-white tracking-widest">{roomCode}</div>
-                  <button onClick={copyRoomCode} className="mt-2 text-sm text-green-300 hover:text-green-200">📋 Copy Code</button>
+                  <button onClick={() => { navigator.clipboard.writeText(roomCode); alert("Room code copied!"); }} className="mt-2 text-sm text-green-300 hover:text-green-200">📋 Copy Code</button>
                 </div>
                 <div className="text-white/70 text-sm">Players: {currentPlayers}/{maxPlayersCount}</div>
               </div>
 
               <div className="space-y-2 mb-6">
-                {players.map((player) => (
-                  <div key={player.id} className="bg-white/10 rounded-lg p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">{player.isHost ? '👑' : '👤'}</span>
-                      <span className="font-semibold text-white">{player.name}</span>
-                      {player.id === playerId && <span className="text-xs text-green-400">(You)</span>}
+                {players.map((player) => {
+                  const isMe = (playerId === "host" && player.isHost) || (playerId === "guest" && !player.isHost) || (player.id === playerId);
+                  return (
+                    <div key={player.id} className="bg-white/10 rounded-lg p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl">{player.isHost ? '👑' : '👤'}</span>
+                        <span className="font-semibold text-white">{player.name}</span>
+                        {isMe && <span className="text-xs text-green-400">(You)</span>}
+                      </div>
+                      <div className="text-emerald-400 text-sm font-semibold">Ready</div>
                     </div>
-                    <div className="text-emerald-400 text-sm font-semibold">Ready</div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {Array.from({ length: maxPlayersCount - currentPlayers }).map((_, i) => (
                   <div key={`empty-${i}`} className="bg-white/5 rounded-lg p-3 flex items-center gap-2 opacity-50">
@@ -1274,15 +1001,23 @@ function TexasHoldemMultiplayerPage() {
     );
   }
 
-  // GAME SCREEN - This is a working foundation, full turn management would need more implementation
+  // GAME SCREEN
   if (screen === "game") {
     const players = gameState?.players || [];
     const pot = gameState?.pot || 0;
     const communityCards = gameState?.communityCards || [];
     const communityVisible = gameState?.communityVisible || 0;
-    const myPlayer = players.find(p => p.id === playerId);
+    const myPlayer = players.find(p => {
+      if (playerId === "host" && p.isHost) return true;
+      if (playerId === "guest" && !p.isHost) return true;
+      return p.id === playerId;
+    });
     const currentPlayer = players[gameState?.currentPlayerIndex];
-    const isMyTurn = currentPlayer?.id === playerId;
+    const isMyTurn = currentPlayer && (
+      (playerId === "host" && currentPlayer.isHost) ||
+      (playerId === "guest" && !currentPlayer.isHost) ||
+      (currentPlayer.id === playerId)
+    );
 
     return (
       <Layout>
@@ -1327,27 +1062,30 @@ function TexasHoldemMultiplayerPage() {
 
             {/* Players */}
             <div className="w-full max-w-lg space-y-1 mb-2 flex-1 overflow-y-auto">
-              {players.map((player, idx) => (
-                <div key={player.id} className={`bg-black/30 border ${player.id === playerId ? 'border-green-500/50' : player.id === currentPlayer?.id ? 'border-yellow-500/50' : 'border-white/10'} rounded-lg p-2`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span>{player.isHost ? '👑' : '👤'}</span>
-                      <span className="text-white font-semibold text-xs">{player.name}</span>
-                      {player.id === playerId && <span className="text-xs text-green-400">(You)</span>}
-                      {player.folded && <span className="text-xs text-red-400">(Folded)</span>}
-                      {player.id === currentPlayer?.id && !player.folded && <span className="text-xs text-yellow-400">⏰</span>}
+              {players.map((player, idx) => {
+                const isMe = (playerId === "host" && player.isHost) || (playerId === "guest" && !player.isHost) || (player.id === playerId);
+                return (
+                  <div key={player.id} className={`bg-black/30 border ${isMe ? 'border-green-500/50' : player.id === currentPlayer?.id ? 'border-yellow-500/50' : 'border-white/10'} rounded-lg p-2`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span>{player.isHost ? '👑' : '👤'}</span>
+                        <span className="text-white font-semibold text-xs">{player.name}</span>
+                        {isMe && <span className="text-xs text-green-400">(You)</span>}
+                        {player.folded && <span className="text-xs text-red-400">(Folded)</span>}
+                        {player.id === currentPlayer?.id && !player.folded && <span className="text-xs text-yellow-400">⏰</span>}
+                      </div>
+                      <div className="text-emerald-400 text-xs">{player.chips} | Bet: {player.bet}</div>
                     </div>
-                    <div className="text-emerald-400 text-xs">{player.chips} | Bet: {player.bet}</div>
+                    {isMe && player.cards && (
+                      <div className="flex gap-1 mt-2 justify-center">
+                        {player.cards.map((card, i) => (
+                          <PlayingCard key={i} card={card} delay={i * 200} />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  {player.id === playerId && player.cards && (
-                    <div className="flex gap-1 mt-2 justify-center">
-                      {player.cards.map((card, i) => (
-                        <PlayingCard key={i} card={card} delay={i * 200} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Action Buttons - Show for current player */}
@@ -1405,7 +1143,7 @@ function TexasHoldemMultiplayerPage() {
               <div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div>
               <div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div>
               <div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div>
-              <div className="mt-4 text-xs opacity-70"><p>Multiplayer v1.0</p></div>
+              <div className="mt-4 text-xs opacity-70"><p>Multiplayer v2.0</p></div>
             </div>
           </div>
         )}
@@ -1508,137 +1246,6 @@ function TexasHoldemMultiplayerPage() {
                   </button>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Game Result Modal */}
-        {gameState?.status === "finished" && gameState?.gameResult && (
-          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
-            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl text-center">
-              <h2 className="text-2xl font-extrabold mb-4">🎉 Game Over!</h2>
-              <div className="space-y-4">
-                <div className="text-lg">
-                  <span className="text-yellow-400 font-bold">{gameState.gameResult.winner}</span> wins!
-                </div>
-                <div className="text-sm text-gray-300">
-                  Hand: <span className="text-green-400">{gameState.gameResult.hand}</span>
-                </div>
-                <div className="text-lg text-emerald-400 font-bold">
-                  Prize: {gameState.gameResult.prize} chips
-                </div>
-              </div>
-              <div className="flex gap-2 mt-6">
-                {!gameState?.newGameRequest && (
-                  <button 
-                    onClick={requestNewGame}
-                    className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg"
-                  >
-                    New Game
-                  </button>
-                )}
-                <button 
-                  onClick={() => {
-                    setScreen("lobby");
-                  }}
-                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg"
-                >
-                  Back to Lobby
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* New Game Approval Modal */}
-        {gameState?.newGameRequest && (
-          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
-            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl text-center">
-              {gameState.status === "waiting_for_host_approval" ? (
-                <>
-                  <h2 className="text-2xl font-extrabold mb-4">🎮 New Game Request</h2>
-                  <div className="space-y-4">
-                    <div className="text-lg">
-                      <span className="text-yellow-400 font-bold">
-                        {gameState.players?.find(p => p.id === gameState.newGameRequester)?.name}
-                      </span> wants to start a new game
-                    </div>
-                    <div className="text-sm text-gray-300">
-                      Host approval required
-                    </div>
-                  </div>
-                  <div className="flex gap-2 mt-6">
-                    {isHost && (
-                      <>
-                        <button 
-                          onClick={approveNewGame}
-                          className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg"
-                        >
-                          Approve
-                        </button>
-                        <button 
-                          onClick={rejectNewGame}
-                          className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg"
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
-                    {!isHost && (
-                      <button 
-                        onClick={() => {
-                          setScreen("lobby");
-                        }}
-                        className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg"
-                      >
-                        Back to Lobby
-                      </button>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h2 className="text-2xl font-extrabold mb-4">⏳ Waiting for Approval</h2>
-                  <div className="space-y-4">
-                    <div className="text-lg">Waiting for all players to approve new game...</div>
-                    <div className="text-sm text-gray-300">
-                      Approved: {gameState.newGameApprovals?.length || 0}/{gameState.players?.length || 0}
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      {gameState.newGameApprovals?.map(id => {
-                        const player = gameState.players?.find(p => p.id === id);
-                        return player?.name;
-                      }).join(", ")}
-                    </div>
-                  </div>
-                  <div className="flex gap-2 mt-6">
-                    {!isHost && !gameState.newGameApprovals?.includes(playerId) && (
-                      <button 
-                        onClick={approveNewGame}
-                        className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg"
-                      >
-                        Approve New Game
-                      </button>
-                    )}
-                    {isHost && (
-                      <button 
-                        onClick={rejectNewGame}
-                        className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg"
-                      >
-                        Cancel Request
-                      </button>
-                    )}
-                    <button 
-                      onClick={() => {
-                        setScreen("lobby");
-                      }}
-                      className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg"
-                    >
-                      Back to Lobby
-                    </button>
-                  </div>
-                </>
-              )}
             </div>
           </div>
         )}
