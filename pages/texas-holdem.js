@@ -1,7 +1,7 @@
-import TexasHoldemPage from '../game/mleo-texas-holdem';
+import TexasHoldemMultiplayerPage from '../game/mleo-texas-holdem-multiplayer';
 
 export default function TexasHoldemGamePage() {
-  return <TexasHoldemPage />;
+  return <TexasHoldemMultiplayerPage />;
 }
 
 
