@@ -250,6 +250,11 @@ function TexasHoldemMultiplayerPage() {
 
   useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
 
+  // Force re-render when gameState changes
+  useEffect(() => {
+    console.log("GameState updated:", gameState);
+  }, [gameState]);
+
   const openWalletModalUnified = () => isConnected ? openAccountModal?.() : openConnectModal?.();
   const hardDisconnect = () => { disconnect?.(); setMenuOpen(false); };
 
@@ -294,10 +299,10 @@ function TexasHoldemMultiplayerPage() {
           
           setGameState(prev => {
             const updatedState = {
-              ...prev,
+                ...prev,
               players: [...(prev?.players || []), newPlayer],
               status: 'waiting'
-            };
+              };
             
             // Send game state to guest
             setTimeout(() => {
@@ -327,7 +332,19 @@ function TexasHoldemMultiplayerPage() {
           try {
             const message = typeof data === 'string' ? JSON.parse(data) : data;
             if (message.type === 'game_action') {
-              handlePlayerAction(message.action, message.amount);
+              console.log("Host processing guest action:", message.action, message.amount);
+              // Process the action and update game state
+              processGuestAction(message.action, message.amount);
+            } else if (message.type === 'request_game_state') {
+              console.log("Host received request for game state");
+              if (gameState) {
+                engineRef.current.broadcast({
+                  type: 'game_state_update',
+                  gameState: gameState
+                });
+              }
+            } else if (message.type === 'game_state_update') {
+              console.log("Host received game state update from guest, ignoring");
             }
           } catch (e) {
             console.error("Error parsing message:", e);
@@ -413,6 +430,9 @@ function TexasHoldemMultiplayerPage() {
               } else if (message.gameState.status === "waiting") {
                 setScreen("lobby");
               }
+            } else if (message.type === 'game_action') {
+              // Guest should not process game actions - only the host does
+              console.log("Guest received game action, ignoring (host should process)");
             }
           } catch (e) {
             console.error("Error parsing message:", e);
@@ -438,11 +458,120 @@ function TexasHoldemMultiplayerPage() {
   const sendGameMessage = (message) => {
     if (engineRef.current) {
       if (isHost) {
+        console.log("Host broadcasting message:", message);
         engineRef.current.broadcast(message);
       } else {
+        console.log("Guest sending message to host:", message);
         engineRef.current.send(message);
       }
     }
+  };
+
+  const processGuestAction = (action, amount = 0) => {
+    // Get current game state from the state
+    const currentGameState = gameState;
+    if (!currentGameState) {
+      console.log("No game state available for guest action");
+      return;
+    }
+    
+    // Force a re-render to ensure we have the latest gameState
+    console.log("Processing guest action with current gameState:", currentGameState);
+    
+    console.log("Processing guest action:", action, amount);
+    console.log("Current game state:", currentGameState);
+    
+    const players = currentGameState.players || [];
+    const currentPlayer = players[currentGameState.currentPlayerIndex];
+    
+    // Check if it's actually the guest's turn (non-host player)
+    if (!currentPlayer || currentPlayer.isHost) {
+      console.log("Not guest's turn, ignoring action. Current player:", currentPlayer);
+      return;
+    }
+    
+    console.log("Processing action for guest player:", currentPlayer);
+    playSfx(clickSound.current);
+    
+    const updatedPlayers = [...currentGameState.players];
+    let newPot = currentGameState.pot;
+    let newCurrentBet = currentGameState.currentBet;
+    
+    if (action === "fold") {
+      updatedPlayers[currentGameState.currentPlayerIndex] = {
+        ...currentPlayer,
+        folded: true
+      };
+    } else if (action === "call") {
+      const callAmount = currentGameState.currentBet - currentPlayer.bet;
+      updatedPlayers[currentGameState.currentPlayerIndex] = {
+        ...currentPlayer,
+        bet: currentGameState.currentBet,
+        chips: currentPlayer.chips - callAmount
+      };
+      newPot += callAmount;
+    } else if (action === "check") {
+      // No change needed for check
+      console.log("Guest checked, no changes needed");
+    } else if (action === "raise") {
+      const raiseAmount = Math.min(amount, currentPlayer.chips);
+      updatedPlayers[currentGameState.currentPlayerIndex] = {
+        ...currentPlayer,
+        bet: currentPlayer.bet + raiseAmount,
+        chips: currentPlayer.chips - raiseAmount
+      };
+      newPot += raiseAmount;
+      newCurrentBet = currentPlayer.bet + raiseAmount;
+    } else if (action === "allin") {
+      const allInAmount = currentPlayer.chips;
+      updatedPlayers[currentGameState.currentPlayerIndex] = {
+        ...currentPlayer,
+        bet: currentPlayer.bet + allInAmount,
+        chips: 0,
+        allIn: true
+      };
+      newPot += allInAmount;
+      newCurrentBet = Math.max(currentGameState.currentBet, currentPlayer.bet + allInAmount);
+    }
+    
+    // Move to next player (host)
+    let nextIndex = (currentGameState.currentPlayerIndex + 1) % currentGameState.players.length;
+    while (updatedPlayers[nextIndex].folded) {
+      nextIndex = (nextIndex + 1) % currentGameState.players.length;
+    }
+    
+    console.log("Guest action processed - current player index:", currentGameState.currentPlayerIndex, "next player index:", nextIndex);
+    console.log("Players after guest action:", updatedPlayers.map(p => ({ name: p.name, isHost: p.isHost, bet: p.bet })));
+    
+    const updatedState = {
+      ...currentGameState,
+      players: updatedPlayers,
+      currentPlayerIndex: nextIndex,
+      pot: newPot,
+      currentBet: newCurrentBet
+    };
+    
+    console.log("Updated state after guest action:", updatedState);
+    console.log("Next player (should be host):", updatedPlayers[nextIndex]);
+    
+    // Update host's game state
+    console.log("Setting new game state for host");
+    setGameState(updatedState);
+    
+    // Force a re-render to ensure UI updates
+    setTimeout(() => {
+      console.log("Force re-render after guest action");
+      setGameState(prev => ({ ...prev }));
+    }, 100);
+    
+    // Send updated game state to all players
+    console.log("Sending updated game state to all players");
+    sendGameMessage({
+      type: 'game_state_update',
+      gameState: updatedState
+    });
+    
+    console.log("Guest action processing completed");
   };
 
   const handleStartGame = () => {
@@ -486,7 +615,7 @@ function TexasHoldemMultiplayerPage() {
     };
 
     console.log("Starting game with state:", updatedState);
-    
+
     // Send game state to all players
     sendGameMessage({
       type: 'game_state_update',
@@ -517,7 +646,21 @@ function TexasHoldemMultiplayerPage() {
     
     playSfx(clickSound.current);
     
+    // If this is a guest action, only send to host - don't process locally
+    if (!isHost) {
+      console.log("Guest sending action to host:", action, amount);
+      sendGameMessage({
+        type: 'game_action',
+        action: action,
+        amount: amount
+      });
+      return; // Don't process locally for guest
+    }
+    
+    // Host processes his own actions
     const updatedPlayers = [...gameState.players];
+    let newPot = gameState.pot;
+    let newCurrentBet = gameState.currentBet;
     
     if (action === "fold") {
       updatedPlayers[gameState.currentPlayerIndex] = {
@@ -531,7 +674,7 @@ function TexasHoldemMultiplayerPage() {
         bet: gameState.currentBet,
         chips: currentPlayer.chips - callAmount
       };
-      gameState.pot += callAmount;
+      newPot += callAmount;
     } else if (action === "check") {
       // No change needed
     } else if (action === "raise") {
@@ -541,8 +684,8 @@ function TexasHoldemMultiplayerPage() {
         bet: currentPlayer.bet + raiseAmount,
         chips: currentPlayer.chips - raiseAmount
       };
-      gameState.pot += raiseAmount;
-      gameState.currentBet = currentPlayer.bet + raiseAmount;
+      newPot += raiseAmount;
+      newCurrentBet = currentPlayer.bet + raiseAmount;
     } else if (action === "allin") {
       const allInAmount = currentPlayer.chips;
       updatedPlayers[gameState.currentPlayerIndex] = {
@@ -551,8 +694,8 @@ function TexasHoldemMultiplayerPage() {
         chips: 0,
         allIn: true
       };
-      gameState.pot += allInAmount;
-      gameState.currentBet = Math.max(gameState.currentBet, currentPlayer.bet + allInAmount);
+      newPot += allInAmount;
+      newCurrentBet = Math.max(gameState.currentBet, currentPlayer.bet + allInAmount);
     }
     
     // Move to next player
@@ -561,14 +704,22 @@ function TexasHoldemMultiplayerPage() {
       nextIndex = (nextIndex + 1) % gameState.players.length;
     }
     
+    console.log("Host player action:", action, "amount:", amount);
+    console.log("Current player index:", gameState.currentPlayerIndex, "Next player index:", nextIndex);
+    console.log("Players:", updatedPlayers.map(p => ({ name: p.name, isHost: p.isHost, bet: p.bet })));
+    
     const updatedState = {
       ...gameState,
       players: updatedPlayers,
       currentPlayerIndex: nextIndex,
-      pot: gameState.pot
+      pot: newPot,
+      currentBet: newCurrentBet
     };
     
-    // Send game state to all players
+    console.log("Updated state after host action:", updatedState);
+    console.log("Next player:", updatedPlayers[nextIndex]);
+      
+      // Send game state to all players
     sendGameMessage({
       type: 'game_state_update',
       gameState: updatedState
@@ -953,14 +1104,14 @@ function TexasHoldemMultiplayerPage() {
                 {players.map((player) => {
                   const isMe = (playerId === "host" && player.isHost) || (playerId === "guest" && !player.isHost) || (player.id === playerId);
                   return (
-                    <div key={player.id} className="bg-white/10 rounded-lg p-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-2xl">{player.isHost ? '👑' : '👤'}</span>
-                        <span className="font-semibold text-white">{player.name}</span>
+                  <div key={player.id} className="bg-white/10 rounded-lg p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{player.isHost ? '👑' : '👤'}</span>
+                      <span className="font-semibold text-white">{player.name}</span>
                         {isMe && <span className="text-xs text-green-400">(You)</span>}
-                      </div>
-                      <div className="text-emerald-400 text-sm font-semibold">Ready</div>
                     </div>
+                    <div className="text-emerald-400 text-sm font-semibold">Ready</div>
+                  </div>
                   );
                 })}
 
@@ -1066,24 +1217,24 @@ function TexasHoldemMultiplayerPage() {
                 const isMe = (playerId === "host" && player.isHost) || (playerId === "guest" && !player.isHost) || (player.id === playerId);
                 return (
                   <div key={player.id} className={`bg-black/30 border ${isMe ? 'border-green-500/50' : player.id === currentPlayer?.id ? 'border-yellow-500/50' : 'border-white/10'} rounded-lg p-2`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span>{player.isHost ? '👑' : '👤'}</span>
-                        <span className="text-white font-semibold text-xs">{player.name}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span>{player.isHost ? '👑' : '👤'}</span>
+                      <span className="text-white font-semibold text-xs">{player.name}</span>
                         {isMe && <span className="text-xs text-green-400">(You)</span>}
-                        {player.folded && <span className="text-xs text-red-400">(Folded)</span>}
-                        {player.id === currentPlayer?.id && !player.folded && <span className="text-xs text-yellow-400">⏰</span>}
-                      </div>
-                      <div className="text-emerald-400 text-xs">{player.chips} | Bet: {player.bet}</div>
+                      {player.folded && <span className="text-xs text-red-400">(Folded)</span>}
+                      {player.id === currentPlayer?.id && !player.folded && <span className="text-xs text-yellow-400">⏰</span>}
                     </div>
-                    {isMe && player.cards && (
-                      <div className="flex gap-1 mt-2 justify-center">
-                        {player.cards.map((card, i) => (
-                          <PlayingCard key={i} card={card} delay={i * 200} />
-                        ))}
-                      </div>
-                    )}
+                    <div className="text-emerald-400 text-xs">{player.chips} | Bet: {player.bet}</div>
                   </div>
+                    {isMe && player.cards && (
+                    <div className="flex gap-1 mt-2 justify-center">
+                      {player.cards.map((card, i) => (
+                        <PlayingCard key={i} card={card} delay={i * 200} />
+                      ))}
+                    </div>
+                  )}
+                </div>
                 );
               })}
             </div>
