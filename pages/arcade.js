@@ -343,6 +343,15 @@ export default function ArcadeHub() {
       href: "/ultimate-poker",
       color: "#6366F1",
     },
+    // 8.5. Texas Hold'em vs Dealer - NEW!
+    {
+      title: "Texas Hold'em",
+      emoji: "🎴",
+      description: "Classic Texas Hold'em vs Dealer! Strategic betting rounds - PRE-FLOP, FLOP, TURN, RIVER. Best hand wins the pot!",
+      prize: "Unlimited",
+      href: "/texas-holdem",
+      color: "#10B981",
+    },
     // 9. Multiplier Ladder
     {
       title: "Ladder",
