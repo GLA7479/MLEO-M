@@ -174,7 +174,7 @@ function PlayingCard({ card, hidden = false, delay = 0 }) {
   );
 }
 
-export default function TexasHoldemMultiplayerPage() {
+function TexasHoldemMultiplayerPage() {
   useIOSViewportFix();
   const router = useRouter();
   const engineRef = useRef(null);
