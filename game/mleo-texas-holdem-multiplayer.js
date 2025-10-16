@@ -3,6 +3,7 @@
 // Complete Texas Hold'em with all betting rounds and turn management
 // ============================================================================
 
+
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
@@ -73,6 +74,14 @@ function shuffleDeck(deck) {
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;
+}
+
+function compareHands(playerHand, dealerHand) {
+  if (playerHand.rank > dealerHand.rank) return 1;
+  if (dealerHand.rank > playerHand.rank) return -1;
+  if (playerHand.highCard > dealerHand.highCard) return 1;
+  if (dealerHand.highCard > playerHand.highCard) return -1;
+  return 0;
 }
 
 function getCardValue(card) {
@@ -202,6 +211,10 @@ export default function TexasHoldemMultiplayerPage() {
   const [maxEntryAmount] = useState(2000000); // 2M מקסימום
   const [showBetModal, setShowBetModal] = useState(false);
   const [isAllIn, setIsAllIn] = useState(false);
+  
+  // Game result states
+  const [gameResult, setGameResult] = useState(null);
+  const [showResultModal, setShowResultModal] = useState(false);
   
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
@@ -498,6 +511,8 @@ export default function TexasHoldemMultiplayerPage() {
       } else if (gameState.round === "river") {
         // Show down
         newRound = "showdown";
+        // הוסף קריאה ל-finishGame
+        setTimeout(() => finishGame(), 1000);
       }
       
       // Reset bets for new round
@@ -514,6 +529,72 @@ export default function TexasHoldemMultiplayerPage() {
     };
     
     engineRef.current.updateGameState(updatedState);
+  };
+
+  const finishGame = () => {
+    const activePlayers = gameState.players.filter(p => !p.folded);
+    
+    if (activePlayers.length === 1) {
+      // רק שחקן אחד נשאר - הוא המנצח
+      const winner = activePlayers[0];
+      const prize = gameState.pot;
+      
+      const updatedPlayers = gameState.players.map(p => 
+        p.id === winner.id 
+          ? { ...p, chips: p.chips + prize }
+          : p
+      );
+      
+      setGameResult({
+        winner: winner.name,
+        prize: prize,
+        hand: "Won by fold"
+      });
+      
+      const updatedState = {
+        ...gameState,
+        players: updatedPlayers,
+        pot: 0,
+        status: "finished"
+      };
+      
+      engineRef.current.updateGameState(updatedState);
+      setShowResultModal(true);
+    } else {
+      // השוואת ידיים
+      const hands = activePlayers.map(player => ({
+        player,
+        hand: evaluateHand([...player.cards, ...gameState.communityCards])
+      }));
+      
+      // מיון לפי כוח היד
+      hands.sort((a, b) => compareHands(b.hand, a.hand));
+      
+      const winner = hands[0];
+      const prize = gameState.pot;
+      
+      const updatedPlayers = gameState.players.map(p => 
+        p.id === winner.player.id 
+          ? { ...p, chips: p.chips + prize }
+          : p
+      );
+      
+      setGameResult({
+        winner: winner.player.name,
+        prize: prize,
+        hand: winner.hand.hand
+      });
+      
+      const updatedState = {
+        ...gameState,
+        players: updatedPlayers,
+        pot: 0,
+        status: "finished"
+      };
+      
+      engineRef.current.updateGameState(updatedState);
+      setShowResultModal(true);
+    }
   };
 
   const copyRoomCode = () => {
@@ -1063,6 +1144,62 @@ export default function TexasHoldemMultiplayerPage() {
                     Cancel
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Game Result Modal */}
+        {showResultModal && gameResult && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl text-center">
+              <h2 className="text-2xl font-extrabold mb-4">🎉 Game Over!</h2>
+              <div className="space-y-4">
+                <div className="text-lg">
+                  <span className="text-yellow-400 font-bold">{gameResult.winner}</span> wins!
+                </div>
+                <div className="text-sm text-gray-300">
+                  Hand: <span className="text-green-400">{gameResult.hand}</span>
+                </div>
+                <div className="text-lg text-emerald-400 font-bold">
+                  Prize: {gameResult.prize} chips
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                <button 
+                  onClick={() => {
+                    setShowResultModal(false);
+                    // Reset game for new hand
+                    const resetState = {
+                      ...gameState,
+                      round: "pre-flop",
+                      pot: 0,
+                      currentBet: 0,
+                      communityCards: [],
+                      communityVisible: 0,
+                      players: gameState.players.map(p => ({
+                        ...p,
+                        bet: 0,
+                        folded: false,
+                        allIn: false,
+                        cards: []
+                      }))
+                    };
+                    engineRef.current.updateGameState(resetState);
+                  }}
+                  className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg"
+                >
+                  New Hand
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowResultModal(false);
+                    setScreen("lobby");
+                  }}
+                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg"
+                >
+                  Back to Lobby
+                </button>
               </div>
             </div>
           </div>
