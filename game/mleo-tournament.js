@@ -1,6 +1,6 @@
 // ============================================================================
-// Texas Hold'em Tournament Game
-// Multiplayer tournament with automatic game progression
+// MLEO Texas Hold'em Tournament
+// Based exactly on mleo-texas-holdem-multiplayer with tournament logic
 // ============================================================================
 
 import { useEffect, useRef, useState } from "react";
@@ -75,6 +75,14 @@ function shuffleDeck(deck) {
   return shuffled;
 }
 
+function compareHands(playerHand, dealerHand) {
+  if (playerHand.rank > dealerHand.rank) return 1;
+  if (dealerHand.rank > playerHand.rank) return -1;
+  if (playerHand.highCard > dealerHand.highCard) return 1;
+  if (dealerHand.highCard > playerHand.highCard) return -1;
+  return 0;
+}
+
 function getCardValue(card) {
   if (card.value === "A") return 14;
   if (card.value === "K") return 13;
@@ -85,7 +93,7 @@ function getCardValue(card) {
 
 function evaluateHand(cards) {
   if (cards.length < 5) return { hand: "High Card", rank: 1, highCard: 0 };
-
+  
   const combinations = [];
   for (let i = 0; i < cards.length; i++) {
     for (let j = i + 1; j < cards.length; j++) {
@@ -98,16 +106,16 @@ function evaluateHand(cards) {
       }
     }
   }
-
+  
   let bestHand = { hand: "High Card", rank: 1, highCard: 0 };
-
+  
   for (const combo of combinations) {
     const evaluated = evaluateFiveCards(combo);
     if (evaluated.rank > bestHand.rank || (evaluated.rank === bestHand.rank && evaluated.highCard > bestHand.highCard)) {
       bestHand = evaluated;
     }
   }
-
+  
   return bestHand;
 }
 
@@ -115,18 +123,16 @@ function evaluateFiveCards(cards) {
   const values = cards.map(card => getCardValue(card)).sort((a, b) => b - a);
   const suits = cards.map(card => card.suit);
   const isFlush = suits.every(suit => suit === suits[0]);
-  const isStraight = values.every((val, i) => i === 0 || val === values[i-1] - 1) ||
-    (values[0] === 14 && values[1] === 5 && values[2] === 4 && values[3] === 3 && values[4] === 2);
-
+  const isStraight = values.every((val, i) => i === 0 || val === values[i-1] - 1) || 
+                     (values[0] === 14 && values[1] === 5 && values[2] === 4 && values[3] === 3 && values[4] === 2);
+  
   const counts = {};
   values.forEach(val => counts[val] = (counts[val] || 0) + 1);
   const countsArray = Object.values(counts).sort((a, b) => b - a);
   const highCard = values[0];
-
-  if (isStraight && isFlush) {
-    if (highCard === 14) return { hand: "Royal Flush", rank: 10, highCard };
-    return { hand: "Straight Flush", rank: 9, highCard };
-  }
+  
+  if (isFlush && isStraight && values[0] === 14 && values[1] === 13) return { hand: "Royal Flush", rank: 10, highCard };
+  if (isFlush && isStraight) return { hand: "Straight Flush", rank: 9, highCard };
   if (countsArray[0] === 4) return { hand: "Four of a Kind", rank: 8, highCard };
   if (countsArray[0] === 3 && countsArray[1] === 2) return { hand: "Full House", rank: 7, highCard };
   if (isFlush) return { hand: "Flush", rank: 6, highCard };
@@ -137,12 +143,34 @@ function evaluateFiveCards(cards) {
   return { hand: "High Card", rank: 1, highCard };
 }
 
-function compareHands(playerHand, dealerHand) {
-  if (playerHand.rank > dealerHand.rank) return 1;
-  if (dealerHand.rank > playerHand.rank) return -1;
-  if (playerHand.highCard > dealerHand.highCard) return 1;
-  if (dealerHand.highCard > playerHand.highCard) return -1;
-  return 0;
+function PlayingCard({ card, hidden = false, delay = 0 }) {
+  if (hidden) {
+    return (
+      <div 
+        className="w-10 h-14 rounded bg-gradient-to-br from-red-600 to-red-800 border border-white/30 flex items-center justify-center shadow text-lg"
+        style={{ animation: `slideInCard 0.4s ease-out ${delay}ms both`, opacity: 0 }}
+      >
+        🂠
+      </div>
+    );
+  }
+  
+  const isRed = card.suit === "♥️" || card.suit === "♦️";
+  const color = isRed ? "text-red-600" : "text-black";
+  
+  return (
+    <div 
+      className="w-10 h-14 rounded bg-white border border-gray-400 shadow p-0.5 relative"
+      style={{ animation: `slideInCard 0.4s ease-out ${delay}ms both`, opacity: 0 }}
+    >
+      <div className={`text-xs font-bold ${color} absolute top-0.5 left-1 leading-tight`}>
+        {card.value}
+      </div>
+      <div className={`text-base ${color} flex items-center justify-center h-full`}>
+        {card.suit}
+      </div>
+    </div>
+  );
 }
 
 export default function TournamentPage() {
@@ -167,26 +195,25 @@ export default function TournamentPage() {
   const [roomCode, setRoomCode] = useState("");
   const [maxPlayers, setMaxPlayers] = useState(6);
   const [startingChips, setStartingChips] = useState(10000);
-  const [tournamentName, setTournamentName] = useState("Texas Hold'em Tournament");
   const [error, setError] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-
+  
   const [tournamentState, setTournamentState] = useState(null);
   const [playerId, setPlayerId] = useState(null);
   const [isHost, setIsHost] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
-
-  // Game states
-  const [currentGame, setCurrentGame] = useState(null);
-  const [gameCountdown, setGameCountdown] = useState(0);
-  const [isSpectating, setIsSpectating] = useState(false);
-
-  // Betting states
+  
+  // Betting logic states
   const [betAmount, setBetAmount] = useState("100");
+  const [maxEntryAmount] = useState(2000000);
   const [showBetModal, setShowBetModal] = useState(false);
-
+  
+  // Tournament specific
+  const [isSpectating, setIsSpectating] = useState(false);
+  const [gameCountdown, setGameCountdown] = useState(0);
+  
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -197,20 +224,12 @@ export default function TournamentPage() {
   const [collectAmount, setCollectAmount] = useState(1000);
   const [vault, setVaultState] = useState(0);
 
-  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalTournaments: 0, wins: 0, topFinishes: 0, totalChipsWon: 0 }));
+  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalTournaments: 0, wins: 0, topFinishes: 0 }));
 
-  // Use ref to track current tournamentState for callbacks
   const tournamentStateRef = useRef(tournamentState);
   tournamentStateRef.current = tournamentState;
 
-  const playSfx = (sound) => {
-    if (sfxMuted) return;
-    try {
-      sound.volume = 0.32;
-      sound.currentTime = 0;
-      sound.play().catch(() => {});
-    } catch {}
-  };
+  const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
 
   useEffect(() => {
     setMounted(true);
@@ -239,7 +258,6 @@ export default function TournamentPage() {
 
   useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
 
-  // Update onStateUpdate callback when screen changes
   useEffect(() => {
     if (engineRef.current) {
       engineRef.current.onStateUpdate = (state) => {
@@ -247,23 +265,19 @@ export default function TournamentPage() {
         setTournamentState(state);
         setForceUpdate(prev => prev + 1);
         
-        // Handle game transitions
+        const me = state.players?.find(p => p.id === playerId);
+        if (me && me.eliminated && !isSpectating) {
+          setIsSpectating(true);
+        }
+        
         if (state.status === "playing" && screen === "lobby") {
           setScreen("game");
-        } else if (state.status === "finished" && screen === "game") {
+        } else if (state.status === "finished" && screen !== "results") {
           setScreen("results");
         }
       };
-      
-      // Handle game messages
-      engineRef.current.onMessage = (message) => {
-        console.log("Received tournament message:", message);
-        if (message.type === 'game_action') {
-          handleGameAction(message);
-        }
-      };
     }
-  }, [screen, forceUpdate]);
+  }, [screen, forceUpdate, playerId, isSpectating]);
 
   const openWalletModalUnified = () => isConnected ? openAccountModal?.() : openConnectModal?.();
   const hardDisconnect = () => { disconnect?.(); setMenuOpen(false); };
@@ -318,10 +332,6 @@ export default function TournamentPage() {
       setError("Please enter your name.");
       return;
     }
-    if (!tournamentName) {
-      setError("Please enter tournament name.");
-      return;
-    }
     setIsConnecting(true);
     setError("");
     try {
@@ -330,8 +340,16 @@ export default function TournamentPage() {
         console.log("Tournament state updated:", state);
         setTournamentState(state);
         setForceUpdate(prev => prev + 1);
+        
+        const me = state.players?.find(p => p.id === playerId);
+        if (me && me.eliminated && !isSpectating) {
+          setIsSpectating(true);
+        }
+        
         if (state.status === "playing" && screen === "lobby") {
           setScreen("game");
+        } else if (state.status === "finished" && screen !== "results") {
+          setScreen("results");
         }
       };
       engineRef.current.onPlayerJoin = (player) => {
@@ -345,7 +363,7 @@ export default function TournamentPage() {
         setError("Connection error: " + err.message);
       };
 
-      const result = await engineRef.current.createTournament(playerName, maxPlayers, startingChips, tournamentName);
+      const result = await engineRef.current.createTournament(playerName, maxPlayers, startingChips);
 
       setPlayerId(result.playerId);
       setIsHost(true);
@@ -378,8 +396,16 @@ export default function TournamentPage() {
         console.log("Tournament state updated:", state);
         setTournamentState(state);
         setForceUpdate(prev => prev + 1);
+        
+        const me = state.players?.find(p => p.id === playerId);
+        if (me && me.eliminated && !isSpectating) {
+          setIsSpectating(true);
+        }
+        
         if (state.status === "playing" && screen === "lobby") {
           setScreen("game");
+        } else if (state.status === "finished" && screen !== "results") {
+          setScreen("results");
         }
       };
       engineRef.current.onPlayerJoin = (player) => {
@@ -411,173 +437,203 @@ export default function TournamentPage() {
     playSfx(clickSound.current);
     if (!engineRef.current || !tournamentState) return;
 
-    try {
-      engineRef.current.startTournament();
-    } catch (err) {
-      setError(err.message);
+    const activePlayers = tournamentState.players.filter(p => !p.eliminated);
+    if (activePlayers.length < 2) {
+      setError("Need at least 2 players to start tournament");
+      return;
     }
+
+    const deck = shuffleDeck(createDeck());
+    const communityCards = deck.slice(0, 5);
+    const players = activePlayers.map((player, index) => ({
+      ...player,
+      cards: [deck[5 + index * 2], deck[6 + index * 2]],
+      bet: 0,
+      folded: false,
+      allIn: false
+    }));
+
+    const updatedState = {
+      ...tournamentState,
+      status: "playing",
+      round: "pre-flop",
+      communityCards: communityCards,
+      communityVisible: 0,
+      pot: SMALL_BLIND + BIG_BLIND,
+      currentPlayerIndex: 0,
+      currentBet: BIG_BLIND,
+      players: players,
+      gameNumber: 1
+    };
+
+    engineRef.current.updateTournamentState(updatedState);
+    setScreen("game");
   };
 
-  const handleGameAction = (action, amount = 0) => {
-    if (!tournamentState || !currentGame) return;
+  const handlePlayerAction = (action, amount = 0) => {
+    if (!tournamentState) return;
 
-    const players = currentGame.players || [];
+    const players = tournamentState.players || [];
     const myPlayer = players.find(p => p.id === playerId);
-    const currentPlayer = players[currentGame.currentPlayerIndex];
+    const currentPlayer = players[tournamentState.currentPlayerIndex];
     const isMyTurn = currentPlayer?.id === playerId;
 
     if (!isMyTurn || myPlayer?.folded || isSpectating) return;
 
     playSfx(clickSound.current);
 
-    const updatedPlayers = [...currentGame.players];
+    const updatedPlayers = [...tournamentState.players];
 
     if (action === "fold") {
-      updatedPlayers[currentGame.currentPlayerIndex] = {
+      updatedPlayers[tournamentState.currentPlayerIndex] = {
         ...currentPlayer,
         folded: true
       };
     } else if (action === "call") {
-      const callAmount = currentGame.currentBet - currentPlayer.bet;
-      updatedPlayers[currentGame.currentPlayerIndex] = {
+      const callAmount = tournamentState.currentBet - currentPlayer.bet;
+      updatedPlayers[tournamentState.currentPlayerIndex] = {
         ...currentPlayer,
-        bet: currentGame.currentBet,
+        bet: tournamentState.currentBet,
         chips: currentPlayer.chips - callAmount
       };
-      currentGame.pot += callAmount;
+      tournamentState.pot += callAmount;
     } else if (action === "check") {
       // No change needed
     } else if (action === "raise") {
       const raiseAmount = Math.min(amount, currentPlayer.chips);
-      updatedPlayers[currentGame.currentPlayerIndex] = {
+      updatedPlayers[tournamentState.currentPlayerIndex] = {
         ...currentPlayer,
         bet: currentPlayer.bet + raiseAmount,
         chips: currentPlayer.chips - raiseAmount
       };
-      currentGame.pot += raiseAmount;
-      currentGame.currentBet = currentPlayer.bet + raiseAmount;
+      tournamentState.pot += raiseAmount;
+      tournamentState.currentBet = currentPlayer.bet + raiseAmount;
     } else if (action === "allin") {
       const allInAmount = currentPlayer.chips;
-      updatedPlayers[currentGame.currentPlayerIndex] = {
+      updatedPlayers[tournamentState.currentPlayerIndex] = {
         ...currentPlayer,
         bet: currentPlayer.bet + allInAmount,
         chips: 0,
         allIn: true
       };
-      currentGame.pot += allInAmount;
-      currentGame.currentBet = Math.max(currentGame.currentBet, currentPlayer.bet + allInAmount);
+      tournamentState.pot += allInAmount;
+      tournamentState.currentBet = Math.max(tournamentState.currentBet, currentPlayer.bet + allInAmount);
     }
 
-    // Move to next player
-    let nextIndex = (currentGame.currentPlayerIndex + 1) % currentGame.players.length;
-    while (updatedPlayers[nextIndex].folded) {
-      nextIndex = (nextIndex + 1) % currentGame.players.length;
+    let nextIndex = (tournamentState.currentPlayerIndex + 1) % tournamentState.players.length;
+    while (updatedPlayers[nextIndex].folded || updatedPlayers[nextIndex].eliminated) {
+      nextIndex = (nextIndex + 1) % tournamentState.players.length;
     }
 
-    // Check if round is over
-    const activePlayers = updatedPlayers.filter(p => !p.folded);
-    const allBetsEqual = activePlayers.every(p => p.bet === currentGame.currentBet);
+    const activePlayers = updatedPlayers.filter(p => !p.folded && !p.eliminated);
+    const allBetsEqual = activePlayers.every(p => p.bet === tournamentState.currentBet || p.allIn);
 
-    let newRound = currentGame.round;
-    let newVisible = currentGame.communityVisible;
+    let newRound = tournamentState.round;
+    let newVisible = tournamentState.communityVisible;
 
     if (activePlayers.length === 1) {
-      // Only one player left, they win by fold
-      finishGame(activePlayers[0]);
+      setTimeout(() => finishGame(activePlayers[0]), 500);
+      newRound = "showdown";
     } else if (allBetsEqual && nextIndex === 0) {
-      if (currentGame.round === "pre-flop") {
+      if (tournamentState.round === "pre-flop") {
         newRound = "flop";
         newVisible = 3;
-      } else if (currentGame.round === "flop") {
+      } else if (tournamentState.round === "flop") {
         newRound = "turn";
         newVisible = 4;
-      } else if (currentGame.round === "turn") {
+      } else if (tournamentState.round === "turn") {
         newRound = "river";
         newVisible = 5;
-      } else if (currentGame.round === "river") {
-        // Show down
+      } else if (tournamentState.round === "river") {
         newRound = "showdown";
         setTimeout(() => finishGame(), 1000);
       }
 
-      // Reset bets for new round
       updatedPlayers.forEach(p => p.bet = 0);
-      currentGame.currentBet = 0;
+      tournamentState.currentBet = 0;
     }
 
-    const updatedGame = {
-      ...currentGame,
+    const updatedState = {
+      ...tournamentState,
       players: updatedPlayers,
       currentPlayerIndex: nextIndex,
       round: newRound,
       communityVisible: newVisible
     };
 
-    setCurrentGame(updatedGame);
-    
-    // Send to host
-    if (engineRef.current) {
-      engineRef.current.sendToHost({
-        type: 'game_action',
-        action: 'update_game',
-        game: updatedGame
-      });
-    }
+    engineRef.current.updateTournamentState(updatedState);
   };
 
   const finishGame = (winner = null) => {
-    if (!currentGame) return;
+    if (!tournamentState) return;
 
-    const activePlayers = currentGame.players.filter(p => !p.folded);
+    const activePlayers = tournamentState.players.filter(p => !p.folded && !p.eliminated);
     
     let gameWinner, prize, hand;
     
     if (winner) {
       gameWinner = winner;
-      prize = currentGame.pot;
+      prize = tournamentState.pot;
       hand = "Won by fold";
     } else {
-      // Evaluate hands and determine winner
       const hands = activePlayers.map(player => ({
         player,
-        hand: evaluateHand([...player.cards, ...currentGame.communityCards])
+        hand: evaluateHand([...player.cards, ...tournamentState.communityCards])
       }));
       
       hands.sort((a, b) => compareHands(b.hand, a.hand));
       
-      gameWinner = hands[0];
-      prize = currentGame.pot;
-      hand = gameWinner.hand.hand;
+      gameWinner = hands[0].player;
+      prize = tournamentState.pot;
+      hand = hands[0].hand.hand;
     }
     
-    // Update player chips
-    const updatedPlayers = currentGame.players.map(p => 
-      p.id === gameWinner.player.id 
+    const updatedPlayers = tournamentState.players.map(p => 
+      p.id === gameWinner.id 
         ? { ...p, chips: p.chips + prize }
         : p
     );
 
-    // Check for elimination
     const eliminatedPlayers = updatedPlayers.filter(p => p.chips === 0 && !p.eliminated);
     
     if (eliminatedPlayers.length > 0) {
       eliminatedPlayers.forEach(player => {
-        if (engineRef.current) {
-          engineRef.current.eliminatePlayer(player.id);
-        }
+        player.eliminated = true;
+        player.position = tournamentState.players.filter(p => p.eliminated).length + 1;
       });
     }
 
-    // Check if tournament should continue
     const remainingPlayers = updatedPlayers.filter(p => p.chips > 0);
     
     if (remainingPlayers.length === 1) {
-      // Tournament over
-      if (engineRef.current) {
-        engineRef.current.endTournament(remainingPlayers[0]);
+      const updatedState = {
+        ...tournamentState,
+        status: "finished",
+        players: updatedPlayers,
+        winner: remainingPlayers[0],
+        gameResult: {
+          winner: gameWinner.name,
+          prize: prize,
+          hand: hand
+        }
+      };
+      
+      engineRef.current.updateTournamentState(updatedState);
+      
+      if (remainingPlayers[0].id === playerId) {
+        setStats(prev => ({
+          ...prev,
+          totalTournaments: prev.totalTournaments + 1,
+          wins: prev.wins + 1
+        }));
+        playSfx(winSound.current);
+      } else {
+        setStats(prev => ({
+          ...prev,
+          totalTournaments: prev.totalTournaments + 1
+        }));
       }
     } else {
-      // Start next game after 10 seconds
       setGameCountdown(10);
       const countdownInterval = setInterval(() => {
         setGameCountdown(prev => {
@@ -589,24 +645,45 @@ export default function TournamentPage() {
           return prev - 1;
         });
       }, 1000);
+      
+      const updatedState = {
+        ...tournamentState,
+        players: updatedPlayers,
+        gameResult: {
+          winner: gameWinner.name,
+          prize: prize,
+          hand: hand
+        }
+      };
+      
+      engineRef.current.updateTournamentState(updatedState);
     }
   };
 
   const startNextGame = (players) => {
-    const activePlayers = players.filter(p => p.chips > 0);
+    const activePlayers = players.filter(p => p.chips > 0 && !p.eliminated);
     if (activePlayers.length < 2) return;
 
     const deck = shuffleDeck(createDeck());
     const communityCards = deck.slice(0, 5);
-    const newPlayers = activePlayers.map((player, index) => ({
-      ...player,
-      cards: [deck[5 + index * 2], deck[6 + index * 2]],
-      bet: 0,
-      folded: false,
-      allIn: false
-    }));
+    const newPlayers = tournamentState.players.map((player) => {
+      if (player.eliminated || player.chips === 0) {
+        return player;
+      }
+      const activeIndex = activePlayers.findIndex(p => p.id === player.id);
+      if (activeIndex === -1) return player;
+      
+      return {
+        ...player,
+        cards: [deck[5 + activeIndex * 2], deck[6 + activeIndex * 2]],
+        bet: 0,
+        folded: false,
+        allIn: false
+      };
+    });
 
-    const newGame = {
+    const updatedState = {
+      ...tournamentState,
       round: "pre-flop",
       pot: SMALL_BLIND + BIG_BLIND,
       currentPlayerIndex: 0,
@@ -614,19 +691,12 @@ export default function TournamentPage() {
       communityCards: communityCards,
       communityVisible: 0,
       players: newPlayers,
-      gameNumber: (currentGame?.gameNumber || 0) + 1
+      gameNumber: (tournamentState.gameNumber || 1) + 1,
+      gameResult: null
     };
 
-    setCurrentGame(newGame);
-    
-    // Send to host
-    if (engineRef.current) {
-      engineRef.current.sendToHost({
-        type: 'game_action',
-        action: 'start_new_game',
-        game: newGame
-      });
-    }
+    engineRef.current.updateTournamentState(updatedState);
+    setGameCountdown(0);
   };
 
   const copyRoomCode = () => {
@@ -645,124 +715,161 @@ export default function TournamentPage() {
     setError("");
     setTournamentState(null);
     setRoomCode("");
-    setCurrentGame(null);
     setIsSpectating(false);
+    setGameCountdown(0);
   };
 
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return null;
 
+  const players = tournamentState?.players || [];
+  const currentPlayers = players.length;
+  const maxPlayersCount = tournamentState?.maxPlayers || maxPlayers;
+  const myPlayer = players.find(p => p.id === playerId);
+  const currentPlayer = players[tournamentState?.currentPlayerIndex];
+  const isMyTurn = currentPlayer?.id === playerId;
+
   // MENU SCREEN
   if (screen === "menu") {
     return (
       <Layout>
-        <div className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-red-900" style={{ height: '100svh' }}>
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
-            <h1 className="text-5xl font-extrabold text-white mb-8 tracking-tight">
-              <span className="text-purple-400">Tournament</span> <span className="text-red-400">Texas Hold'em</span>
-            </h1>
-            <div className="w-full max-w-sm bg-black/50 rounded-2xl p-6 shadow-xl space-y-4">
-              <button onClick={() => { setScreen("create"); playSfx(clickSound.current); }} className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg hover:brightness-110 transition-all">
-                Create Tournament 🏆
+        <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-orange-900" style={{ height: '100svh' }}>
+          <div className="absolute inset-0 opacity-10"><div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} /></div>
+          
+          <div className="absolute top-4 left-4 flex gap-2 z-50">
+            <button onClick={backSafe} className="px-4 py-2 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">BACK</button>
+          </div>
+
+          <div className="absolute top-4 right-4 flex gap-2 z-50">
+            <button onClick={() => { playSfx(clickSound.current); const el = wrapRef.current || document.documentElement; if (!document.fullscreenElement) { el.requestFullscreen?.().catch(() => {}); } else { document.exitFullscreen?.().catch(() => {}); } }} className="px-4 py-2 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFullscreen ? "EXIT" : "FULL"}</button>
+            <button onClick={() => { playSfx(clickSound.current); setMenuOpen(true); }} className="px-4 py-2 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">MENU</button>
+          </div>
+
+          <div className="relative h-full flex flex-col items-center justify-center px-4">
+            <div className="text-center mb-8">
+              <h1 className="text-4xl font-extrabold text-white mb-2">🏆 Texas Hold'em</h1>
+              <p className="text-white/70 text-lg">Tournament Mode</p>
+            </div>
+
+            <div className="w-full max-w-md space-y-4">
+              <button 
+                onClick={() => { playSfx(clickSound.current); setScreen("create"); }} 
+                className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all"
+              >
+                🎮 Create Tournament
               </button>
-              <button onClick={() => { setScreen("join"); playSfx(clickSound.current); }} className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-red-500 to-orange-600 text-white shadow-lg hover:brightness-110 transition-all">
-                Join Tournament 👥
+
+              <button 
+                onClick={() => { playSfx(clickSound.current); setScreen("join"); }} 
+                className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:brightness-110 transition-all"
+              >
+                🔗 Join Tournament
               </button>
-              <button onClick={backSafe} className="w-full py-4 rounded-lg font-bold text-lg bg-white/10 text-white/70 shadow-lg hover:bg-white/20 transition-all">
-                ← Back to Arcade
-              </button>
+
+              <div className="text-center text-white/60 text-sm mt-8">
+                <p>• Tournament with 2-6 players</p>
+                <p>• Last player standing wins</p>
+                <p>• Automatic game progression</p>
+              </div>
             </div>
           </div>
         </div>
+
+        {menuOpen && (
+          <div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}>
+            <div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div>
+              <div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div>
+              <div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div>
+              <div className="mt-4 text-xs opacity-70"><p>Tournament v1.0</p></div>
+            </div>
+          </div>
+        )}
       </Layout>
     );
   }
 
-  // CREATE TOURNAMENT SCREEN
+  // CREATE SCREEN
   if (screen === "create") {
     return (
       <Layout>
-        <div className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-red-900" style={{ height: '100svh' }}>
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
-            <h1 className="text-4xl font-extrabold text-white mb-6 tracking-tight">
-              Create Tournament 🏆
-            </h1>
-            <div className="w-full max-w-sm bg-black/50 rounded-2xl p-6 shadow-xl space-y-4">
-              <div>
-                <label className="text-sm text-white/70 mb-2 block">Tournament Name</label>
-                <input
-                  type="text"
-                  value={tournamentName}
-                  onChange={(e) => setTournamentName(e.target.value)}
-                  maxLength={30}
-                  placeholder="Enter tournament name..."
-                  className="w-full px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white placeholder-white/40"
-                />
-              </div>
-              
-              <div>
-                <label className="text-sm text-white/70 mb-2 block">Your Name</label>
-                <input
-                  type="text"
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  maxLength={15}
-                  placeholder="Enter your name..."
-                  className="w-full px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white placeholder-white/40"
-                />
-              </div>
+        <div className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-orange-900" style={{ height: '100svh' }}>
+          <div className="absolute inset-0 opacity-10"><div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} /></div>
+          
+          <div className="absolute top-4 left-4">
+            <button onClick={backToMenu} className="px-4 py-2 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">BACK</button>
+          </div>
 
-              <div>
-                <label className="text-sm text-white/70 mb-2 block">Number of Players</label>
-                <div className="flex gap-2">
-                  {[2, 3, 4, 5, 6].map(num => (
-                    <button
-                      key={num}
-                      onClick={() => setMaxPlayers(num)}
-                      className={`flex-1 py-3 rounded-lg font-bold ${
-                        maxPlayers === num
-                          ? 'bg-purple-500 text-white'
-                          : 'bg-white/10 text-white/70 hover:bg-white/20'
-                      } transition-all`}
-                    >
-                      {num}
-                    </button>
-                  ))}
+          <div className="relative h-full flex flex-col items-center justify-center px-4">
+            <div className="w-full max-w-md bg-black/30 border border-white/10 rounded-2xl p-6 shadow-2xl">
+              <h2 className="text-2xl font-extrabold text-white mb-6 text-center">🎮 Create Tournament</h2>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-white/70 mb-2 block">Your Name</label>
+                  <input
+                    type="text"
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    maxLength={15}
+                    placeholder="Enter your name..."
+                    className="w-full px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white placeholder-white/40"
+                  />
                 </div>
-              </div>
 
-              <div>
-                <label className="text-sm text-white/70 mb-2 block">Starting Chips per Player</label>
-                <input
-                  type="number"
-                  value={startingChips}
-                  onChange={(e) => {
-                    const value = Math.min(Number(e.target.value), 1000000);
-                    setStartingChips(value);
-                  }}
-                  min="1000"
-                  max="1000000"
-                  placeholder="10000"
-                  className="w-full px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white placeholder-white/40"
-                />
-                <div className="text-xs text-white/50 mt-1">
-                  Each player starts with this amount
+                <div>
+                  <label className="text-sm text-white/70 mb-2 block">Number of Players</label>
+                  <div className="flex gap-2">
+                    {[2, 3, 4, 5, 6].map(num => (
+                      <button
+                        key={num}
+                        onClick={() => setMaxPlayers(num)}
+                        className={`flex-1 py-3 rounded-lg font-bold ${
+                          maxPlayers === num
+                            ? 'bg-purple-500 text-white'
+                            : 'bg-white/10 text-white/70 hover:bg-white/20'
+                        } transition-all`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {error && (
-                <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-300 text-sm text-center">
-                  {error}
+                <div>
+                  <label className="text-sm text-white/70 mb-2 block">Starting Chips (Max: {maxEntryAmount.toLocaleString()})</label>
+                  <input
+                    type="number"
+                    value={startingChips}
+                    onChange={(e) => {
+                      const value = Math.min(Number(e.target.value), maxEntryAmount);
+                      setStartingChips(value);
+                    }}
+                    min="1000"
+                    max={maxEntryAmount}
+                    placeholder="10000"
+                    className="w-full px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white placeholder-white/40"
+                  />
+                  <div className="text-xs text-white/50 mt-1">
+                    Each player starts with this amount
+                  </div>
                 </div>
-              )}
 
-              <button onClick={handleCreateTournament} disabled={isConnecting} className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
-                {isConnecting ? 'Creating Tournament...' : 'Create Tournament'}
-              </button>
-              <button onClick={() => { setScreen("menu"); playSfx(clickSound.current); }} className="w-full py-4 rounded-lg font-bold text-lg bg-white/10 text-white/70 shadow-lg hover:bg-white/20 transition-all">
-                ← Back
-              </button>
+                {error && (
+                  <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-300 text-sm text-center">
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleCreateTournament}
+                  disabled={isConnecting}
+                  className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
+                >
+                  {isConnecting ? "Creating..." : "Create Tournament"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -770,51 +877,60 @@ export default function TournamentPage() {
     );
   }
 
-  // JOIN TOURNAMENT SCREEN
+  // JOIN SCREEN
   if (screen === "join") {
     return (
       <Layout>
-        <div className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-red-900" style={{ height: '100svh' }}>
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
-            <h1 className="text-4xl font-extrabold text-white mb-6 tracking-tight">
-              Join Tournament 👥
-            </h1>
-            <div className="w-full max-w-sm bg-black/50 rounded-2xl p-6 shadow-xl space-y-4">
-              <div>
-                <label className="text-sm text-white/70 mb-2 block">Your Name</label>
-                <input
-                  type="text"
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  maxLength={15}
-                  placeholder="Enter your name..."
-                  className="w-full px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white placeholder-white/40"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-white/70 mb-2 block">Tournament Code</label>
-                <input
-                  type="text"
-                  value={roomCode}
-                  onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                  maxLength={5}
-                  placeholder="Enter 5-letter code"
-                  className="w-full px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white placeholder-white/40 uppercase"
-                />
-              </div>
+        <div className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-orange-900" style={{ height: '100svh' }}>
+          <div className="absolute inset-0 opacity-10"><div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} /></div>
+          
+          <div className="absolute top-4 left-4">
+            <button onClick={backToMenu} className="px-4 py-2 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">BACK</button>
+          </div>
 
-              {error && (
-                <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-300 text-sm text-center">
-                  {error}
+          <div className="relative h-full flex flex-col items-center justify-center px-4">
+            <div className="w-full max-w-md bg-black/30 border border-white/10 rounded-2xl p-6 shadow-2xl">
+              <h2 className="text-2xl font-extrabold text-white mb-6 text-center">🔗 Join Tournament</h2>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-white/70 mb-2 block">Your Name</label>
+                  <input
+                    type="text"
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    maxLength={15}
+                    placeholder="Enter your name..."
+                    className="w-full px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white placeholder-white/40"
+                  />
                 </div>
-              )}
 
-              <button onClick={handleJoinTournament} disabled={isConnecting} className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-red-500 to-orange-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
-                {isConnecting ? 'Joining Tournament...' : 'Join Tournament'}
-              </button>
-              <button onClick={() => { setScreen("menu"); playSfx(clickSound.current); }} className="w-full py-4 rounded-lg font-bold text-lg bg-white/10 text-white/70 shadow-lg hover:bg-white/20 transition-all">
-                ← Back
-              </button>
+                <div>
+                  <label className="text-sm text-white/70 mb-2 block">Tournament Code</label>
+                  <input
+                    type="text"
+                    value={roomCode}
+                    onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                    maxLength={5}
+                    placeholder="XXXXX"
+                    className="w-full px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white text-center text-2xl font-bold tracking-widest placeholder-white/40"
+                  />
+                </div>
+
+                {error && (
+                  <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-300 text-sm text-center">
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleJoinTournament}
+                  disabled={isConnecting}
+                  className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
+                >
+                  {isConnecting ? "Joining..." : "Join Tournament"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -824,65 +940,64 @@ export default function TournamentPage() {
 
   // LOBBY SCREEN
   if (screen === "lobby") {
-    const players = tournamentState?.players || [];
-    const currentPlayers = players.length;
-    const maxPlayersCount = tournamentState?.maxPlayers || maxPlayers;
-
     return (
       <Layout>
-        <div className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-red-900" style={{ height: '100svh' }}>
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
-            <h1 className="text-4xl font-extrabold text-white mb-6 tracking-tight">
-              Tournament Lobby 🏆
-            </h1>
-            <div className="w-full max-w-sm bg-black/50 rounded-2xl p-6 shadow-xl space-y-4">
-              <div className="bg-purple-500/20 border border-purple-500/50 rounded-lg p-3 mb-4">
-                <div className="text-sm text-white/70 mb-1">Tournament Code</div>
-                <div className="text-3xl font-bold text-white tracking-widest">{roomCode}</div>
-                <button onClick={copyRoomCode} className="mt-2 text-sm text-purple-300 hover:text-purple-200">📋 Copy Code</button>
+        <div className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-orange-900" style={{ height: '100svh' }}>
+          <div className="absolute inset-0 opacity-10"><div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} /></div>
+          
+          <div className="absolute top-4 left-4">
+            <button onClick={backToMenu} className="px-4 py-2 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">LEAVE</button>
+          </div>
+
+          <div className="relative h-full flex flex-col items-center justify-center px-4">
+            <div className="w-full max-w-md">
+              <div className="text-center mb-6">
+                <h2 className="text-3xl font-extrabold text-white mb-2">Tournament Lobby</h2>
+                <div className="inline-block bg-purple-600/30 border border-purple-500/50 rounded-lg px-6 py-3">
+                  <div className="text-xs text-white/60 mb-1">TOURNAMENT CODE</div>
+                  <div className="text-3xl font-bold text-white tracking-widest font-mono">{roomCode}</div>
+                  <button onClick={copyRoomCode} className="text-xs text-purple-300 hover:text-purple-200 mt-1">📋 Copy</button>
+                </div>
               </div>
-              <div className="text-white/70 text-sm">Players: {currentPlayers}/{maxPlayersCount}</div>
-              <div className="text-white/70 text-sm">Starting Chips: {tournamentState?.startingChips?.toLocaleString()}</div>
-            </div>
 
-            <div className="space-y-2 mb-6">
-              {players.map((player) => (
-                <div key={player.id} className="bg-white/10 rounded-lg p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span>{player.isHost ? '👑' : '👤'}</span>
-                    <span className="text-white font-semibold text-sm">{player.name}</span>
-                    {player.id === playerId && <span className="text-xs text-purple-400">(You)</span>}
+              <div className="text-center text-white/60 text-sm mb-4">
+                Players: {currentPlayers}/{maxPlayersCount} • Starting Chips: {tournamentState?.startingChips?.toLocaleString()}
+              </div>
+
+              <div className="space-y-2 mb-6">
+                {players.map((player) => (
+                  <div key={player.id} className="bg-black/30 border border-white/10 rounded-lg p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{player.isHost ? '👑' : '👤'}</span>
+                      <div>
+                        <div className="text-white font-bold">{player.name}</div>
+                        {player.id === playerId && <div className="text-xs text-purple-400">(You)</div>}
+                      </div>
+                    </div>
+                    <div className="text-emerald-400 font-semibold">Ready</div>
                   </div>
-                  <div className="text-emerald-400 text-sm font-semibold">Ready</div>
-                </div>
-              ))}
+                ))}
 
-              {Array.from({ length: maxPlayersCount - currentPlayers }).map((_, i) => (
-                <div key={`empty-${i}`} className="bg-white/5 rounded-lg p-3 flex items-center gap-2 opacity-50">
-                  <span className="text-2xl">⏳</span>
-                  <span className="text-white/50">Waiting...</span>
-                </div>
-              ))}
-            </div>
+                {Array.from({ length: maxPlayersCount - currentPlayers }).map((_, i) => (
+                  <div key={`empty-${i}`} className="bg-black/20 border border-white/5 rounded-lg p-4 flex items-center gap-3 opacity-40">
+                    <span className="text-2xl">⏳</span>
+                    <span className="text-white/50">Waiting for player...</span>
+                  </div>
+                ))}
+              </div>
 
-            {isHost ? (
-              <>
+              {isHost ? (
                 <button
                   onClick={handleStartTournament}
                   disabled={currentPlayers < 2}
-                  className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
+                  className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {currentPlayers < 2 ? 'Need at least 2 players' : 'Start Tournament'}
+                  {currentPlayers < 2 ? "Need at least 2 players" : "Start Tournament"}
                 </button>
-                <button onClick={backToMenu} className="w-full py-4 rounded-lg font-bold text-lg bg-white/10 text-white/70 shadow-lg hover:bg-white/20 transition-all">
-                  ← Back to Menu
-                </button>
-              </>
-            ) : (
-              <button onClick={backToMenu} className="w-full py-4 rounded-lg font-bold text-lg bg-white/10 text-white/70 shadow-lg hover:bg-white/20 transition-all">
-                ← Back to Menu
-              </button>
-            )}
+              ) : (
+                <div className="text-center text-white/50 text-sm">Waiting for host to start...</div>
+              )}
+            </div>
           </div>
         </div>
       </Layout>
@@ -891,108 +1006,101 @@ export default function TournamentPage() {
 
   // GAME SCREEN
   if (screen === "game") {
-    const players = currentGame?.players || [];
-    const myPlayer = players.find(p => p.id === playerId);
-    const currentPlayer = players[currentGame?.currentPlayerIndex];
-    const isMyTurn = currentPlayer?.id === playerId;
-
     return (
       <Layout>
-        <div className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-red-900" style={{ height: '100svh' }}>
-          {/* Header */}
-          <div className="absolute top-0 left-0 right-0 z-10 p-4">
-            <div className="flex justify-between items-center">
-              <button onClick={backToMenu} className="px-4 py-2 bg-red-500/20 border border-red-500/30 text-red-300 rounded-lg hover:bg-red-500/30 font-semibold text-sm">
-                LEAVE
-              </button>
-              <div className="text-center">
-                <div className="text-white font-bold text-lg">{tournamentState?.tournamentName}</div>
-                <div className="text-white/70 text-sm">Game #{currentGame?.gameNumber || 1}</div>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => setIsFullscreen(!isFullscreen)} className="px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-300 rounded-lg hover:bg-blue-500/30 font-semibold text-sm">
-                  FULL
-                </button>
-                <button onClick={() => setMenuOpen(true)} className="px-4 py-2 bg-gray-500/20 border border-gray-500/30 text-gray-300 rounded-lg hover:bg-gray-500/30 font-semibold text-sm">
-                  MENU
-                </button>
-              </div>
-            </div>
+        <style jsx>{`
+          @keyframes slideInCard {
+            from {
+              opacity: 0;
+              transform: translateY(-30px) scale(0.8);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+        `}</style>
+        <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-orange-900" style={{ height: '100svh' }}>
+          <div className="absolute inset-0 opacity-10"><div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} /></div>
+          
+          <div className="absolute top-2 left-2 flex gap-2 z-50">
+            <button onClick={backToMenu} className="px-3 py-1 rounded-lg text-xs font-bold bg-white/5 border border-white/10 hover:bg-white/10">LEAVE</button>
           </div>
 
-          {/* Game Countdown */}
+          <div className="absolute top-2 right-2 flex gap-2 z-50">
+            <button onClick={() => { playSfx(clickSound.current); const el = wrapRef.current || document.documentElement; if (!document.fullscreenElement) { el.requestFullscreen?.().catch(() => {}); } else { document.exitFullscreen?.().catch(() => {}); } }} className="px-3 py-1 rounded-lg text-xs font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFullscreen ? "EXIT" : "FULL"}</button>
+            <button onClick={() => { playSfx(clickSound.current); setMenuOpen(true); }} className="px-3 py-1 rounded-lg text-xs font-bold bg-white/5 border border-white/10 hover:bg-white/10">MENU</button>
+          </div>
+
+          {/* Game Countdown Overlay */}
           {gameCountdown > 0 && (
-            <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center">
-              <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-8 shadow-2xl text-center">
-                <h2 className="text-4xl font-extrabold mb-4">Next Game Starting</h2>
-                <div className="text-6xl font-bold text-purple-400 mb-4">{gameCountdown}</div>
-                <div className="text-lg text-gray-300">Get ready for the next round!</div>
+            <div className="absolute inset-0 z-[100] bg-black/90 flex items-center justify-center">
+              <div className="text-center">
+                {tournamentState?.gameResult && (
+                  <div className="mb-6">
+                    <div className="text-2xl font-bold text-yellow-400 mb-2">
+                      {tournamentState.gameResult.winner} wins!
+                    </div>
+                    <div className="text-sm text-emerald-400 mb-1">
+                      {tournamentState.gameResult.hand}
+                    </div>
+                    <div className="text-lg text-white/70">
+                      {tournamentState.gameResult.prize} chips
+                    </div>
+                  </div>
+                )}
+                <div className="text-xl text-white/70 mb-3">Next Game Starting</div>
+                <div className="text-6xl font-bold text-purple-400">{gameCountdown}</div>
               </div>
             </div>
           )}
 
-          {/* Spectator Mode */}
+          {/* Spectator Banner */}
           {isSpectating && (
-            <div className="absolute top-20 left-4 right-4 z-20">
-              <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-3 text-center">
-                <div className="text-yellow-300 font-semibold">👀 Spectator Mode</div>
-                <div className="text-yellow-200 text-sm">You've been eliminated. You can watch or leave.</div>
+            <div className="absolute top-12 left-0 right-0 z-10 bg-yellow-600/20 border-b border-yellow-500/50 py-2">
+              <div className="text-center text-yellow-300 text-xs font-semibold">
+                👀 Spectator Mode - You've been eliminated
               </div>
             </div>
           )}
 
-          {/* Game Area */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 pt-20">
-            {/* Pot */}
-            <div className="mb-8 text-center">
-              <div className="text-white/70 text-sm mb-1">POT</div>
-              <div className="text-4xl font-bold text-emerald-400">{currentGame?.pot || 0}</div>
+          <div className="relative h-full flex flex-col items-center px-2 py-12">
+            <div className="text-center mb-2">
+              <div className="text-xs text-white/60">Game #{tournamentState?.gameNumber || 1} • {players.filter(p => !p.eliminated).length} left</div>
+              <div className="text-2xl font-bold text-amber-400">POT: {fmt(tournamentState?.pot || 0)}</div>
             </div>
 
             {/* Community Cards */}
-            <div className="mb-8 flex gap-2">
-              {currentGame?.communityCards?.slice(0, currentGame?.communityVisible || 0).map((card, index) => (
-                <div key={index} className="w-12 h-16 bg-white rounded-lg flex flex-col items-center justify-center text-black font-bold text-xs">
-                  <div>{card.value}</div>
-                  <div className="text-lg">{card.suit}</div>
-                </div>
-              ))}
-              {Array.from({ length: 5 - (currentGame?.communityVisible || 0) }).map((_, index) => (
-                <div key={`back-${index}`} className="w-12 h-16 bg-gray-600 rounded-lg flex items-center justify-center">
-                  <div className="text-white text-xs">?</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Player Cards */}
-            {myPlayer && !isSpectating && (
-              <div className="mb-8 flex gap-2">
-                {myPlayer.cards?.map((card, index) => (
-                  <div key={index} className="w-12 h-16 bg-white rounded-lg flex flex-col items-center justify-center text-black font-bold text-xs">
-                    <div>{card.value}</div>
-                    <div className="text-lg">{card.suit}</div>
-                  </div>
+            <div className="mb-3">
+              <div className="flex gap-1 justify-center">
+                {(tournamentState?.communityCards || []).slice(0, tournamentState?.communityVisible || 0).map((card, i) => (
+                  <PlayingCard key={i} card={card} delay={i * 200} />
                 ))}
               </div>
-            )}
+            </div>
 
-            {/* Player List */}
-            <div className="w-full max-w-2xl space-y-2 mb-6">
-              {players.map((player, index) => (
-                <div key={player.id} className={`bg-white/10 rounded-lg p-3 flex items-center justify-between ${
-                  player.id === playerId ? 'ring-2 ring-purple-400' : ''
-                } ${player.folded ? 'opacity-50' : ''} ${currentPlayer?.id === player.id ? 'bg-purple-500/20' : ''}`}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{player.isHost ? '👑' : '👤'}</span>
-                    <span className="text-white font-semibold text-sm">{player.name}</span>
-                    {player.id === playerId && <span className="text-xs text-purple-400">(You)</span>}
-                    {player.folded && <span className="text-xs text-red-400">FOLDED</span>}
-                    {player.allIn && <span className="text-xs text-yellow-400">ALL-IN</span>}
+            {/* Players */}
+            <div className="w-full max-w-lg space-y-1 mb-2 flex-1 overflow-y-auto">
+              {players.map((player) => (
+                <div key={player.id} className={`bg-black/30 border ${player.eliminated ? 'border-red-900/50 opacity-50' : player.id === playerId ? 'border-purple-500/50' : player.id === currentPlayer?.id ? 'border-yellow-500/50' : 'border-white/10'} rounded-lg p-2`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span>{player.isHost ? '👑' : '👤'}</span>
+                      <span className="text-white font-semibold text-xs">{player.name}</span>
+                      {player.id === playerId && <span className="text-xs text-purple-400">(You)</span>}
+                      {player.eliminated && <span className="text-xs text-red-400">(Eliminated)</span>}
+                      {player.folded && !player.eliminated && <span className="text-xs text-gray-400">(Folded)</span>}
+                      {player.id === currentPlayer?.id && !player.folded && !player.eliminated && <span className="text-xs text-yellow-400">⏰</span>}
+                    </div>
+                    <div className="text-emerald-400 text-xs">{player.chips} | Bet: {player.bet}</div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-emerald-400 text-sm font-semibold">{player.chips} chips</div>
-                    {player.bet > 0 && <div className="text-yellow-400 text-xs">Bet: {player.bet}</div>}
-                  </div>
+                  {player.id === playerId && player.cards && !isSpectating && (
+                    <div className="flex gap-1 mt-2 justify-center">
+                      {player.cards.map((card, i) => (
+                        <PlayingCard key={i} card={card} delay={i * 200} />
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -1001,103 +1109,165 @@ export default function TournamentPage() {
             {isMyTurn && !myPlayer?.folded && !isSpectating && (
               <div className="w-full max-w-sm space-y-2">
                 <div className="flex gap-2">
-                  <button onClick={() => handleGameAction("fold")} className="flex-1 h-10 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 font-semibold text-xs">FOLD</button>
-                  <button
-                    onClick={() => handleGameAction("check")}
-                    disabled={currentGame?.currentBet > myPlayer.bet}
+                  <button onClick={() => handlePlayerAction("fold")} className="flex-1 h-10 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 font-semibold text-xs">FOLD</button>
+                  <button 
+                    onClick={() => handlePlayerAction("check")} 
+                    disabled={tournamentState.currentBet > myPlayer.bet}
                     className="flex-1 h-10 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     CHECK
                   </button>
-                  <button
-                    onClick={() => handleGameAction("call")}
-                    disabled={currentGame?.currentBet <= myPlayer.bet || myPlayer.chips < (currentGame?.currentBet - myPlayer.bet)}
+                  <button 
+                    onClick={() => handlePlayerAction("call")} 
+                    disabled={tournamentState.currentBet <= myPlayer.bet || myPlayer.chips < (tournamentState.currentBet - myPlayer.bet)}
                     className="flex-1 h-10 rounded-lg bg-green-500/20 border border-green-500/30 text-green-300 hover:bg-green-500/30 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    CALL {currentGame?.currentBet > myPlayer.bet ? `(${currentGame.currentBet - myPlayer.bet})` : ''}
+                    CALL {tournamentState.currentBet > myPlayer.bet ? `(${tournamentState.currentBet - myPlayer.bet})` : ''}
                   </button>
                 </div>
+                
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowBetModal(true)}
+                  <button 
+                    onClick={() => setShowBetModal(true)} 
                     disabled={myPlayer.chips === 0}
                     className="flex-1 h-10 rounded-lg bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     BET/RAISE
                   </button>
-                  <button
-                    onClick={() => handleGameAction("allin")}
+                  <button 
+                    onClick={() => handlePlayerAction("allin")} 
                     disabled={myPlayer.chips === 0 || myPlayer.allIn}
                     className="flex-1 h-10 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     ALL-IN
                   </button>
                 </div>
-              </div>
-            )}
-
-            {/* Spectator Actions */}
-            {isSpectating && (
-              <div className="w-full max-w-sm space-y-2">
-                <button
-                  onClick={() => {
-                    setIsSpectating(false);
-                    backToMenu();
-                  }}
-                  className="w-full h-10 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 font-semibold text-xs"
-                >
-                  Leave Tournament
-                </button>
+                
+                <div className="flex gap-2">
+                  <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
+                  <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>
+                  <button onClick={() => { setShowVaultModal(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all">💰 Vault</button>
+                </div>
               </div>
             )}
           </div>
+        </div>
 
-          {/* Bet Modal */}
-          {showBetModal && (
-            <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
-              <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl">
-                <h2 className="text-2xl font-extrabold mb-4">💰 Place Bet</h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">Bet Amount</label>
-                    <input
-                      type="number"
-                      value={betAmount}
-                      onChange={(e) => setBetAmount(e.target.value)}
-                      className="w-full p-3 bg-gray-800 text-white rounded-lg border border-gray-600 focus:border-yellow-500 focus:outline-none"
-                      placeholder="Enter bet amount"
-                      min="1"
-                      max={myPlayer?.chips || 0}
-                    />
-                    <div className="text-xs text-gray-400 mt-1">
-                      Available: {myPlayer?.chips || 0} chips
-                    </div>
+        {/* Bet Modal */}
+        {showBetModal && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl">
+              <h2 className="text-2xl font-extrabold mb-4">💰 Place Bet</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Bet Amount</label>
+                  <input
+                    type="number"
+                    value={betAmount}
+                    onChange={(e) => setBetAmount(e.target.value)}
+                    className="w-full p-3 bg-gray-800 text-white rounded-lg border border-gray-600 focus:border-yellow-500 focus:outline-none"
+                    placeholder="Enter bet amount"
+                    min="1"
+                    max={myPlayer?.chips || 0}
+                  />
+                  <div className="text-xs text-gray-400 mt-1">
+                    Available: {myPlayer?.chips || 0} chips
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        const amount = Number(betAmount);
-                        if (amount > 0 && amount <= (myPlayer?.chips || 0)) {
-                          handleGameAction("raise", amount);
-                          setShowBetModal(false);
-                        }
-                      }}
-                      className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-lg transition-colors"
-                    >
-                      BET
-                    </button>
-                    <button
-                      onClick={() => setShowBetModal(false)}
-                      className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const amount = Number(betAmount);
+                      if (amount > 0 && amount <= (myPlayer?.chips || 0)) {
+                        handlePlayerAction("raise", amount);
+                        setShowBetModal(false);
+                      }
+                    }}
+                    className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-lg transition"
+                  >
+                    BET
+                  </button>
+                  <button
+                    onClick={() => setShowBetModal(false)}
+                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg transition"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {menuOpen && (
+          <div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}>
+            <div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div>
+              <div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div>
+              <div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div>
+              <div className="mt-4 text-xs opacity-70"><p>Tournament v1.0</p></div>
+            </div>
+          </div>
+        )}
+
+        {showHowToPlay && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+              <h2 className="text-2xl font-extrabold mb-4">🎴 How to Play</h2>
+              <div className="space-y-3 text-sm">
+                <p><strong>Tournament Texas Hold'em:</strong></p>
+                <p>• Each player gets 2 hole cards</p>
+                <p>• 5 community cards are revealed (Flop, Turn, River)</p>
+                <p>• Best 5-card hand wins the pot!</p>
+                <p>• Small blind: {SMALL_BLIND} • Big blind: {BIG_BLIND}</p>
+                <p><strong>Tournament Rules:</strong></p>
+                <p>• Last player with chips wins</p>
+                <p>• Eliminated players can spectate</p>
+                <p>• Games restart automatically after 10 seconds</p>
+                <p className="text-white/60 text-xs mt-4">Full betting rounds with Check/Fold/Call/Raise/All-In!</p>
+              </div>
+              <button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
+            </div>
+          </div>
+        )}
+
+        {showStats && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+              <h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Tournaments</div><div className="text-xl font-bold">{stats.totalTournaments}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Wins</div><div className="text-xl font-bold text-green-400">{stats.wins}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Top 3 Finishes</div><div className="text-lg font-bold text-yellow-400">{stats.topFinishes}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-lg font-bold text-purple-400">{stats.totalTournaments > 0 ? Math.round((stats.wins / stats.totalTournaments) * 100) : 0}%</div></div>
+                </div>
+              </div>
+              <button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
+            </div>
+          </div>
+        )}
+
+        {showVaultModal && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+              <h2 className="text-2xl font-extrabold mb-4">💰 MLEO Vault</h2>
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-6 text-center"><div className="text-sm text-white/60 mb-1">Current Balance</div><div className="text-3xl font-bold text-emerald-400">{fmt(vault)} MLEO</div></div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-white/70 mb-2 block">Collect to Wallet</label>
+                  <div className="flex gap-2 mb-2">
+                    <input type="number" value={collectAmount} onChange={(e) => setCollectAmount(Number(e.target.value))} className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white" min="1" max={vault} />
+                    <button onClick={() => setCollectAmount(vault)} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold">MAX</button>
+                  </div>
+                  <button onClick={collectToWallet} disabled={collectAmount <= 0 || collectAmount > vault || claiming} className="w-full py-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed">{claiming ? "Collecting..." : `Collect ${fmt(collectAmount)} MLEO`}</button>
+                </div>
+                <div className="text-xs text-white/60"><p>• Your vault is shared across all MLEO games</p><p>• Collect earnings to your wallet anytime</p><p>• Network: BSC Testnet (TBNB)</p></div>
+              </div>
+              <button onClick={() => setShowVaultModal(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
+            </div>
+          </div>
+        )}
       </Layout>
     );
   }
@@ -1105,62 +1275,77 @@ export default function TournamentPage() {
   // RESULTS SCREEN
   if (screen === "results") {
     const winner = tournamentState?.winner;
-    const eliminatedPlayers = tournamentState?.eliminatedPlayers || [];
+    const sortedPlayers = [...players].sort((a, b) => {
+      if (a.eliminated && b.eliminated) return a.position - b.position;
+      if (a.eliminated) return 1;
+      if (b.eliminated) return -1;
+      return b.chips - a.chips;
+    });
 
     return (
       <Layout>
-        <div className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-red-900" style={{ height: '100svh' }}>
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
-            <h1 className="text-4xl font-extrabold text-white mb-8 tracking-tight">
-              Tournament Results 🏆
-            </h1>
-            
+        <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-orange-900" style={{ height: '100svh' }}>
+          <div className="absolute inset-0 opacity-10"><div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} /></div>
+          
+          <div className="absolute top-4 left-4">
+            <button onClick={backToMenu} className="px-4 py-2 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">EXIT</button>
+          </div>
+
+          <div className="relative h-full flex flex-col items-center justify-center px-4 overflow-y-auto">
             {winner && (
-              <div className="w-full max-w-md bg-black/50 rounded-2xl p-6 shadow-xl space-y-4 mb-6">
-                <div className="text-center">
-                  <div className="text-6xl mb-4">🏆</div>
-                  <div className="text-2xl font-bold text-yellow-400 mb-2">{winner.name}</div>
-                  <div className="text-lg text-white/70">Tournament Winner!</div>
-                  <div className="text-emerald-400 text-xl font-bold">{winner.chips} chips</div>
-                </div>
+              <div className="text-center mb-8">
+                <div className="text-6xl mb-4">🏆</div>
+                <div className="text-3xl font-bold text-yellow-400 mb-2">{winner.name}</div>
+                <div className="text-lg text-white/70">Tournament Winner!</div>
+                <div className="text-2xl font-bold text-emerald-400 mt-2">{winner.chips} chips</div>
               </div>
             )}
 
-            <div className="w-full max-w-md bg-black/50 rounded-2xl p-6 shadow-xl space-y-4">
-              <h2 className="text-xl font-bold text-white text-center mb-4">Final Standings</h2>
-              <div className="space-y-2">
-                {eliminatedPlayers.map((player, index) => (
-                  <div key={player.id} className="flex items-center justify-between bg-white/10 rounded-lg p-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">#{player.position}</span>
-                      <span className="text-white font-semibold">{player.name}</span>
-                      {player.id === playerId && <span className="text-xs text-purple-400">(You)</span>}
+            <div className="w-full max-w-md">
+              <h2 className="text-2xl font-bold text-center mb-4 text-white">Final Standings</h2>
+              <div className="space-y-2 mb-6">
+                {sortedPlayers.map((player, index) => (
+                  <div 
+                    key={player.id} 
+                    className={`rounded-lg p-3 flex items-center justify-between ${
+                      index === 0 ? 'bg-yellow-600/20 border-2 border-yellow-500' : 'bg-black/30 border border-white/10'
+                    } ${player.id === playerId ? 'ring-2 ring-purple-500' : ''}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl font-bold text-white/50">#{index + 1}</span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-semibold">{player.name}</span>
+                          {player.id === playerId && <span className="text-xs text-purple-400">(You)</span>}
+                        </div>
+                        <div className="text-sm text-emerald-400">{player.chips} chips</div>
+                      </div>
                     </div>
-                    <div className="text-emerald-400 text-sm font-semibold">{player.chips} chips</div>
+                    {index === 0 && <div className="text-2xl">👑</div>}
                   </div>
                 ))}
               </div>
-            </div>
 
-            <div className="flex gap-2 mt-6">
-              <button
-                onClick={backToMenu}
-                className="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 rounded-lg"
-              >
-                New Tournament
-              </button>
-              <button
-                onClick={backSafe}
-                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg"
-              >
-                Back to Arcade
-              </button>
+              <div className="space-y-2">
+                <button
+                  onClick={backToMenu}
+                  className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all"
+                >
+                  New Tournament
+                </button>
+                <button
+                  onClick={backSafe}
+                  className="w-full py-3 rounded-lg font-semibold bg-white/10 text-white hover:bg-white/20 transition-all"
+                >
+                  Back to Arcade
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </Layout>
     );
   }
-
+  
   return null;
 }
