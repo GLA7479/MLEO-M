@@ -12,6 +12,7 @@
     "@upstash/redis": "^1.35.5",
     "autoprefixer": "^10.4.20",
     "next": "^14.2.5",
+    "peerjs": "^1.5.4",
     "postcss": "^8.4.38",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
