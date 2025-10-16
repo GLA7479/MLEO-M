@@ -206,6 +206,16 @@ function TexasHoldemMultiplayerPage() {
   const [isHost, setIsHost] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
   
+  // WebRTC states
+  const [inviteCode, setInviteCode] = useState("");
+  const [answerCode, setAnswerCode] = useState("");
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showAnswerModal, setShowAnswerModal] = useState(false);
+  
+  // Raise modal state
+  const [showRaiseModal, setShowRaiseModal] = useState(false);
+  const [raiseAmount, setRaiseAmount] = useState(0);
+  
   // Betting logic states
   const [betAmount, setBetAmount] = useState("100");
   const [maxEntryAmount] = useState(2000000); // 2M מקסימום
@@ -317,33 +327,93 @@ function TexasHoldemMultiplayerPage() {
     setError("");
 
     try {
-      const engine = new MultiplayerEngine();
-      engineRef.current = engine;
+      const host = new DirectHost({
+        onPeerOpen: (peerId) => {
+          console.log("Player joined:", peerId);
+          // Add player to game state
+          const newPlayer = {
+            id: peerId,
+            name: `Player ${peerId}`,
+            isHost: false,
+            chips: 10000,
+            status: 'ready'
+          };
+          setGameState(prev => {
+            if (!prev) {
+              // Initialize game state if it doesn't exist
+              return {
+                roomCode: "DIRECT",
+                maxPlayers,
+                players: [{
+                  id: "host",
+                  name: playerName,
+                  isHost: true,
+                  chips: 10000,
+                  status: 'ready'
+                }, newPlayer],
+                status: 'waiting',
+                hostId: "host"
+              };
+            }
+            return {
+              ...prev,
+              players: [...prev.players, newPlayer]
+            };
+          });
+        },
+        onPeerClose: (peerId) => {
+          console.log("Player left:", peerId);
+          setGameState(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              players: prev.players.filter(p => p.id !== peerId)
+            };
+          });
+        },
+        onMessage: (peerId, data) => {
+          console.log("Message from", peerId, ":", data);
+          // Handle game messages
+          try {
+            const message = typeof data === 'string' ? JSON.parse(data) : data;
+            if (message.type === 'game_action') {
+              console.log("Host received game action:", message);
+              handleGameMessage(message);
+            } else if (message.type === 'game_state_update') {
+              console.log("Host received game state update:", message);
+              setGameState(message.gameState);
+            }
+          } catch (e) {
+            console.error("Error parsing message:", e);
+          }
+        },
+        onLog: (msg) => console.log("Host log:", msg)
+      });
 
-      // onStateUpdate will be set in useEffect
-
-      engine.onPlayerJoin = (player) => {
-        console.log("Player joined:", player);
-        // The onStateUpdate will handle the state update
-      };
-
-      engine.onPlayerLeave = (player) => {
-        console.log("Player left:", player);
-        // The onStateUpdate will handle the state update
-      };
-
-      engine.onError = (err) => {
-        console.error("Create room engine error:", err);
-        setError("Connection error: " + err.message);
-      };
-
-      const result = await engine.createRoom(playerName, maxPlayers, startingChips);
+      engineRef.current = host;
+      const inviteCode = await host.createInvite();
       
-      setPlayerId(result.playerId);
+      setPlayerId("host");
       setIsHost(true);
-      setRoomCode(result.roomCode);
-      setGameState(engine.gameState);
-      setScreen("lobby");
+      setInviteCode(inviteCode);
+      console.log("Setting showInviteModal to true");
+      setShowInviteModal(true);
+      
+      // Initialize game state
+      const initialGameState = {
+        roomCode: "DIRECT",
+        maxPlayers,
+        players: [{
+          id: "host",
+          name: playerName,
+          isHost: true,
+          chips: 10000,
+          status: 'ready'
+        }],
+        status: 'waiting',
+        hostId: "host"
+      };
+      setGameState(initialGameState);
 
     } catch (err) {
       console.error("Create room error:", err);
@@ -359,8 +429,8 @@ function TexasHoldemMultiplayerPage() {
       return;
     }
 
-    if (!roomCode.trim() || roomCode.length !== 5) {
-      setError("Please enter a valid 5-character room code");
+    if (!answerCode.trim()) {
+      setError("Please enter an answer code");
       return;
     }
 
@@ -369,37 +439,48 @@ function TexasHoldemMultiplayerPage() {
     setError("");
 
     try {
-      const engine = new MultiplayerEngine();
-      engineRef.current = engine;
+      const guest = new DirectGuest({
+        onOpen: () => {
+          console.log("Guest connected to host");
+          setPlayerId("guest");
+          setIsHost(false);
+          setScreen("game");
+        },
+        onMessage: (data) => {
+          console.log("Guest received message:", data);
+          try {
+            const message = typeof data === 'string' ? JSON.parse(data) : data;
+            handleGameMessage(message);
+          } catch (e) {
+            console.error("Error parsing message:", e);
+          }
+        },
+        onLog: (msg) => console.log("Guest log:", msg)
+      });
 
-      // onStateUpdate will be set in useEffect
-
-      engine.onPlayerJoin = (player) => {
-        console.log("Player joined:", player);
-        // The onStateUpdate will handle the state update
-      };
-
-      engine.onPlayerLeave = (player) => {
-        console.log("Player left:", player);
-        // The onStateUpdate will handle the state update
-      };
-
-      engine.onError = (err) => {
-        console.error("Join room engine error:", err);
-        setError("Connection error: " + err.message);
-      };
-
-      const result = await engine.joinRoom(roomCode.toUpperCase(), playerName);
+      engineRef.current = guest;
+      await guest.joinFromInvite(answerCode);
       
-      setPlayerId(result.playerId);
-      setIsHost(false);
-      setScreen("lobby");
+      setAnswerCode("");
+      setShowAnswerModal(false);
 
     } catch (err) {
       console.error("Join room error:", err);
-      setError("Failed to join room. Please check the room code.");
+      setError("Failed to join room. Please check the answer code.");
     } finally {
       setIsConnecting(false);
+    }
+  };
+
+  const sendGameMessage = (message) => {
+    if (engineRef.current) {
+      if (isHost) {
+        // Host broadcasts to all guests
+        engineRef.current.broadcast(message);
+      } else {
+        // Guest sends to host
+        engineRef.current.send(message);
+      }
     }
   };
 
@@ -724,6 +805,7 @@ function TexasHoldemMultiplayerPage() {
 
   if (!mounted) return null;
 
+
   // MENU SCREEN
   if (screen === "menu") {
     return (
@@ -867,6 +949,51 @@ function TexasHoldemMultiplayerPage() {
             </div>
           </div>
         </div>
+
+        {/* Invite Modal */}
+        {showInviteModal && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl">
+              <h2 className="text-2xl font-extrabold mb-4 text-center">🎮 Invite Players</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-white/70 mb-2 block">Invite Code</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={inviteCode}
+                      readOnly
+                      className="flex-1 px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white font-mono text-center"
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(inviteCode);
+                        alert("Copied to clipboard!");
+                      }}
+                      className="px-4 py-3 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <div className="text-xs text-white/60 mt-2">
+                    Share this code with other players to join your game
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setShowInviteModal(false);
+                      setScreen("lobby");
+                    }}
+                    className="flex-1 py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold"
+                  >
+                    Continue to Lobby
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </Layout>
     );
   }
