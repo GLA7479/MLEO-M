@@ -361,6 +361,15 @@ export default function ArcadeHub() {
       href: "/texas-holdem-multiplayer",
       color: "#059669",
     },
+    // 8.7. Texas Hold'em Tournament - NEW!
+    {
+      title: "Tournament Texas Hold'em",
+      emoji: "🏆",
+      description: "Tournament mode! Host creates tournament, players join with code. Automatic elimination until one winner takes all!",
+      prize: "Tournament",
+      href: "/tournament",
+      color: "#7C3AED",
+    },
     // 9. Multiplier Ladder
     {
       title: "Ladder",

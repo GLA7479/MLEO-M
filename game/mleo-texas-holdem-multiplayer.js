@@ -219,6 +219,7 @@ export default function TexasHoldemMultiplayerPage() {
   // New game approval states
   const [pendingNewGame, setPendingNewGame] = useState(false);
   const [newGameApprovals, setNewGameApprovals] = useState(new Set());
+  const [newGameRequester, setNewGameRequester] = useState(null);
   
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
@@ -564,6 +565,7 @@ export default function TexasHoldemMultiplayerPage() {
       status: "playing",
       gameResult: null, // נקה את התוצאה
       newGameRequest: false, // נקה את בקשת המשחק החדש
+      newGameRequester: null, // נקה את מבקש המשחק
       newGameApprovals: [] // נקה את האישורים
     };
     
@@ -574,43 +576,83 @@ export default function TexasHoldemMultiplayerPage() {
   };
 
   const requestNewGame = () => {
-    if (!isHost) return;
-    
-    console.log("Host requesting new game");
+    console.log("Player requesting new game:", playerId);
     setPendingNewGame(true);
+    setNewGameRequester(playerId);
     
-    // עדכן את gameState עם בקשה למשחק חדש
-    const updatedState = {
-      ...gameState,
-      newGameRequest: true,
-      newGameApprovals: [playerId], // המארח מאשר אוטומטית
-      status: "waiting_for_approval"
-    };
-    
-    engineRef.current.updateGameState(updatedState);
+    if (isHost) {
+      // המארח מבקש - מתחיל מיד עם אישור אוטומטי
+      const updatedState = {
+        ...gameState,
+        newGameRequest: true,
+        newGameRequester: playerId,
+        newGameApprovals: [playerId], // המארח מאשר אוטומטית
+        status: "waiting_for_approval"
+      };
+      
+      engineRef.current.updateGameState(updatedState);
+    } else {
+      // שחקן מבקש - שולח בקשה למארח
+      const updatedState = {
+        ...gameState,
+        newGameRequest: true,
+        newGameRequester: playerId,
+        newGameApprovals: [], // מתחיל ללא אישורים
+        status: "waiting_for_host_approval"
+      };
+      
+      engineRef.current.updateGameState(updatedState);
+    }
   };
 
   const approveNewGame = () => {
     console.log("Player approving new game:", playerId);
     
-    // הוסף את השחקן לרשימת האישורים
-    const currentApprovals = gameState.newGameApprovals || [];
-    if (!currentApprovals.includes(playerId)) {
-      const updatedApprovals = [...currentApprovals, playerId];
-      
+    if (isHost && gameState.status === "waiting_for_host_approval") {
+      // המארח מאשר בקשה משחקן
       const updatedState = {
         ...gameState,
-        newGameApprovals: updatedApprovals
+        status: "waiting_for_approval",
+        newGameApprovals: [playerId] // המארח מאשר
       };
       
       engineRef.current.updateGameState(updatedState);
-      
-      // בדוק אם כל השחקנים אישרו
-      if (updatedApprovals.length === gameState.players.length) {
-        console.log("All players approved, starting new hand");
-        setTimeout(() => startNewHand(), 500);
+    } else {
+      // שחקן רגיל מאשר
+      const currentApprovals = gameState.newGameApprovals || [];
+      if (!currentApprovals.includes(playerId)) {
+        const updatedApprovals = [...currentApprovals, playerId];
+        
+        const updatedState = {
+          ...gameState,
+          newGameApprovals: updatedApprovals
+        };
+        
+        engineRef.current.updateGameState(updatedState);
+        
+        // בדוק אם כל השחקנים אישרו
+        if (updatedApprovals.length === gameState.players.length) {
+          console.log("All players approved, starting new hand");
+          setTimeout(() => startNewHand(), 500);
+        }
       }
     }
+  };
+
+  const rejectNewGame = () => {
+    console.log("Rejecting new game request");
+    
+    const updatedState = {
+      ...gameState,
+      newGameRequest: false,
+      newGameRequester: null,
+      newGameApprovals: [],
+      status: "finished"
+    };
+    
+    engineRef.current.updateGameState(updatedState);
+    setPendingNewGame(false);
+    setNewGameRequester(null);
   };
 
   const finishGame = () => {
@@ -1213,7 +1255,7 @@ export default function TexasHoldemMultiplayerPage() {
         )}
 
         {/* Game Result Modal */}
-        {gameState?.status === "finished" && gameState?.gameResult && !gameState?.newGameRequest && (
+        {gameState?.status === "finished" && gameState?.gameResult && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
             <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl text-center">
               <h2 className="text-2xl font-extrabold mb-4">🎉 Game Over!</h2>
@@ -1229,19 +1271,12 @@ export default function TexasHoldemMultiplayerPage() {
                 </div>
               </div>
               <div className="flex gap-2 mt-6">
-                {isHost ? (
+                {!gameState?.newGameRequest && (
                   <button 
                     onClick={requestNewGame}
                     className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg"
                   >
                     New Game
-                  </button>
-                ) : (
-                  <button 
-                    onClick={approveNewGame}
-                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg"
-                  >
-                    Approve New Game
                   </button>
                 )}
                 <button 
@@ -1261,53 +1296,91 @@ export default function TexasHoldemMultiplayerPage() {
         {gameState?.newGameRequest && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
             <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl text-center">
-              <h2 className="text-2xl font-extrabold mb-4">⏳ Waiting for Approval</h2>
-              <div className="space-y-4">
-                <div className="text-lg">Waiting for all players to approve new game...</div>
-                <div className="text-sm text-gray-300">
-                  Approved: {gameState.newGameApprovals?.length || 0}/{gameState.players?.length || 0}
-                </div>
-                <div className="text-xs text-gray-400">
-                  {gameState.newGameApprovals?.map(id => {
-                    const player = gameState.players?.find(p => p.id === id);
-                    return player?.name;
-                  }).join(", ")}
-                </div>
-              </div>
-              <div className="flex gap-2 mt-6">
-                {!isHost && !gameState.newGameApprovals?.includes(playerId) && (
-                  <button 
-                    onClick={approveNewGame}
-                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg"
-                  >
-                    Approve New Game
-                  </button>
-                )}
-                {isHost && (
-                  <button 
-                    onClick={() => {
-                      const updatedState = {
-                        ...gameState,
-                        newGameRequest: false,
-                        newGameApprovals: [],
-                        status: "finished"
-                      };
-                      engineRef.current.updateGameState(updatedState);
-                    }}
-                    className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg"
-                  >
-                    Cancel Request
-                  </button>
-                )}
-                <button 
-                  onClick={() => {
-                    setScreen("lobby");
-                  }}
-                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg"
-                >
-                  Back to Lobby
-                </button>
-              </div>
+              {gameState.status === "waiting_for_host_approval" ? (
+                <>
+                  <h2 className="text-2xl font-extrabold mb-4">🎮 New Game Request</h2>
+                  <div className="space-y-4">
+                    <div className="text-lg">
+                      <span className="text-yellow-400 font-bold">
+                        {gameState.players?.find(p => p.id === gameState.newGameRequester)?.name}
+                      </span> wants to start a new game
+                    </div>
+                    <div className="text-sm text-gray-300">
+                      Host approval required
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-6">
+                    {isHost && (
+                      <>
+                        <button 
+                          onClick={approveNewGame}
+                          className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg"
+                        >
+                          Approve
+                        </button>
+                        <button 
+                          onClick={rejectNewGame}
+                          className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg"
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
+                    {!isHost && (
+                      <button 
+                        onClick={() => {
+                          setScreen("lobby");
+                        }}
+                        className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg"
+                      >
+                        Back to Lobby
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-2xl font-extrabold mb-4">⏳ Waiting for Approval</h2>
+                  <div className="space-y-4">
+                    <div className="text-lg">Waiting for all players to approve new game...</div>
+                    <div className="text-sm text-gray-300">
+                      Approved: {gameState.newGameApprovals?.length || 0}/{gameState.players?.length || 0}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {gameState.newGameApprovals?.map(id => {
+                        const player = gameState.players?.find(p => p.id === id);
+                        return player?.name;
+                      }).join(", ")}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-6">
+                    {!isHost && !gameState.newGameApprovals?.includes(playerId) && (
+                      <button 
+                        onClick={approveNewGame}
+                        className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg"
+                      >
+                        Approve New Game
+                      </button>
+                    )}
+                    {isHost && (
+                      <button 
+                        onClick={rejectNewGame}
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg"
+                      >
+                        Cancel Request
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => {
+                        setScreen("lobby");
+                      }}
+                      className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg"
+                    >
+                      Back to Lobby
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
