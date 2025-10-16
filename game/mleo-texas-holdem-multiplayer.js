@@ -416,11 +416,17 @@ export default function TexasHoldemMultiplayerPage() {
   };
 
   const handlePlayerAction = (action, amount = 0) => {
-    if (!isHost || !gameState) return;
+    if (!gameState) return;
+    
+    const players = gameState.players || [];
+    const myPlayer = players.find(p => p.id === playerId);
+    const currentPlayer = players[gameState.currentPlayerIndex];
+    const isMyTurn = currentPlayer?.id === playerId;
+    
+    if (!isMyTurn || myPlayer?.folded) return;
     
     playSfx(clickSound.current);
     
-    const currentPlayer = gameState.players[gameState.currentPlayerIndex];
     const updatedPlayers = [...gameState.players];
     
     if (action === "fold") {
@@ -863,8 +869,8 @@ export default function TexasHoldemMultiplayerPage() {
               ))}
             </div>
 
-            {/* Action Buttons - Only show for HOST */}
-            {isHost && (
+            {/* Action Buttons - Show for current player */}
+            {isMyTurn && !myPlayer?.folded && (
               <div className="w-full max-w-sm space-y-2">
                 <div className="flex gap-2">
                   <button onClick={() => handlePlayerAction("fold")} className="flex-1 h-10 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 font-semibold text-xs">FOLD</button>
