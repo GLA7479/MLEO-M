@@ -602,7 +602,7 @@ export default function TexasHoldemPage() {
             </div>
           </div>
 
-          <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
+          <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap" style={{ minHeight: '48px' }}>
             {gameState === "betting" && (
               <>
                 <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs">1K</button>
@@ -617,23 +617,23 @@ export default function TexasHoldemPage() {
             )}
           </div>
 
-          <div ref={ctaRef} className="flex flex-col gap-2 w-full max-w-sm" style={{ minHeight: '120px' }}>
+          <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
             {gameState === "betting" ? (
-              <button onClick={() => dealCards(false)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-blue-600 text-white shadow-lg hover:brightness-110 transition-all">DEAL</button>
+              <button onClick={() => dealCards(false)} className="w-full h-12 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-blue-600 text-white shadow-lg hover:brightness-110 transition-all">DEAL</button>
             ) : gameState === "pre-flop" ? (
               <div className="flex gap-2">
-                <button onClick={fold} className="flex-1 py-3 rounded-lg font-bold text-sm bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:brightness-110">FOLD</button>
-                <button onClick={call} className="flex-1 py-3 rounded-lg font-bold text-sm bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:brightness-110">CALL (×1)</button>
+                <button onClick={fold} className="flex-1 h-12 rounded-lg font-bold text-sm bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:brightness-110">FOLD</button>
+                <button onClick={call} className="flex-1 h-12 rounded-lg font-bold text-sm bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:brightness-110">CALL (×1)</button>
               </div>
             ) : (gameState === "flop" || gameState === "turn" || gameState === "river") ? (
               <div className="flex gap-2">
-                <button onClick={check} className="flex-1 py-3 rounded-lg font-bold text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:brightness-110">CHECK</button>
-                <button onClick={bet} className="flex-1 py-3 rounded-lg font-bold text-sm bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:brightness-110">BET (×1)</button>
+                <button onClick={check} className="flex-1 h-12 rounded-lg font-bold text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:brightness-110">CHECK</button>
+                <button onClick={bet} className="flex-1 h-12 rounded-lg font-bold text-sm bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:brightness-110">BET (×1)</button>
               </div>
             ) : gameState === "finished" ? (
-              <button onClick={newHand} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-blue-600 text-white shadow-lg hover:brightness-110 transition-all">NEW HAND</button>
+              <button onClick={newHand} className="w-full h-12 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-blue-600 text-white shadow-lg hover:brightness-110 transition-all">NEW HAND</button>
             ) : (
-              <div className="w-full py-3 text-center text-white/60 text-sm font-bold">Dealing...</div>
+              <div className="w-full h-12 flex items-center justify-center text-white/60 text-sm font-bold">Dealing...</div>
             )}
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
