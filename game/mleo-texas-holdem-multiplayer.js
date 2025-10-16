@@ -10,7 +10,7 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { MultiplayerEngine } from "../lib/multiplayer-engine";
+import { DirectHost, DirectGuest } from "../lib/webrtc-direct";
 
 function useIOSViewportFix() {
   useEffect(() => {
