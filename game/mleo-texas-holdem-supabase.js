@@ -154,6 +154,7 @@ function TexasHoldemSupabasePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [sfxMuted, setSfxMuted] = useState(false);
+  const [gameMessage, setGameMessage] = useState("");
 
   const playSfx = (sound) => { 
     if (sfxMuted || !sound) return; 
@@ -364,9 +365,12 @@ function TexasHoldemSupabasePage() {
           setGame(payload.new);
           setCurrentPlayerIndex(payload.new.current_player_index || 0);
           
-          if (payload.new.status === GAME_STATUS.PLAYING) {
-            setScreen("game");
-          }
+                if (payload.new.status === GAME_STATUS.PLAYING) {
+                  setScreen("game");
+                } else if (payload.new.status === GAME_STATUS.FINISHED) {
+                  // Game finished - stay on game screen to show winner
+                  console.log("Game finished, showing winner");
+                }
         }
       )
       .on('postgres_changes', 
@@ -484,7 +488,7 @@ function TexasHoldemSupabasePage() {
     }
   };
 
-  // Player action
+  // Player action with advanced game logic
   const handlePlayerAction = async (action, amount = 0) => {
     if (!game || !playerId) return;
     
@@ -504,17 +508,36 @@ function TexasHoldemSupabasePage() {
     playSfx(clickSound.current);
     
     try {
-      // Update player action
+      // Calculate new bet and chips
+      let newBet = myPlayer.bet;
+      let newChips = myPlayer.chips;
+      let newStatus = myPlayer.status;
+      
+      if (action === "fold") {
+        newStatus = PLAYER_STATUS.FOLDED;
+      } else if (action === "call") {
+        const callAmount = game.current_bet - myPlayer.bet;
+        newBet = game.current_bet;
+        newChips = myPlayer.chips - callAmount;
+      } else if (action === "check") {
+        // No change needed for check
+      } else if (action === "raise") {
+        const raiseAmount = Math.min(amount, myPlayer.chips);
+        newBet = myPlayer.bet + raiseAmount;
+        newChips = myPlayer.chips - raiseAmount;
+      } else if (action === "allin") {
+        newBet = myPlayer.bet + myPlayer.chips;
+        newChips = 0;
+        newStatus = PLAYER_STATUS.ALL_IN;
+      }
+
+      // Update player
       const { error } = await supabase
         .from(TABLES.PLAYERS)
         .update({
-          status: action === "fold" ? PLAYER_STATUS.FOLDED : PLAYER_STATUS.READY,
-          bet: action === "call" ? game.current_bet : 
-               action === "raise" ? myPlayer.bet + amount :
-               action === "allin" ? myPlayer.chips : myPlayer.bet,
-          chips: action === "call" ? myPlayer.chips - (game.current_bet - myPlayer.bet) :
-                 action === "raise" ? myPlayer.chips - amount :
-                 action === "allin" ? 0 : myPlayer.chips
+          status: newStatus,
+          bet: newBet,
+          chips: newChips
         })
         .eq("id", playerId);
 
@@ -523,28 +546,91 @@ function TexasHoldemSupabasePage() {
         return;
       }
 
-      // Update game state
-      const newPot = game.pot + (action === "call" ? (game.current_bet - myPlayer.bet) :
-                                action === "raise" ? amount :
-                                action === "allin" ? myPlayer.chips : 0);
-      
-      const newCurrentBet = action === "raise" ? myPlayer.bet + amount :
-                           action === "allin" ? Math.max(game.current_bet, myPlayer.chips) :
-                           game.current_bet;
+      // Calculate new pot and current bet
+      const betIncrease = newBet - myPlayer.bet;
+
+      // Set game message
+      const actionMessages = {
+        "fold": `${myPlayer.name} folded`,
+        "check": `${myPlayer.name} checked`,
+        "call": `${myPlayer.name} called ${betIncrease}`,
+        "raise": `${myPlayer.name} raised by ${amount}`,
+        "allin": `${myPlayer.name} went all in!`
+      };
+      setGameMessage(actionMessages[action] || `${myPlayer.name} made a move`);
+      const newPot = game.pot + betIncrease;
+      const newCurrentBet = Math.max(game.current_bet, newBet);
 
       // Move to next player
       let nextIndex = (currentPlayerIndex + 1) % players.length;
       while (players[nextIndex]?.status === PLAYER_STATUS.FOLDED) {
         nextIndex = (nextIndex + 1) % players.length;
       }
+      
+      console.log("Turn management:", {
+        currentPlayer: currentPlayerIndex,
+        nextPlayer: nextIndex,
+        action,
+        newBet,
+        newChips
+      });
 
+      // Check if betting round is complete
+      const activePlayers = players.filter(p => p.status !== PLAYER_STATUS.FOLDED);
+      
+      let updatedGame = {
+        pot: newPot,
+        current_bet: newCurrentBet,
+        current_player_index: nextIndex
+      };
+
+      // Check if game should end (only one active player left)
+      if (activePlayers.length === 1) {
+        console.log("Only one player left - ending game");
+        await determineWinner();
+        return;
+      }
+
+      // Check if we need to progress to next round
+      // This happens when all active players have bet the same amount
+      const allPlayersBet = activePlayers.every(p => p.bet === newCurrentBet || p.status === PLAYER_STATUS.ALL_IN);
+      const bettingComplete = allPlayersBet && activePlayers.length > 1;
+      
+      if (bettingComplete) {
+        const nextRound = getNextRound(game.round);
+        const newCommunityVisible = getCommunityVisible(nextRound);
+        
+        updatedGame = {
+          ...updatedGame,
+          round: nextRound,
+          community_visible: newCommunityVisible,
+          current_bet: 0
+        };
+
+        // Reset all player bets for next round
+        for (const player of activePlayers) {
+          await supabase
+            .from(TABLES.PLAYERS)
+            .update({ bet: 0 })
+            .eq("id", player.id);
+        }
+
+        // Update players state locally
+        setPlayers(prev => prev.map(p => ({
+          ...p,
+          bet: 0
+        })));
+
+        // Check for game end
+        if (nextRound === "showdown") {
+          await determineWinner();
+        }
+      }
+
+      // Update game state
       const { error: gameError } = await supabase
         .from(TABLES.GAMES)
-        .update({
-          pot: newPot,
-          current_bet: newCurrentBet,
-          current_player_index: nextIndex
-        })
+        .update(updatedGame)
         .eq("id", game.id);
 
       if (gameError) {
@@ -553,6 +639,252 @@ function TexasHoldemSupabasePage() {
 
     } catch (err) {
       console.error("Player action error:", err);
+    }
+  };
+
+  // Get next round
+  const getNextRound = (currentRound) => {
+    const rounds = ["pre-flop", "flop", "turn", "river", "showdown"];
+    const currentIndex = rounds.indexOf(currentRound);
+    return rounds[currentIndex + 1] || "showdown";
+  };
+
+  // Get community cards visible count
+  const getCommunityVisible = (round) => {
+    const visible = {
+      "pre-flop": 0,
+      "flop": 3,
+      "turn": 4,
+      "river": 5,
+      "showdown": 5
+    };
+    return visible[round] || 0;
+  };
+
+  // Evaluate poker hand
+  const evaluateHand = (cards) => {
+    if (!cards || cards.length < 5) return { rank: 0, highCard: 0, name: "Invalid" };
+    
+    // Convert cards to numbers for easier comparison
+    const cardValues = cards.map(card => {
+      const value = card.value;
+      if (value === 'A') return 14;
+      if (value === 'K') return 13;
+      if (value === 'Q') return 12;
+      if (value === 'J') return 11;
+      return parseInt(value);
+    });
+    
+    const suits = cards.map(card => card.suit);
+    
+    // Count occurrences of each value
+    const valueCounts = {};
+    cardValues.forEach(value => {
+      valueCounts[value] = (valueCounts[value] || 0) + 1;
+    });
+    
+    const counts = Object.values(valueCounts).sort((a, b) => b - a);
+    const values = Object.keys(valueCounts).map(Number).sort((a, b) => b - a);
+    
+    // Check for straight flush
+    if (isFlush(suits) && isStraight(cardValues)) {
+      return { rank: 9, highCard: Math.max(...cardValues), name: "Straight Flush" };
+    }
+    
+    // Check for four of a kind
+    if (counts[0] === 4) {
+      return { rank: 8, highCard: values[0], name: "Four of a Kind" };
+    }
+    
+    // Check for full house
+    if (counts[0] === 3 && counts[1] === 2) {
+      return { rank: 7, highCard: values[0], name: "Full House" };
+    }
+    
+    // Check for flush
+    if (isFlush(suits)) {
+      return { rank: 6, highCard: Math.max(...cardValues), name: "Flush" };
+    }
+    
+    // Check for straight
+    if (isStraight(cardValues)) {
+      return { rank: 5, highCard: Math.max(...cardValues), name: "Straight" };
+    }
+    
+    // Check for three of a kind
+    if (counts[0] === 3) {
+      return { rank: 4, highCard: values[0], name: "Three of a Kind" };
+    }
+    
+    // Check for two pair
+    if (counts[0] === 2 && counts[1] === 2) {
+      return { rank: 3, highCard: Math.max(values[0], values[1]), name: "Two Pair" };
+    }
+    
+    // Check for pair
+    if (counts[0] === 2) {
+      return { rank: 2, highCard: values[0], name: "Pair" };
+    }
+    
+    // High card
+    return { rank: 1, highCard: Math.max(...cardValues), name: "High Card" };
+  };
+
+  // Check if cards form a flush
+  const isFlush = (suits) => {
+    return suits.every(suit => suit === suits[0]);
+  };
+
+  // Check if cards form a straight
+  const isStraight = (values) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i] - sorted[i-1] !== 1) {
+        // Check for A-2-3-4-5 straight
+        if (sorted[0] === 2 && sorted[1] === 3 && sorted[2] === 4 && sorted[3] === 5 && sorted[4] === 14) {
+          return true;
+        }
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // Determine winner
+  const determineWinner = async () => {
+    try {
+      const activePlayers = players.filter(p => p.status !== PLAYER_STATUS.FOLDED);
+      console.log("Determining winner. Active players:", activePlayers.length);
+      
+      if (activePlayers.length === 1) {
+        // Only one player left - they win
+        const winner = activePlayers[0];
+        console.log("Winner by fold:", winner.name);
+        
+        // Update winner's chips
+        await supabase
+          .from(TABLES.PLAYERS)
+          .update({ chips: winner.chips + game.pot })
+          .eq("id", winner.id);
+          
+        // Show winner message
+        setGameMessage(`🎉 ${winner.name} wins by fold! Pot: ${game.pot}`);
+        
+        // Update game status to finished first
+        await supabase
+          .from(TABLES.GAMES)
+          .update({
+            status: GAME_STATUS.FINISHED,
+            pot: newPot,
+            current_bet: 0,
+            current_player_index: nextIndex,
+            round: "finished"
+          })
+          .eq("id", game.id);
+        
+        // Reset game after 5 seconds
+        setTimeout(async () => {
+          await supabase
+            .from(TABLES.GAMES)
+            .update({
+              status: GAME_STATUS.WAITING,
+              pot: 0,
+              current_bet: 0,
+              current_player_index: 0,
+              round: "pre-flop",
+              community_visible: 0,
+              community_cards: []
+            })
+            .eq("id", game.id);
+            
+          // Reset all players
+          for (const player of players) {
+            await supabase
+              .from(TABLES.PLAYERS)
+              .update({ 
+                cards: [],
+                bet: 0,
+                status: PLAYER_STATUS.READY,
+                chips: Math.max(player.chips, 1000) // Ensure minimum chips
+              })
+              .eq("id", player.id);
+          }
+          
+          setScreen("lobby");
+          setGameMessage("");
+        }, 5000);
+        
+      } else if (activePlayers.length > 1) {
+        // Evaluate hands and determine winner
+        const hands = activePlayers.map(player => ({
+          player,
+          hand: evaluateHand([...player.cards, ...game.community_cards.slice(0, game.community_visible)])
+        }));
+        
+        hands.sort((a, b) => {
+          if (a.hand.rank !== b.hand.rank) return b.hand.rank - a.hand.rank;
+          return b.hand.highCard - a.hand.highCard;
+        });
+        
+        const winner = hands[0].player;
+        const winningHand = hands[0].hand;
+        console.log("Winner by hand:", winner.name, winningHand);
+        
+        // Update winner's chips
+        await supabase
+          .from(TABLES.PLAYERS)
+          .update({ chips: winner.chips + game.pot })
+          .eq("id", winner.id);
+          
+        // Show winner message
+        setGameMessage(`🎉 ${winner.name} wins with ${winningHand.name}! Pot: ${game.pot}`);
+        
+        // Update game status to finished first
+        await supabase
+          .from(TABLES.GAMES)
+          .update({
+            status: GAME_STATUS.FINISHED,
+            pot: game.pot,
+            current_bet: 0,
+            current_player_index: 0,
+            round: "finished"
+          })
+          .eq("id", game.id);
+        
+        // Reset game after 7 seconds (longer for showdown)
+        setTimeout(async () => {
+          await supabase
+            .from(TABLES.GAMES)
+            .update({
+              status: GAME_STATUS.WAITING,
+              pot: 0,
+              current_bet: 0,
+              current_player_index: 0,
+              round: "pre-flop",
+              community_visible: 0,
+              community_cards: []
+            })
+            .eq("id", game.id);
+            
+          // Reset all players
+          for (const player of players) {
+            await supabase
+              .from(TABLES.PLAYERS)
+              .update({ 
+                cards: [],
+                bet: 0,
+                status: PLAYER_STATUS.READY,
+                chips: Math.max(player.chips, 1000) // Ensure minimum chips
+              })
+              .eq("id", player.id);
+          }
+          
+          setScreen("lobby");
+          setGameMessage("");
+        }, 7000);
+      }
+    } catch (err) {
+      console.error("Error determining winner:", err);
     }
   };
 
@@ -854,19 +1186,48 @@ function TexasHoldemSupabasePage() {
           <div className="absolute top-2 right-2 flex gap-2 z-50">
             <button onClick={() => { playSfx(clickSound.current); const el = wrapRef.current || document.documentElement; if (!document.fullscreenElement) { el.requestFullscreen?.().catch(() => {}); } else { document.exitFullscreen?.().catch(() => {}); } }} className="px-3 py-1 rounded-lg text-xs font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFullscreen ? "EXIT" : "FULL"}</button>
             <button onClick={() => { playSfx(clickSound.current); setMenuOpen(true); }} className="px-3 py-1 rounded-lg text-xs font-bold bg-white/5 border border-white/10 hover:bg-white/10">MENU</button>
+            {isHost && (
+              <button onClick={async () => { 
+                playSfx(clickSound.current); 
+                await determineWinner(); 
+              }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30">END GAME</button>
+            )}
           </div>
 
           <div className="relative h-full flex flex-col items-center px-2 py-12">
             <div className="text-center mb-2">
               <div className="text-xs text-white/60">Room: {roomCode} • Round: {game?.round}</div>
               <div className="text-2xl font-bold text-amber-400">POT: {fmt(pot)}</div>
+              {gameMessage && (
+                <div className={`text-sm mt-2 px-3 py-2 rounded text-center ${
+                  game?.status === GAME_STATUS.FINISHED 
+                    ? 'bg-green-900/50 text-green-300 border border-green-500' 
+                    : 'bg-yellow-900/30 text-yellow-300'
+                }`}>
+                  {gameMessage}
+                  {game?.status === GAME_STATUS.FINISHED && (
+                    <div className="text-xs mt-1 text-white/60">
+                      Returning to lobby in a few seconds...
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Community Cards */}
             <div className="mb-3">
+              <div className="text-center text-white mb-2">
+                <span className="text-lg font-bold">Community Cards - {game?.round?.toUpperCase() || 'PRE-FLOP'}</span>
+              </div>
               <div className="flex gap-1 justify-center">
                 {communityCards.slice(0, communityVisible).map((card, i) => (
                   <PlayingCard key={i} card={card} delay={i * 200} />
+                ))}
+                {/* Show placeholder cards for remaining community cards */}
+                {Array.from({ length: 5 - communityVisible }).map((_, i) => (
+                  <div key={`placeholder-${i}`} className="w-12 h-16 bg-gray-600 rounded border-2 border-gray-500 flex items-center justify-center">
+                    <span className="text-gray-400 text-xs">?</span>
+                  </div>
                 ))}
               </div>
             </div>
@@ -888,10 +1249,18 @@ function TexasHoldemSupabasePage() {
                     <div className="text-emerald-400 text-xs">{player.chips} | Bet: {player.bet}</div>
                   </div>
                     {isMe && player.cards && player.cards.length > 0 && (
-                    <div className="flex gap-1 mt-2 justify-center">
-                      {player.cards.map((card, i) => (
-                        <PlayingCard key={i} card={card} delay={i * 200} />
-                      ))}
+                    <div className="mt-2">
+                      <div className="flex gap-1 justify-center">
+                        {player.cards.map((card, i) => (
+                          <PlayingCard key={i} card={card} delay={i * 200} />
+                        ))}
+                      </div>
+                      {/* Show current hand strength */}
+                      {game?.community_cards && game.community_visible > 0 && (
+                        <div className="text-center text-yellow-300 mt-2 text-xs">
+                          Hand: {evaluateHand([...player.cards, ...game.community_cards.slice(0, game.community_visible)]).name}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -900,21 +1269,24 @@ function TexasHoldemSupabasePage() {
             </div>
 
             {/* Action Buttons - Show for current player */}
-            {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && (
-              <div className="w-full max-w-sm space-y-2">
+            {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && (
+              <div className="w-full max-w-sm space-y-3 bg-gray-800/50 p-4 rounded-lg">
+                <div className="text-center text-white mb-2">
+                  <span className="text-lg font-bold">Your Turn - Choose Action</span>
+                </div>
                 <div className="flex gap-2">
-                  <button onClick={() => handlePlayerAction("fold")} className="flex-1 h-10 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 font-semibold text-xs">FOLD</button>
+                  <button onClick={() => handlePlayerAction("fold")} className="flex-1 h-12 rounded-lg bg-red-600 border border-red-500 text-white hover:bg-red-700 font-bold text-sm">FOLD</button>
                   <button 
                     onClick={() => handlePlayerAction("check")} 
                     disabled={game.current_bet > myPlayer.bet}
-                    className="flex-1 h-10 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 h-12 rounded-lg bg-blue-600 border border-blue-500 text-white hover:bg-blue-700 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     CHECK
                   </button>
                   <button 
                     onClick={() => handlePlayerAction("call")} 
                     disabled={game.current_bet <= myPlayer.bet || myPlayer.chips < (game.current_bet - myPlayer.bet)}
-                    className="flex-1 h-10 rounded-lg bg-green-500/20 border border-green-500/30 text-green-300 hover:bg-green-500/30 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 h-12 rounded-lg bg-green-600 border border-green-500 text-white hover:bg-green-700 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     CALL {game.current_bet > myPlayer.bet ? `(${game.current_bet - myPlayer.bet})` : ''}
                   </button>
@@ -924,16 +1296,23 @@ function TexasHoldemSupabasePage() {
                   <button 
                     onClick={() => handlePlayerAction("raise", 100)} 
                     disabled={myPlayer.chips === 0}
-                    className="flex-1 h-10 rounded-lg bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 h-12 rounded-lg bg-yellow-600 border border-yellow-500 text-white hover:bg-yellow-700 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    RAISE 100
+                    RAISE +100
+                  </button>
+                  <button 
+                    onClick={() => handlePlayerAction("raise", 500)} 
+                    disabled={myPlayer.chips === 0}
+                    className="flex-1 h-12 rounded-lg bg-yellow-600 border border-yellow-500 text-white hover:bg-yellow-700 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    RAISE +500
                   </button>
                   <button 
                     onClick={() => handlePlayerAction("allin")} 
                     disabled={myPlayer.chips === 0 || myPlayer.status === PLAYER_STATUS.ALL_IN}
-                    className="flex-1 h-10 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 h-12 rounded-lg bg-purple-600 border border-purple-500 text-white hover:bg-purple-700 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    ALL-IN
+                    ALL IN
                   </button>
                 </div>
               </div>

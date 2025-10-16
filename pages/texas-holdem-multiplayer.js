@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import TexasHoldemMultiplayerPage from '../game/mleo-texas-holdem-multiplayer';
-import TexasHoldemSimplePage from '../game/mleo-texas-holdem-simple';
+import TexasHoldemSupabasePage from '../game/mleo-texas-holdem-supabase';
 
 export default function TexasHoldemMultiplayerGamePage() {
   const [useSimpleVersion, setUseSimpleVersion] = useState(true);
@@ -21,7 +21,7 @@ export default function TexasHoldemMultiplayerGamePage() {
               }}
               className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg hover:brightness-110 transition-all"
             >
-              🚀 Simple Version (Recommended)
+              🚀 Supabase Version (Recommended)
             </button>
             
             <button
@@ -36,8 +36,8 @@ export default function TexasHoldemMultiplayerGamePage() {
           </div>
           
           <div className="mt-6 text-xs text-white/60 text-center">
-            <p>• Simple version: New, clean, and working</p>
-            <p>• Original version: Previous implementation</p>
+            <p>• Supabase version: Real-time multiplayer with Supabase</p>
+            <p>• Original version: Previous WebRTC implementation</p>
           </div>
         </div>
       </div>
@@ -48,7 +48,7 @@ export default function TexasHoldemMultiplayerGamePage() {
   const shouldUseSimple = typeof window !== 'undefined' ? 
     localStorage.getItem('texas-holdem-version') === 'simple' : true;
   
-  return shouldUseSimple ? <TexasHoldemSimplePage /> : <TexasHoldemMultiplayerPage />;
+  return shouldUseSimple ? <TexasHoldemSupabasePage /> : <TexasHoldemMultiplayerPage />;
 }
 
 // Add getStaticProps to fix Next.js error
