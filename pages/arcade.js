@@ -352,6 +352,15 @@ export default function ArcadeHub() {
       href: "/texas-holdem",
       color: "#10B981",
     },
+    // 8.6. Texas Hold'em Multiplayer - NEW!
+    {
+      title: "Texas Hold'em Multiplayer",
+      emoji: "🎴👥",
+      description: "Play Texas Hold'em with friends! 2-6 players, real-time P2P connection via WiFi. No server needed!",
+      prize: "Social",
+      href: "/texas-holdem-multiplayer",
+      color: "#059669",
+    },
     // 9. Multiplier Ladder
     {
       title: "Ladder",
