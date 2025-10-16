@@ -333,8 +333,27 @@ function TexasHoldemMultiplayerPage() {
             const message = typeof data === 'string' ? JSON.parse(data) : data;
             if (message.type === 'game_action') {
               console.log("Host processing guest action:", message.action, message.amount);
+              console.log("Current gameState:", gameState);
               // Process the action and update game state
-              processGuestAction(message.action, message.amount);
+              if (gameState && gameState.players && gameState.players.length > 0 && gameState.status === 'playing') {
+                console.log("Game state is ready, processing action immediately");
+                processGuestAction(message.action, message.amount);
+              } else {
+                console.log("Game state not ready, queuing action...");
+                console.log("GameState status:", gameState?.status);
+                console.log("Players count:", gameState?.players?.length);
+                // Force a re-render to get the latest state
+                setGameState(prev => {
+                  if (prev && prev.players && prev.players.length > 0 && prev.status === 'playing') {
+                    console.log("Found valid state after re-render, processing action");
+                    setTimeout(() => processGuestAction(message.action, message.amount), 50);
+                  } else {
+                    console.log("State still not ready after re-render");
+                    console.log("Prev state:", prev);
+                  }
+                  return prev;
+                });
+              }
             } else if (message.type === 'request_game_state') {
               console.log("Host received request for game state");
               if (gameState) {
@@ -470,8 +489,30 @@ function TexasHoldemMultiplayerPage() {
   const processGuestAction = (action, amount = 0) => {
     // Get current game state from the state
     const currentGameState = gameState;
+    console.log("processGuestAction called with gameState:", currentGameState);
+    
     if (!currentGameState) {
       console.log("No game state available for guest action");
+      // Try to get the state from a fresh render
+      setGameState(prev => {
+        if (prev && prev.players && prev.players.length > 0 && prev.status === 'playing') {
+          console.log("Found valid state after setState, processing action");
+          setTimeout(() => processGuestAction(action, amount), 50);
+        } else {
+          console.log("State still not available after setState");
+        }
+        return prev;
+      });
+      return;
+    }
+    
+    // Wait a bit for state to be available
+    if (!currentGameState.players || currentGameState.players.length === 0 || currentGameState.status !== 'playing') {
+      console.log("Game state not ready, retrying...");
+      console.log("Players:", currentGameState.players?.length);
+      console.log("Status:", currentGameState.status);
+      console.log("Full gameState:", currentGameState);
+      setTimeout(() => processGuestAction(action, amount), 200);
       return;
     }
     
@@ -487,8 +528,15 @@ function TexasHoldemMultiplayerPage() {
     // Check if it's actually the guest's turn (non-host player)
     if (!currentPlayer || currentPlayer.isHost) {
       console.log("Not guest's turn, ignoring action. Current player:", currentPlayer);
+      console.log("Current player index:", currentGameState.currentPlayerIndex);
+      console.log("Players:", currentGameState.players.map(p => ({ name: p.name, isHost: p.isHost })));
+      console.log("Expected guest turn but got host player");
       return;
     }
+    
+    console.log("Confirmed guest's turn, processing action");
+    console.log("Guest player details:", currentPlayer);
+    console.log("Action to process:", action, "Amount:", amount);
     
     console.log("Processing action for guest player:", currentPlayer);
     playSfx(clickSound.current);
@@ -534,11 +582,15 @@ function TexasHoldemMultiplayerPage() {
       newCurrentBet = Math.max(currentGameState.currentBet, currentPlayer.bet + allInAmount);
     }
     
-    // Move to next player (host)
-    let nextIndex = (currentGameState.currentPlayerIndex + 1) % currentGameState.players.length;
+    // Move to next player - פשוט!
+    let nextIndex = (currentGameState.currentPlayerIndex + 1) % 2;
+    
+    // בדיקה שהשחקן הבא לא קיפל
     while (updatedPlayers[nextIndex].folded) {
-      nextIndex = (nextIndex + 1) % currentGameState.players.length;
+      nextIndex = (nextIndex + 1) % 2;
     }
+    
+    console.log("Guest action - Current index:", currentGameState.currentPlayerIndex, "Next index:", nextIndex);
     
     console.log("Guest action processed - current player index:", currentGameState.currentPlayerIndex, "next player index:", nextIndex);
     console.log("Players after guest action:", updatedPlayers.map(p => ({ name: p.name, isHost: p.isHost, bet: p.bet })));
@@ -566,10 +618,25 @@ function TexasHoldemMultiplayerPage() {
     
     // Send updated game state to all players
     console.log("Sending updated game state to all players");
-    sendGameMessage({
-      type: 'game_state_update',
-      gameState: updatedState
-    });
+    console.log("Updated state:", updatedState);
+    console.log("Updated currentPlayerIndex:", updatedState.currentPlayerIndex);
+    console.log("Next player should be:", updatedState.players[updatedState.currentPlayerIndex]);
+    
+    // Update local state first
+    setGameState(updatedState);
+    
+    setTimeout(() => {
+      if (engineRef.current) {
+        engineRef.current.broadcast({
+          type: 'game_state_update',
+          gameState: updatedState
+        });
+        console.log("Game state broadcasted to all players");
+        console.log("Broadcasted state:", updatedState);
+      } else {
+        console.log("No engine available to broadcast");
+      }
+    }, 100);
     
     console.log("Guest action processing completed");
   };
@@ -587,9 +654,9 @@ function TexasHoldemMultiplayerPage() {
     const players = gameState.players.map((player, idx) => ({
       ...player,
       cards: [deck[idx * 2], deck[idx * 2 + 1]],
-      bet: idx === 0 ? SMALL_BLIND : idx === 1 ? BIG_BLIND : 0,
+      bet: player.isHost ? SMALL_BLIND : BIG_BLIND,
       folded: false,
-      chips: 10000 - (idx === 0 ? SMALL_BLIND : idx === 1 ? BIG_BLIND : 0),
+      chips: 10000 - (player.isHost ? SMALL_BLIND : BIG_BLIND),
       allIn: false
     }));
 
@@ -601,6 +668,10 @@ function TexasHoldemMultiplayerPage() {
       deck[players.length * 2 + 4]
     ];
 
+    // Find host index
+    const hostIndex = players.findIndex(p => p.isHost);
+    const guestIndex = players.findIndex(p => !p.isHost);
+    
     const updatedState = {
       ...gameState,
       status: "playing",
@@ -608,11 +679,14 @@ function TexasHoldemMultiplayerPage() {
       communityCards: communityCards,
       communityVisible: 0,
       pot: SMALL_BLIND + BIG_BLIND,
-      currentPlayerIndex: 2 >= players.length ? 0 : 2,
+      currentPlayerIndex: hostIndex, // תמיד מתחיל מהמארח
       round: "pre-flop",
       currentBet: BIG_BLIND,
       deck: deck
     };
+    
+    console.log("Starting game - Host index:", hostIndex, "Guest index:", guestIndex);
+    console.log("Current player index:", updatedState.currentPlayerIndex);
 
     console.log("Starting game with state:", updatedState);
 
@@ -638,11 +712,20 @@ function TexasHoldemMultiplayerPage() {
     const currentPlayer = players[gameState.currentPlayerIndex];
     const isMyTurn = currentPlayer && (
       (playerId === "host" && currentPlayer.isHost) ||
-      (playerId === "guest" && !currentPlayer.isHost) ||
-      (currentPlayer.id === playerId)
+      (playerId === "guest" && !currentPlayer.isHost)
     );
     
-    if (!isMyTurn || myPlayer?.folded) return;
+    // Debug logging
+    console.log("HandlePlayerAction - playerId:", playerId, "currentPlayer:", currentPlayer, "isMyTurn:", isMyTurn);
+    console.log("Game state currentPlayerIndex:", gameState.currentPlayerIndex);
+    console.log("Players:", gameState.players.map(p => ({ name: p.name, isHost: p.isHost })));
+    console.log("Game state status:", gameState.status);
+    console.log("Full game state:", gameState);
+    
+    if (!isMyTurn || myPlayer?.folded) {
+      console.log("Not my turn or folded, ignoring action");
+      return;
+    }
     
     playSfx(clickSound.current);
     
@@ -698,11 +781,15 @@ function TexasHoldemMultiplayerPage() {
       newCurrentBet = Math.max(gameState.currentBet, currentPlayer.bet + allInAmount);
     }
     
-    // Move to next player
-    let nextIndex = (gameState.currentPlayerIndex + 1) % gameState.players.length;
+    // Move to next player - פשוט!
+    let nextIndex = (gameState.currentPlayerIndex + 1) % 2;
+    
+    // בדיקה שהשחקן הבא לא קיפל
     while (updatedPlayers[nextIndex].folded) {
-      nextIndex = (nextIndex + 1) % gameState.players.length;
+      nextIndex = (nextIndex + 1) % 2;
     }
+    
+    console.log("Host action - Current index:", gameState.currentPlayerIndex, "Next index:", nextIndex);
     
     console.log("Host player action:", action, "amount:", amount);
     console.log("Current player index:", gameState.currentPlayerIndex, "Next player index:", nextIndex);
@@ -718,14 +805,22 @@ function TexasHoldemMultiplayerPage() {
     
     console.log("Updated state after host action:", updatedState);
     console.log("Next player:", updatedPlayers[nextIndex]);
-      
-      // Send game state to all players
-    sendGameMessage({
-      type: 'game_state_update',
-      gameState: updatedState
-    });
     
+    // Update local state first
     setGameState(updatedState);
+    
+    // Send game state to all players
+    setTimeout(() => {
+      if (engineRef.current) {
+        engineRef.current.broadcast({
+          type: 'game_state_update',
+          gameState: updatedState
+        });
+        console.log("Host action - Game state broadcasted to all players");
+      } else {
+        console.log("No engine available to broadcast host action");
+      }
+    }, 100);
   };
 
   const backToMenu = () => {
@@ -1166,9 +1261,21 @@ function TexasHoldemMultiplayerPage() {
     const currentPlayer = players[gameState?.currentPlayerIndex];
     const isMyTurn = currentPlayer && (
       (playerId === "host" && currentPlayer.isHost) ||
-      (playerId === "guest" && !currentPlayer.isHost) ||
-      (currentPlayer.id === playerId)
+      (playerId === "guest" && !currentPlayer.isHost)
     );
+    
+    // Debug logging
+    console.log("Turn check - playerId:", playerId, "currentPlayer:", currentPlayer, "isMyTurn:", isMyTurn);
+    console.log("Game state currentPlayerIndex:", gameState?.currentPlayerIndex);
+    console.log("Players:", gameState?.players?.map(p => ({ name: p.name, isHost: p.isHost })));
+    console.log("Game state status:", gameState?.status);
+    console.log("Full game state:", gameState);
+    
+    // Force a re-render if state is not ready
+    if (!gameState || !gameState.players || gameState.players.length === 0) {
+      console.log("Game state not ready, forcing re-render");
+      setGameState(prev => prev);
+    }
 
     return (
       <Layout>

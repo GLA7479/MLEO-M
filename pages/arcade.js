@@ -361,6 +361,15 @@ export default function ArcadeHub() {
       href: "/texas-holdem-multiplayer",
       color: "#059669",
     },
+    // 8.6.1. Texas Hold'em Supabase - NEW!
+    {
+      title: "Texas Hold'em Supabase",
+      emoji: "🎴⚡",
+      description: "Real-time Texas Hold'em multiplayer with Supabase! Fast, reliable, and works anywhere. 2-6 players. BEST VERSION!",
+      prize: "Social",
+      href: "/texas-holdem-supabase",
+      color: "#10B981",
+    },
     // 8.7. Texas Hold'em Tournament - NEW!
     {
       title: "Tournament Texas Hold'em",
