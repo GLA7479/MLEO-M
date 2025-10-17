@@ -11,6 +11,42 @@ import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicC
 import { parseUnits } from "viem";
 import { supabase, TABLES, GAME_STATUS, PLAYER_STATUS } from "../lib/supabase";
 
+// VAULT System (same as other games)
+function safeRead(key, def) {
+  if (typeof window === "undefined") return def;
+  try {
+    const val = localStorage.getItem(key);
+    return val ? JSON.parse(val) : def;
+  } catch {
+    return def;
+  }
+}
+
+function safeWrite(key, val) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(key, JSON.stringify(val));
+  } catch {}
+}
+
+function getVault() {
+  const rushData = safeRead("mleo_rush_core_v4", {});
+  return rushData.vault || 0;
+}
+
+function setVault(amount) {
+  const rushData = safeRead("mleo_rush_core_v4", {});
+  rushData.vault = amount;
+  safeWrite("mleo_rush_core_v4", rushData);
+}
+
+function fmt(n) {
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
+  return Math.floor(n).toString();
+}
+
 function useIOSViewportFix() {
   useEffect(() => {
     const root = document.documentElement;
@@ -44,30 +80,7 @@ const BIG_BLIND = 50;
 const STARTING_CHIPS = 1000;
 const BETTING_TIME_LIMIT = 30000; // 30 seconds per action
 
-// Simple utility functions
-function safeRead(key, fallback = {}) { 
-  if (typeof window === "undefined") return fallback; 
-  try { 
-    const raw = localStorage.getItem(key); 
-    return raw ? JSON.parse(raw) : fallback; 
-  } catch { 
-    return fallback; 
-  } 
-}
-
-function safeWrite(key, val) { 
-  if (typeof window === "undefined") return; 
-  try { 
-    localStorage.setItem(key, JSON.stringify(val)); 
-  } catch {} 
-}
-
-function fmt(n) { 
-  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B"; 
-  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M"; 
-  if (n >= 1e3) return (n / 1e3).toFixed(2) + "K"; 
-  return Math.floor(n).toString(); 
-}
+// Simple utility functions (removed duplicate definitions)
 
 // Simple card functions
 function createDeck() {
@@ -162,6 +175,10 @@ function TexasHoldemSupabasePage() {
   
   // Winner modal
   const [winnerModal, setWinnerModal] = useState({ open: false, text: "", hand: "", pot: 0 });
+  
+  // VAULT system
+  const [vaultAmount, setVaultAmount] = useState(0);
+  const [entryFee, setEntryFee] = useState(1000); // Default entry fee
 
   const playSfx = (sound) => { 
     if (sfxMuted || !sound) return; 
@@ -261,6 +278,9 @@ function TexasHoldemSupabasePage() {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     
+    // Load VAULT amount
+    setVaultAmount(getVault());
+    
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
       // Cleanup subscriptions
@@ -282,11 +302,22 @@ function TexasHoldemSupabasePage() {
       return;
     }
 
+    // Check VAULT balance
+    const currentVault = getVault();
+    if (currentVault < entryFee) {
+      setError(`Insufficient MLEO in VAULT. Need ${fmt(entryFee)} MLEO, have ${fmt(currentVault)} MLEO`);
+      return;
+    }
+
     playSfx(clickSound.current);
     setIsConnecting(true);
     setError("");
 
     try {
+      // Deduct entry fee from VAULT
+      setVault(currentVault - entryFee);
+      setVaultAmount(currentVault - entryFee);
+
       // Generate room code
       const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       
@@ -303,7 +334,8 @@ function TexasHoldemSupabasePage() {
           round: "pre-flop",
           community_cards: [],
           community_visible: 0,
-          deck: []
+          deck: [],
+          entry_fee: entryFee
         })
         .select()
         .single();
@@ -321,7 +353,7 @@ function TexasHoldemSupabasePage() {
           game_id: gameData.id,
           name: playerName,
           is_host: true,
-          chips: 10000,
+          chips: entryFee, // Use entry fee as starting chips
           bet: 0,
           status: PLAYER_STATUS.READY,
           cards: [],
@@ -385,6 +417,14 @@ function TexasHoldemSupabasePage() {
         return;
       }
 
+      // Check VAULT balance for entry fee
+      const currentVault = getVault();
+      const requiredEntryFee = gameData.entry_fee || 1000;
+      if (currentVault < requiredEntryFee) {
+        setError(`Insufficient MLEO in VAULT. Need ${fmt(requiredEntryFee)} MLEO, have ${fmt(currentVault)} MLEO`);
+        return;
+      }
+
       // Check if room is full
       const { data: existingPlayers } = await supabase
         .from(TABLES.PLAYERS)
@@ -396,6 +436,10 @@ function TexasHoldemSupabasePage() {
         return;
       }
 
+      // Deduct entry fee from VAULT
+      setVault(currentVault - requiredEntryFee);
+      setVaultAmount(currentVault - requiredEntryFee);
+
       // Create guest player
       const { data: playerData, error: playerError } = await supabase
         .from(TABLES.PLAYERS)
@@ -403,7 +447,7 @@ function TexasHoldemSupabasePage() {
           game_id: gameData.id,
           name: playerName,
           is_host: false,
-          chips: 10000,
+          chips: requiredEntryFee, // Use entry fee as starting chips
           bet: 0,
           status: PLAYER_STATUS.READY,
           cards: [],
@@ -534,12 +578,13 @@ function TexasHoldemSupabasePage() {
       const bigBlindIndex = (dealerIndex + 2) % players.length;
       
       // Deal 2 cards each
+      const entryFee = game.entry_fee || 1000; // Use actual entry fee
       const updatedPlayers = players.map((p, idx) => {
         const base = { ...p };
         base.cards = [ deck[idx*2], deck[idx*2+1] ];
         base.bet = 0;
         base.status = PLAYER_STATUS.READY;
-        base.chips = Math.max(base.chips ?? STARTING_CHIPS, STARTING_CHIPS);
+        base.chips = entryFee; // Use entry fee as starting chips
         return base;
       });
 
@@ -970,8 +1015,14 @@ function TexasHoldemSupabasePage() {
       
       if (active.length === 1) {
         const w = active[0];
-        await supabase.from(TABLES.PLAYERS).update({ chips: (w.chips||0) + (gNow.pot||0) }).eq("id", w.id);
-        setGameMessage(`🎉 ${w.name} wins by fold! Pot: ${gNow.pot||0}`);
+        const potAmount = gNow.pot || 0;
+        
+        // Add winnings to winner's VAULT
+        const currentVault = getVault();
+        setVault(currentVault + potAmount);
+        setVaultAmount(currentVault + potAmount);
+        
+        setGameMessage(`🎉 ${w.name} wins by fold! Pot: ${fmt(potAmount)} MLEO`);
         await supabase
           .from(TABLES.GAMES)
           .update({
@@ -993,14 +1044,19 @@ function TexasHoldemSupabasePage() {
       }).sort((a,b)=> compareRankTuple(b.evalRes.score, a.evalRes.score));
 
       const winner = ranked[0];
-      await supabase.from(TABLES.PLAYERS).update({ chips: (winner.p.chips||0) + (gNow.pot||0) }).eq("id", winner.p.id);
+      const potAmount = gNow.pot || 0;
+      
+      // Add winnings to winner's VAULT
+      const currentVault = getVault();
+      setVault(currentVault + potAmount);
+      setVaultAmount(currentVault + potAmount);
 
       // Reveal cards
       for (const r of ranked) {
         await supabase.from(TABLES.PLAYERS).update({ revealed: true }).eq("id", r.p.id);
       }
 
-      setGameMessage(`🎉 ${winner.p.name} wins with ${winner.evalRes.name}! Pot: ${gNow.pot||0}`);
+      setGameMessage(`🎉 ${winner.p.name} wins with ${winner.evalRes.name}! Pot: ${fmt(potAmount)} MLEO`);
       await supabase
         .from(TABLES.GAMES)
         .update({
@@ -1121,6 +1177,27 @@ function TexasHoldemSupabasePage() {
                   />
                 </div>
 
+                <div>
+                  <label className="text-sm text-white/70 mb-2 block">Entry Fee (MLEO)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={entryFee}
+                      onChange={(e) => setEntryFee(Math.max(100, parseInt(e.target.value) || 100))}
+                      min="100"
+                      step="100"
+                      placeholder="1000"
+                      className="w-full px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white placeholder-white/40 pr-16"
+                    />
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/60 text-sm">
+                      MLEO
+                    </div>
+                  </div>
+                  <div className="text-xs text-white/50 mt-1">
+                    Your VAULT: {fmt(vaultAmount)} MLEO
+                  </div>
+                </div>
+
                 {error && (
                   <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-300 text-sm text-center">
                     {error}
@@ -1179,6 +1256,15 @@ function TexasHoldemSupabasePage() {
                     placeholder="Enter room code..."
                     className="w-full px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white font-mono text-center placeholder-white/40"
                   />
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  <div className="text-sm text-blue-300 text-center">
+                    Your VAULT: {fmt(vaultAmount)} MLEO
+                  </div>
+                  <div className="text-xs text-blue-200/70 text-center mt-1">
+                    Entry fee will be deducted when joining
+                  </div>
                 </div>
 
                 {error && (
@@ -1333,6 +1419,9 @@ function TexasHoldemSupabasePage() {
               <div className="text-2xl font-bold text-amber-400">POT: {fmt(pot)}</div>
               <div className="text-xs text-white/60 mt-1">
                 Blinds: {SMALL_BLIND}/{BIG_BLIND} • Current Bet: {fmt(game?.current_bet || 0)}
+              </div>
+              <div className="text-xs text-emerald-400 mt-1">
+                Your VAULT: {fmt(vaultAmount)} MLEO
               </div>
               {gameMessage && (
                 <div className={`text-sm mt-2 px-3 py-2 rounded text-center ${
