@@ -315,21 +315,35 @@ export default function MLEOCrash() {
   };
 
   // ------------------------------- Actions ----------------------------------
-  const placeBet = () => {
-    let amt = Number(betAmount);
-    if (!Number.isFinite(amt) || amt <= 0) return;
+  const placeBet = (isFreePlayParam = false) => {
+    let amt = Number(betAmount) || MIN_BET;
+    if (!Number.isFinite(amt) || amt < MIN_BET) return;
     if (phase !== "betting") return;
     
-    const currentVault = getVault();
-    if (amt > currentVault) {
-      alert('Insufficient MLEO in vault');
-      return;
-    }
+    if (isFreePlay || isFreePlayParam) {
+      const result = useFreePlayToken();
+      if (result.success) {
+        amt = result.amount;
+        setIsFreePlay(false);
+        router.replace('/crash2', undefined, { shallow: true });
+        setPlayerBet({ amount: amt, accepted: false });
+      } else {
+        alert('No free play tokens available!');
+        setIsFreePlay(false);
+        return;
+      }
+    } else {
+      const currentVault = getVault();
+      if (amt > currentVault) {
+        alert('Insufficient MLEO in vault');
+        return;
+      }
 
-    // Deduct from vault
-    setVault(currentVault - amt);
-    setVaultState(currentVault - amt);
-    setPlayerBet({ amount: amt, accepted: false });
+      // Deduct from vault
+      setVault(currentVault - amt);
+      setVaultState(currentVault - amt);
+      setPlayerBet({ amount: amt, accepted: false });
+    }
   };
 
   const cashOut = () => {
@@ -398,21 +412,21 @@ export default function MLEOCrash() {
   const chart = useMemo(() => {
     const W = 600;
     const H = 260;
-    if (!chartData.length) {
-      return { W, H, d: "", xCrash: null, yCrash: null };
-    }
-    const tMax = chartData[chartData.length - 1].t || 1000;
     const padL = 36, padR = 12, padT = 16, padB = 28;
     const iw = W - padL - padR;
     const ih = H - padT - padB;
-
-    const t0 = chartData[0].t;
-    const tSpan = Math.max(1000, tMax - t0); // avoid div/0
     const mMin = 1;
     const mMax = maxY;
-
-    const scaleX = (t) => padL + ((t - t0) / tSpan) * iw;
     const scaleY = (m) => padT + ih - ((m - mMin) / (mMax - mMin)) * ih;
+
+    if (!chartData.length) {
+      return { W, H, d: "", xCrash: null, yCrash: null, padL, padR, padT, padB, scaleY, mMin, mMax };
+    }
+    
+    const tMax = chartData[chartData.length - 1].t || 1000;
+    const t0 = chartData[0].t;
+    const tSpan = Math.max(1000, tMax - t0); // avoid div/0
+    const scaleX = (t) => padL + ((t - t0) / tSpan) * iw;
 
     let d = "";
     chartData.forEach((p, i) => {
@@ -439,29 +453,20 @@ export default function MLEOCrash() {
   }
 
   return (
-    <Layout vault={vault} refreshVault={refreshVault}>
+    <Layout title="MLEO Crash">
       <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-zinc-900 to-black text-white">
         <div className="mx-auto max-w-5xl px-4 py-6 pb-20">
           <header className="flex items-center justify-between mb-6">
-            {gameActive || payout ? (
-              <button 
-                onClick={resetToSetup}
-                className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
-              >
+            <Link href="/arcade">
+              <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
                 BACK
               </button>
-            ) : (
-              <Link href="/arcade">
-                <button className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">
-                  BACK
-                </button>
-              </Link>
-            )}
+            </Link>
 
             <div className="text-center">
               <h1 className="text-3xl font-bold mb-1">
                 📈 {isFreePlay && <span className="text-amber-400">🎁 FREE PLAY - </span>}
-                Crash
+                Crash2
               </h1>
               <p className="text-zinc-400 text-sm">
                 {isFreePlay ? "Playing with a free token - good luck!" : "Cash out before the crash!"}
@@ -614,9 +619,18 @@ export default function MLEOCrash() {
               </div>
             </div>
 
+            {freePlayTokens > 0 && phase === "betting" && (
+              <button
+                onClick={() => placeBet(true)}
+                className="mt-4 w-full rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 px-4 py-2.5 font-semibold text-white shadow hover:from-amber-400 hover:via-orange-400 hover:to-yellow-400"
+              >
+                🎁 FREE PLAY ({freePlayTokens}/5)
+              </button>
+            )}
+            
             <button
-              onClick={placeBet}
-              disabled={phase !== "betting" || !betAmount || Number(betAmount) <= 0 || Number(betAmount) > balance}
+              onClick={() => placeBet(false)}
+              disabled={phase !== "betting" || !betAmount || Number(betAmount) <= 0 || Number(betAmount) > vault}
               className="mt-4 w-full rounded-xl bg-emerald-500 px-4 py-2.5 font-semibold text-black shadow hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Join Round

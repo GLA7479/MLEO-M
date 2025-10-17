@@ -983,7 +983,9 @@ export default function TexasHoldemCasinoPage() {
           pot: pot,
           current_bet: currentBet,
           current_player_index: firstToAct,
-          last_raiser_index: bigBlindIdx
+          last_raiser_index: bigBlindIdx,
+          community_cards: [],              // ⬅️ חדש
+          community_visible: 0              // ⬅️ חדש
         })
         .eq('id', newGame.id);
       
@@ -998,27 +1000,30 @@ export default function TexasHoldemCasinoPage() {
     }
   };
 
-  // Player action handler
+  // Player action handler (REPLACE)
   const handlePlayerAction = async (action, amount = 0) => {
     if (!game || !playerId) return;
     if (game.status !== GAME_STATUS.PLAYING || game.round === "finished") return;
 
     try {
-      // Get fresh data
-      const { data: gNow } = await supabase.from('casino_games').select("*").eq("id", currentGameId).single();
-      const { data: pNow } = await supabase.from('casino_players').select("*").eq("game_id", currentGameId).order("seat_index");
+      // 1) Pull fresh game/players
+      const { data: gNow } = await supabase
+        .from('casino_games').select('*').eq('id', currentGameId).single();
+      const { data: pNow } = await supabase
+        .from('casino_players').select('*').eq('game_id', currentGameId).order('seat_index');
 
-      const curIdx = gNow.current_player_index ?? 0;
       const pls = pNow || players;
-      const me = pls.find(p => p.id === playerId);
-      const cur = pls[curIdx];
+      const curIdx = gNow.current_player_index ?? 0;
+      const cur    = pls[curIdx];
+      const me     = pls.find(p => p.id === playerId);
 
-      if (!cur || cur.id !== playerId) return; // not my turn
-      if (me.status === PLAYER_STATUS.FOLDED || gNow.status !== GAME_STATUS.PLAYING) return;
+      if (!cur || cur.id !== playerId) return;                         // not my turn
+      if (!me || me.status === PLAYER_STATUS.FOLDED) return;
+      if (gNow.status !== GAME_STATUS.PLAYING) return;
 
-      const active = pls.filter(p => p.status !== PLAYER_STATUS.FOLDED);
       const toCall = Math.max(0, (gNow.current_bet ?? 0) - (me.current_bet ?? 0));
 
+      // 2) apply action locally
       let newBet = me.current_bet ?? 0;
       let newChips = me.chips ?? 0;
       let newStatus = me.status;
@@ -1032,7 +1037,7 @@ export default function TexasHoldemCasinoPage() {
         newBet += pay; newChips -= pay;
         if (pay < toCall) newStatus = PLAYER_STATUS.ALL_IN;
       } else if (action === "raise") {
-        let raiseTo = Math.max((gNow.current_bet ?? 0) + selectedTable.big_blind, amount);
+        let raiseTo = Math.max((gNow.current_bet ?? 0) + (selectedTable?.big_blind || 0), amount);
         raiseTo = Math.min(raiseTo, newBet + newChips);
         const put = raiseTo - newBet;
         if (put <= 0) return;
@@ -1045,44 +1050,28 @@ export default function TexasHoldemCasinoPage() {
         newStatus = PLAYER_STATUS.ALL_IN;
       }
 
-      // Update player
-      await supabase.from('casino_players')
-        .update({ 
-          status: newStatus, 
-          current_bet: newBet, 
-          chips: newChips,
-          has_acted: true,                // ⬅️ חדש
-          last_action: action,
-          last_action_time: new Date().toISOString()
-        })
-        .eq("id", playerId);
+      // 3) persist my action
+      await supabase.from('casino_players').update({
+        status: newStatus,
+        current_bet: newBet,
+        chips: newChips,
+        last_action: action,
+        last_action_time: new Date().toISOString(),
+      }).eq('id', playerId);
 
-      // אם הפעולה היא Raise (או All-in שמעלה מעל current_bet) - אפס has_acted לכולם מלבד המעלה
-      const isAggressive = action === "raise" || (action === "allin" && newBet > (gNow.current_bet||0));
-      if (isAggressive) {
-        // מאפסים לכולם מלבד המעלה – כולם חייבים לפעול מחדש
-        for (const p of freshPlayers) {
-          await supabase.from('casino_players')
-            .update({ has_acted: p.id === playerId }) // המעלה true, השאר false
-            .eq('id', p.id);
-        }
-      }
+      // 4) recompute fresh state *after* the update
+      const { data: freshPlayers } = await supabase
+        .from('casino_players').select('*').eq('game_id', currentGameId).order('seat_index');
 
-      // Recompute pot/current bet
-      const freshPlayers = (await supabase.from('casino_players').select("*").eq("game_id", currentGameId)).data || pls;
       const pot = freshPlayers.reduce((s,p)=> s + (p.current_bet||0), 0);
       const currentBet = Math.max(...freshPlayers.map(p=>p.current_bet||0), 0);
 
-      // Detect last aggressor
       const lastRaiserIndex =
         (action === "raise" || (action === "allin" && newBet > (gNow.current_bet || 0)))
           ? curIdx
           : (gNow.last_raiser_index ?? curIdx);
 
-      // Stop timer
-      stopActionTimer();
-
-      // Advance to next active
+      // 5) who acts next?
       const canAct = (p) => p.status !== PLAYER_STATUS.FOLDED && p.status !== PLAYER_STATUS.ALL_IN;
       let nextIdx = (curIdx + 1) % freshPlayers.length;
       while (!canAct(freshPlayers[nextIdx])) {
@@ -1090,99 +1079,85 @@ export default function TexasHoldemCasinoPage() {
         if (nextIdx === curIdx) break;
       }
 
-      // Betting-round completion - לוגיקה יציבה עם has_acted
-      const activeCanAct = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED);
-      const everyoneMatched = activeCanAct.every(p => 
-        p.status === PLAYER_STATUS.ALL_IN || (p.current_bet||0) === currentBet
-      );
-      const everyoneActed = activeCanAct.every(p => !!p.has_acted);
-      
-      const bettingDone = (activeCanAct.length <= 1) || (everyoneMatched && everyoneActed);
-
-      // Only 1 player left?
-      const notFolded = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED);
-      if (notFolded.length === 1) {
+      // 6) early finish by folds
+      const stillIn = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED);
+      if (stillIn.length === 1) {
+        stopActionTimer();
         await supabase.from('casino_games').update({
           pot, current_bet: currentBet, current_player_index: nextIdx
-        }).eq("id", currentGameId);
+        }).eq('id', currentGameId);
         await determineWinner();
         return;
       }
 
-      if (bettingDone) {
-        const nextRound = getNextRound(gNow.round);
+      // 7) street completion – stable rule
+      const activeNotFolded = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED);
+      const everyoneMatched = activeNotFolded.every(p =>
+        p.status === PLAYER_STATUS.ALL_IN || (p.current_bet || 0) === currentBet
+      );
+      const bettingDone = everyoneMatched; // מספיק כדי לסגור רחוב
 
-        // חשב קלפים קהילתיים לפי המעבר (בבת אחת)
-        let nextCommunity = gNow.community_cards || [];
-        const deck = gNow.deck || [];
-        const start = freshPlayers.length * 2; // 2 קלפים לכל שחקן
-        if (nextRound === "flop"   && gNow.round === "preflop") nextCommunity = [ deck[start+1], deck[start+2], deck[start+3] ];
-        if (nextRound === "turn"   && gNow.round === "flop")    nextCommunity = [ ...nextCommunity, deck[start+4] ];
-        if (nextRound === "river"  && gNow.round === "turn")    nextCommunity = [ ...nextCommunity, deck[start+5] ];
+      stopActionTimer();
 
-        // בחר first-to-act לרחוב הבא (השחקן משמאל לדילר שלא קיפל)
-        const dealerIndex = gNow.dealer_index ?? 0;
-        let startIdx = (dealerIndex + 1) % freshPlayers.length;
-        while (freshPlayers[startIdx].status === PLAYER_STATUS.FOLDED) {
-          startIdx = (startIdx + 1) % freshPlayers.length;
-        }
-
-        // אפס הימורי רחוב ו-has_acted לשחקנים פעילים
-        for (const p of freshPlayers) {
-          if (p.status !== PLAYER_STATUS.FOLDED) {
-            await supabase.from('casino_players').update({ 
-              current_bet: 0, 
-              has_acted: false 
-            }).eq("id", p.id);
-          }
-        }
-        
-        // סמן שהשחקן הראשון לפעול כבר פעל (כדי שלא נסגור מיד את הרחוב)
-        await supabase.from('casino_players')
-          .update({ has_acted: true })
-          .eq('id', freshPlayers[startIdx].id);
-
-        // עדכון יחיד למשחק – כל מה שה־UI צריך בבת אחת
-        await supabase.from('casino_games').update({
-          pot,
-          current_bet: 0,
-          last_raise_to: 0,
-          last_raiser_index: startIdx,
-          round: nextRound,
-          community_visible: getCommunityVisible(nextRound),
-          community_cards: nextCommunity,
-          current_player_index: startIdx,
-        }).eq("id", currentGameId);
-
-        // לוג עזר כדי לוודא שהמעבר קורה
-        console.log('→ STREET DONE:', {
-          from: gNow.round, 
-          to: nextRound,
-          pot, 
-          nextCommunityLen: nextCommunity.length,
-          communityVisible: getCommunityVisible(nextRound)
-        });
-
-        // אם כל הפעילים באול-אין – מיד פותחים הכל ומכריעים
-        const allAllInNow = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED)
-                                        .every(p => p.status === PLAYER_STATUS.ALL_IN);
-        if (allAllInNow) {
-          await supabase.from('casino_games').update({ community_visible: 5 }).eq("id", currentGameId);
-          await determineWinner();
-        } else if (nextRound === "showdown") {
-          // Normal showdown - wait for next action
-          console.log("Normal showdown, waiting for next action");
-        }
-      } else {
-        // Continue betting
+      if (!bettingDone) {
+        // keep betting
         await supabase.from('casino_games').update({
           pot,
           current_bet: currentBet,
           last_raiser_index: lastRaiserIndex,
           current_player_index: nextIdx
-        }).eq("id", currentGameId);
+        }).eq('id', currentGameId);
+        return;
       }
 
+      // 8) next street: compute board with proper burns
+      const nextRound = getNextRound(gNow.round);
+      const deck = gNow.deck || [];
+      const n = freshPlayers.length;
+      const base = n * 2;
+
+      let nextCommunity = gNow.community_cards || [];
+      if (nextRound === "flop"   && gNow.round === "preflop") nextCommunity = [deck[base+1], deck[base+2], deck[base+3]];
+      if (nextRound === "turn"   && gNow.round === "flop")    nextCommunity = [...nextCommunity, deck[base+5]];
+      if (nextRound === "river"  && gNow.round === "turn")    nextCommunity = [...nextCommunity, deck[base+7]];
+
+      // reset street bets
+      for (const p of freshPlayers) {
+        if (p.status !== PLAYER_STATUS.FOLDED) {
+          await supabase.from('casino_players').update({ current_bet: 0 }).eq('id', p.id);
+        }
+      }
+
+      // first-to-act for next street = משמאל לדילר (שעדיין בשולחן)
+      const dealerIndex = gNow.dealer_index ?? 0;
+      let startIdx = (dealerIndex + 1) % freshPlayers.length;
+      while (freshPlayers[startIdx].status === PLAYER_STATUS.FOLDED) {
+        startIdx = (startIdx + 1) % freshPlayers.length;
+      }
+
+      // atomic game update: cards + visibility + state
+      await supabase.from('casino_games').update({
+        pot,
+        current_bet: 0,
+        last_raise_to: 0,
+        last_raiser_index: startIdx,
+        round: nextRound,
+        community_visible: getCommunityVisible(nextRound),
+        community_cards: nextCommunity,
+        current_player_index: startIdx,
+      }).eq('id', currentGameId);
+
+      // דיבאגר קליל
+      console.log('→ STREET DONE', { from: gNow.round, to: nextRound, board: nextCommunity, pot });
+
+      // אם כולם באול-אין – פותחים הכל וישר שואודאון
+      const allAllIn = activeNotFolded.every(p => p.status === PLAYER_STATUS.ALL_IN);
+      if (allAllIn) {
+        await supabase.from('casino_games')
+          .update({ community_visible: 5, round: 'showdown' })
+          .eq('id', currentGameId);
+        await determineWinner();
+      }
     } catch (err) {
       console.error("Player action error:", err);
     }

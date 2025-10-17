@@ -266,9 +266,6 @@ export default function PlinkoPage() {
   const resetToSetup = () => {
     setResult(null);
     setShowResultPopup(false);
-    setBall(null);
-    setAnimating(false);
-    setGameActive(false);
   };
 
   // Canvas init & resize
@@ -705,7 +702,7 @@ function buildBoardGeometry(w, h) {
       if (result.success) {
         bet = result.amount;
         setIsFreePlay(false);
-        router.replace('/plinko', undefined, { shallow: true });
+        router.replace('/plinko2', undefined, { shallow: true });
       } else {
         setResult({ error: true, message: 'No free play tokens available!' });
         setIsFreePlay(false);
@@ -811,7 +808,7 @@ function buildBoardGeometry(w, h) {
                 <span className="text-5xl">🎯</span>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-teal-400 bg-clip-text text-transparent">
                   {isFreePlay && <span className="text-amber-400">🎁 </span>}
-                  MLEO Plinko
+                  MLEO Plinko2
                 </h1>
               </div>
               <div className="text-sm opacity-70 mt-1">

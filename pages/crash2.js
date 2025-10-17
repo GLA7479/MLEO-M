@@ -1,7 +1,4 @@
-import Crash2Game from '../game/mleo-crash2';
-
-export default function Crash2Page() {
-  return <Crash2Game />;
-}
+// pages/crash2.js
+export { default } from "../game/mleo-crash-v1";
 
 

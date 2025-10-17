@@ -402,7 +402,7 @@ export default function ArcadeHub() {
       title: "Mystery Box",
       emoji: "🎁",
       description: "Choose 1 box from 10! Find the jackpot or walk away empty!",
-      prize: "×50",
+      prize: "×10",
       href: "/mystery",
       color: "#F59E0B",
     },
@@ -536,16 +536,7 @@ export default function ArcadeHub() {
       href: "/coin-flip",
       color: "#F59E0B",
     },
-    // 26. Plinko2 - NEW WITH PHYSICS!
-    {
-      title: "Plinko2",
-      emoji: "🎯",
-      description: "Drop balls with real physics! Watch them bounce through pegs to win big multipliers!",
-      prize: "×10",
-      href: "/plinko2",
-      color: "#3B82F6",
-    },
-    // 27. Crash2 - NEW WITH LIVE CHART!
+    // 26. Crash2 - NEW WITH LIVE CHART!
     {
       title: "Crash2",
       emoji: "📈",
@@ -554,13 +545,13 @@ export default function ArcadeHub() {
       href: "/crash2",
       color: "#EF4444",
     },
-    // 28. Plinko3 - OPTIMIZED VERSION!
+    // 27. Plinko2 - OPTIMIZED VERSION!
     {
-      title: "Plinko3",
+      title: "Plinko2",
       emoji: "🎲",
       description: "Enhanced Plinko with 17 rows, wall penalty, and maximized play area!",
       prize: "×10",
-      href: "/plinko3",
+      href: "/plinko2",
       color: "#8B5CF6",
     },
   ];
@@ -653,7 +644,7 @@ export default function ArcadeHub() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/40">
               <span className="text-2xl">🎮</span>
-              <span className="font-bold text-purple-300">28 Exciting Games to Play!</span>
+              <span className="font-bold text-purple-300">27 Exciting Games to Play!</span>
             </div>
           </div>
 

@@ -51,7 +51,7 @@ function useIOSViewportFix() {
 
 const LS_KEY = "mleo_ladder_v2";
 const MIN_BET = 1000;
-const MULTIPLIERS = [1.2, 1.5, 2, 2.5, 3.5, 5, 7, 10, 15, 20];
+const MULTIPLIERS = [1.1, 1.3, 1.6, 2, 2.5, 3.5, 5, 7, 10, 15];
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -391,7 +391,7 @@ useEffect(() => {
     if (!gameActive) return;
     playSfx(clickSound.current);
     const chance = Math.random();
-    const successRate = 0.65 - currentStep * 0.05;
+    const successRate = 0.5 - currentStep * 0.06;
     
     if (chance < successRate) {
       const newStep = currentStep + 1;
@@ -791,8 +791,13 @@ useEffect(() => {
                 </p>
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
                   <p className="text-blue-300 font-semibold">
-                    🎯 Success rate decreases by 5% each step!
+                    🎯 Success rate decreases by 6% each step!
                   </p>
+                  <div className="text-xs text-white/80 mt-2 space-y-1">
+                    <p>• Step 1: 50% success → ×1.1</p>
+                    <p>• Step 5: 26% success → ×2.5</p>
+                    <p>• Step 10: 2% success → ×15</p>
+                  </div>
                 </div>
               </div>
               <button

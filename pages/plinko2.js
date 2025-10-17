@@ -1,7 +1,4 @@
-import Plinko2Game from '../game/mleo-plinko2';
-
-export default function Plinko2Page() {
-  return <Plinko2Game />;
-}
+// pages/plinko2.js
+export { default } from "../game/mleo-plinko-v1";
 
 

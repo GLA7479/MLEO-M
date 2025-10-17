@@ -51,7 +51,8 @@ const MIN_BET = 1000;
 const TOTAL_BOXES = 10;
 
 // Prize distribution in boxes (multipliers)
-const PRIZES = [0, 0.5, 1, 1, 2, 2, 5, 5, 10, 50];
+// RTP: ~92% (House Edge: 8%)
+const PRIZES = [0, 0, 0, 0, 0, 0, 0.5, 1, 2, 10];
 
 // On-chain Claim Config
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
@@ -412,7 +413,7 @@ export default function MysteryBoxPage() {
       multiplier: multiplier,
       prize: prize,
       profit: prize - bet,
-      jackpot: multiplier === 50
+      jackpot: multiplier === 10
     };
 
     setGameResult(resultData);
@@ -426,7 +427,7 @@ export default function MysteryBoxPage() {
       totalBet: stats.totalBet + bet,
       totalWon: stats.totalWon + prize,
       biggestWin: Math.max(stats.biggestWin, prize),
-      jackpots: multiplier === 50 ? stats.jackpots + 1 : stats.jackpots,
+      jackpots: multiplier === 10 ? stats.jackpots + 1 : stats.jackpots,
       lastBet: bet
     };
     setStats(newStats);
@@ -453,7 +454,7 @@ export default function MysteryBoxPage() {
     );
   }
 
-  const potentialWin = Math.floor(Number(betAmount) * 50); // Max jackpot
+  const potentialWin = Math.floor(Number(betAmount) * 10); // Max win
 
   return (
     <Layout>
@@ -569,7 +570,7 @@ export default function MysteryBoxPage() {
                       : 'bg-gradient-to-br from-orange-500 to-amber-600 hover:brightness-110 shadow-lg cursor-pointer text-white'
                   } disabled:cursor-not-allowed`}
                 >
-                  {selectedBox === index ? (prize === 50 ? '💎' : prize >= 5 ? '🎁' : prize >= 1 ? '🪙' : '💔') : '🎁'}
+                  {selectedBox === index ? (prize === 10 ? '💎' : prize >= 2 ? '🎁' : prize >= 1 ? '🪙' : prize > 0 ? '📉' : '💔') : '🎁'}
                 </button>
               ))}
             </div>
@@ -740,12 +741,11 @@ export default function MysteryBoxPage() {
                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mt-4">
                   <p className="text-amber-300 font-semibold">🎁 Prize Distribution</p>
                   <div className="text-xs text-white/80 mt-2 space-y-1">
-                    <p>• 1 box: ×50 💎 (JACKPOT!)</p>
-                    <p>• 2 boxes: ×10 🎉</p>
-                    <p>• 2 boxes: ×5 🎁</p>
-                    <p>• 2 boxes: ×2 🪙</p>
-                    <p>• 2 boxes: ×1 (break even)</p>
-                    <p>• 1 box: ×0 💔 (lose all)</p>
+                    <p>• 1 box: ×10 💎 (BIG WIN!)</p>
+                    <p>• 1 box: ×2 🎉</p>
+                    <p>• 1 box: ×1 🪙 (break even)</p>
+                    <p>• 1 box: ×0.5 📉 (small loss)</p>
+                    <p>• 6 boxes: ×0 💔 (lose all)</p>
                   </div>
             </div>
             </div>
@@ -797,10 +797,10 @@ export default function MysteryBoxPage() {
         </div>
 
                 <div className="bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border border-yellow-500/30 rounded-lg p-4">
-                  <div className="text-sm font-semibold mb-2">💎 Jackpots Hit</div>
+                  <div className="text-sm font-semibold mb-2">💎 Big Wins Hit</div>
                   <div className="text-center">
                     <div className="text-3xl font-bold text-yellow-400">{stats.jackpots}</div>
-                    <div className="text-xs text-white/60 mt-1">×50 Multiplier Wins</div>
+                    <div className="text-xs text-white/60 mt-1">×10 Multiplier Wins</div>
                   </div>
                 </div>
               </div>

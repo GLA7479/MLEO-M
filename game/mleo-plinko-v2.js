@@ -55,7 +55,7 @@ const MIN_BET = 1000;
 const MULTIPLIERS = [10, 3, 1.5, 1, 0.5, 0.3, 0.1, 0, 0.1, 0.3, 0.5, 1, 1.5, 3, 10];
 const BUCKET_COLORS = ["from-yellow-300 to-yellow-500", "from-orange-400 to-orange-600", "from-green-500 to-emerald-500", "from-blue-500 to-cyan-500", "from-purple-500 to-purple-600", "from-gray-600 to-gray-700", "from-red-600 to-red-700", "from-black to-gray-900", "from-red-600 to-red-700", "from-gray-600 to-gray-700", "from-purple-500 to-purple-600", "from-blue-500 to-cyan-500", "from-green-500 to-emerald-500", "from-orange-400 to-orange-600", "from-yellow-300 to-yellow-500"];
 
-const ROWS = 16;
+const ROWS = 17;
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -105,6 +105,13 @@ function fmt(n) {
   if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
   return Math.floor(n).toString();
 }
+
+function formatBetDisplay(n) {
+  const num = Number(n) || 0;
+  if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M";
+  if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K";
+  return num.toString();
+}
 function shortAddr(addr) {
   if (!addr || addr.length < 10) return addr || "";
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -134,6 +141,7 @@ export default function Plinko2Page() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000");
+  const [isEditingBet, setIsEditingBet] = useState(false);
   const [ballsDropping, setBallsDropping] = useState(0);
 
   // Game state
@@ -393,14 +401,12 @@ export default function Plinko2Page() {
         ball.x += ball.vx * dt;
         ball.y += ball.vy * dt;
 
-        // Wall collision
-        if (ball.x - ball.r < 0) {
-          ball.x = ball.r;
-          ball.vx *= -0.5;
-        }
-        if (ball.x + ball.r > canvas.width) {
-          ball.x = canvas.width - ball.r;
-          ball.vx *= -0.5;
+        // Wall collision - REMOVE ball if hits walls (0x multiplier)
+        if (ball.x - ball.r < 0 || ball.x + ball.r > canvas.width) {
+          const zeroBucket = { multiplier: 0, index: -1 };
+          landInBucket(ball, zeroBucket);
+          balls.splice(i, 1);
+          continue;
         }
 
         // Peg collision
@@ -505,7 +511,7 @@ export default function Plinko2Page() {
       if (result.success) {
         bet = result.amount;
         setIsFreePlay(false);
-        router.replace("/plinko2", undefined, { shallow: true });
+        router.replace("/plinko", undefined, { shallow: true });
       } else {
         alert("No free play tokens available!");
         setIsFreePlay(false);
@@ -738,7 +744,63 @@ export default function Plinko2Page() {
             />
           </div>
 
-          <div ref={betRef} className="flex items-center justify-center gap-2 mb-1">
+          <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
+            <button
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                // If at default (1000), SET the amount. Otherwise ADD to it.
+                const newBet = current === MIN_BET 
+                  ? Math.min(vault, 1000)
+                  : Math.min(vault, current + 1000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+            >
+              1K
+            </button>
+            <button
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                // If at default (1000), SET the amount. Otherwise ADD to it.
+                const newBet = current === MIN_BET 
+                  ? Math.min(vault, 10000)
+                  : Math.min(vault, current + 10000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+            >
+              10K
+            </button>
+            <button
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                // If at default (1000), SET the amount. Otherwise ADD to it.
+                const newBet = current === MIN_BET 
+                  ? Math.min(vault, 100000)
+                  : Math.min(vault, current + 100000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+            >
+              100K
+            </button>
+            <button
+              onClick={() => {
+                const current = Number(betAmount) || MIN_BET;
+                // If at default (1000), SET the amount. Otherwise ADD to it.
+                const newBet = current === MIN_BET 
+                  ? Math.min(vault, 1000000)
+                  : Math.min(vault, current + 1000000);
+                setBetAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+            >
+              1M
+            </button>
             <button
               onClick={() => {
                 const current = Number(betAmount) || MIN_BET;
@@ -751,11 +813,19 @@ export default function Plinko2Page() {
               −
             </button>
             <input
-              type="number"
-              value={betAmount}
-              onChange={(e) => setBetAmount(e.target.value)}
-              className="w-24 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs"
-              min={MIN_BET}
+              type="text"
+              value={isEditingBet ? betAmount : formatBetDisplay(betAmount)}
+              onFocus={() => setIsEditingBet(true)}
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                setBetAmount(val || '0');
+              }}
+              onBlur={() => {
+                setIsEditingBet(false);
+                const current = Number(betAmount) || MIN_BET;
+                setBetAmount(String(Math.max(MIN_BET, current)));
+              }}
+              className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs"
             />
             <button
               onClick={() => {
@@ -767,6 +837,16 @@ export default function Plinko2Page() {
               className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
             >
               +
+            </button>
+            <button
+              onClick={() => {
+                setBetAmount(String(MIN_BET));
+                playSfx(clickSound.current);
+              }}
+              className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50"
+              title="Reset to minimum bet"
+            >
+              ↺
             </button>
           </div>
 
@@ -910,7 +990,7 @@ export default function Plinko2Page() {
                 </button>
               </div>
               <div className="mt-4 text-xs opacity-70">
-                <p>Plinko v2.0</p>
+                <p>Plinko2 v2.0</p>
               </div>
             </div>
           </div>
@@ -1070,3 +1150,4 @@ export default function Plinko2Page() {
     </Layout>
   );
 }
+

@@ -1,6 +1,6 @@
 // ============================================================================
-// MLEO Plinko2 - Full-Screen Professional Plinko Game (No-Scroll Auto-Scale)
-// Live physics simulation • Multi-ball drop • Responsive canvas!
+// MLEO Crash2 - Full-Screen Professional Crash Game (No-Scroll Auto-Scale)
+// Live multiplier chart • Provably Fair • Cash out before crash!
 // ============================================================================
 
 import { useEffect, useRef, useState } from "react";
@@ -48,18 +48,25 @@ function useIOSViewportFix() {
   }, []);
 }
 
-const LS_KEY = "mleo_plinko2_v1";
+const LS_KEY = "mleo_crash2_v1";
 const MIN_BET = 1000;
-
-// High Risk only - maximum multipliers
-const MULTIPLIERS = [10, 3, 1.5, 1, 0.5, 0.3, 0.1, 0, 0.1, 0.3, 0.5, 1, 1.5, 3, 10];
-const BUCKET_COLORS = ["from-yellow-300 to-yellow-500", "from-orange-400 to-orange-600", "from-green-500 to-emerald-500", "from-blue-500 to-cyan-500", "from-purple-500 to-purple-600", "from-gray-600 to-gray-700", "from-red-600 to-red-700", "from-black to-gray-900", "from-red-600 to-red-700", "from-gray-600 to-gray-700", "from-purple-500 to-purple-600", "from-blue-500 to-cyan-500", "from-green-500 to-emerald-500", "from-orange-400 to-orange-600", "from-yellow-300 to-yellow-500"];
-
-const ROWS = 17;
+const ROUND = {
+  bettingSeconds: 10,
+  intermissionMs: 3000,
+  fps: 60,
+  minCrash: 1.01,
+  maxCrash: 10.0,
+  growth: (elapsedMs) => {
+    const t = elapsedMs / 1000;
+    const rate = 0.85;
+    const m = Math.exp(rate * t * 0.6);
+    return Math.max(1, m);
+  },
+};
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
-const GAME_ID = 26;
+const GAME_ID = 25;
 const MINING_CLAIM_ABI = [
   {
     type: "function",
@@ -112,12 +119,36 @@ function formatBetDisplay(n) {
   if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K";
   return num.toString();
 }
+
 function shortAddr(addr) {
   if (!addr || addr.length < 10) return addr || "";
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
-export default function Plinko2Page() {
+// Provably Fair helpers
+async function sha256Hex(str) {
+  const enc = new TextEncoder();
+  const data = enc.encode(str);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+function hashToUnitFloat(hex) {
+  const slice = hex.slice(0, 13);
+  const int = parseInt(slice, 16);
+  const max = Math.pow(16, slice.length);
+  return int / max;
+}
+function hashToCrash(hex, minCrash, maxCrash) {
+  const u = hashToUnitFloat(hex);
+  const k = 1.45;
+  const skew = Math.pow(u, k);
+  const v = minCrash + (maxCrash - minCrash) * skew;
+  return Math.max(minCrash, Math.min(maxCrash, Math.round(v * 100) / 100));
+}
+
+export default function Crash2Page() {
   useIOSViewportFix();
   const router = useRouter();
 
@@ -127,7 +158,6 @@ export default function Plinko2Page() {
   const metersRef = useRef(null);
   const betRef = useRef(null);
   const ctaRef = useRef(null);
-  const canvasRef = useRef(null);
 
   const { openConnectModal } = useConnectModal();
   const { openAccountModal } = useAccountModal();
@@ -142,19 +172,37 @@ export default function Plinko2Page() {
   const [vault, setVaultState] = useState(0);
   const [betAmount, setBetAmount] = useState("1000");
   const [isEditingBet, setIsEditingBet] = useState(false);
-  const [ballsDropping, setBallsDropping] = useState(0);
+  const [autoCashOut, setAutoCashOut] = useState("2.00");
+  const [enableAutoCashOut, setEnableAutoCashOut] = useState(false);
 
   // Game state
-  const ballsRef = useRef([]);
-  const pegsRef = useRef([]);
-  const bucketsRef = useRef([]);
+  const [phase, setPhase] = useState("betting");
+  const [countdown, setCountdown] = useState(ROUND.bettingSeconds);
+  const [playerBet, setPlayerBet] = useState(null);
+  const [canCashOut, setCanCashOut] = useState(false);
+  const [cashedOutAt, setCashedOutAt] = useState(null);
+  const [payoutAmount, setPayoutAmount] = useState(null);
+
+  // Provably Fair
+  const [serverSeed, setServerSeed] = useState("");
+  const [serverSeedHash, setServerSeedHash] = useState("");
+  const [clientSeed, setClientSeed] = useState(() =>
+    Math.random().toString(36).slice(2)
+  );
+  const [nonce, setNonce] = useState(0);
+  const [crashPoint, setCrashPoint] = useState(null);
+
+  // Live chart
+  const [multiplier, setMultiplier] = useState(1.0);
+  const startTimeRef = useRef(0);
   const rafRef = useRef(0);
-  const lastTimeRef = useRef(0);
+  const dataRef = useRef([]);
+  const [chartData, setChartData] = useState([]);
 
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
   const [showResultPopup, setShowResultPopup] = useState(false);
-  const [lastResult, setLastResult] = useState(null);
+  const [gameResult, setGameResult] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -222,7 +270,15 @@ export default function Plinko2Page() {
     safeWrite(LS_KEY, stats);
   }, [stats]);
 
-  // Dynamic canvas scaling
+  useEffect(() => {
+    if (gameResult) {
+      setShowResultPopup(true);
+      const timer = setTimeout(() => setShowResultPopup(false), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [gameResult]);
+
+  // Dynamic chart scaling
   useEffect(() => {
     if (!wrapRef.current) return;
     const calc = () => {
@@ -245,7 +301,7 @@ export default function Plinko2Page() {
         48 +
         safeBottom +
         24;
-      const freeH = Math.max(200, rootH - used);
+      const freeH = Math.max(150, rootH - used);
       document.documentElement.style.setProperty("--chart-h", freeH + "px");
     };
     calc();
@@ -257,253 +313,74 @@ export default function Plinko2Page() {
     };
   }, [mounted]);
 
-  // Canvas setup and physics
+  // Round lifecycle
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !mounted) return;
-
-    const resize = () => {
-      const parent = canvas.parentElement;
-      if (!parent) return;
-      canvas.width = parent.clientWidth;
-      canvas.height = parent.clientHeight;
-      buildBoard();
-    };
-
-    const buildBoard = () => {
-      const w = canvas.width;
-      const h = canvas.height;
-      const bucketCount = MULTIPLIERS.length;
-
-      // Build pegs - more rows, tighter spacing
-      const pegs = [];
-      const pegGapX = (w - 40) / (ROWS + 2);
-      const pegGapY = (h - 50) / (ROWS + 2);
-
-      for (let row = 0; row < ROWS; row++) {
-        const pegCount = row + 2;
-        const rowY = 40 + row * pegGapY;
-        for (let col = 0; col < pegCount; col++) {
-          const rowWidth = pegCount * pegGapX;
-          const startX = (w - rowWidth) / 2 + pegGapX / 2;
-          const pegX = startX + col * pegGapX;
-          pegs.push({ x: pegX, y: rowY, r: 3 });
-        }
-      }
-
-      // Build buckets - 50% smaller height
-      const buckets = [];
-      const bucketWidth = (w - 40) / bucketCount;
-      for (let i = 0; i < bucketCount; i++) {
-        buckets.push({
-          x: 20 + i * bucketWidth,
-          y: h - 30,
-          w: bucketWidth,
-          h: 20,
-          multiplier: MULTIPLIERS[i],
-          index: i,
-        });
-      }
-
-      pegsRef.current = pegs;
-      bucketsRef.current = buckets;
-    };
-
-    resize();
-    window.addEventListener("resize", resize);
-
-    // Physics loop
-    const step = (time) => {
-      const dt = lastTimeRef.current ? Math.min((time - lastTimeRef.current) / 1000, 0.033) : 0.016;
-      lastTimeRef.current = time;
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      // Clear
-      ctx.fillStyle = "#0a0a0a";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Draw pegs
-      pegsRef.current.forEach((peg) => {
-        ctx.fillStyle = "#555";
-        ctx.beginPath();
-        ctx.arc(peg.x, peg.y, peg.r, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // Draw buckets
-      bucketsRef.current.forEach((bucket, i) => {
-        const grad = ctx.createLinearGradient(
-          bucket.x,
-          bucket.y,
-          bucket.x,
-          bucket.y + bucket.h
-        );
-        const colorClass = BUCKET_COLORS[i] || "from-gray-700 to-gray-800";
-        // Simple color extraction (not perfect but works)
-        if (colorClass.includes("yellow")) {
-          grad.addColorStop(0, "#facc15");
-          grad.addColorStop(1, "#f59e0b");
-        } else if (colorClass.includes("orange")) {
-          grad.addColorStop(0, "#f97316");
-          grad.addColorStop(1, "#ea580c");
-        } else if (colorClass.includes("green")) {
-          grad.addColorStop(0, "#10b981");
-          grad.addColorStop(1, "#059669");
-        } else if (colorClass.includes("blue")) {
-          grad.addColorStop(0, "#3b82f6");
-          grad.addColorStop(1, "#06b6d4");
-        } else if (colorClass.includes("purple")) {
-          grad.addColorStop(0, "#a855f7");
-          grad.addColorStop(1, "#9333ea");
-        } else if (colorClass.includes("red")) {
-          grad.addColorStop(0, "#ef4444");
-          grad.addColorStop(1, "#dc2626");
-        } else {
-          grad.addColorStop(0, "#6b7280");
-          grad.addColorStop(1, "#374151");
-        }
-        ctx.fillStyle = grad;
-        ctx.fillRect(bucket.x, bucket.y, bucket.w, bucket.h);
-
-        // Multiplier text - smaller for smaller buckets
-        ctx.fillStyle = "white";
-        ctx.font = "bold 10px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(
-          `${bucket.multiplier}x`,
-          bucket.x + bucket.w / 2,
-          bucket.y + bucket.h / 2 + 3
-        );
-      });
-
-      // Update and draw balls
-      const balls = ballsRef.current;
-      for (let i = balls.length - 1; i >= 0; i--) {
-        const ball = balls[i];
-
-        // Gravity
-        ball.vy += 800 * dt;
-
-        // Drag
-        ball.vx *= 0.995;
-        ball.vy *= 0.995;
-
-        // Max velocity
-        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
-        if (speed > 1500) {
-          ball.vx *= 1500 / speed;
-          ball.vy *= 1500 / speed;
-        }
-
-        // Update position
-        ball.x += ball.vx * dt;
-        ball.y += ball.vy * dt;
-
-        // Wall collision - REMOVE ball if hits walls (0x multiplier)
-        if (ball.x - ball.r < 0 || ball.x + ball.r > canvas.width) {
-          const zeroBucket = { multiplier: 0, index: -1 };
-          landInBucket(ball, zeroBucket);
-          balls.splice(i, 1);
-          continue;
-        }
-
-        // Peg collision
-        pegsRef.current.forEach((peg) => {
-          const dx = ball.x - peg.x;
-          const dy = ball.y - peg.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < ball.r + peg.r) {
-            const angle = Math.atan2(dy, dx);
-            const overlap = ball.r + peg.r - dist;
-            ball.x += Math.cos(angle) * overlap;
-            ball.y += Math.sin(angle) * overlap;
-            const dvx = ball.vx;
-            const dvy = ball.vy;
-            const dot = dvx * Math.cos(angle) + dvy * Math.sin(angle);
-            ball.vx = (dvx - 2 * dot * Math.cos(angle)) * 0.6;
-            ball.vy = (dvy - 2 * dot * Math.sin(angle)) * 0.6;
+    if (phase === "betting") {
+      const timer = setInterval(() => {
+        setCountdown((c) => {
+          if (c <= 1) {
+            startNextRound();
+            return ROUND.bettingSeconds;
           }
+          return c - 1;
         });
-
-        // Bucket collision
-        let landed = false;
-        bucketsRef.current.forEach((bucket) => {
-          if (
-            ball.y + ball.r >= bucket.y &&
-            ball.x >= bucket.x &&
-            ball.x <= bucket.x + bucket.w &&
-            ball.vy > 0
-          ) {
-            landed = true;
-            landInBucket(ball, bucket);
-            balls.splice(i, 1);
-          }
-        });
-
-        // Draw ball - smaller for better physics
-        if (!landed) {
-          ctx.fillStyle = "#fbbf24";
-          ctx.beginPath();
-          ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-
-      setBallsDropping(balls.length);
-      rafRef.current = requestAnimationFrame(step);
-    };
-
-    rafRef.current = requestAnimationFrame(step);
-
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-      window.removeEventListener("resize", resize);
-    };
-  }, [mounted]);
-
-  const landInBucket = (ball, bucket) => {
-    const bet = ball.bet;
-    const multiplier = bucket.multiplier;
-    const prize = Math.floor(bet * multiplier);
-    const win = prize > 0;
-
-    if (win && prize > 0) {
-      const newVault = getVault() + prize;
-      setVault(newVault);
-      setVaultState(newVault);
-      playSfx(winSound.current);
+      }, 1000);
+      return () => clearInterval(timer);
     }
+  }, [phase]);
 
-    const result = {
-      win,
-      multiplier,
-      prize,
-      profit: win ? prize - bet : -bet,
-      bucketIndex: bucket.index,
-    };
-
-    setLastResult(result);
-    setShowResultPopup(true);
-    setTimeout(() => setShowResultPopup(false), 3000);
-
-    const newStats = {
-      ...stats,
-      totalGames: stats.totalGames + 1,
-      wins: win ? stats.wins + 1 : stats.wins,
-      losses: win ? stats.losses : stats.losses + 1,
-      totalBet: stats.totalBet + bet,
-      totalWon: win ? stats.totalWon + prize : stats.totalWon,
-      biggestWin: Math.max(stats.biggestWin, win ? prize : 0),
-      biggestMultiplier: Math.max(stats.biggestMultiplier, multiplier),
-      lastBet: bet,
-    };
-    setStats(newStats);
+  const startNextRound = async () => {
+    const seed = Math.random().toString(36).slice(2, 12);
+    setServerSeed(seed);
+    const hash = await sha256Hex(seed + clientSeed + nonce);
+    setServerSeedHash(hash);
+    const crash = hashToCrash(hash, ROUND.minCrash, ROUND.maxCrash);
+    setCrashPoint(crash);
+    setPhase("running");
+    setMultiplier(1.0);
+    dataRef.current = [[0, 1.0]];
+    setChartData([[0, 1.0]]);
+    startTimeRef.current = Date.now();
+    takeoff(crash);
   };
 
-  const dropBall = (isFreePlayParam = false) => {
+  const takeoff = (crash) => {
+    const animate = () => {
+      const elapsed = Date.now() - startTimeRef.current;
+      const m = ROUND.growth(elapsed);
+      setMultiplier(m);
+      dataRef.current.push([elapsed, m]);
+      if (dataRef.current.length % 3 === 0) {
+        setChartData([...dataRef.current]);
+      }
+
+      // Auto cash out
+      if (
+        enableAutoCashOut &&
+        playerBet &&
+        canCashOut &&
+        !cashedOutAt &&
+        m >= Number(autoCashOut)
+      ) {
+        cashOut();
+      }
+
+      if (m >= crash) {
+        setPhase("crashed");
+        setMultiplier(crash);
+        dataRef.current.push([elapsed, crash]);
+        setChartData([...dataRef.current]);
+        endRound(false);
+      } else {
+        rafRef.current = requestAnimationFrame(animate);
+      }
+    };
+    rafRef.current = requestAnimationFrame(animate);
+  };
+
+  const placeBet = (isFreePlayParam = false) => {
     playSfx(clickSound.current);
+    if (phase !== "betting") return;
     const currentVault = getVault();
     let bet = Number(betAmount) || MIN_BET;
     if (isFreePlay || isFreePlayParam) {
@@ -511,7 +388,7 @@ export default function Plinko2Page() {
       if (result.success) {
         bet = result.amount;
         setIsFreePlay(false);
-        router.replace("/plinko2", undefined, { shallow: true });
+        router.replace("/crash", undefined, { shallow: true });
       } else {
         alert("No free play tokens available!");
         setIsFreePlay(false);
@@ -530,20 +407,90 @@ export default function Plinko2Page() {
       setVaultState(currentVault - bet);
     }
     setBetAmount(String(bet));
+    setPlayerBet({ amount: bet, accepted: true });
+    setCanCashOut(false);
+    setCashedOutAt(null);
+    setPayoutAmount(null);
+    setGameResult(null);
+  };
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  useEffect(() => {
+    if (phase === "running" && playerBet && !cashedOutAt) {
+      setCanCashOut(true);
+    }
+  }, [phase, playerBet, cashedOutAt]);
 
-    const ball = {
-      x: canvas.width / 2 + (Math.random() - 0.5) * 20,
-      y: 20,
-      vx: (Math.random() - 0.5) * 50,
-      vy: 50,
-      r: 3,
-      bet,
-    };
+  const cashOut = () => {
+    if (!canCashOut || !playerBet || cashedOutAt) return;
+    playSfx(clickSound.current);
+    setCashedOutAt(multiplier);
+    setCanCashOut(false);
+    const payout = Math.floor(playerBet.amount * multiplier);
+    setPayoutAmount(payout);
+    const newVault = getVault() + payout;
+    setVault(newVault);
+    setVaultState(newVault);
+    playSfx(winSound.current);
+  };
 
-    ballsRef.current.push(ball);
+  const endRound = (won) => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    
+    if (playerBet) {
+      const bet = playerBet.amount;
+      const cashed = cashedOutAt;
+      const prize = cashed ? Math.floor(bet * cashed) : 0;
+      const win = prize > 0;
+
+      const resultData = {
+        win,
+        crashedAt: crashPoint,
+        cashedAt: cashed,
+        prize,
+        profit: win ? prize - bet : -bet,
+      };
+      setGameResult(resultData);
+
+      const newStats = {
+        ...stats,
+        totalGames: stats.totalGames + 1,
+        wins: win ? stats.wins + 1 : stats.wins,
+        losses: win ? stats.losses : stats.losses + 1,
+        totalBet: stats.totalBet + bet,
+        totalWon: win ? stats.totalWon + prize : stats.totalWon,
+        biggestWin: Math.max(stats.biggestWin, win ? prize : 0),
+        biggestMultiplier: Math.max(
+          stats.biggestMultiplier,
+          cashed || 0
+        ),
+        lastBet: bet,
+      };
+      setStats(newStats);
+    }
+
+    setTimeout(() => {
+      setPhase("revealing");
+      setTimeout(() => {
+        setPhase("intermission");
+        setTimeout(() => {
+          resetRound();
+        }, ROUND.intermissionMs);
+      }, 2000);
+    }, 1000);
+  };
+
+  const resetRound = () => {
+    setPhase("betting");
+    setCountdown(ROUND.bettingSeconds);
+    setPlayerBet(null);
+    setCanCashOut(false);
+    setCashedOutAt(null);
+    setPayoutAmount(null);
+    setMultiplier(1.0);
+    setServerSeed("");
+    setNonce((n) => n + 1);
+    dataRef.current = [];
+    setChartData([]);
   };
 
   const backSafe = () => {
@@ -609,16 +556,29 @@ export default function Plinko2Page() {
 
   if (!mounted)
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-blue-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-orange-900 via-black to-red-900 flex items-center justify-center">
         <div className="text-white text-xl">Loading...</div>
       </div>
     );
+
+  const potentialWin = playerBet
+    ? Math.floor(playerBet.amount * multiplier)
+    : 0;
+  
+  // Chart SVG generation
+  const maxY = Math.max(...chartData.map((d) => d[1]), 2);
+  const maxX = Math.max(...chartData.map((d) => d[0]), 1000);
+  const chart = chartData.map((d, i) => {
+    const x = (d[0] / maxX) * 280;
+    const y = 180 - ((d[1] - 1) / (maxY - 1)) * 160;
+    return i === 0 ? `M${x},${y}` : `L${x},${y}`;
+  }).join(" ");
 
   return (
     <Layout>
       <div
         ref={wrapRef}
-        className="relative w-full overflow-hidden bg-gradient-to-br from-purple-900 via-black to-blue-900"
+        className="relative w-full overflow-hidden bg-gradient-to-br from-orange-900 via-black to-red-900"
         style={{ height: "100svh" }}
       >
         <div className="absolute inset-0 opacity-10">
@@ -650,7 +610,8 @@ export default function Plinko2Page() {
               </button>
               {freePlayTokens > 0 && (
                 <button
-                  onClick={() => dropBall(true)}
+                  onClick={() => placeBet(true)}
+                  disabled={phase !== "betting" || playerBet}
                   className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50"
                   title={`${freePlayTokens} Free Play${
                     freePlayTokens > 1 ? "s" : ""
@@ -701,10 +662,16 @@ export default function Plinko2Page() {
         >
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">
-              🎯 Plinko
+              🚀 Crash
             </h1>
             <p className="text-white/70 text-xs">
-              High Risk • Max Multipliers!
+              {phase === "betting"
+                ? `Betting ${countdown}s`
+                : phase === "running"
+                ? "Flying..."
+                : phase === "crashed"
+                ? `Crashed at ${crashPoint?.toFixed(2)}x`
+                : "Next round..."}
             </p>
           </div>
 
@@ -721,133 +688,187 @@ export default function Plinko2Page() {
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">Bet</div>
               <div className="text-sm font-bold text-amber-400">
-                {fmt(Number(betAmount))}
+                {fmt(playerBet ? playerBet.amount : Number(betAmount))}
               </div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
-              <div className="text-[10px] text-white/60">Balls</div>
-              <div className="text-sm font-bold text-purple-400">
-                {ballsDropping}
+              <div className="text-[10px] text-white/60">Win</div>
+              <div className="text-sm font-bold text-green-400">
+                {fmt(payoutAmount || potentialWin)}
               </div>
             </div>
           </div>
 
-          {/* CANVAS */}
+          {/* CHART */}
           <div
-            id="plinko-canvas-wrap"
+            id="crash-chart-wrap"
             className="mb-1 w-full max-w-md"
-            style={{ height: "var(--chart-h, 300px)" }}
+            style={{ height: "var(--chart-h, 200px)" }}
           >
-            <canvas
-              ref={canvasRef}
-              className="w-full h-full rounded-lg border-2 border-white/10"
-            />
+            <div className="relative w-full h-full bg-black/30 border border-white/10 rounded-lg p-2 pb-1 flex flex-col">
+              <div className="relative flex-1 w-full">
+                <div 
+                  className="absolute top-2 left-2 z-10 text-4xl font-bold text-white"
+                  style={{ opacity: phase === "betting" ? 0 : 1, transition: "opacity 0.3s" }}
+                >
+                  {multiplier.toFixed(2)}x
+                </div>
+                <div 
+                  className="absolute inset-0 flex items-center justify-center text-white/50 text-sm"
+                  style={{ opacity: phase === "betting" ? 1 : 0, transition: "opacity 0.3s" }}
+                >
+                  Waiting for round to start...
+                </div>
+                <svg
+                  viewBox="0 0 300 200"
+                  className="w-full h-full"
+                  preserveAspectRatio="xMidYMid meet"
+                  style={{ opacity: phase === "betting" ? 0 : 1, transition: "opacity 0.3s" }}
+                >
+                  <path
+                    d={chart || "M0,180 L300,180"}
+                    stroke={phase === "crashed" ? "#ef4444" : "#10b981"}
+                    strokeWidth="3"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+              <div className="text-center text-xs text-white/60 -mt-4">
+                Round #{nonce} • {phase === "betting" ? "Placing bets..." : phase === "running" ? `Flying ${multiplier.toFixed(2)}x` : `Crashed @ ${crashPoint?.toFixed(2)}x`}
+              </div>
+            </div>
           </div>
 
-          <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button
-              onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                // If at default (1000), SET the amount. Otherwise ADD to it.
-                const newBet = current === MIN_BET 
-                  ? Math.min(vault, 1000)
-                  : Math.min(vault, current + 1000);
-                setBetAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
-            >
-              1K
-            </button>
-            <button
-              onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                // If at default (1000), SET the amount. Otherwise ADD to it.
-                const newBet = current === MIN_BET 
-                  ? Math.min(vault, 10000)
-                  : Math.min(vault, current + 10000);
-                setBetAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
-            >
-              10K
-            </button>
-            <button
-              onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                // If at default (1000), SET the amount. Otherwise ADD to it.
-                const newBet = current === MIN_BET 
-                  ? Math.min(vault, 100000)
-                  : Math.min(vault, current + 100000);
-                setBetAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
-            >
-              100K
-            </button>
-            <button
-              onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                // If at default (1000), SET the amount. Otherwise ADD to it.
-                const newBet = current === MIN_BET 
-                  ? Math.min(vault, 1000000)
-                  : Math.min(vault, current + 1000000);
-                setBetAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
-            >
-              1M
-            </button>
-            <button
-              onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                const newBet = Math.max(MIN_BET, current - 1000);
-                setBetAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
-            >
-              −
-            </button>
-            <input
-              type="text"
-              value={isEditingBet ? betAmount : formatBetDisplay(betAmount)}
-              onFocus={() => setIsEditingBet(true)}
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, '');
-                setBetAmount(val || '0');
-              }}
-              onBlur={() => {
-                setIsEditingBet(false);
-                const current = Number(betAmount) || MIN_BET;
-                setBetAmount(String(Math.max(MIN_BET, current)));
-              }}
-              className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs"
-            />
-            <button
-              onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                const newBet = Math.min(vault, current + 1000);
-                setBetAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
-            >
-              +
-            </button>
-            <button
-              onClick={() => {
-                setBetAmount(String(MIN_BET));
-                playSfx(clickSound.current);
-              }}
-              className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50"
-              title="Reset to minimum bet"
-            >
-              ↺
-            </button>
+          <div ref={betRef} className="w-full max-w-md mb-1 space-y-2">
+            <div className="flex items-center justify-center gap-1 flex-wrap">
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = current === MIN_BET 
+                    ? Math.min(vault, 1000)
+                    : Math.min(vault, current + 1000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              >
+                1K
+              </button>
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = current === MIN_BET 
+                    ? Math.min(vault, 10000)
+                    : Math.min(vault, current + 10000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              >
+                10K
+              </button>
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = current === MIN_BET 
+                    ? Math.min(vault, 100000)
+                    : Math.min(vault, current + 100000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              >
+                100K
+              </button>
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = current === MIN_BET 
+                    ? Math.min(vault, 1000000)
+                    : Math.min(vault, current + 1000000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              >
+                1M
+              </button>
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = Math.max(MIN_BET, current - 1000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
+              >
+                −
+              </button>
+              <input
+                type="text"
+                value={isEditingBet ? betAmount : formatBetDisplay(betAmount)}
+                onFocus={() => setIsEditingBet(true)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  setBetAmount(val || '0');
+                }}
+                onBlur={() => {
+                  setIsEditingBet(false);
+                  const current = Number(betAmount) || MIN_BET;
+                  setBetAmount(String(Math.max(MIN_BET, current)));
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs"
+              />
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = Math.min(vault, current + 1000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
+              >
+                +
+              </button>
+              <button
+                onClick={() => {
+                  setBetAmount(String(MIN_BET));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50"
+                title="Reset to minimum bet"
+              >
+                ↺
+              </button>
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <input
+                type="checkbox"
+                checked={enableAutoCashOut}
+                onChange={(e) => setEnableAutoCashOut(e.target.checked)}
+                className="w-4 h-4"
+              />
+              <span className="text-white text-xs">Auto Cash Out @</span>
+              <input
+                type="number"
+                value={autoCashOut}
+                onChange={(e) => setAutoCashOut(e.target.value)}
+                className="w-20 h-8 bg-black/30 border border-white/20 rounded text-center text-white text-xs"
+                step="0.1"
+                min="1.01"
+              />
+              <span className="text-white text-xs">x</span>
+            </div>
           </div>
 
           <div
@@ -856,11 +877,23 @@ export default function Plinko2Page() {
             style={{ minHeight: "140px" }}
           >
             <button
-              onClick={() => dropBall(false)}
-              disabled={Number(betAmount) < MIN_BET}
-              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
+              onClick={
+                phase === "running" && canCashOut
+                  ? cashOut
+                  : () => placeBet(false)
+              }
+              disabled={
+                (phase === "betting" && (playerBet || Number(betAmount) < MIN_BET)) ||
+                (phase === "running" && !canCashOut) ||
+                (phase !== "betting" && phase !== "running")
+              }
+              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
             >
-              🎯 DROP BALL
+              {phase === "running" && canCashOut
+                ? `💰 CASH OUT ${fmt(potentialWin)}`
+                : playerBet
+                ? "✅ BET PLACED"
+                : `🎲 JOIN ROUND`}
             </button>
             <div className="flex gap-2">
               <button
@@ -894,24 +927,29 @@ export default function Plinko2Page() {
           </div>
         </div>
 
-        {showResultPopup && lastResult && (
+        {showResultPopup && gameResult && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
             <div
               className={`${
-                lastResult.win ? "bg-green-500" : "bg-red-500"
+                gameResult.win ? "bg-green-500" : "bg-red-500"
               } text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`}
               style={{ animation: "fadeIn 0.3s ease-in-out" }}
             >
               <div className="text-4xl mb-2">
-                {lastResult.win ? "🎯" : "💥"}
+                {gameResult.win ? "🚀" : "💥"}
               </div>
               <div className="text-2xl font-bold mb-1">
-                {lastResult.win ? `${lastResult.multiplier}x!` : "BETTER LUCK!"}
+                {gameResult.win ? "CASHED OUT!" : "CRASHED!"}
               </div>
               <div className="text-lg">
-                {lastResult.win
-                  ? `+${fmt(lastResult.prize)} MLEO`
-                  : `-${fmt(Math.abs(lastResult.profit))} MLEO`}
+                {gameResult.win
+                  ? `+${fmt(gameResult.prize)} MLEO`
+                  : `-${fmt(Math.abs(gameResult.profit))} MLEO`}
+              </div>
+              <div className="text-sm opacity-80 mt-2">
+                {gameResult.win
+                  ? `@ ${gameResult.cashedAt?.toFixed(2)}x`
+                  : `Crashed @ ${gameResult.crashedAt?.toFixed(2)}x`}
               </div>
             </div>
           </div>
@@ -990,7 +1028,7 @@ export default function Plinko2Page() {
                 </button>
               </div>
               <div className="mt-4 text-xs opacity-70">
-                <p>Plinko v2.0</p>
+                <p>Crash v2.0</p>
               </div>
             </div>
           </div>
@@ -999,23 +1037,28 @@ export default function Plinko2Page() {
         {showHowToPlay && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
             <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
-              <h2 className="text-2xl font-extrabold mb-4">🎯 How to Play</h2>
+              <h2 className="text-2xl font-extrabold mb-4">🚀 How to Play</h2>
               <div className="space-y-3 text-sm">
                 <p>
-                  <strong>1. Choose Risk:</strong> Low, Medium, or High risk levels
+                  <strong>1. Place Your Bet:</strong> Join the round during betting phase (10s)
                 </p>
                 <p>
-                  <strong>2. Set Your Bet:</strong> Choose your MLEO amount
+                  <strong>2. Watch It Rise:</strong> The multiplier grows from 1.00x
                 </p>
                 <p>
-                  <strong>3. Drop Ball:</strong> Watch it bounce through pegs!
+                  <strong>3. Cash Out:</strong> Click Cash Out before it crashes!
                 </p>
                 <p>
-                  <strong>4. Land in Bucket:</strong> Win based on multiplier
+                  <strong>4. Auto Cash Out:</strong> Set automatic cash out at your target
                 </p>
-                <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
-                  <p className="text-purple-300 font-semibold">
-                    🎯 Higher risk = bigger multipliers!
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
+                  <p className="text-orange-300 font-semibold">
+                    ⚠️ If you don't cash out before crash, you lose!
+                  </p>
+                </div>
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  <p className="text-blue-300 font-semibold text-xs">
+                    🔒 Provably Fair: Hash shown before each round
                   </p>
                 </div>
               </div>
@@ -1038,7 +1081,7 @@ export default function Plinko2Page() {
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
-                    <div className="text-xs text-white/60">Total Drops</div>
+                    <div className="text-xs text-white/60">Total Rounds</div>
                     <div className="text-xl font-bold">{stats.totalGames}</div>
                   </div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
@@ -1071,7 +1114,7 @@ export default function Plinko2Page() {
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
                     <div className="text-xs text-white/60">Best Multi</div>
                     <div className="text-lg font-bold text-purple-400">
-                      {stats.biggestMultiplier.toFixed(1)}x
+                      {(stats.biggestMultiplier || 0).toFixed(2)}x
                     </div>
                   </div>
                 </div>

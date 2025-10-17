@@ -39,7 +39,6 @@ function useIOSViewportFix() {
 const LS_KEY = "mleo_chamber_v2";
 const MIN_BET = 1000;
 const TOTAL_CHAMBERS = 6;
-const DANGER_CHAMBER = 2; // Chamber 3 is always danger
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -78,6 +77,7 @@ export default function ChamberPage() {
   const [betAmount, setBetAmount] = useState("1000");
   const [isEditingBet, setIsEditingBet] = useState(false);
   const [selectedChambers, setSelectedChambers] = useState([]);
+  const [dangerChamber, setDangerChamber] = useState(null);
   const [gameActive, setGameActive] = useState(false);
   const [gameResult, setGameResult] = useState(null);
   const [isFreePlay, setIsFreePlay] = useState(false);
@@ -102,6 +102,11 @@ export default function ChamberPage() {
   useEffect(() => {
     setMounted(true);
     setVaultState(getVault());
+    // Reset game state on mount
+    setDangerChamber(null);
+    setGameActive(false);
+    setGameResult(null);
+    setSelectedChambers([]);
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
     const freePlayStatus = getFreePlayStatus();
@@ -155,6 +160,8 @@ export default function ChamberPage() {
     setBetAmount(String(bet));
     setGameResult(null);
     setSelectedChambers([]);
+    // Randomly select danger chamber (0-5)
+    setDangerChamber(Math.floor(Math.random() * TOTAL_CHAMBERS));
     setGameActive(true);
   };
 
@@ -163,7 +170,7 @@ export default function ChamberPage() {
     playSfx(clickSound.current);
     const newSelected = [...selectedChambers, index];
     setSelectedChambers(newSelected);
-    if (index === DANGER_CHAMBER) {
+    if (index === dangerChamber) {
       endGame(false, newSelected.length);
     } else if (newSelected.length >= TOTAL_CHAMBERS - 1) {
         endGame(true, newSelected.length);
@@ -195,7 +202,7 @@ export default function ChamberPage() {
     setStats(newStats);
   };
 
-  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setSelectedChambers([]); setGameActive(false); };
+  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setSelectedChambers([]); setDangerChamber(null); setGameActive(false); };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-slate-900 via-black to-slate-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -244,7 +251,7 @@ export default function ChamberPage() {
             <div className={`flex gap-2 justify-center mb-2 transition-opacity ${gameActive || gameResult ? 'opacity-100' : 'opacity-0'}`}>
                   {[...Array(TOTAL_CHAMBERS)].map((_, index) => {
                     const isSelected = selectedChambers.includes(index);
-                const isDanger = index === DANGER_CHAMBER;
+                const isDanger = (gameActive || gameResult) && index === dangerChamber;
                 const isSafe = isSelected && !isDanger;
                     return (
                       <button
@@ -344,7 +351,7 @@ export default function ChamberPage() {
 
         {menuOpen && (<div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}><div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div><div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div><div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div><div className="mt-4 text-xs opacity-70"><p>Lucky Chamber v2.0</p></div></div></div>)}
 
-        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">🔫 How to Play</h2><div className="space-y-3 text-sm"><p><strong>1. Start Game:</strong> Min {MIN_BET} MLEO</p><p><strong>2. Pick Chambers:</strong> Choose safe chambers!</p><p><strong>3. Avoid Danger:</strong> Chamber 3 is always danger!</p><p><strong>4. Cash Out:</strong> Take your winnings anytime!</p><div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3"><p className="text-yellow-300 font-semibold">Multipliers:</p><div className="text-xs text-white/80 mt-2 space-y-1"><p>• 1 Chamber: ×1.5</p><p>• 2 Chambers: ×2.25</p><p>• 3 Chambers: ×3.38</p><p>• 4 Chambers: ×5.06</p><p>• 5 Chambers: ×7.59</p></div></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">🔫 How to Play</h2><div className="space-y-2 text-sm"><p><strong>1. Start:</strong> Place your bet (min {MIN_BET} MLEO)</p><p><strong>2. Pick:</strong> Choose chambers one by one</p><p><strong>3. Risk:</strong> 1 random chamber is dangerous (16.7% each pick)</p><p><strong>4. Reward:</strong> Each safe chamber = ×1.5 multiplier</p><p><strong>5. Cash Out:</strong> Take winnings anytime or risk more!</p><div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2"><div className="text-xs text-yellow-300 space-y-0.5"><p>1 safe: ×1.5 | 2: ×2.25 | 3: ×3.38</p><p>4: ×5.06 | 5 (perfect): ×7.59</p></div></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
 
         {showStats && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2><div className="space-y-3"><div className="grid grid-cols-2 gap-3"><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Games</div><div className="text-xl font-bold">{stats.totalGames}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Bet</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Chambers</div><div className="text-lg font-bold text-purple-400">{stats.chambersOpened}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalBet)}</div></div></div></div><button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
 
