@@ -534,13 +534,14 @@ function TexasHoldemSupabasePage() {
         };
       });
 
-      // Deal community cards (burn one card before flop)
+      // Deal community cards properly (5 separate cards for flop, turn, river)
+      const startIndex = players.length * 2; // After player cards
       const communityCards = [
-        deck[players.length * 2 + 1], // Burn first card
-        deck[players.length * 2 + 2], // Flop 1
-        deck[players.length * 2 + 3], // Flop 2
-        deck[players.length * 2 + 4], // Flop 3
-        deck[players.length * 2 + 5]  // Turn (will be dealt later)
+        deck[startIndex + 1], // Flop card 1 (after burn)
+        deck[startIndex + 2], // Flop card 2
+        deck[startIndex + 3], // Flop card 3
+        deck[startIndex + 5], // Turn card (after burn)
+        deck[startIndex + 7]  // River card (after burn)
       ];
 
       // Determine first action (UTG - Under The Gun)
