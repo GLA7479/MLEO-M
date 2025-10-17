@@ -1614,7 +1614,7 @@ export default function TexasHoldemCasinoPage() {
                       </div>
                       
                       {/* Player Cards */}
-                      {isMe && player.hole_cards && (
+                      {player.hole_cards && (isMe || game?.status === GAME_STATUS.FINISHED || game?.round === "showdown") && (
                         <div className="flex justify-center gap-1 mt-2">
                           {player.hole_cards.map((card, cardIdx) => (
                             <PlayingCard key={cardIdx} card={card} delay={cardIdx * 100} />
@@ -1627,7 +1627,7 @@ export default function TexasHoldemCasinoPage() {
               </div>
 
               {/* Action Buttons */}
-              {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && game?.round !== "finished" && game?.round !== "showdown" && (
+              {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && game?.round !== "finished" && game?.round !== "showdown" && !winnerModal.open && (
                 <div className="text-center">
                   <div className="text-white/70 text-sm mb-4">
                     Your Turn {timeLeft > 0 && `(${timeLeft}s)`}
