@@ -73,7 +73,7 @@ function useIOSViewportFix() {
 }
 
 // Simple constants
-const SUITS = ["♠️", "♥️", "♦️", "♣️"];
+const SUITS = ["♠", "♥", "♦", "♣"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 const SMALL_BLIND = 25;
 const BIG_BLIND = 50;
@@ -492,6 +492,27 @@ function TexasHoldemSupabasePage() {
         (payload) => {
           console.log("Game updated:", payload);
           const g = payload.new;
+          
+          // Validate and fix cards when reading from DB
+          if (g.community_cards) {
+            console.log("Reading from DB - Community cards:", g.community_cards);
+            
+            // Fix cards with empty or invalid suits
+            const fixedCommunityCards = g.community_cards.map(card => {
+              if (card && card.value && (!card.suit || card.suit === '')) {
+                console.warn("Fixing card with empty suit:", card);
+                // Try to reconstruct suit from deck if possible
+                return { ...card, suit: '♠' }; // Default fallback
+              }
+              return card;
+            });
+            
+            if (fixedCommunityCards !== g.community_cards) {
+              console.log("Fixed community cards:", fixedCommunityCards);
+              g.community_cards = fixedCommunityCards;
+            }
+          }
+          
           setGame(g);
           setCurrentPlayerIndex(g.current_player_index ?? 0);
 
@@ -533,7 +554,27 @@ function TexasHoldemSupabasePage() {
           
           if (playersData) {
             console.log("Updated players list:", playersData);
-            setPlayers(playersData);
+            
+            // Fix player cards with empty or invalid suits
+            const fixedPlayersData = playersData.map(player => {
+              if (player.cards && Array.isArray(player.cards)) {
+                const fixedCards = player.cards.map(card => {
+                  if (card && card.value && (!card.suit || card.suit === '')) {
+                    console.warn("Fixing player card with empty suit:", card);
+                    return { ...card, suit: '♠' }; // Default fallback
+                  }
+                  return card;
+                });
+                
+                if (JSON.stringify(fixedCards) !== JSON.stringify(player.cards)) {
+                  console.log("Fixed player cards for", player.name, ":", fixedCards);
+                  return { ...player, cards: fixedCards };
+                }
+              }
+              return player;
+            });
+            
+            setPlayers(fixedPlayersData);
           }
         }
       )
@@ -550,7 +591,27 @@ function TexasHoldemSupabasePage() {
           
           if (playersData) {
             console.log("Updated players list:", playersData);
-            setPlayers(playersData);
+            
+            // Fix player cards with empty or invalid suits
+            const fixedPlayersData = playersData.map(player => {
+              if (player.cards && Array.isArray(player.cards)) {
+                const fixedCards = player.cards.map(card => {
+                  if (card && card.value && (!card.suit || card.suit === '')) {
+                    console.warn("Fixing player card with empty suit:", card);
+                    return { ...card, suit: '♠' }; // Default fallback
+                  }
+                  return card;
+                });
+                
+                if (JSON.stringify(fixedCards) !== JSON.stringify(player.cards)) {
+                  console.log("Fixed player cards for", player.name, ":", fixedCards);
+                  return { ...player, cards: fixedCards };
+                }
+              }
+              return player;
+            });
+            
+            setPlayers(fixedPlayersData);
           }
         }
       )
@@ -581,7 +642,17 @@ function TexasHoldemSupabasePage() {
       const entryFee = game.entry_fee || 1000; // Use actual entry fee
       const updatedPlayers = players.map((p, idx) => {
         const base = { ...p };
-        base.cards = [ deck[idx*2], deck[idx*2+1] ];
+        const card1 = deck[idx*2];
+        const card2 = deck[idx*2+1];
+        
+        // Validate cards before assigning
+        if (!card1 || !card2 || !card1.suit || !card1.value || !card2.suit || !card2.value) {
+          console.error("Invalid cards for player", p.name, ":", { card1, card2, deckIndex: idx*2 });
+          base.cards = [];
+        } else {
+          base.cards = [card1, card2];
+        }
+        
         base.bet = 0;
         base.status = PLAYER_STATUS.READY;
         base.chips = entryFee; // Use entry fee as starting chips
@@ -602,6 +673,16 @@ function TexasHoldemSupabasePage() {
         deck[start+5], // turn after burn
         deck[start+7]  // river after burn
       ];
+      
+      // Validate community cards
+      const validCommunityCards = communityCards.filter(card => 
+        card && card.suit && card.value && card.suit !== '' && card.value !== ''
+      );
+      
+      if (validCommunityCards.length !== 5) {
+        console.error("Invalid community cards:", communityCards);
+        console.error("Valid cards:", validCommunityCards);
+      }
 
       // First to act preflop (UTG). Heads-up: SB acts first preflop.
       let firstToAct = (players.length === 2) ? smallBlindIndex : (bigBlindIndex + 1) % players.length;
@@ -612,6 +693,10 @@ function TexasHoldemSupabasePage() {
       const lastRaiseTo = currentBet;  // amount to call
       const lastAggressor = bigBlindIndex; // BB is considered last to act preflop
 
+      // Validate cards before saving to DB
+      console.log("Saving to DB - Community cards:", communityCards);
+      console.log("Saving to DB - Deck sample:", deck.slice(0, 5));
+      
       // Persist game
       await supabase.from(TABLES.GAMES).update({
         status: GAME_STATUS.PLAYING,
@@ -727,7 +812,10 @@ function TexasHoldemSupabasePage() {
       // Betting-round completion
       const activeCanAct = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED);
       const everyoneMatched = activeCanAct.every(p => (p.status === PLAYER_STATUS.ALL_IN) || ((p.bet||0) === currentBet));
-      const bettingDone = everyoneMatched && (nextIdx === lastRaiserIndex);
+      
+      // Special case: if everyone is all-in, betting is done regardless of position
+      const allAllIn = activeCanAct.every(p => p.status === PLAYER_STATUS.ALL_IN);
+      const bettingDone = everyoneMatched && (allAllIn || (nextIdx === lastRaiserIndex));
 
       // Only 1 player left?
       const notFolded = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED);
@@ -769,8 +857,16 @@ function TexasHoldemSupabasePage() {
 
         await supabase.from(TABLES.GAMES).update(updates).eq("id", game.id);
 
-        if (nextRound === "showdown") {
+        // If all players are all-in, go directly to showdown regardless of round
+        const allAllIn = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED).every(p => p.status === PLAYER_STATUS.ALL_IN);
+        if (allAllIn) {
+          console.log("All players all-in, going directly to showdown");
+          // Make sure all community cards are visible before showdown
+          await supabase.from(TABLES.GAMES).update({ community_visible: 5 }).eq("id", game.id);
           await determineWinner();
+        } else if (nextRound === "showdown") {
+          // Normal showdown - wait for next action
+          console.log("Normal showdown, waiting for next action");
         }
       } else {
         // Keep betting
@@ -807,8 +903,38 @@ function TexasHoldemSupabasePage() {
   const RANKS_ORDER = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
 
   const normalizeCards = (cards) => {
-    return cards.map(c => ({ r: RANKS_ORDER[c.value], v: c.value, s: c.suit }))
-                .sort((a,b)=> b.r - a.r);
+    if (!cards || !Array.isArray(cards)) {
+      console.error("normalizeCards: invalid input:", cards);
+      return [];
+    }
+    
+    console.log("normalizeCards input:", cards);
+    
+    const validCards = cards.map(c => {
+      // Try to fix cards with missing or invalid suits
+      if (c && c.value && RANKS_ORDER[c.value] !== undefined) {
+        if (!c.suit || c.suit === '') {
+          console.warn("Fixing card with missing suit:", c);
+          return { ...c, suit: '♠' }; // Default suit
+        }
+        return c;
+      }
+      return null;
+    }).filter(c => c !== null);
+    
+    console.log("normalizeCards valid cards:", validCards);
+    
+    if (validCards.length < cards.length) {
+      console.error("normalizeCards: filtered out invalid cards. Original:", cards.length, "Valid:", validCards.length);
+    }
+    
+    return validCards
+      .map(c => ({ 
+        r: RANKS_ORDER[c.value], 
+        v: c.value, 
+        s: c.suit 
+      }))
+      .sort((a,b) => b.r - a.r);
   };
 
   const uniqueRanksDesc = (rs) => {
@@ -818,11 +944,15 @@ function TexasHoldemSupabasePage() {
   };
 
   const findFlush = (cards7) => {
+    if (!cards7 || !Array.isArray(cards7)) return null;
+    
     const bySuit = new Map();
     for (const c of cards7) {
-      const arr = bySuit.get(c.s) || [];
-      arr.push(c);
-      bySuit.set(c.s, arr);
+      if (c && c.s && typeof c.r !== 'undefined') {
+        const arr = bySuit.get(c.s) || [];
+        arr.push(c);
+        bySuit.set(c.s, arr);
+      }
     }
     for (const arr of bySuit.values()) {
       if (arr.length >= 5) {
@@ -877,9 +1007,17 @@ function TexasHoldemSupabasePage() {
     
     const counts = new Map();
     for (const c of best5) {
-      if (c && typeof c.r !== 'undefined') {
+      if (c && typeof c.r !== 'undefined' && c.r !== null) {
         counts.set(c.r, (counts.get(c.r)||0)+1);
+      } else {
+        console.error("Invalid card in handRankTuple:", c);
+        return [0];
       }
+    }
+    
+    if (counts.size === 0) {
+      console.error("No valid cards found in handRankTuple");
+      return [0];
     }
     const entries = [...counts.entries()].sort((a,b)=> (b[1]-a[1]) || (b[0]-a[0]));
     const ranksDesc = best5.map(c=>c.r).sort((a,b)=> b-a);
@@ -952,18 +1090,30 @@ function TexasHoldemSupabasePage() {
 
     let best = null, bestRank = null;
     for (const h of candidateHands) {
-      if (h && h.length === 5) {
-        const t = handRankTuple(h);
-        if (!best || compareRankTuple(t, bestRank) > 0) {
-          best = h; bestRank = t;
+      if (h && h.length === 5 && h.every(c => c && typeof c.r !== 'undefined' && c.r !== null)) {
+        try {
+          const t = handRankTuple(h);
+          if (t && t.length > 0 && t[0] !== 0) {
+            if (!best || compareRankTuple(t, bestRank) > 0) {
+              best = h; bestRank = t;
+            }
+          }
+        } catch (error) {
+          console.error("Error in handRankTuple for hand:", h, error);
         }
       }
     }
     
-    // Fallback: return first 5 cards if no valid hand found
+    // Fallback: return first 5 valid cards if no valid hand found
     if (!best) {
-      best = cards7.slice(0, 5);
-      bestRank = handRankTuple(best);
+      const validCards = cards7.filter(c => c && typeof c.r !== 'undefined' && c.r !== null);
+      if (validCards.length >= 5) {
+        best = validCards.slice(0, 5);
+        bestRank = handRankTuple(best);
+      } else {
+        console.error("Not enough valid cards for fallback:", cards7);
+        return { best5: [], tuple: [0] };
+      }
     }
     
     return { best5: best, tuple: bestRank };
@@ -982,20 +1132,64 @@ function TexasHoldemSupabasePage() {
     if (!cards || cards.length < 5) return { rank: 0, score: [0], name: "Invalid", best5: [] };
     
     try {
-      const norm = normalizeCards(cards);
+      // Convert cards from {suit, value} format to {r, s} format if needed
+      console.log("evaluateHand input cards:", cards);
+      
+      const convertedCards = cards.map(card => {
+        if (card && card.suit && card.value && card.suit !== '' && card.value !== '') {
+          // Convert from {suit, value} to {r, s} format
+          const rank = RANKS_ORDER[card.value];
+          if (rank === undefined) {
+            console.error("Invalid card value:", card.value, "Available values:", Object.keys(RANKS_ORDER));
+            return null;
+          }
+          return { r: rank, s: card.suit, value: card.value };
+        } else if (card && typeof card.r !== 'undefined' && card.s && card.s !== '') {
+          // Already in {r, s} format
+          return card;
+        } else if (card && card.value) {
+          // Try to fix card with missing suit
+          console.warn("Attempting to fix card with missing suit:", card);
+          const rank = RANKS_ORDER[card.value];
+          if (rank !== undefined) {
+            return { r: rank, s: '♠', value: card.value }; // Default suit
+          }
+        }
+        console.error("Invalid card format - missing suit or value:", card);
+        return null;
+      }).filter(c => c !== null);
+      
+      console.log("evaluateHand converted cards:", convertedCards);
+      
+      if (convertedCards.length < 5) {
+        console.error("Not enough valid cards for evaluation after conversion:", { original: cards, converted: convertedCards });
+        return { rank: 0, score: [0], name: "Invalid", best5: [] };
+      }
+      
+      const norm = normalizeCards(convertedCards);
+      if (!norm || norm.length < 5) {
+        console.error("normalizeCards failed:", convertedCards);
+        return { rank: 0, score: [0], name: "Invalid", best5: [] };
+      }
+      
       const { best5, tuple } = best5Of7(norm);
       
-      if (!best5 || best5.length !== 5) {
-        console.error("Invalid best5 returned:", best5);
+      if (!best5 || best5.length !== 5 || !tuple || tuple.length === 0) {
+        console.error("Invalid best5 or tuple returned:", { best5, tuple });
         return { rank: 0, score: [0], name: "Invalid", best5: [] };
       }
       
       const names = {9:'Straight Flush',8:'Four of a Kind',7:'Full House',6:'Flush',5:'Straight',4:'Three of a Kind',3:'Two Pair',2:'Pair',1:'High Card'};
       return { 
-        rank: tuple[0], 
+        rank: tuple[0] || 0, 
         score: tuple, 
         name: names[tuple[0]] || "Unknown", 
-        best5: best5.map(c=>({value:Object.keys(RANKS_ORDER).find(k=>RANKS_ORDER[k]===c.r), suit:c.s})) 
+        best5: best5.map(c => {
+          if (!c || typeof c.r === 'undefined' || typeof c.s === 'undefined') {
+            return { value: "?", suit: "?" };
+          }
+          return { value: Object.keys(RANKS_ORDER).find(k => RANKS_ORDER[k] === c.r) || "?", suit: c.s };
+        })
       };
     } catch (error) {
       console.error("Error in evaluateHand:", error, cards);
@@ -1036,10 +1230,18 @@ function TexasHoldemSupabasePage() {
       }
 
       // Showdown: evaluate best5-of-7
+      // Ensure all community cards are visible for showdown
+      await supabase.from(TABLES.GAMES).update({ community_visible: 5 }).eq("id", game.id);
+      
       const board5 = (gNow.community_cards||[]).slice(0,5);
+      console.log("Showdown - Community cards:", board5);
+      console.log("Showdown - Active players:", active.map(p => ({ name: p.name, cards: p.cards })));
+      
       const ranked = active.map(p => {
         const all = [...(p.cards||[]), ...board5];
+        console.log("Cards for showdown evaluation:", all);
         const evalRes = evaluateHand(all);
+        console.log("Hand evaluation result:", evalRes);
         return { p, evalRes };
       }).sort((a,b)=> compareRankTuple(b.evalRes.score, a.evalRes.score));
 
@@ -1494,7 +1696,33 @@ function TexasHoldemSupabasePage() {
                       {/* Show current hand strength */}
                       {game?.community_cards && game.community_visible > 0 && (
                         <div className="text-center text-yellow-300 mt-2 text-xs">
-                          Hand: {evaluateHand([...player.cards, ...game.community_cards.slice(0, game.community_visible)]).name}
+                          Hand: {(() => {
+                            try {
+                              const playerCards = (player.cards || []).filter(c => c && c.suit && c.suit !== '' && c.value);
+                              const communityCards = (game.community_cards || []).slice(0, game.community_visible || 0).filter(c => c && c.suit && c.suit !== '' && c.value);
+                              const allCards = [...playerCards, ...communityCards];
+                              
+                              console.log("Cards for evaluation:", {
+                                playerCards,
+                                communityCards,
+                                allCards,
+                                playerCardsCount: playerCards.length,
+                                communityCardsCount: communityCards.length,
+                                totalCount: allCards.length
+                              });
+                              
+                              if (allCards.length < 5) {
+                                console.error("Not enough cards for evaluation:", allCards);
+                                return "Invalid";
+                              }
+                              
+                              const result = evaluateHand(allCards);
+                              return result.name;
+                            } catch (error) {
+                              console.error("Error evaluating hand:", error);
+                              return "Error";
+                            }
+                          })()}
                         </div>
                       )}
                     </div>
