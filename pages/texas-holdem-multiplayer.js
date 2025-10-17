@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import TexasHoldemMultiplayerPage from '../game/mleo-texas-holdem-multiplayer';
-import TexasHoldemSupabasePage from '../game/mleo-texas-holdem-supabase';
+import TexasHoldemSupabasePage from '../game/mleo-texas-holdem-supabase-try';
 
 export default function TexasHoldemMultiplayerGamePage() {
   const [useSimpleVersion, setUseSimpleVersion] = useState(true);
