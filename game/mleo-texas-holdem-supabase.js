@@ -507,90 +507,68 @@ function TexasHoldemSupabasePage() {
     try {
       const deck = shuffleDeck(createDeck());
       
-      // Determine dealer position (first player is dealer)
-      const dealerIndex = 0;
+      // Rotate dealer each hand (persist on game)
+      const dealerIndex = (game.dealer_index ?? 0) % players.length;
       const smallBlindIndex = (dealerIndex + 1) % players.length;
       const bigBlindIndex = (dealerIndex + 2) % players.length;
       
-      // Update players with cards and blinds
-      const updatedPlayers = players.map((player, idx) => {
-        let bet = 0;
-        let chips = player.chips || STARTING_CHIPS;
-        
-        if (idx === smallBlindIndex) {
-          bet = SMALL_BLIND;
-          chips -= SMALL_BLIND;
-        } else if (idx === bigBlindIndex) {
-          bet = BIG_BLIND;
-          chips -= BIG_BLIND;
-        }
-        
-        return {
-          ...player,
-          cards: [deck[idx * 2], deck[idx * 2 + 1]],
-          bet: bet,
-          chips: chips,
-          status: PLAYER_STATUS.READY
-        };
+      // Deal 2 cards each
+      const updatedPlayers = players.map((p, idx) => {
+        const base = { ...p };
+        base.cards = [ deck[idx*2], deck[idx*2+1] ];
+        base.bet = 0;
+        base.status = PLAYER_STATUS.READY;
+        base.chips = Math.max(base.chips ?? STARTING_CHIPS, STARTING_CHIPS);
+        return base;
       });
 
-      // Deal community cards properly (5 separate cards for flop, turn, river)
-      const startIndex = players.length * 2; // After player cards
+      // Post blinds
+      updatedPlayers[smallBlindIndex].bet = Math.min(SMALL_BLIND, updatedPlayers[smallBlindIndex].chips);
+      updatedPlayers[smallBlindIndex].chips -= updatedPlayers[smallBlindIndex].bet;
+
+      updatedPlayers[bigBlindIndex].bet = Math.min(BIG_BLIND, updatedPlayers[bigBlindIndex].chips);
+      updatedPlayers[bigBlindIndex].chips -= updatedPlayers[bigBlindIndex].bet;
+
+      // Community with burns (don't store burns)
+      const start = players.length * 2;
       const communityCards = [
-        deck[startIndex + 1], // Flop card 1 (after burn)
-        deck[startIndex + 2], // Flop card 2
-        deck[startIndex + 3], // Flop card 3
-        deck[startIndex + 5], // Turn card (after burn)
-        deck[startIndex + 7]  // River card (after burn)
+        deck[start+1], deck[start+2], deck[start+3], // flop after burn
+        deck[start+5], // turn after burn
+        deck[start+7]  // river after burn
       ];
 
-      // Determine first action (UTG - Under The Gun)
-      let firstActionIndex = (bigBlindIndex + 1) % players.length;
-      if (players.length === 2) {
-        // Heads up: Small blind acts first
-        firstActionIndex = smallBlindIndex;
-      }
+      // First to act preflop (UTG). Heads-up: SB acts first preflop.
+      let firstToAct = (players.length === 2) ? smallBlindIndex : (bigBlindIndex + 1) % players.length;
 
-      // Update game in Supabase
-      const { error: gameError } = await supabase
-        .from(TABLES.GAMES)
-        .update({
-          status: GAME_STATUS.PLAYING,
-          pot: SMALL_BLIND + BIG_BLIND,
-          current_bet: BIG_BLIND,
-          current_player_index: firstActionIndex,
-          round: "pre-flop",
-          community_cards: communityCards,
-          community_visible: 0,
-          deck: deck
-        })
-        .eq("id", game.id);
+      // Initialize betting state
+      const pot0 = (updatedPlayers[smallBlindIndex].bet + updatedPlayers[bigBlindIndex].bet);
+      const currentBet = updatedPlayers[bigBlindIndex].bet; // usually BIG_BLIND
+      const lastRaiseTo = currentBet;  // amount to call
+      const lastAggressor = bigBlindIndex; // BB is considered last to act preflop
 
-      if (gameError) {
-        console.error("Error starting game:", gameError);
-        setError("Failed to start game");
-        return;
-      }
+      // Persist game
+      await supabase.from(TABLES.GAMES).update({
+        status: GAME_STATUS.PLAYING,
+        dealer_index: dealerIndex,
+        pot: pot0,
+        current_bet: currentBet,
+        last_raise_to: lastRaiseTo,
+        last_raiser_index: lastAggressor,
+        current_player_index: firstToAct,
+        round: "pre-flop",
+        community_cards: communityCards,
+        community_visible: 0,
+        deck: deck
+      }).eq("id", game.id);
 
-      // Update players in Supabase
-      for (const player of updatedPlayers) {
-        const { error: playerError } = await supabase
-          .from(TABLES.PLAYERS)
-          .update({
-            cards: player.cards,
-            bet: player.bet,
-            chips: player.chips,
-            status: player.status
-          })
-          .eq("id", player.id);
-
-        if (playerError) {
-          console.error("Error updating player:", playerError);
-        }
+      // Persist players
+      for (const p of updatedPlayers) {
+        await supabase.from(TABLES.PLAYERS)
+          .update({ cards: p.cards, bet: p.bet, chips: p.chips, status: p.status })
+          .eq("id", p.id);
       }
 
       setScreen("game");
-
     } catch (err) {
       console.error("Start game error:", err);
       setError("Failed to start game");
@@ -600,225 +578,131 @@ function TexasHoldemSupabasePage() {
   // Player action with advanced game logic
   const handlePlayerAction = async (action, amount = 0) => {
     if (!game || !playerId) return;
-    
-    const currentPlayer = players[currentPlayerIndex];
-    const myPlayer = players.find(p => p.id === playerId);
-    
-    if (!currentPlayer || currentPlayer.id !== playerId) {
-      console.log("Not my turn");
-      return;
-    }
-    
-    if (myPlayer.status === PLAYER_STATUS.FOLDED) {
-      console.log("Player is folded");
-      return;
-    }
-    
+
+    // Pull fresh snapshot from DB to avoid races
+    const { data: gNow } = await supabase.from(TABLES.GAMES).select("*").eq("id", game.id).single();
+    const { data: pNow } = await supabase.from(TABLES.PLAYERS).select("*").eq("game_id", game.id).order("position");
+
+    const curIdx = gNow.current_player_index ?? 0;
+    const pls = pNow || players;
+    const me = pls.find(p => p.id === playerId);
+    const cur = pls[curIdx];
+
+    if (!cur || cur.id !== playerId) return; // not my turn
+    if (me.status === PLAYER_STATUS.FOLDED || gNow.status !== GAME_STATUS.PLAYING) return;
+
     playSfx(clickSound.current);
     
     try {
-      // Calculate new bet and chips based on poker rules
-      let newBet = myPlayer.bet;
-      let newChips = myPlayer.chips;
-      let newStatus = myPlayer.status;
-      let actionAmount = 0;
-      
+      const active = pls.filter(p => p.status !== PLAYER_STATUS.FOLDED);
+      const toCall = Math.max(0, (gNow.current_bet ?? 0) - (me.bet ?? 0));
+
+      let newBet = me.bet ?? 0;
+      let newChips = me.chips ?? 0;
+      let newStatus = me.status;
+
       if (action === "fold") {
         newStatus = PLAYER_STATUS.FOLDED;
-      } else if (action === "call") {
-        const callAmount = game.current_bet - myPlayer.bet;
-        actionAmount = callAmount;
-        newBet = game.current_bet;
-        newChips = myPlayer.chips - callAmount;
       } else if (action === "check") {
-        // Check is only valid if no bet to call
-        if (game.current_bet > myPlayer.bet) {
-          console.log("Cannot check when there's a bet to call");
-          return;
-        }
+        if (toCall > 0) return; // illegal
+      } else if (action === "call") {
+        const pay = Math.min(toCall, newChips);
+        newBet += pay; newChips -= pay;
+        if (pay < toCall) newStatus = PLAYER_STATUS.ALL_IN;
       } else if (action === "raise") {
-        // Raise must be at least the size of the current bet
-        const minRaise = game.current_bet * 2 - myPlayer.bet;
-        const actualRaise = Math.max(minRaise, amount);
-        const raiseAmount = Math.min(actualRaise, myPlayer.chips);
-        
-        actionAmount = raiseAmount;
-        newBet = myPlayer.bet + raiseAmount;
-        newChips = myPlayer.chips - raiseAmount;
+        let raiseTo = Math.max((gNow.current_bet ?? 0) + BIG_BLIND, amount);
+        raiseTo = Math.min(raiseTo, newBet + newChips);
+        const put = raiseTo - newBet;
+        if (put <= 0) return;
+        newBet = raiseTo;
+        newChips -= put;
+        if (newChips === 0) newStatus = PLAYER_STATUS.ALL_IN;
       } else if (action === "allin") {
-        actionAmount = myPlayer.chips;
-        newBet = myPlayer.bet + myPlayer.chips;
-        newChips = 0;
+        const put = newChips;
+        newBet += put; newChips = 0;
         newStatus = PLAYER_STATUS.ALL_IN;
       }
 
       // Update player
-      const { error } = await supabase
-        .from(TABLES.PLAYERS)
-        .update({
-          status: newStatus,
-          bet: newBet,
-          chips: newChips
-        })
+      await supabase.from(TABLES.PLAYERS)
+        .update({ status: newStatus, bet: newBet, chips: newChips })
         .eq("id", playerId);
 
-      if (error) {
-        console.error("Error updating player action:", error);
-        return;
+      // Recompute pot/current bet
+      const freshPlayers = (await supabase.from(TABLES.PLAYERS).select("*").eq("game_id", game.id)).data || pls;
+      const pot = freshPlayers.reduce((s,p)=> s + (p.bet||0), 0);
+      const currentBet = Math.max(...freshPlayers.map(p=>p.bet||0), 0);
+
+      // Detect last aggressor
+      let lastRaiserIndex = gNow.last_raiser_index ?? curIdx;
+      if ( (action === "raise") || (action === "allin" && newBet > (gNow.current_bet||0)) ) {
+        lastRaiserIndex = curIdx;
       }
 
-      // Calculate new pot and current bet
-      const betIncrease = newBet - myPlayer.bet;
-
-      // Set game message
-      const actionMessages = {
-        "fold": `${myPlayer.name} folded`,
-        "check": `${myPlayer.name} checked`,
-        "call": `${myPlayer.name} called ${actionAmount}`,
-        "raise": `${myPlayer.name} raised to ${newBet}`,
-        "allin": `${myPlayer.name} went all in with ${actionAmount}!`
-      };
-      setGameMessage(actionMessages[action] || `${myPlayer.name} made a move`);
-      const newPot = game.pot + betIncrease;
-      const newCurrentBet = Math.max(game.current_bet, newBet);
-
-      // Stop current timer
+      // Stop timer
       stopActionTimer();
 
-      // Move to next player
-      let nextIndex = (currentPlayerIndex + 1) % players.length;
-      while (players[nextIndex]?.status === PLAYER_STATUS.FOLDED) {
-        nextIndex = (nextIndex + 1) % players.length;
+      // Advance to next active
+      const canAct = (p) => p.status !== PLAYER_STATUS.FOLDED && p.status !== PLAYER_STATUS.ALL_IN;
+      let nextIdx = (curIdx + 1) % freshPlayers.length;
+      while (!canAct(freshPlayers[nextIdx])) {
+        nextIdx = (nextIdx + 1) % freshPlayers.length;
+        if (nextIdx === curIdx) break;
       }
-      
-      // Start timer for next player if it's their turn
-      if (nextIndex !== currentPlayerIndex) {
-        const nextPlayer = players[nextIndex];
-        if (nextPlayer && nextPlayer.id === playerId) {
-          startActionTimer(nextPlayer.id);
-        }
-      }
-      
-      console.log("Turn management:", {
-        currentPlayer: currentPlayerIndex,
-        nextPlayer: nextIndex,
-        action,
-        newBet,
-        newChips
-      });
 
-      // Check if betting round is complete
-      const activePlayers = players.filter(p => p.status !== PLAYER_STATUS.FOLDED);
-      
-      let updatedGame = {
-        pot: newPot,
-        current_bet: newCurrentBet,
-        current_player_index: nextIndex
-      };
+      // Betting-round completion
+      const activeCanAct = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED);
+      const everyoneMatched = activeCanAct.every(p => (p.status === PLAYER_STATUS.ALL_IN) || ((p.bet||0) === currentBet));
+      const bettingDone = everyoneMatched && (nextIdx === lastRaiserIndex);
 
-      // Check if game should end (only one active player left)
-      if (activePlayers.length === 1) {
-        console.log("Only one player left - ending game");
+      // Only 1 player left?
+      const notFolded = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED);
+      if (notFolded.length === 1) {
+        await supabase.from(TABLES.GAMES).update({
+          pot, current_bet: currentBet, current_player_index: nextIdx
+        }).eq("id", game.id);
         await determineWinner();
         return;
       }
 
-      // Check if all active players have bet the same amount OR are all-in
-      // This is crucial for proper betting round completion
-      const allPlayersBet = activePlayers.every(p => {
-        // Player has bet the current bet amount OR is all-in
-        return (p.bet === newCurrentBet) || (p.status === PLAYER_STATUS.ALL_IN);
-      });
+      if (bettingDone) {
+        const nextRound = getNextRound(gNow.round);
+        const newVisible = getCommunityVisible(nextRound);
 
-      // Check if betting round is complete
-      // This is the KEY to proper poker logic!
-      let bettingComplete = false;
-      
-      if (game.round === "pre-flop") {
-        // Pre-flop: Big Blind gets last action (unless they raised)
-        const dealerIndex = 0;
-        const bigBlindIndex = (dealerIndex + 2) % players.length;
-        
-        // If Big Blind raised, they don't get last action
-        const bigBlindPlayer = players[bigBlindIndex];
-        if (bigBlindPlayer && bigBlindPlayer.bet > BIG_BLIND) {
-          // Big Blind raised - action continues until it returns to them
-          bettingComplete = allPlayersBet && activePlayers.length > 1 && 
-            nextIndex === bigBlindIndex;
-        } else {
-          // Big Blind didn't raise - they get last action
-          bettingComplete = allPlayersBet && activePlayers.length > 1 && 
-            nextIndex === bigBlindIndex;
-        }
-      } else {
-        // Post-flop: Small Blind starts, action goes until everyone has acted
-        const dealerIndex = 0;
-        const smallBlindIndex = (dealerIndex + 1) % players.length;
-        
-        // Find first active player after dealer (Small Blind or next active)
-        let firstActiveAfterDealer = smallBlindIndex;
-        while (players[firstActiveAfterDealer]?.status === PLAYER_STATUS.FOLDED) {
-          firstActiveAfterDealer = (firstActiveAfterDealer + 1) % players.length;
-        }
-        
-        bettingComplete = allPlayersBet && activePlayers.length > 1 && 
-          nextIndex === firstActiveAfterDealer;
-      }
-      
-      if (bettingComplete) {
-        const nextRound = getNextRound(game.round);
-        const newCommunityVisible = getCommunityVisible(nextRound);
-        
-        // Determine starting player for next round
-        let nextRoundStartIndex = 0;
-        if (nextRound !== "pre-flop") {
-          // In post-flop rounds, Small Blind starts (or first active player)
-          const dealerIndex = 0;
-          const smallBlindIndex = (dealerIndex + 1) % players.length;
-          nextRoundStartIndex = smallBlindIndex;
-          
-          // Find first active player if Small Blind is folded
-          while (players[nextRoundStartIndex]?.status === PLAYER_STATUS.FOLDED) {
-            nextRoundStartIndex = (nextRoundStartIndex + 1) % players.length;
+        // Reset street bets
+        for (const p of freshPlayers) {
+          if (p.status !== PLAYER_STATUS.FOLDED) {
+            await supabase.from(TABLES.PLAYERS).update({ bet: 0 }).eq("id", p.id);
           }
         }
-        
-        updatedGame = {
-          ...updatedGame,
-          round: nextRound,
-          community_visible: newCommunityVisible,
-          current_bet: 0,
-          current_player_index: nextRoundStartIndex
-        };
 
-        // Reset all player bets for next round
-        for (const player of activePlayers) {
-          await supabase
-            .from(TABLES.PLAYERS)
-            .update({ bet: 0 })
-            .eq("id", player.id);
+        // Pick first to act postflop
+        let dealerIndex = gNow.dealer_index ?? 0;
+        let startIdx = (dealerIndex + 1) % freshPlayers.length;
+        while (freshPlayers[startIdx].status === PLAYER_STATUS.FOLDED) {
+          startIdx = (startIdx + 1) % freshPlayers.length;
         }
 
-        // Update players state locally
-        setPlayers(prev => prev.map(p => ({
-          ...p,
-          bet: 0
-        })));
+        const updates = {
+          pot, 
+          current_bet: 0,
+          last_raise_to: 0,
+          last_raiser_index: startIdx,
+          round: nextRound,
+          community_visible: newVisible,
+          current_player_index: startIdx,
+        };
 
-        // Check for game end
+        await supabase.from(TABLES.GAMES).update(updates).eq("id", game.id);
+
         if (nextRound === "showdown") {
           await determineWinner();
         }
-      }
-
-      // Update game state
-      const { error: gameError } = await supabase
-        .from(TABLES.GAMES)
-        .update(updatedGame)
-        .eq("id", game.id);
-
-      if (gameError) {
-        console.error("Error updating game state:", gameError);
+      } else {
+        // Keep betting
+        await supabase.from(TABLES.GAMES).update({
+          pot, current_bet: currentBet, last_raiser_index: lastRaiserIndex, current_player_index: nextIdx
+        }).eq("id", game.id);
       }
 
     } catch (err) {
@@ -845,231 +729,242 @@ function TexasHoldemSupabasePage() {
     return visible[round] || 0;
   };
 
-  // Evaluate poker hand
-  const evaluateHand = (cards) => {
-    if (!cards || cards.length < 5) return { rank: 0, highCard: 0, name: "Invalid" };
-    
-    // Convert cards to numbers for easier comparison
-    const cardValues = cards.map(card => {
-      const value = card.value;
-      if (value === 'A') return 14;
-      if (value === 'K') return 13;
-      if (value === 'Q') return 12;
-      if (value === 'J') return 11;
-      return parseInt(value);
-    });
-    
-    const suits = cards.map(card => card.suit);
-    
-    // Count occurrences of each value
-    const valueCounts = {};
-    cardValues.forEach(value => {
-      valueCounts[value] = (valueCounts[value] || 0) + 1;
-    });
-    
-    const counts = Object.values(valueCounts).sort((a, b) => b - a);
-    const values = Object.keys(valueCounts).map(Number).sort((a, b) => b - a);
-    
-    // Check for straight flush
-    if (isFlush(suits) && isStraight(cardValues)) {
-      return { rank: 9, highCard: Math.max(...cardValues), name: "Straight Flush" };
-    }
-    
-    // Check for four of a kind
-    if (counts[0] === 4) {
-      return { rank: 8, highCard: values[0], name: "Four of a Kind" };
-    }
-    
-    // Check for full house
-    if (counts[0] === 3 && counts[1] === 2) {
-      return { rank: 7, highCard: values[0], name: "Full House" };
-    }
-    
-    // Check for flush
-    if (isFlush(suits)) {
-      return { rank: 6, highCard: Math.max(...cardValues), name: "Flush" };
-    }
-    
-    // Check for straight
-    if (isStraight(cardValues)) {
-      return { rank: 5, highCard: Math.max(...cardValues), name: "Straight" };
-    }
-    
-    // Check for three of a kind
-    if (counts[0] === 3) {
-      return { rank: 4, highCard: values[0], name: "Three of a Kind" };
-    }
-    
-    // Check for two pair
-    if (counts[0] === 2 && counts[1] === 2) {
-      return { rank: 3, highCard: Math.max(values[0], values[1]), name: "Two Pair" };
-    }
-    
-    // Check for pair
-    if (counts[0] === 2) {
-      return { rank: 2, highCard: values[0], name: "Pair" };
-    }
-    
-    // High card
-    return { rank: 1, highCard: Math.max(...cardValues), name: "High Card" };
+  // ===== Poker Hand Evaluation (7->best5) =====
+  const RANKS_ORDER = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
+
+  const normalizeCards = (cards) => {
+    return cards.map(c => ({ r: RANKS_ORDER[c.value], v: c.value, s: c.suit }))
+                .sort((a,b)=> b.r - a.r);
   };
 
-  // Check if cards form a flush
-  const isFlush = (suits) => {
-    return suits.every(suit => suit === suits[0]);
+  const uniqueRanksDesc = (rs) => {
+    const seen = new Set(); const out = [];
+    for (const x of rs) if (!seen.has(x)) { seen.add(x); out.push(x); }
+    return out;
   };
 
-  // Check if cards form a straight
-  const isStraight = (values) => {
-    const sorted = [...values].sort((a, b) => a - b);
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i] - sorted[i-1] !== 1) {
-        // Check for A-2-3-4-5 straight
-        if (sorted[0] === 2 && sorted[1] === 3 && sorted[2] === 4 && sorted[3] === 5 && sorted[4] === 14) {
-          return true;
-        }
-        return false;
+  const findFlush = (cards7) => {
+    const bySuit = new Map();
+    for (const c of cards7) {
+      const arr = bySuit.get(c.s) || [];
+      arr.push(c);
+      bySuit.set(c.s, arr);
+    }
+    for (const arr of bySuit.values()) {
+      if (arr.length >= 5) {
+        return arr.sort((a,b)=> b.r - a.r).slice(0,5);
       }
     }
-    return true;
+    return null;
+  };
+
+  const findStraightFromRanks = (descRanks) => {
+    const ranks = [...descRanks];
+    if (ranks.includes(14)) ranks.push(1);
+    let run = [ranks[0]];
+    for (let i=1;i<ranks.length;i++) {
+      const prev = ranks[i-1], cur = ranks[i];
+      if (cur === prev) continue;
+      if (cur === prev - 1) {
+        run.push(cur);
+      } else {
+        run = [cur];
+      }
+      if (run.length >= 5) {
+        const top = Math.max(...run.slice(-5));
+        return top === 5 && run.slice(-5).includes(14) ? 5 : Math.max(...run.slice(-5));
+      }
+    }
+    return null;
+  };
+
+  const pickStraightHand = (cards7) => {
+    const uniqueDesc = uniqueRanksDesc(cards7.map(c=>c.r));
+    const high = findStraightFromRanks(uniqueDesc);
+    if (!high) return null;
+    const need = [];
+    const seq = (high === 5) ? [5,4,3,2,14] : [high, high-1, high-2, high-3, high-4];
+    for (const r of seq) {
+      const pick = cards7.find(c => c.r === r && !need.includes(c));
+      if (!pick) return null;
+      need.push(pick);
+    }
+    return need.sort((a,b)=> b.r - a.r);
+  };
+
+  const handRankTuple = (best5) => {
+    if (!best5 || best5.length !== 5) return [0]; // Invalid hand
+    
+    // Check if cards have the expected format
+    if (!best5[0] || typeof best5[0].r === 'undefined') {
+      console.error("Invalid card format in handRankTuple:", best5);
+      return [0];
+    }
+    
+    const counts = new Map();
+    for (const c of best5) {
+      if (c && typeof c.r !== 'undefined') {
+        counts.set(c.r, (counts.get(c.r)||0)+1);
+      }
+    }
+    const entries = [...counts.entries()].sort((a,b)=> (b[1]-a[1]) || (b[0]-a[0]));
+    const ranksDesc = best5.map(c=>c.r).sort((a,b)=> b-a);
+
+    const isFlush5 = best5.every(c => c.s === best5[0].s);
+    const uniq = uniqueRanksDesc(ranksDesc);
+    const isStraight5 = findStraightFromRanks(uniq) !== null;
+
+    if (isFlush5 && isStraight5) {
+      const high = (best5.find(c=>c.r===14) && best5.some(c=>c.r===5)) ? 5 : Math.max(...best5.map(c=>c.r));
+      return [9, high];
+    }
+    if (entries[0][1] === 4) {
+      const four = entries[0][0];
+      const kicker = Math.max(...ranksDesc.filter(r=>r!==four));
+      return [8, four, kicker];
+    }
+    if (entries[0][1] === 3 && entries[1] && entries[1][1] === 2) {
+      return [7, entries[0][0], entries[1][0]];
+    }
+    if (isFlush5) {
+      return [6, ...ranksDesc];
+    }
+    if (isStraight5) {
+      const high = (best5.find(c=>c.r===14) && best5.some(c=>c.r===5)) ? 5 : Math.max(...best5.map(c=>c.r));
+      return [5, high];
+    }
+    if (entries[0][1] === 3) {
+      const trips = entries[0][0];
+      const kickers = ranksDesc.filter(r=>r!==trips).slice(0,2);
+      return [4, trips, ...kickers];
+    }
+    if (entries[0][1] === 2 && entries[1] && entries[1][1] === 2) {
+      const highPair = Math.max(entries[0][0], entries[1][0]);
+      const lowPair  = Math.min(entries[0][0], entries[1][0]);
+      const kicker = Math.max(...ranksDesc.filter(r=>r!==highPair && r!==lowPair));
+      return [3, highPair, lowPair, kicker];
+    }
+    if (entries[0][1] === 2) {
+      const pair = entries[0][0];
+      const kickers = ranksDesc.filter(r=>r!==pair).slice(0,3);
+      return [2, pair, ...kickers];
+    }
+    return [1, ...ranksDesc];
+  };
+
+  const best5Of7 = (cards7) => {
+    if (!cards7 || cards7.length < 5) {
+      return { best5: [], tuple: [0] };
+    }
+
+    const flush5 = findFlush(cards7);
+    const straight5 = pickStraightHand(cards7);
+
+    let candidateHands = [];
+    if (flush5) {
+      const suited = flush5;
+      const sf = pickStraightHand(suited);
+      if (sf) candidateHands.push(sf);
+      candidateHands.push(flush5);
+    }
+    if (straight5) candidateHands.push(straight5);
+
+    if (candidateHands.length === 0 || candidateHands.some(h => handRankTuple(h)[0] < 9)) {
+      const c = cards7;
+      for (let a=0;a<3;a++) for (let b=a+1;b<4;b++) for (let d=b+1;d<5;d++) for (let e=d+1;e<6;e++) for (let f=e+1;f<7;f++) {
+        candidateHands.push([c[a],c[b],c[d],c[e],c[f]]);
+      }
+    }
+
+    let best = null, bestRank = null;
+    for (const h of candidateHands) {
+      if (h && h.length === 5) {
+        const t = handRankTuple(h);
+        if (!best || compareRankTuple(t, bestRank) > 0) {
+          best = h; bestRank = t;
+        }
+      }
+    }
+    
+    // Fallback: return first 5 cards if no valid hand found
+    if (!best) {
+      best = cards7.slice(0, 5);
+      bestRank = handRankTuple(best);
+    }
+    
+    return { best5: best, tuple: bestRank };
+  };
+
+  const compareRankTuple = (a,b) => {
+    for (let i=0;i<Math.max(a.length,b.length);i++){
+      const x = a[i] ?? -1, y = b[i] ?? -1;
+      if (x!==y) return x>y?1:-1;
+    }
+    return 0;
+  };
+
+  // Public API used by UI
+  const evaluateHand = (cards) => {
+    if (!cards || cards.length < 5) return { rank: 0, score: [0], name: "Invalid", best5: [] };
+    
+    try {
+      const norm = normalizeCards(cards);
+      const { best5, tuple } = best5Of7(norm);
+      
+      if (!best5 || best5.length !== 5) {
+        console.error("Invalid best5 returned:", best5);
+        return { rank: 0, score: [0], name: "Invalid", best5: [] };
+      }
+      
+      const names = {9:'Straight Flush',8:'Four of a Kind',7:'Full House',6:'Flush',5:'Straight',4:'Three of a Kind',3:'Two Pair',2:'Pair',1:'High Card'};
+      return { 
+        rank: tuple[0], 
+        score: tuple, 
+        name: names[tuple[0]] || "Unknown", 
+        best5: best5.map(c=>({value:Object.keys(RANKS_ORDER).find(k=>RANKS_ORDER[k]===c.r), suit:c.s})) 
+      };
+    } catch (error) {
+      console.error("Error in evaluateHand:", error, cards);
+      return { rank: 0, score: [0], name: "Error", best5: [] };
+    }
   };
 
   // Determine winner
   const determineWinner = async () => {
     try {
-      // Stop any running timers
       stopActionTimer();
+
+      const { data: gNow } = await supabase.from(TABLES.GAMES).select("*").eq("id", game.id).single();
+      const { data: pls } = await supabase.from(TABLES.PLAYERS).select("*").eq("game_id", game.id).order("position");
+
+      const active = pls.filter(p => p.status !== PLAYER_STATUS.FOLDED);
       
-      const activePlayers = players.filter(p => p.status !== PLAYER_STATUS.FOLDED);
-      console.log("Determining winner. Active players:", activePlayers.length);
-      
-      if (activePlayers.length === 1) {
-        // Only one player left - they win
-        const winner = activePlayers[0];
-        console.log("Winner by fold:", winner.name);
-        
-        // Update winner's chips
-        await supabase
-          .from(TABLES.PLAYERS)
-          .update({ chips: winner.chips + game.pot })
-          .eq("id", winner.id);
-          
-        // Show winner message
-        setGameMessage(`🎉 ${winner.name} wins by fold! Pot: ${game.pot}`);
-        
-        // Update game status to finished first
-        await supabase
-          .from(TABLES.GAMES)
-          .update({
-            status: GAME_STATUS.FINISHED,
-            pot: game.pot,
-            current_bet: 0,
-            current_player_index: 0,
-            round: "finished"
-          })
-          .eq("id", game.id);
-        
-        // Reset game after 5 seconds
-        setTimeout(async () => {
-          await supabase
-            .from(TABLES.GAMES)
-            .update({
-              status: GAME_STATUS.WAITING,
-              pot: 0,
-              current_bet: 0,
-              current_player_index: 0,
-              round: "pre-flop",
-              community_visible: 0,
-              community_cards: []
-            })
-            .eq("id", game.id);
-            
-          // Reset all players
-          for (const player of players) {
-            await supabase
-              .from(TABLES.PLAYERS)
-              .update({ 
-                cards: [],
-                bet: 0,
-                status: PLAYER_STATUS.READY,
-                chips: Math.max(player.chips, 1000) // Ensure minimum chips
-              })
-              .eq("id", player.id);
-          }
-          
-          setScreen("lobby");
-          setGameMessage("");
-        }, 5000);
-        
-      } else if (activePlayers.length > 1) {
-        // Evaluate hands and determine winner
-        const hands = activePlayers.map(player => ({
-          player,
-          hand: evaluateHand([...player.cards, ...game.community_cards.slice(0, game.community_visible)])
-        }));
-        
-        hands.sort((a, b) => {
-          if (a.hand.rank !== b.hand.rank) return b.hand.rank - a.hand.rank;
-          return b.hand.highCard - a.hand.highCard;
-        });
-        
-        const winner = hands[0].player;
-        const winningHand = hands[0].hand;
-        console.log("Winner by hand:", winner.name, winningHand);
-        
-        // Update winner's chips
-        await supabase
-          .from(TABLES.PLAYERS)
-          .update({ chips: winner.chips + game.pot })
-          .eq("id", winner.id);
-          
-        // Show winner message
-        setGameMessage(`🎉 ${winner.name} wins with ${winningHand.name}! Pot: ${game.pot}`);
-        
-        // Update game status to finished first
-        await supabase
-          .from(TABLES.GAMES)
-          .update({
-            status: GAME_STATUS.FINISHED,
-            pot: game.pot,
-            current_bet: 0,
-            current_player_index: 0,
-            round: "finished"
-          })
-          .eq("id", game.id);
-        
-        // Reset game after 7 seconds (longer for showdown)
-        setTimeout(async () => {
-          await supabase
-            .from(TABLES.GAMES)
-            .update({
-              status: GAME_STATUS.WAITING,
-              pot: 0,
-              current_bet: 0,
-              current_player_index: 0,
-              round: "pre-flop",
-              community_visible: 0,
-              community_cards: []
-            })
-            .eq("id", game.id);
-            
-          // Reset all players
-          for (const player of players) {
-            await supabase
-              .from(TABLES.PLAYERS)
-              .update({ 
-                cards: [],
-                bet: 0,
-                status: PLAYER_STATUS.READY,
-                chips: Math.max(player.chips, 1000) // Ensure minimum chips
-              })
-              .eq("id", player.id);
-          }
-          
-          setScreen("lobby");
-          setGameMessage("");
-        }, 7000);
+      if (active.length === 1) {
+        const w = active[0];
+        await supabase.from(TABLES.PLAYERS).update({ chips: (w.chips||0) + (gNow.pot||0) }).eq("id", w.id);
+        setGameMessage(`🎉 ${w.name} wins by fold! Pot: ${gNow.pot||0}`);
+        await supabase.from(TABLES.GAMES).update({ status: GAME_STATUS.FINISHED, round: "finished", current_bet: 0 }).eq("id", game.id);
+        return;
       }
+
+      // Showdown: evaluate best5-of-7
+      const board5 = (gNow.community_cards||[]).slice(0,5);
+      const ranked = active.map(p => {
+        const all = [...(p.cards||[]), ...board5];
+        const evalRes = evaluateHand(all);
+        return { p, evalRes };
+      }).sort((a,b)=> compareRankTuple(b.evalRes.score, a.evalRes.score));
+
+      const winner = ranked[0];
+      await supabase.from(TABLES.PLAYERS).update({ chips: (winner.p.chips||0) + (gNow.pot||0) }).eq("id", winner.p.id);
+
+      // Reveal cards
+      for (const r of ranked) {
+        await supabase.from(TABLES.PLAYERS).update({ revealed: true }).eq("id", r.p.id);
+      }
+
+      setGameMessage(`🎉 ${winner.p.name} wins with ${winner.evalRes.name}! Pot: ${gNow.pot||0}`);
+      await supabase.from(TABLES.GAMES).update({ status: GAME_STATUS.FINISHED, round: "finished", current_bet: 0 }).eq("id", game.id);
     } catch (err) {
       console.error("Error determining winner:", err);
     }
