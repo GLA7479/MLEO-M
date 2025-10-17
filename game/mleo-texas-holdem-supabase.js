@@ -159,6 +159,9 @@ function TexasHoldemSupabasePage() {
   const [gameMessage, setGameMessage] = useState("");
   const [actionTimer, setActionTimer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
+  
+  // Winner modal
+  const [winnerModal, setWinnerModal] = useState({ open: false, text: "", hand: "", pot: 0 });
 
   const playSfx = (sound) => { 
     if (sfxMuted || !sound) return; 
@@ -444,15 +447,33 @@ function TexasHoldemSupabasePage() {
         { event: '*', schema: 'public', table: TABLES.GAMES, filter: `id=eq.${gameId}` },
         (payload) => {
           console.log("Game updated:", payload);
-          setGame(payload.new);
-          setCurrentPlayerIndex(payload.new.current_player_index || 0);
-          
-                if (payload.new.status === GAME_STATUS.PLAYING) {
-                  setScreen("game");
-                } else if (payload.new.status === GAME_STATUS.FINISHED) {
-                  // Game finished - stay on game screen to show winner
-                  console.log("Game finished, showing winner");
-                }
+          const g = payload.new;
+          setGame(g);
+          setCurrentPlayerIndex(g.current_player_index ?? 0);
+
+          // אם עברנו ל־PLAYING — הצג את מסך המשחק
+          if (g.status === GAME_STATUS.PLAYING) {
+            setScreen("game");
+          }
+
+          // אם היד הסתיימה — עצור טיימרים, הצג מודאל, הסתר כפתורים, ואתחל יד חדשה אם אני Host
+          if (g.status === GAME_STATUS.FINISHED || g.round === "finished") {
+            stopActionTimer();
+
+            // נבנה טקסט תוצאה (מתבסס על gameMessage הקיים אם יש)
+            const text = (g.result_text || g.message || g.game_message || "Hand finished");
+            const hand = g.result_hand || ""; // אופציונלי אם תשמור
+            const pot  = g.pot || 0;
+
+            setWinnerModal({ open: true, text, hand, pot });
+
+            // אצל ה־Host — הפעל יד חדשה אוטומטית אחרי 6–7 שניות
+            if (isHost) {
+              setTimeout(() => {
+                startNewGame().catch(()=>{});
+              }, 6500);
+            }
+          }
         }
       )
       .on('postgres_changes', 
@@ -568,6 +589,12 @@ function TexasHoldemSupabasePage() {
           .eq("id", p.id);
       }
 
+      // Update dealer for next hand
+      const nextDealer = (dealerIndex + 1) % players.length;
+      await supabase.from(TABLES.GAMES)
+        .update({ dealer_index: nextDealer })
+        .eq("id", game.id);
+
       setScreen("game");
     } catch (err) {
       console.error("Start game error:", err);
@@ -578,6 +605,8 @@ function TexasHoldemSupabasePage() {
   // Player action with advanced game logic
   const handlePlayerAction = async (action, amount = 0) => {
     if (!game || !playerId) return;
+    // block when not in active betting
+    if (game.status !== GAME_STATUS.PLAYING || game.round === "finished") return;
 
     // Pull fresh snapshot from DB to avoid races
     const { data: gNow } = await supabase.from(TABLES.GAMES).select("*").eq("id", game.id).single();
@@ -943,7 +972,17 @@ function TexasHoldemSupabasePage() {
         const w = active[0];
         await supabase.from(TABLES.PLAYERS).update({ chips: (w.chips||0) + (gNow.pot||0) }).eq("id", w.id);
         setGameMessage(`🎉 ${w.name} wins by fold! Pot: ${gNow.pot||0}`);
-        await supabase.from(TABLES.GAMES).update({ status: GAME_STATUS.FINISHED, round: "finished", current_bet: 0 }).eq("id", game.id);
+        await supabase
+          .from(TABLES.GAMES)
+          .update({
+            status: GAME_STATUS.FINISHED,
+            round: "finished",
+            current_bet: 0,
+            current_player_index: null,   // אין עוד תור
+            community_visible: 5,         // חשוף לכולם (לא חובה)
+            result_text: `🎉 ${w.name} wins by fold! Pot: ${gNow.pot||0}`,
+          })
+          .eq("id", game.id);
         return;
       }
 
@@ -964,7 +1003,18 @@ function TexasHoldemSupabasePage() {
       }
 
       setGameMessage(`🎉 ${winner.p.name} wins with ${winner.evalRes.name}! Pot: ${gNow.pot||0}`);
-      await supabase.from(TABLES.GAMES).update({ status: GAME_STATUS.FINISHED, round: "finished", current_bet: 0 }).eq("id", game.id);
+      await supabase
+        .from(TABLES.GAMES)
+        .update({
+          status: GAME_STATUS.FINISHED,
+          round: "finished",
+          current_bet: 0,
+          current_player_index: null,   // אין עוד תור
+          community_visible: 5,
+          result_text: `🎉 ${winner.p.name} wins with ${winner.evalRes.name}! Pot: ${gNow.pot||0}`,
+          result_hand: winner.evalRes.name
+        })
+        .eq("id", game.id);
     } catch (err) {
       console.error("Error determining winner:", err);
     }
@@ -1444,6 +1494,27 @@ function TexasHoldemSupabasePage() {
                     Start New Game
                   </button>
                 )}
+              </div>
+            )}
+
+            {/* Winner Modal */}
+            {winnerModal.open && (
+              <div className="fixed inset-0 z-[11000] bg-black/70 flex items-center justify-center p-4">
+                <div className="bg-zinc-900 text-white w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center">
+                  <div className="text-2xl font-extrabold mb-2">🎉 Hand Result</div>
+                  <div className="text-emerald-300 font-semibold">{winnerModal.text}</div>
+                  {winnerModal.hand && <div className="text-white/70 text-sm mt-1">{winnerModal.hand}</div>}
+                  {winnerModal.pot > 0 && <div className="text-amber-300 mt-2">Pot: {fmt(winnerModal.pot)}</div>}
+                  <div className="text-xs text-white/50 mt-3">
+                    {isHost ? "Starting next hand..." : "Waiting for host to start next hand..."}
+                  </div>
+                  <button
+                    onClick={() => setWinnerModal(m => ({...m, open:false}))}
+                    className="mt-4 w-full py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold"
+                  >
+                    OK
+                  </button>
+                </div>
               </div>
             )}
           </div>
