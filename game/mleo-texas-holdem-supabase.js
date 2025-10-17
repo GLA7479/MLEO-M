@@ -39,8 +39,10 @@ function useIOSViewportFix() {
 // Simple constants
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
-const SMALL_BLIND = 50;
-const BIG_BLIND = 100;
+const SMALL_BLIND = 25;
+const BIG_BLIND = 50;
+const STARTING_CHIPS = 1000;
+const BETTING_TIME_LIMIT = 30000; // 30 seconds per action
 
 // Simple utility functions
 function safeRead(key, fallback = {}) { 
@@ -155,6 +157,8 @@ function TexasHoldemSupabasePage() {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [sfxMuted, setSfxMuted] = useState(false);
   const [gameMessage, setGameMessage] = useState("");
+  const [actionTimer, setActionTimer] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(0);
 
   const playSfx = (sound) => { 
     if (sfxMuted || !sound) return; 
@@ -162,6 +166,38 @@ function TexasHoldemSupabasePage() {
       sound.currentTime = 0; 
       sound.play().catch(() => {}); 
     } catch {} 
+  };
+
+  // Start action timer
+  const startActionTimer = (playerId) => {
+    if (actionTimer) {
+      clearInterval(actionTimer);
+    }
+    
+    setTimeLeft(BETTING_TIME_LIMIT / 1000);
+    
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          // Auto-fold if time runs out
+          handlePlayerAction("fold");
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    setActionTimer(timer);
+  };
+
+  // Stop action timer
+  const stopActionTimer = () => {
+    if (actionTimer) {
+      clearInterval(actionTimer);
+      setActionTimer(null);
+    }
+    setTimeLeft(0);
   };
 
   useEffect(() => {
@@ -412,7 +448,7 @@ function TexasHoldemSupabasePage() {
       });
   };
 
-  // Start game
+  // Start game with proper poker logic
   const handleStartGame = async () => {
     if (!isHost || !game) return;
     if (players.length < 2) {
@@ -425,22 +461,48 @@ function TexasHoldemSupabasePage() {
     try {
       const deck = shuffleDeck(createDeck());
       
+      // Determine dealer position (first player is dealer)
+      const dealerIndex = 0;
+      const smallBlindIndex = (dealerIndex + 1) % players.length;
+      const bigBlindIndex = (dealerIndex + 2) % players.length;
+      
       // Update players with cards and blinds
-      const updatedPlayers = players.map((player, idx) => ({
-        ...player,
-        cards: [deck[idx * 2], deck[idx * 2 + 1]],
-        bet: idx === 0 ? SMALL_BLIND : idx === 1 ? BIG_BLIND : 0,
-        chips: 10000 - (idx === 0 ? SMALL_BLIND : idx === 1 ? BIG_BLIND : 0),
-        status: PLAYER_STATUS.READY
-      }));
+      const updatedPlayers = players.map((player, idx) => {
+        let bet = 0;
+        let chips = player.chips || STARTING_CHIPS;
+        
+        if (idx === smallBlindIndex) {
+          bet = SMALL_BLIND;
+          chips -= SMALL_BLIND;
+        } else if (idx === bigBlindIndex) {
+          bet = BIG_BLIND;
+          chips -= BIG_BLIND;
+        }
+        
+        return {
+          ...player,
+          cards: [deck[idx * 2], deck[idx * 2 + 1]],
+          bet: bet,
+          chips: chips,
+          status: PLAYER_STATUS.READY
+        };
+      });
 
+      // Deal community cards (burn one card before flop)
       const communityCards = [
-        deck[players.length * 2],
-        deck[players.length * 2 + 1],
-        deck[players.length * 2 + 2],
-        deck[players.length * 2 + 3],
-        deck[players.length * 2 + 4]
+        deck[players.length * 2 + 1], // Burn first card
+        deck[players.length * 2 + 2], // Flop 1
+        deck[players.length * 2 + 3], // Flop 2
+        deck[players.length * 2 + 4], // Flop 3
+        deck[players.length * 2 + 5]  // Turn (will be dealt later)
       ];
+
+      // Determine first action (UTG - Under The Gun)
+      let firstActionIndex = (bigBlindIndex + 1) % players.length;
+      if (players.length === 2) {
+        // Heads up: Small blind acts first
+        firstActionIndex = smallBlindIndex;
+      }
 
       // Update game in Supabase
       const { error: gameError } = await supabase
@@ -449,7 +511,7 @@ function TexasHoldemSupabasePage() {
           status: GAME_STATUS.PLAYING,
           pot: SMALL_BLIND + BIG_BLIND,
           current_bet: BIG_BLIND,
-          current_player_index: 2 >= players.length ? 0 : 2,
+          current_player_index: firstActionIndex,
           round: "pre-flop",
           community_cards: communityCards,
           community_visible: 0,
@@ -508,24 +570,36 @@ function TexasHoldemSupabasePage() {
     playSfx(clickSound.current);
     
     try {
-      // Calculate new bet and chips
+      // Calculate new bet and chips based on poker rules
       let newBet = myPlayer.bet;
       let newChips = myPlayer.chips;
       let newStatus = myPlayer.status;
+      let actionAmount = 0;
       
       if (action === "fold") {
         newStatus = PLAYER_STATUS.FOLDED;
       } else if (action === "call") {
         const callAmount = game.current_bet - myPlayer.bet;
+        actionAmount = callAmount;
         newBet = game.current_bet;
         newChips = myPlayer.chips - callAmount;
       } else if (action === "check") {
-        // No change needed for check
+        // Check is only valid if no bet to call
+        if (game.current_bet > myPlayer.bet) {
+          console.log("Cannot check when there's a bet to call");
+          return;
+        }
       } else if (action === "raise") {
-        const raiseAmount = Math.min(amount, myPlayer.chips);
+        // Raise must be at least the size of the current bet
+        const minRaise = game.current_bet * 2 - myPlayer.bet;
+        const actualRaise = Math.max(minRaise, amount);
+        const raiseAmount = Math.min(actualRaise, myPlayer.chips);
+        
+        actionAmount = raiseAmount;
         newBet = myPlayer.bet + raiseAmount;
         newChips = myPlayer.chips - raiseAmount;
       } else if (action === "allin") {
+        actionAmount = myPlayer.chips;
         newBet = myPlayer.bet + myPlayer.chips;
         newChips = 0;
         newStatus = PLAYER_STATUS.ALL_IN;
@@ -553,18 +627,29 @@ function TexasHoldemSupabasePage() {
       const actionMessages = {
         "fold": `${myPlayer.name} folded`,
         "check": `${myPlayer.name} checked`,
-        "call": `${myPlayer.name} called ${betIncrease}`,
-        "raise": `${myPlayer.name} raised by ${amount}`,
-        "allin": `${myPlayer.name} went all in!`
+        "call": `${myPlayer.name} called ${actionAmount}`,
+        "raise": `${myPlayer.name} raised to ${newBet}`,
+        "allin": `${myPlayer.name} went all in with ${actionAmount}!`
       };
       setGameMessage(actionMessages[action] || `${myPlayer.name} made a move`);
       const newPot = game.pot + betIncrease;
       const newCurrentBet = Math.max(game.current_bet, newBet);
 
+      // Stop current timer
+      stopActionTimer();
+
       // Move to next player
       let nextIndex = (currentPlayerIndex + 1) % players.length;
       while (players[nextIndex]?.status === PLAYER_STATUS.FOLDED) {
         nextIndex = (nextIndex + 1) % players.length;
+      }
+      
+      // Start timer for next player if it's their turn
+      if (nextIndex !== currentPlayerIndex) {
+        const nextPlayer = players[nextIndex];
+        if (nextPlayer && nextPlayer.id === playerId) {
+          startActionTimer(nextPlayer.id);
+        }
       }
       
       console.log("Turn management:", {
@@ -1196,8 +1281,11 @@ function TexasHoldemSupabasePage() {
 
           <div className="relative h-full flex flex-col items-center px-2 py-12">
             <div className="text-center mb-2">
-              <div className="text-xs text-white/60">Room: {roomCode} • Round: {game?.round}</div>
+              <div className="text-xs text-white/60">Room: {roomCode} • Round: {game?.round?.toUpperCase()}</div>
               <div className="text-2xl font-bold text-amber-400">POT: {fmt(pot)}</div>
+              <div className="text-xs text-white/60 mt-1">
+                Blinds: {SMALL_BLIND}/{BIG_BLIND} • Current Bet: {fmt(game?.current_bet || 0)}
+              </div>
               {gameMessage && (
                 <div className={`text-sm mt-2 px-3 py-2 rounded text-center ${
                   game?.status === GAME_STATUS.FINISHED 
@@ -1236,14 +1324,25 @@ function TexasHoldemSupabasePage() {
             <div className="w-full max-w-lg space-y-1 mb-2 flex-1 overflow-y-auto">
               {players.map((player, idx) => {
                 const isMe = player.id === playerId;
+                const dealerIndex = 0; // First player is dealer
+                const smallBlindIndex = (dealerIndex + 1) % players.length;
+                const bigBlindIndex = (dealerIndex + 2) % players.length;
+                
+                let positionLabel = "";
+                if (idx === dealerIndex) positionLabel = "D";
+                else if (idx === smallBlindIndex) positionLabel = "SB";
+                else if (idx === bigBlindIndex) positionLabel = "BB";
+                
                 return (
                   <div key={player.id} className={`bg-black/30 border ${isMe ? 'border-green-500/50' : idx === currentPlayerIndex ? 'border-yellow-500/50' : 'border-white/10'} rounded-lg p-2`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span>{player.is_host ? '👑' : '👤'}</span>
                       <span className="text-white font-semibold text-xs">{player.name}</span>
+                      {positionLabel && <span className="text-xs bg-blue-600 px-1 rounded">{positionLabel}</span>}
                         {isMe && <span className="text-xs text-green-400">(You)</span>}
                       {player.status === PLAYER_STATUS.FOLDED && <span className="text-xs text-red-400">(Folded)</span>}
+                      {player.status === PLAYER_STATUS.ALL_IN && <span className="text-xs text-purple-400">(All-in)</span>}
                       {idx === currentPlayerIndex && player.status !== PLAYER_STATUS.FOLDED && <span className="text-xs text-yellow-400">⏰</span>}
                     </div>
                     <div className="text-emerald-400 text-xs">{player.chips} | Bet: {player.bet}</div>
@@ -1273,46 +1372,53 @@ function TexasHoldemSupabasePage() {
               <div className="w-full max-w-sm space-y-3 bg-gray-800/50 p-4 rounded-lg">
                 <div className="text-center text-white mb-2">
                   <span className="text-lg font-bold">Your Turn - Choose Action</span>
+                  {timeLeft > 0 && (
+                    <div className="text-sm text-yellow-400 mt-1">
+                      Time left: {timeLeft}s
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => handlePlayerAction("fold")} className="flex-1 h-12 rounded-lg bg-red-600 border border-red-500 text-white hover:bg-red-700 font-bold text-sm">FOLD</button>
-                  <button 
-                    onClick={() => handlePlayerAction("check")} 
-                    disabled={game.current_bet > myPlayer.bet}
-                    className="flex-1 h-12 rounded-lg bg-blue-600 border border-blue-500 text-white hover:bg-blue-700 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    CHECK
-                  </button>
-                  <button 
-                    onClick={() => handlePlayerAction("call")} 
-                    disabled={game.current_bet <= myPlayer.bet || myPlayer.chips < (game.current_bet - myPlayer.bet)}
-                    className="flex-1 h-12 rounded-lg bg-green-600 border border-green-500 text-white hover:bg-green-700 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    CALL {game.current_bet > myPlayer.bet ? `(${game.current_bet - myPlayer.bet})` : ''}
-                  </button>
+                  {game.current_bet === myPlayer.bet ? (
+                    <button 
+                      onClick={() => handlePlayerAction("check")} 
+                      className="flex-1 h-12 rounded-lg bg-blue-600 border border-blue-500 text-white hover:bg-blue-700 font-bold text-sm"
+                    >
+                      CHECK
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handlePlayerAction("call")} 
+                      disabled={myPlayer.chips < (game.current_bet - myPlayer.bet)}
+                      className="flex-1 h-12 rounded-lg bg-green-600 border border-green-500 text-white hover:bg-green-700 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      CALL {game.current_bet > myPlayer.bet ? `(${game.current_bet - myPlayer.bet})` : ''}
+                    </button>
+                  )}
                 </div>
                 
                 <div className="flex gap-2">
                   <button 
-                    onClick={() => handlePlayerAction("raise", 100)} 
-                    disabled={myPlayer.chips === 0}
+                    onClick={() => handlePlayerAction("raise", BIG_BLIND)} 
+                    disabled={myPlayer.chips === 0 || myPlayer.chips < BIG_BLIND}
                     className="flex-1 h-12 rounded-lg bg-yellow-600 border border-yellow-500 text-white hover:bg-yellow-700 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    RAISE +100
+                    RAISE {BIG_BLIND}
                   </button>
                   <button 
-                    onClick={() => handlePlayerAction("raise", 500)} 
-                    disabled={myPlayer.chips === 0}
+                    onClick={() => handlePlayerAction("raise", BIG_BLIND * 2)} 
+                    disabled={myPlayer.chips === 0 || myPlayer.chips < BIG_BLIND * 2}
                     className="flex-1 h-12 rounded-lg bg-yellow-600 border border-yellow-500 text-white hover:bg-yellow-700 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    RAISE +500
+                    RAISE {BIG_BLIND * 2}
                   </button>
                   <button 
                     onClick={() => handlePlayerAction("allin")} 
                     disabled={myPlayer.chips === 0 || myPlayer.status === PLAYER_STATUS.ALL_IN}
                     className="flex-1 h-12 rounded-lg bg-purple-600 border border-purple-500 text-white hover:bg-purple-700 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    ALL IN
+                    ALL IN ({myPlayer.chips})
                   </button>
                 </div>
               </div>
