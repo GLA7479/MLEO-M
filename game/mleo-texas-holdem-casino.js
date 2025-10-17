@@ -84,6 +84,19 @@ const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"
 const RANKS_ORDER = { A:14,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,J:11,Q:12,K:13 };
 const BETTING_TIME_LIMIT = 30000; // 30 seconds
 
+// Game status constants
+const GAME_STATUS = {
+  WAITING: 'waiting',
+  PLAYING: 'playing',
+  FINISHED: 'finished'
+};
+
+const PLAYER_STATUS = {
+  ACTIVE: 'active',
+  FOLDED: 'folded',
+  ALL_IN: 'all_in'
+};
+
 function createDeck() {
   const deck = [];
   for (const suit of SUITS) {
@@ -102,6 +115,239 @@ function shuffleDeck(deck) {
   }
   return shuffled;
 }
+
+// ============================================================================
+// POKER HAND EVALUATION
+// ============================================================================
+
+const normalizeCards = (cards) => {
+  if (!Array.isArray(cards)) return [];
+
+  const normalized = cards.map((c) => {
+    if (!c) return null;
+
+    const r = (typeof c.r === 'number' && c.r > 0) ? c.r :
+              (c.value && RANKS_ORDER[c.value] !== undefined) ? RANKS_ORDER[c.value] : null;
+    const s = c.s || c.suit || null;
+
+    if (!r || !s) return null;
+    return { r, s };
+  }).filter(Boolean);
+
+  return normalized.sort((a, b) => b.r - a.r);
+};
+
+const uniqueRanksDesc = (rs) => {
+  const seen = new Set();
+  const out = [];
+  for (const x of rs) if (!seen.has(x)) { seen.add(x); out.push(x); }
+  return out;
+};
+
+const findFlush = (cards7) => {
+  if (!cards7 || !Array.isArray(cards7)) return null;
+  
+  const bySuit = new Map();
+  for (const c of cards7) {
+    if (c && c.s && typeof c.r !== 'undefined') {
+      const arr = bySuit.get(c.s) || [];
+      arr.push(c);
+      bySuit.set(c.s, arr);
+    }
+  }
+  for (const arr of bySuit.values()) {
+    if (arr.length >= 5) {
+      return arr.sort((a,b)=> b.r - a.r).slice(0,5);
+    }
+  }
+  return null;
+};
+
+const findStraightFromRanks = (descRanks) => {
+  const ranks = [...descRanks];
+  if (ranks.includes(14)) ranks.push(1);
+  let run = [ranks[0]];
+  for (let i=1;i<ranks.length;i++) {
+    const prev = ranks[i-1], cur = ranks[i];
+    if (cur === prev) continue;
+    if (cur === prev - 1) {
+      run.push(cur);
+    } else {
+      run = [cur];
+    }
+    if (run.length >= 5) {
+      const top = Math.max(...run.slice(-5));
+      return top === 5 && run.slice(-5).includes(14) ? 5 : Math.max(...run.slice(-5));
+    }
+  }
+  return null;
+};
+
+const pickStraightHand = (cards7) => {
+  const uniqueDesc = uniqueRanksDesc(cards7.map(c=>c.r));
+  const high = findStraightFromRanks(uniqueDesc);
+  if (!high) return null;
+  const need = [];
+  const seq = (high === 5) ? [5,4,3,2,14] : [high, high-1, high-2, high-3, high-4];
+  for (const r of seq) {
+    const pick = cards7.find(c => c.r === r && !need.includes(c));
+    if (!pick) return null;
+    need.push(pick);
+  }
+  return need.sort((a,b)=> b.r - a.r);
+};
+
+const handRankTuple = (best5) => {
+  if (!best5 || best5.length !== 5) return [0];
+  
+  const counts = new Map();
+  for (const c of best5) {
+    if (c && typeof c.r !== 'undefined' && c.r !== null) {
+      counts.set(c.r, (counts.get(c.r)||0)+1);
+    } else {
+      return [0];
+    }
+  }
+  
+  const entries = [...counts.entries()].sort((a,b)=> (b[1]-a[1]) || (b[0]-a[0]));
+  const ranksDesc = best5.map(c=>c.r).sort((a,b)=> b-a);
+
+  const isFlush5 = best5.every(c => c.s === best5[0].s);
+  const uniq = uniqueRanksDesc(ranksDesc);
+  const isStraight5 = findStraightFromRanks(uniq) !== null;
+
+  if (isFlush5 && isStraight5) {
+    const high = (best5.find(c=>c.r===14) && best5.some(c=>c.r===5)) ? 5 : Math.max(...best5.map(c=>c.r));
+    return [9, high];
+  }
+  if (entries[0][1] === 4) {
+    const four = entries[0][0];
+    const kicker = Math.max(...ranksDesc.filter(r=>r!==four));
+    return [8, four, kicker];
+  }
+  if (entries[0][1] === 3 && entries[1] && entries[1][1] === 2) {
+    return [7, entries[0][0], entries[1][0]];
+  }
+  if (isFlush5) {
+    return [6, ...ranksDesc];
+  }
+  if (isStraight5) {
+    const high = (best5.find(c=>c.r===14) && best5.some(c=>c.r===5)) ? 5 : Math.max(...best5.map(c=>c.r));
+    return [5, high];
+  }
+  if (entries[0][1] === 3) {
+    const trips = entries[0][0];
+    const kickers = ranksDesc.filter(r=>r!==trips).slice(0,2);
+    return [4, trips, ...kickers];
+  }
+  if (entries[0][1] === 2 && entries[1] && entries[1][1] === 2) {
+    const highPair = Math.max(entries[0][0], entries[1][0]);
+    const lowPair  = Math.min(entries[0][0], entries[1][0]);
+    const kicker = Math.max(...ranksDesc.filter(r=>r!==highPair && r!==lowPair));
+    return [3, highPair, lowPair, kicker];
+  }
+  if (entries[0][1] === 2) {
+    const pair = entries[0][0];
+    const kickers = ranksDesc.filter(r=>r!==pair).slice(0,3);
+    return [2, pair, ...kickers];
+  }
+  return [1, ...ranksDesc];
+};
+
+const best5Of7 = (cards7) => {
+  if (!cards7 || cards7.length < 5) {
+    return { best5: [], tuple: [0] };
+  }
+
+  const flush5 = findFlush(cards7);
+  const straight5 = pickStraightHand(cards7);
+
+  let candidateHands = [];
+  if (flush5) {
+    const suited = flush5;
+    const sf = pickStraightHand(suited);
+    if (sf) candidateHands.push(sf);
+    candidateHands.push(flush5);
+  }
+  if (straight5) candidateHands.push(straight5);
+
+  if (candidateHands.length === 0 || candidateHands.some(h => handRankTuple(h)[0] < 9)) {
+    const c = cards7;
+    for (let a=0;a<3;a++) for (let b=a+1;b<4;b++) for (let d=b+1;d<5;d++) for (let e=d+1;e<6;e++) for (let f=e+1;f<7;f++) {
+      candidateHands.push([c[a],c[b],c[d],c[e],c[f]]);
+    }
+  }
+
+  let best = null, bestRank = null;
+  for (const h of candidateHands) {
+    if (h && h.length === 5 && h.every(c => c && typeof c.r !== 'undefined' && c.r !== null)) {
+      try {
+        const t = handRankTuple(h);
+        if (t && t.length > 0 && t[0] !== 0) {
+          if (!best || compareRankTuple(t, bestRank) > 0) {
+            best = h; bestRank = t;
+          }
+        }
+      } catch (error) {
+        console.error("Error in handRankTuple for hand:", h, error);
+      }
+    }
+  }
+
+  return { best5: best || [], tuple: bestRank || [0] };
+};
+
+const compareRankTuple = (a, b) => {
+  if (!a || !b) return 0;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const ai = a[i] || 0;
+    const bi = b[i] || 0;
+    if (ai !== bi) return ai - bi;
+  }
+  return 0;
+};
+
+const evaluateHand = (cards) => {
+  if (!cards || cards.length < 5) return { rank: 0, score: [0], name: "Invalid", best5: [] };
+  
+  try {
+    const converted = cards.map((card) => {
+      if (!card) return null;
+      if (typeof card.r === 'number' && card.s) return { r: card.r, s: card.s };
+      if (card.suit && card.value && RANKS_ORDER[card.value] !== undefined) {
+        return { r: RANKS_ORDER[card.value], s: card.suit };
+      }
+      return null;
+    }).filter(Boolean);
+    
+    if (converted.length < 5) {
+      return { rank: 0, score: [0], name: "Invalid", best5: [] };
+    }
+    
+    const norm = normalizeCards(converted);
+    if (norm.length < 5) {
+      return { rank: 0, score: [0], name: "Invalid", best5: [] };
+    }
+    
+    const { best5, tuple } = best5Of7(norm);
+    
+    if (!best5 || best5.length !== 5 || !tuple || !tuple.length) {
+      return { rank: 0, score: [0], name: "Invalid", best5: [] };
+    }
+
+    const names = {9:'Straight Flush',8:'Four of a Kind',7:'Full House',6:'Flush',5:'Straight',4:'Three of a Kind',3:'Two Pair',2:'Pair',1:'High Card'};
+    const rev = {2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A'};
+    return {
+      rank: tuple[0],
+      score: tuple,
+      name: names[tuple[0]] || "Unknown",
+      best5: best5.map(c => ({ value: rev[c.r] || "?", suit: c.s }))
+    };
+  } catch (error) {
+    console.error("Error in evaluateHand:", error, cards);
+    return { rank: 0, score: [0], name: "Error", best5: [] };
+  }
+};
 
 // ============================================================================
 // UI COMPONENTS
@@ -175,10 +421,147 @@ export default function TexasHoldemCasinoPage() {
   const [sfxMuted, setSfxMuted] = useState(false);
   const [error, setError] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [gameMessage, setGameMessage] = useState("");
+  const [actionTimer, setActionTimer] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [winnerModal, setWinnerModal] = useState({ open: false, text: "", hand: "", pot: 0 });
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     setVaultAmount(getVault());
+    
+    // Check if user is admin
+    setIsAdmin(address === "0x39846ebBA723e440562a60f4B4a0147150442c7b");
+  }, [address]);
+
+  // Timer functions
+  const startActionTimer = (playerId) => {
+    if (actionTimer) {
+      clearInterval(actionTimer);
+    }
+    
+    setTimeLeft(BETTING_TIME_LIMIT / 1000);
+    
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          // Auto-fold if time runs out
+          handlePlayerAction("fold");
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    setActionTimer(timer);
+  };
+
+  const stopActionTimer = () => {
+    if (actionTimer) {
+      clearInterval(actionTimer);
+      setActionTimer(null);
+    }
+    setTimeLeft(0);
+  };
+
+  // Game flow functions
+  const getNextRound = (currentRound) => {
+    const rounds = ["preflop", "flop", "turn", "river", "showdown"];
+    const currentIndex = rounds.indexOf(currentRound);
+    return rounds[currentIndex + 1] || "showdown";
+  };
+
+  const getCommunityVisible = (round) => {
+    const visible = {
+      "preflop": 0,
+      "flop": 3,
+      "turn": 4,
+      "river": 5,
+      "showdown": 5
+    };
+    return visible[round] || 0;
+  };
+
+  // ============================================================================
+  // CLEANUP FUNCTIONS
+  // ============================================================================
+
+  // Cleanup inactive players (not active for 5+ minutes)
+  const cleanupInactivePlayers = async () => {
+    try {
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const { error } = await supabase
+        .from('casino_players')
+        .delete()
+        .lt('last_action_time', fiveMinutesAgo.toISOString());
+      
+      if (error) console.error("Error cleaning inactive players:", error);
+    } catch (err) {
+      console.error("Error in cleanupInactivePlayers:", err);
+    }
+  };
+
+  // Cleanup empty games (no players)
+  const cleanupEmptyGames = async () => {
+    try {
+      const { data: games, error: gamesError } = await supabase
+        .from('casino_games')
+        .select('id');
+      
+      if (gamesError) throw gamesError;
+      
+      for (const game of games || []) {
+        const { data: players, error: playersError } = await supabase
+          .from('casino_players')
+          .select('id')
+          .eq('game_id', game.id);
+        
+        if (playersError) continue;
+        
+        if (!players || players.length === 0) {
+          await supabase.from('casino_games').delete().eq('id', game.id);
+        }
+      }
+    } catch (err) {
+      console.error("Error in cleanupEmptyGames:", err);
+    }
+  };
+
+  // Cleanup finished game
+  const cleanupFinishedGame = async () => {
+    try {
+      if (currentGameId) {
+        await supabase.from('casino_games').delete().eq('id', currentGameId);
+      }
+    } catch (err) {
+      console.error("Error in cleanupFinishedGame:", err);
+    }
+  };
+
+  // Reset all tables (admin only)
+  const resetAllTables = async () => {
+    try {
+      await supabase.from('casino_players').delete();
+      await supabase.from('casino_games').delete();
+      await supabase.from('casino_tables').update({ current_players: 0 });
+      setError("All tables reset successfully!");
+      loadTables(); // Reload tables
+    } catch (err) {
+      console.error("Error resetting tables:", err);
+      setError("Failed to reset tables: " + err.message);
+    }
+  };
+
+  // Periodic cleanup every 15 minutes
+  useEffect(() => {
+    const cleanupInterval = setInterval(async () => {
+      await cleanupInactivePlayers();
+      await cleanupEmptyGames();
+    }, 15 * 60 * 1000); // 15 minutes
+    
+    return () => clearInterval(cleanupInterval);
   }, []);
 
   useEffect(() => {
@@ -335,6 +718,17 @@ export default function TexasHoldemCasinoPage() {
         .delete()
         .eq('id', playerId);
       
+      // Check if game should be cleaned up
+      const { data: remainingPlayers } = await supabase
+        .from('casino_players')
+        .select('id')
+        .eq('game_id', currentGameId);
+      
+      // If no players left, clean up the game
+      if (!remainingPlayers || remainingPlayers.length === 0) {
+        await cleanupFinishedGame();
+      }
+      
       // Reset state
       setPlayerId(null);
       setCurrentTableId(null);
@@ -399,6 +793,18 @@ export default function TexasHoldemCasinoPage() {
       gameChannel.unsubscribe();
     };
   }, [currentGameId, screen]);
+
+  // Start timer when it's my turn
+  useEffect(() => {
+    if (game && myPlayer && playerId && screen === "game") {
+      const isMyTurn = game.current_player_index === players.findIndex(p => p.id === playerId);
+      if (isMyTurn && myPlayer.status !== PLAYER_STATUS.FOLDED && game.status === GAME_STATUS.PLAYING) {
+        startActionTimer(playerId);
+      } else {
+        stopActionTimer();
+      }
+    }
+  }, [game?.current_player_index, myPlayer?.status, game?.status, players, playerId, screen]);
 
   const loadTableData = async () => {
     if (!currentTableId) return;
@@ -534,6 +940,321 @@ export default function TexasHoldemCasinoPage() {
     }
   };
 
+  // Player action handler
+  const handlePlayerAction = async (action, amount = 0) => {
+    if (!game || !playerId) return;
+    if (game.status !== GAME_STATUS.PLAYING || game.round === "finished") return;
+
+    try {
+      // Get fresh data
+      const { data: gNow } = await supabase.from('casino_games').select("*").eq("id", currentGameId).single();
+      const { data: pNow } = await supabase.from('casino_players').select("*").eq("game_id", currentGameId).order("seat_index");
+
+      const curIdx = gNow.current_player_index ?? 0;
+      const pls = pNow || players;
+      const me = pls.find(p => p.id === playerId);
+      const cur = pls[curIdx];
+
+      if (!cur || cur.id !== playerId) return; // not my turn
+      if (me.status === PLAYER_STATUS.FOLDED || gNow.status !== GAME_STATUS.PLAYING) return;
+
+      const active = pls.filter(p => p.status !== PLAYER_STATUS.FOLDED);
+      const toCall = Math.max(0, (gNow.current_bet ?? 0) - (me.current_bet ?? 0));
+
+      let newBet = me.current_bet ?? 0;
+      let newChips = me.chips ?? 0;
+      let newStatus = me.status;
+
+      if (action === "fold") {
+        newStatus = PLAYER_STATUS.FOLDED;
+      } else if (action === "check") {
+        if (toCall > 0) return; // illegal
+      } else if (action === "call") {
+        const pay = Math.min(toCall, newChips);
+        newBet += pay; newChips -= pay;
+        if (pay < toCall) newStatus = PLAYER_STATUS.ALL_IN;
+      } else if (action === "raise") {
+        let raiseTo = Math.max((gNow.current_bet ?? 0) + selectedTable.big_blind, amount);
+        raiseTo = Math.min(raiseTo, newBet + newChips);
+        const put = raiseTo - newBet;
+        if (put <= 0) return;
+        newBet = raiseTo;
+        newChips -= put;
+        if (newChips === 0) newStatus = PLAYER_STATUS.ALL_IN;
+      } else if (action === "allin") {
+        const put = newChips;
+        newBet += put; newChips = 0;
+        newStatus = PLAYER_STATUS.ALL_IN;
+      }
+
+      // Update player
+      await supabase.from('casino_players')
+        .update({ 
+          status: newStatus, 
+          current_bet: newBet, 
+          chips: newChips,
+          last_action: action,
+          last_action_time: new Date().toISOString()
+        })
+        .eq("id", playerId);
+
+      // Recompute pot/current bet
+      const freshPlayers = (await supabase.from('casino_players').select("*").eq("game_id", currentGameId)).data || pls;
+      const pot = freshPlayers.reduce((s,p)=> s + (p.current_bet||0), 0);
+      const currentBet = Math.max(...freshPlayers.map(p=>p.current_bet||0), 0);
+
+      // Stop timer
+      stopActionTimer();
+
+      // Check if only 1 player left
+      const notFolded = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED);
+      if (notFolded.length === 1) {
+        await supabase.from('casino_games').update({
+          pot, current_bet: currentBet, current_player_index: null
+        }).eq("id", currentGameId);
+        await determineWinner();
+        return;
+      }
+
+      // Advance to next player
+      const canAct = (p) => p.status !== PLAYER_STATUS.FOLDED && p.status !== PLAYER_STATUS.ALL_IN;
+      let nextIdx = (curIdx + 1) % freshPlayers.length;
+      while (!canAct(freshPlayers[nextIdx])) {
+        nextIdx = (nextIdx + 1) % freshPlayers.length;
+        if (nextIdx === curIdx) break;
+      }
+
+      // Check if betting round is complete
+      const activeCanAct = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED);
+      const everyoneMatched = activeCanAct.every(p => (p.status === PLAYER_STATUS.ALL_IN) || ((p.current_bet||0) === currentBet));
+      const allAllIn = activeCanAct.every(p => p.status === PLAYER_STATUS.ALL_IN);
+      const bettingDone = everyoneMatched && (allAllIn || (nextIdx === curIdx));
+
+      if (bettingDone) {
+        const nextRound = getNextRound(gNow.round);
+        const newVisible = getCommunityVisible(nextRound);
+
+        // Reset street bets
+        for (const p of freshPlayers) {
+          if (p.status !== PLAYER_STATUS.FOLDED) {
+            await supabase.from('casino_players').update({ current_bet: 0 }).eq("id", p.id);
+          }
+        }
+
+        // Deal community cards if needed
+        if (nextRound === "flop" && gNow.round === "preflop") {
+          const deck = gNow.deck || [];
+          const start = players.length * 2;
+          const communityCards = [
+            deck[start+1], deck[start+2], deck[start+3]
+          ];
+          await supabase.from('casino_games').update({
+            community_cards: communityCards
+          }).eq("id", currentGameId);
+        } else if (nextRound === "turn" && gNow.round === "flop") {
+          const deck = gNow.deck || [];
+          const start = players.length * 2;
+          const communityCards = [
+            ...(gNow.community_cards || []),
+            deck[start+4]
+          ];
+          await supabase.from('casino_games').update({
+            community_cards: communityCards
+          }).eq("id", currentGameId);
+        } else if (nextRound === "river" && gNow.round === "turn") {
+          const deck = gNow.deck || [];
+          const start = players.length * 2;
+          const communityCards = [
+            ...(gNow.community_cards || []),
+            deck[start+5]
+          ];
+          await supabase.from('casino_games').update({
+            community_cards: communityCards
+          }).eq("id", currentGameId);
+        }
+
+        // Pick first to act
+        let dealerIndex = gNow.dealer_index ?? 0;
+        let startIdx = (dealerIndex + 1) % freshPlayers.length;
+        while (freshPlayers[startIdx].status === PLAYER_STATUS.FOLDED) {
+          startIdx = (startIdx + 1) % freshPlayers.length;
+        }
+
+        const updates = {
+          pot, 
+          current_bet: 0,
+          round: nextRound,
+          community_visible: newVisible,
+          current_player_index: startIdx,
+        };
+
+        await supabase.from('casino_games').update(updates).eq("id", currentGameId);
+
+        // If all players are all-in or showdown, determine winner
+        if (allAllIn || nextRound === "showdown") {
+          await supabase.from('casino_games').update({ community_visible: 5 }).eq("id", currentGameId);
+          await determineWinner();
+        }
+      } else {
+        // Continue betting
+        await supabase.from('casino_games').update({
+          pot, current_bet: currentBet, current_player_index: nextIdx
+        }).eq("id", currentGameId);
+      }
+
+    } catch (err) {
+      console.error("Player action error:", err);
+    }
+  };
+
+  // Determine winner
+  const determineWinner = async () => {
+    try {
+      stopActionTimer();
+
+      const { data: gNow } = await supabase.from('casino_games').select("*").eq("id", currentGameId).single();
+      const { data: pls } = await supabase.from('casino_players').select("*").eq("game_id", currentGameId).order("seat_index");
+
+      const active = pls.filter(p => p.status !== PLAYER_STATUS.FOLDED);
+      
+      if (active.length === 1) {
+        const w = active[0];
+        const potAmount = gNow.pot || 0;
+        
+        // Add winnings to winner's VAULT
+        const currentVault = getVault();
+        setVault(currentVault + potAmount);
+        setVaultAmount(currentVault + potAmount);
+        
+        setGameMessage(`🎉 ${w.player_name} wins by fold! Pot: ${fmt(potAmount)} MLEO`);
+        setWinnerModal({ open: true, text: `🎉 ${w.player_name} wins by fold!`, hand: "", pot: potAmount });
+        
+        await supabase.from('casino_games').update({
+          status: GAME_STATUS.FINISHED,
+          round: "showdown",
+          current_bet: 0,
+          community_visible: 5,
+        }).eq("id", currentGameId);
+        return;
+      }
+
+      // Showdown: evaluate best5-of-7
+      await supabase.from('casino_games').update({ community_visible: 5 }).eq("id", currentGameId);
+      
+      const board5 = (gNow.community_cards||[]).slice(0,5);
+      
+      const ranked = active.map(p => {
+        const all = [...(p.hole_cards||[]), ...board5];
+        const evalRes = evaluateHand(all);
+        return { p, evalRes };
+      }).sort((a,b)=> compareRankTuple(b.evalRes.score, a.evalRes.score));
+
+      const winner = ranked[0];
+      const potAmount = gNow.pot || 0;
+      
+      // Add winnings to winner's VAULT
+      const currentVault = getVault();
+      setVault(currentVault + potAmount);
+      setVaultAmount(currentVault + potAmount);
+
+      // Reveal cards
+      for (const r of ranked) {
+        await supabase.from('casino_players').update({ revealed: true }).eq("id", r.p.id);
+      }
+
+      setGameMessage(`🎉 ${winner.p.player_name} wins with ${winner.evalRes.name}! Pot: ${fmt(potAmount)} MLEO`);
+      setWinnerModal({ 
+        open: true, 
+        text: `🎉 ${winner.p.player_name} wins!`, 
+        hand: winner.evalRes.name, 
+        pot: potAmount 
+      });
+      
+      await supabase.from('casino_games').update({
+        status: GAME_STATUS.FINISHED,
+        round: "showdown",
+        current_bet: 0,
+        community_visible: 5,
+      }).eq("id", currentGameId);
+
+      // Auto-start new hand after 5 seconds
+      setTimeout(() => {
+        setWinnerModal({ open: false, text: "", hand: "", pot: 0 });
+        startNewHand();
+      }, 5000);
+
+      // Clean up finished game after 30 seconds
+      setTimeout(() => {
+        cleanupFinishedGame();
+      }, 30000);
+
+    } catch (err) {
+      console.error("Error determining winner:", err);
+    }
+  };
+
+  // Start new hand
+  const startNewHand = async () => {
+    if (!currentTableId || players.length < 2) return;
+    
+    try {
+      const deck = shuffleDeck(createDeck());
+      
+      // Reset players
+      const updatedPlayers = players.map((p, idx) => {
+        const card1 = deck[idx * 2];
+        const card2 = deck[idx * 2 + 1];
+        
+        return {
+          ...p,
+          hole_cards: [card1, card2],
+          current_bet: 0,
+          status: PLAYER_STATUS.ACTIVE,
+          revealed: false
+        };
+      });
+      
+      // Post blinds
+      const smallBlindIndex = 1 % players.length;
+      const bigBlindIndex = 2 % players.length;
+      
+      updatedPlayers[smallBlindIndex].current_bet = Math.min(selectedTable.small_blind, updatedPlayers[smallBlindIndex].chips);
+      updatedPlayers[smallBlindIndex].chips -= updatedPlayers[smallBlindIndex].current_bet;
+      
+      updatedPlayers[bigBlindIndex].current_bet = Math.min(selectedTable.big_blind, updatedPlayers[bigBlindIndex].chips);
+      updatedPlayers[bigBlindIndex].chips -= updatedPlayers[bigBlindIndex].current_bet;
+      
+      // Update players in database
+      for (const player of updatedPlayers) {
+        await supabase.from('casino_players').update({
+          hole_cards: player.hole_cards,
+          current_bet: player.current_bet,
+          status: player.status,
+          chips: player.chips,
+          revealed: player.revealed
+        }).eq('id', player.id);
+      }
+      
+      // Update game
+      const pot = updatedPlayers.reduce((sum, p) => sum + p.current_bet, 0);
+      const currentBet = Math.max(...updatedPlayers.map(p => p.current_bet));
+      
+      await supabase.from('casino_games').update({
+        status: GAME_STATUS.PLAYING,
+        pot: pot,
+        current_bet: currentBet,
+        round: 'preflop',
+        community_visible: 0,
+        community_cards: [],
+        deck: deck,
+        current_player_index: 0
+      }).eq("id", currentGameId);
+      
+    } catch (err) {
+      console.error("Error starting new hand:", err);
+    }
+  };
+
   // ============================================================================
   // RENDER SCREENS
   // ============================================================================
@@ -663,6 +1384,29 @@ export default function TexasHoldemCasinoPage() {
                 </div>
               )}
             </div>
+
+            {/* Admin Controls */}
+            {isAdmin && (
+              <div className="mt-4 text-center">
+                <button
+                  onClick={resetAllTables}
+                  className="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all mr-4"
+                >
+                  🔄 Reset All Tables
+                </button>
+                <button
+                  onClick={async () => {
+                    await cleanupInactivePlayers();
+                    await cleanupEmptyGames();
+                    loadTables();
+                    setError("Cleanup completed!");
+                  }}
+                  className="px-6 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all"
+                >
+                  🧹 Cleanup Now
+                </button>
+              </div>
+            )}
 
             {/* Back Button */}
             <div className="mt-6 text-center">
@@ -883,21 +1627,63 @@ export default function TexasHoldemCasinoPage() {
               </div>
 
               {/* Action Buttons */}
-              {isMyTurn && myPlayer?.status !== 'folded' && game?.status === 'playing' && (
+              {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && game?.round !== "finished" && game?.round !== "showdown" && (
                 <div className="text-center">
-                  <div className="text-white/70 text-sm mb-4">Your Turn</div>
+                  <div className="text-white/70 text-sm mb-4">
+                    Your Turn {timeLeft > 0 && `(${timeLeft}s)`}
+                  </div>
                   <div className="flex justify-center gap-3">
-                    <button className="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold">
+                    <button 
+                      onClick={() => handlePlayerAction("fold")}
+                      className="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all"
+                    >
                       FOLD
                     </button>
-                    <button className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold">
-                      CALL
+                    <button 
+                      onClick={() => handlePlayerAction("call")}
+                      className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all"
+                    >
+                      {game?.current_bet > (myPlayer?.current_bet || 0) ? 'CALL' : 'CHECK'}
                     </button>
-                    <button className="px-6 py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold">
+                    <button 
+                      onClick={() => handlePlayerAction("raise", (game?.current_bet || 0) + selectedTable?.big_blind)}
+                      className="px-6 py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold transition-all"
+                    >
                       RAISE
                     </button>
-                    <button className="px-6 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold">
+                    <button 
+                      onClick={() => handlePlayerAction("allin")}
+                      className="px-6 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all"
+                    >
                       ALL IN
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Game Messages */}
+              {gameMessage && (
+                <div className="text-center text-white/90 text-sm mb-4 bg-black/30 rounded-lg p-3">
+                  {gameMessage}
+                </div>
+              )}
+
+              {/* Winner Modal */}
+              {winnerModal.open && (
+                <div className="fixed inset-0 z-[11000] bg-black/70 flex items-center justify-center p-4">
+                  <div className="bg-zinc-900 text-white w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center">
+                    <div className="text-2xl font-extrabold mb-2">🎉 Hand Result</div>
+                    <div className="text-emerald-300 font-semibold">{winnerModal.text}</div>
+                    {winnerModal.hand && <div className="text-white/70 text-sm mt-1">{winnerModal.hand}</div>}
+                    {winnerModal.pot > 0 && <div className="text-amber-300 mt-2">Pot: {fmt(winnerModal.pot)}</div>}
+                    <div className="text-xs text-white/50 mt-3">
+                      Starting next hand...
+                    </div>
+                    <button
+                      onClick={() => setWinnerModal({ open: false, text: "", hand: "", pot: 0 })}
+                      className="mt-4 w-full py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold"
+                    >
+                      OK
                     </button>
                   </div>
                 </div>
