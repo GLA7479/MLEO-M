@@ -78,6 +78,8 @@ CREATE TRIGGER casino_games_updated_at
 
 -- Insert default poker rooms
 INSERT INTO casino_tables (name, min_buyin, small_blind, big_blind, max_players) VALUES
+  ('Pico Stakes', 1000, 10, 20, 6),
+  ('Nano Stakes', 10000, 100, 200, 6),
   ('Micro Stakes', 100000, 1000, 2000, 6),
   ('Low Stakes', 500000, 5000, 10000, 6),
   ('Medium Stakes', 1000000, 10000, 20000, 6),
