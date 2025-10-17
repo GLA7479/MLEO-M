@@ -871,7 +871,8 @@ export default function TexasHoldemCasinoPage() {
           deck: deck,
           round: 'preflop',
           dealer_index: 0,
-          current_player_index: 0
+          current_player_index: 1,
+          last_raiser_index: 1
         })
         .select()
         .single();
@@ -930,7 +931,8 @@ export default function TexasHoldemCasinoPage() {
         .update({
           pot: pot,
           current_bet: currentBet,
-          current_player_index: 0
+          current_player_index: 1,
+          last_raiser_index: 1
         })
         .eq('id', newGame.id);
       
@@ -1003,6 +1005,12 @@ export default function TexasHoldemCasinoPage() {
       const pot = freshPlayers.reduce((s,p)=> s + (p.current_bet||0), 0);
       const currentBet = Math.max(...freshPlayers.map(p=>p.current_bet||0), 0);
 
+      // Detect last aggressor
+      let lastRaiserIndex = gNow.last_raiser_index ?? curIdx;
+      if ((action === "raise") || (action === "allin" && newBet > (gNow.current_bet||0))) {
+        lastRaiserIndex = curIdx;
+      }
+
       // Stop timer
       stopActionTimer();
 
@@ -1028,7 +1036,7 @@ export default function TexasHoldemCasinoPage() {
       const activeCanAct = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED);
       const everyoneMatched = activeCanAct.every(p => (p.status === PLAYER_STATUS.ALL_IN) || ((p.current_bet||0) === currentBet));
       const allAllIn = activeCanAct.every(p => p.status === PLAYER_STATUS.ALL_IN);
-      const bettingDone = everyoneMatched && (allAllIn || (nextIdx === curIdx));
+      const bettingDone = everyoneMatched && (allAllIn || (nextIdx === lastRaiserIndex));
 
       if (bettingDone) {
         const nextRound = getNextRound(gNow.round);
@@ -1083,6 +1091,8 @@ export default function TexasHoldemCasinoPage() {
         const updates = {
           pot, 
           current_bet: 0,
+          last_raise_to: 0,
+          last_raiser_index: startIdx,
           round: nextRound,
           community_visible: newVisible,
           current_player_index: startIdx,
@@ -1090,15 +1100,20 @@ export default function TexasHoldemCasinoPage() {
 
         await supabase.from('casino_games').update(updates).eq("id", currentGameId);
 
-        // If all players are all-in or showdown, determine winner
-        if (allAllIn || nextRound === "showdown") {
+        // If all players are all-in, go directly to showdown regardless of round
+        if (allAllIn) {
+          console.log("All players all-in, going directly to showdown");
+          // Make sure all community cards are visible before showdown
           await supabase.from('casino_games').update({ community_visible: 5 }).eq("id", currentGameId);
           await determineWinner();
+        } else if (nextRound === "showdown") {
+          // Normal showdown - wait for next action
+          console.log("Normal showdown, waiting for next action");
         }
       } else {
         // Continue betting
         await supabase.from('casino_games').update({
-          pot, current_bet: currentBet, current_player_index: nextIdx
+          pot, current_bet: currentBet, last_raiser_index: lastRaiserIndex, current_player_index: nextIdx
         }).eq("id", currentGameId);
       }
 
@@ -1239,6 +1254,10 @@ export default function TexasHoldemCasinoPage() {
       const pot = updatedPlayers.reduce((sum, p) => sum + p.current_bet, 0);
       const currentBet = Math.max(...updatedPlayers.map(p => p.current_bet));
       
+      // Calculate dealer and first to act
+      const dealerIndex = ((game?.dealer_index ?? 0) + 1) % players.length;
+      const startIdx = (dealerIndex + 1) % players.length;
+      
       await supabase.from('casino_games').update({
         status: GAME_STATUS.PLAYING,
         pot: pot,
@@ -1247,7 +1266,9 @@ export default function TexasHoldemCasinoPage() {
         community_visible: 0,
         community_cards: [],
         deck: deck,
-        current_player_index: 0
+        dealer_index: dealerIndex,
+        current_player_index: startIdx,
+        last_raiser_index: startIdx
       }).eq("id", currentGameId);
       
     } catch (err) {
@@ -1614,7 +1635,7 @@ export default function TexasHoldemCasinoPage() {
                       </div>
                       
                       {/* Player Cards */}
-                      {player.hole_cards && (isMe || game?.status === GAME_STATUS.FINISHED || game?.round === "showdown") && (
+                      {player.hole_cards && isMe && (
                         <div className="flex justify-center gap-1 mt-2">
                           {player.hole_cards.map((card, cardIdx) => (
                             <PlayingCard key={cardIdx} card={card} delay={cardIdx * 100} />
