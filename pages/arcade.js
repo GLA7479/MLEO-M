@@ -370,12 +370,12 @@ export default function ArcadeHub() {
       href: "/texas-holdem-supabase-try",
       color: "#10B981",
     },
-    // 8.7. Texas Hold'em Tournament - NEW!
+    // 8.7. Texas Hold'em Rooms - NEW!
     {
-      title: "Tournament Texas Hold'em",
-      emoji: "🏆",
-      description: "Tournament mode! Host creates tournament, players join with code. Automatic elimination until one winner takes all!",
-      prize: "Tournament",
+      title: "Texas Hold'em Rooms",
+      emoji: "🎰🎴",
+      description: "Join permanent poker tables! Drop-in/drop-out multiplayer with real stakes. Play anytime!",
+      prize: "Social",
       href: "/tournament",
       color: "#7C3AED",
     },
