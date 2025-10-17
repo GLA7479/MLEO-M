@@ -200,6 +200,52 @@ function TexasHoldemSupabasePage() {
     setTimeLeft(0);
   };
 
+  // Start new game
+  const startNewGame = async () => {
+    if (!isHost || !game) return;
+    
+    try {
+      // Stop any running timers
+      stopActionTimer();
+      
+      // Reset game to waiting state
+      await supabase
+        .from(TABLES.GAMES)
+        .update({
+          status: GAME_STATUS.WAITING,
+          pot: 0,
+          current_bet: 0,
+          current_player_index: 0,
+          round: "pre-flop",
+          community_visible: 0,
+          community_cards: []
+        })
+        .eq("id", game.id);
+
+      // Reset all players
+      for (const player of players) {
+        await supabase
+          .from(TABLES.PLAYERS)
+          .update({ 
+            cards: [],
+            bet: 0,
+            status: PLAYER_STATUS.READY,
+            chips: Math.max(player.chips, STARTING_CHIPS) // Ensure minimum chips
+          })
+          .eq("id", player.id);
+      }
+      
+      // Clear game message
+      setGameMessage("");
+      
+      // Return to lobby
+      setScreen("lobby");
+      
+    } catch (err) {
+      console.error("Error starting new game:", err);
+    }
+  };
+
   useEffect(() => {
     setMounted(true);
     
@@ -838,6 +884,9 @@ function TexasHoldemSupabasePage() {
   // Determine winner
   const determineWinner = async () => {
     try {
+      // Stop any running timers
+      stopActionTimer();
+      
       const activePlayers = players.filter(p => p.status !== PLAYER_STATUS.FOLDED);
       console.log("Determining winner. Active players:", activePlayers.length);
       
@@ -1272,10 +1321,16 @@ function TexasHoldemSupabasePage() {
             <button onClick={() => { playSfx(clickSound.current); const el = wrapRef.current || document.documentElement; if (!document.fullscreenElement) { el.requestFullscreen?.().catch(() => {}); } else { document.exitFullscreen?.().catch(() => {}); } }} className="px-3 py-1 rounded-lg text-xs font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFullscreen ? "EXIT" : "FULL"}</button>
             <button onClick={() => { playSfx(clickSound.current); setMenuOpen(true); }} className="px-3 py-1 rounded-lg text-xs font-bold bg-white/5 border border-white/10 hover:bg-white/10">MENU</button>
             {isHost && (
-              <button onClick={async () => { 
-                playSfx(clickSound.current); 
-                await determineWinner(); 
-              }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30">END GAME</button>
+              <div className="flex gap-2">
+                <button onClick={async () => { 
+                  playSfx(clickSound.current); 
+                  await determineWinner(); 
+                }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30">END GAME</button>
+                <button onClick={async () => { 
+                  playSfx(clickSound.current); 
+                  await startNewGame(); 
+                }} className="px-3 py-1 rounded-lg text-xs font-bold bg-green-500/20 border border-green-500/30 text-green-300 hover:bg-green-500/30">NEW GAME</button>
+              </div>
             )}
           </div>
 
@@ -1368,7 +1423,7 @@ function TexasHoldemSupabasePage() {
             </div>
 
             {/* Action Buttons - Show for current player */}
-            {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && (
+            {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && game?.round !== "finished" && (
               <div className="w-full max-w-sm space-y-3 bg-gray-800/50 p-4 rounded-lg">
                 <div className="text-center text-white mb-2">
                   <span className="text-lg font-bold">Your Turn - Choose Action</span>
@@ -1421,6 +1476,26 @@ function TexasHoldemSupabasePage() {
                     ALL IN ({myPlayer.chips})
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* Game Finished Message */}
+            {game?.status === GAME_STATUS.FINISHED && (
+              <div className="w-full max-w-sm bg-green-800/50 p-4 rounded-lg text-center">
+                <div className="text-green-300 text-lg font-bold mb-2">
+                  🎉 Game Finished! 🎉
+                </div>
+                <div className="text-white text-sm mb-3">
+                  {gameMessage || "Check the results above"}
+                </div>
+                {isHost && (
+                  <button 
+                    onClick={startNewGame}
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-bold text-sm"
+                  >
+                    Start New Game
+                  </button>
+                )}
               </div>
             )}
           </div>
