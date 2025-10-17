@@ -534,13 +534,14 @@ function TexasHoldemSupabasePage() {
         };
       });
 
-      // Deal community cards (burn one card before flop)
+      // Deal community cards properly (5 separate cards for flop, turn, river)
+      const startIndex = players.length * 2; // After player cards
       const communityCards = [
-        deck[players.length * 2 + 1], // Burn first card
-        deck[players.length * 2 + 2], // Flop 1
-        deck[players.length * 2 + 3], // Flop 2
-        deck[players.length * 2 + 4], // Flop 3
-        deck[players.length * 2 + 5]  // Turn (will be dealt later)
+        deck[startIndex + 1], // Flop card 1 (after burn)
+        deck[startIndex + 2], // Flop card 2
+        deck[startIndex + 3], // Flop card 3
+        deck[startIndex + 5], // Turn card (after burn)
+        deck[startIndex + 7]  // River card (after burn)
       ];
 
       // Determine first action (UTG - Under The Gun)
@@ -589,6 +590,14 @@ function TexasHoldemSupabasePage() {
       }
 
       setScreen("game");
+      
+      // Start timer for first player if it's current player
+      setTimeout(() => {
+        const firstPlayer = players[firstActionIndex];
+        if (firstPlayer && firstPlayer.id === playerId) {
+          startActionTimer(firstPlayer.id);
+        }
+      }, 1000); // Small delay to ensure UI is ready
 
     } catch (err) {
       console.error("Start game error:", err);
@@ -691,7 +700,8 @@ function TexasHoldemSupabasePage() {
       }
       
       // Start timer for next player if it's their turn
-      if (nextIndex !== currentPlayerIndex) {
+      // Don't start timer if betting round is complete
+      if (nextIndex !== currentPlayerIndex && !bettingComplete) {
         const nextPlayer = players[nextIndex];
         if (nextPlayer && nextPlayer.id === playerId) {
           startActionTimer(nextPlayer.id);
@@ -723,19 +733,51 @@ function TexasHoldemSupabasePage() {
       }
 
       // Check if we need to progress to next round
-      // This happens when all active players have bet the same amount
-      const allPlayersBet = activePlayers.every(p => p.bet === newCurrentBet || p.status === PLAYER_STATUS.ALL_IN);
-      const bettingComplete = allPlayersBet && activePlayers.length > 1;
+      // This happens when all active players have bet the same amount OR all-in
+      const allPlayersBet = activePlayers.every(p => 
+        p.bet === newCurrentBet || p.status === PLAYER_STATUS.ALL_IN
+      );
+      
+      // Also check if we've gone full circle (action returned to original bettor)
+      // Special case for pre-flop: Big Blind gets last action
+      let bettingComplete = false;
+      
+      if (game.round === "pre-flop") {
+        // In pre-flop, betting is complete when action returns to Big Blind
+        const dealerIndex = 0;
+        const bigBlindIndex = (dealerIndex + 2) % players.length;
+        bettingComplete = allPlayersBet && activePlayers.length > 1 && 
+          nextIndex === bigBlindIndex;
+      } else {
+        // In other rounds, betting is complete when all players have acted
+        bettingComplete = allPlayersBet && activePlayers.length > 1 && 
+          nextIndex === currentPlayerIndex;
+      }
       
       if (bettingComplete) {
         const nextRound = getNextRound(game.round);
         const newCommunityVisible = getCommunityVisible(nextRound);
         
+        // Determine starting player for next round
+        let nextRoundStartIndex = 0;
+        if (nextRound !== "pre-flop") {
+          // In post-flop rounds, Small Blind starts (or first active player)
+          const dealerIndex = 0;
+          const smallBlindIndex = (dealerIndex + 1) % players.length;
+          nextRoundStartIndex = smallBlindIndex;
+          
+          // Find first active player if Small Blind is folded
+          while (players[nextRoundStartIndex]?.status === PLAYER_STATUS.FOLDED) {
+            nextRoundStartIndex = (nextRoundStartIndex + 1) % players.length;
+          }
+        }
+        
         updatedGame = {
           ...updatedGame,
           round: nextRound,
           community_visible: newCommunityVisible,
-          current_bet: 0
+          current_bet: 0,
+          current_player_index: nextRoundStartIndex
         };
 
         // Reset all player bets for next round
@@ -755,6 +797,12 @@ function TexasHoldemSupabasePage() {
         // Check for game end
         if (nextRound === "showdown") {
           await determineWinner();
+        } else {
+          // Start timer for next round if it's current player's turn
+          const nextPlayer = players[nextRoundStartIndex];
+          if (nextPlayer && nextPlayer.id === playerId) {
+            startActionTimer(nextPlayer.id);
+          }
         }
       }
 
