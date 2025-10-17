@@ -457,12 +457,12 @@ function TexasHoldemSupabasePage() {
           }
 
           // אם היד הסתיימה — עצור טיימרים, הצג מודאל, הסתר כפתורים, ואתחל יד חדשה אם אני Host
-          if (g.status === GAME_STATUS.FINISHED || g.round === "finished") {
+          if (g.status === GAME_STATUS.FINISHED || g.round === "showdown") {
             stopActionTimer();
 
             // נבנה טקסט תוצאה (מתבסס על gameMessage הקיים אם יש)
-            const text = (g.result_text || g.message || g.game_message || "Hand finished");
-            const hand = g.result_hand || ""; // אופציונלי אם תשמור
+            const text = (g.message || g.game_message || "Hand finished");
+            const hand = ""; // לא משתמשים ב-result_hand כרגע
             const pot  = g.pot || 0;
 
             setWinnerModal({ open: true, text, hand, pot });
@@ -976,11 +976,9 @@ function TexasHoldemSupabasePage() {
           .from(TABLES.GAMES)
           .update({
             status: GAME_STATUS.FINISHED,
-            round: "finished",
+            round: "showdown",
             current_bet: 0,
-            current_player_index: null,   // אין עוד תור
-            community_visible: 5,         // חשוף לכולם (לא חובה)
-            result_text: `🎉 ${w.name} wins by fold! Pot: ${gNow.pot||0}`,
+            community_visible: 5,         // חשוף לכולם
           })
           .eq("id", game.id);
         return;
@@ -1007,12 +1005,9 @@ function TexasHoldemSupabasePage() {
         .from(TABLES.GAMES)
         .update({
           status: GAME_STATUS.FINISHED,
-          round: "finished",
+          round: "showdown",
           current_bet: 0,
-          current_player_index: null,   // אין עוד תור
           community_visible: 5,
-          result_text: `🎉 ${winner.p.name} wins with ${winner.evalRes.name}! Pot: ${gNow.pot||0}`,
-          result_hand: winner.evalRes.name
         })
         .eq("id", game.id);
     } catch (err) {
