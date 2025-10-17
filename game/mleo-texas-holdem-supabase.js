@@ -723,20 +723,72 @@ function TexasHoldemSupabasePage() {
         return;
       }
 
-      // Check if we need to progress to next round
-      // This happens when all active players have bet the same amount
-      const allPlayersBet = activePlayers.every(p => p.bet === newCurrentBet || p.status === PLAYER_STATUS.ALL_IN);
-      const bettingComplete = allPlayersBet && activePlayers.length > 1;
+      // Check if all active players have bet the same amount OR are all-in
+      // This is crucial for proper betting round completion
+      const allPlayersBet = activePlayers.every(p => {
+        // Player has bet the current bet amount OR is all-in
+        return (p.bet === newCurrentBet) || (p.status === PLAYER_STATUS.ALL_IN);
+      });
+
+      // Check if betting round is complete
+      // This is the KEY to proper poker logic!
+      let bettingComplete = false;
+      
+      if (game.round === "pre-flop") {
+        // Pre-flop: Big Blind gets last action (unless they raised)
+        const dealerIndex = 0;
+        const bigBlindIndex = (dealerIndex + 2) % players.length;
+        
+        // If Big Blind raised, they don't get last action
+        const bigBlindPlayer = players[bigBlindIndex];
+        if (bigBlindPlayer && bigBlindPlayer.bet > BIG_BLIND) {
+          // Big Blind raised - action continues until it returns to them
+          bettingComplete = allPlayersBet && activePlayers.length > 1 && 
+            nextIndex === bigBlindIndex;
+        } else {
+          // Big Blind didn't raise - they get last action
+          bettingComplete = allPlayersBet && activePlayers.length > 1 && 
+            nextIndex === bigBlindIndex;
+        }
+      } else {
+        // Post-flop: Small Blind starts, action goes until everyone has acted
+        const dealerIndex = 0;
+        const smallBlindIndex = (dealerIndex + 1) % players.length;
+        
+        // Find first active player after dealer (Small Blind or next active)
+        let firstActiveAfterDealer = smallBlindIndex;
+        while (players[firstActiveAfterDealer]?.status === PLAYER_STATUS.FOLDED) {
+          firstActiveAfterDealer = (firstActiveAfterDealer + 1) % players.length;
+        }
+        
+        bettingComplete = allPlayersBet && activePlayers.length > 1 && 
+          nextIndex === firstActiveAfterDealer;
+      }
       
       if (bettingComplete) {
         const nextRound = getNextRound(game.round);
         const newCommunityVisible = getCommunityVisible(nextRound);
         
+        // Determine starting player for next round
+        let nextRoundStartIndex = 0;
+        if (nextRound !== "pre-flop") {
+          // In post-flop rounds, Small Blind starts (or first active player)
+          const dealerIndex = 0;
+          const smallBlindIndex = (dealerIndex + 1) % players.length;
+          nextRoundStartIndex = smallBlindIndex;
+          
+          // Find first active player if Small Blind is folded
+          while (players[nextRoundStartIndex]?.status === PLAYER_STATUS.FOLDED) {
+            nextRoundStartIndex = (nextRoundStartIndex + 1) % players.length;
+          }
+        }
+        
         updatedGame = {
           ...updatedGame,
           round: nextRound,
           community_visible: newCommunityVisible,
-          current_bet: 0
+          current_bet: 0,
+          current_player_index: nextRoundStartIndex
         };
 
         // Reset all player bets for next round
@@ -910,9 +962,9 @@ function TexasHoldemSupabasePage() {
           .from(TABLES.GAMES)
           .update({
             status: GAME_STATUS.FINISHED,
-            pot: newPot,
+            pot: game.pot,
             current_bet: 0,
-            current_player_index: nextIndex,
+            current_player_index: 0,
             round: "finished"
           })
           .eq("id", game.id);
