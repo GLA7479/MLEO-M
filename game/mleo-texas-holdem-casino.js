@@ -370,6 +370,36 @@ export default function TexasHoldemCasinoPage() {
     };
   }, [currentTableId, screen]);
 
+  // Auto-start game when 2+ players
+  useEffect(() => {
+    if (players.length >= 2 && !currentGameId) {
+      startGame();
+    }
+  }, [players.length, currentGameId]);
+
+  // Subscribe to game updates
+  useEffect(() => {
+    if (!currentGameId || screen !== "game") return;
+    
+    loadGameData();
+    
+    const gameChannel = supabase
+      .channel(`game_${currentGameId}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'casino_games', filter: `id=eq.${currentGameId}` },
+        () => loadGameData()
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'casino_players', filter: `game_id=eq.${currentGameId}` },
+        () => loadGameData()
+      )
+      .subscribe();
+    
+    return () => {
+      gameChannel.unsubscribe();
+    };
+  }, [currentGameId, screen]);
+
   const loadTableData = async () => {
     if (!currentTableId) return;
     
@@ -388,6 +418,119 @@ export default function TexasHoldemCasinoPage() {
       }
     } catch (err) {
       console.error("Error loading table data:", err);
+    }
+  };
+
+  const loadGameData = async () => {
+    if (!currentGameId) return;
+    
+    try {
+      const { data: gameData } = await supabase
+        .from('casino_games')
+        .select('*')
+        .eq('id', currentGameId)
+        .single();
+      
+      const { data: playersData } = await supabase
+        .from('casino_players')
+        .select('*')
+        .eq('game_id', currentGameId)
+        .order('seat_index', { ascending: true });
+      
+      setGame(gameData);
+      setPlayers(playersData || []);
+      
+      if (playerId) {
+        const me = playersData?.find(p => p.id === playerId);
+        setMyPlayer(me);
+      }
+    } catch (err) {
+      console.error("Error loading game data:", err);
+    }
+  };
+
+  // Start a new game
+  const startGame = async () => {
+    if (!currentTableId || players.length < 2) return;
+    
+    try {
+      const deck = shuffleDeck(createDeck());
+      
+      // Create new game
+      const { data: newGame, error: gameError } = await supabase
+        .from('casino_games')
+        .insert({
+          table_id: currentTableId,
+          status: 'playing',
+          deck: deck,
+          round: 'preflop',
+          dealer_index: 0,
+          current_player_index: 0
+        })
+        .select()
+        .single();
+      
+      if (gameError) throw gameError;
+      
+      setCurrentGameId(newGame.id);
+      setGame(newGame);
+      setScreen("game");
+      
+      // Deal cards to players
+      const updatedPlayers = players.map((p, idx) => {
+        const card1 = deck[idx * 2];
+        const card2 = deck[idx * 2 + 1];
+        
+        return {
+          ...p,
+          game_id: newGame.id,
+          hole_cards: [card1, card2],
+          current_bet: 0,
+          status: 'active',
+          chips: selectedTable.min_buyin
+        };
+      });
+      
+      // Post blinds
+      const smallBlindIndex = 1 % players.length;
+      const bigBlindIndex = 2 % players.length;
+      
+      updatedPlayers[smallBlindIndex].current_bet = Math.min(selectedTable.small_blind, updatedPlayers[smallBlindIndex].chips);
+      updatedPlayers[smallBlindIndex].chips -= updatedPlayers[smallBlindIndex].current_bet;
+      
+      updatedPlayers[bigBlindIndex].current_bet = Math.min(selectedTable.big_blind, updatedPlayers[bigBlindIndex].chips);
+      updatedPlayers[bigBlindIndex].chips -= updatedPlayers[bigBlindIndex].current_bet;
+      
+      // Update players in database
+      for (const player of updatedPlayers) {
+        await supabase
+          .from('casino_players')
+          .update({
+            game_id: player.game_id,
+            hole_cards: player.hole_cards,
+            current_bet: player.current_bet,
+            status: player.status,
+            chips: player.chips
+          })
+          .eq('id', player.id);
+      }
+      
+      // Update game with pot and current bet
+      const pot = updatedPlayers.reduce((sum, p) => sum + p.current_bet, 0);
+      const currentBet = Math.max(...updatedPlayers.map(p => p.current_bet));
+      
+      await supabase
+        .from('casino_games')
+        .update({
+          pot: pot,
+          current_bet: currentBet,
+          current_player_index: 0
+        })
+        .eq('id', newGame.id);
+      
+    } catch (err) {
+      console.error("Error starting game:", err);
+      setError("Failed to start game: " + err.message);
     }
   };
 
@@ -617,6 +760,156 @@ export default function TexasHoldemCasinoPage() {
               >
                 Leave Table
               </button>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ============================================================================
+  // GAME SCREEN (Active poker game)
+  // ============================================================================
+
+  if (screen === "game") {
+    const isMyTurn = myPlayer && game && game.current_player_index === players.findIndex(p => p.id === playerId);
+    const communityCards = game?.community_cards || [];
+    const visibleCards = communityCards.slice(0, game?.community_visible || 0);
+    
+    return (
+      <Layout
+        address={address}
+        isConnected={isConnected}
+        openConnectModal={openConnectModal}
+        openAccountModal={openAccountModal}
+        disconnect={disconnect}
+        vaultAmount={vaultAmount}
+      >
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+          {/* Header */}
+          <div className="max-w-6xl mx-auto mb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-white">
+                  🃏 {selectedTable?.name}
+                </h2>
+                <div className="text-white/70 text-sm">
+                  Round: {game?.round || 'preflop'} | Pot: {fmt(game?.pot || 0)} MLEO
+                </div>
+              </div>
+              
+              <button
+                onClick={handleLeaveTable}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all"
+              >
+                Leave Table
+              </button>
+            </div>
+          </div>
+
+          {/* Game Table */}
+          <div className="max-w-6xl mx-auto">
+            <div className="bg-gradient-to-br from-green-800 to-green-900 rounded-2xl p-6 shadow-2xl border border-green-600/30">
+              
+              {/* Community Cards */}
+              <div className="text-center mb-8">
+                <div className="text-white/70 text-sm mb-3">Community Cards</div>
+                <div className="flex justify-center gap-2">
+                  {visibleCards.map((card, idx) => (
+                    <PlayingCard key={idx} card={card} delay={idx * 100} />
+                  ))}
+                  {Array.from({ length: 5 - visibleCards.length }).map((_, idx) => (
+                    <div key={idx} className="w-10 h-14 rounded bg-white/10 border border-white/20 flex items-center justify-center">
+                      ?
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Players */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                {players.map((player, idx) => {
+                  const isCurrentPlayer = game?.current_player_index === idx;
+                  const isMe = player.id === playerId;
+                  
+                  return (
+                    <div
+                      key={player.id}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        isCurrentPlayer
+                          ? 'border-yellow-400 bg-yellow-400/20'
+                          : isMe
+                          ? 'border-purple-400 bg-purple-400/20'
+                          : 'border-white/20 bg-white/5'
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className="text-white font-bold text-sm mb-1">
+                          {player.player_name}
+                          {isMe && ' (You)'}
+                          {isCurrentPlayer && ' 👑'}
+                        </div>
+                        
+                        <div className="text-emerald-400 text-xs mb-2">
+                          {fmt(player.chips)} chips
+                        </div>
+                        
+                        {player.current_bet > 0 && (
+                          <div className="text-amber-400 text-xs">
+                            Bet: {fmt(player.current_bet)}
+                          </div>
+                        )}
+                        
+                        {player.status === 'folded' && (
+                          <div className="text-red-400 text-xs">FOLDED</div>
+                        )}
+                        
+                        {player.status === 'all_in' && (
+                          <div className="text-orange-400 text-xs">ALL IN</div>
+                        )}
+                      </div>
+                      
+                      {/* Player Cards */}
+                      {isMe && player.hole_cards && (
+                        <div className="flex justify-center gap-1 mt-2">
+                          {player.hole_cards.map((card, cardIdx) => (
+                            <PlayingCard key={cardIdx} card={card} delay={cardIdx * 100} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Action Buttons */}
+              {isMyTurn && myPlayer?.status !== 'folded' && game?.status === 'playing' && (
+                <div className="text-center">
+                  <div className="text-white/70 text-sm mb-4">Your Turn</div>
+                  <div className="flex justify-center gap-3">
+                    <button className="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold">
+                      FOLD
+                    </button>
+                    <button className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold">
+                      CALL
+                    </button>
+                    <button className="px-6 py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold">
+                      RAISE
+                    </button>
+                    <button className="px-6 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold">
+                      ALL IN
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Game Status */}
+              {game?.status === 'finished' && (
+                <div className="text-center text-white/70">
+                  <div className="text-2xl mb-2">🎉</div>
+                  <div>Hand finished! Starting new hand...</div>
+                </div>
+              )}
             </div>
           </div>
         </div>
