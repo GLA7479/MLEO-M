@@ -796,9 +796,14 @@ export default function TexasHoldemCasinoPage() {
         .select('id')
         .eq('game_id', currentGameId);
       
-      // If no players left, clean up the game
+      // If no players left, mark game as waiting
       if (!remainingPlayers || remainingPlayers.length === 0) {
-        await cleanupFinishedGame();
+        await supabase.from('casino_games').update({
+          status: GAME_STATUS.WAITING,
+          round: 'preflop',
+          pot: 0,
+          current_bet: 0
+        }).eq('id', currentGameId);
       }
       
       // Reset state
@@ -917,29 +922,34 @@ export default function TexasHoldemCasinoPage() {
 
   const loadGameData = async () => {
     if (!currentGameId) return;
-    
+
     try {
-      const { data: gameData } = await supabase
+      const { data: gameData, error: ge } = await supabase
         .from('casino_games')
         .select('*')
         .eq('id', currentGameId)
         .single();
-      
+
+      if (ge || !gameData) {
+        // המשחק לא קיים – לא לקרוס
+        setCurrentGameId(null);
+        setScreen('table');
+        return;
+      }
+
       const { data: playersData } = await supabase
         .from('casino_players')
         .select('*')
         .eq('game_id', currentGameId)
-        .order('seat_index', { ascending: true });
-      
+        .order('seat_index');
+
       setGame(gameData);
       setPlayers(playersData || []);
-      
-      if (playerId) {
-        const me = playersData?.find(p => p.id === playerId);
-        setMyPlayer(me);
-      }
+      if (playerId) setMyPlayer(playersData?.find(p => p.id === playerId) || null);
     } catch (err) {
-      console.error("Error loading game data:", err);
+      console.error('loadGameData error:', err);
+      setCurrentGameId(null);
+      setScreen('table');
     }
   };
 
@@ -1485,7 +1495,6 @@ export default function TexasHoldemCasinoPage() {
           setWinnerModal({ open: false, text: "", hand: "", pot: 0 });
           startNewHand();
         }, 5000);
-        setTimeout(() => { cleanupFinishedGame(); }, 30000);
         return;
       }
 
@@ -1543,16 +1552,11 @@ export default function TexasHoldemCasinoPage() {
         current_bet: 0
       }).eq("id", currentGameId);
 
-      // התחל יד חדשה ואח״כ ניקוי
+      // התחל יד חדשה
       setTimeout(() => {
         setWinnerModal({ open: false, text: "", hand: "", pot: 0 });
         startNewHand();
       }, 5000);
-
-      // Clean up finished game after 30 seconds
-      setTimeout(() => {
-        cleanupFinishedGame();
-      }, 30000);
 
     } catch (err) {
       console.error("Error determining winner:", err);
