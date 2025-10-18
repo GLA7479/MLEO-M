@@ -770,13 +770,20 @@ export default function TexasHoldemCasinoPage() {
     if (!playerId || !currentTableId) return;
 
     try {
-      const { data: g } = await supabase
-        .from('casino_games').select('*').eq('id', currentGameId).maybeSingle();
+      // תמיד נבדוק את מצב המשחק ישירות מה-DB לפי השולחן
+      const { data: tableRow } = await supabase
+        .from('casino_tables').select('id,current_game_id').eq('id', currentTableId).single();
+      const activeGameId = tableRow?.current_game_id || null;
+      const { data: g } = activeGameId
+        ? await supabase.from('casino_games').select('*').eq('id', activeGameId).maybeSingle()
+        : { data: null };
       const { data: me } = await supabase
         .from('casino_players').select('*').eq('id', playerId).maybeSingle();
 
-      // רק כשאין יד פעילה זה "עזיבה מלאה" → החזרה ל-Vault ומחיקה
-      if (!g || g.status !== 'playing' || !me?.game_id) {
+      // תנאי "עזיבה מלאה" אמיתי:
+      // אין משחק פעיל, או שהסטטוס לא playing, או שהשחקן לא מוצמד ליד הנוכחית
+      const isFullLeave = (!g || g.status !== GAME_STATUS.PLAYING || !me?.game_id || (activeGameId && me.game_id !== activeGameId));
+      if (isFullLeave) {
         if (me && me.chips > 0) {
           const newVault = vaultAmount + me.chips;
           setVault(newVault);
@@ -792,7 +799,7 @@ export default function TexasHoldemCasinoPage() {
 
         // אם זה היה התור שלו – העבר תור
         const { data: pls } = await supabase
-          .from('casino_players').select('*').eq('game_id', currentGameId).order('seat_index');
+          .from('casino_players').select('*').eq('game_id', activeGameId).order('seat_index');
         const curIdx = g.current_player_index ?? 0;
         if (pls?.[curIdx]?.id === playerId) {
           const canAct = (p) => p.status !== 'folded' && p.status !== 'all_in';
@@ -804,7 +811,7 @@ export default function TexasHoldemCasinoPage() {
           await supabase.from('casino_games').update({
             current_player_index: nextIdx,
             turn_deadline: new Date(Date.now() + BETTING_TIME_LIMIT).toISOString()
-          }).eq('id', currentGameId);
+          }).eq('id', activeGameId);
         }
       }
 
@@ -2082,6 +2089,11 @@ export default function TexasHoldemCasinoPage() {
                           {player.player_name}
                           {isMe && ' (You)'}
                           {isCurrentPlayer && ' 👑'}
+                          {player.will_leave && (
+                            <span className="ml-2 px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-300 text-[10px] align-middle">
+                              יעזוב בסוף היד
+                            </span>
+                          )}
                         </div>
                         
                         <div className="text-emerald-400 text-xs mb-2">
