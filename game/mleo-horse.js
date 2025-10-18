@@ -85,6 +85,7 @@ export default function HorseRacePage() {
   const [selectedHorse, setSelectedHorse] = useState(null);
   const [racing, setRacing] = useState(false);
   const [winner, setWinner] = useState(null);
+  const [horseProgress, setHorseProgress] = useState([0, 0, 0, 0, 0]);
   const [gameResult, setGameResult] = useState(null);
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
@@ -166,38 +167,99 @@ export default function HorseRacePage() {
     setRacing(true);
     setGameResult(null);
     setWinner(null);
+    setHorseProgress([0, 0, 0, 0, 0]);
 
-    setTimeout(() => {
-      const winnerIndex = Math.floor(Math.random() * HORSES.length);
-          setWinner(winnerIndex);
-      setRacing(false);
-      checkResult(winnerIndex, bet);
-    }, 2000);
+    // Pre-determine all positions (1st, 2nd, 3rd, 4th, 5th)
+    const positions = [...Array(HORSES.length)].map((_, i) => i);
+    for (let i = positions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [positions[i], positions[j]] = [positions[j], positions[i]];
+    }
+    const winnerIndex = positions[0];
+    const secondIndex = positions[1];
+    const thirdIndex = positions[2];
+    const fourthIndex = positions[3];
+    
+    // Animate race - update every 100ms
+    const raceInterval = setInterval(() => {
+      setHorseProgress(prev => {
+        const newProgress = prev.map((p, i) => {
+          if (p >= 100) return 100;
+          // Different speeds for different positions
+          let speed;
+          if (i === winnerIndex) speed = 5 + Math.random() * 3; // 1st: fastest
+          else if (i === secondIndex) speed = 4.5 + Math.random() * 2.5; // 2nd
+          else if (i === thirdIndex) speed = 4 + Math.random() * 2; // 3rd
+          else if (i === fourthIndex) speed = 3.5 + Math.random() * 2; // 4th
+          else speed = 3 + Math.random() * 2; // 5th: slowest
+          return Math.min(100, p + speed);
+        });
+        
+        // Check if race finished
+        if (newProgress[winnerIndex] >= 100) {
+          clearInterval(raceInterval);
+          setTimeout(() => {
+            setWinner(winnerIndex);
+            setRacing(false);
+            checkResult(positions, bet);
+          }, 200);
+        }
+        
+        return newProgress;
+      });
+    }, 100); // Update every 100ms
   };
 
-  const checkResult = (winnerIndex, bet) => {
-    const win = winnerIndex === selectedHorse;
-    const prize = win ? Math.floor(bet * 5.4) : 0; // 108% RTP!
+  const checkResult = (positions, bet) => {
+    // positions[0] = 1st, positions[1] = 2nd, positions[2] = 3rd, positions[3] = 4th
+    const myPosition = positions.indexOf(selectedHorse);
+    
+    // Prize multipliers: 1st=×3.6, 2nd=×1, 3rd=×0.6, 4th=×0.2 (108% RTP!)
+    let multiplier = 0;
+    let place = '';
+    if (myPosition === 0) { multiplier = 3.6; place = '1st 🥇'; }
+    else if (myPosition === 1) { multiplier = 1; place = '2nd 🥈'; }
+    else if (myPosition === 2) { multiplier = 0.6; place = '3rd 🥉'; }
+    else if (myPosition === 3) { multiplier = 0.2; place = '4th'; }
+    else { multiplier = 0; place = '5th'; }
+    
+    const prize = Math.floor(bet * multiplier);
+    const win = prize > bet; // Win if prize > bet (1st or 2nd)
 
-    if (win && prize > 0) {
+    if (prize > 0) {
       const newVault = getVault() + prize;
       setVault(newVault); setVaultState(newVault);
-      playSfx(winSound.current);
+      if (win) playSfx(winSound.current);
     }
 
-    const resultData = { win, winner: HORSES[winnerIndex].name, selected: HORSES[selectedHorse].name, prize, profit: win ? prize - bet : -bet, multiplier: 5.4 };
+    const winnerIndex = positions[0];
+    const resultData = { 
+      win, 
+      winner: HORSES[winnerIndex].name, 
+      selected: HORSES[selectedHorse].name, 
+      prize, 
+      profit: prize - bet, 
+      multiplier,
+      place
+    };
     setGameResult(resultData);
 
-    const newStats = { ...stats, totalRaces: stats.totalRaces + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalBet: stats.totalBet + bet, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), lastBet: bet };
+    const newStats = { ...stats, totalRaces: stats.totalRaces + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalBet: stats.totalBet + bet, totalWon: stats.totalWon + prize, biggestWin: Math.max(stats.biggestWin, prize), lastBet: bet };
     setStats(newStats);
   };
 
-  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setWinner(null); setRacing(false); };
+  const resetGame = () => { 
+    setGameResult(null); 
+    setShowResultPopup(false); 
+    setWinner(null); 
+    setHorseProgress([0, 0, 0, 0, 0]);
+    setRacing(false); 
+  };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-green-900 via-black to-emerald-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
 
-  const potentialWin = Math.floor(Number(betAmount) * 5);
+  const potentialWin = Math.floor(Number(betAmount) * 3.6);
 
   return (
     <Layout>
@@ -219,7 +281,7 @@ export default function HorseRacePage() {
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">🏇 Horse Racing</h1>
-            <p className="text-white/70 text-xs">Bet on your horse • Win ×5.4!</p>
+            <p className="text-white/70 text-xs">Bet on your horse • Win ×3.6!</p>
           </div>
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
@@ -237,16 +299,47 @@ export default function HorseRacePage() {
           </div>
 
           <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
-            <div className="grid grid-cols-5 gap-2 mb-2">
+            {/* Horse Selection Buttons */}
+            <div className="grid grid-cols-5 gap-2 mb-3 w-full">
               {HORSES.map((horse, index) => (
                 <button key={index} onClick={() => { setSelectedHorse(index); playSfx(clickSound.current); }} disabled={racing}
-                  className={`h-16 rounded-lg font-bold text-2xl transition-all ${selectedHorse === index ? 'bg-gradient-to-r from-green-600 to-green-500 text-white ring-2 ring-green-300' : winner === index ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white hover:bg-white/20'} disabled:opacity-50`}>
+                  className={`h-14 rounded-lg font-bold text-2xl transition-all ${selectedHorse === index ? 'bg-gradient-to-r from-green-600 to-green-500 text-white ring-2 ring-green-300' : winner === index ? 'bg-yellow-500 text-black animate-pulse' : 'bg-white/10 text-white hover:bg-white/20'} disabled:opacity-50`}>
                   {horse.emoji}
-                        </button>
-                      ))}
-                    </div>
-            <div className="text-center" style={{ height: '28px' }}>
-              <div className={`text-base font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-red-400'}`}>{gameResult ? (gameResult.win ? `${gameResult.winner} WINS!` : `Winner: ${gameResult.winner}`) : 'waiting'}</div>
+                </button>
+              ))}
+            </div>
+
+            {/* Race Track */}
+            <div className="w-full space-y-2 bg-black/30 border border-white/10 rounded-lg p-3">
+              {HORSES.map((horse, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <div className="text-lg w-8">{horse.emoji}</div>
+                  <div className="flex-1 h-6 bg-black/50 rounded-full overflow-hidden border border-white/20 relative">
+                    <div 
+                      className={`h-full transition-all duration-100 ${
+                        selectedHorse === index ? 'bg-gradient-to-r from-green-500 to-emerald-400' : 
+                        winner === index ? 'bg-gradient-to-r from-yellow-500 to-amber-400' : 
+                        'bg-gradient-to-r from-blue-500 to-cyan-400'
+                      }`}
+                      style={{ width: `${horseProgress[index]}%` }}
+                    />
+                    {winner === index && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold">
+                        🏆
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-xs text-white/60 w-12 text-right">
+                    {horseProgress[index].toFixed(0)}%
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="text-center mt-2" style={{ height: '24px' }}>
+              <div className={`text-sm font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-red-400'}`}>
+                {gameResult ? (gameResult.win ? `🏆 ${gameResult.winner} WINS!` : `Winner: ${gameResult.winner}`) : ''}
+              </div>
             </div>
           </div>
 
@@ -275,11 +368,14 @@ export default function HorseRacePage() {
 
         {showResultPopup && gameResult && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
-            <div className={`${gameResult.win ? 'bg-green-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
-              <div className="text-4xl mb-2">{gameResult.win ? '🏆' : '😔'}</div>
-              <div className="text-2xl font-bold mb-1">{gameResult.win ? 'YOU WIN!' : 'YOU LOSE'}</div>
-              <div className="text-lg">{gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div>
-              <div className="text-sm opacity-80 mt-2">Winner: {gameResult.winner}</div>
+            <div className={`${gameResult.place === '1st 🥇' ? 'bg-yellow-500' : gameResult.place === '2nd 🥈' ? 'bg-green-500' : gameResult.prize > 0 ? 'bg-blue-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
+              <div className="text-4xl mb-2">{gameResult.place || '😔'}</div>
+              <div className="text-2xl font-bold mb-1">{gameResult.place === '1st 🥇' ? 'WINNER!' : gameResult.place === '2nd 🥈' ? 'NICE!' : gameResult.prize > 0 ? 'CLOSE!' : 'LOST'}</div>
+              <div className="text-lg">{gameResult.prize > 0 ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div>
+              <div className="text-sm opacity-80 mt-2">
+                {gameResult.selected} finished {gameResult.place}
+                {gameResult.place !== '1st 🥇' && (<div className="text-xs mt-1">Winner: {gameResult.winner}</div>)}
+              </div>
             </div>
           </div>
         )}
@@ -302,11 +398,20 @@ export default function HorseRacePage() {
               <div className="space-y-3 text-sm">
                 <p><strong>1. Select Horse:</strong> Choose your favorite!</p>
                 <p><strong>2. Set Bet:</strong> Min {MIN_BET} MLEO</p>
-                <p><strong>3. Race:</strong> Watch them compete!</p>
-                <p><strong>4. Win:</strong> If your horse wins, you get ×5.4!</p>
+                <p><strong>3. Race:</strong> Watch the progress bars!</p>
+                <p><strong>4. Win Prizes:</strong> Top 4 positions get paid!</p>
                 <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
-                  <p className="text-green-300 font-semibold">Payout: ×5.4 (108% RTP!)</p>
-                  <p className="text-xs text-white/80 mt-1">All horses have equal 20% chance to win!</p>
+                  <p className="text-green-300 font-semibold mb-2">Prize Table:</p>
+                  <div className="text-xs text-white/80 space-y-1">
+                    <p>🥇 1st Place: ×3.6</p>
+                    <p>🥈 2nd Place: ×1 (break even)</p>
+                    <p>🥉 3rd Place: ×0.6</p>
+                    <p>4th Place: ×0.2</p>
+                    <p>5th Place: ×0 (lose)</p>
+                  </div>
+                </div>
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mt-2">
+                  <p className="text-blue-300 font-semibold text-xs">💡 Each horse has equal chance! Watch the race bars!</p>
         </div>
               </div>
               <button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>

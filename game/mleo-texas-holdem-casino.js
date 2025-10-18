@@ -978,9 +978,11 @@ export default function TexasHoldemCasinoPage() {
       // Post blinds
       updatedPlayers[smallBlindIdx].current_bet = Math.min(selectedTable.small_blind, updatedPlayers[smallBlindIdx].chips);
       updatedPlayers[smallBlindIdx].chips -= updatedPlayers[smallBlindIdx].current_bet;
+      updatedPlayers[smallBlindIdx].hand_invested = (updatedPlayers[smallBlindIdx].hand_invested || 0) + updatedPlayers[smallBlindIdx].current_bet;
       
       updatedPlayers[bigBlindIdx].current_bet = Math.min(selectedTable.big_blind, updatedPlayers[bigBlindIdx].chips);
       updatedPlayers[bigBlindIdx].chips -= updatedPlayers[bigBlindIdx].current_bet;
+      updatedPlayers[bigBlindIdx].hand_invested = (updatedPlayers[bigBlindIdx].hand_invested || 0) + updatedPlayers[bigBlindIdx].current_bet;
       
       // Update players in database
       for (const player of updatedPlayers) {
@@ -991,7 +993,8 @@ export default function TexasHoldemCasinoPage() {
             hole_cards: player.hole_cards,
             current_bet: player.current_bet,
             status: player.status,
-            chips: player.chips
+            chips: player.chips,
+            hand_invested: player.hand_invested || 0
           })
           .eq('id', player.id);
       }
@@ -1050,37 +1053,42 @@ export default function TexasHoldemCasinoPage() {
       let newBet = me.current_bet ?? 0;
       let newChips = me.chips ?? 0;
       let newStatus = me.status;
+      let put = 0; // כמה שם השחקן בקופה
 
       if (action === "fold") {
         newStatus = PLAYER_STATUS.FOLDED;
       } else if (action === "check") {
         if (toCall > 0) return; // לא חוקי
       } else if (action === "call") {
-        const pay = Math.min(toCall, newChips);
-        newBet += pay; newChips -= pay;
-        if (pay < toCall) newStatus = PLAYER_STATUS.ALL_IN;
+        put = Math.min(toCall, newChips);
+        newBet += put; newChips -= put;
+        if (put < toCall) newStatus = PLAYER_STATUS.ALL_IN;
       } else if (action === "raise") {
         // מינימום העלאה = ההעלאה האחרונה ברחוב (או BB אם עוד לא הייתה העלאה)
         const lastRaiseTo = gNow.last_raise_to || 0;
         const minRaiseSize = Math.max((lastRaiseTo - (gNow.current_bet || 0)), selectedTable?.big_blind || 0);
         let raiseTo = Math.max((gNow.current_bet || 0) + minRaiseSize, amount);
         raiseTo = Math.min(raiseTo, newBet + newChips);
-        const put = raiseTo - newBet;
+        put = raiseTo - newBet;
         if (put <= 0) return;
         newBet = raiseTo;
         newChips -= put;
         if (newChips === 0) newStatus = PLAYER_STATUS.ALL_IN;
       } else if (action === "allin") {
-        const put = newChips;
+        put = newChips;
         newBet += put; newChips = 0;
         newStatus = PLAYER_STATUS.ALL_IN;
       }
+
+      // עדכון hand_invested מצטבר
+      const newInvested = (me.hand_invested || 0) + (put || 0);
 
       // 3) עדכון השחקן
       await supabase.from('casino_players').update({
         status: newStatus,
         current_bet: newBet,
         chips: newChips,
+        hand_invested: newInvested,        // ⬅️ חדש
         last_action: action,
         last_action_time: new Date().toISOString(),
       }).eq('id', playerId);
@@ -1198,6 +1206,128 @@ export default function TexasHoldemCasinoPage() {
     }
   };
 
+  // --- Side Pots --------------------------------------------------------------
+
+  function buildSidePots(players) {
+    // players: [{ id, seat_index, status, hand_invested, hole_cards }]
+    // נבנה שכבות לפי ההשקעה המצטברת ביד
+    const contrib = players.map(p => ({ id: p.id, folded: p.status === 'folded', v: Math.max(0, p.hand_invested || 0) }));
+    const pots = [];
+
+    while (true) {
+      const active = contrib.filter(c => c.v > 0);
+      if (active.length === 0) break;
+
+      const minLayer = Math.min(...active.map(c => c.v));
+      const layerParticipants = contrib.filter(c => c.v > 0); // כל מי שעדיין יש לו תרומה > 0 משתתף בשכבה הזו
+      const amount = minLayer * layerParticipants.length;
+
+      const eligibleIds = layerParticipants
+        .filter(c => !c.folded)      // רק מי שלא קיפל זכאי לזכייה
+        .map(c => c.id);
+
+      pots.push({
+        amount,
+        eligibleIds
+      });
+
+      // הורד את השכבה מכל המשתתפים בשכבה
+      for (const lp of layerParticipants) lp.v -= minLayer;
+    }
+
+    return pots; // [{amount, eligibleIds}]
+  }
+
+  function orderSeatsForRemainders(players, dealerIndex) {
+    // החזרת מערך מזהי שחקנים לפי סדר קבלת "צ'יפ מוזר" (odd chip):
+    // החל מהשחקן משמאל לדילר, עם wrap-around
+    const sorted = [...players].sort((a, b) => a.seat_index - b.seat_index);
+    const start = (dealerIndex + 1) % sorted.length;
+    const ring = [];
+    for (let i = 0; i < sorted.length; i++) {
+      ring.push(sorted[(start + i) % sorted.length].id);
+    }
+    return ring;
+  }
+
+  async function settleSidePots(currentGameId, dealerIndex, board5) {
+    // טען מצב נוכחי
+    const { data: pls } = await supabase
+      .from('casino_players')
+      .select('id,player_name,seat_index,status,hole_cards,hand_invested,chips,game_id')
+      .eq('game_id', currentGameId)
+      .order('seat_index');
+
+    const players = pls || [];
+    const totalPot = players.reduce((s, p) => s + Math.max(0, p.hand_invested || 0), 0);
+
+    const pots = buildSidePots(players); // [{amount, eligibleIds}]
+
+    // הכנה לסדר שאריות
+    const oddOrder = orderSeatsForRemainders(players, dealerIndex);
+
+    // מצטבר עדכונים ל-DB
+    const chipIncrements = new Map(); // playerId -> +chips
+
+    for (const pot of pots) {
+      const elig = players.filter(p => pot.eligibleIds.includes(p.id));
+      if (elig.length === 0 || pot.amount <= 0) continue;
+
+      // דירוג ידיים לזכאים
+      const ranked = elig.map(p => {
+        const all = [...(p.hole_cards || []), ...board5];
+        const evalRes = evaluateHand(all);
+        return { p, evalRes };
+      }).sort((a, b) => compareRankTuple(b.evalRes.score, a.evalRes.score));
+
+      // מצא את הניקוד הטוב ביותר
+      const bestScore = ranked[0].evalRes.score;
+      const winners = ranked.filter(r => compareRankTuple(r.evalRes.score, bestScore) === 0).map(r => r.p);
+
+      // חלוקה שווה + שאריות לפי oddOrder
+      const baseShare = Math.floor(pot.amount / winners.length);
+      let remainder = pot.amount - baseShare * winners.length;
+
+      for (const w of winners) {
+        chipIncrements.set(w.id, (chipIncrements.get(w.id) || 0) + baseShare);
+      }
+
+      if (remainder > 0) {
+        // חלק שאריות לפי סדר oddOrder (משמאל לדילר)
+        for (const pid of oddOrder) {
+          if (remainder === 0) break;
+          if (winners.find(w => w.id === pid)) {
+            chipIncrements.set(pid, (chipIncrements.get(pid) || 0) + 1);
+            remainder--;
+          }
+        }
+      }
+    }
+
+    // בצע העדכונים
+    for (const [pid, inc] of chipIncrements.entries()) {
+      await supabase.from('casino_players').update({
+        chips: (players.find(p => p.id === pid)?.chips || 0) + inc
+      }).eq('id', pid);
+    }
+
+    // איפוס הימורים/השקעה ידנית של כולם (יד נגמרה)
+    await supabase.from('casino_players')
+      .update({ current_bet: 0, hand_invested: 0 })
+      .eq('game_id', currentGameId);
+
+    // אפס את הקופה וסמן סיום
+    await supabase.from('casino_games').update({
+      pot: 0,
+      current_bet: 0,
+      round: 'showdown',
+      status: 'finished',
+      community_visible: 5
+    }).eq('id', currentGameId);
+
+    return { totalPot, pots, chipIncrements };
+  }
+
   // Determine winner
   const determineWinner = async () => {
     try {
@@ -1246,46 +1376,42 @@ export default function TexasHoldemCasinoPage() {
       }
 
       // --- SHOWDOWN מלא ---
-      await supabase.from('casino_games').update({ community_visible: 5 }).eq("id", currentGameId);
-
-      const board5 = (gNow.community_cards||[]).slice(0,5);
-      const ranked = active.map(p => {
-        const all = [...(p.hole_cards||[]), ...board5];
-        const evalRes = evaluateHand(all);
-        return { p, evalRes };
-      }).sort((a,b)=> compareRankTuple(b.evalRes.score, a.evalRes.score));
-
-      const winner = ranked[0];
-      const potAmount = gNow.pot || 0;
+      // וודא שהלוח הוא 5 קלפים:
+      const board5 = (gNow.community_cards || []).slice(0, 5);
 
       // גלה קלפים לכולם
       await supabase.from('casino_players')
         .update({ revealed: true })
-        .in("id", ranked.map(r => r.p.id));
+        .eq("game_id", currentGameId);
 
-      // 1) הוסף את הקופה לצ'יפים של המנצח
-      await supabase.from('casino_players')
-        .update({ chips: (winner.p.chips || 0) + potAmount })
-        .eq('id', winner.p.id);
+      // בצע חלוקת סייד-פוטים:
+      const { pots, chipIncrements } = await settleSidePots(currentGameId, gNow.dealer_index || 0, board5);
 
-      // אפס הימורים
-      await supabase.from('casino_players')
-        .update({ current_bet: 0 })
-        .eq('game_id', currentGameId);
+      // מסר ידידותי: בחר את הזוכה (או הזוכים) של הפוט העליון להצגה
+      let topWinnersText = '';
+      if (pots.length > 0) {
+        const topPot = pots[pots.length - 1];
+        const { data: elig } = await supabase
+          .from('casino_players')
+          .select('id,player_name,seat_index,hole_cards,hand_invested,status')
+          .in('id', topPot.eligibleIds);
 
-      // 2) עדכן את המשחק
-      await supabase.from('casino_games').update({
-        status: GAME_STATUS.FINISHED,
-        round: "showdown",
-        current_bet: 0,
-        pot: 0,                            // ⬅️ אפס את הקופה
-        community_visible: 5,
-      }).eq("id", currentGameId);
+        const rankedTop = (elig || []).map(p => {
+          const all = [...(p.hole_cards || []), ...board5];
+          return { p, evalRes: evaluateHand(all) };
+        }).sort((a, b) => compareRankTuple(b.evalRes.score, a.evalRes.score));
+
+        const bestScore = rankedTop[0].evalRes.score;
+        const winners = rankedTop.filter(r => compareRankTuple(r.evalRes.score, bestScore) === 0);
+
+        topWinnersText = winners.map(w => `${w.p.player_name} (${w.evalRes.name})`).join(' & ');
+      }
 
       // UI
-      setGameMessage(`🎉 ${winner.p.player_name} wins with ${winner.evalRes.name}! Pot: ${fmt(potAmount)} MLEO`);
-      setWinnerModal({ open: true, text: `🎉 ${winner.p.player_name} wins!`, hand: winner.evalRes.name, pot: potAmount });
+      setGameMessage(`🏆 Pots settled. ${topWinnersText ? 'Top pot: ' + topWinnersText : ''}`);
+      setWinnerModal({ open: true, text: "🏆 Side pots settled", hand: topWinnersText, pot: (gNow.pot || 0) });
 
+      // התחל יד חדשה ואח״כ ניקוי
       setTimeout(() => {
         setWinnerModal({ open: false, text: "", hand: "", pot: 0 });
         startNewHand();
@@ -1314,6 +1440,11 @@ export default function TexasHoldemCasinoPage() {
         .eq('game_id', currentGameId).order('seat_index');
       const n = (freshPlayers?.length) || players.length;
       
+      // איפוס hand_invested לכולם בתחילת יד חדשה
+      await supabase.from('casino_players')
+        .update({ hand_invested: 0 })
+        .eq('game_id', currentGameId);
+      
       // Compute positions for the new hand (MUST be before using them)
       const dealerIndex   = ((game?.dealer_index ?? -1) + 1) % n;
       const smallBlindIdx = (dealerIndex + 1) % n;
@@ -1331,16 +1462,19 @@ export default function TexasHoldemCasinoPage() {
           hole_cards: [card1, card2],
           current_bet: 0,
           status: PLAYER_STATUS.ACTIVE,
-          revealed: false
+          revealed: false,
+          hand_invested: 0
         };
       });
       
       // Post blinds - use the calculated indices
       updatedPlayers[smallBlindIdx].current_bet = Math.min(selectedTable.small_blind, updatedPlayers[smallBlindIdx].chips);
       updatedPlayers[smallBlindIdx].chips -= updatedPlayers[smallBlindIdx].current_bet;
+      updatedPlayers[smallBlindIdx].hand_invested = updatedPlayers[smallBlindIdx].current_bet;
       
       updatedPlayers[bigBlindIdx].current_bet = Math.min(selectedTable.big_blind, updatedPlayers[bigBlindIdx].chips);
       updatedPlayers[bigBlindIdx].chips -= updatedPlayers[bigBlindIdx].current_bet;
+      updatedPlayers[bigBlindIdx].hand_invested = updatedPlayers[bigBlindIdx].current_bet;
       
       // Update players in database
       for (const player of updatedPlayers) {
@@ -1349,7 +1483,8 @@ export default function TexasHoldemCasinoPage() {
           current_bet: player.current_bet,
           status: player.status,
           chips: player.chips,
-          revealed: player.revealed
+          revealed: player.revealed,
+          hand_invested: player.hand_invested || 0
         }).eq('id', player.id);
       }
       
