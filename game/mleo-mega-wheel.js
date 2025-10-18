@@ -38,8 +38,8 @@ function useIOSViewportFix() {
 
 const LS_KEY = "mleo_mega_wheel_v2";
 const MIN_BET = 1000;
-const WHEEL_SEGMENTS = [0.5, 0.8, 1, 1.2, 1.5, 2, 3, 5, 8]; // 108% RTP!
-const WHEEL_COLORS = ['Red', 'Blue', 'Green', 'Purple', 'Orange', 'Yellow', 'Gray', 'Pink', 'Brown'];
+const WHEEL_SEGMENTS = [0.5, 0.5, 0.8, 0.8, 1, 1.2, 1.5, 2.5]; // 8 segments, 108% RTP!
+const WHEEL_COLORS = ['Red', 'Blue', 'Green', 'Purple', 'Orange', 'Yellow', 'Gray', 'Pink'];
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -167,14 +167,15 @@ export default function MegaWheelPage() {
     const color = WHEEL_COLORS[segmentIndex];
     
     // Calculate target rotation (5 full spins + land on segment)
-    const degreesPerSegment = 360 / WHEEL_SEGMENTS.length;
-    const targetSegmentDegree = segmentIndex * degreesPerSegment;
-    // Adjust for pointer position - pointer is at top (0 degrees)
-    // We need to rotate so the target segment ends up at the top
-    const finalRotation = 360 * 5 + (360 - targetSegmentDegree + degreesPerSegment/2); // 5 full rotations + target
+    const degreesPerSegment = 360 / WHEEL_SEGMENTS.length; // 45 degrees per segment
+    // Calculate the center of the target segment
+    const segmentCenter = segmentIndex * degreesPerSegment + degreesPerSegment / 2;
+    // We need to rotate so the center of the target segment ends up at the top (0 degrees)
+    // The wheel rotates clockwise, so we need to rotate counter-clockwise
+    const finalRotation = 360 * 5 + (360 - segmentCenter); // 5 full rotations + target center
     
     // Animate with easing (fast -> slow)
-    let currentRotation = wheelRotation;
+    const startRotation = wheelRotation;
     const totalDuration = 3000; // 3 seconds
     const startTime = Date.now();
     
@@ -185,7 +186,7 @@ export default function MegaWheelPage() {
       // Easing function: ease-out (starts fast, ends slow)
       const eased = 1 - Math.pow(1 - progress, 3);
       
-      const newRotation = wheelRotation + (finalRotation * eased);
+      const newRotation = startRotation + (finalRotation * eased);
       setWheelRotation(newRotation);
       
       if (progress < 1) {
@@ -266,15 +267,14 @@ export default function MegaWheelPage() {
                 style={{ 
                   transform: `rotate(${wheelRotation}deg)`,
                   background: `conic-gradient(from 0deg,
-                    #ef4444 0deg, #ef4444 40deg,
-                    #3b82f6 40deg, #3b82f6 80deg,
-                    #22c55e 80deg, #22c55e 120deg,
-                    #8b5cf6 120deg, #8b5cf6 160deg,
-                    #f97316 160deg, #f97316 200deg,
-                    #eab308 200deg, #eab308 240deg,
-                    #a3a3a3 240deg, #a3a3a3 280deg,
-                    #ec4899 280deg, #ec4899 320deg,
-                    #8b4513 320deg, #8b4513 360deg
+                    #ef4444 0deg, #ef4444 45deg,
+                    #3b82f6 45deg, #3b82f6 90deg,
+                    #22c55e 90deg, #22c55e 135deg,
+                    #8b5cf6 135deg, #8b5cf6 180deg,
+                    #f97316 180deg, #f97316 225deg,
+                    #eab308 225deg, #eab308 270deg,
+                    #a3a3a3 270deg, #a3a3a3 315deg,
+                    #ec4899 315deg, #ec4899 360deg
                   )`
                 }}
               >
@@ -351,42 +351,38 @@ export default function MegaWheelPage() {
                 <p><strong>3. Win:</strong> Land on a multiplier!</p>
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
                   <p className="text-yellow-300 font-semibold mb-2">Color Prizes (108% RTP!):</p>
-                  <div className="grid grid-cols-3 gap-1 text-xs">
+                  <div className="grid grid-cols-4 gap-1 text-xs">
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 rounded bg-red-500"></div>
                       <span className="text-white/70">×0.5</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 rounded bg-blue-500"></div>
-                      <span className="text-white/70">×0.8</span>
+                      <span className="text-white/70">×0.5</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 rounded bg-green-500"></div>
-                      <span className="text-white/70">×1.0</span>
+                      <span className="text-white/70">×0.8</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 rounded bg-purple-500"></div>
-                      <span className="text-white/70">×1.2</span>
+                      <span className="text-white/70">×0.8</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 rounded bg-orange-500"></div>
-                      <span className="text-white/70">×1.5</span>
+                      <span className="text-white/70">×1.0</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 rounded bg-yellow-500"></div>
-                      <span className="text-white/70">×2.0</span>
+                      <span className="text-white/70">×1.2</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 rounded bg-gray-400"></div>
-                      <span className="text-white/70">×3.0</span>
+                      <span className="text-white/70">×1.5</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 rounded bg-pink-500"></div>
-                      <span className="text-white/70">×5.0</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded" style={{backgroundColor: '#8b4513'}}></div>
-                      <span className="text-white/70">×8.0</span>
+                      <span className="text-white/70">×2.5</span>
                     </div>
                   </div>
                 </div>
