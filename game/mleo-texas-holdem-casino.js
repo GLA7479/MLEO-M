@@ -449,6 +449,13 @@ export default function TexasHoldemCasinoPage() {
     return (me?.current_bet || 0) + (me?.chips || 0);
   };
 
+  // Helper function for RPC - pad tuple to 8 elements
+  function padTuple8(arr = []) {
+    const out = arr.slice(0, 8);
+    while (out.length < 8) out.push(0);
+    return out.map(x => Number(x || 0));
+  }
+
   // Timer functions
   const startActionTimer = (playerId) => {
     if (actionTimer) {
@@ -1028,6 +1035,7 @@ export default function TexasHoldemCasinoPage() {
   };
 
   const handlePlayerAction = async (action, amount = 0) => {
+    if (!currentGameId) return;
     if (!game || !playerId) return;
     if (game.status !== GAME_STATUS.PLAYING || game.round === "finished") return;
 
@@ -1250,6 +1258,47 @@ export default function TexasHoldemCasinoPage() {
     return ring;
   }
 
+  // מחלק את ה-pot למנצח, מאפס current_bet לכולם ומאפס pot במשחק
+  async function awardPotToWinner(currentGameId, winnerPlayerId) {
+    // תמונת מצב עדכנית
+    const { data: g } = await supabase
+      .from('casino_games')
+      .select('id,pot')
+      .eq('id', currentGameId)
+      .single();
+
+    if (!g) return;
+
+    const potAmount = g.pot || 0;
+
+    // מוצאים את המנצח (בשביל ה-chips העדכני)
+    const { data: w } = await supabase
+      .from('casino_players')
+      .select('id,chips')
+      .eq('id', winnerPlayerId)
+      .single();
+
+    // 1) מזכים את המנצח בצ'יפים (stack)
+    if (w && potAmount > 0) {
+      await supabase
+        .from('casino_players')
+        .update({ chips: (w.chips || 0) + potAmount })
+        .eq('id', winnerPlayerId);
+    }
+
+    // 2) מאפסים current_bet לכל שחקני היד
+    await supabase
+      .from('casino_players')
+      .update({ current_bet: 0 })
+      .eq('game_id', currentGameId);
+
+    // 3) מאפסים את ה-pot במשחק
+    await supabase
+      .from('casino_games')
+      .update({ pot: 0, current_bet: 0 })
+      .eq('id', currentGameId);
+  }
+
   async function settleSidePots(currentGameId, dealerIndex, board5) {
     // טען מצב נוכחי
     const { data: pls } = await supabase
@@ -1343,28 +1392,24 @@ export default function TexasHoldemCasinoPage() {
         const w = active[0];
         const potAmount = gNow.pot || 0;
 
-        // 1) הוסף את הקופה לצ'יפים של המנצח בטבלה
-        await supabase.from('casino_players')
-          .update({ chips: (w.chips || 0) + potAmount })
-          .eq('id', w.id);
+        // אין צורך בקלפים – פשוט מעבירים דירוג "דמה" (tuple גדל) רק למנצח:
+        await supabase.rpc('award_pots_v2', {
+          game_uuid: currentGameId,
+          rankings_json: [{ player_id: w.id, tuple: padTuple8([99,99,99,99,99,99,99,99]) }]
+        });
 
-        // אפס הימורים של כולם
-        await supabase.from('casino_players')
-          .update({ current_bet: 0 })
-          .eq('game_id', currentGameId);
+        // רענון תצוגה
+        await loadGameData();
 
-        // 2) עדכן את המשחק
+        setGameMessage(`🎉 ${w.player_name} wins by fold! Pot: ${fmt(potAmount)} MLEO`);
+        setWinnerModal({ open: true, text: `🎉 ${w.player_name} wins by fold!`, hand: "", pot: potAmount });
+
         await supabase.from('casino_games').update({
           status: GAME_STATUS.FINISHED,
           round: "showdown",
-          current_bet: 0,
-          pot: 0,                            // ⬅️ אפס את הקופה
           community_visible: 5,
+          current_bet: 0
         }).eq("id", currentGameId);
-
-        // UI
-        setGameMessage(`🎉 ${w.player_name} wins by fold! Pot: ${fmt(potAmount)} MLEO`);
-        setWinnerModal({ open: true, text: `🎉 ${w.player_name} wins by fold!`, hand: "", pot: potAmount });
 
         // התחל יד חדשה...
         setTimeout(() => {
@@ -1376,30 +1421,41 @@ export default function TexasHoldemCasinoPage() {
       }
 
       // --- SHOWDOWN מלא ---
-      // וודא שהלוח הוא 5 קלפים:
       const board5 = (gNow.community_cards || []).slice(0, 5);
 
-      // גלה קלפים לכולם
+      // בונים דירוגים רק לשחקנים שלא קיפלו (folded לא משתתף בזכייה)
+      const rankings = (pls || [])
+        .filter(p => p.status !== 'folded')
+        .map(p => {
+          const all = [...(p.hole_cards || []), ...board5];
+          const ev  = evaluateHand(all);      // מחזיר {score: int[] ...}
+          return { player_id: p.id, tuple: padTuple8(ev.score) };
+        });
+
+      // קריאת ה-RPC – הוא יבצע Side Pots מלא + חלוקה לשחקנים (chips) ויאפס את הקופה/הימורים
+      await supabase.rpc('award_pots_v2', {
+        game_uuid: currentGameId,
+        rankings_json: rankings
+      });
+
+      // חשיפת קלפים לכולם (אופציונלי)
       await supabase.from('casino_players')
         .update({ revealed: true })
-        .eq("game_id", currentGameId);
+        .eq('game_id', currentGameId);
 
-      // בצע חלוקת סייד-פוטים:
-      const { pots, chipIncrements } = await settleSidePots(currentGameId, gNow.dealer_index || 0, board5);
+      // רענון תצוגה
+      await loadGameData();
 
-      // מסר ידידותי: בחר את הזוכה (או הזוכים) של הפוט העליון להצגה
+      // מסר ידידותי: בחר את הזוכה (או הזוכים) להצגה
       let topWinnersText = '';
-      if (pots.length > 0) {
-        const topPot = pots[pots.length - 1];
-        const { data: elig } = await supabase
-          .from('casino_players')
-          .select('id,player_name,seat_index,hole_cards,hand_invested,status')
-          .in('id', topPot.eligibleIds);
-
-        const rankedTop = (elig || []).map(p => {
-          const all = [...(p.hole_cards || []), ...board5];
-          return { p, evalRes: evaluateHand(all) };
-        }).sort((a, b) => compareRankTuple(b.evalRes.score, a.evalRes.score));
+      if (rankings.length > 0) {
+        const rankedTop = rankings
+          .map(r => {
+            const p = pls.find(pl => pl.id === r.player_id);
+            const all = [...(p.hole_cards || []), ...board5];
+            return { p, evalRes: evaluateHand(all) };
+          })
+          .sort((a, b) => compareRankTuple(b.evalRes.score, a.evalRes.score));
 
         const bestScore = rankedTop[0].evalRes.score;
         const winners = rankedTop.filter(r => compareRankTuple(r.evalRes.score, bestScore) === 0);
@@ -1408,8 +1464,15 @@ export default function TexasHoldemCasinoPage() {
       }
 
       // UI
-      setGameMessage(`🏆 Pots settled. ${topWinnersText ? 'Top pot: ' + topWinnersText : ''}`);
+      setGameMessage(`🏆 Pots settled. ${topWinnersText ? 'Winners: ' + topWinnersText : ''}`);
       setWinnerModal({ open: true, text: "🏆 Side pots settled", hand: topWinnersText, pot: (gNow.pot || 0) });
+
+      await supabase.from('casino_games').update({
+        status: GAME_STATUS.FINISHED,
+        round: "showdown",
+        community_visible: 5,
+        current_bet: 0
+      }).eq("id", currentGameId);
 
       // התחל יד חדשה ואח״כ ניקוי
       setTimeout(() => {

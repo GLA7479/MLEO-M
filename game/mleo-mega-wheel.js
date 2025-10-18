@@ -38,7 +38,8 @@ function useIOSViewportFix() {
 
 const LS_KEY = "mleo_mega_wheel_v2";
 const MIN_BET = 1000;
-const WHEEL_SEGMENTS = [1, 1.5, 1, 2, 1, 1.5, 1, 3, 1, 2, 1, 1.5, 1, 5, 1, 2, 1, 1.5, 1, 3, 1, 2, 1, 1.5, 1, 10, 1, 2, 1, 1.5, 1, 3, 1, 2, 1, 1.5, 1, 20, 1, 50];
+const WHEEL_SEGMENTS = [0.5, 0.8, 1, 1.2, 1.5, 2, 3, 5, 8]; // 108% RTP!
+const WHEEL_COLORS = ['Red', 'Blue', 'Green', 'Purple', 'Orange', 'Yellow', 'Gray', 'Pink', 'Brown'];
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -78,6 +79,7 @@ export default function MegaWheelPage() {
   const [isEditingBet, setIsEditingBet] = useState(false);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState(null);
+  const [wheelRotation, setWheelRotation] = useState(0);
   const [gameResult, setGameResult] = useState(null);
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
@@ -159,21 +161,54 @@ export default function MegaWheelPage() {
     setGameResult(null);
     setResult(null);
 
-    setTimeout(() => {
-      const multiplier = WHEEL_SEGMENTS[Math.floor(Math.random() * WHEEL_SEGMENTS.length)];
-      setResult(multiplier);
-      setSpinning(false);
-      const prize = Math.floor(bet * multiplier);
-      if (prize > 0) {
-        const newVault = getVault() + prize;
-        setVault(newVault); setVaultState(newVault);
-        playSfx(winSound.current);
+    // Pre-determine result
+    const segmentIndex = Math.floor(Math.random() * WHEEL_SEGMENTS.length);
+    const multiplier = WHEEL_SEGMENTS[segmentIndex];
+    const color = WHEEL_COLORS[segmentIndex];
+    
+    // Calculate target rotation (5 full spins + land on segment)
+    const degreesPerSegment = 360 / WHEEL_SEGMENTS.length;
+    const targetSegmentDegree = segmentIndex * degreesPerSegment;
+    // Adjust for pointer position - pointer is at top (0 degrees)
+    // We need to rotate so the target segment ends up at the top
+    const finalRotation = 360 * 5 + (360 - targetSegmentDegree + degreesPerSegment/2); // 5 full rotations + target
+    
+    // Animate with easing (fast -> slow)
+    let currentRotation = wheelRotation;
+    const totalDuration = 3000; // 3 seconds
+    const startTime = Date.now();
+    
+    const animateWheel = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / totalDuration, 1);
+      
+      // Easing function: ease-out (starts fast, ends slow)
+      const eased = 1 - Math.pow(1 - progress, 3);
+      
+      const newRotation = wheelRotation + (finalRotation * eased);
+      setWheelRotation(newRotation);
+      
+      if (progress < 1) {
+        requestAnimationFrame(animateWheel);
+      } else {
+        // Finished spinning
+        setResult(multiplier);
+        setSpinning(false);
+        
+        const prize = Math.floor(bet * multiplier);
+        if (prize > 0) {
+          const newVault = getVault() + prize;
+          setVault(newVault); setVaultState(newVault);
+          playSfx(winSound.current);
+        }
+        const resultData = { multiplier, prize, profit: prize - bet, color };
+        setGameResult(resultData);
+        const newStats = { ...stats, totalSpins: stats.totalSpins + 1, totalBet: stats.totalBet + bet, totalWon: stats.totalWon + prize, biggestWin: Math.max(stats.biggestWin, prize), biggestMultiplier: Math.max(stats.biggestMultiplier, multiplier), lastBet: bet };
+        setStats(newStats);
       }
-      const resultData = { multiplier, prize, profit: prize - bet };
-      setGameResult(resultData);
-      const newStats = { ...stats, totalSpins: stats.totalSpins + 1, totalBet: stats.totalBet + bet, totalWon: stats.totalWon + prize, biggestWin: Math.max(stats.biggestWin, prize), biggestMultiplier: Math.max(stats.biggestMultiplier, multiplier), lastBet: bet };
-      setStats(newStats);
-    }, 2000);
+    };
+    
+    requestAnimationFrame(animateWheel);
   };
 
   const resetGame = () => { setGameResult(null); setShowResultPopup(false); setResult(null); setSpinning(false); };
@@ -203,7 +238,7 @@ export default function MegaWheelPage() {
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">🎡 Mega Wheel</h1>
-            <p className="text-white/70 text-xs">Spin the wheel • Win up to ×50!</p>
+            <p className="text-white/70 text-xs">Spin the wheel • Win up to ×8!</p>
           </div>
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
@@ -221,12 +256,43 @@ export default function MegaWheelPage() {
           </div>
 
           <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
-            <div className={`w-32 h-32 rounded-full bg-gradient-to-br from-yellow-400 via-orange-500 to-red-600 shadow-2xl flex items-center justify-center text-white text-5xl font-bold border-4 border-white/30 ${spinning ? 'animate-spin' : ''}`}>
-              {result ? `×${result}` : '🎡'}
+            {/* Pointer at top */}
+            <div className="w-0 h-0 border-l-[16px] border-l-transparent border-r-[16px] border-r-transparent border-t-[24px] border-t-red-500 mb-3 drop-shadow-2xl z-10" />
+            
+            {/* The Wheel */}
+            <div className="relative">
+              <div 
+                className="w-64 h-64 rounded-full border-4 border-gray-300 relative"
+                style={{ 
+                  transform: `rotate(${wheelRotation}deg)`,
+                  background: `conic-gradient(from 0deg,
+                    #ef4444 0deg, #ef4444 40deg,
+                    #3b82f6 40deg, #3b82f6 80deg,
+                    #22c55e 80deg, #22c55e 120deg,
+                    #8b5cf6 120deg, #8b5cf6 160deg,
+                    #f97316 160deg, #f97316 200deg,
+                    #eab308 200deg, #eab308 240deg,
+                    #a3a3a3 240deg, #a3a3a3 280deg,
+                    #ec4899 280deg, #ec4899 320deg,
+                    #8b4513 320deg, #8b4513 360deg
+                  )`
+                }}
+              >
+                
+                {/* Center circle */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-24 h-24 rounded-full bg-white border-2 border-gray-400 flex items-center justify-center">
+                    <div className="text-2xl font-bold text-gray-800">
+                      {result ? `×${result}` : '🎡'}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="text-center mt-2" style={{ height: '28px' }}>
-              <div className={`text-base font-bold text-yellow-400 transition-opacity ${result && !spinning ? 'opacity-100' : 'opacity-0'}`}>
-                {result ? `×${result} Multiplier!` : 'waiting'}
+            
+            <div className="text-center mt-3" style={{ height: '28px' }}>
+              <div className={`text-lg font-bold text-yellow-400 transition-opacity ${result && !spinning ? 'opacity-100' : 'opacity-0'}`}>
+                {result && gameResult ? `${gameResult.color} ×${result} Multiplier!` : ''}
               </div>
             </div>
           </div>
@@ -258,7 +324,7 @@ export default function MegaWheelPage() {
           <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
             <div className="bg-gradient-to-r from-yellow-500 to-orange-600 text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto" style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
               <div className="text-4xl mb-2">🎉</div>
-              <div className="text-2xl font-bold mb-1">×{gameResult.multiplier}!</div>
+              <div className="text-2xl font-bold mb-1">{gameResult.color} ×{gameResult.multiplier}!</div>
               <div className="text-lg">+{fmt(gameResult.prize)} MLEO</div>
             </div>
           </div>
@@ -284,10 +350,44 @@ export default function MegaWheelPage() {
                 <p><strong>2. Spin Wheel:</strong> Watch it spin!</p>
                 <p><strong>3. Win:</strong> Land on a multiplier!</p>
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
-                  <p className="text-yellow-300 font-semibold">Multipliers:</p>
-                  <div className="text-xs text-white/80 mt-2 space-y-1">
-                    <p>• ×1 to ×50 possible!</p>
-                    <p>• Higher multipliers are rare 💎</p>
+                  <p className="text-yellow-300 font-semibold mb-2">Color Prizes (108% RTP!):</p>
+                  <div className="grid grid-cols-3 gap-1 text-xs">
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded bg-red-500"></div>
+                      <span className="text-white/70">×0.5</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded bg-blue-500"></div>
+                      <span className="text-white/70">×0.8</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded bg-green-500"></div>
+                      <span className="text-white/70">×1.0</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded bg-purple-500"></div>
+                      <span className="text-white/70">×1.2</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded bg-orange-500"></div>
+                      <span className="text-white/70">×1.5</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded bg-yellow-500"></div>
+                      <span className="text-white/70">×2.0</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded bg-gray-400"></div>
+                      <span className="text-white/70">×3.0</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded bg-pink-500"></div>
+                      <span className="text-white/70">×5.0</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded" style={{backgroundColor: '#8b4513'}}></div>
+                      <span className="text-white/70">×8.0</span>
+                    </div>
                   </div>
                 </div>
               </div>

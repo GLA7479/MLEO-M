@@ -498,8 +498,8 @@ export default function ArcadeHub() {
     {
       title: "Mega Wheel",
       emoji: "🎡",
-      description: "40 segments of fortune! Spin for prizes up to ×50 jackpot!",
-      prize: "×50",
+      description: "40 segments of fortune! Spin for prizes up to ×8 jackpot!",
+      prize: "×8",
       href: "/mega-wheel",
       color: "#A855F7",
     },
