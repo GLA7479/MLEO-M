@@ -51,8 +51,8 @@ function useIOSViewportFix() {
 const LS_KEY = "mleo_plinko2_v1";
 const MIN_BET = 1000;
 
-// High Risk only - maximum multipliers
-const MULTIPLIERS = [10, 3, 1.5, 1, 0.5, 0.3, 0.1, 0, 0.1, 0.3, 0.5, 1, 1.5, 3, 10];
+// Staircase multipliers - increases from center to corners (114% RTP)
+const MULTIPLIERS = [4.3, 3.2, 2.35, 1.63, 1.25, 1.03, 0.93, 0.5, 0.93, 1.03, 1.25, 1.63, 2.35, 3.2, 4.3];
 const BUCKET_COLORS = ["from-yellow-300 to-yellow-500", "from-orange-400 to-orange-600", "from-green-500 to-emerald-500", "from-blue-500 to-cyan-500", "from-purple-500 to-purple-600", "from-gray-600 to-gray-700", "from-red-600 to-red-700", "from-black to-gray-900", "from-red-600 to-red-700", "from-gray-600 to-gray-700", "from-purple-500 to-purple-600", "from-blue-500 to-cyan-500", "from-green-500 to-emerald-500", "from-orange-400 to-orange-600", "from-yellow-300 to-yellow-500"];
 
 const ROWS = 17;
@@ -735,13 +735,37 @@ export default function Plinko2Page() {
           {/* CANVAS */}
           <div
             id="plinko-canvas-wrap"
-            className="mb-1 w-full max-w-md"
+            className="mb-1 w-full max-w-md relative"
             style={{ height: "var(--chart-h, 300px)" }}
           >
             <canvas
               ref={canvasRef}
               className="w-full h-full rounded-lg border-2 border-white/10"
             />
+            
+            {/* RESULT POPUP - Inside game area */}
+            {showResultPopup && lastResult && (
+              <div className="absolute top-2 right-2 z-[9999] pointer-events-none">
+                <div
+                  className={`${
+                    lastResult.win ? "bg-green-500" : "bg-red-500"
+                  } text-white px-3 py-2 rounded-lg shadow-2xl text-center pointer-events-auto max-w-[200px]`}
+                  style={{ animation: "fadeIn 0.3s ease-in-out" }}
+                >
+                  <div className="text-lg mb-1">
+                    {lastResult.win ? "🎯" : "💥"}
+                  </div>
+                  <div className="text-sm font-bold mb-1">
+                    {lastResult.win ? `${lastResult.multiplier}x!` : "BETTER LUCK!"}
+                  </div>
+                  <div className="text-xs">
+                    {lastResult.win
+                      ? `+${fmt(lastResult.prize)} MLEO`
+                      : `-${fmt(Math.abs(lastResult.profit))} MLEO`}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
@@ -894,29 +918,6 @@ export default function Plinko2Page() {
           </div>
         </div>
 
-        {showResultPopup && lastResult && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
-            <div
-              className={`${
-                lastResult.win ? "bg-green-500" : "bg-red-500"
-              } text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`}
-              style={{ animation: "fadeIn 0.3s ease-in-out" }}
-            >
-              <div className="text-4xl mb-2">
-                {lastResult.win ? "🎯" : "💥"}
-              </div>
-              <div className="text-2xl font-bold mb-1">
-                {lastResult.win ? `${lastResult.multiplier}x!` : "BETTER LUCK!"}
-              </div>
-              <div className="text-lg">
-                {lastResult.win
-                  ? `+${fmt(lastResult.prize)} MLEO`
-                  : `-${fmt(Math.abs(lastResult.profit))} MLEO`}
-              </div>
-            </div>
-          </div>
-        )}
-
         {menuOpen && (
           <div
             className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3"
@@ -1013,10 +1014,15 @@ export default function Plinko2Page() {
                 <p>
                   <strong>4. Land in Bucket:</strong> Win based on multiplier
                 </p>
-                <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
-                  <p className="text-purple-300 font-semibold">
-                    🎯 Higher risk = bigger multipliers!
-                  </p>
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                  <p className="text-yellow-300 font-semibold mb-2">🎰 Staircase Prizes (114% RTP!):</p>
+                  <div className="text-xs space-y-1">
+                    <p className="text-white/80">🏆 Corners: <span className="text-yellow-300 font-bold">×4.3</span> (ultra rare!)</p>
+                    <p className="text-white/80">💎 Near edges: <span className="text-orange-300 font-bold">×3.2, ×2.35</span></p>
+                    <p className="text-white/80">⭐ Mid zones: <span className="text-green-300 font-bold">×1.63, ×1.25</span></p>
+                    <p className="text-white/80">📍 Center: <span className="text-blue-300">×0.5 - ×1.03</span></p>
+                    <p className="text-white/60 mt-1 italic">Prizes increase as you move from center to corners!</p>
+                  </div>
                 </div>
               </div>
               <button

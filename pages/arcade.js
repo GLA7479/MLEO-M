@@ -276,7 +276,7 @@ export default function ArcadeHub() {
       title: "Plinko",
       emoji: "🎯",
       description: "Drop the ball through pegs! Land on high multipliers for massive wins!",
-      prize: "×10",
+      prize: "×4.3",
       href: "/plinko",
       color: "#3B82F6",
     },

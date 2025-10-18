@@ -17,22 +17,22 @@ const LS_KEY = "mleo_plinko_v2_physics";
 const MIN_BET = 1000; // Minimum bet amount
 
 // 15 buckets (13 original + 2 zero buckets at edges)
-const MULTIPLIERS = [0, 10, 1.5, 3, 1, 0.5, 0.2, 0, 0.2, 0.5, 1, 3, 1.5, 10, 0];
+const MULTIPLIERS = [0, 2.2, 1.2, 1.5, 1.3, 1.1, 0.9, 0, 0.9, 1.1, 1.3, 1.5, 1.2, 2.2, 0];
 const BUCKET_COLORS = [
   "from-gray-700 to-gray-800",       // 0x (edge)
-  "from-yellow-400 to-amber-500",    // 10x
-  "from-orange-500 to-orange-600",   // 1.5x
-  "from-green-500 to-emerald-500",   // 3x
-  "from-blue-500 to-cyan-500",       // 1x
-  "from-purple-500 to-purple-600",   // 0.5x
-  "from-red-500 to-red-600",         // 0.2x
+  "from-yellow-400 to-amber-500",    // 2.2x
+  "from-orange-500 to-orange-600",   // 1.2x
+  "from-green-500 to-emerald-500",   // 1.5x
+  "from-blue-500 to-cyan-500",       // 1.3x
+  "from-purple-500 to-purple-600",   // 1.1x
+  "from-red-500 to-red-600",         // 0.9x
   "from-gray-700 to-gray-800",       // 0x
-  "from-red-500 to-red-600",         // 0.2x
-  "from-purple-500 to-purple-600",   // 0.5x
-  "from-blue-500 to-cyan-500",       // 1x
-  "from-green-500 to-emerald-500",   // 3x
-  "from-orange-500 to-orange-600",   // 1.5x
-  "from-yellow-400 to-amber-500",    // 10x
+  "from-red-500 to-red-600",         // 0.9x
+  "from-purple-500 to-purple-600",   // 1.1x
+  "from-blue-500 to-cyan-500",       // 1.3x
+  "from-green-500 to-emerald-500",   // 1.5x
+  "from-orange-500 to-orange-600",   // 1.2x
+  "from-yellow-400 to-amber-500",    // 2.2x
   "from-gray-700 to-gray-800",       // 0x (edge)
 ];
 
@@ -1017,6 +1017,39 @@ function buildBoardGeometry(w, h) {
               <li>• <strong>Multiple balls:</strong> Drop as many as you want simultaneously</li>
               <li>• <strong>Instant payout:</strong> Prize is awarded upon bucket capture</li>
             </ul>
+            <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+              <p className="text-yellow-300 font-semibold mb-2">Prize Distribution (109% RTP!):</p>
+              <div className="grid grid-cols-3 gap-1 text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-yellow-400"></div>
+                  <span className="text-white/70">×2.2</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-orange-500"></div>
+                  <span className="text-white/70">×1.2</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-green-500"></div>
+                  <span className="text-white/70">×1.5</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-blue-500"></div>
+                  <span className="text-white/70">×1.3</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-purple-500"></div>
+                  <span className="text-white/70">×1.1</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-red-500"></div>
+                  <span className="text-white/70">×0.9</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-gray-600"></div>
+                  <span className="text-white/70">×0</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* STATS */}
@@ -1058,9 +1091,9 @@ function buildBoardGeometry(w, h) {
 
         {/* FLOATING RESULT POPUP */}
         {result && showResultPopup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="fixed top-4 right-4 z-50 pointer-events-none">
             <div 
-              className={`text-center p-4 rounded-xl border-2 transition-all duration-500 transform pointer-events-auto max-w-sm mx-4 ${
+              className={`text-center p-2 rounded-lg border transition-all duration-500 transform pointer-events-auto max-w-[200px] ${
                 showResultPopup ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
               } ${
                 result.error
@@ -1070,34 +1103,34 @@ function buildBoardGeometry(w, h) {
                   : "bg-gradient-to-br from-zinc-600 to-zinc-700 border-zinc-300 shadow-2xl shadow-zinc-500/70"
               }`}
             >
-              <div className="text-2xl font-black mb-2 animate-pulse text-white drop-shadow-lg">
+              <div className="text-sm font-black mb-1 animate-pulse text-white drop-shadow-lg">
                 {result.error ? "⚠️ Error" : 
-                 result.win && result.prize > 0 ? "🎯 Winner! 🎯" : 
+                 result.win && result.prize > 0 ? "🎯 Winner!" : 
                  "⚪ No Win"}
               </div>
               {result.multiplier !== undefined && (
-                <div className="text-base mb-2 text-white/90 font-semibold">
-                  Multiplier: ×{result.multiplier}
+                <div className="text-xs mb-1 text-white/90 font-semibold">
+                  ×{result.multiplier}
                 </div>
               )}
               {result.prize && result.prize > 0 && (
                 <div className="space-y-1">
-                  <div className="text-3xl font-black text-white animate-bounce drop-shadow-2xl">
+                  <div className="text-sm font-black text-white animate-bounce drop-shadow-2xl">
                     +{fmt(result.prize)} MLEO
                   </div>
                 </div>
               )}
               {result.error && (
-                <div className="text-base font-bold text-white">
+                <div className="text-xs font-bold text-white">
                   {result.message}
                 </div>
               )}
               {!result.error && !result.win && (
-                <div className="text-lg font-bold text-white">
+                <div className="text-xs font-bold text-white">
                   Better luck next time!
                 </div>
               )}
-              <div className="mt-2 text-xs text-white/70 animate-pulse">
+              <div className="mt-1 text-[10px] text-white/70 animate-pulse">
                 Auto-closing...
               </div>
             </div>
