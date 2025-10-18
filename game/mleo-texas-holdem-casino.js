@@ -768,45 +768,47 @@ export default function TexasHoldemCasinoPage() {
 
   const handleLeaveTable = async () => {
     if (!playerId || !currentTableId) return;
-    
+
     try {
-      // Get player's current chips
-      const { data: player } = await supabase
-        .from('casino_players')
-        .select('chips')
-        .eq('id', playerId)
-        .single();
-      
-      if (player && player.chips > 0) {
-        // Return chips to vault
-        const newVault = vaultAmount + player.chips;
-        setVault(newVault);
-        setVaultAmount(newVault);
+      const { data: g } = await supabase
+        .from('casino_games').select('*').eq('id', currentGameId).maybeSingle();
+      const { data: me } = await supabase
+        .from('casino_players').select('*').eq('id', playerId).maybeSingle();
+
+      // רק כשאין יד פעילה זה "עזיבה מלאה" → החזרה ל-Vault ומחיקה
+      if (!g || g.status !== 'playing' || !me?.game_id) {
+        if (me && me.chips > 0) {
+          const newVault = vaultAmount + me.chips;
+          setVault(newVault);
+          setVaultAmount(newVault);
+        }
+        await supabase.from('casino_players').delete().eq('id', playerId);
+      } else {
+        // יש יד פעילה → נשארים עם הצ'יפים על השולחן, רק מתקפלים ומסומנים ליציאה
+        await supabase.from('casino_players').update({
+          status: 'folded',
+          will_leave: true
+        }).eq('id', playerId);
+
+        // אם זה היה התור שלו – העבר תור
+        const { data: pls } = await supabase
+          .from('casino_players').select('*').eq('game_id', currentGameId).order('seat_index');
+        const curIdx = g.current_player_index ?? 0;
+        if (pls?.[curIdx]?.id === playerId) {
+          const canAct = (p) => p.status !== 'folded' && p.status !== 'all_in';
+          let nextIdx = (curIdx + 1) % pls.length;
+          while (pls[nextIdx] && !canAct(pls[nextIdx])) {
+            nextIdx = (nextIdx + 1) % pls.length;
+            if (nextIdx === curIdx) break;
+          }
+          await supabase.from('casino_games').update({
+            current_player_index: nextIdx,
+            turn_deadline: new Date(Date.now() + BETTING_TIME_LIMIT).toISOString()
+          }).eq('id', currentGameId);
+        }
       }
-      
-      // Remove player from table
-      await supabase
-        .from('casino_players')
-        .delete()
-        .eq('id', playerId);
-      
-      // Check if game should be cleaned up
-      const { data: remainingPlayers } = await supabase
-        .from('casino_players')
-        .select('id')
-        .eq('game_id', currentGameId);
-      
-      // If no players left, mark game as waiting
-      if (!remainingPlayers || remainingPlayers.length === 0) {
-        await supabase.from('casino_games').update({
-          status: GAME_STATUS.WAITING,
-          round: 'preflop',
-          pot: 0,
-          current_bet: 0
-        }).eq('id', currentGameId);
-      }
-      
-      // Reset state
+
+      // איפוס ל־Lobby מקומי
       setPlayerId(null);
       setCurrentTableId(null);
       setCurrentGameId(null);
@@ -815,7 +817,6 @@ export default function TexasHoldemCasinoPage() {
       setGame(null);
       setMyPlayer(null);
       setScreen("lobby");
-      
     } catch (err) {
       console.error("Error leaving table:", err);
       setError("Failed to leave table: " + err.message);
@@ -1707,6 +1708,26 @@ export default function TexasHoldemCasinoPage() {
       }).eq('id', currentGameId);
 
       await loadGameData();
+
+      // ניקוי אחרי התחלת יד: מי שסומן will_leave יוצא מהשולחן עכשיו.
+      // לפני המחיקה – אם זה אני, זכה את ה-Vault בצ'יפים שלי.
+      const { data: leavers } = await supabase
+        .from('casino_players')
+        .select('id,chips')
+        .eq('table_id', currentTableId)
+        .eq('will_leave', true);
+
+      const meLeaving = (leavers || []).find(p => p.id === playerId);
+      if (meLeaving && meLeaving.chips > 0) {
+        const newVault = getVault() + meLeaving.chips;
+        setVault(newVault);
+        setVaultAmount(newVault);
+      }
+
+      await supabase.from('casino_players')
+        .delete()
+        .eq('table_id', currentTableId)
+        .eq('will_leave', true);
     } catch (err) {
       console.error('Error starting new hand (seat-based):', err);
     }
