@@ -51,8 +51,8 @@ const MIN_BET = 1000;
 const TOTAL_BOXES = 10;
 
 // Prize distribution in boxes (multipliers)
-// RTP: ~92% (House Edge: 8%)
-const PRIZES = [0, 0, 0, 0, 0, 0, 0.5, 1, 2, 10];
+// RTP: 110% - Fun arcade bonus!
+const PRIZES = [0, 0, 0, 0, 0.5, 1, 1, 1.5, 3, 4];
 
 // On-chain Claim Config
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
@@ -413,7 +413,7 @@ export default function MysteryBoxPage() {
       multiplier: multiplier,
       prize: prize,
       profit: prize - bet,
-      jackpot: multiplier === 10
+      jackpot: multiplier === 4
     };
 
     setGameResult(resultData);
@@ -427,7 +427,7 @@ export default function MysteryBoxPage() {
       totalBet: stats.totalBet + bet,
       totalWon: stats.totalWon + prize,
       biggestWin: Math.max(stats.biggestWin, prize),
-      jackpots: multiplier === 10 ? stats.jackpots + 1 : stats.jackpots,
+      jackpots: multiplier === 4 ? stats.jackpots + 1 : stats.jackpots,
       lastBet: bet
     };
     setStats(newStats);
@@ -739,15 +739,16 @@ export default function MysteryBoxPage() {
                 <p><strong>3. Choose Box:</strong> Pick one of the 10 mystery boxes</p>
                 <p><strong>4. Win:</strong> Each box contains a hidden multiplier - find the jackpot!</p>
                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mt-4">
-                  <p className="text-amber-300 font-semibold">🎁 Prize Distribution</p>
+                  <p className="text-amber-300 font-semibold">🎁 Prize Distribution (110% RTP!)</p>
                   <div className="text-xs text-white/80 mt-2 space-y-1">
-                    <p>• 1 box: ×10 💎 (BIG WIN!)</p>
-                    <p>• 1 box: ×2 🎉</p>
-                    <p>• 1 box: ×1 🪙 (break even)</p>
+                    <p>• 1 box: ×4 💎 (BIG WIN!)</p>
+                    <p>• 1 box: ×3 🎉</p>
+                    <p>• 1 box: ×1.5 ✨</p>
+                    <p>• 2 boxes: ×1 🪙 (break even)</p>
                     <p>• 1 box: ×0.5 📉 (small loss)</p>
-                    <p>• 6 boxes: ×0 💔 (lose all)</p>
+                    <p>• 4 boxes: ×0 💔 (lose all)</p>
                   </div>
-            </div>
+                </div>
             </div>
               <button
                 onClick={() => setShowHowToPlay(false)}
@@ -800,7 +801,7 @@ export default function MysteryBoxPage() {
                   <div className="text-sm font-semibold mb-2">💎 Big Wins Hit</div>
                   <div className="text-center">
                     <div className="text-3xl font-bold text-yellow-400">{stats.jackpots}</div>
-                    <div className="text-xs text-white/60 mt-1">×10 Multiplier Wins</div>
+                    <div className="text-xs text-white/60 mt-1">×4 Multiplier Wins</div>
                   </div>
                 </div>
               </div>

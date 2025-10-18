@@ -415,7 +415,17 @@ useEffect(() => {
     if (grid.includes(index)) {
       endGame(false, newRevealed.length - 1);
     } else {
-      const multiplier = 1 + newRevealed.length * 0.3;
+      // Calculate multiplier based on cumulative probability (like real Mines games)
+      const bombCount = DIFFICULTIES[difficulty].bombs;
+      const safeCells = GRID_SIZE - bombCount;
+      let cumulativeProb = 1;
+      for (let i = 0; i < newRevealed.length; i++) {
+        const safeLeft = safeCells - i;
+        const totalLeft = GRID_SIZE - i;
+        cumulativeProb *= safeLeft / totalLeft;
+      }
+      // Fair multiplier = 1 / probability, with 5% player advantage!
+      const multiplier = (1 / cumulativeProb) * 1.05;
       const prize = Math.floor(Number(betAmount) * multiplier);
       setCurrentPrize(prize);
     }
@@ -625,6 +635,8 @@ useEffect(() => {
               {[...Array(GRID_SIZE)].map((_, i) => {
                 const isRevealed = revealed.includes(i);
                 const isBomb = grid.includes(i);
+                const showBomb = gameResult && isBomb; // Show bombs after game ends
+                const shouldShow = isRevealed || showBomb;
                 return (
                   <button
                     key={i}
@@ -636,14 +648,14 @@ useEffect(() => {
                       borderRadius: "10px",
                     }}
                     className={`text-xl font-bold transition-all ${
-                      isRevealed
+                      shouldShow
                         ? isBomb
                           ? "bg-red-500 text-white"
                           : "bg-green-500 text-white"
                         : "bg-white/10 text-white hover:bg-white/20"
                     } disabled:opacity-50`}
                   >
-                    {isRevealed ? (isBomb ? "💣" : "💎") : "?"}
+                    {shouldShow ? (isBomb ? "💣" : "💎") : "?"}
                   </button>
                 );
               })}
@@ -835,9 +847,15 @@ useEffect(() => {
                   <strong>3. Cash Out:</strong> Take your prize anytime!
                 </p>
                 <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
-                  <p className="text-purple-300 font-semibold">
-                    Each gem increases multiplier by ×0.3!
+                  <p className="text-purple-300 font-semibold mb-2">
+                    Multiplier based on probability!
                   </p>
+                  <div className="text-xs text-white/80 space-y-1">
+                    <p>• Easy (3 bombs): 5 gems = ×1.96</p>
+                    <p>• Medium (5 bombs): 5 gems = ×3.32</p>
+                    <p>• Hard (7 bombs): 5 gems = ×6.01</p>
+                    <p>• Expert (10 bombs): 5 gems = ×17.16</p>
+                  </div>
                 </div>
               </div>
               <button

@@ -48,7 +48,7 @@ function useIOSViewportFix() {
 // ============================================================================
 const LS_KEY = "mleo_limbo_v2";
 const MIN_BET = 1000;
-const HOUSE_EDGE = 0.02; // 2% house edge
+const HOUSE_EDGE = -0.08; // 108% RTP - Fun arcade bonus!
 
 // On-chain Claim Config
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
@@ -911,8 +911,8 @@ export default function LimboPage() {
                 <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-lg p-3 mt-4">
                   <p className="text-indigo-300 font-semibold">💡 Strategy Tips</p>
                   <p className="text-xs text-white/80 mt-1">• Higher target = Lower win chance but bigger prize</p>
-                  <p className="text-xs text-white/80">• ×2 target = ~49% win chance</p>
-                  <p className="text-xs text-white/80">• ×100 target = ~0.98% win chance</p>
+                  <p className="text-xs text-white/80">• ×2 target = ~54% win chance (108% RTP!)</p>
+                  <p className="text-xs text-white/80">• ×100 target = ~1.08% win chance</p>
                   <p className="text-xs text-white/80">• Use quick select buttons for popular multipliers</p>
                 </div>
               </div>

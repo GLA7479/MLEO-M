@@ -93,6 +93,7 @@ export default function BombPage() {
   const [showStats, setShowStats] = useState(false);
   const [showVaultModal, setShowVaultModal] = useState(false);
   const [sfxMuted, setSfxMuted] = useState(false);
+  const [clickedWire, setClickedWire] = useState(null);
   const clickSound = useRef(null);
   const winSound = useRef(null);
 
@@ -165,22 +166,34 @@ export default function BombPage() {
   const cutWire = (wire) => {
     if (!gameActive) return;
     playSfx(clickSound.current);
-    if (wire === correctWire) {
-      const newLevel = level + 1;
-      if (newLevel >= TOTAL_LEVELS) {
-        endGame(true, newLevel);
+    setClickedWire(wire);
+    setTimeout(() => {
+      if (wire === correctWire) {
+        const newLevel = level + 1;
+        if (newLevel >= TOTAL_LEVELS) {
+          endGame(true, newLevel);
+        } else {
+          setLevel(newLevel);
+          setCorrectWire(WIRES[Math.floor(Math.random() * WIRES.length)]);
+        }
       } else {
-        setLevel(newLevel);
-        setCorrectWire(WIRES[Math.floor(Math.random() * WIRES.length)]);
+        endGame(false, level);
       }
-    } else {
-      endGame(false, level);
-    }
+      setClickedWire(null);
+    }, 200);
+  };
+
+  const cashOut = () => {
+    if (!gameActive || level === 0) return;
+    playSfx(clickSound.current);
+    endGame(true, level);
   };
 
   const endGame = (win, finalLevel) => {
     const bet = Number(betAmount);
-    const multiplier = 1 + (finalLevel * 2);
+    // Fun arcade multipliers: 108% RTP!
+    const multipliers = [2.65, 4.2, 6.4, 10.5, 20];
+    const multiplier = multipliers[Math.min(finalLevel - 1, multipliers.length - 1)] || 1;
     const prize = win ? Math.floor(bet * multiplier) : 0;
 
     if (win && prize > 0) {
@@ -202,7 +215,9 @@ export default function BombPage() {
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-red-900 via-black to-orange-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
 
-  const currentMultiplier = 1 + (level * 2);
+  const multipliers = [2.65, 4.2, 6.4, 10.5, 20];
+  const currentMultiplier = gameActive && level > 0 ? multipliers[level - 1] : (level + 1 <= multipliers.length ? multipliers[level] : 1);
+  const currentPrize = gameActive && level > 0 ? Math.floor(Number(betAmount) * multipliers[level - 1]) : 0;
   const potentialWin = Math.floor(Number(betAmount) * currentMultiplier);
 
   return (
@@ -243,9 +258,32 @@ export default function BombPage() {
           </div>
 
           <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
-            <div className="text-center mb-2"><div className="text-5xl mb-2">💣</div><div className="text-xs text-white/70">Level: {level + 1}/{TOTAL_LEVELS} • Multiplier: ×{currentMultiplier}</div></div>
-            <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
-              {WIRES.map((wire) => (<button key={wire} onClick={() => cutWire(wire)} disabled={!gameActive} className={`py-4 rounded-lg font-bold text-sm transition-all ${wire === 'red' ? 'bg-red-500' : wire === 'blue' ? 'bg-blue-500' : wire === 'green' ? 'bg-green-500' : 'bg-yellow-500'} text-white hover:brightness-110 disabled:opacity-50`}>{wire === 'red' ? '🔴' : wire === 'blue' ? '🔵' : wire === 'green' ? '🟢' : '🟡'} {wire.toUpperCase()}</button>))}
+            <div className="text-center mb-3">
+              <div className="text-5xl mb-3">💣</div>
+              <div className="text-base font-bold text-white bg-black/30 border border-white/20 rounded-lg px-4 py-2 inline-block">
+                Level: {level + 1}/{TOTAL_LEVELS} • Multiplier: ×{currentMultiplier}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 w-full max-w-[280px]">
+              {WIRES.map((wire) => {
+                const isClicked = clickedWire === wire;
+                const wireColor = wire === 'red' ? 'bg-red-500' : wire === 'blue' ? 'bg-blue-500' : wire === 'green' ? 'bg-green-500' : 'bg-yellow-500';
+                const wireEmoji = wire === 'red' ? '🔴' : wire === 'blue' ? '🔵' : wire === 'green' ? '🟢' : '🟡';
+                return (
+                  <button 
+                    key={wire} 
+                    onClick={() => cutWire(wire)} 
+                    disabled={!gameActive || clickedWire !== null} 
+                    className={`py-2 px-3 rounded-lg font-bold text-sm transition-all duration-200 ${wireColor} text-white shadow-lg hover:shadow-2xl hover:brightness-110 active:scale-95 disabled:opacity-50 ${isClicked ? 'scale-95 brightness-125 ring-4 ring-white' : ''}`}
+                    style={{ transform: isClicked ? 'scale(0.95)' : 'scale(1)' }}
+                  >
+                    <div className="flex flex-col items-center gap-0.5">
+                      <div className="text-lg">{wireEmoji}</div>
+                      <div className="text-[10px]">{wire.toUpperCase()}</div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -261,7 +299,17 @@ export default function BombPage() {
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            <button onClick={gameResult ? resetGame : () => startGame(false)} disabled={gameActive} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-orange-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">{gameResult ? "PLAY AGAIN" : "START"}</button>
+            <button 
+              onClick={gameActive ? cashOut : (gameResult ? resetGame : () => startGame(false))} 
+              disabled={gameActive && level === 0}
+              className={`w-full py-3 rounded-lg font-bold text-base shadow-lg hover:brightness-110 transition-all disabled:opacity-50 ${
+                gameActive 
+                  ? 'bg-gradient-to-r from-emerald-500 to-green-600' 
+                  : 'bg-gradient-to-r from-red-500 to-orange-600'
+              } text-white`}
+            >
+              {gameActive ? `💰 CASH OUT ${fmt(currentPrize)}` : (gameResult ? "PLAY AGAIN" : "START")}
+            </button>
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>
@@ -274,7 +322,7 @@ export default function BombPage() {
 
         {menuOpen && (<div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}><div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div><div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div><div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div><div className="mt-4 text-xs opacity-70"><p>Bomb Squad v2.0</p></div></div></div>)}
 
-        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">💣 How to Play</h2><div className="space-y-3 text-sm"><p><strong>1. Start Defusing:</strong> Min {MIN_BET} MLEO</p><p><strong>2. Cut Right Wire:</strong> 25% chance each level!</p><p><strong>3. Complete 5 Levels:</strong> Win big!</p><div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3"><p className="text-red-300 font-semibold">Each level: ×2 multiplier!</p></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">💣 How to Play</h2><div className="space-y-3 text-sm"><p><strong>1. Start Defusing:</strong> Min {MIN_BET} MLEO</p><p><strong>2. Cut Right Wire:</strong> 25% chance each level!</p><p><strong>3. Cash Out or Continue:</strong> Take your prize or risk it for more!</p><div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3"><p className="text-red-300 font-semibold mb-2">Multipliers per level:</p><div className="text-xs text-white/80 space-y-1"><p>• Level 1: ×2.65 (25% to reach)</p><p>• Level 2: ×4.2 (6.25% to reach)</p><p>• Level 3: ×6.4 (1.56% to reach)</p><p>• Level 4: ×10.5 (0.39% to reach)</p><p>• Level 5: ×20 (0.10% to reach)</p></div></div><div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 mt-2"><p className="text-green-300 font-semibold text-xs">💡 Strategy: Cash out early for safer wins, or risk it all for ×20!</p></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
 
         {showStats && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2><div className="space-y-3"><div className="grid grid-cols-2 gap-3"><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Games</div><div className="text-xl font-bold">{stats.totalGames}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalGames > 0 ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : 0}%</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Bet</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Perfect</div><div className="text-lg font-bold text-purple-400">{stats.perfectDefuses}</div></div></div></div><button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
 

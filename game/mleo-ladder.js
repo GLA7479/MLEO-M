@@ -51,7 +51,7 @@ function useIOSViewportFix() {
 
 const LS_KEY = "mleo_ladder_v2";
 const MIN_BET = 1000;
-const MULTIPLIERS = [1.1, 1.3, 1.6, 2, 2.5, 3.5, 5, 7, 10, 15];
+const MULTIPLIERS = [1.15, 1.3, 1.5, 1.8, 2.2, 2.8, 3.8, 5.5, 8, 14]; // 113% RTP - Fun!
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -391,7 +391,7 @@ useEffect(() => {
     if (!gameActive) return;
     playSfx(clickSound.current);
     const chance = Math.random();
-    const successRate = 0.5 - currentStep * 0.06;
+    const successRate = 0.5 - currentStep * 0.04; // Starts at 50%, decreases by 4% per step
     
     if (chance < successRate) {
       const newStep = currentStep + 1;

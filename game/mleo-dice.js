@@ -48,7 +48,7 @@ function useIOSViewportFix() {
 // ============================================================================
 const LS_KEY = "mleo_dice_v2";
 const MIN_BET = 1000;
-const HOUSE_EDGE = 0.01; // 1% house edge
+const HOUSE_EDGE = -0.08; // 108% RTP - Fun arcade bonus!
 
 // On-chain Claim Config
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);

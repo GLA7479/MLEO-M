@@ -48,7 +48,7 @@ function useIOSViewportFix() {
 // ============================================================================
 const LS_KEY = "mleo_coinflip_v1";
 const MIN_BET = 1000;
-const WIN_MULTIPLIER = 1.95; // 2.5% house edge
+const WIN_MULTIPLIER = 2.16; // 108% RTP - Fun arcade bonus!
 
 // On-chain Claim Config
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
