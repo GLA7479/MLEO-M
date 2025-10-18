@@ -53,12 +53,12 @@ const LS_KEY = "mleo_goldrush_v2";
 const MIN_BET = 1000;
 const GRID_SIZE = 25;
 const PRIZES = {
-  small_gem: { emoji: '💎', multiplier: 1, count: 8 },
-  medium_gem: { emoji: '💍', multiplier: 3, count: 6 },
-  large_treasure: { emoji: '👑', multiplier: 5, count: 3 },
-  jackpot: { emoji: '🌟', multiplier: 10, count: 2 },
+  small_gem: { emoji: '💎', multiplier: 0.5, count: 8 },
+  medium_gem: { emoji: '💍', multiplier: 0.8, count: 6 },
+  large_treasure: { emoji: '👑', multiplier: 1.2, count: 3 },
+  jackpot: { emoji: '🌟', multiplier: 2, count: 2 },
   skull: { emoji: '💀', multiplier: -1, count: 6 }
-};
+}; // 109% RTP at 3 digs - Fun arcade!
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -802,9 +802,16 @@ useEffect(() => {
                   <strong>4. Cash Out:</strong> Take your winnings anytime!
                 </p>
                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-                  <p className="text-amber-300 font-semibold">
-                    💎 Small Gem: ×1 | 💍 Medium: ×3 | 👑 Large: ×5 | 🌟 Jackpot: ×10
+                  <p className="text-amber-300 font-semibold mb-2">
+                    Prize Values (109% RTP!):
                   </p>
+                  <div className="text-xs text-white/80 space-y-1">
+                    <p>💎 Small Gem: ×0.5 (8 on map)</p>
+                    <p>💍 Medium: ×0.8 (6 on map)</p>
+                    <p>👑 Large: ×1.2 (3 on map)</p>
+                    <p>🌟 Jackpot: ×2 (2 on map)</p>
+                    <p>💀 Skull: Lose all (6 on map)</p>
+                  </div>
                 </div>
               </div>
               <button

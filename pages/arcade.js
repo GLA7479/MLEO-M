@@ -420,7 +420,7 @@ export default function ArcadeHub() {
       title: "Horse Racing",
       emoji: "🏇",
       description: "Bet on your favorite horse! Watch them race and win big!",
-      prize: "×5",
+      prize: "×5.4",
       href: "/horse",
       color: "#16A34A",
     },

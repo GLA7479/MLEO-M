@@ -180,7 +180,9 @@ export default function DragonTowerPage() {
 
   const endGame = (win, finalFloor) => {
     const bet = Number(betAmount);
-    const multiplier = 1 + (finalFloor * 1.5);
+    // Fun arcade multipliers: 107% RTP!
+    const multipliers = [1.7, 2.4, 3.3, 4.8, 7.2, 10.5, 16, 26];
+    const multiplier = multipliers[Math.min(finalFloor - 1, multipliers.length - 1)] || 1;
     const prize = win ? Math.floor(bet * multiplier) : 0;
 
     if (win && prize > 0) {
@@ -197,12 +199,20 @@ export default function DragonTowerPage() {
     setStats(newStats);
   };
 
+  const cashOut = () => {
+    if (!gameActive || floor === 0) return;
+    playSfx(clickSound.current);
+    endGame(true, floor);
+  };
+
   const resetGame = () => { setGameResult(null); setShowResultPopup(false); setFloor(0); setSafeCards([]); setGameActive(false); };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-red-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
 
-  const currentMultiplier = 1 + (floor * 1.5);
+  const multipliers = [1.7, 2.4, 3.3, 4.8, 7.2, 10.5, 16, 26];
+  const currentMultiplier = gameActive && floor > 0 ? multipliers[floor - 1] : (floor + 1 <= multipliers.length ? multipliers[floor] : 1);
+  const currentPrize = gameActive && floor > 0 ? Math.floor(Number(betAmount) * multipliers[floor - 1]) : 0;
   const potentialWin = Math.floor(Number(betAmount) * currentMultiplier);
 
   return (
@@ -260,7 +270,17 @@ export default function DragonTowerPage() {
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            <button onClick={gameResult ? resetGame : () => startGame(false)} disabled={gameActive} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-purple-500 to-red-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">{gameResult ? "PLAY AGAIN" : "START"}</button>
+            <button 
+              onClick={gameActive ? cashOut : (gameResult ? resetGame : () => startGame(false))} 
+              disabled={gameActive && floor === 0}
+              className={`w-full py-3 rounded-lg font-bold text-base shadow-lg hover:brightness-110 transition-all disabled:opacity-50 ${
+                gameActive 
+                  ? 'bg-gradient-to-r from-emerald-500 to-green-600' 
+                  : 'bg-gradient-to-r from-purple-500 to-red-600'
+              } text-white`}
+            >
+              {gameActive ? `💰 CASH OUT ${fmt(currentPrize)}` : (gameResult ? "PLAY AGAIN" : "START")}
+            </button>
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>
@@ -273,7 +293,7 @@ export default function DragonTowerPage() {
 
         {menuOpen && (<div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}><div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div><div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div><div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div><div className="mt-4 text-xs opacity-70"><p>Dragon Tower v2.0</p></div></div></div>)}
 
-        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">🐉 How to Play</h2><div className="space-y-3 text-sm"><p><strong>1. Start:</strong> Min {MIN_BET} MLEO</p><p><strong>2. Pick Cards:</strong> Only 1 safe card per floor!</p><p><strong>3. Climb 8 Floors:</strong> Win big!</p><div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3"><p className="text-purple-300 font-semibold">Each floor: ×1.5 multiplier!</p></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">🐉 How to Play</h2><div className="space-y-3 text-sm"><p><strong>1. Start:</strong> Min {MIN_BET} MLEO</p><p><strong>2. Pick Cards:</strong> Only 1 safe card per floor (33% chance)!</p><p><strong>3. Cash Out or Climb:</strong> Take your prize or risk more!</p><div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3"><p className="text-purple-300 font-semibold mb-2">Multipliers (107% RTP!):</p><div className="text-xs text-white/80 space-y-1"><p>• Floor 1: ×1.7 | Floor 2: ×2.4</p><p>• Floor 3: ×3.3 | Floor 4: ×4.8</p><p>• Floor 5: ×7.2 | Floor 6: ×10.5</p><p>• Floor 7: ×16 | Floor 8: ×26 🏆</p></div></div><div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 mt-2"><p className="text-green-300 font-semibold text-xs">💡 Tip: Cash out early for safer wins!</p></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
 
         {showStats && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2><div className="space-y-3"><div className="grid grid-cols-2 gap-3"><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Games</div><div className="text-xl font-bold">{stats.totalGames}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalGames > 0 ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : 0}%</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Bet</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Max Floor</div><div className="text-lg font-bold text-purple-400">{stats.maxFloor}/{TOTAL_FLOORS}</div></div></div></div><button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
 

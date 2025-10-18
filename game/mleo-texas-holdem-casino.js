@@ -426,6 +426,7 @@ export default function TexasHoldemCasinoPage() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [winnerModal, setWinnerModal] = useState({ open: false, text: "", hand: "", pot: 0 });
   const [isAdmin, setIsAdmin] = useState(false);
+  const [raiseTo, setRaiseTo] = useState(null);
 
   useEffect(() => {
     setMounted(true);
@@ -434,6 +435,19 @@ export default function TexasHoldemCasinoPage() {
     // Check if user is admin
     setIsAdmin(address === "0x39846ebBA723e440562a60f4B4a0147150442c7b");
   }, [address]);
+
+  // Helper functions for raise calculations
+  const getMinRaiseSize = (g, tableBB = 0) => {
+    const lastRaiseTo = g?.last_raise_to || 0;
+    const curBet = g?.current_bet || 0;
+    // אם עוד לא הייתה העלאה ברחוב: מינימום = BB; אחרת = גודל ההעלאה הקודמת
+    return Math.max(lastRaiseTo - curBet, tableBB);
+  };
+
+  const getMaxRaiseTo = (me) => {
+    // לא לעבור ALL-IN מלא (מותר כמובן, אבל זה הגבול העליון)
+    return (me?.current_bet || 0) + (me?.chips || 0);
+  };
 
   // Timer functions
   const startActionTimer = (playerId) => {
@@ -811,6 +825,15 @@ export default function TexasHoldemCasinoPage() {
     }
   }, [game?.current_player_index, myPlayer?.status, game?.status, players, playerId, screen]);
 
+  // Update raiseTo when game state changes
+  useEffect(() => {
+    if (!game || !myPlayer || screen !== "game") return;
+    const minSize = getMinRaiseSize(game, selectedTable?.big_blind || 0);
+    const minTo = (game?.current_bet || 0) + minSize;
+    const maxTo = getMaxRaiseTo(myPlayer);
+    setRaiseTo(Math.min(Math.max(minTo, myPlayer?.current_bet || 0), maxTo));
+  }, [game?.current_bet, game?.last_raise_to, myPlayer?.chips, myPlayer?.current_bet, screen, selectedTable?.big_blind]);
+
   const loadTableData = async () => {
     if (!currentTableId) return;
     
@@ -982,10 +1005,11 @@ export default function TexasHoldemCasinoPage() {
         .update({
           pot: pot,
           current_bet: currentBet,
+          last_raise_to: currentBet,         // ⬅️ חדש: גובה ההעלאה האחרון (BB בתחילת פרה-פלופ)
           current_player_index: firstToAct,
-          last_raiser_index: bigBlindIdx,
-          community_cards: [],              // ⬅️ חדש
-          community_visible: 0              // ⬅️ חדש
+          last_raiser_index: bigBlindIdx,    // האגרסור בתחילת פרה-פלופ = BB
+          community_cards: [],
+          community_visible: 0
         })
         .eq('id', newGame.id);
       
@@ -1000,13 +1024,12 @@ export default function TexasHoldemCasinoPage() {
     }
   };
 
-  // Player action handler (REPLACE)
   const handlePlayerAction = async (action, amount = 0) => {
     if (!game || !playerId) return;
     if (game.status !== GAME_STATUS.PLAYING || game.round === "finished") return;
 
     try {
-      // 1) Pull fresh game/players
+      // 1) תמונת מצב עדכנית
       const { data: gNow } = await supabase
         .from('casino_games').select('*').eq('id', currentGameId).single();
       const { data: pNow } = await supabase
@@ -1017,13 +1040,13 @@ export default function TexasHoldemCasinoPage() {
       const cur    = pls[curIdx];
       const me     = pls.find(p => p.id === playerId);
 
-      if (!cur || cur.id !== playerId) return;                         // not my turn
+      if (!cur || cur.id !== playerId) return;                         // לא התור שלי
       if (!me || me.status === PLAYER_STATUS.FOLDED) return;
       if (gNow.status !== GAME_STATUS.PLAYING) return;
 
       const toCall = Math.max(0, (gNow.current_bet ?? 0) - (me.current_bet ?? 0));
 
-      // 2) apply action locally
+      // 2) יישום הפעולה מקומית
       let newBet = me.current_bet ?? 0;
       let newChips = me.chips ?? 0;
       let newStatus = me.status;
@@ -1031,13 +1054,16 @@ export default function TexasHoldemCasinoPage() {
       if (action === "fold") {
         newStatus = PLAYER_STATUS.FOLDED;
       } else if (action === "check") {
-        if (toCall > 0) return; // illegal
+        if (toCall > 0) return; // לא חוקי
       } else if (action === "call") {
         const pay = Math.min(toCall, newChips);
         newBet += pay; newChips -= pay;
         if (pay < toCall) newStatus = PLAYER_STATUS.ALL_IN;
       } else if (action === "raise") {
-        let raiseTo = Math.max((gNow.current_bet ?? 0) + (selectedTable?.big_blind || 0), amount);
+        // מינימום העלאה = ההעלאה האחרונה ברחוב (או BB אם עוד לא הייתה העלאה)
+        const lastRaiseTo = gNow.last_raise_to || 0;
+        const minRaiseSize = Math.max((lastRaiseTo - (gNow.current_bet || 0)), selectedTable?.big_blind || 0);
+        let raiseTo = Math.max((gNow.current_bet || 0) + minRaiseSize, amount);
         raiseTo = Math.min(raiseTo, newBet + newChips);
         const put = raiseTo - newBet;
         if (put <= 0) return;
@@ -1050,7 +1076,7 @@ export default function TexasHoldemCasinoPage() {
         newStatus = PLAYER_STATUS.ALL_IN;
       }
 
-      // 3) persist my action
+      // 3) עדכון השחקן
       await supabase.from('casino_players').update({
         status: newStatus,
         current_bet: newBet,
@@ -1059,19 +1085,19 @@ export default function TexasHoldemCasinoPage() {
         last_action_time: new Date().toISOString(),
       }).eq('id', playerId);
 
-      // 4) recompute fresh state *after* the update
+      // 4) תמונת מצב אחרי העדכון
       const { data: freshPlayers } = await supabase
         .from('casino_players').select('*').eq('game_id', currentGameId).order('seat_index');
 
-      const pot = freshPlayers.reduce((s,p)=> s + (p.current_bet||0), 0);
-      const currentBet = Math.max(...freshPlayers.map(p=>p.current_bet||0), 0);
+      const pot = freshPlayers.reduce((s, p) => s + (p.current_bet || 0), 0);
+      const currentBet = Math.max(...freshPlayers.map(p => p.current_bet || 0), 0);
 
-      const lastRaiserIndex =
-        (action === "raise" || (action === "allin" && newBet > (gNow.current_bet || 0)))
-          ? curIdx
-          : (gNow.last_raiser_index ?? curIdx);
+      // אם הייתה העלאה אמיתית – עדכן אגרסור וגובה ההעלאה
+      const didRaise = (action === "raise") || (action === "allin" && newBet > (gNow.current_bet || 0));
+      const newLastRaiserIndex = didRaise ? curIdx : (gNow.last_raiser_index ?? curIdx);
+      const newLastRaiseTo     = didRaise ? newBet  : (gNow.last_raise_to ?? (gNow.current_bet || 0));
 
-      // 5) who acts next?
+      // מי הבא שיכול לפעול?
       const canAct = (p) => p.status !== PLAYER_STATUS.FOLDED && p.status !== PLAYER_STATUS.ALL_IN;
       let nextIdx = (curIdx + 1) % freshPlayers.length;
       while (!canAct(freshPlayers[nextIdx])) {
@@ -1079,7 +1105,7 @@ export default function TexasHoldemCasinoPage() {
         if (nextIdx === curIdx) break;
       }
 
-      // 6) early finish by folds
+      // אם נשאר שחקן יחיד
       const stillIn = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED);
       if (stillIn.length === 1) {
         stopActionTimer();
@@ -1090,67 +1116,76 @@ export default function TexasHoldemCasinoPage() {
         return;
       }
 
-      // 7) street completion – stable rule
+      // האם כולם מיושרים לגובה ההימור (מלבד אול-אין/פולד)?
       const activeNotFolded = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED);
       const everyoneMatched = activeNotFolded.every(p =>
         p.status === PLAYER_STATUS.ALL_IN || (p.current_bet || 0) === currentBet
       );
-      const bettingDone = everyoneMatched; // מספיק כדי לסגור רחוב
+
+      // סגירת רחוב: כולם מיושרים **והתור חוזר לאגרסור האחרון**
+      const reachedAggressor = nextIdx === newLastRaiserIndex;
+      const moreThanOneCanAct = activeNotFolded.filter(canAct).length > 1;
+      const bettingDone = (!moreThanOneCanAct) || (everyoneMatched && reachedAggressor);
 
       stopActionTimer();
 
       if (!bettingDone) {
-        // keep betting
+        // ממשיכים להמר באותו רחוב
         await supabase.from('casino_games').update({
           pot,
           current_bet: currentBet,
-          last_raiser_index: lastRaiserIndex,
+          last_raiser_index: newLastRaiserIndex,
+          last_raise_to: newLastRaiseTo,
           current_player_index: nextIdx
         }).eq('id', currentGameId);
         return;
       }
 
-      // 8) next street: compute board with proper burns
+      // מעבר לרחוב הבא – מחשבים לוח עם "burn" תקין
       const nextRound = getNextRound(gNow.round);
       const deck = gNow.deck || [];
       const n = freshPlayers.length;
       const base = n * 2;
 
       let nextCommunity = gNow.community_cards || [];
-      if (nextRound === "flop"   && gNow.round === "preflop") nextCommunity = [deck[base+1], deck[base+2], deck[base+3]];
-      if (nextRound === "turn"   && gNow.round === "flop")    nextCommunity = [...nextCommunity, deck[base+5]];
-      if (nextRound === "river"  && gNow.round === "turn")    nextCommunity = [...nextCommunity, deck[base+7]];
+      if (nextRound === "flop"  && gNow.round === "preflop") nextCommunity = [deck[base+1], deck[base+2], deck[base+3]]; // burn: base+0
+      if (nextRound === "turn"  && gNow.round === "flop")    nextCommunity = [...nextCommunity, deck[base+5]];          // burn: base+4
+      if (nextRound === "river" && gNow.round === "turn")    nextCommunity = [...nextCommunity, deck[base+7]];          // burn: base+6
 
-      // reset street bets
+      // מאפסים הימורי רחוב לכל מי שלא קיפל
       for (const p of freshPlayers) {
         if (p.status !== PLAYER_STATUS.FOLDED) {
           await supabase.from('casino_players').update({ current_bet: 0 }).eq('id', p.id);
         }
       }
 
-      // first-to-act for next street = משמאל לדילר (שעדיין בשולחן)
+      // הראשון לפעולה ברחוב הבא: לשמאל הדילר
       const dealerIndex = gNow.dealer_index ?? 0;
       let startIdx = (dealerIndex + 1) % freshPlayers.length;
-      while (freshPlayers[startIdx].status === PLAYER_STATUS.FOLDED) {
+      while (freshPlayers[startIdx].status === PLAYER_STATUS.FOLDED || freshPlayers[startIdx].status === PLAYER_STATUS.ALL_IN) {
         startIdx = (startIdx + 1) % freshPlayers.length;
       }
 
-      // atomic game update: cards + visibility + state
+      // עדכון משחק לרחוב הבא:
+      // בפלופ/טרן/ריבר current_bet=0 ואין אגרסור עד שתהיה העלאה → last_raiser_index=startIdx, last_raise_to=0
       await supabase.from('casino_games').update({
         pot,
         current_bet: 0,
         last_raise_to: 0,
         last_raiser_index: startIdx,
         round: nextRound,
-        community_visible: getCommunityVisible(nextRound),
         community_cards: nextCommunity,
-        current_player_index: startIdx,
+        community_visible: getCommunityVisible(nextRound),
+        current_player_index: startIdx
       }).eq('id', currentGameId);
 
-      // דיבאגר קליל
-      console.log('→ STREET DONE', { from: gNow.round, to: nextRound, board: nextCommunity, pot });
+      // אם עברנו לשואודאון בלי ALL-IN גורף – הכרז מנצח
+      if (nextRound === 'showdown') {
+        await determineWinner();
+        return;
+      }
 
-      // אם כולם באול-אין – פותחים הכל וישר שואודאון
+      // אם כולם באול-אין – פותחים הכל ומסיימים
       const allAllIn = activeNotFolded.every(p => p.status === PLAYER_STATUS.ALL_IN);
       if (allAllIn) {
         await supabase.from('casino_games')
@@ -1173,71 +1208,84 @@ export default function TexasHoldemCasinoPage() {
 
       const active = pls.filter(p => p.status !== PLAYER_STATUS.FOLDED);
       
+      // --- זכייה ע"י קיפול ---
       if (active.length === 1) {
         const w = active[0];
         const potAmount = gNow.pot || 0;
-        
-        // Add winnings to winner's VAULT
-        const currentVault = getVault();
-        setVault(currentVault + potAmount);
-        setVaultAmount(currentVault + potAmount);
-        
-        setGameMessage(`🎉 ${w.player_name} wins by fold! Pot: ${fmt(potAmount)} MLEO`);
-        setWinnerModal({ open: true, text: `🎉 ${w.player_name} wins by fold!`, hand: "", pot: potAmount });
-        
+
+        // 1) הוסף את הקופה לצ'יפים של המנצח בטבלה
+        await supabase.from('casino_players')
+          .update({ chips: (w.chips || 0) + potAmount })
+          .eq('id', w.id);
+
+        // אפס הימורים של כולם
+        await supabase.from('casino_players')
+          .update({ current_bet: 0 })
+          .eq('game_id', currentGameId);
+
+        // 2) עדכן את המשחק
         await supabase.from('casino_games').update({
           status: GAME_STATUS.FINISHED,
           round: "showdown",
           current_bet: 0,
+          pot: 0,                            // ⬅️ אפס את הקופה
           community_visible: 5,
         }).eq("id", currentGameId);
+
+        // UI
+        setGameMessage(`🎉 ${w.player_name} wins by fold! Pot: ${fmt(potAmount)} MLEO`);
+        setWinnerModal({ open: true, text: `🎉 ${w.player_name} wins by fold!`, hand: "", pot: potAmount });
+
+        // התחל יד חדשה...
+        setTimeout(() => {
+          setWinnerModal({ open: false, text: "", hand: "", pot: 0 });
+          startNewHand();
+        }, 5000);
+        setTimeout(() => { cleanupFinishedGame(); }, 30000);
         return;
       }
 
-      // Showdown: evaluate best5-of-7
+      // --- SHOWDOWN מלא ---
       await supabase.from('casino_games').update({ community_visible: 5 }).eq("id", currentGameId);
-      
+
       const board5 = (gNow.community_cards||[]).slice(0,5);
-      console.log("Showdown - Community cards:", board5);
-      console.log("Showdown - Active players:", active.map(p => ({ name: p.player_name, cards: p.hole_cards })));
-      
       const ranked = active.map(p => {
         const all = [...(p.hole_cards||[]), ...board5];
-        console.log("Cards for showdown evaluation:", all);
         const evalRes = evaluateHand(all);
-        console.log("Hand evaluation result:", evalRes);
         return { p, evalRes };
       }).sort((a,b)=> compareRankTuple(b.evalRes.score, a.evalRes.score));
 
       const winner = ranked[0];
       const potAmount = gNow.pot || 0;
-      
-      // Add winnings to winner's VAULT
-      const currentVault = getVault();
-      setVault(currentVault + potAmount);
-      setVaultAmount(currentVault + potAmount);
 
-      // Reveal cards
-      for (const r of ranked) {
-        await supabase.from('casino_players').update({ revealed: true }).eq("id", r.p.id);
-      }
+      // גלה קלפים לכולם
+      await supabase.from('casino_players')
+        .update({ revealed: true })
+        .in("id", ranked.map(r => r.p.id));
 
-      setGameMessage(`🎉 ${winner.p.player_name} wins with ${winner.evalRes.name}! Pot: ${fmt(potAmount)} MLEO`);
-      setWinnerModal({ 
-        open: true, 
-        text: `🎉 ${winner.p.player_name} wins!`, 
-        hand: winner.evalRes.name, 
-        pot: potAmount 
-      });
-      
+      // 1) הוסף את הקופה לצ'יפים של המנצח
+      await supabase.from('casino_players')
+        .update({ chips: (winner.p.chips || 0) + potAmount })
+        .eq('id', winner.p.id);
+
+      // אפס הימורים
+      await supabase.from('casino_players')
+        .update({ current_bet: 0 })
+        .eq('game_id', currentGameId);
+
+      // 2) עדכן את המשחק
       await supabase.from('casino_games').update({
         status: GAME_STATUS.FINISHED,
         round: "showdown",
         current_bet: 0,
+        pot: 0,                            // ⬅️ אפס את הקופה
         community_visible: 5,
       }).eq("id", currentGameId);
 
-      // Auto-start new hand after 5 seconds
+      // UI
+      setGameMessage(`🎉 ${winner.p.player_name} wins with ${winner.evalRes.name}! Pot: ${fmt(potAmount)} MLEO`);
+      setWinnerModal({ open: true, text: `🎉 ${winner.p.player_name} wins!`, hand: winner.evalRes.name, pot: potAmount });
+
       setTimeout(() => {
         setWinnerModal({ open: false, text: "", hand: "", pot: 0 });
         startNewHand();
@@ -1313,13 +1361,14 @@ export default function TexasHoldemCasinoPage() {
         status: GAME_STATUS.PLAYING,
         pot: pot,
         current_bet: currentBet,
+        last_raise_to: currentBet,           // ⬅️ חדש
         round: 'preflop',
         community_visible: 0,
         community_cards: [],
         deck: deck,
         dealer_index: dealerIndex,
-        current_player_index: startIdx,
-        last_raiser_index: bigBlindIdx
+        current_player_index: startIdx,      // (bigBlindIdx + 1) % n
+        last_raiser_index: bigBlindIdx       // האגרסור בתחילת פרה-פלופ = BB
       }).eq("id", currentGameId);
       
     } catch (err) {
@@ -1711,34 +1760,52 @@ export default function TexasHoldemCasinoPage() {
               </div>
 
               {/* Action Buttons */}
-              {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && game?.round !== "finished" && !winnerModal.open && (
+              {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && game?.round !== "finished" && game?.round !== 'showdown' && !winnerModal.open && (
                 <div className="text-center">
                   <div className="text-white/70 text-sm mb-4">
                     Your Turn {timeLeft > 0 && `(${timeLeft}s)`}
                   </div>
-                  <div className="flex justify-center gap-3">
-                    <button 
-                      onClick={() => handlePlayerAction("fold")}
-                      className="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all"
-                    >
+                  <div className="flex justify-center gap-3 flex-wrap">
+                    <button onClick={() => handlePlayerAction("fold")} className="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all">
                       FOLD
                     </button>
-                    <button 
+
+                    <button
                       onClick={() => handlePlayerAction(game?.current_bet > (myPlayer?.current_bet || 0) ? "call" : "check")}
                       className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all"
                     >
                       {game?.current_bet > (myPlayer?.current_bet || 0) ? 'CALL' : 'CHECK'}
                     </button>
-                    <button 
-                      onClick={() => handlePlayerAction("raise", (game?.current_bet || 0) + selectedTable?.big_blind)}
-                      className="px-6 py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold transition-all"
-                    >
-                      RAISE
-                    </button>
-                    <button 
-                      onClick={() => handlePlayerAction("allin")}
-                      className="px-6 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all"
-                    >
+
+                    {/* RAISE CONTROL */}
+                    <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2">
+                      <input
+                        type="range"
+                        min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)}
+                        max={getMaxRaiseTo(myPlayer)}
+                        step={selectedTable?.big_blind || 1}
+                        value={raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))}
+                        onChange={(e) => setRaiseTo(Number(e.target.value))}
+                        className="w-40"
+                      />
+                      <input
+                        type="number"
+                        className="w-24 bg-black/40 border border-white/20 rounded px-2 py-1 text-white"
+                        value={raiseTo ?? ''}
+                        min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)}
+                        max={getMaxRaiseTo(myPlayer)}
+                        step={selectedTable?.big_blind || 1}
+                        onChange={(e) => setRaiseTo(Math.min(Math.max(Number(e.target.value) || 0, (game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)), getMaxRaiseTo(myPlayer)))}
+                      />
+                      <button
+                        onClick={() => handlePlayerAction("raise", raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)))}
+                        className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold"
+                      >
+                        RAISE TO
+                      </button>
+                    </div>
+
+                    <button onClick={() => handlePlayerAction("allin")} className="px-6 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all">
                       ALL IN
                     </button>
                   </div>

@@ -177,7 +177,7 @@ export default function HorseRacePage() {
 
   const checkResult = (winnerIndex, bet) => {
     const win = winnerIndex === selectedHorse;
-    const prize = win ? bet * 5 : 0;
+    const prize = win ? Math.floor(bet * 5.4) : 0; // 108% RTP!
 
     if (win && prize > 0) {
       const newVault = getVault() + prize;
@@ -185,7 +185,7 @@ export default function HorseRacePage() {
       playSfx(winSound.current);
     }
 
-    const resultData = { win, winner: HORSES[winnerIndex].name, selected: HORSES[selectedHorse].name, prize, profit: win ? prize - bet : -bet };
+    const resultData = { win, winner: HORSES[winnerIndex].name, selected: HORSES[selectedHorse].name, prize, profit: win ? prize - bet : -bet, multiplier: 5.4 };
     setGameResult(resultData);
 
     const newStats = { ...stats, totalRaces: stats.totalRaces + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalBet: stats.totalBet + bet, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), lastBet: bet };
@@ -219,7 +219,7 @@ export default function HorseRacePage() {
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">🏇 Horse Racing</h1>
-            <p className="text-white/70 text-xs">Bet on your horse • Win ×5!</p>
+            <p className="text-white/70 text-xs">Bet on your horse • Win ×5.4!</p>
           </div>
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
@@ -303,10 +303,10 @@ export default function HorseRacePage() {
                 <p><strong>1. Select Horse:</strong> Choose your favorite!</p>
                 <p><strong>2. Set Bet:</strong> Min {MIN_BET} MLEO</p>
                 <p><strong>3. Race:</strong> Watch them compete!</p>
-                <p><strong>4. Win:</strong> If your horse wins, you get ×5!</p>
+                <p><strong>4. Win:</strong> If your horse wins, you get ×5.4!</p>
                 <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
-                  <p className="text-green-300 font-semibold">Payout: ×5</p>
-                  <p className="text-xs text-white/80 mt-1">All horses have equal chance to win!</p>
+                  <p className="text-green-300 font-semibold">Payout: ×5.4 (108% RTP!)</p>
+                  <p className="text-xs text-white/80 mt-1">All horses have equal 20% chance to win!</p>
         </div>
               </div>
               <button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>

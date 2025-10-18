@@ -78,10 +78,12 @@ export default function ShooterPage() {
   const [betAmount, setBetAmount] = useState("1000");
   const [isEditingBet, setIsEditingBet] = useState(false);
   const [score, setScore] = useState(0);
+  const [misses, setMisses] = useState(0);
   const [timeLeft, setTimeLeft] = useState(TIME_LIMIT);
   const [gameActive, setGameActive] = useState(false);
   const [gameResult, setGameResult] = useState(null);
   const [targetPos, setTargetPos] = useState({ x: 50, y: 50 });
+  const targetTimerRef = useRef(null);
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
   const [showResultPopup, setShowResultPopup] = useState(false);
@@ -167,6 +169,7 @@ export default function ShooterPage() {
     setBetAmount(String(bet));
     setGameResult(null);
     setScore(0);
+    setMisses(0);
     setTimeLeft(TIME_LIMIT);
     setGameActive(true);
     moveTarget();
@@ -174,36 +177,66 @@ export default function ShooterPage() {
 
   const moveTarget = () => {
     setTargetPos({ x: 10 + Math.random() * 80, y: 10 + Math.random() * 60 });
+    
+    // Auto-move target every 1 second - if not clicked, it's a miss!
+    if (targetTimerRef.current) clearTimeout(targetTimerRef.current);
+    targetTimerRef.current = setTimeout(() => {
+      if (gameActive) {
+        const newMisses = misses + 1;
+        setMisses(newMisses);
+        if (newMisses >= 3) {
+          // 3 misses = Game Over!
+          endGame();
+        } else {
+          moveTarget();
+        }
+      }
+    }, 1000); // Target disappears after 1 second
   };
 
   const hitTarget = () => {
     if (!gameActive) return;
     playSfx(clickSound.current);
     setScore(score + 1);
-    moveTarget();
+    if (score + 1 >= TOTAL_TARGETS) {
+      // Won! Hit all targets!
+      if (targetTimerRef.current) clearTimeout(targetTimerRef.current);
+      endGame();
+    } else {
+      moveTarget();
+    }
   };
 
   const endGame = () => {
     const bet = Number(betAmount);
-    const multiplier = 1 + (score * 0.2);
-    const prize = score >= TOTAL_TARGETS ? Math.floor(bet * multiplier) : 0;
-    const win = prize > 0;
+    // Partial wins! Each target = ×0.33 (110% RTP at 10 targets)
+    const multiplier = score * 0.33;
+    const prize = Math.floor(bet * multiplier);
+    const win = prize > bet; // Win if prize > bet
 
-    if (win && prize > 0) {
+    if (prize > 0) {
       const newVault = getVault() + prize;
       setVault(newVault); setVaultState(newVault);
-      playSfx(winSound.current);
+      if (win) playSfx(winSound.current);
     }
 
-    const resultData = { win, score, multiplier, prize, profit: win ? prize - bet : -bet };
+    const resultData = { win, score, multiplier, prize, profit: prize - bet, perfect: score >= TOTAL_TARGETS };
     setGameResult(resultData);
     setGameActive(false);
 
-    const newStats = { ...stats, totalGames: stats.totalGames + 1, totalBet: stats.totalBet + bet, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), bestScore: Math.max(stats.bestScore, score), lastBet: bet };
+    const newStats = { ...stats, totalGames: stats.totalGames + 1, totalBet: stats.totalBet + bet, totalWon: stats.totalWon + prize, biggestWin: Math.max(stats.biggestWin, prize), bestScore: Math.max(stats.bestScore, score), lastBet: bet };
     setStats(newStats);
   };
 
-  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setScore(0); setTimeLeft(TIME_LIMIT); setGameActive(false); };
+  const resetGame = () => { 
+    if (targetTimerRef.current) clearTimeout(targetTimerRef.current);
+    setGameResult(null); 
+    setShowResultPopup(false); 
+    setScore(0); 
+    setMisses(0);
+    setTimeLeft(TIME_LIMIT); 
+    setGameActive(false); 
+  };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-blue-900 via-black to-cyan-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -249,9 +282,16 @@ export default function ShooterPage() {
 
           <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
             <div className="w-full relative bg-black/20 border border-white/10 rounded-lg" style={{ height: '100%' }}>
-              {gameActive && (<button onClick={hitTarget} className="absolute w-12 h-12 rounded-full bg-red-500 text-white text-2xl font-bold hover:brightness-110 transition-all" style={{ left: `${targetPos.x}%`, top: `${targetPos.y}%`, transform: 'translate(-50%, -50%)' }}>🎯</button>)}
-              <div className="absolute top-2 left-2 text-white text-sm font-bold">Score: {score}/{TOTAL_TARGETS}</div>
-              <div className="absolute top-2 right-2 text-white text-sm font-bold">Time: {timeLeft}s</div>
+              {gameActive && (<button onClick={hitTarget} className="absolute w-12 h-12 rounded-full bg-red-500 text-white text-2xl font-bold hover:brightness-110 transition-all animate-pulse" style={{ left: `${targetPos.x}%`, top: `${targetPos.y}%`, transform: 'translate(-50%, -50%)' }}>🎯</button>)}
+              <div className="absolute top-2 left-2 text-white text-sm font-bold bg-black/40 px-2 py-1 rounded">
+                Hits: {score}/{TOTAL_TARGETS}
+              </div>
+              <div className="absolute top-2 right-2 text-white text-sm font-bold bg-black/40 px-2 py-1 rounded">
+                Time: {timeLeft}s
+              </div>
+              <div className="absolute bottom-2 left-2 text-white text-sm font-bold bg-black/40 px-2 py-1 rounded">
+                Misses: <span className={misses >= 2 ? 'text-red-400' : 'text-white'}>{misses}/3</span> ❌
+              </div>
             </div>
           </div>
 
@@ -276,11 +316,11 @@ export default function ShooterPage() {
           </div>
         </div>
 
-        {showResultPopup && gameResult && (<div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none"><div className={`${gameResult.win ? 'bg-green-500' : 'bg-gray-600'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}><div className="text-4xl mb-2">{gameResult.win ? '🎯' : '⏰'}</div><div className="text-2xl font-bold mb-1">{gameResult.win ? 'SUCCESS!' : 'TIME UP!'}</div><div className="text-lg">{gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : `Score: ${gameResult.score}`}</div></div></div>)}
+        {showResultPopup && gameResult && (<div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none"><div className={`${gameResult.perfect ? 'bg-yellow-500' : gameResult.win ? 'bg-green-500' : gameResult.prize > 0 ? 'bg-blue-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}><div className="text-4xl mb-2">{gameResult.perfect ? '👑' : gameResult.win ? '🎯' : gameResult.prize > 0 ? '💪' : '⏰'}</div><div className="text-2xl font-bold mb-1">{gameResult.perfect ? 'PERFECT!' : gameResult.win ? 'NICE!' : gameResult.prize > 0 ? 'GOOD TRY!' : 'MISS!'}</div><div className="text-lg">{gameResult.prize > 0 ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div><div className="text-sm opacity-80 mt-2">Score: {gameResult.score}/{TOTAL_TARGETS} • ×{gameResult.multiplier.toFixed(2)}</div></div></div>)}
 
         {menuOpen && (<div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}><div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div><div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div><div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div><div className="mt-4 text-xs opacity-70"><p>Target Shooter v2.0</p></div></div></div>)}
 
-        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">🎯 How to Play</h2><div className="space-y-3 text-sm"><p><strong>1. Start:</strong> Min {MIN_BET} MLEO</p><p><strong>2. Click Targets:</strong> Hit {TOTAL_TARGETS} targets before time runs out!</p><p><strong>3. Win:</strong> Complete all targets!</p><div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3"><p className="text-blue-300 font-semibold">Each target: ×0.2 multiplier!</p></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">🎯 How to Play</h2><div className="space-y-3 text-sm"><p><strong>1. Start:</strong> Min {MIN_BET} MLEO</p><p><strong>2. Click Fast:</strong> Targets move every 1 second!</p><p><strong>3. Don't Miss:</strong> 3 misses = Game Over!</p><p><strong>4. Partial Wins:</strong> Get paid for each hit!</p><div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3"><p className="text-blue-300 font-semibold mb-2">Each target = ×0.33</p><div className="text-xs text-white/80 space-y-1"><p>• 4 targets: ×1.32 (break even)</p><p>• 7 targets: ×2.31 (good!)</p><p>• 10 targets: ×3.3 (perfect!) 🏆</p></div></div><div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mt-2"><p className="text-red-300 font-semibold text-xs">⚠️ Warning: Miss 3 targets and you lose!</p></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
 
         {showStats && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2><div className="space-y-3"><div className="grid grid-cols-2 gap-3"><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Games</div><div className="text-xl font-bold">{stats.totalGames}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Bet</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Best Score</div><div className="text-lg font-bold text-cyan-400">{stats.bestScore}/{TOTAL_TARGETS}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalBet)}</div></div></div></div><button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
 
