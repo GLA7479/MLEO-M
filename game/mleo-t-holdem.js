@@ -147,6 +147,7 @@ export default function HoldemPage() {
   const [currentHandId, setCurrentHandId] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
   const [serverSeats, setServerSeats] = useState([]); // seats from server
+  const [state, setState] = useState({}); // server state snapshot
 
   // Vault & buy-in
   const [vault, setVaultState] = useState(0);
@@ -396,18 +397,29 @@ export default function HoldemPage() {
             current_turn: state.hand.current_turn
           });
           
-          // Check if street can advance
-          if (canAdvanceStreet(state) && !window.__advancing) {
-            window.__advancing = true;
-            console.log("Advancing street...");
-            fetch("/api/poker/advance-street", {
-              method: "POST",
-              headers: { "Content-Type":"application/json" },
-              body: JSON.stringify({ hand_id: state.hand.id })
-            }).finally(() => {
-              setTimeout(() => { window.__advancing = false; }, 1500);
-            });
+          // Store state snapshot for other functions
+          setState(state);
+          
+          // Retry if players empty (server snapshot not ready yet)
+          if (Array.isArray(state.players) && state.players.length === 0) {
+            setTimeout(() => {
+              fetch(`/api/poker/state?hand_id=${hand_id}`)
+                .then(r => r.json())
+                .then(s2 => { 
+                  if (!s2?.error && s2.players && s2.players.length > 0) {
+                    setState(s2);
+                    // Re-process the state
+                    if (s2.hand?.pot_total) setPot(Number(s2.hand.pot_total));
+                    const board2 = (s2.hand && s2.hand.board) || s2.board || [];
+                    setCommunity(Array.isArray(board2) ? board2 : []);
+                  }
+                })
+                .catch(()=>{});
+            }, 250);
           }
+          
+          // Check if street can advance
+          maybeAdvance(state);
           
           // Check if hand is over
           if (state.hand.stage === 'hand_end') {
@@ -512,36 +524,61 @@ export default function HoldemPage() {
   // Street advancement logic
   let _advancing = false; // Prevent double advances
   
+  function holeFor(seatIdx) {
+    // server: players[row].hole_cards OR map by seat
+    const fromPlayers = (state?.players || []).find(p => p.seat_index === seatIdx)?.hole_cards;
+    if (fromPlayers && fromPlayers.length === 2) return fromPlayers;
+    const map = state?.holes || state?.hole_cards || state?.hand?.holes || holeCards || {};
+    return map?.[seatIdx] || null;
+  }
+  
+  function computeBackupTurn(state) {
+    const seats = state?.seats || state?.hand?.seats || [];
+    const alive = seats
+      .map((s, i) => ({ ...s, i }))
+      .filter(s => s?.player_name && !s?.sat_out && ((s.stack_live ?? s.stack ?? 0) > 0));
+
+    if (!alive.length) return null;
+
+    const n = seats.length || 9;
+    const dealer = seats.findIndex(s => s?.is_dealer);
+    const sb = seats.findIndex(s => s?.is_sb);
+    const bb = seats.findIndex(s => s?.is_bb);
+
+    let start = (bb >= 0 ? bb : (sb >= 0 ? sb : dealer));
+    if (start < 0) start = alive[0].i;
+
+    for (let step = 1; step <= n; step++) {
+      const idx = (start + step) % n;
+      const s = seats[idx];
+      if (s?.player_name && !s?.sat_out && ((s.stack_live ?? s.stack ?? 0) > 0)) return idx;
+    }
+    return null;
+  }
+  
   function everyoneDone(state) {
-    // Players still in hand
-    const alive = state.players.filter(p => !p.folded && !p.sat_out);
-    if (alive.length <= 1) return true; // Everyone folded → end hand / advance
-    
-    // Highest bet on table
-    const maxBet = Math.max(0, ...state.players.map(p => Number(p.bet_street || 0)));
-    
-    // All "alive" players matched (bet == maxBet) and no raise pending
-    return alive.every(p => Number(p.bet_street || 0) === maxBet);
+    const seats = state?.seats || serverSeats || [];
+    const bets = state?.bets || Object.values(bets).length > 0 ? bets : {};
+    const alive = seats
+      .map((s,i)=>({s,i}))
+      .filter(x => x.s?.player_id && !x.s?.sat_out && (x.s?.stack_live ?? x.s?.stack ?? 0) > 0);
+    if (alive.length <= 1) return true;
+    const maxBet = Math.max(0, ...Object.values(bets));
+    return alive.every(x => (bets[x.i] || 0) === maxBet);
   }
   
   async function maybeAdvance(state) {
-    if (_advancing) return;
-    if (!state?.hand_id) return;
+    if (_advancing || !currentHandId) return;
     if (!everyoneDone(state)) return;
-    
     _advancing = true;
     try {
-      const r = await fetch('/api/poker/advance-street', {
+      await fetch('/api/poker/advance-street', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hand_id: state.hand_id })
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ hand_id: currentHandId })
       });
-      if (!r.ok) {
-        const t = await r.text().catch(()=>'');
-        console.warn('advance failed', r.status, t);
-      }
-    } finally {
-      _advancing = false;
+    } finally { 
+      _advancing = false; 
     }
   }
   
@@ -660,19 +697,24 @@ export default function HoldemPage() {
     }
   };
 
-  // Turn timer - smooth counting based on server deadline
-  useEffect(() => {
-    let raf = 0;
-    function tick() {
-      const now = Date.now();
-      const end = currentHand?.turn_deadline ? new Date(currentHand.turn_deadline).getTime() : now;
-      const msLeft = Math.max(0, end - now);
-      setTurnLeftSec(Math.ceil(msLeft/1000));
-      raf = requestAnimationFrame(tick);
-    }
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [currentHand?.turn_deadline]);
+  // Turn timer
+  useEffect(()=>{
+    if (!(stage==="preflop"||stage==="flop"||stage==="turn"||stage==="river")) return;
+    if (turnSeat===null) return;
+    setTurnLeftSec(TURN_SECONDS);
+    const iv = setInterval(()=>{
+      setTurnLeftSec(t=>{
+        if (t<=1) {
+          clearInterval(iv);
+          const myBet = bets[turnSeat]||0;
+          const need = toCall - myBet;
+          if (need>0) timeoutFold(turnSeat); else timeoutCheck(turnSeat);
+        }
+        return t-1;
+      });
+    }, 1000);
+    return ()=>clearInterval(iv);
+  }, [turnSeat, stage, toCall, bets]);
 
   const sumBets = () => Object.values(bets).reduce((a,b)=>a+(b||0),0);
 
@@ -796,7 +838,12 @@ export default function HoldemPage() {
   
   const meIdx = mySeat ? mySeat.seat_index : -1;
   const myChips = mySeat ? mySeat.stack : 0;
-  const myTurn = meIdx===turnSeat && (stage==="preflop"||stage==="flop"||stage==="turn"||stage==="river");
+  
+  // Calculate effective turn with backup
+  const serverTurn = turnSeat;
+  const backupTurn = computeBackupTurn({ seats: serverSeats });
+  const effectiveTurn = (serverTurn === null || serverTurn === undefined) ? backupTurn : serverTurn;
+  const myTurn = (meIdx !== -1 && effectiveTurn === meIdx) && (stage==="preflop"||stage==="flop"||stage==="turn"||stage==="river");
 
   const passTurn = (fromIdx, raised) => {
     const alive = seats.map((p,i)=>({p,i})).filter(x=>x.p && !folded[x.i] && (!allIn[x.i] || (bets[x.i]||0)>0));
@@ -967,9 +1014,17 @@ export default function HoldemPage() {
                         <div className="opacity-70">Hole:</div>
                       </div>
                       <div className="mt-1 flex gap-1">
-                        {(holeCards[i]||[]).map((c,idx)=>(
-                          <Card key={idx} card={(p.you || stage==="showdown") ? c : null} faceDown={!(p.you || stage==="showdown")} />
-                        ))}
+                        {(() => {
+                          const myHole = holeFor(i);
+                          if (myHole && Array.isArray(myHole)) {
+                            return myHole.map((c,idx)=>(
+                              <Card key={idx} card={(p.you || stage==="showdown") ? c : null} faceDown={!(p.you || stage==="showdown")} />
+                            ));
+                          }
+                          return (holeCards[i]||[]).map((c,idx)=>(
+                            <Card key={idx} card={(p.you || stage==="showdown") ? c : null} faceDown={!(p.you || stage==="showdown")} />
+                          ));
+                        })()}
                       </div>
                       {p.you && (
                         <div className="mt-2 flex gap-2">
@@ -983,7 +1038,12 @@ export default function HoldemPage() {
             </div>
 
             {/* Action Bar */}
-            {meIdx!==-1 && myTurn && !folded[meIdx] && (
+            {(() => {
+              const meSeated = serverSeats?.[meIdx];
+              const inHandFallback = !!(meSeated?.player_id && !meSeated?.sat_out && (meSeated?.stack_live ?? meSeated?.stack ?? 0) > 0);
+              const showActionBar = inHandFallback && (stage==="preflop"||stage==="flop"||stage==="turn"||stage==="river");
+              return meIdx!==-1 && myTurn && !folded[meIdx] && showActionBar;
+            })() && (
               <ActionBar
                 toCall={Math.max(0, toCall - (bets[meIdx]||0))}
                 myBet={bets[meIdx]||0}
