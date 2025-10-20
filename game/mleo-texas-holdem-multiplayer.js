@@ -582,12 +582,12 @@ function TexasHoldemMultiplayerPage() {
       newCurrentBet = Math.max(currentGameState.currentBet, currentPlayer.bet + allInAmount);
     }
     
-    // Move to next player - פשוט!
-    let nextIndex = (currentGameState.currentPlayerIndex + 1) % 2;
+    // Move to next player - תיקון: תמיכה ב-2-6 שחקנים
+    let nextIndex = (currentGameState.currentPlayerIndex + 1) % updatedPlayers.length;
     
     // בדיקה שהשחקן הבא לא קיפל
     while (updatedPlayers[nextIndex].folded) {
-      nextIndex = (nextIndex + 1) % 2;
+      nextIndex = (nextIndex + 1) % updatedPlayers.length;
     }
     
     console.log("Guest action - Current index:", currentGameState.currentPlayerIndex, "Next index:", nextIndex);
@@ -781,12 +781,12 @@ function TexasHoldemMultiplayerPage() {
       newCurrentBet = Math.max(gameState.currentBet, currentPlayer.bet + allInAmount);
     }
     
-    // Move to next player - פשוט!
-    let nextIndex = (gameState.currentPlayerIndex + 1) % 2;
+    // Move to next player - תיקון: תמיכה ב-2-6 שחקנים
+    let nextIndex = (gameState.currentPlayerIndex + 1) % updatedPlayers.length;
     
     // בדיקה שהשחקן הבא לא קיפל
     while (updatedPlayers[nextIndex].folded) {
-      nextIndex = (nextIndex + 1) % 2;
+      nextIndex = (nextIndex + 1) % updatedPlayers.length;
     }
     
     console.log("Host action - Current index:", gameState.currentPlayerIndex, "Next index:", nextIndex);

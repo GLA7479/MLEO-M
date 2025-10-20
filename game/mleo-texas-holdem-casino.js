@@ -1064,27 +1064,31 @@ export default function TexasHoldemCasinoPage() {
       const sb = updatedPlayers[pos.smallBlindIdx];
       const bb = updatedPlayers[pos.bigBlindIdx];
 
-      sb.current_bet = Math.min(selectedTable.small_blind, sb.chips);
+      sb.current_bet = Math.min(tbl.small_blind ?? 0, sb.chips);
       sb.chips -= sb.current_bet;
       sb.hand_invested = sb.current_bet;
 
-      bb.current_bet = Math.min(selectedTable.big_blind, bb.chips);
+      bb.current_bet = Math.min(tbl.big_blind ?? 0, bb.chips);
       bb.chips -= bb.current_bet;
       bb.hand_invested = bb.current_bet;
       
-      // Update players in database
-      for (const player of updatedPlayers) {
-        await supabase
-          .from('casino_players')
-          .update({
-            game_id: player.game_id,
-            hole_cards: player.hole_cards,
-            current_bet: player.current_bet,
-            status: player.status,
-            chips: player.chips,
-            hand_invested: player.hand_invested || 0
-          })
-          .eq('id', player.id);
+      // Update players in database (תפוס שגיאות)
+      const updates = updatedPlayers.map(p =>
+        supabase.from('casino_players').update({
+          game_id: p.game_id,
+          hole_cards: p.hole_cards,
+          current_bet: p.current_bet,
+          status: p.status,
+          chips: p.chips,
+          hand_invested: p.hand_invested || 0
+        }).eq('id', p.id)
+      );
+      const results = await Promise.all(updates);
+      const bad = results.find(r => r.error);
+      if (bad && bad.error) {
+        console.error('player update error:', bad.error);
+        setError('DB update failed: ' + bad.error.message);
+        return; // אל תמשיך אם השלב הקריטי נכשל
       }
       
       // Update game with pot and current bet
@@ -1623,6 +1627,14 @@ export default function TexasHoldemCasinoPage() {
     try {
       const deck = shuffleDeck(createDeck());
 
+      // טען את פרטי השולחן (small_blind, big_blind)
+      const { data: tbl } = await supabase
+        .from('casino_tables')
+        .select('id, small_blind, big_blind')
+        .eq('id', currentTableId)
+        .single();
+      if (!tbl) return; // הגנה
+
       // 1) טען את כל היושבים בשולחן (לא לפי game_id!)
       const { data: tablePlayers } = await supabase
         .from('casino_players')
@@ -1674,11 +1686,11 @@ export default function TexasHoldemCasinoPage() {
       const sb = updated[pos.smallBlindIdx];
       const bb = updated[pos.bigBlindIdx];
 
-      sb.current_bet = Math.min(selectedTable.small_blind, sb.chips);
+      sb.current_bet = Math.min(tbl.small_blind ?? 0, sb.chips);
       sb.chips      -= sb.current_bet;
       sb.hand_invested = sb.current_bet;
 
-      bb.current_bet = Math.min(selectedTable.big_blind, bb.chips);
+      bb.current_bet = Math.min(tbl.big_blind ?? 0, bb.chips);
       bb.chips      -= bb.current_bet;
       bb.hand_invested = bb.current_bet;
 

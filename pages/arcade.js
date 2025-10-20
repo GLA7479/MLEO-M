@@ -370,7 +370,16 @@ export default function ArcadeHub() {
       href: "/texas-holdem-supabase-try",
       color: "#10B981",
     },
-    // 8.7. Texas Hold'em Rooms - NEW!
+    // 8.7. T-Hold'em Rooms - NEW!
+    {
+      title: "T-Hold'em Rooms",
+      emoji: "🎴💎",
+      description: "Private Texas Hold'em tables! 2-9 players, 30s turn timer, private room codes. Play with friends!",
+      prize: "Social",
+      href: "/mleo-t-holdem",
+      color: "#F59E0B",
+    },
+    // 8.8. Texas Hold'em Rooms
     {
       title: "Texas Hold'em Rooms",
       emoji: "🎰🎴",
@@ -644,7 +653,7 @@ export default function ArcadeHub() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/40">
               <span className="text-2xl">🎮</span>
-              <span className="font-bold text-purple-300">27 Exciting Games to Play!</span>
+              <span className="font-bold text-purple-300">28 Exciting Games to Play!</span>
             </div>
           </div>
 

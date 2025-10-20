@@ -79,3 +79,5 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 3. **Network Tab** - האם יש בעיות חיבור
 
 **המשחק החדש יעבוד הרבה יותר טוב מהקודם!** 🎴⚡
+
+

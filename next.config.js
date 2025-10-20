@@ -13,6 +13,24 @@ const nextConfig = {
         tls: false,
       };
     }
+    
+    // Fix for MetaMask SDK chunk loading issues
+    config.optimization = {
+      ...config.optimization,
+      splitChunks: {
+        ...config.optimization.splitChunks,
+        cacheGroups: {
+          ...config.optimization.splitChunks?.cacheGroups,
+          metamask: {
+            test: /[\\/]node_modules[\\/]@metamask[\\/]/,
+            name: 'metamask',
+            chunks: 'all',
+            priority: 10,
+          },
+        },
+      },
+    };
+    
     return config;
   },
   // Ensure proper build output
