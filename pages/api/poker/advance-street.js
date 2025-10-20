@@ -53,10 +53,15 @@ export default async function handler(req,res){
     const first = leftOfButton(order, dealer_seat);
     const ddl = first ? new Date(Date.now()+30_000) : null;
 
+    // Update hand stage and turn info
     await q(`UPDATE poker_hands
-             SET stage=$2, board=$3::jsonb, deck_remaining=$4::jsonb, current_turn=$5, turn_deadline=$6
+             SET stage=$2, current_turn=$3, turn_deadline=$4
              WHERE id=$1`,
-      [hand_id, stage, JSON.stringify(board), JSON.stringify(deck_remaining), first, ddl]);
+      [hand_id, stage, first, ddl]);
+
+    // Update board and deck using RPC functions
+    await q(`SELECT set_board($1, $2)`, [hand_id, board]);
+    await q(`SELECT set_deck_remaining($1, $2)`, [hand_id, deck_remaining]);
 
     res.json({ ok:true, stage, board, current_turn:first });
   } catch(e){

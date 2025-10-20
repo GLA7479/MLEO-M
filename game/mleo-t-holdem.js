@@ -1,4 +1,4 @@
-// pages/mleo-t-holdem.js
+// game/mleo-t-holdem.js
 // ============================================================================
 // MLEO Texas Hold'em (client-first demo, English-only)
 // - Works with your Layout and local Vault
@@ -53,6 +53,9 @@ const TURN_SECONDS = 30;
 const NEXT_HAND_DELAY_MS = 10000;
 const STORAGE_KEY = "mleo_holdem_state_v1";
 const NAME_KEY = "mleo_display_name_v1";
+
+// ===== API Integration =====
+const TABLE_NAME = "TEST"; // room code
 
 // ===== Cards =====
 const RANKS = ["2","3","4","5","6","7","8","9","T","J","Q","K","A"];
@@ -139,6 +142,12 @@ export default function HoldemPage() {
     return s.name || "";
   });
 
+  // API Integration
+  const [tableId, setTableId] = useState(null);
+  const [currentHandId, setCurrentHandId] = useState(null);
+  const [pollingInterval, setPollingInterval] = useState(null);
+  const [serverSeats, setServerSeats] = useState([]); // seats from server
+
   // Vault & buy-in
   const [vault, setVaultState] = useState(0);
   const [buyIn, setBuyIn] = useState(tableMin);
@@ -163,7 +172,7 @@ export default function HoldemPage() {
   const [turnLeftSec, setTurnLeftSec] = useState(TURN_SECONDS);
   const [handMsg, setHandMsg] = useState("Waiting for players...");
 
-  // Init vault & blinds
+  // Init vault & blinds & load table
   useEffect(()=>{
     const v = getVault();
     setVaultState(v);
@@ -171,10 +180,45 @@ export default function HoldemPage() {
     const bb = Math.max(sb+1, Math.floor(tableMin*0.02));
     setSmallBlind(sb);
     setBigBlind(bb);
+    loadTable();
+
+    // Start polling for server seats
+    let alive = true;
+    async function pollSeats() {
+      if (!alive) return;
+      try {
+        const r = await fetch(`/api/poker/table?name=${encodeURIComponent(TABLE_NAME)}`).then(r=>r.json());
+        if (alive && r && !r.error) {
+          setServerSeats(r.seats || []);
+        }
+      } catch (e) {
+        console.error("Polling error:", e);
+      }
+      if (alive) {
+        setTimeout(pollSeats, 1500); // poll every 1.5 seconds
+      }
+    }
+    setTimeout(pollSeats, 1500); // start polling after initial load
+
+    return () => { alive = false; };
   }, [tableMin]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      stopPolling();
+    };
+  }, []);
 
   // Persist name
   useEffect(()=> safeWrite(NAME_KEY, { name: displayName||"" }), [displayName]);
+
+  // Create a map of server seats by index
+  const seatByIndex = useMemo(() => {
+    const m = new Map();
+    (serverSeats || []).forEach(s => m.set(s.seat_index, s));
+    return m;
+  }, [serverSeats]);
 
   // Restore seat for this room
   useEffect(()=>{
@@ -193,6 +237,216 @@ export default function HoldemPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomCode]);
 
+  // API Functions
+  async function loadTable() {
+    try {
+      const r = await fetch(`/api/poker/table?name=${encodeURIComponent(TABLE_NAME)}`).then(r=>r.json());
+      if (!r || r.error) {
+        console.error("loadTable error:", r);
+        alert(`Table load failed: ${r?.error || "unknown"}`);
+        return;
+      }
+      setTableId(r.table.id);
+      setServerSeats(r.seats || []);
+      console.log("Table loaded:", r.table.id, "with", r.seats?.length || 0, "seats");
+    } catch (e) {
+      console.error("Failed to load table:", e);
+      alert("Failed to load table. Check server logs.");
+    }
+  }
+
+  async function apiSit(seatIdx, name, buyin) {
+    try {
+      await fetch(`/api/poker/sit`, { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ table_id: tableId, seat_index: seatIdx, player_name: name, buyin })
+      });
+      await loadTable();
+    } catch (e) {
+      console.error("Failed to sit:", e);
+    }
+  }
+
+  async function apiLeave(seatIdx) {
+    try {
+      await fetch(`/api/poker/leave`, { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ table_id: tableId, seat_index: seatIdx })
+      });
+      await loadTable();
+    } catch (e) {
+      console.error("Failed to leave:", e);
+    }
+  }
+
+  async function apiStartHand() {
+    try {
+      return await fetch(`/api/poker/start-hand`, { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ table_id: tableId })
+      }).then(r=>r.json()); // {hand_id,...}
+    } catch (e) {
+      console.error("Failed to start hand:", e);
+      return null;
+    }
+  }
+
+  async function apiAction(hand_id, seat_index, action, amount = 0) {
+    try {
+      // For bet/raise, send as raise_to parameter
+      const body = (action === 'bet' || action === 'raise') 
+        ? { hand_id, seat_index, action, raise_to: amount }
+        : { hand_id, seat_index, action, amount };
+        
+      await fetch(`/api/poker/action`, { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+    } catch (e) {
+      console.error("Failed to perform action:", e);
+    }
+  }
+
+  // Helper: Check if street can advance
+  function canAdvanceStreet(state) {
+    if (!state?.players?.length || !state.hand) return false;
+    if (state.hand.stage === 'river' || state.hand.stage === 'showdown') return false;
+    
+    const active = state.players.filter(p => !p.folded && !p.all_in);
+    if (active.length === 0) return false;
+    
+    const allActed = active.every(p => p.acted_street === true);
+    const allZeroCall = active.every(p => (state.to_call?.[p.seat_index] || 0) === 0);
+    
+    return allActed && allZeroCall;
+  }
+
+  // Polling functions
+  function startPolling(hand_id) {
+    if (!hand_id) return;
+    
+    setCurrentHandId(hand_id);
+    console.log("Starting polling for hand:", hand_id);
+    
+    // Clear existing polling
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+    }
+    
+    // Start new polling every 1 second
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/poker/state?hand_id=${hand_id}`);
+        const state = await response.json();
+        
+        if (state?.error) {
+          console.warn("State error:", state);
+          return;
+        }
+        
+        if (state.hand) {
+          // Update UI based on server state
+          setPot(state.hand.pot_total || 0);
+          setStage(state.hand.stage || "waiting");
+          setTurnSeat(state.hand.current_turn ?? null);
+          
+          // Update hole cards for players
+          if (state.players && state.players.length > 0) {
+            const newHoleCards = {};
+            const newBets = {};
+            const newFolded = {};
+            const newAllIn = {};
+            
+            state.players.forEach(p => {
+              if (p.hole_cards && p.hole_cards.length === 2) {
+                newHoleCards[p.seat_index] = p.hole_cards;
+              }
+              newBets[p.seat_index] = Number(p.bet_street || 0);
+              newFolded[p.seat_index] = p.folded || false;
+              newAllIn[p.seat_index] = p.all_in || false;
+            });
+            
+            setHoleCards(newHoleCards);
+            setBets(newBets);
+            setFolded(newFolded);
+            setAllIn(newAllIn);
+          }
+          
+          // Update board cards (when available)
+          if (state.board) {
+            setCommunity(state.board);
+          }
+          
+          // Update toCall from server for my seat
+          if (state.to_call && displayName) {
+            const mySeat = (serverSeats || []).find(s => s && s.player_name === displayName);
+            if (mySeat && state.to_call[mySeat.seat_index] !== undefined) {
+              setToCall(state.to_call[mySeat.seat_index]);
+            }
+          }
+          
+          console.log("State updated:", {
+            stage: state.hand.stage,
+            pot: state.hand.pot_total,
+            players: state.players.length,
+            actions: state.actions.length,
+            current_turn: state.hand.current_turn
+          });
+          
+          // Check if street can advance
+          if (canAdvanceStreet(state) && !window.__advancing) {
+            window.__advancing = true;
+            console.log("Advancing street...");
+            fetch("/api/poker/advance-street", {
+              method: "POST",
+              headers: { "Content-Type":"application/json" },
+              body: JSON.stringify({ hand_id: state.hand.id })
+            }).finally(() => {
+              setTimeout(() => { window.__advancing = false; }, 1500);
+            });
+          }
+          
+          // Check if hand is over
+          if (state.hand.stage === 'hand_end') {
+            console.log("Hand ended, stopping polling");
+            stopPolling();
+          }
+        }
+      } catch (e) {
+        console.error("Polling error:", e);
+      }
+    }, 1000);
+    
+    // Also poll tick API for timeout enforcement
+    const tickInterval = setInterval(async () => {
+      try {
+        await fetch(`/api/poker/tick?hand_id=${hand_id}`);
+      } catch (e) {
+        console.error("Tick error:", e);
+      }
+    }, 2000);
+    
+    setPollingInterval(interval);
+    // Store tick interval for cleanup
+    window.__tickInterval = tickInterval;
+  }
+
+  function stopPolling() {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      setPollingInterval(null);
+    }
+    if (window.__tickInterval) {
+      clearInterval(window.__tickInterval);
+      window.__tickInterval = null;
+    }
+    setCurrentHandId(null);
+  }
+
   const saveSeatState = (seatIdx, chips) => {
     const saved = safeRead(STORAGE_KEY, {});
     saved[roomCode] = {
@@ -204,113 +458,128 @@ export default function HoldemPage() {
   };
 
   // Sit / Leave
-  const sitDown = (seatIdx) => {
+  const sitDown = async (seatIdx) => {
     if (!displayName.trim()) { alert("Set a display name first."); return; }
     if (buyIn < tableMin) { alert(`Minimum buy-in: ${fmt(tableMin)}`); return; }
     const v = getVault();
     if (v < buyIn) { alert("Insufficient Vault balance."); return; }
+    if (!tableId) { alert("Table not loaded yet."); return; }
+    
+    // Check if seat is already taken on server
+    const serverSeat = seatByIndex.get(seatIdx);
+    if (serverSeat) {
+      alert("Seat is already taken!");
+      return;
+    }
+    
     // deduct from Vault
     setVault(v - buyIn); setVaultState(v - buyIn);
-    setSeats(prev=>{
-      if (prev[seatIdx]) return prev;
-      const cp = prev.slice();
-      cp[seatIdx] = { id:"you", name: displayName||"You", chips: buyIn, sittingOut:false, you:true };
-      return cp;
-    });
+    
+    // Call API - this will refresh serverSeats automatically
+    await apiSit(seatIdx, displayName, buyIn);
+    
     saveSeatState(seatIdx, buyIn);
   };
 
-  const leaveTable = () => {
-    setSeats(prev=>{
-      const idx = prev.findIndex(p=>p && p.you);
-      if (idx===-1) return prev;
-      const chips = prev[idx].chips||0;
-      const v = getVault() + chips;
-      setVault(v); setVaultState(v);
-      const cp = prev.slice(); cp[idx]=null;
-      const saved = safeRead(STORAGE_KEY, {}); delete saved[roomCode]; safeWrite(STORAGE_KEY, saved);
-      // reset hand state
-      setStage("waiting"); setTurnSeat(null); setHandMsg("Waiting for players...");
-      setCommunity([]); setHoleCards({}); setPot(0); setBets({}); setFolded({}); setAllIn({}); setActed({}); setToCall(0);
-      return cp;
-    });
+  const leaveTable = async () => {
+    // Stop polling
+    stopPolling();
+    
+    // Find my seat from serverSeats
+    const mySeat = (serverSeats || []).find(s => s && s.player_name === displayName);
+    if (!mySeat) return;
+    
+    const chips = mySeat.stack || 0;
+    const v = getVault() + chips;
+    setVault(v); setVaultState(v);
+    
+    // Call API - this will refresh serverSeats automatically
+    if (tableId) {
+      await apiLeave(mySeat.seat_index);
+    }
+    
+    const saved = safeRead(STORAGE_KEY, {}); 
+    delete saved[roomCode]; 
+    safeWrite(STORAGE_KEY, saved);
+    
+    // reset hand state
+    setStage("waiting"); setTurnSeat(null); setHandMsg("Waiting for players...");
+    setCommunity([]); setHoleCards({}); setPot(0); setBets({}); setFolded({}); setAllIn({}); setActed({}); setToCall(0);
+  };
+
+  // Player actions
+  const playerAction = async (action, amount = 0) => {
+    if (!currentHandId) return;
+    
+    // Find my seat from serverSeats
+    const mySeat = (serverSeats || []).find(s => s && s.player_name === displayName);
+    if (!mySeat) return;
+    
+    try {
+      await apiAction(currentHandId, mySeat.seat_index, action, amount);
+      // The UI will be updated via polling
+    } catch (e) {
+      console.error("Action failed:", e);
+      setHandMsg("Action failed. Please try again.");
+    }
   };
 
   // Can start?
-  const canStart = useMemo(()=> seats.filter(p=>p && p.chips>0).length>=2 , [seats]);
+  const canStart = useMemo(()=> {
+    const seatedCount = (serverSeats || []).filter(s => s && s.player_name && s.stack > 0).length;
+    return seatedCount >= 2;
+  }, [serverSeats]);
 
   // Start hand
-  const startHand = () => {
-    if (!canStart) { setHandMsg("Need at least 2 seated players with chips."); return; }
-
-    const occ = seats.map((p,i)=>p?i:null).filter(i=>i!==null);
-    if (occ.length<2) return;
-
-    // advance Dealer button to next occupied
-    let nextBtn = buttonIdx;
-    if (!seats[nextBtn]) nextBtn = occ[0]; else {
-      let j=(nextBtn+1)%SEATS; while(!seats[j]) j=(j+1)%SEATS; nextBtn=j;
+  const startHand = async () => {
+    if (!canStart) { 
+      setHandMsg("Need at least 2 seated players with chips."); 
+      return; 
+    }
+    if (!tableId) { 
+      setHandMsg("Table not loaded yet."); 
+      return; 
     }
 
-    const d = shuffle(buildDeck());
-    const newHole = {};
-    const newFold = {};
-    const newAllIn = {};
-    const newBets = {};
-    const newActed = {};
+    try {
+      setHandMsg("Starting hand...");
+      
+      // 1) Start hand on server
+      const start = await fetch('/api/poker/start-hand', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table_id: tableId })
+      }).then(r => r.json());
 
-    const nextOccupiedFrom = (from) => {
-      let j=(from+1)%SEATS;
-      for (let g=0; g<SEATS; g++) {
-        if (seats[j] && seats[j].chips>0) return j;
-        j=(j+1)%SEATS;
+      if (!start?.hand_id) {
+        console.error('start-hand failed', start);
+        setHandMsg('Start hand failed');
+        return;
       }
-      return from;
-    };
 
-    const sbIdx = nextOccupiedFrom(nextBtn);
-    const bbIdx = nextOccupiedFrom(sbIdx);
+      console.log('HAND STARTED:', start);
+      setCurrentHandId(start.hand_id);
 
-    // deal 2 each
-    let di=0;
-    for (let r=0;r<2;r++){
-      for (const si of occ) if (seats[si].chips>0) {
-        (newHole[si] ||= []).push(d[di++]);
-      }
+      // 2) Deal init (holes to players)
+      const deal = await fetch('/api/poker/deal-init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table_id: tableId, hand_id: start.hand_id })
+      }).then(r => r.json());
+
+      console.log('CARDS DEALT:', deal);
+      setHandMsg(`Hand #${start.hand_no} - Cards dealt!`);
+
+      // 3) Start polling for state updates
+      startPolling(start.hand_id);
+
+      // 4) Refresh table state
+      await loadTable();
+      
+    } catch (e) {
+      console.error('Start hand error:', e);
+      setHandMsg('Server error on start');
     }
-
-    // post blinds
-    const sbAmt = Math.min(seats[sbIdx].chips, smallBlind);
-    const bbAmt = Math.min(seats[bbIdx].chips, bigBlind);
-    newBets[sbIdx]=sbAmt; newBets[bbIdx]=bbAmt;
-
-    const pay = (arr, idx, amt)=>{
-      const cp = arr.map(p=>p?{...p}:p);
-      if (!cp[idx]) return cp;
-      cp[idx].chips -= amt;
-      return cp;
-    };
-    const s1 = pay(seats, sbIdx, sbAmt);
-    const s2 = pay(s1, bbIdx, bbAmt);
-
-    // UTG acts first (next after BB)
-    const actor = nextOccupiedFrom(bbIdx);
-
-    setSeats(s2);
-    setDeck(d.slice(di));
-    setHoleCards(newHole);
-    setFolded(newFold);
-    setAllIn(newAllIn);
-    setBets(newBets);
-    setActed(newActed);
-    setCommunity([]);
-    setPot(sbAmt+bbAmt);
-    setToCall(bbAmt);
-    setButtonIdx(nextBtn);
-    setStage("preflop");
-    setTurnSeat(actor);
-    setTurnLeftSec(TURN_SECONDS);
-    setHandMsg(`New hand • SB: ${fmt(sbAmt)}  BB: ${fmt(bbAmt)}`);
   };
 
   // Turn timer
@@ -447,7 +716,13 @@ export default function HoldemPage() {
   };
 
   // My actions (demo: client controls only their seat)
-  const meIdx = seats.findIndex(p=>p && p.you);
+  // Find my seat from serverSeats
+  const mySeat = useMemo(() => {
+    return (serverSeats || []).find(s => s && s.player_name === displayName);
+  }, [serverSeats, displayName]);
+  
+  const meIdx = mySeat ? mySeat.seat_index : -1;
+  const myChips = mySeat ? mySeat.stack : 0;
   const myTurn = meIdx===turnSeat && (stage==="preflop"||stage==="flop"||stage==="turn"||stage==="river");
 
   const passTurn = (fromIdx, raised) => {
@@ -474,49 +749,47 @@ export default function HoldemPage() {
   };
 
   const doFold = () => {
-    if (!myTurn) return;
-    setFolded(f=>({...f,[meIdx]:true}));
-    passTurn(meIdx, false);
+    if (!myTurn || meIdx === -1) return;
+    // Call API action instead of local state
+    playerAction('fold', 0);
   };
   const doCheck = () => {
-    if (!myTurn) return;
+    if (!myTurn || meIdx === -1) return;
     const myBet=bets[meIdx]||0;
     if (myBet<toCall) { doCall(); return; }
-    setActed(a=>({...a,[meIdx]:true}));
-    passTurn(meIdx, false);
+    // Call API action instead of local state
+    playerAction('check', 0);
   };
   const doCall = () => {
-    if (!myTurn) return;
+    if (!myTurn || meIdx === -1) return;
     const need = Math.max(0, toCall - (bets[meIdx]||0));
-    const have = seats[meIdx].chips;
+    const have = myChips;
     const pay = Math.min(need, have);
     if (pay>0) {
-      setSeats(prev=>{ const cp=prev.map(p=>p?{...p}:p); cp[meIdx].chips-=pay; return cp; });
-      setBets(b=>({...b,[meIdx]:(b[meIdx]||0)+pay}));
+      // Call API action instead of local state
+      playerAction('call', pay);
     }
-    if (have - pay === 0) setAllIn(a=>({...a,[meIdx]:true}));
-    setActed(a=>({...a,[meIdx]:true}));
-    passTurn(meIdx, false);
   };
   const doBetOrRaise = (amt) => {
-    if (!myTurn) return;
+    if (!myTurn || meIdx === -1) return;
     amt = Math.max(0, Math.floor(Number(amt)||0));
-    const myChips = seats[meIdx].chips;
     const add = Math.min(amt, myChips);
     if (add<=0) return;
-    const newBet = (bets[meIdx]||0)+add;
-    setSeats(prev=>{ const cp=prev.map(p=>p?{...p}:p); cp[meIdx].chips-=add; return cp; });
-    setBets(b=>({...b,[meIdx]:newBet}));
-    setToCall(newBet);
-    setActed({});
-    if (myChips - add === 0) setAllIn(a=>({...a,[meIdx]:true}));
-    passTurn(meIdx, true);
+    
+    // For raise, send total amount (current bet + to call + raise amount)
+    // For bet, send just the amount
+    const currentBet = bets[meIdx] || 0;
+    const totalAmount = toCall > 0 ? (currentBet + toCall + add) : add;
+    
+    // Call API action instead of local state
+    playerAction(toCall > 0 ? 'raise' : 'bet', totalAmount);
   };
   const doAllIn = () => {
-    if (!myTurn) return;
-    const shove = seats[meIdx].chips;
+    if (!myTurn || meIdx === -1) return;
+    const shove = myChips;
     if (shove<=0) return;
-    doBetOrRaise(shove);
+    // Call API action instead of local state
+    playerAction('allin', shove);
   };
 
   // Layout sizing like your other games
@@ -589,7 +862,20 @@ export default function HoldemPage() {
 
             {/* Seats */}
             <div className="grid grid-cols-3 gap-3 mt-4">
-              {seats.map((p,i)=>(
+              {Array.from({length: SEATS}).map((_,i)=>{
+                const serverSeat = seatByIndex.get(i);
+                const localSeat = seats[i];
+                // Check if this is "you" by comparing display name
+                const isYou = serverSeat?.player_name === displayName || localSeat?.you || false;
+                const p = serverSeat ? { 
+                  name: serverSeat.player_name, 
+                  chips: serverSeat.stack,
+                  you: isYou,
+                  id: serverSeat.player_name
+                } : localSeat;
+                const isTaken = !!serverSeat;
+                
+                return (
                 <div key={i} className={`rounded-xl p-2 border ${turnSeat===i?'border-emerald-400':'border-white/10'} bg-black/30`}>
                   <div className="flex justify-between items-center text-xs mb-1">
                     <div className="font-bold">Seat #{i+1}</div>
@@ -598,8 +884,8 @@ export default function HoldemPage() {
 
                   {!p ? (
                     <button className="w-full py-2 rounded bg-white/10 hover:bg-white/20 text-sm"
-                            onClick={()=>sitDown(i)} disabled={seats.some(x=>x && x.you)}>
-                      Sit here (≥ {fmt(tableMin)})
+                            onClick={()=>sitDown(i)} disabled={isTaken || meIdx !== -1}>
+                      {isTaken ? "Seat taken" : `Sit here (≥ ${fmt(tableMin)})`}
                     </button>
                   ) : (
                     <>
@@ -626,7 +912,7 @@ export default function HoldemPage() {
                     </>
                   )}
                 </div>
-              ))}
+              )})}
             </div>
 
             {/* Action Bar */}
@@ -634,7 +920,7 @@ export default function HoldemPage() {
               <ActionBar
                 toCall={Math.max(0, toCall - (bets[meIdx]||0))}
                 myBet={bets[meIdx]||0}
-                myChips={seats[meIdx].chips}
+                myChips={myChips}
                 onFold={doFold}
                 onCheck={doCheck}
                 onCall={doCall}
@@ -720,43 +1006,27 @@ function ActionBar({ toCall, myChips, onFold, onCheck, onCall, onBet, onAllIn, b
           </button>
         )}
 
-        {/* Raise - only show if call needed */}
-        {toCall > 0 && (
-          <div className="ml-auto flex items-center gap-2">
-            <input type="number" min={toCall+1} step={bigBlind} value={Math.max(toCall+1, amt)}
-                   onChange={e=>setAmt(Math.max(toCall+1, Math.floor(Number(e.target.value)||0)))}
-                   className="w-24 px-2 py-1 text-sm rounded bg-white/10 border border-white/20" />
-            <button onClick={()=>onBet(Math.min(myChips, amt))}
-                    disabled={!canBet || amt <= toCall}
-                    className="px-3 py-2 rounded bg-amber-500/80 hover:bg-amber-500 font-bold text-sm disabled:opacity-50">
-              Raise to {fmt(amt)}
+        {/* Bet/Raise */}
+        <div className="ml-auto flex items-center gap-2">
+          {presets.map(p=>(
+            <button key={p.label} onClick={()=>setAmt(Math.min(myChips, p.val))}
+                    className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-xs">
+              {p.label}
             </button>
-          </div>
-        )}
-
-        {/* Bet - only show if no call needed */}
-        {toCall === 0 && (
-          <div className="ml-auto flex items-center gap-2">
-            {presets.map(p=>(
-              <button key={p.label} onClick={()=>setAmt(Math.min(myChips, p.val))}
-                      className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-xs">
-                {p.label}
-              </button>
-            ))}
-            <input type="number" min={1} step={bigBlind} value={amt}
-                   onChange={e=>setAmt(Math.max(1, Math.floor(Number(e.target.value)||0)))}
-                   className="w-24 px-2 py-1 text-sm rounded bg-white/10 border border-white/20" />
-            <button onClick={()=>onBet(Math.min(myChips, amt))}
-                    disabled={!canBet}
-                    className="px-3 py-2 rounded bg-amber-500/80 hover:bg-amber-500 font-bold text-sm disabled:opacity-50">
-              Bet
-            </button>
-            <button onClick={onAllIn} disabled={myChips<=0}
-                    className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-500 font-bold text-sm disabled:opacity-50">
-              All-in
-            </button>
-          </div>
-        )}
+          ))}
+          <input type="number" min={1} step={bigBlind} value={amt}
+                 onChange={e=>setAmt(Math.max(1, Math.floor(Number(e.target.value)||0)))}
+                 className="w-24 px-2 py-1 text-sm rounded bg-white/10 border border-white/20" />
+          <button onClick={()=>onBet(Math.min(myChips, amt))}
+                  disabled={!canBet}
+                  className="px-3 py-2 rounded bg-amber-500/80 hover:bg-amber-500 font-bold text-sm disabled:opacity-50">
+            {toCall===0 ? "Bet" : "Raise"}
+          </button>
+          <button onClick={onAllIn} disabled={myChips<=0}
+                  className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-500 font-bold text-sm disabled:opacity-50">
+            All-in
+          </button>
+        </div>
       </div>
     </div>
   );

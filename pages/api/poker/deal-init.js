@@ -44,8 +44,8 @@ export default async function handler(req,res){
       await q(
         `INSERT INTO poker_hand_players
          (hand_id, table_id, seat_index, player_name, player_id, hole_cards, stack_start, stack_live, folded, all_in, bet_street, acted_street)
-         VALUES ($1,$2,$3,$4,NULL,$5::jsonb,$6,$6,false,false,0,false)`,
-        [hand_id, table_id, s.seat_index, s.player_name, JSON.stringify(holeBySeat[s.seat_index]||[]), s.stack]
+         VALUES ($1,$2,$3,$4,NULL,$5,$6,$6,false,false,0,false)`,
+        [hand_id, table_id, s.seat_index, s.player_name, holeBySeat[s.seat_index]||[], s.stack]
       );
     }
 
@@ -73,16 +73,19 @@ export default async function handler(req,res){
     const afterBB = leftOf(bbSeat);
     const deadline = new Date(Date.now() + 30_000);
 
+    // Update hand stage and turn info
     await q(
       `UPDATE poker_hands
          SET stage='preflop',
-             deck_remaining=$2::jsonb,
-             board=$3::jsonb,
-             current_turn=$4,
-             turn_deadline=$5
+             current_turn=$2,
+             turn_deadline=$3
        WHERE id=$1`,
-      [hand_id, JSON.stringify(deck), JSON.stringify([]), afterBB, deadline]
+      [hand_id, afterBB, deadline]
     );
+
+    // Update deck and board using RPC functions
+    await q(`SELECT set_deck_remaining($1, $2)`, [hand_id, deck]);
+    await q(`SELECT set_board($1, $2)`, [hand_id, []]);
 
     res.json({ ok:true, players: seats.rows.length, current_turn: afterBB, to_call: BB });
   } catch(e){
