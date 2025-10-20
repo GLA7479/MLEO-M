@@ -511,19 +511,71 @@ export default function HoldemPage() {
   };
 
   // Player actions
+  const [actionInFlight, setActionInFlight] = useState(false);
+  
   const playerAction = async (action, amount = 0) => {
-    if (!currentHandId) return;
+    if (!currentHandId || actionInFlight) return;
     
     // Find my seat from serverSeats
     const mySeat = (serverSeats || []).find(s => s && s.player_name === displayName);
     if (!mySeat) return;
     
+    setActionInFlight(true);
+    
     try {
       await apiAction(currentHandId, mySeat.seat_index, action, amount);
-      // The UI will be updated via polling
+      
+      // Fetch fresh snapshot immediately (no waiting for polling)
+      const r = await fetch(`/api/poker/state?hand_id=${currentHandId}`);
+      if (r.ok) {
+        const state = await r.json();
+        
+        // Update community cards
+        const board = (state.hand && state.hand.board) || state.board || [];
+        setCommunity(Array.isArray(board) ? board : []);
+        
+        // Update pot
+        if (state.hand?.pot_total) {
+          setPot(Number(state.hand.pot_total));
+        }
+        
+        // Update players state
+        if (state.players) {
+          const newStacks = {};
+          const newBets = {};
+          const newFolded = {};
+          const newAllIn = {};
+          
+          state.players.forEach(p => {
+            newStacks[p.seat_index] = Number(p.stack_live || 0);
+            newBets[p.seat_index] = Number(p.bet_street || 0);
+            newFolded[p.seat_index] = p.folded || false;
+            newAllIn[p.seat_index] = p.all_in || false;
+          });
+          
+          setStacks(newStacks);
+          setBets(newBets);
+          setFolded(newFolded);
+          setAllIn(newAllIn);
+        }
+        
+        // Update toCall
+        const me = (serverSeats || []).find(s => s && s.player_name === displayName);
+        if (state.to_call && me && state.to_call[me.seat_index] !== undefined) {
+          setToCall(state.to_call[me.seat_index]);
+        } else if (state.players && me) {
+          const maxBet = Math.max(0, ...state.players.map(p => Number(p.bet_street || 0)));
+          const mine   = Number(state.players.find(p => p.seat_index === me.seat_index)?.bet_street || 0);
+          setToCall(Math.max(0, maxBet - mine));
+        }
+        
+        console.log("Action completed, UI updated immediately");
+      }
     } catch (e) {
       console.error("Action failed:", e);
       setHandMsg("Action failed. Please try again.");
+    } finally {
+      setActionInFlight(false);
     }
   };
 
