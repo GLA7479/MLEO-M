@@ -163,6 +163,7 @@ export default function HoldemPage() {
   const [holeCards, setHoleCards] = useState({}); // seat -> [c1,c2]
   const [pot, setPot] = useState(0);
   const [bets, setBets] = useState({}); // seat -> bet this street
+  const [stacks, setStacks] = useState({}); // seat -> current stack
   const [toCall, setToCall] = useState(0);
   const [acted, setActed] = useState({});
   const [allIn, setAllIn] = useState({});
@@ -507,7 +508,7 @@ export default function HoldemPage() {
     
     // reset hand state
     setStage("waiting"); setTurnSeat(null); setHandMsg("Waiting for players...");
-    setCommunity([]); setHoleCards({}); setPot(0); setBets({}); setFolded({}); setAllIn({}); setActed({}); setToCall(0);
+    setCommunity([]); setHoleCards({}); setPot(0); setBets({}); setStacks({}); setFolded({}); setAllIn({}); setActed({}); setToCall(0);
   };
 
   // Player actions
@@ -763,7 +764,7 @@ export default function HoldemPage() {
     setStage("hand_end"); setTurnSeat(null);
     setTimeout(()=>{
       setCommunity([]); setHoleCards({});
-      setBets({}); setActed({}); setAllIn({}); setFolded({});
+      setBets({}); setStacks({}); setActed({}); setAllIn({}); setFolded({});
       setPot(0); setToCall(0);
       setStage("waiting");
       if (canStart) startHand();
