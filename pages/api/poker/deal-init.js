@@ -1,6 +1,7 @@
 export const config = { runtime: "nodejs" };
 
 import { q } from "../../../lib/db";
+import { supabase } from "../../../lib/supabase";
 
 function buildDeck(){
   const R = ["2","3","4","5","6","7","8","9","T","J","Q","K","A"];
@@ -13,7 +14,14 @@ function buildDeck(){
 export default async function handler(req,res){
   if (req.method!=="POST") return res.status(405).end();
   const { table_id, hand_id } = req.body||{};
-  if (!table_id || !hand_id) return res.status(400).json({ error:"bad_request" });
+  
+  // Log request for debugging
+  console.log('REQ /api/poker/deal-init:', { table_id, hand_id });
+  
+  if (!table_id || !hand_id) {
+    console.log('ERROR: Missing table_id or hand_id');
+    return res.status(400).json({ error:"bad_request", details: "Missing table_id or hand_id" });
+  }
 
   try {
     const t = await q(`SELECT small_blind, big_blind FROM poker_tables WHERE id=$1`, [table_id]);
@@ -47,6 +55,13 @@ export default async function handler(req,res){
          VALUES ($1,$2,$3,$4,NULL,$5,$6,$6,false,false,0,false)`,
         [hand_id, table_id, s.seat_index, s.player_name, holeBySeat[s.seat_index]||[], s.stack]
       );
+      
+      // Set hole cards using Supabase RPC
+      await supabase.rpc('set_hole_cards', { 
+        p_hand: hand_id, 
+        p_seat: s.seat_index, 
+        p_cards: holeBySeat[s.seat_index]||[] 
+      });
     }
 
     // sb/bb relative to dealer
@@ -83,9 +98,9 @@ export default async function handler(req,res){
       [hand_id, afterBB, deadline]
     );
 
-    // Update deck and board using RPC functions
-    await q(`SELECT set_deck_remaining($1, $2)`, [hand_id, deck]);
-    await q(`SELECT set_board($1, $2)`, [hand_id, []]);
+    // Update deck and board using Supabase RPC functions
+    await supabase.rpc('set_deck_remaining', { p_hand: hand_id, p_cards: deck });
+    await supabase.rpc('set_board', { p_hand: hand_id, p_cards: [] });
 
     res.json({ ok:true, players: seats.rows.length, current_turn: afterBB, to_call: BB });
   } catch(e){

@@ -7,7 +7,14 @@ import { q } from "../../../lib/db";
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
   const { table_id, seat_index } = req.body || {};
-  if (!table_id || seat_index==null) return res.status(400).json({ error:"bad_request" });
+  
+  // Log request for debugging
+  console.log('REQ /api/poker/leave:', { table_id, seat_index });
+  
+  if (!table_id || seat_index==null) {
+    console.log('ERROR: Missing required fields');
+    return res.status(400).json({ error:"bad_request", details: "Missing table_id or seat_index" });
+  }
   try {
     const del = await q(
       `DELETE FROM poker_seats WHERE table_id=$1 AND seat_index=$2 RETURNING stack`,

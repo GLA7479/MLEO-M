@@ -13,7 +13,14 @@ export default async function handler(req, res) {
     }
     if (req.method === "POST") {
       const { table_id, player_name, message } = req.body || {};
-      if (!table_id || !player_name || !message) return res.status(400).json({ error:"bad_request" });
+      
+      // Log request for debugging
+      console.log('REQ /api/poker/chat:', { table_id, player_name, message: message?.substring(0, 50) + '...' });
+      
+      if (!table_id || !player_name || !message) {
+        console.log('ERROR: Missing required fields');
+        return res.status(400).json({ error:"bad_request", details: "Missing table_id, player_name, or message" });
+      }
       await q(
         `INSERT INTO chat_messages (table_id, player_id, message, system) VALUES ($1, NULL, $2, false)`,
         [table_id, `${player_name}: ${message}`]

@@ -296,10 +296,11 @@ export default function HoldemPage() {
 
   async function apiAction(hand_id, seat_index, action, amount = 0) {
     try {
-      // For bet/raise, send as raise_to parameter
-      const body = (action === 'bet' || action === 'raise') 
-        ? { hand_id, seat_index, action, raise_to: amount }
-        : { hand_id, seat_index, action, amount };
+      // Always send amount parameter
+      const body = { hand_id, seat_index, action };
+      if (action === 'bet' || action === 'raise' || action === 'allin') {
+        body.amount = amount;          // תמיד amount
+      }
         
       await fetch(`/api/poker/action`, { 
         method: "POST", 
@@ -377,23 +378,25 @@ export default function HoldemPage() {
           }
           
           // Update board cards (when available)
-          if (state.board) {
-            setCommunity(state.board);
-          }
+          const board = (state.hand && state.hand.board) || state.board || [];
+          setCommunity(Array.isArray(board) ? board : []);
           
           // Update toCall from server for my seat
-          if (state.to_call && displayName) {
-            const mySeat = (serverSeats || []).find(s => s && s.player_name === displayName);
-            if (mySeat && state.to_call[mySeat.seat_index] !== undefined) {
-              setToCall(state.to_call[mySeat.seat_index]);
-            }
+          const me = (serverSeats || []).find(s => s && s.player_name === displayName);
+          if (state.to_call && me && state.to_call[me.seat_index] !== undefined) {
+            setToCall(state.to_call[me.seat_index]);
+          } else if (state.players && me) {
+            const maxBet = Math.max(0, ...state.players.map(p => Number(p.bet_street || 0)));
+            const mine   = Number(state.players.find(p => p.seat_index === me.seat_index)?.bet_street || 0);
+            setToCall(Math.max(0, maxBet - mine));
           }
           
+          const actions = Array.isArray(state.actions) ? state.actions : [];
           console.log("State updated:", {
             stage: state.hand.stage,
             pot: state.hand.pot_total,
             players: state.players.length,
-            actions: state.actions.length,
+            actions: actions.length,
             current_turn: state.hand.current_turn
           });
           

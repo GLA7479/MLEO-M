@@ -8,7 +8,14 @@ import { q } from "../../../lib/db";
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
   const { table_id } = req.body || {};
-  if (!table_id) return res.status(400).json({ error:"bad_request" });
+  
+  // Log request for debugging
+  console.log('REQ /api/poker/start-hand:', { table_id });
+  
+  if (!table_id) {
+    console.log('ERROR: Missing table_id');
+    return res.status(400).json({ error:"bad_request", details: "Missing table_id" });
+  }
   try {
     const t = await q(`SELECT small_blind, big_blind FROM poker_tables WHERE id=$1`, [table_id]);
     if (!t.rows.length) return res.status(404).json({ error:"table_not_found" });

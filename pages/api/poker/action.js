@@ -19,20 +19,31 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
   
   let { hand_id, seat_index, action, amount, raise_to } = req.body || {};
-  if (!hand_id || seat_index==null || !action) return res.status(400).json({ error:"bad_request" });
+  
+  // Log request for debugging
+  console.log('REQ /api/poker/action:', { hand_id, seat_index, action, amount, raise_to });
+  
+  if (!hand_id || seat_index==null || !action) {
+    console.log('ERROR: Missing required fields');
+    return res.status(400).json({ error:"bad_request", details: "Missing hand_id, seat_index, or action" });
+  }
 
   try {
     // Normalize bet/raise to raise_to
     if (action === 'bet' || action === 'raise') {
       action = 'raise_to';
       amount = Number(raise_to ?? amount);
+      console.log('Normalized action to raise_to with amount:', amount);
     }
 
     // Check if it's player's turn
     const h = await q(`SELECT current_turn, stage FROM poker_hands WHERE id=$1`, [hand_id]);
     if (!h.rows.length) return res.status(404).json({ error:"hand_not_found" });
     const { current_turn, stage } = h.rows[0];
-    if (current_turn !== seat_index) return res.status(409).json({ error:"not_your_turn" });
+    if (current_turn !== seat_index) {
+      console.log('ERROR: Not player turn. Current turn:', current_turn, 'Player seat:', seat_index);
+      return res.status(409).json({ error:"not_your_turn" });
+    }
 
     // Get table info
     const t = await q(`SELECT small_blind, big_blind FROM poker_tables WHERE id=(SELECT table_id FROM poker_hands WHERE id=$1)`, [hand_id]);
@@ -41,7 +52,10 @@ export default async function handler(req, res) {
     // Get player info
     const p = await q(`SELECT stack_live, bet_street, folded, all_in FROM poker_hand_players WHERE hand_id=$1 AND seat_index=$2`, [hand_id, seat_index]);
     if (!p.rows.length) return res.status(404).json({ error:"player_not_found" });
-    if (p.rows[0].folded || p.rows[0].all_in) return res.status(409).json({ error:"inactive_player" });
+    if (p.rows[0].folded || p.rows[0].all_in) {
+      console.log('ERROR: Player is inactive. Folded:', p.rows[0].folded, 'All-in:', p.rows[0].all_in);
+      return res.status(409).json({ error:"inactive_player" });
+    }
 
     // Calculate to_call
     const others = await q(`SELECT bet_street FROM poker_hand_players WHERE hand_id=$1 AND folded=false AND all_in=false`, [hand_id]);
@@ -55,16 +69,22 @@ export default async function handler(req, res) {
 
     if (action==='fold'){
       setFold=true;
-    } else if (action==='check'){
-      if (toCall>0) return res.status(400).json({ error:"illegal_check", toCall });
+    } else     if (action==='check'){
+      if (toCall>0) {
+        console.log('ERROR: Illegal check. toCall:', toCall);
+        return res.status(400).json({ error:"illegal_check", toCall });
+      }
     } else if (action==='call'){
       used = Math.min(toCall, stack);
       if (used < toCall && used===stack) setAllin=true;
       addBet = used;
-    } else if (action==='raise_to' || action==='allin'){
+    } else     if (action==='raise_to' || action==='allin'){
       let want = Number(amount||0);
       if (action==='allin') want = stack;
-      if (want<=0) return res.status(400).json({ error:"bad_amount" });
+      if (want<=0) {
+        console.log('ERROR: Bad amount. want:', want);
+        return res.status(400).json({ error:"bad_amount" });
+      }
 
       if (maxBet===0 && want < BB) {
         return res.status(400).json({ error:"min_bet_bb", min: BB });

@@ -1,6 +1,7 @@
 export const config = { runtime: "nodejs" };
 
 import { q } from "../../../lib/db";
+import { supabase } from "../../../lib/supabase";
 
 function leftOfButton(order, dealerSeat) {
   if (!order.length) return null;
@@ -11,7 +12,14 @@ function leftOfButton(order, dealerSeat) {
 export default async function handler(req,res){
   if (req.method!=='POST') return res.status(405).end();
   const { hand_id } = req.body||{};
-  if (!hand_id) return res.status(400).json({ error:"bad_request" });
+  
+  // Log request for debugging
+  console.log('REQ /api/poker/advance-street:', { hand_id });
+  
+  if (!hand_id) {
+    console.log('ERROR: Missing hand_id');
+    return res.status(400).json({ error:"bad_request", details: "Missing hand_id" });
+  }
 
   try {
     const h = await q(`SELECT stage, dealer_seat, board, deck_remaining FROM poker_hands WHERE id=$1`, [hand_id]);
@@ -59,9 +67,9 @@ export default async function handler(req,res){
              WHERE id=$1`,
       [hand_id, stage, first, ddl]);
 
-    // Update board and deck using RPC functions
-    await q(`SELECT set_board($1, $2)`, [hand_id, board]);
-    await q(`SELECT set_deck_remaining($1, $2)`, [hand_id, deck_remaining]);
+    // Update board and deck using Supabase RPC functions
+    await supabase.rpc('set_board', { p_hand: hand_id, p_cards: board });
+    await supabase.rpc('set_deck_remaining', { p_hand: hand_id, p_cards: deck_remaining });
 
     res.json({ ok:true, stage, board, current_turn:first });
   } catch(e){

@@ -7,7 +7,14 @@ import { q } from "../../../lib/db";
 export default async function handler(req, res) {
   try {
     const { name, id } = req.query || {};
-    if (!name && !id) return res.status(400).json({ error: "bad_request" });
+    
+    // Log request for debugging
+    console.log('REQ /api/poker/table:', { name, id });
+    
+    if (!name && !id) {
+      console.log('ERROR: Missing name or id');
+      return res.status(400).json({ error: "bad_request", details: "Missing name or id" });
+    }
 
     const tableSql = id
       ? `SELECT id, name, small_blind, big_blind, max_players FROM poker_tables WHERE id = $1`
@@ -15,7 +22,10 @@ export default async function handler(req, res) {
     const tv = id ? [id] : [name];
 
     const t = await q(tableSql, tv);
-    if (!t.rows.length) return res.status(404).json({ error: "table_not_found" });
+    if (!t.rows.length) {
+      console.log('ERROR: Table not found');
+      return res.status(404).json({ error: "table_not_found" });
+    }
     const table = t.rows[0];
 
     const s = await q(
@@ -24,6 +34,7 @@ export default async function handler(req, res) {
       [table.id]
     );
 
+    console.log('SUCCESS: Table found with', s.rows.length, 'seats');
     return res.status(200).json({ table, seats: s.rows });
   } catch (e) {
     console.error("API /poker/table error:", e);

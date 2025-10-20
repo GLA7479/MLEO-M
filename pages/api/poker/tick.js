@@ -17,7 +17,14 @@ async function nextActiveSeatAfter(hand_id, fromSeat) {
 
 export default async function handler(req,res){
   const { hand_id } = req.query || {};
-  if (!hand_id) return res.status(400).json({ error:"bad_request" });
+  
+  // Log request for debugging
+  console.log('REQ /api/poker/tick:', { hand_id });
+  
+  if (!hand_id) {
+    console.log('ERROR: Missing hand_id');
+    return res.status(400).json({ error:"bad_request", details: "Missing hand_id" });
+  }
 
   try {
     const h = await q(`SELECT current_turn, turn_deadline FROM poker_hands WHERE id=$1`, [hand_id]);

@@ -5,7 +5,14 @@ import { q } from "../../../lib/db";
 export default async function handler(req, res) {
   try {
     const { hand_id } = req.query || {};
-    if (!hand_id) return res.status(400).json({ error: "bad_request", details: "missing hand_id" });
+    
+    // Log request for debugging
+    console.log('REQ /api/poker/state:', { hand_id });
+    
+    if (!hand_id) {
+      console.log('ERROR: Missing hand_id');
+      return res.status(400).json({ error: "bad_request", details: "missing hand_id" });
+    }
 
     // Hand
     const h = await q(

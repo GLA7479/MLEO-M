@@ -8,7 +8,14 @@ import { q } from "../../../lib/db";
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
   const { table_id, seat_index, player_name, buyin } = req.body || {};
-  if (!table_id || seat_index==null || !player_name || !buyin) return res.status(400).json({ error:"bad_request" });
+  
+  // Log request for debugging
+  console.log('REQ /api/poker/sit:', { table_id, seat_index, player_name, buyin });
+  
+  if (!table_id || seat_index==null || !player_name || !buyin) {
+    console.log('ERROR: Missing required fields');
+    return res.status(400).json({ error:"bad_request", details: "Missing table_id, seat_index, player_name, or buyin" });
+  }
   try {
     const up = await q(
       `INSERT INTO poker_seats (table_id, seat_index, player_name, stack, is_sitting_out)

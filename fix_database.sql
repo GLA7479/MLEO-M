@@ -1,5 +1,5 @@
 -- פונקציות RPC לתיקון בעיית text[] vs jsonb
--- הרץ את הפקודות האלה במסד הנתונים שלך
+-- הרץ את הפקודות האלה ב-Supabase SQL Editor
 
 -- פונקציה לחלוקת קלפים
 CREATE OR REPLACE FUNCTION set_hole_cards(p_hand uuid, p_seat int, p_cards text[])
