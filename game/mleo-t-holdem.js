@@ -297,19 +297,14 @@ export default function HoldemPage() {
 
   async function apiAction(hand_id, seat_index, action, amount = 0) {
     try {
-      // Always send amount parameter
-      const body = { hand_id, seat_index, action };
-      if (action === 'bet' || action === 'raise' || action === 'allin') {
-        body.amount = amount;          // תמיד amount
-      }
-        
-      await fetch(`/api/poker/action`, { 
-        method: "POST", 
-        headers: { "Content-Type": "application/json" },
+      const body = { hand_id, seat_index, action, amount: Number(amount)||0 };
+      await fetch('/api/poker/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
     } catch (e) {
-      console.error("Failed to perform action:", e);
+      console.error('Failed to perform action:', e);
     }
   }
 
@@ -514,6 +509,42 @@ export default function HoldemPage() {
   // Player actions
   const [actionInFlight, setActionInFlight] = useState(false);
   
+  // Street advancement logic
+  let _advancing = false; // Prevent double advances
+  
+  function everyoneDone(state) {
+    // Players still in hand
+    const alive = state.players.filter(p => !p.folded && !p.sat_out);
+    if (alive.length <= 1) return true; // Everyone folded → end hand / advance
+    
+    // Highest bet on table
+    const maxBet = Math.max(0, ...state.players.map(p => Number(p.bet_street || 0)));
+    
+    // All "alive" players matched (bet == maxBet) and no raise pending
+    return alive.every(p => Number(p.bet_street || 0) === maxBet);
+  }
+  
+  async function maybeAdvance(state) {
+    if (_advancing) return;
+    if (!state?.hand_id) return;
+    if (!everyoneDone(state)) return;
+    
+    _advancing = true;
+    try {
+      const r = await fetch('/api/poker/advance-street', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hand_id: state.hand_id })
+      });
+      if (!r.ok) {
+        const t = await r.text().catch(()=>'');
+        console.warn('advance failed', r.status, t);
+      }
+    } finally {
+      _advancing = false;
+    }
+  }
+  
   const playerAction = async (action, amount = 0) => {
     if (!currentHandId || actionInFlight) return;
     
@@ -571,6 +602,9 @@ export default function HoldemPage() {
         }
         
         console.log("Action completed, UI updated immediately");
+        
+        // Check if we should advance street
+        maybeAdvance(state);
       }
     } catch (e) {
       console.error("Action failed:", e);
@@ -600,62 +634,45 @@ export default function HoldemPage() {
     try {
       setHandMsg("Starting hand...");
       
-      // 1) Start hand on server
-      const start = await fetch('/api/poker/start-hand', {
+      // Start hand on server (includes dealing and blinds)
+      const r = await fetch('/api/poker/start-hand', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ table_id: tableId })
-      }).then(r => r.json());
-
-      if (!start?.hand_id) {
-        console.error('start-hand failed', start);
-        setHandMsg('Start hand failed');
-        return;
+      });
+      
+      if (!r.ok) {
+        const error = await r.text().catch(() => 'Unknown error');
+        throw new Error(`Start failed: ${error}`);
       }
-
+      
+      const start = await r.json();
       console.log('HAND STARTED:', start);
       setCurrentHandId(start.hand_id);
-
-      // 2) Deal init (holes to players)
-      const deal = await fetch('/api/poker/deal-init', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ table_id: tableId, hand_id: start.hand_id })
-      }).then(r => r.json());
-
-      console.log('CARDS DEALT:', deal);
       setHandMsg(`Hand #${start.hand_no} - Cards dealt!`);
 
-      // 3) Start polling for state updates
+      // Start polling for state updates
       startPolling(start.hand_id);
-
-      // 4) Refresh table state
-      await loadTable();
       
     } catch (e) {
-      console.error('Start hand error:', e);
-      setHandMsg('Server error on start');
+      console.error('Failed to start hand:', e);
+      setHandMsg('Start hand failed: ' + e.message);
     }
   };
 
-  // Turn timer
-  useEffect(()=>{
-    if (!(stage==="preflop"||stage==="flop"||stage==="turn"||stage==="river")) return;
-    if (turnSeat===null) return;
-    setTurnLeftSec(TURN_SECONDS);
-    const iv = setInterval(()=>{
-      setTurnLeftSec(t=>{
-        if (t<=1) {
-          clearInterval(iv);
-          const myBet = bets[turnSeat]||0;
-          const need = toCall - myBet;
-          if (need>0) timeoutFold(turnSeat); else timeoutCheck(turnSeat);
-        }
-        return t-1;
-      });
-    }, 1000);
-    return ()=>clearInterval(iv);
-  }, [turnSeat, stage, toCall, bets]);
+  // Turn timer - smooth counting based on server deadline
+  useEffect(() => {
+    let raf = 0;
+    function tick() {
+      const now = Date.now();
+      const end = currentHand?.turn_deadline ? new Date(currentHand.turn_deadline).getTime() : now;
+      const msLeft = Math.max(0, end - now);
+      setTurnLeftSec(Math.ceil(msLeft/1000));
+      raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [currentHand?.turn_deadline]);
 
   const sumBets = () => Object.values(bets).reduce((a,b)=>a+(b||0),0);
 
@@ -829,16 +846,10 @@ export default function HoldemPage() {
   const doBetOrRaise = (amt) => {
     if (!myTurn || meIdx === -1) return;
     amt = Math.max(0, Math.floor(Number(amt)||0));
-    const add = Math.min(amt, myChips);
-    if (add<=0) return;
-    
-    // For raise, send total amount (current bet + to call + raise amount)
-    // For bet, send just the amount
     const currentBet = bets[meIdx] || 0;
-    const totalAmount = toCall > 0 ? (currentBet + toCall + add) : add;
-    
-    // Call API action instead of local state
-    playerAction(toCall > 0 ? 'raise' : 'bet', totalAmount);
+    const needToCall = Math.max(0, toCall - currentBet);
+    const delta = (needToCall > 0) ? (needToCall + amt) : amt;
+    playerAction(needToCall > 0 ? 'raise' : 'bet', delta);
   };
   const doAllIn = () => {
     if (!myTurn || meIdx === -1) return;
