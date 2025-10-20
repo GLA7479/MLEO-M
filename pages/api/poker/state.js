@@ -1,4 +1,3 @@
-// pages/api/poker/state.js
 export const config = { runtime: "nodejs" };
 
 import { q } from "../../../lib/db";
@@ -10,7 +9,7 @@ export default async function handler(req, res) {
 
     // Hand
     const h = await q(
-      `SELECT id, table_id, hand_no, dealer_seat, stage, pot_total, created_at
+      `SELECT id, table_id, hand_no, dealer_seat, stage, pot_total, board, deck_remaining, current_turn, turn_deadline, created_at
        FROM poker_hands WHERE id=$1`,
       [hand_id]
     );
@@ -34,6 +33,18 @@ export default async function handler(req, res) {
       [hand_id]
     );
 
+    // Calculate to_call for each player
+    const maxBet = Math.max(0, ...players.rows
+      .filter(p => !p.folded && !p.all_in)
+      .map(p => Number(p.bet_street||0))
+    );
+    
+    const toCallBySeat = {};
+    players.rows.forEach(p => {
+      const myBet = Number(p.bet_street||0);
+      toCallBySeat[p.seat_index] = Math.max(0, maxBet - myBet);
+    });
+
     // Actions log
     const actions = await q(
       `SELECT seat_index, action, amount, made_at
@@ -47,9 +58,10 @@ export default async function handler(req, res) {
     return res.status(200).json({
       hand, 
       table,
-      board: [],          // נוסיף Flop/Turn/River בהמשך
+      board: Array.isArray(hand.board) ? hand.board : [],
       players: players.rows,
-      actions: actions.rows
+      actions: actions.rows,
+      to_call: toCallBySeat
     });
   } catch (e) {
     console.error("API /poker/state error:", e);
