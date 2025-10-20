@@ -720,27 +720,43 @@ function ActionBar({ toCall, myChips, onFold, onCheck, onCall, onBet, onAllIn, b
           </button>
         )}
 
-        {/* Bet/Raise */}
-        <div className="ml-auto flex items-center gap-2">
-          {presets.map(p=>(
-            <button key={p.label} onClick={()=>setAmt(Math.min(myChips, p.val))}
-                    className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-xs">
-              {p.label}
+        {/* Raise - only show if call needed */}
+        {toCall > 0 && (
+          <div className="ml-auto flex items-center gap-2">
+            <input type="number" min={toCall+1} step={bigBlind} value={Math.max(toCall+1, amt)}
+                   onChange={e=>setAmt(Math.max(toCall+1, Math.floor(Number(e.target.value)||0)))}
+                   className="w-24 px-2 py-1 text-sm rounded bg-white/10 border border-white/20" />
+            <button onClick={()=>onBet(Math.min(myChips, amt))}
+                    disabled={!canBet || amt <= toCall}
+                    className="px-3 py-2 rounded bg-amber-500/80 hover:bg-amber-500 font-bold text-sm disabled:opacity-50">
+              Raise to {fmt(amt)}
             </button>
-          ))}
-          <input type="number" min={1} step={bigBlind} value={amt}
-                 onChange={e=>setAmt(Math.max(1, Math.floor(Number(e.target.value)||0)))}
-                 className="w-24 px-2 py-1 text-sm rounded bg-white/10 border border-white/20" />
-          <button onClick={()=>onBet(Math.min(myChips, amt))}
-                  disabled={!canBet}
-                  className="px-3 py-2 rounded bg-amber-500/80 hover:bg-amber-500 font-bold text-sm disabled:opacity-50">
-            {toCall===0 ? "Bet" : "Raise"}
-          </button>
-          <button onClick={onAllIn} disabled={myChips<=0}
-                  className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-500 font-bold text-sm disabled:opacity-50">
-            All-in
-          </button>
-        </div>
+          </div>
+        )}
+
+        {/* Bet - only show if no call needed */}
+        {toCall === 0 && (
+          <div className="ml-auto flex items-center gap-2">
+            {presets.map(p=>(
+              <button key={p.label} onClick={()=>setAmt(Math.min(myChips, p.val))}
+                      className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-xs">
+                {p.label}
+              </button>
+            ))}
+            <input type="number" min={1} step={bigBlind} value={amt}
+                   onChange={e=>setAmt(Math.max(1, Math.floor(Number(e.target.value)||0)))}
+                   className="w-24 px-2 py-1 text-sm rounded bg-white/10 border border-white/20" />
+            <button onClick={()=>onBet(Math.min(myChips, amt))}
+                    disabled={!canBet}
+                    className="px-3 py-2 rounded bg-amber-500/80 hover:bg-amber-500 font-bold text-sm disabled:opacity-50">
+              Bet
+            </button>
+            <button onClick={onAllIn} disabled={myChips<=0}
+                    className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-500 font-bold text-sm disabled:opacity-50">
+              All-in
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
