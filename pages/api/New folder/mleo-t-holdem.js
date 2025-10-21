@@ -12,7 +12,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
-import { createClient } from "@supabase/supabase-js";
 
 // ===== Vault helpers (aligned with your other games) =====
 function safeRead(key, fallback = {}) {
@@ -149,7 +148,6 @@ export default function HoldemPage() {
   const [pollingInterval, setPollingInterval] = useState(null);
   const [serverSeats, setServerSeats] = useState([]); // seats from server
   const [state, setState] = useState({}); // server state snapshot
-  const [myHole, setMyHole] = useState(null); // my hole cards from server
 
   // Vault & buy-in
   const [vault, setVaultState] = useState(0);
@@ -214,82 +212,6 @@ export default function HoldemPage() {
     };
   }, []);
 
-  // ===== Realtime Subscription (Supabase) =====
-  useEffect(() => {
-    if (!currentHandId || typeof window === "undefined") return;
-    
-    // Initialize Supabase client
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    
-    if (!supabaseUrl || !supabaseKey) {
-      console.log("Supabase not configured, using polling only");
-      return;
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
-    // Subscribe to changes for current hand
-    const channel = supabase
-      .channel(`hand:${currentHandId}`)
-      .on('postgres_changes', 
-        { event: '*', schema: 'poker', table: 'poker_hands', filter: `id=eq.${currentHandId}` },
-        (payload) => {
-          console.log('Realtime: poker_hands changed', payload);
-          // Refresh state immediately
-          fetch(`/api/poker/state?hand_id=${currentHandId}&viewer=${encodeURIComponent(displayName || '')}`)
-            .then(r => r.json())
-            .then(s => {
-              if (!s?.error && s.hand) {
-                setState(s);
-                if (s.my_hole) setMyHole(s.my_hole);
-              }
-            })
-            .catch(console.error);
-        }
-      )
-      .on('postgres_changes',
-        { event: '*', schema: 'poker', table: 'poker_hand_players', filter: `hand_id=eq.${currentHandId}` },
-        (payload) => {
-          console.log('Realtime: poker_hand_players changed', payload);
-          // Refresh state
-          fetch(`/api/poker/state?hand_id=${currentHandId}&viewer=${encodeURIComponent(displayName || '')}`)
-            .then(r => r.json())
-            .then(s => {
-              if (!s?.error && s.hand) {
-                setState(s);
-                if (s.my_hole) setMyHole(s.my_hole);
-              }
-            })
-            .catch(console.error);
-        }
-      )
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'poker', table: 'poker_actions', filter: `hand_id=eq.${currentHandId}` },
-        (payload) => {
-          console.log('Realtime: new action', payload);
-          // Refresh state
-          fetch(`/api/poker/state?hand_id=${currentHandId}&viewer=${encodeURIComponent(displayName || '')}`)
-            .then(r => r.json())
-            .then(s => {
-              if (!s?.error && s.hand) {
-                setState(s);
-                if (s.my_hole) setMyHole(s.my_hole);
-              }
-            })
-            .catch(console.error);
-        }
-      )
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
-      });
-
-    return () => {
-      console.log('Unsubscribing from realtime');
-      supabase.removeChannel(channel);
-    };
-  }, [currentHandId]);
-
   // Persist name
   useEffect(()=> safeWrite(NAME_KEY, { name: displayName||"" }), [displayName]);
 
@@ -337,57 +259,27 @@ export default function HoldemPage() {
 
   async function apiSit(seatIdx, name, buyin) {
     try {
-      console.log("apiSit called:", { table_id: tableId, seat_index: seatIdx, player_name: name, buyin });
-      const response = await fetch(`/api/poker/sit`, { 
+      await fetch(`/api/poker/sit`, { 
         method: "POST", 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ table_id: tableId, seat_index: seatIdx, player_name: name, buyin })
       });
-      
-      const data = await response.json();
-      console.log("apiSit response:", response.status, data);
-      
-      if (!response.ok) {
-        if (data.error === 'seat_taken') {
-          alert("Seat is already taken!");
-        } else {
-          alert(`Failed to sit: ${data.error || 'Unknown error'}`);
-        }
-        return false;
-      }
-      
       await loadTable();
-      return true;
     } catch (e) {
       console.error("Failed to sit:", e);
-      alert("Network error while trying to sit");
-      return false;
     }
   }
 
   async function apiLeave(seatIdx) {
     try {
-      console.log("apiLeave called:", { table_id: tableId, seat_index: seatIdx });
-      const response = await fetch(`/api/poker/leave`, { 
+      await fetch(`/api/poker/leave`, { 
         method: "POST", 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ table_id: tableId, seat_index: seatIdx })
       });
-      
-      const data = await response.json();
-      console.log("apiLeave response:", response.status, data);
-      
-      if (!response.ok) {
-        alert(`Failed to leave: ${data.error || 'Unknown error'}`);
-        return false;
-      }
-      
       await loadTable();
-      return true;
     } catch (e) {
       console.error("Failed to leave:", e);
-      alert("Network error while trying to leave");
-      return false;
     }
   }
 
@@ -446,7 +338,7 @@ export default function HoldemPage() {
     // Start new polling every 1 second
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/poker/state?hand_id=${hand_id}&viewer=${encodeURIComponent(displayName || '')}`);
+        const response = await fetch(`/api/poker/state?hand_id=${hand_id}`);
         const state = await response.json();
         
         if (state?.error) {
@@ -459,11 +351,6 @@ export default function HoldemPage() {
           setPot(state.hand.pot_total || 0);
           setStage(state.hand.stage || "waiting");
           setTurnSeat(state.hand.current_turn ?? null);
-          
-          // Update my hole cards
-          if (state.my_hole) {
-            setMyHole(state.my_hole);
-          }
           
           // Update hole cards for players
           if (state.players && state.players.length > 0) {
@@ -516,7 +403,7 @@ export default function HoldemPage() {
           // Retry if players empty (server snapshot not ready yet)
           if (Array.isArray(state.players) && state.players.length === 0) {
             setTimeout(() => {
-              fetch(`/api/poker/state?hand_id=${hand_id}&viewer=${encodeURIComponent(displayName || '')}`)
+              fetch(`/api/poker/state?hand_id=${hand_id}`)
                 .then(r => r.json())
                 .then(s2 => { 
                   if (!s2?.error && s2.players && s2.players.length > 0) {
@@ -525,7 +412,6 @@ export default function HoldemPage() {
                     if (s2.hand?.pot_total) setPot(Number(s2.hand.pot_total));
                     const board2 = (s2.hand && s2.hand.board) || s2.board || [];
                     setCommunity(Array.isArray(board2) ? board2 : []);
-                    if (s2.my_hole) setMyHole(s2.my_hole);
                   }
                 })
                 .catch(()=>{});
@@ -549,11 +435,7 @@ export default function HoldemPage() {
     // Also poll tick API for timeout enforcement
     const tickInterval = setInterval(async () => {
       try {
-        await fetch('/api/poker/tick', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ hand_id: hand_id })
-        });
+        await fetch(`/api/poker/tick?hand_id=${hand_id}`);
       } catch (e) {
         console.error("Tick error:", e);
       }
@@ -594,26 +476,18 @@ export default function HoldemPage() {
     if (v < buyIn) { alert("Insufficient Vault balance."); return; }
     if (!tableId) { alert("Table not loaded yet."); return; }
     
-    // Check if seat is already taken on server (only if player_name exists)
+    // Check if seat is already taken on server
     const serverSeat = seatByIndex.get(seatIdx);
-    if (serverSeat && serverSeat.player_name) {
+    if (serverSeat) {
       alert("Seat is already taken!");
       return;
     }
-    
-    console.log(`Attempting to sit at seat ${seatIdx} with table_id: ${tableId}`);
     
     // deduct from Vault
     setVault(v - buyIn); setVaultState(v - buyIn);
     
     // Call API - this will refresh serverSeats automatically
-    const result = await apiSit(seatIdx, displayName, buyIn);
-    
-    if (result === false) {
-      // Restore vault if sit failed
-      setVault(v); setVaultState(v);
-      return;
-    }
+    await apiSit(seatIdx, displayName, buyIn);
     
     saveSeatState(seatIdx, buyIn);
   };
@@ -651,16 +525,9 @@ export default function HoldemPage() {
   let _advancing = false; // Prevent double advances
   
   function holeFor(seatIdx) {
-    // If this is my seat and I have hole cards from server, use them
-    if (seatIdx === meIdx && myHole && Array.isArray(myHole) && myHole.length === 2) {
-      return myHole;
-    }
-    // In showdown, everyone's cards are visible
-    if (stage === "showdown" || stage === "hand_end") {
-      const fromPlayers = (state?.players || []).find(p => p.seat_index === seatIdx)?.hole_cards;
-      if (fromPlayers && fromPlayers.length === 2) return fromPlayers;
-    }
-    // Fallback to local state
+    // server: players[row].hole_cards OR map by seat
+    const fromPlayers = (state?.players || []).find(p => p.seat_index === seatIdx)?.hole_cards;
+    if (fromPlayers && fromPlayers.length === 2) return fromPlayers;
     const map = state?.holes || state?.hole_cards || state?.hand?.holes || holeCards || {};
     return map?.[seatIdx] || null;
   }
@@ -728,14 +595,9 @@ export default function HoldemPage() {
       await apiAction(currentHandId, mySeat.seat_index, action, amount);
       
       // Fetch fresh snapshot immediately (no waiting for polling)
-      const r = await fetch(`/api/poker/state?hand_id=${currentHandId}&viewer=${encodeURIComponent(displayName || '')}`);
+      const r = await fetch(`/api/poker/state?hand_id=${currentHandId}`);
       if (r.ok) {
         const state = await r.json();
-        
-        // Update my hole cards
-        if (state.my_hole) {
-          setMyHole(state.my_hole);
-        }
         
         // Update community cards
         const board = (state.hand && state.hand.board) || state.board || [];
@@ -1116,9 +978,16 @@ export default function HoldemPage() {
             <div className="grid grid-cols-3 gap-3 mt-4">
               {Array.from({length: SEATS}).map((_,i)=>{
                 const serverSeat = seatByIndex.get(i);
-                // Check if seat has a player (from server - source of truth)
-                const hasPlayer = serverSeat && serverSeat.player_name;
-                const isYou = serverSeat?.player_name === displayName;
+                const localSeat = seats[i];
+                // Check if this is "you" by comparing display name
+                const isYou = serverSeat?.player_name === displayName || localSeat?.you || false;
+                const p = serverSeat ? { 
+                  name: serverSeat.player_name, 
+                  chips: serverSeat.stack,
+                  you: isYou,
+                  id: serverSeat.player_name
+                } : localSeat;
+                const isTaken = !!serverSeat;
                 
                 return (
                 <div key={i} className={`rounded-xl p-2 border ${turnSeat===i?'border-emerald-400':'border-white/10'} bg-black/30`}>
@@ -1127,19 +996,16 @@ export default function HoldemPage() {
                     {i===buttonIdx && <div className="px-1 py-0.5 rounded bg-yellow-500/20 text-yellow-300 font-bold">D</div>}
                   </div>
 
-                  {!hasPlayer ? (
-                    <button 
-                      className="w-full py-2 rounded bg-white/10 hover:bg-white/20 text-sm"
-                      onClick={()=>sitDown(i)} 
-                      disabled={meIdx !== -1}
-                    >
-                      Sit here (≥ ${fmt(tableMin)})
+                  {!p ? (
+                    <button className="w-full py-2 rounded bg-white/10 hover:bg-white/20 text-sm"
+                            onClick={()=>sitDown(i)} disabled={isTaken || meIdx !== -1}>
+                      {isTaken ? "Seat taken" : `Sit here (≥ ${fmt(tableMin)})`}
                     </button>
                   ) : (
                     <>
                       <div className="flex items-center justify-between text-sm">
-                        <div className="font-semibold truncate">{serverSeat.player_name}{isYou && " (You)"}</div>
-                        <div className="text-emerald-300 font-bold">{fmt(serverSeat.stack_live || serverSeat.stack)}</div>
+                        <div className="font-semibold truncate">{p.name}{p.you && " (You)"}</div>
+                        <div className="text-emerald-300 font-bold">{fmt(p.chips)}</div>
                       </div>
                       <div className="mt-1 flex items-center justify-between text-xs">
                         <div className={`${folded[i]?'text-rose-400':'opacity-70'}`}>
@@ -1152,15 +1018,15 @@ export default function HoldemPage() {
                           const myHole = holeFor(i);
                           if (myHole && Array.isArray(myHole)) {
                             return myHole.map((c,idx)=>(
-                              <Card key={idx} card={(isYou || stage==="showdown") ? c : null} faceDown={!(isYou || stage==="showdown")} />
+                              <Card key={idx} card={(p.you || stage==="showdown") ? c : null} faceDown={!(p.you || stage==="showdown")} />
                             ));
                           }
                           return (holeCards[i]||[]).map((c,idx)=>(
-                            <Card key={idx} card={(isYou || stage==="showdown") ? c : null} faceDown={!(isYou || stage==="showdown")} />
+                            <Card key={idx} card={(p.you || stage==="showdown") ? c : null} faceDown={!(p.you || stage==="showdown")} />
                           ));
                         })()}
                       </div>
-                      {isYou && (
+                      {p.you && (
                         <div className="mt-2 flex gap-2">
                           <button onClick={leaveTable} className="flex-1 py-1 rounded bg-rose-600 hover:bg-rose-500 text-xs">Leave table</button>
                         </div>

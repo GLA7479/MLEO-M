@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎴 Poker API Test Console</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      color: #fff;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 2.5em;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    .card {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 15px;
+      padding: 20px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .card h2 {
+      margin-bottom: 15px;
+      font-size: 1.3em;
+      border-bottom: 2px solid rgba(255,255,255,0.3);
+      padding-bottom: 10px;
+    }
+    button {
+      width: 100%;
+      padding: 12px 20px;
+      margin: 5px 0;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      font-weight: 600;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .success { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+    .warning { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .info { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    
+    #output {
+      background: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      padding: 20px;
+      margin-top: 20px;
+      min-height: 300px;
+      max-height: 500px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .log-entry {
+      margin: 5px 0;
+      padding: 8px;
+      border-radius: 5px;
+      background: rgba(255,255,255,0.05);
+    }
+    .log-success { border-left: 3px solid #38ef7d; }
+    .log-error { border-left: 3px solid #f5576c; }
+    .log-info { border-left: 3px solid #00f2fe; }
+    
+    .status {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: bold;
+      margin: 5px 0;
+    }
+    .status-ready { background: #38ef7d; color: #000; }
+    .status-waiting { background: #feca57; color: #000; }
+    .status-error { background: #f5576c; }
+    
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 5px;
+      background: rgba(255,255,255,0.1);
+      color: white;
+      font-size: 14px;
+    }
+    input::placeholder { color: rgba(255,255,255,0.5); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎴 Texas Hold'em Poker - Test Console</h1>
+    
+    <div class="grid">
+      <!-- Setup -->
+      <div class="card">
+        <h2>1️⃣ הגדרות</h2>
+        <input type="text" id="roomName" placeholder="שם החדר" value="test-room">
+        <div id="tableStatus" class="status status-waiting">ממתין...</div>
+      </div>
+
+      <!-- Table -->
+      <div class="card">
+        <h2>2️⃣ טבלה</h2>
+        <button onclick="loadTable()" class="info">טען טבלה</button>
+        <button onclick="checkTable()" class="info">בדוק סטטוס</button>
+        <div style="font-size: 12px; margin-top: 10px;">
+          Table ID: <span id="tableId">-</span>
+        </div>
+      </div>
+
+      <!-- Players -->
+      <div class="card">
+        <h2>3️⃣ שחקנים</h2>
+        <button onclick="sitPlayer('Alice', 0)" class="success">שב Alice (כיסא 0)</button>
+        <button onclick="sitPlayer('Bob', 1)" class="success">שב Bob (כיסא 1)</button>
+        <button onclick="sitPlayer('Charlie', 2)" class="success">שב Charlie (כיסא 2)</button>
+      </div>
+
+      <!-- Hand -->
+      <div class="card">
+        <h2>4️⃣ יד</h2>
+        <button onclick="startHand()" class="info">התחל יד חדשה</button>
+        <button onclick="getState()">קבל מצב נוכחי</button>
+        <div style="font-size: 12px; margin-top: 10px;">
+          Hand ID: <span id="handId">-</span><br>
+          Stage: <span id="stage">-</span><br>
+          Turn: <span id="turn">-</span>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="card">
+        <h2>5️⃣ פעולות</h2>
+        <input type="number" id="seatIndex" placeholder="מספר כיסא (0-8)" value="0">
+        <button onclick="doAction('fold')" class="warning">Fold</button>
+        <button onclick="doAction('check')" class="success">Check</button>
+        <button onclick="doAction('call')" class="success">Call</button>
+        <button onclick="doAction('raise')" class="info">Raise (BB×2)</button>
+        <button onclick="doAction('allin')" class="warning">All-in</button>
+      </div>
+
+      <!-- Streets -->
+      <div class="card">
+        <h2>6️⃣ רחובות</h2>
+        <button onclick="advanceStreet()" class="info">קדם רחוב</button>
+        <div style="font-size: 12px; margin-top: 10px;">
+          Preflop → Flop → Turn → River → Showdown
+        </div>
+      </div>
+    </div>
+
+    <!-- Output -->
+    <div class="card">
+      <h2>📋 Output Log</h2>
+      <button onclick="clearLog()" style="width: auto; padding: 8px 15px;">נקה</button>
+      <div id="output"></div>
+    </div>
+  </div>
+
+  <script>
+    let tableId = null;
+    let handId = null;
+    const BASE_URL = window.location.origin;
+
+    function log(message, type = 'info') {
+      const output = document.getElementById('output');
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${type}`;
+      entry.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong> ${message}`;
+      output.appendChild(entry);
+      output.scrollTop = output.scrollHeight;
+    }
+
+    function clearLog() {
+      document.getElementById('output').innerHTML = '';
+    }
+
+    async function api(endpoint, options = {}) {
+      try {
+        const response = await fetch(`${BASE_URL}${endpoint}`, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...options.headers,
+          },
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          log(`❌ ${endpoint}: ${JSON.stringify(data)}`, 'error');
+          return null;
+        }
+        
+        log(`✅ ${endpoint}: Success`, 'success');
+        console.log(data);
+        return data;
+      } catch (error) {
+        log(`❌ ${endpoint}: ${error.message}`, 'error');
+        return null;
+      }
+    }
+
+    async function loadTable() {
+      const room = document.getElementById('roomName').value || 'test-room';
+      const data = await api(`/api/poker/table?name=${encodeURIComponent(room)}`);
+      if (data) {
+        tableId = data.table.id;
+        document.getElementById('tableId').textContent = tableId;
+        document.getElementById('tableStatus').textContent = 'מוכן ✓';
+        document.getElementById('tableStatus').className = 'status status-ready';
+        log(`🆔 Table ID: ${tableId}`, 'info');
+      }
+    }
+
+    async function checkTable() {
+      if (!tableId) { log('⚠️ טען טבלה תחילה', 'error'); return; }
+      const data = await api(`/api/poker/table?id=${tableId}`);
+      if (data) {
+        log(`👥 Seats: ${data.seats.filter(s => s.player_name).length}/9`, 'info');
+      }
+    }
+
+    async function sitPlayer(name, seatIdx) {
+      if (!tableId) { log('⚠️ טען טבלה תחילה', 'error'); return; }
+      const data = await api('/api/poker/sit', {
+        method: 'POST',
+        body: JSON.stringify({
+          table_id: tableId,
+          seat_index: seatIdx,
+          player_name: name,
+          buyin: 2000,
+        }),
+      });
+      if (data) {
+        log(`🪑 ${name} ישב בכיסא ${seatIdx}`, 'success');
+      }
+    }
+
+    async function startHand() {
+      if (!tableId) { log('⚠️ טען טבלה תחילה', 'error'); return; }
+      const data = await api('/api/poker/start-hand', {
+        method: 'POST',
+        body: JSON.stringify({ table_id: tableId }),
+      });
+      if (data) {
+        handId = data.hand_id;
+        document.getElementById('handId').textContent = handId;
+        log(`🎴 Hand ID: ${handId} | SB: ${data.sb_seat} | BB: ${data.bb_seat}`, 'success');
+        await getState();
+      }
+    }
+
+    async function getState() {
+      if (!handId) { log('⚠️ התחל יד תחילה', 'error'); return; }
+      const data = await api(`/api/poker/state?hand_id=${handId}`);
+      if (data) {
+        document.getElementById('stage').textContent = data.hand.stage;
+        document.getElementById('turn').textContent = data.hand.current_turn ?? '-';
+        log(`📊 Stage: ${data.hand.stage} | Turn: ${data.hand.current_turn} | Pot: ${data.hand.pot_total}`, 'info');
+        log(`🎯 To Call: ${JSON.stringify(data.to_call)}`, 'info');
+      }
+    }
+
+    async function doAction(action) {
+      if (!handId) { log('⚠️ התחל יד תחילה', 'error'); return; }
+      const seatIdx = parseInt(document.getElementById('seatIndex').value);
+      
+      let amount = 0;
+      if (action === 'call') {
+        const state = await api(`/api/poker/state?hand_id=${handId}`);
+        amount = state?.to_call?.[seatIdx] || 0;
+      } else if (action === 'raise') {
+        amount = 40; // 2×BB (assuming BB=20)
+      } else if (action === 'allin') {
+        amount = 2000;
+      }
+      
+      const data = await api('/api/poker/action', {
+        method: 'POST',
+        body: JSON.stringify({
+          hand_id: handId,
+          seat_index: seatIdx,
+          action: action,
+          amount: amount,
+        }),
+      });
+      if (data) {
+        log(`♠️ Seat ${seatIdx}: ${action.toUpperCase()} ${amount || ''}`, 'success');
+        await getState();
+      }
+    }
+
+    async function advanceStreet() {
+      if (!handId) { log('⚠️ התחל יד תחילה', 'error'); return; }
+      const data = await api('/api/poker/advance-street', {
+        method: 'POST',
+        body: JSON.stringify({ hand_id: handId }),
+      });
+      if (data) {
+        log(`🎯 Advanced to: ${data.stage}`, 'success');
+        if (data.board) {
+          log(`🃏 Board: ${data.board.join(' ')}`, 'info');
+        }
+        if (data.winners) {
+          log(`🏆 Winners: ${JSON.stringify(data.winners)}`, 'success');
+        }
+        await getState();
+      }
+    }
+
+    // Auto-load on startup
+    window.onload = () => {
+      log('🎴 Texas Hold\'em Poker Test Console Ready', 'success');
+      log('💡 Tip: Open Browser Console (F12) for detailed responses', 'info');
+    };
+  </script>
+</body>
+</html>
+
