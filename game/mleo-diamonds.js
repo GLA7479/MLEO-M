@@ -367,11 +367,12 @@ useEffect(() => {
   const startGame = (isFreePlayParam = false) => {
     playSfx(clickSound.current);
     const currentVault = getVault();
-    let bet = Number(betAmount) || MIN_BET;
+    let bet = MIN_BET;
+    
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
       if (result.success) {
-        bet = result.amount;
+        bet = 1000; // Always 1000 MLEO for free play - independent of betAmount!
         setIsFreePlay(false);
         router.replace("/diamonds", undefined, { shallow: true });
       } else {
@@ -380,6 +381,7 @@ useEffect(() => {
         return;
       }
     } else {
+      bet = Number(betAmount) || MIN_BET; // Only use betAmount for regular games
       if (bet < MIN_BET) {
         alert(`Minimum bet is ${MIN_BET} MLEO`);
         return;
