@@ -86,19 +86,27 @@ export default async function handler(req, res) {
     const holes = {};
     for (const s of order) { holes[s] = [deck.pop(), deck.pop()]; }
 
-    // Insert hand
+    // Determine UTG (first to act after BB in preflop)
+    const utgIdx = (idxD + 3) % order.length;  // After dealer, SB, BB
+    const utgSeat = order[utgIdx];
+
+    // Insert hand - set current_turn to UTG
     const hid = await q(`
       INSERT INTO poker.poker_hands(table_id, hand_no, stage, dealer_seat, sb_seat, bb_seat, current_turn, pot_total, board, deck_remaining, turn_deadline)
       VALUES ($1,$2,'preflop',$3,$4,$5,$6,0,'{}',$7, now() + interval '30 seconds')
       RETURNING id, dealer_seat, sb_seat, bb_seat
-    `,[table_id, hand_no, nextDealer, sbSeat, bbSeat, (bbSeat+1)%9, deck]);
+    `,[table_id, hand_no, nextDealer, sbSeat, bbSeat, utgSeat, deck]);
     const hand_id = hid.rows[0].id;
+    
+    console.log(`Hand ${hand_id}: Dealer=${nextDealer}, SB=${sbSeat}, BB=${bbSeat}, UTG=${utgSeat}`);
 
-    // Create hand players
+    // Create hand players (SB/BB have NOT acted yet - they only posted blinds)
     for (const s of order) {
       await q(`INSERT INTO poker.poker_hand_players(hand_id, seat_index, bet_street, folded, all_in, acted_street, hole_cards)
                VALUES ($1,$2,0,false,false,false,$3)`, [hand_id, s, holes[s]]);
     }
+    
+    // Mark that this is preflop - SB/BB have NOT made a decision yet (only posted blinds)
     
     // Post blinds
     async function postBlind(seatIndex, amount){

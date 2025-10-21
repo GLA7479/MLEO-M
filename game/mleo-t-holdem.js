@@ -410,8 +410,8 @@ export default function HoldemPage() {
         hand_id, 
         seat_index, 
         action, 
-        amount: Number(amount)||0,
-        action_id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}` // Idempotency
+        amount: Number(amount)||0
+        // השרת ייצר action_id UUID אוטומטית
       };
       const response = await fetch('/api/poker/action', {
         method: 'POST',
@@ -1018,11 +1018,36 @@ export default function HoldemPage() {
   const meIdx = mySeat ? mySeat.seat_index : -1;
   const myChips = mySeat ? mySeat.stack : 0;
   
-  // Calculate effective turn with backup
-  const serverTurn = turnSeat;
+  // Calculate effective turn - ensure we're comparing seat_index to seat_index
+  const serverTurn = turnSeat;  // This comes from state.hand.current_turn
   const backupTurn = computeBackupTurn({ seats: serverSeats });
-  const effectiveTurn = (serverTurn === null || serverTurn === undefined) ? backupTurn : serverTurn;
-  const myTurn = (meIdx !== -1 && effectiveTurn === meIdx) && (stage==="preflop"||stage==="flop"||stage==="turn"||stage==="river");
+  
+  // Ensure both are numbers for comparison
+  const effectiveTurn = (serverTurn === null || serverTurn === undefined) ? backupTurn : Number(serverTurn);
+  const myTurn = 
+    typeof effectiveTurn === 'number' &&
+    typeof meIdx === 'number' &&
+    meIdx !== -1 &&
+    effectiveTurn === meIdx &&
+    (stage==="preflop"||stage==="flop"||stage==="turn"||stage==="river");
+  
+  // Debug logging
+  useEffect(() => {
+    if (currentHandId) {
+      console.log('Turn Debug:', {
+        meIdx,
+        displayName,
+        serverTurn,
+        serverTurnType: typeof serverTurn,
+        effectiveTurn,
+        effectiveTurnType: typeof effectiveTurn,
+        myTurn,
+        stage,
+        mySeat: mySeat?.seat_index,
+        comparison: `${effectiveTurn} === ${meIdx} ? ${effectiveTurn === meIdx}`
+      });
+    }
+  }, [meIdx, serverTurn, effectiveTurn, myTurn, stage, currentHandId, displayName, mySeat]);
 
   const passTurn = (fromIdx, raised) => {
     const alive = seats.map((p,i)=>({p,i})).filter(x=>x.p && !folded[x.i] && (!allIn[x.i] || (bets[x.i]||0)>0));
@@ -1217,7 +1242,27 @@ export default function HoldemPage() {
               const meSeated = seatByIndex.get(meIdx);
               const inHandFallback = !!(meSeated?.player_name && !meSeated?.sat_out && (meSeated?.stack_live ?? meSeated?.stack ?? 0) > 0);
               const showActionBar = inHandFallback && (stage==="preflop"||stage==="flop"||stage==="turn"||stage==="river");
-              return meIdx!==-1 && myTurn && !folded[meIdx] && showActionBar;
+              const shouldShow = meIdx!==-1 && myTurn && !folded[meIdx] && showActionBar;
+              
+              // Debug
+              if (meIdx !== -1 && (stage==="preflop"||stage==="flop"||stage==="turn"||stage==="river")) {
+                console.log('ActionBar Debug:', {
+                  meIdx,
+                  meIdxType: typeof meIdx,
+                  myTurn,
+                  folded: folded[meIdx],
+                  showActionBar,
+                  shouldShow,
+                  effectiveTurn,
+                  effectiveTurnType: typeof effectiveTurn,
+                  stage,
+                  comparison: `turn ${effectiveTurn} vs me ${meIdx} = ${effectiveTurn === meIdx}`,
+                  meSeated: !!meSeated,
+                  inHandFallback
+                });
+              }
+              
+              return shouldShow;
             })() && (
               <ActionBar
                 toCall={Math.max(0, toCall - (bets[meIdx]||0))}

@@ -99,6 +99,10 @@ export default async function handler(req, res) {
 
     if (hand.stage === "preflop") {
       board = board.concat(draw(deck, 3)); // FLOP
+      
+      // Clear turn/deadline first to avoid ghost ticks
+      await q(`UPDATE poker.poker_hands SET current_turn=NULL, turn_deadline=NULL WHERE id=$1`, [hand_id]);
+      
       const nextTurn = await firstToActAfterDealer(hand_id, hand);
       await q(`
         UPDATE poker.poker_hands
@@ -113,6 +117,10 @@ export default async function handler(req, res) {
 
     if (hand.stage === "flop") {
       board = board.concat(draw(deck, 1)); // TURN
+      
+      // Clear turn/deadline first to avoid ghost ticks
+      await q(`UPDATE poker.poker_hands SET current_turn=NULL, turn_deadline=NULL WHERE id=$1`, [hand_id]);
+      
       const nextTurn = await firstToActAfterDealer(hand_id, hand);
       await q(`
         UPDATE poker.poker_hands
@@ -127,6 +135,10 @@ export default async function handler(req, res) {
 
     if (hand.stage === "turn") {
       board = board.concat(draw(deck, 1)); // RIVER
+      
+      // Clear turn/deadline first to avoid ghost ticks
+      await q(`UPDATE poker.poker_hands SET current_turn=NULL, turn_deadline=NULL WHERE id=$1`, [hand_id]);
+      
       const nextTurn = await firstToActAfterDealer(hand_id, hand);
       await q(`
         UPDATE poker.poker_hands
