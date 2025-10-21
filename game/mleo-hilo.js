@@ -171,17 +171,16 @@ export default function HiLoPage() {
     if (gameActive) return;
     playSfx(clickSound.current);
     const currentVault = getVault();
-    let bet = MIN_BET;
+    let bet = Number(betAmount) || MIN_BET;
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
       if (result.success) { 
-        bet = 1000; // Always 1000 MLEO for free play - independent of betAmount!
+        bet = result.amount;
         setIsFreePlay(false); 
         router.replace('/hilo', undefined, { shallow: true }); 
       }
       else { alert('No free play tokens available!'); setIsFreePlay(false); return; }
     } else {
-      bet = Number(betAmount) || MIN_BET; // Only use betAmount for regular games
       if (bet < MIN_BET) { alert(`Minimum bet is ${MIN_BET} MLEO`); return; }
       if (currentVault < bet) { alert('Insufficient MLEO in vault'); return; }
       setVault(currentVault - bet); setVaultState(currentVault - bet);
