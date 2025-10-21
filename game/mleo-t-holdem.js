@@ -440,17 +440,20 @@ export default function HoldemPage() {
     if (stage === 'hand_end' || stage === 'showdown') return false;
 
     const alive = (state.players || []).filter(p => p.folded === false);
-    if (alive.length <= 1) return true; // זוכה יחיד → סגור
+    if (alive.length <= 1) return true; // נשאר אחד חי → סגור יד
 
     const maxBet = Math.max(0, ...alive.map(p => Number(p.bet_street || 0)));
     const everyoneSettled = alive.every(p => {
       const playerBet = Number(p.bet_street || 0);
       const playerStack = state.seats?.find(s => s.seat_index === p.seat_index)?.stack_live ?? 0;
-      return playerBet === maxBet || playerStack === 0; // מיושר או all-in
+      return playerBet === maxBet || playerStack === 0; // יישור או all-in
     });
 
-    // ודא שהייתה לפחות פעולה ברחוב (מונע פתיחה מוקדמת)
-    const hasActionThisStreet = (state.actions || []).length > 0;
+    // ✅ ספר רק פעולות "אמיתיות", לא auto_*
+    const realActions = (state.actions || []).filter(a => !(String(a.action||'').startsWith('auto_')));
+
+    // ✅ בפריפלופ נדרוש לפחות פעולה אמיתית אחת (מעבר לבליינדים)
+    const hasActionThisStreet = stage === 'preflop' ? realActions.length > 0 : true;
 
     return everyoneSettled && hasActionThisStreet;
   }
@@ -1134,18 +1137,28 @@ export default function HoldemPage() {
   };
   const doBetOrRaise = (amt) => {
     if (!myTurn || meIdx === -1) return;
-    amt = Math.max(0, Math.floor(Number(amt)||0));
-    
-    // Calculate if there's an open bet (server normalizes bet→raise automatically)
-    const maxBet = Math.max(0, ...Object.values(bets));
-    const myBet = bets[meIdx] || 0;
-    const needToCall = Math.max(0, maxBet - myBet);
-    
-    // Always send the total amount to put in (server handles the logic)
-    const totalAmount = needToCall + amt;
-    const actionType = maxBet > 0 ? 'raise' : 'bet';
-    
-    playerAction(actionType, totalAmount);
+
+    // amount from the input
+    amt = Math.max(0, Math.floor(Number(amt) || 0));
+
+    // ✅ ALWAYS base "need to call" on server-driven toCall
+    //    (not on local bets[] which may lag)
+    const myBetNow = bets[meIdx] || 0;
+    const needToCall = Math.max(0, (toCall || 0) - myBetNow);
+
+    // total chips we will put in this action = call + raise amount
+    const totalToPut = needToCall + amt;
+
+    // choose action label (server anyway normalizes bet→raise if there's an open bet)
+    const actionType = needToCall > 0 ? 'raise' : 'bet';
+
+    // guard: nothing to send
+    if (totalToPut <= 0 || myChips <= 0) return;
+
+    // clamp to my stack
+    const send = Math.min(totalToPut, myChips);
+
+    playerAction(actionType, send);
   };
   const doAllIn = () => {
     if (!myTurn || meIdx === -1) return;
