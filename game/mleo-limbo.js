@@ -48,7 +48,7 @@ function useIOSViewportFix() {
 // ============================================================================
 const LS_KEY = "mleo_limbo_v2";
 const MIN_BET = 1000;
-const HOUSE_EDGE = -0.08; // 108% RTP - Fun arcade bonus!
+const HOUSE_EDGE = -0.08; // Fun arcade bonus!
 
 // On-chain Claim Config
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
@@ -700,22 +700,35 @@ export default function LimboPage() {
             >
               −
             </button>
-            <input
-              type="text"
-              value={isEditingBet ? betAmount : formatBetDisplay(betAmount)}
-              onFocus={() => setIsEditingBet(true)}
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, '');
-                setBetAmount(val || '0');
-              }}
-              onBlur={() => {
-                setIsEditingBet(false);
-                const current = Number(betAmount) || MIN_BET;
-                setBetAmount(String(Math.max(MIN_BET, current)));
-              }}
-              disabled={rolling}
-              className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={isEditingBet ? betAmount : formatBetDisplay(betAmount)}
+                onFocus={() => setIsEditingBet(true)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  setBetAmount(val || '0');
+                }}
+                onBlur={() => {
+                  setIsEditingBet(false);
+                  const current = Number(betAmount) || MIN_BET;
+                  setBetAmount(String(Math.max(MIN_BET, current)));
+                }}
+                disabled={rolling}
+                className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6"
+              />
+              <button
+                onClick={() => {
+                  setBetAmount(String(MIN_BET));
+                  playSfx(clickSound.current);
+                }}
+                disabled={rolling}
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center"
+                title="Reset to minimum bet"
+              >
+                ↺
+              </button>
+            </div>
             <button
               onClick={() => {
                 const current = Number(betAmount) || MIN_BET;
@@ -727,17 +740,6 @@ export default function LimboPage() {
               className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
             >
               +
-            </button>
-            <button
-              onClick={() => {
-                setBetAmount(String(MIN_BET));
-                playSfx(clickSound.current);
-              }}
-              disabled={rolling}
-              className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50"
-              title="Reset to minimum bet"
-            >
-              ↺
             </button>
           </div>
 
@@ -909,11 +911,13 @@ export default function LimboPage() {
                 <p><strong>3. Roll:</strong> Click "ROLL" to generate a random multiplier</p>
                 <p><strong>4. Win:</strong> If the result is ≥ your target, you win your bet × target multiplier!</p>
                 <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-lg p-3 mt-4">
-                  <p className="text-indigo-300 font-semibold">💡 Strategy Tips</p>
-                  <p className="text-xs text-white/80 mt-1">• Higher target = Lower win chance but bigger prize</p>
-                  <p className="text-xs text-white/80">• ×2 target = ~54% win chance (108% RTP!)</p>
-                  <p className="text-xs text-white/80">• ×100 target = ~1.08% win chance</p>
-                  <p className="text-xs text-white/80">• Use quick select buttons for popular multipliers</p>
+                  <p className="text-indigo-300 font-semibold">💰 Prize Range</p>
+                  <p className="text-xs text-white/80 mt-1">• <strong>Minimum:</strong> ×1.01</p>
+                  <p className="text-xs text-white/80">• <strong>Maximum:</strong> ×100</p>
+                  <p className="text-xs text-white/80 mt-2"><strong>You choose your target!</strong></p>
+                </div>
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-2 mt-2">
+                  <p className="text-purple-300 font-semibold text-xs">💡 Higher target = Bigger prize but harder to win</p>
                 </div>
               </div>
               <button

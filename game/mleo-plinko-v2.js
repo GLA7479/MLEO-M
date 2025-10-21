@@ -51,11 +51,32 @@ function useIOSViewportFix() {
 const LS_KEY = "mleo_plinko2_v1";
 const MIN_BET = 1000;
 
-// Staircase multipliers - increases from center to corners (114% RTP)
-const MULTIPLIERS = [4.3, 3.2, 2.35, 1.63, 1.25, 1.03, 0.93, 0.5, 0.93, 1.03, 1.25, 1.63, 2.35, 3.2, 4.3];
-const BUCKET_COLORS = ["from-yellow-300 to-yellow-500", "from-orange-400 to-orange-600", "from-green-500 to-emerald-500", "from-blue-500 to-cyan-500", "from-purple-500 to-purple-600", "from-gray-600 to-gray-700", "from-red-600 to-red-700", "from-black to-gray-900", "from-red-600 to-red-700", "from-gray-600 to-gray-700", "from-purple-500 to-purple-600", "from-blue-500 to-cyan-500", "from-green-500 to-emerald-500", "from-orange-400 to-orange-600", "from-yellow-300 to-yellow-500"];
+// EXTREME Plinko - 0 center and corners (Custom Probabilities!)
+const MULTIPLIERS = [0, 40, 2, 18, 1.5, 5, 1, 0.5, 0, 0.5, 1, 5, 1.5, 18, 2, 40, 0];
 
-const ROWS = 17;
+// Custom probabilities (not binomial) - like real casinos!
+const CUSTOM_PROBABILITIES = [
+  0.00005,  // 0.005% - corner ×0
+  0.0005,   // 0.05% - ×40
+  0.001,    // 0.1% - ×2
+  0.005,    // 0.5% - ×18
+  0.02,     // 2% - ×1.5
+  0.06,     // 6% - ×5
+  0.12,     // 12% - ×1
+  0.18,     // 18% - ×0.5
+  0.4,      // 40% - center ×0
+  0.18,     // 18% - ×0.5
+  0.12,     // 12% - ×1
+  0.06,     // 6% - ×5
+  0.02,     // 2% - ×1.5
+  0.005,    // 0.5% - ×18
+  0.001,    // 0.1% - ×2
+  0.0005,   // 0.05% - ×40
+  0.00005   // 0.005% - corner ×0
+];
+const BUCKET_COLORS = ["from-black to-gray-900", "from-yellow-300 to-yellow-500", "from-orange-400 to-orange-600", "from-green-500 to-emerald-500", "from-blue-500 to-cyan-500", "from-purple-500 to-purple-600", "from-gray-600 to-gray-700", "from-red-600 to-red-700", "from-black to-gray-900", "from-red-600 to-red-700", "from-gray-600 to-gray-700", "from-purple-500 to-purple-600", "from-blue-500 to-cyan-500", "from-green-500 to-emerald-500", "from-orange-400 to-orange-600", "from-yellow-300 to-yellow-500", "from-black to-gray-900"];
+
+const ROWS = 16;
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -465,7 +486,21 @@ export default function Plinko2Page() {
 
   const landInBucket = (ball, bucket) => {
     const bet = ball.bet;
-    const multiplier = bucket.multiplier;
+    
+    // Use custom probabilities instead of physical bucket position
+    const random = Math.random();
+    let cumulativeProbability = 0;
+    let selectedBucketIndex = 0;
+    
+    for (let i = 0; i < CUSTOM_PROBABILITIES.length; i++) {
+      cumulativeProbability += CUSTOM_PROBABILITIES[i];
+      if (random <= cumulativeProbability) {
+        selectedBucketIndex = i;
+        break;
+      }
+    }
+    
+    const multiplier = MULTIPLIERS[selectedBucketIndex];
     const prize = Math.floor(bet * multiplier);
     const win = prize > 0;
 
@@ -481,7 +516,7 @@ export default function Plinko2Page() {
       multiplier,
       prize,
       profit: win ? prize - bet : -bet,
-      bucketIndex: bucket.index,
+      bucketIndex: selectedBucketIndex,
     };
 
     setLastResult(result);
@@ -704,7 +739,7 @@ export default function Plinko2Page() {
               🎯 Plinko
             </h1>
             <p className="text-white/70 text-xs">
-              High Risk • Max Multipliers!
+              EXTREME MODE • ×40 Jackpot!
             </p>
           </div>
 
@@ -745,7 +780,9 @@ export default function Plinko2Page() {
             
             {/* RESULT POPUP - Inside game area */}
             {showResultPopup && lastResult && (
-              <div className="absolute top-2 right-2 z-[9999] pointer-events-none">
+              <div className={`absolute top-2 z-[9999] pointer-events-none ${
+                lastResult.win ? "right-2" : "left-2"
+              }`}>
                 <div
                   className={`${
                     lastResult.win ? "bg-green-500" : "bg-red-500"
@@ -836,21 +873,33 @@ export default function Plinko2Page() {
             >
               −
             </button>
-            <input
-              type="text"
-              value={isEditingBet ? betAmount : formatBetDisplay(betAmount)}
-              onFocus={() => setIsEditingBet(true)}
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, '');
-                setBetAmount(val || '0');
-              }}
-              onBlur={() => {
-                setIsEditingBet(false);
-                const current = Number(betAmount) || MIN_BET;
-                setBetAmount(String(Math.max(MIN_BET, current)));
-              }}
-              className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={isEditingBet ? betAmount : formatBetDisplay(betAmount)}
+                onFocus={() => setIsEditingBet(true)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  setBetAmount(val || '0');
+                }}
+                onBlur={() => {
+                  setIsEditingBet(false);
+                  const current = Number(betAmount) || MIN_BET;
+                  setBetAmount(String(Math.max(MIN_BET, current)));
+                }}
+                className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6"
+              />
+              <button
+                onClick={() => {
+                  setBetAmount(String(MIN_BET));
+                  playSfx(clickSound.current);
+                }}
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center"
+                title="Reset to minimum bet"
+              >
+                ↺
+              </button>
+            </div>
             <button
               onClick={() => {
                 const current = Number(betAmount) || MIN_BET;
@@ -861,16 +910,6 @@ export default function Plinko2Page() {
               className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
             >
               +
-            </button>
-            <button
-              onClick={() => {
-                setBetAmount(String(MIN_BET));
-                playSfx(clickSound.current);
-              }}
-              className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50"
-              title="Reset to minimum bet"
-            >
-              ↺
             </button>
           </div>
 
@@ -1003,25 +1042,26 @@ export default function Plinko2Page() {
               <h2 className="text-2xl font-extrabold mb-4">🎯 How to Play</h2>
               <div className="space-y-3 text-sm">
                 <p>
-                  <strong>1. Choose Risk:</strong> Low, Medium, or High risk levels
+                  <strong>1. Set Your Bet:</strong> Choose your MLEO amount
                 </p>
                 <p>
-                  <strong>2. Set Your Bet:</strong> Choose your MLEO amount
+                  <strong>2. Drop Ball:</strong> Click "DROP BALL" to play!
                 </p>
                 <p>
-                  <strong>3. Drop Ball:</strong> Watch it bounce through pegs!
+                  <strong>3. Watch:</strong> Ball bounces through pegs
                 </p>
                 <p>
-                  <strong>4. Land in Bucket:</strong> Win based on multiplier
+                  <strong>4. Win:</strong> Land in a bucket with a multiplier!
                 </p>
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
-                  <p className="text-yellow-300 font-semibold mb-2">🎰 Staircase Prizes (114% RTP!):</p>
+                  <p className="text-yellow-300 font-semibold mb-2">💥 EXTREME Prizes!</p>
                   <div className="text-xs space-y-1">
-                    <p className="text-white/80">🏆 Corners: <span className="text-yellow-300 font-bold">×4.3</span> (ultra rare!)</p>
-                    <p className="text-white/80">💎 Near edges: <span className="text-orange-300 font-bold">×3.2, ×2.35</span></p>
-                    <p className="text-white/80">⭐ Mid zones: <span className="text-green-300 font-bold">×1.63, ×1.25</span></p>
-                    <p className="text-white/80">📍 Center: <span className="text-blue-300">×0.5 - ×1.03</span></p>
-                    <p className="text-white/60 mt-1 italic">Prizes increase as you move from center to corners!</p>
+                    <p className="text-white/80">🚀 <span className="text-yellow-300 font-bold text-base">×40</span> - Ultra rare jackpot!</p>
+                    <p className="text-white/80">🔥 Great prizes: <span className="text-orange-300 font-bold">×18, ×2</span></p>
+                    <p className="text-white/80">💎 Middle prizes: <span className="text-green-300 font-bold">×5, ×1.5</span></p>
+                    <p className="text-white/80">⭐ Small prizes: <span className="text-blue-300">×1, ×0.5</span></p>
+                    <p className="text-white/80">💀 <span className="text-red-400 font-bold">Center & Corners: ×0</span></p>
+                    <p className="text-yellow-200 mt-1 italic font-semibold">Aim for the middle zones!</p>
                   </div>
                 </div>
               </div>

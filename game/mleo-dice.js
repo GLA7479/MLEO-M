@@ -48,7 +48,7 @@ function useIOSViewportFix() {
 // ============================================================================
 const LS_KEY = "mleo_dice_v2";
 const MIN_BET = 1000;
-const HOUSE_EDGE = -0.08; // 108% RTP - Fun arcade bonus!
+const HOUSE_EDGE = -0.08; // Fun arcade bonus!
 
 // On-chain Claim Config
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
@@ -757,22 +757,35 @@ export default function DicePage() {
             >
               −
             </button>
-            <input
-              type="text"
-              value={isEditingBet ? betAmount : formatBetDisplay(betAmount)}
-              onFocus={() => setIsEditingBet(true)}
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, '');
-                setBetAmount(val || '0');
-              }}
-              onBlur={() => {
-                setIsEditingBet(false);
-                const current = Number(betAmount) || MIN_BET;
-                setBetAmount(String(Math.max(MIN_BET, current)));
-              }}
-              disabled={rolling}
-              className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={isEditingBet ? betAmount : formatBetDisplay(betAmount)}
+                onFocus={() => setIsEditingBet(true)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  setBetAmount(val || '0');
+                }}
+                onBlur={() => {
+                  setIsEditingBet(false);
+                  const current = Number(betAmount) || MIN_BET;
+                  setBetAmount(String(Math.max(MIN_BET, current)));
+                }}
+                disabled={rolling}
+                className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6"
+              />
+              <button
+                onClick={() => {
+                  setBetAmount(String(MIN_BET));
+                  playSfx(clickSound.current);
+                }}
+                disabled={rolling}
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center"
+                title="Reset to minimum bet"
+              >
+                ↺
+              </button>
+            </div>
             <button
               onClick={() => {
                 const current = Number(betAmount) || MIN_BET;
@@ -784,17 +797,6 @@ export default function DicePage() {
               className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
             >
               +
-            </button>
-            <button
-              onClick={() => {
-                setBetAmount(String(MIN_BET));
-                playSfx(clickSound.current);
-              }}
-              disabled={rolling}
-              className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50"
-              title="Reset to minimum bet"
-            >
-              ↺
             </button>
           </div>
 
@@ -949,10 +951,13 @@ export default function DicePage() {
                 <p><strong>4. Roll:</strong> Click "ROLL DICE" to play</p>
                 <p><strong>5. Win:</strong> If your prediction is correct, you win based on the multiplier!</p>
                 <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 mt-4">
-                  <p className="text-emerald-300 font-semibold">💡 Strategy Tips</p>
-                  <p className="text-xs text-white/80 mt-1">• Higher risk = Higher multiplier</p>
-                  <p className="text-xs text-white/80">• 50/50 odds = ~×1.98 multiplier</p>
-                  <p className="text-xs text-white/80">• 1% win chance = ~×99 multiplier</p>
+                  <p className="text-emerald-300 font-semibold">💰 Prize Range</p>
+                  <p className="text-xs text-white/80 mt-1">• <strong>Minimum:</strong> ×1.01</p>
+                  <p className="text-xs text-white/80">• <strong>Maximum:</strong> ×99</p>
+                  <p className="text-xs text-white/80 mt-2"><strong>You control the risk/reward!</strong></p>
+                </div>
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-2 mt-2">
+                  <p className="text-purple-300 font-semibold text-xs">💡 Higher risk = Bigger prize but harder to win</p>
                 </div>
               </div>
               <button

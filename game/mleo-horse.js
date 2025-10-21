@@ -214,7 +214,7 @@ export default function HorseRacePage() {
     // positions[0] = 1st, positions[1] = 2nd, positions[2] = 3rd, positions[3] = 4th
     const myPosition = positions.indexOf(selectedHorse);
     
-    // Prize multipliers: 1st=×3.6, 2nd=×1, 3rd=×0.6, 4th=×0.2 (108% RTP!)
+    // Prize multipliers based on finish position
     let multiplier = 0;
     let place = '';
     if (myPosition === 0) { multiplier = 3.6; place = '1st 🥇'; }
@@ -349,9 +349,11 @@ export default function HorseRacePage() {
             <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={racing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
             <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={racing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
             <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={racing} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
-            <input type="text" value={isEditingBet ? betAmount : formatBetDisplay(betAmount)} onFocus={() => setIsEditingBet(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setBetAmount(val || '0'); }} onBlur={() => { setIsEditingBet(false); const current = Number(betAmount) || MIN_BET; setBetAmount(String(Math.max(MIN_BET, current))); }} disabled={racing} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs" />
+            <div className="relative">
+              <input type="text" value={isEditingBet ? betAmount : formatBetDisplay(betAmount)} onFocus={() => setIsEditingBet(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setBetAmount(val || '0'); }} onBlur={() => { setIsEditingBet(false); const current = Number(betAmount) || MIN_BET; setBetAmount(String(Math.max(MIN_BET, current))); }} disabled={racing} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
+              <button onClick={() => { setBetAmount(String(MIN_BET)); playSfx(clickSound.current); }} disabled={racing} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum bet">↺</button>
+            </div>
             <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={racing} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
-            <button onClick={() => { setBetAmount(String(MIN_BET)); playSfx(clickSound.current); }} disabled={racing} className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50" title="Reset to minimum bet">↺</button>
           </div>
             
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
@@ -401,13 +403,13 @@ export default function HorseRacePage() {
                 <p><strong>3. Race:</strong> Watch the progress bars!</p>
                 <p><strong>4. Win Prizes:</strong> Top 4 positions get paid!</p>
                 <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
-                  <p className="text-green-300 font-semibold mb-2">Prize Table:</p>
-                  <div className="text-xs text-white/80 space-y-1">
-                    <p>🥇 1st Place: ×3.6</p>
-                    <p>🥈 2nd Place: ×1 (break even)</p>
-                    <p>🥉 3rd Place: ×0.6</p>
-                    <p>4th Place: ×0.2</p>
-                    <p>5th Place: ×0 (lose)</p>
+                  <p className="text-green-300 font-semibold mb-2">🏆 Finish Prizes:</p>
+                    <div className="text-xs text-white/80 space-y-1">
+                      <p>🥇 <strong>1st Place:</strong> ×3.6</p>
+                      <p>🥈 <strong>2nd Place:</strong> ×1 (break even)</p>
+                      <p>🥉 <strong>3rd Place:</strong> ×0.6</p>
+                      <p>• <strong>4th Place:</strong> ×0.2</p>
+                      <p>• <strong>5th Place:</strong> ×0</p>
                   </div>
                 </div>
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mt-2">

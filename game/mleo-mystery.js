@@ -51,7 +51,7 @@ const MIN_BET = 1000;
 const TOTAL_BOXES = 10;
 
 // Prize distribution in boxes (multipliers)
-// RTP: 110% - Fun arcade bonus!
+// Fun arcade bonus!
 const PRIZES = [0, 0, 0, 0, 0.5, 1, 1, 1.5, 3, 4];
 
 // On-chain Claim Config
@@ -588,9 +588,11 @@ export default function MysteryBoxPage() {
             <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
             <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
             <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
-            <input type="text" value={isEditingBet ? betAmount : formatBetDisplay(betAmount)} onFocus={() => setIsEditingBet(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setBetAmount(val || '0'); }} onBlur={() => { setIsEditingBet(false); const current = Number(betAmount) || MIN_BET; setBetAmount(String(Math.max(MIN_BET, current))); }} disabled={gameActive || gameResult} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs" />
+            <div className="relative">
+              <input type="text" value={isEditingBet ? betAmount : formatBetDisplay(betAmount)} onFocus={() => setIsEditingBet(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setBetAmount(val || '0'); }} onBlur={() => { setIsEditingBet(false); const current = Number(betAmount) || MIN_BET; setBetAmount(String(Math.max(MIN_BET, current))); }} disabled={gameActive || gameResult} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
+              <button onClick={() => { setBetAmount(String(MIN_BET)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum bet">↺</button>
+            </div>
             <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
-            <button onClick={() => { setBetAmount(String(MIN_BET)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50" title="Reset to minimum bet">↺</button>
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
@@ -739,14 +741,14 @@ export default function MysteryBoxPage() {
                 <p><strong>3. Choose Box:</strong> Pick one of the 10 mystery boxes</p>
                 <p><strong>4. Win:</strong> Each box contains a hidden multiplier - find the jackpot!</p>
                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mt-4">
-                  <p className="text-amber-300 font-semibold">🎁 Prize Distribution (110% RTP!)</p>
+                  <p className="text-amber-300 font-semibold">🎁 Prize Options (10 boxes):</p>
                   <div className="text-xs text-white/80 mt-2 space-y-1">
-                    <p>• 1 box: ×4 💎 (BIG WIN!)</p>
-                    <p>• 1 box: ×3 🎉</p>
-                    <p>• 1 box: ×1.5 ✨</p>
-                    <p>• 2 boxes: ×1 🪙 (break even)</p>
-                    <p>• 1 box: ×0.5 📉 (small loss)</p>
-                    <p>• 4 boxes: ×0 💔 (lose all)</p>
+                    <p>• 💎 <strong>×4</strong> - JACKPOT!</p>
+                    <p>• 🎉 <strong>×3</strong> - Great win!</p>
+                    <p>• ✨ <strong>×1.5</strong> - Good prize</p>
+                    <p>• 🪙 <strong>×1</strong> - Break even</p>
+                    <p>• 📉 <strong>×0.5</strong> - Small loss</p>
+                    <p>• 💔 <strong>×0</strong> - Empty box</p>
                   </div>
                 </div>
             </div>
