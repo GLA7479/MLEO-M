@@ -419,11 +419,17 @@ export default function HoldemPage() {
         body: JSON.stringify(body)
       });
       const result = await response.json();
-      console.log('Action result:', result);
+      console.log('Action result:', response.status, result);
+      
+      // If server returned error (400/409/500), include it in result
+      if (!response.ok) {
+        return { error: result.error || 'action_failed', ...result };
+      }
+      
       return result;
     } catch (e) {
       console.error('Failed to perform action:', e);
-      return null;
+      return { error: 'network_error', message: e.message };
     }
   }
 
@@ -745,6 +751,30 @@ export default function HoldemPage() {
     try {
       const actionResult = await apiAction(currentHandId, mySeat.seat_index, action, amount);
       
+      // If action failed, refresh state and stop
+      if (!actionResult || actionResult.error) {
+        console.warn('Action failed:', actionResult);
+        setHandMsg(actionResult?.error === 'cannot_check_facing_bet' 
+          ? `Cannot check - must call ${actionResult.toCall || 'bet'}`
+          : `Action failed: ${actionResult?.error || 'unknown'}`);
+        
+        // Always refresh state after error to reset UI
+        const r = await fetch(`/api/poker/state?hand_id=${currentHandId}&viewer=${encodeURIComponent(displayName || '')}`);
+        if (r.ok) {
+          const state = await r.json();
+          setState(state);
+          setPot(state.hand?.pot_total || 0);
+          setStage(state.hand?.stage || "waiting");
+          setTurnSeat(state.hand?.current_turn ?? null);
+          setCommunity(Array.isArray(state.hand?.board) ? state.hand.board : []);
+          if (state.my_hole) setMyHole(state.my_hole);
+        }
+        
+        // Clear error message after 3 seconds
+        setTimeout(() => setHandMsg(""), 3000);
+        return;
+      }
+      
       // Fetch fresh snapshot immediately (no waiting for polling)
       const r = await fetch(`/api/poker/state?hand_id=${currentHandId}&viewer=${encodeURIComponent(displayName || '')}`);
       if (r.ok) {
@@ -804,12 +834,18 @@ export default function HoldemPage() {
         
         // If action response indicates round settled, advance immediately
         if (actionResult && (actionResult.round_settled || actionResult.fold_win || actionResult.stage === 'hand_end')) {
-          console.log("Round settled or hand ended, advancing...");
-          await fetch('/api/poker/advance-street', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ hand_id: currentHandId })
-          });
+          console.log("Round settled or hand ended, advancing...", actionResult);
+          
+          if (actionResult.stage !== 'hand_end') {
+            // Not yet ended - advance street
+            const advRes = await fetch('/api/poker/advance-street', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ hand_id: currentHandId })
+            });
+            const advData = await advRes.json();
+            console.log("Advanced to:", advData.stage || advData);
+          }
           
           // Refresh state after advance
           setTimeout(async () => {
@@ -817,9 +853,13 @@ export default function HoldemPage() {
             if (r2.ok) {
               const s2 = await r2.json();
               setState(s2);
+              setPot(s2.hand?.pot_total || 0);
+              setStage(s2.hand?.stage || "waiting");
+              setTurnSeat(s2.hand?.current_turn ?? null);
+              setCommunity(Array.isArray(s2.hand?.board) ? s2.hand.board : []);
               if (s2.my_hole) setMyHole(s2.my_hole);
             }
-          }, 300);
+          }, 500);
         }
       }
     } catch (e) {
@@ -1079,9 +1119,7 @@ export default function HoldemPage() {
   };
   const doCheck = () => {
     if (!myTurn || meIdx === -1) return;
-    const myBet=bets[meIdx]||0;
-    if (myBet<toCall) { doCall(); return; }
-    // Call API action instead of local state
+    // Server validates - only allow check if no bet to call
     playerAction('check', 0);
   };
   const doCall = () => {
@@ -1097,10 +1135,17 @@ export default function HoldemPage() {
   const doBetOrRaise = (amt) => {
     if (!myTurn || meIdx === -1) return;
     amt = Math.max(0, Math.floor(Number(amt)||0));
-    const currentBet = bets[meIdx] || 0;
-    const needToCall = Math.max(0, toCall - currentBet);
-    const delta = (needToCall > 0) ? (needToCall + amt) : amt;
-    playerAction(needToCall > 0 ? 'raise' : 'bet', delta);
+    
+    // Calculate if there's an open bet (server normalizes bet→raise automatically)
+    const maxBet = Math.max(0, ...Object.values(bets));
+    const myBet = bets[meIdx] || 0;
+    const needToCall = Math.max(0, maxBet - myBet);
+    
+    // Always send the total amount to put in (server handles the logic)
+    const totalAmount = needToCall + amt;
+    const actionType = maxBet > 0 ? 'raise' : 'bet';
+    
+    playerAction(actionType, totalAmount);
   };
   const doAllIn = () => {
     if (!myTurn || meIdx === -1) return;
@@ -1326,14 +1371,16 @@ function Card({ card, faceDown }) {
   );
 }
 
-function ActionBar({ toCall, myChips, onFold, onCheck, onCall, onBet, onAllIn, bigBlind }) {
+function ActionBar({ toCall, myBet, myChips, onFold, onCheck, onCall, onBet, onAllIn, bigBlind }) {
   const [amt, setAmt] = useState(bigBlind*2);
 
   useEffect(()=>{ setAmt(bigBlind*2); }, [bigBlind]);
 
-  const canCall = toCall>0 && myChips>0;
-  const canCheck = toCall===0;
-  const canBet = myChips>0;
+  // Calculate if there's an open bet (including BB in preflop)
+  const hasOpenBet = toCall > 0;
+  const canCheck = toCall === 0;
+  const canCall = toCall > 0 && myChips >= toCall;
+  const canBetOrRaise = myChips > 0;
 
   const presets = [
     { label: "1×BB", val: bigBlind },
@@ -1344,12 +1391,18 @@ function ActionBar({ toCall, myChips, onFold, onCheck, onCall, onBet, onAllIn, b
   return (
     <div className="mt-4 bg-black/40 border border-white/10 rounded-xl p-2">
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={onFold} className="px-3 py-2 rounded bg-rose-600 hover:bg-rose-500 font-bold text-sm">Fold</button>
+        <button onClick={onFold} className="px-3 py-2 rounded bg-rose-600 hover:bg-rose-500 font-bold text-sm">
+          Fold
+        </button>
+        
+        {/* Show Check OR Call, never both */}
         {canCheck ? (
-          <button onClick={onCheck} className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 font-bold text-sm">Check</button>
+          <button onClick={onCheck} className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-500 font-bold text-sm">
+            Check
+          </button>
         ) : (
-          <button onClick={onCall} disabled={!canCall} className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 font-bold text-sm disabled:opacity-50">
-            Call {fmt(Math.min(toCall, myChips))}
+          <button onClick={onCall} disabled={!canCall} className="px-3 py-2 rounded bg-cyan-600 hover:bg-cyan-500 font-bold text-sm disabled:opacity-50">
+            Call {fmt(toCall)}
           </button>
         )}
 
@@ -1361,16 +1414,16 @@ function ActionBar({ toCall, myChips, onFold, onCheck, onCall, onBet, onAllIn, b
               {p.label}
             </button>
           ))}
-          <input type="number" min={1} step={bigBlind} value={amt}
-                 onChange={e=>setAmt(Math.max(1, Math.floor(Number(e.target.value)||0)))}
+          <input type="number" min={bigBlind} step={bigBlind} value={amt}
+                 onChange={e=>setAmt(Math.max(bigBlind, Math.floor(Number(e.target.value)||0)))}
                  className="w-24 px-2 py-1 text-sm rounded bg-white/10 border border-white/20" />
-          <button onClick={()=>onBet(Math.min(myChips, amt))}
-                  disabled={!canBet}
+          <button onClick={()=>onBet(amt)}
+                  disabled={!canBetOrRaise}
                   className="px-3 py-2 rounded bg-amber-500/80 hover:bg-amber-500 font-bold text-sm disabled:opacity-50">
-            {toCall===0 ? "Bet" : "Raise"}
+            {hasOpenBet ? "Raise" : "Bet"}
           </button>
           <button onClick={onAllIn} disabled={myChips<=0}
-                  className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-500 font-bold text-sm disabled:opacity-50">
+                  className="px-3 py-2 rounded bg-purple-600 hover:bg-purple-500 font-bold text-sm disabled:opacity-50">
             All-in
           </button>
         </div>

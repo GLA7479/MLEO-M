@@ -34,15 +34,43 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: 'not_your_turn' });
     }
 
+    // --- Validate action before applying ---
+    const mbRow = await q(
+      `SELECT COALESCE(MAX(bet_street),0)::bigint AS mb
+       FROM poker.poker_hand_players WHERE hand_id=$1`,
+      [hand_id]
+    );
+    const maxBetBefore = Number(mbRow.rows[0].mb || 0);
+    const myBetBeforeRow = await q(
+      `SELECT COALESCE(bet_street,0)::bigint AS bs
+       FROM poker.poker_hand_players
+       WHERE hand_id=$1 AND seat_index=$2`,
+      [hand_id, seat_index]
+    );
+    const myBetBefore = Number(myBetBeforeRow.rows[0]?.bs || 0);
+    const needToCall = Math.max(0, maxBetBefore - myBetBefore);
+
+    // אסור Check מול הימור פתוח
+    if (action === 'check' && needToCall > 0) {
+      await q('ROLLBACK');
+      return res.status(400).json({ error: 'cannot_check_facing_bet', toCall: needToCall });
+    }
+
+    // "bet" כשיש הימור פתוח נחשב "raise"
+    let normalizedAction = action;
+    if (action === 'bet' && maxBetBefore > 0) {
+      normalizedAction = 'raise';
+    }
+
     // Insert action
     await q(
       `INSERT INTO poker.poker_actions (hand_id, seat_index, action, amount)
        VALUES ($1,$2,$3,$4)`,
-      [hand_id, seat_index, action, Number(amount) || 0]
+      [hand_id, seat_index, normalizedAction, Number(amount) || 0]
     );
 
     // Update per-action state (fold/check/call/raise/allin)
-    await applyAction(hand, seat_index, action, Number(amount) || 0);
+    await applyAction(hand, seat_index, normalizedAction, Number(amount) || 0);
 
     // ==== A) Close immediately if only 1 player alive ====
     const aliveRows = await q(
