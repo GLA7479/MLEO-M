@@ -113,6 +113,67 @@ export default async function handler(req, res) {
 
     await q(`UPDATE poker.poker_hands SET current_turn = COALESCE($2, current_turn), turn_deadline = now() + interval '30 seconds' WHERE id=$1`, [hand_id, nextSeat]);
 
+    // ======= A1) אם נשאר שחקן חי יחיד → סגור יד מיידית וחלק קופה =======
+    const aliveRows = await q(`
+      SELECT php.seat_index, php.folded, ps.stack_live, php.bet_street
+      FROM poker.poker_hand_players php
+      JOIN poker.poker_seats ps
+        ON ps.table_id=$1 AND ps.seat_index=php.seat_index
+      WHERE php.hand_id=$2
+    `, [hand.table_id, hand_id]);
+
+    const alive = aliveRows.rows.filter(r => r.folded === false);
+    if (alive.length <= 1) {
+      // אסוף הימורי הרחוב הנוכחי לקופה
+      const streetSum = aliveRows.rows.reduce((a,b)=>a + Number(b.bet_street||0), 0);
+      if (streetSum > 0) {
+        // לצבור ל-contrib_total ול-pot_total ולנקות bet_street
+        for (const r of aliveRows.rows) {
+          if (Number(r.bet_street||0) > 0) {
+            await q(`UPDATE poker.poker_hand_players
+                     SET contrib_total = contrib_total + $3, bet_street=0
+                     WHERE hand_id=$1 AND seat_index=$2`,
+                    [hand_id, r.seat_index, r.bet_street]);
+          }
+        }
+        await q(`UPDATE poker.poker_hands SET pot_total = pot_total + $2 WHERE id=$1`, [hand_id, streetSum]);
+      }
+
+      // המנצח הוא השחקן החי היחיד (אם אין—אין חלוקה)
+      if (alive.length === 1) {
+        const winnerSeat = alive[0].seat_index;
+        const potRow = await q(`SELECT pot_total FROM poker.poker_hands WHERE id=$1`, [hand_id]);
+        const pot = Number(potRow.rows[0]?.pot_total || 0);
+
+        if (pot > 0) {
+          await q(`UPDATE poker.poker_seats SET stack_live = stack_live + $3 WHERE table_id=$1 AND seat_index=$2`,
+                  [hand.table_id, winnerSeat, pot]);
+          await q(`UPDATE poker.poker_hand_players SET win_amount = COALESCE(win_amount,0) + $3
+                   WHERE hand_id=$1 AND seat_index=$2`,
+                  [hand_id, winnerSeat, pot]);
+        }
+      }
+
+      // סגור יד
+      await q(`UPDATE poker.poker_hands SET stage='hand_end', ended_at=now() WHERE id=$1`, [hand_id]);
+      await q("COMMIT");
+      console.log(`Hand ${hand_id} ended - fold win by seat ${alive.length ? alive[0].seat_index : 'none'}`);
+      return res.json({ ok:true, stage:'hand_end', fold_win: true, winners: alive.length ? [alive[0].seat_index] : [] });
+    }
+
+    // A2) אם **סיבוב הימורים** הסתיים (כולם מיושרים)
+    const maxBetRow2 = await q(`SELECT MAX(bet_street) AS mb FROM poker.poker_hand_players WHERE hand_id=$1`, [hand_id]);
+    const maxBet2 = Number(maxBetRow2.rows[0].mb||0);
+    const settled = aliveRows.rows
+      .filter(r => r.folded === false)
+      .every(r => Number(r.bet_street||0) === maxBet2 || Number(r.stack_live) === 0); // all-in מיושר
+
+    if (settled) {
+      await q("COMMIT");
+      console.log(`Hand ${hand_id} round settled, client should advance street`);
+      return res.json({ ok:true, round_settled:true }); // הלקוח ייקרא /advance-street מייד
+    }
+
     await q("COMMIT");
 
     // החזר מצב עדכני

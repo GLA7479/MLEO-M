@@ -406,29 +406,47 @@ export default function HoldemPage() {
 
   async function apiAction(hand_id, seat_index, action, amount = 0) {
     try {
-      const body = { hand_id, seat_index, action, amount: Number(amount)||0 };
-      await fetch('/api/poker/action', {
+      const body = { 
+        hand_id, 
+        seat_index, 
+        action, 
+        amount: Number(amount)||0,
+        action_id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}` // Idempotency
+      };
+      const response = await fetch('/api/poker/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
+      const result = await response.json();
+      console.log('Action result:', result);
+      return result;
     } catch (e) {
       console.error('Failed to perform action:', e);
+      return null;
     }
   }
 
   // Helper: Check if street can advance
   function canAdvanceStreet(state) {
-    if (!state?.players?.length || !state.hand) return false;
-    if (state.hand.stage === 'river' || state.hand.stage === 'showdown') return false;
-    
-    const active = state.players.filter(p => !p.folded && !p.all_in);
-    if (active.length === 0) return false;
-    
-    const allActed = active.every(p => p.acted_street === true);
-    const allZeroCall = active.every(p => (state.to_call?.[p.seat_index] || 0) === 0);
-    
-    return allActed && allZeroCall;
+    if (!state?.hand) return false;
+    const stage = state.hand.stage;
+    if (stage === 'hand_end' || stage === 'showdown') return false;
+
+    const alive = (state.players || []).filter(p => p.folded === false);
+    if (alive.length <= 1) return true; // זוכה יחיד → סגור
+
+    const maxBet = Math.max(0, ...alive.map(p => Number(p.bet_street || 0)));
+    const everyoneSettled = alive.every(p => {
+      const playerBet = Number(p.bet_street || 0);
+      const playerStack = state.seats?.find(s => s.seat_index === p.seat_index)?.stack_live ?? 0;
+      return playerBet === maxBet || playerStack === 0; // מיושר או all-in
+    });
+
+    // ודא שהייתה לפחות פעולה ברחוב (מונע פתיחה מוקדמת)
+    const hasActionThisStreet = (state.actions || []).length > 0;
+
+    return everyoneSettled && hasActionThisStreet;
   }
 
   // Polling functions
@@ -725,7 +743,7 @@ export default function HoldemPage() {
     setActionInFlight(true);
     
     try {
-      await apiAction(currentHandId, mySeat.seat_index, action, amount);
+      const actionResult = await apiAction(currentHandId, mySeat.seat_index, action, amount);
       
       // Fetch fresh snapshot immediately (no waiting for polling)
       const r = await fetch(`/api/poker/state?hand_id=${currentHandId}&viewer=${encodeURIComponent(displayName || '')}`);
@@ -778,8 +796,31 @@ export default function HoldemPage() {
         
         console.log("Action completed, UI updated immediately");
         
+        // Store state for maybeAdvance
+        setState(state);
+        
         // Check if we should advance street
-        maybeAdvance(state);
+        await maybeAdvance(state);
+        
+        // If action response indicates round settled, advance immediately
+        if (actionResult && (actionResult.round_settled || actionResult.fold_win || actionResult.stage === 'hand_end')) {
+          console.log("Round settled or hand ended, advancing...");
+          await fetch('/api/poker/advance-street', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hand_id: currentHandId })
+          });
+          
+          // Refresh state after advance
+          setTimeout(async () => {
+            const r2 = await fetch(`/api/poker/state?hand_id=${currentHandId}&viewer=${encodeURIComponent(displayName || '')}`);
+            if (r2.ok) {
+              const s2 = await r2.json();
+              setState(s2);
+              if (s2.my_hole) setMyHole(s2.my_hole);
+            }
+          }, 300);
+        }
       }
     } catch (e) {
       console.error("Action failed:", e);
