@@ -374,7 +374,6 @@ useEffect(() => {
       if (result.success) {
         bet = result.amount;
         setIsFreePlay(false);
-        router.replace("/diamonds", undefined, { shallow: true });
       } else {
         alert("No free play tokens available!");
         setIsFreePlay(false);

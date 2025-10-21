@@ -276,8 +276,7 @@ export default function BlackjackPage() {
       const result = useFreePlayToken();
       if (result.success) { 
         bet = result.amount;
-        setIsFreePlay(false); 
-        router.replace('/blackjack', undefined, { shallow: true }); 
+        setIsFreePlay(false);
       }
       else { alert('No free play tokens available!'); setIsFreePlay(false); return; }
     } else {
