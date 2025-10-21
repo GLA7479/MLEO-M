@@ -243,6 +243,7 @@ export default function HoldemPage() {
               if (!s?.error && s.hand) {
                 setState(s);
                 if (s.my_hole) setMyHole(s.my_hole);
+                maybeAdvance(s);
               }
             })
             .catch(console.error);
@@ -259,6 +260,7 @@ export default function HoldemPage() {
               if (!s?.error && s.hand) {
                 setState(s);
                 if (s.my_hole) setMyHole(s.my_hole);
+                maybeAdvance(s);
               }
             })
             .catch(console.error);
@@ -275,6 +277,7 @@ export default function HoldemPage() {
               if (!s?.error && s.hand) {
                 setState(s);
                 if (s.my_hole) setMyHole(s.my_hole);
+                maybeAdvance(s);
               }
             })
             .catch(console.error);
@@ -442,6 +445,16 @@ export default function HoldemPage() {
     const alive = (state.players || []).filter(p => p.folded === false);
     if (alive.length <= 1) return true; // נשאר אחד חי → סגור יד
 
+    // ✅ בדוק אם כולם ALL-IN
+    const everyoneAllIn = alive.every(p => {
+      const stack = state.seats?.find(s => s.seat_index === p.seat_index)?.stack_live ?? 0;
+      return stack === 0 || p.all_in === true;
+    });
+    if (everyoneAllIn) {
+      console.log('Everyone all-in, advancing street');
+      return true; // ← advance מיידי!
+    }
+
     const maxBet = Math.max(0, ...alive.map(p => Number(p.bet_street || 0)));
     const everyoneSettled = alive.every(p => {
       const playerBet = Number(p.bet_street || 0);
@@ -455,7 +468,13 @@ export default function HoldemPage() {
     // ✅ בפריפלופ נדרוש לפחות פעולה אמיתית אחת (מעבר לבליינדים)
     const hasActionThisStreet = stage === 'preflop' ? realActions.length > 0 : true;
 
-    return everyoneSettled && hasActionThisStreet;
+    const canAdvance = everyoneSettled && hasActionThisStreet;
+    
+    if (canAdvance) {
+      console.log('Street can advance:', { stage, everyoneSettled, hasActionThisStreet, realActionsCount: realActions.length });
+    }
+    
+    return canAdvance;
   }
 
   // Polling functions
@@ -518,14 +537,16 @@ export default function HoldemPage() {
           const board = (state.hand && state.hand.board) || state.board || [];
           setCommunity(Array.isArray(board) ? board : []);
           
-          // Update toCall from server for my seat
-          const me = (serverSeats || []).find(s => s && s.player_name === displayName);
-          if (state.to_call && me && state.to_call[me.seat_index] !== undefined) {
-            setToCall(state.to_call[me.seat_index]);
-          } else if (state.players && me) {
-            const maxBet = Math.max(0, ...state.players.map(p => Number(p.bet_street || 0)));
-            const mine   = Number(state.players.find(p => p.seat_index === me.seat_index)?.bet_street || 0);
-            setToCall(Math.max(0, maxBet - mine));
+          // Update toCall from players/bets only (ignore server to_call map)
+          if (state.players && Array.isArray(state.players)) {
+            const me = (serverSeats || []).find(s => s && s.player_name === displayName);
+            if (me) {
+              const maxBet = Math.max(0, ...state.players.map(p => Number(p.bet_street || 0)));
+              const mine   = Number(state.players.find(p => p.seat_index === me.seat_index)?.bet_street || 0);
+              setToCall(Math.max(0, maxBet - mine));
+            } else {
+              setToCall(0);
+            }
           }
           
           const actions = Array.isArray(state.actions) ? state.actions : [];
@@ -539,6 +560,7 @@ export default function HoldemPage() {
           
           // Store state snapshot for other functions
           setState(state);
+          maybeAdvance(state);
           
           // Retry if players empty (server snapshot not ready yet)
           if (Array.isArray(state.players) && state.players.length === 0) {
@@ -548,6 +570,7 @@ export default function HoldemPage() {
                 .then(s2 => { 
                   if (!s2?.error && s2.players && s2.players.length > 0) {
                     setState(s2);
+                    maybeAdvance(s2);
                     // Re-process the state
                     if (s2.hand?.pot_total) setPot(Number(s2.hand.pot_total));
                     const board2 = (s2.hand && s2.hand.board) || s2.board || [];
@@ -861,6 +884,7 @@ export default function HoldemPage() {
               setTurnSeat(s2.hand?.current_turn ?? null);
               setCommunity(Array.isArray(s2.hand?.board) ? s2.hand.board : []);
               if (s2.my_hole) setMyHole(s2.my_hole);
+              maybeAdvance(s2);
             }
           }, 500);
         }
@@ -1059,7 +1083,7 @@ export default function HoldemPage() {
   }, [serverSeats, displayName]);
   
   const meIdx = mySeat ? mySeat.seat_index : -1;
-  const myChips = mySeat ? mySeat.stack : 0;
+  const myChips = mySeat ? (Number(mySeat.stack_live ?? mySeat.stack ?? 0)) : 0;
   
   // Calculate effective turn - ensure we're comparing seat_index to seat_index
   const serverTurn = turnSeat;  // This comes from state.hand.current_turn
@@ -1127,11 +1151,14 @@ export default function HoldemPage() {
   };
   const doCall = () => {
     if (!myTurn || meIdx === -1) return;
-    const need = Math.max(0, toCall - (bets[meIdx]||0));
+    // Base call amount on latest bets snapshot from server
+    const maxBet = Math.max(0, ...Object.values(bets));
+    const myBetNow = bets[meIdx] || 0;
+    const need = Math.max(0, maxBet - myBetNow);
     const have = myChips;
     const pay = Math.min(need, have);
-    if (pay>0) {
-      // Call API action instead of local state
+    if (pay > 0) {
+      console.log('Calling:', { need, have, pay, maxBet, myBetNow });
       playerAction('call', pay);
     }
   };
@@ -1141,10 +1168,10 @@ export default function HoldemPage() {
     // amount from the input
     amt = Math.max(0, Math.floor(Number(amt) || 0));
 
-    // ✅ ALWAYS base "need to call" on server-driven toCall
-    //    (not on local bets[] which may lag)
+    // Base needToCall on current bets snapshot (more reliable than cached toCall)
+    const maxBet = Math.max(0, ...Object.values(bets));
     const myBetNow = bets[meIdx] || 0;
-    const needToCall = Math.max(0, (toCall || 0) - myBetNow);
+    const needToCall = Math.max(0, maxBet - myBetNow);
 
     // total chips we will put in this action = call + raise amount
     const totalToPut = needToCall + amt;
@@ -1316,14 +1343,18 @@ export default function HoldemPage() {
                   stage,
                   comparison: `turn ${effectiveTurn} vs me ${meIdx} = ${effectiveTurn === meIdx}`,
                   meSeated: !!meSeated,
-                  inHandFallback
+                  inHandFallback,
+                  toCall,
+                  toCallType: typeof toCall,
+                  myBet: bets[meIdx] || 0,
+                  myChips
                 });
               }
               
               return shouldShow;
             })() && (
               <ActionBar
-                toCall={Math.max(0, toCall - (bets[meIdx]||0))}
+                toCall={toCall || 0}
                 myBet={bets[meIdx]||0}
                 myChips={myChips}
                 onFold={doFold}
