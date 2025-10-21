@@ -51,8 +51,8 @@ export default async function handler(req,res){
     for (const s of seats.rows){
       await q(
         `INSERT INTO poker_hand_players
-         (hand_id, table_id, seat_index, player_name, player_id, hole_cards, stack_start, stack_live, folded, all_in, bet_street, acted_street)
-         VALUES ($1,$2,$3,$4,NULL,$5,$6,$6,false,false,0,false)`,
+         (hand_id, table_id, seat_index, player_name, player_id, hole_cards, stack_start, stack_live, folded, all_in, bet_street, acted_street, in_hand)
+         VALUES ($1,$2,$3,$4,NULL,$5,$6,$6,false,false,0,false,true)`,
         [hand_id, table_id, s.seat_index, s.player_name, holeBySeat[s.seat_index]||[], s.stack]
       );
       

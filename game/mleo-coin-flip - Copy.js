@@ -48,7 +48,7 @@ function useIOSViewportFix() {
 // ============================================================================
 const LS_KEY = "mleo_coinflip_v1";
 const MIN_BET = 1000;
-const WIN_MULTIPLIER = 2.16; // Fun arcade bonus!
+const WIN_MULTIPLIER = 2.16; // 108% RTP - Fun arcade bonus!
 
 // On-chain Claim Config
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
@@ -558,7 +558,7 @@ export default function CoinFlipPage() {
               🪙 Coin Flip
             </h1>
             <p className="text-white/70 text-xs">
-              Choose Heads or Tails • Win Big!
+              Choose Heads or Tails • Win ×{WIN_MULTIPLIER}
             </p>
           </div>
 
@@ -697,35 +697,22 @@ export default function CoinFlipPage() {
             >
               −
             </button>
-            <div className="relative">
-              <input
-                type="text"
-                value={isEditingBet ? betAmount : formatBetDisplay(betAmount)}
-                onFocus={() => setIsEditingBet(true)}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9]/g, '');
-                  setBetAmount(val || '0');
-                }}
-                onBlur={() => {
-                  setIsEditingBet(false);
-                  const current = Number(betAmount) || MIN_BET;
-                  setBetAmount(String(Math.max(MIN_BET, current)));
-                }}
-                disabled={flipping}
-                className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6"
-              />
-              <button
-                onClick={() => {
-                  setBetAmount(String(MIN_BET));
-                  playSfx(clickSound.current);
-                }}
-                disabled={flipping}
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center"
-                title="Reset to minimum bet"
-              >
-                ↺
-              </button>
-            </div>
+            <input
+              type="text"
+              value={isEditingBet ? betAmount : formatBetDisplay(betAmount)}
+              onFocus={() => setIsEditingBet(true)}
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                setBetAmount(val || '0');
+              }}
+              onBlur={() => {
+                setIsEditingBet(false);
+                const current = Number(betAmount) || MIN_BET;
+                setBetAmount(String(Math.max(MIN_BET, current)));
+              }}
+              disabled={flipping}
+              className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs"
+            />
             <button
               onClick={() => {
                 const current = Number(betAmount) || MIN_BET;
@@ -737,6 +724,17 @@ export default function CoinFlipPage() {
               className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
             >
               +
+            </button>
+            <button
+              onClick={() => {
+                setBetAmount(String(MIN_BET));
+                playSfx(clickSound.current);
+              }}
+              disabled={flipping}
+              className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50"
+              title="Reset to minimum bet"
+            >
+              ↺
             </button>
           </div>
 
@@ -896,14 +894,10 @@ export default function CoinFlipPage() {
                 <p><strong>1. Choose Your Side:</strong> Select Heads (👑) or Tails (⚡)</p>
                 <p><strong>2. Set Your Bet:</strong> Minimum bet is {MIN_BET} MLEO. Use +/- to adjust.</p>
                 <p><strong>3. Flip:</strong> Click "FLIP COIN" to start the game</p>
-                <p><strong>4. Win:</strong> If your choice matches, you win <strong className="text-yellow-300">×2.16</strong> your bet!</p>
+                <p><strong>4. Win:</strong> If your choice matches, you win ×{WIN_MULTIPLIER} your bet!</p>
                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mt-4">
-                  <p className="text-amber-300 font-semibold">💰 Prizes</p>
-                  <p className="text-xs text-white/80 mt-1">• <strong>Correct guess:</strong> Win ×2.16</p>
-                  <p className="text-xs text-white/80">• <strong>Wrong guess:</strong> Lose bet</p>
-                </div>
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2 mt-2">
-                  <p className="text-blue-300 text-xs">💡 Each flip uses cryptographically secure random generation for fair results.</p>
+                  <p className="text-amber-300 font-semibold">💡 Fair Play</p>
+                  <p className="text-xs text-white/80 mt-1">Each flip uses cryptographically secure random generation for fair results.</p>
                 </div>
               </div>
               <button

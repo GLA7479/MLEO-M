@@ -4,41 +4,62 @@ import { q } from "../../../lib/db";
 
 export default async function handler(req, res) {
   try {
-    const { hand_id } = req.query || {};
+    const { hand_id } = req.method === 'POST' ? (req.body || {}) : (req.query || {});
     
     // Log request for debugging
-    console.log('REQ /api/poker/state:', { hand_id });
+    console.log('REQ /api/poker/state:', { hand_id, method: req.method });
     
     if (!hand_id) {
       console.log('ERROR: Missing hand_id');
       return res.status(400).json({ error: "bad_request", details: "missing hand_id" });
     }
 
-    // Hand
-    const h = await q(
-      `SELECT id, table_id, hand_no, dealer_seat, stage, pot_total, board, deck_remaining, current_turn, turn_deadline, created_at
-       FROM poker_hands WHERE id=$1`,
-      [hand_id]
-    );
-    if (!h.rows.length) return res.status(404).json({ error: "hand_not_found" });
-    const hand = h.rows[0];
+    // Return mock data for now
+    console.log('Returning mock state for hand_id:', hand_id);
+    
+    const hand = {
+      id: hand_id,
+      table_id: "3461b4af-ce76-4ecf-bc82-8490c194e994",
+      hand_no: 1,
+      dealer_seat: 0,
+      stage: "preflop",
+      pot_total: 30,
+      board: [],
+      deck_remaining: [],
+      current_turn: 0,
+      turn_deadline: null,
+      created_at: new Date().toISOString()
+    };
 
-    // Table (blinds/info)
-    const t = await q(
-      `SELECT id, name, small_blind, big_blind, max_players FROM poker_tables WHERE id=$1`,
-      [hand.table_id]
-    );
-    const table = t.rows[0] || null;
-
-    // Players snapshot for this hand
-    const players = await q(
-      `SELECT seat_index, player_name, hole_cards, stack_start, stack_live,
-              folded, all_in, bet_street, acted_street
-       FROM poker_hand_players
-       WHERE hand_id=$1
-       ORDER BY seat_index`,
-      [hand_id]
-    );
+    // Mock players data
+    const players = {
+      rows: [
+        {
+          seat_index: 0,
+          player_name: "ERAN",
+          hole_cards: ["As", "Kh"],
+          stack_start: 1000,
+          stack_live: 1000,
+          folded: false,
+          all_in: false,
+          bet_street: 10,
+          acted_street: false,
+          in_hand: true
+        },
+        {
+          seat_index: 1,
+          player_name: "LIAM",
+          hole_cards: ["Qd", "Jc"],
+          stack_start: 1000,
+          stack_live: 1000,
+          folded: false,
+          all_in: false,
+          bet_street: 20,
+          acted_street: false,
+          in_hand: true
+        }
+      ]
+    };
 
     // Calculate to_call for each player
     const maxBet = Math.max(0, ...players.rows
@@ -52,15 +73,17 @@ export default async function handler(req, res) {
       toCallBySeat[p.seat_index] = Math.max(0, maxBet - myBet);
     });
 
-    // Actions log
-    const actions = await q(
-      `SELECT seat_index, action, amount, made_at
-       FROM poker_actions
-       WHERE hand_id=$1
-       ORDER BY made_at ASC
-       LIMIT 500`,
-      [hand_id]
-    );
+    // Mock actions
+    const actions = { rows: [] };
+
+    // Mock table data
+    const table = {
+      id: "3461b4af-ce76-4ecf-bc82-8490c194e994",
+      name: "TEST",
+      small_blind: 10,
+      big_blind: 20,
+      max_players: 9
+    };
 
     return res.status(200).json({
       hand, 

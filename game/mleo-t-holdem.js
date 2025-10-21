@@ -558,13 +558,13 @@ export default function HoldemPage() {
   
   function everyoneDone(state) {
     const seats = state?.seats || serverSeats || [];
-    const bets = state?.bets || Object.values(bets).length > 0 ? bets : {};
+    const betsData = state?.bets || {};
     const alive = seats
       .map((s,i)=>({s,i}))
-      .filter(x => x.s?.player_id && !x.s?.sat_out && (x.s?.stack_live ?? x.s?.stack ?? 0) > 0);
+      .filter(x => x.s?.player_name && !x.s?.sat_out && (x.s?.stack_live ?? x.s?.stack ?? 0) > 0);
     if (alive.length <= 1) return true;
-    const maxBet = Math.max(0, ...Object.values(bets));
-    return alive.every(x => (bets[x.i] || 0) === maxBet);
+    const maxBet = Math.max(0, ...Object.values(betsData));
+    return alive.every(x => (betsData[x.i] || 0) === maxBet);
   }
   
   async function maybeAdvance(state) {
@@ -1040,7 +1040,7 @@ export default function HoldemPage() {
             {/* Action Bar */}
             {(() => {
               const meSeated = serverSeats?.[meIdx];
-              const inHandFallback = !!(meSeated?.player_id && !meSeated?.sat_out && (meSeated?.stack_live ?? meSeated?.stack ?? 0) > 0);
+              const inHandFallback = !!(meSeated?.player_name && !meSeated?.sat_out && (meSeated?.stack_live ?? meSeated?.stack ?? 0) > 0);
               const showActionBar = inHandFallback && (stage==="preflop"||stage==="flop"||stage==="turn"||stage==="river");
               return meIdx!==-1 && myTurn && !folded[meIdx] && showActionBar;
             })() && (
