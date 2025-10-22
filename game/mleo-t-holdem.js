@@ -840,14 +840,16 @@ export default function HoldemPage() {
           setAllIn(newAllIn);
         }
         
-        // Update toCall
-        const me = (serverSeats || []).find(s => s && s.player_name === displayName);
-        if (state.to_call && me && state.to_call[me.seat_index] !== undefined) {
-          setToCall(state.to_call[me.seat_index]);
-        } else if (state.players && me) {
-          const maxBet = Math.max(0, ...state.players.map(p => Number(p.bet_street || 0)));
-          const mine   = Number(state.players.find(p => p.seat_index === me.seat_index)?.bet_street || 0);
-          setToCall(Math.max(0, maxBet - mine));
+        // Update toCall from players/bets only (ignore server to_call map)
+        if (state.players && Array.isArray(state.players)) {
+          const me = (serverSeats || []).find(s => s && s.player_name === displayName);
+          if (me) {
+            const maxBet = Math.max(0, ...state.players.map(p => Number(p.bet_street || 0)));
+            const mine   = Number(state.players.find(p => p.seat_index === me.seat_index)?.bet_street || 0);
+            setToCall(Math.max(0, maxBet - mine));
+          } else {
+            setToCall(0);
+          }
         }
         
         console.log("Action completed, UI updated immediately");
@@ -904,7 +906,7 @@ export default function HoldemPage() {
   }, [serverSeats]);
 
   // Start hand
-  const startHand = async () => {
+  const startHand = async (force = false) => {
     if (!canStart) { 
       setHandMsg("Need at least 2 seated players with chips."); 
       return; 
@@ -921,7 +923,7 @@ export default function HoldemPage() {
       const r = await fetch('/api/poker/start-hand', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ table_id: tableId })
+        body: JSON.stringify({ table_id: tableId, force_new: !!force })
       });
       
       if (!r.ok) {
@@ -1240,6 +1242,9 @@ export default function HoldemPage() {
             </div>
             <button onClick={()=>canStart && startHand()} className={`px-3 py-1 rounded font-bold text-sm ${canStart?'bg-emerald-600 hover:bg-emerald-500':'bg-white/10 opacity-60'}`}>
               Start
+            </button>
+            <button onClick={()=>canStart && startHand(true)} className={`ml-2 px-3 py-1 rounded font-bold text-sm ${canStart?'bg-amber-600 hover:bg-amber-500':'bg-white/10 opacity-60'}`} title="Force close old hand and start new">
+              Force start
             </button>
             <div className="ml-auto text-sm">
               <span className="opacity-80 mr-1">Turn:</span><span className="font-bold">{turnSeat!==null? `#${turnSeat+1}` : "-"}</span>

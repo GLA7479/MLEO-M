@@ -31,6 +31,20 @@ function safeWrite(key, val) {
   } catch {}
 }
 
+// Persist local identity per table to keep playerId across refreshes/tabs
+function savePlayerIdentity(tableId, pid) {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(`mleo_poker_player_${tableId}`, String(pid)); } catch {}
+}
+function loadPlayerIdentity(tableId) {
+  if (typeof window === "undefined") return null;
+  try { return localStorage.getItem(`mleo_poker_player_${tableId}`) || null; } catch { return null; }
+}
+function clearPlayerIdentity(tableId) {
+  if (typeof window === "undefined") return;
+  try { localStorage.removeItem(`mleo_poker_player_${tableId}`); } catch {}
+}
+
 function getVault() {
   const rushData = safeRead("mleo_rush_core_v4", {});
   return rushData.vault || 0;
@@ -436,6 +450,14 @@ export default function TexasHoldemCasinoPage() {
     setIsAdmin(address === "0x39846ebBA723e440562a60f4B4a0147150442c7b");
   }, [address]);
 
+  // Restore player identity if lost (e.g., refresh)
+  useEffect(() => {
+    if (!playerId && currentTableId) {
+      const saved = loadPlayerIdentity(currentTableId);
+      if (saved) setPlayerId(saved);
+    }
+  }, [playerId, currentTableId]);
+
   // Helper functions for raise calculations
   const getMinRaiseSize = (g, tableBB = 0) => {
     const lastRaiseTo = g?.last_raise_to || 0;
@@ -756,6 +778,7 @@ export default function TexasHoldemCasinoPage() {
       if (playerError) throw playerError;
       
       setPlayerId(newPlayer.id);
+      savePlayerIdentity(table.id, newPlayer.id);
       setCurrentTableId(table.id);
       setSelectedTable(table);
       setScreen("table");
@@ -768,55 +791,47 @@ export default function TexasHoldemCasinoPage() {
 
   const handleLeaveTable = async () => {
     if (!playerId || !currentTableId) return;
-
+    
     try {
-      // תמיד נבדוק את מצב המשחק ישירות מה-DB לפי השולחן
-      const { data: tableRow } = await supabase
-        .from('casino_tables').select('id,current_game_id').eq('id', currentTableId).single();
-      const activeGameId = tableRow?.current_game_id || null;
-      const { data: g } = activeGameId
-        ? await supabase.from('casino_games').select('*').eq('id', activeGameId).maybeSingle()
-        : { data: null };
-      const { data: me } = await supabase
-        .from('casino_players').select('*').eq('id', playerId).maybeSingle();
-
-      // תנאי "עזיבה מלאה" אמיתי:
-      // אין משחק פעיל, או שהסטטוס לא playing, או שהשחקן לא מוצמד ליד הנוכחית
-      const isFullLeave = (!g || g.status !== GAME_STATUS.PLAYING || !me?.game_id || (activeGameId && me.game_id !== activeGameId));
-      if (isFullLeave) {
-        if (me && me.chips > 0) {
-          const newVault = vaultAmount + me.chips;
-          setVault(newVault);
-          setVaultAmount(newVault);
-        }
-        await supabase.from('casino_players').delete().eq('id', playerId);
-      } else {
-        // יש יד פעילה → נשארים עם הצ'יפים על השולחן, רק מתקפלים ומסומנים ליציאה
-        await supabase.from('casino_players').update({
-          status: 'folded',
-          will_leave: true
-        }).eq('id', playerId);
-
-        // אם זה היה התור שלו – העבר תור
-        const { data: pls } = await supabase
-          .from('casino_players').select('*').eq('game_id', activeGameId).order('seat_index');
-        const curIdx = g.current_player_index ?? 0;
-        if (pls?.[curIdx]?.id === playerId) {
-          const canAct = (p) => p.status !== 'folded' && p.status !== 'all_in';
-          let nextIdx = (curIdx + 1) % pls.length;
-          while (pls[nextIdx] && !canAct(pls[nextIdx])) {
-            nextIdx = (nextIdx + 1) % pls.length;
-            if (nextIdx === curIdx) break;
-          }
-          await supabase.from('casino_games').update({
-            current_player_index: nextIdx,
-            turn_deadline: new Date(Date.now() + BETTING_TIME_LIMIT).toISOString()
-          }).eq('id', activeGameId);
-        }
+      // Get player's current chips
+      const { data: player } = await supabase
+        .from('casino_players')
+        .select('chips')
+        .eq('id', playerId)
+        .single();
+      
+      if (player && player.chips > 0) {
+        // Return chips to vault
+        const newVault = vaultAmount + player.chips;
+        setVault(newVault);
+        setVaultAmount(newVault);
       }
-
-      // איפוס ל־Lobby מקומי
+      
+      // Remove player from table
+      await supabase
+        .from('casino_players')
+        .delete()
+        .eq('id', playerId);
+      
+      // Check if game should be cleaned up
+      const { data: remainingPlayers } = await supabase
+        .from('casino_players')
+        .select('id')
+        .eq('game_id', currentGameId);
+      
+      // If no players left, mark game as waiting
+      if (!remainingPlayers || remainingPlayers.length === 0) {
+        await supabase.from('casino_games').update({
+          status: GAME_STATUS.WAITING,
+          round: 'preflop',
+          pot: 0,
+          current_bet: 0
+        }).eq('id', currentGameId);
+      }
+      
+      // Reset state
       setPlayerId(null);
+      clearPlayerIdentity(currentTableId);
       setCurrentTableId(null);
       setCurrentGameId(null);
       setSelectedTable(null);
@@ -824,6 +839,7 @@ export default function TexasHoldemCasinoPage() {
       setGame(null);
       setMyPlayer(null);
       setScreen("lobby");
+      
     } catch (err) {
       console.error("Error leaving table:", err);
       setError("Failed to leave table: " + err.message);
@@ -836,6 +852,21 @@ export default function TexasHoldemCasinoPage() {
     
     loadTableData();
     
+    // Watch for current_game_id changes on the table and auto-switch to game
+    const tableWatch = supabase
+      .channel(`table_${currentTableId}_game_watch`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'casino_tables', filter: `id=eq.${currentTableId}` },
+        (payload) => {
+          const row = payload.new || payload.old;
+          if (row && row.current_game_id && !currentGameId) {
+            setCurrentGameId(row.current_game_id);
+            setScreen('game');
+          }
+        }
+      )
+      .subscribe();
+
     const playersChannel = supabase
       .channel(`table_${currentTableId}_players`)
       .on('postgres_changes',
@@ -845,6 +876,7 @@ export default function TexasHoldemCasinoPage() {
       .subscribe();
     
     return () => {
+      tableWatch.unsubscribe();
       playersChannel.unsubscribe();
     };
   }, [currentTableId, screen]);
@@ -922,6 +954,18 @@ export default function TexasHoldemCasinoPage() {
       if (playerId) {
         const me = playersData?.find(p => p.id === playerId);
         setMyPlayer(me);
+      }
+
+      // Also check if a game has started on this table and switch
+      const { data: tblRow } = await supabase
+        .from('casino_tables')
+        .select('current_game_id')
+        .eq('id', currentTableId)
+        .single();
+
+      if (tblRow && tblRow.current_game_id && !currentGameId) {
+        setCurrentGameId(tblRow.current_game_id);
+        setScreen('game');
       }
     } catch (err) {
       console.error("Error loading table data:", err);
@@ -1064,31 +1108,27 @@ export default function TexasHoldemCasinoPage() {
       const sb = updatedPlayers[pos.smallBlindIdx];
       const bb = updatedPlayers[pos.bigBlindIdx];
 
-      sb.current_bet = Math.min(tbl.small_blind ?? 0, sb.chips);
+      sb.current_bet = Math.min(selectedTable.small_blind, sb.chips);
       sb.chips -= sb.current_bet;
       sb.hand_invested = sb.current_bet;
 
-      bb.current_bet = Math.min(tbl.big_blind ?? 0, bb.chips);
+      bb.current_bet = Math.min(selectedTable.big_blind, bb.chips);
       bb.chips -= bb.current_bet;
       bb.hand_invested = bb.current_bet;
       
-      // Update players in database (תפוס שגיאות)
-      const updates = updatedPlayers.map(p =>
-        supabase.from('casino_players').update({
-          game_id: p.game_id,
-          hole_cards: p.hole_cards,
-          current_bet: p.current_bet,
-          status: p.status,
-          chips: p.chips,
-          hand_invested: p.hand_invested || 0
-        }).eq('id', p.id)
-      );
-      const results = await Promise.all(updates);
-      const bad = results.find(r => r.error);
-      if (bad && bad.error) {
-        console.error('player update error:', bad.error);
-        setError('DB update failed: ' + bad.error.message);
-        return; // אל תמשיך אם השלב הקריטי נכשל
+      // Update players in database
+      for (const player of updatedPlayers) {
+        await supabase
+          .from('casino_players')
+          .update({
+            game_id: player.game_id,
+            hole_cards: player.hole_cards,
+            current_bet: player.current_bet,
+            status: player.status,
+            chips: player.chips,
+            hand_invested: player.hand_invested || 0
+          })
+          .eq('id', player.id);
       }
       
       // Update game with pot and current bet
@@ -1627,14 +1667,6 @@ export default function TexasHoldemCasinoPage() {
     try {
       const deck = shuffleDeck(createDeck());
 
-      // טען את פרטי השולחן (small_blind, big_blind)
-      const { data: tbl } = await supabase
-        .from('casino_tables')
-        .select('id, small_blind, big_blind')
-        .eq('id', currentTableId)
-        .single();
-      if (!tbl) return; // הגנה
-
       // 1) טען את כל היושבים בשולחן (לא לפי game_id!)
       const { data: tablePlayers } = await supabase
         .from('casino_players')
@@ -1686,11 +1718,11 @@ export default function TexasHoldemCasinoPage() {
       const sb = updated[pos.smallBlindIdx];
       const bb = updated[pos.bigBlindIdx];
 
-      sb.current_bet = Math.min(tbl.small_blind ?? 0, sb.chips);
+      sb.current_bet = Math.min(selectedTable.small_blind, sb.chips);
       sb.chips      -= sb.current_bet;
       sb.hand_invested = sb.current_bet;
 
-      bb.current_bet = Math.min(tbl.big_blind ?? 0, bb.chips);
+      bb.current_bet = Math.min(selectedTable.big_blind, bb.chips);
       bb.chips      -= bb.current_bet;
       bb.hand_invested = bb.current_bet;
 
@@ -1727,26 +1759,6 @@ export default function TexasHoldemCasinoPage() {
       }).eq('id', currentGameId);
 
       await loadGameData();
-
-      // ניקוי אחרי התחלת יד: מי שסומן will_leave יוצא מהשולחן עכשיו.
-      // לפני המחיקה – אם זה אני, זכה את ה-Vault בצ'יפים שלי.
-      const { data: leavers } = await supabase
-        .from('casino_players')
-        .select('id,chips')
-        .eq('table_id', currentTableId)
-        .eq('will_leave', true);
-
-      const meLeaving = (leavers || []).find(p => p.id === playerId);
-      if (meLeaving && meLeaving.chips > 0) {
-        const newVault = getVault() + meLeaving.chips;
-        setVault(newVault);
-        setVaultAmount(newVault);
-      }
-
-      await supabase.from('casino_players')
-        .delete()
-        .eq('table_id', currentTableId)
-        .eq('will_leave', true);
     } catch (err) {
       console.error('Error starting new hand (seat-based):', err);
     }
@@ -2101,11 +2113,6 @@ export default function TexasHoldemCasinoPage() {
                           {player.player_name}
                           {isMe && ' (You)'}
                           {isCurrentPlayer && ' 👑'}
-                          {player.will_leave && (
-                            <span className="ml-2 px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-300 text-[10px] align-middle">
-                              יעזוב בסוף היד
-                            </span>
-                          )}
                         </div>
                         
                         <div className="text-emerald-400 text-xs mb-2">

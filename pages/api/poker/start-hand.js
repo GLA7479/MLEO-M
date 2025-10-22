@@ -12,7 +12,8 @@ function shuffledDeck(){
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
-  const { table_id } = req.body || {};
+  const { table_id, force_new: forceNewRaw } = req.body || {};
+  const force_new = !!forceNewRaw;
   if (!table_id) return res.status(400).json({ error: "bad_request", details: "Missing table_id" });
 
   try {
@@ -32,16 +33,22 @@ export default async function handler(req, res) {
     `, [table_id]);
 
     if (active.rowCount) {
-      await q("COMMIT");
-      console.log(`Hand ${active.rows[0].id} already active, returning it`);
-      return res.status(200).json({ 
-        hand_id: active.rows[0].id, 
-        hand_no: active.rows[0].hand_no,
-        dealer_seat: active.rows[0].dealer_seat,
-        sb_seat: active.rows[0].sb_seat,
-        bb_seat: active.rows[0].bb_seat,
-        reused: true 
-      });
+      const a = active.rows[0];
+      if (force_new) {
+        // Close existing hand and continue to create a new one
+        await q(`UPDATE poker.poker_hands SET stage='hand_end', ended_at=now() WHERE id=$1`, [a.id]);
+      } else {
+        await q("COMMIT");
+        console.log(`Hand ${a.id} already active, returning it`);
+        return res.status(200).json({ 
+          hand_id: a.id, 
+          hand_no: a.hand_no,
+          dealer_seat: a.dealer_seat,
+          sb_seat: a.sb_seat,
+          bb_seat: a.bb_seat,
+          reused: true 
+        });
+      }
     }
 
     // Check for seated players with chips
@@ -57,24 +64,35 @@ export default async function handler(req, res) {
       return res.status(400).json({ error:"need_two_players" });
     }
 
-    // Get next hand number atomically
+    // Get next hand number atomically and robustly (never collide with existing MAX)
     const nh = await q(`
-      UPDATE poker.poker_tables
-      SET next_hand_no = next_hand_no + 1
-      WHERE id=$1
-      RETURNING next_hand_no - 1 AS hand_no
+      WITH mx AS (
+        SELECT COALESCE(MAX(hand_no) + 1, 1)::bigint AS want
+        FROM poker.poker_hands
+        WHERE table_id = $1
+      )
+      , upd AS (
+        UPDATE poker.poker_tables t
+        SET next_hand_no = GREATEST(t.next_hand_no, (SELECT want FROM mx)) + 1
+        WHERE t.id = $1
+        RETURNING next_hand_no - 1 AS hand_no
+      )
+      SELECT hand_no FROM upd
     `, [table_id]);
-    const hand_no = Number(nh.rows[0].hand_no);
+    const hand_no = Number(nh.rows[0].hand_no || 1);
 
-    // Determine dealer, SB, BB
+    // Determine dealer, SB, BB (robust ring logic)
     const last = await q(`SELECT dealer_seat FROM poker.poker_hands WHERE table_id=$1 ORDER BY started_at DESC LIMIT 1`, [table_id]);
     const lastDealer = last.rowCount ? last.rows[0].dealer_seat : -1;
     const order = seated.rows.map(r=>r.seat_index);
-    const nextDealer = order[(order.findIndex(x=>x>lastDealer)+1 + (lastDealer<0?0:0)) % order.length] ?? order[0];
+    // Ring index of next dealer
+    const dealerIdx = (lastDealer>=0 && order.includes(lastDealer))
+      ? (order.indexOf(lastDealer) + 1) % order.length
+      : 0;
+    const nextDealer = order[dealerIdx];
 
-    const idxD = order.indexOf(nextDealer);
-    const sbSeat = order[(idxD+1) % order.length];
-    const bbSeat = order[(idxD+2) % order.length];
+    const sbSeat = order[(dealerIdx + 1) % order.length];
+    const bbSeat = order[(dealerIdx + 2) % order.length];
 
     // Get stake
     const t = await q(`SELECT stake_min FROM poker.poker_tables WHERE id=$1`, [table_id]);
@@ -87,8 +105,14 @@ export default async function handler(req, res) {
     for (const s of order) { holes[s] = [deck.pop(), deck.pop()]; }
 
     // Determine UTG (first to act after BB in preflop)
-    const utgIdx = (idxD + 3) % order.length;  // After dealer, SB, BB
-    const utgSeat = order[utgIdx];
+    // For 2 players (heads-up): UTG is SB (dealer acts first preflop)
+    let utgSeat;
+    if (order.length >= 3) {
+      utgSeat = order[(dealerIdx + 3) % order.length];
+    } else {
+      utgSeat = order[(dealerIdx + 1) % order.length];
+    }
+    if (utgSeat === undefined || utgSeat === null) utgSeat = sbSeat ?? order[0];
 
     // Insert hand - set current_turn to UTG
     const hid = await q(`
