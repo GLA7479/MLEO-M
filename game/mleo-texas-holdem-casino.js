@@ -1824,6 +1824,16 @@ export default function TexasHoldemCasinoPage() {
         <div className="flex items-center justify-center h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
           <div className="text-white text-xl">Loading...</div>
         </div>
+
+        {/* Bottom Utility Bar: BACK / FULL */}
+        <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
+          <div className="relative px-2 py-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 6px)" }}>
+            <div className="flex items-center justify-between gap-2 pointer-events-auto">
+              <button onClick={() => router.push('/arcade')} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10" title="Back to Arcade">BACK</button>
+              <button onClick={toggleFullscreen} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10" title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>{isFullscreen ? 'EXIT' : 'FULL'}</button>
+            </div>
+          </div>
+        </div>
       </Layout>
     );
   }
@@ -1854,29 +1864,26 @@ export default function TexasHoldemCasinoPage() {
           {/* Top HUD Bar */}
           <div ref={headerRef} className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
             <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
-              {/* Left: Back */}
-              <div className="absolute left-2 top-2 pointer-events-auto">
+              {/* Left: BACK */}
+              <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
                 <button
                   onClick={() => router.push('/arcade')}
-                  className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-3 text-white hover:bg-white/20 transition-all"
+                  className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+                  title="Back to Arcade"
                 >
-                  ← Back
+                  BACK
                 </button>
               </div>
-              
-              {/* Right: Vault */}
-              <div className="absolute right-2 top-2 pointer-events-auto">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={toggleFullscreen}
-                    className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-3 text-white hover:bg-white/20 transition-all"
-                    aria-label="Toggle fullscreen"
-                  >⤢</button>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2">
-                  <div className="text-white/70 text-sm">Vault</div>
-                  <div className="text-white font-bold">{fmt(vaultAmount)} MLEO</div>
-                </div>
+
+              {/* Right: FULL */}
+              <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
+                <button
+                  onClick={toggleFullscreen}
+                  className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+                  title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                >
+                  {isFullscreen ? 'EXIT' : 'FULL'}
+                </button>
               </div>
             </div>
           </div>
@@ -2022,9 +2029,9 @@ export default function TexasHoldemCasinoPage() {
           <div ref={headerRef} className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
             <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
               <div className="flex items-center justify-between gap-2 pointer-events-auto">
-                <button onClick={() => router.push('/arcade')} className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm font-bold">← Arcade</button>
+                <button onClick={() => router.push('/arcade')} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10" title="Back to Arcade">BACK</button>
                 <div className="text-white font-extrabold text-lg truncate">🃏 {selectedTable?.name}</div>
-                <button onClick={handleLeaveTable} className="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold">Leave</button>
+                <button onClick={toggleFullscreen} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10" title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>{isFullscreen ? 'EXIT' : 'FULL'}</button>
               </div>
             </div>
           </div>
@@ -2070,6 +2077,8 @@ export default function TexasHoldemCasinoPage() {
               <button onClick={handleLeaveTable} className="px-8 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all">Leave Table</button>
             </div>
           </div>
+
+          
         </div>
       </Layout>
     );
@@ -2111,12 +2120,12 @@ export default function TexasHoldemCasinoPage() {
           <div ref={headerRef} className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
             <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
               <div className="flex items-center justify-between gap-2 pointer-events-auto">
-                <button onClick={() => router.push('/arcade')} className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm font-bold">← Arcade</button>
+                <button onClick={() => router.push('/arcade')} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10" title="Back to Arcade">BACK</button>
                 <div className="text-center flex-1">
                   <div className="text-white font-extrabold text-lg truncate">🃏 {selectedTable?.name}</div>
                   <div className="text-white/60 text-xs">Round: {game?.round || 'preflop'} | Pot: {fmt(game?.pot || 0)} MLEO</div>
                 </div>
-                <button onClick={handleLeaveTable} className="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold">Leave</button>
+                <button onClick={toggleFullscreen} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10" title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>{isFullscreen ? 'EXIT' : 'FULL'}</button>
               </div>
             </div>
           </div>
@@ -2125,6 +2134,11 @@ export default function TexasHoldemCasinoPage() {
           <div className="relative w-full h-full flex flex-col items-center justify-start pt-[calc(var(--head-h,0px)+8px)] px-2 pb-3">
             <div ref={metersRef} className="w-full max-w-6xl bg-black/30 rounded-xl p-3 mb-2 backdrop-blur-sm border border-white/10 text-center">
               <div className="text-white/70 text-xs">Round: {game?.round || 'preflop'} • Current bet: {fmt(game?.current_bet || 0)}</div>
+            </div>
+
+            {/* Leave Table button (moved from header) */}
+            <div className="w-full max-w-6xl text-right mb-2">
+              <button onClick={handleLeaveTable} className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold">Leave Table</button>
             </div>
 
             {/* GAME AREA */}
@@ -2221,6 +2235,16 @@ export default function TexasHoldemCasinoPage() {
                   <div>Hand finished! Starting new hand...</div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Bottom Utility Bar: BACK / FULL */}
+          <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
+            <div className="relative px-2 py-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 6px)" }}>
+              <div className="flex items-center justify-between gap-2 pointer-events-auto">
+                <button onClick={() => router.push('/arcade')} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10" title="Back to Arcade">BACK</button>
+                <button onClick={toggleFullscreen} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10" title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>{isFullscreen ? 'EXIT' : 'FULL'}</button>
+              </div>
             </div>
           </div>
         </div>
