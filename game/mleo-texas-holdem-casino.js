@@ -1774,26 +1774,48 @@ export default function TexasHoldemCasinoPage() {
 
   if (screen === "lobby") {
     return (
-      <Layout
-        address={address}
-        isConnected={isConnected}
-        openConnectModal={openConnectModal}
-        openAccountModal={openAccountModal}
-        disconnect={disconnect}
-        vaultAmount={vaultAmount}
-      >
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
-          {/* Header */}
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-6">
-              <h1 className="text-4xl font-extrabold text-white mb-2">
-                🎰 Texas Hold'em Rooms
-              </h1>
-              <p className="text-white/70">Join a table and play poker with real players!</p>
-            </div>
+      <div className="relative w-full overflow-hidden bg-gradient-to-br from-indigo-900 via-black to-purple-900" style={{ height: '100svh' }}>
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)',
+            backgroundSize: '30px 30px'
+          }} />
+        </div>
 
-            {/* Player Info */}
-            <div className="bg-black/30 rounded-xl p-4 mb-4 backdrop-blur-sm border border-white/10">
+        {/* Top HUD Bar */}
+        <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+          <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
+            {/* Left: Back */}
+            <div className="absolute left-2 top-2 pointer-events-auto">
+              <button
+                onClick={() => router.push('/arcade')}
+                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-3 text-white hover:bg-white/20 transition-all"
+              >
+                ← Back
+              </button>
+            </div>
+            
+            {/* Right: Vault */}
+            <div className="absolute right-2 top-2 pointer-events-auto">
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2">
+                <div className="text-white/70 text-sm">Vault</div>
+                <div className="text-white font-bold">{fmt(vaultAmount)} MLEO</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4 py-20">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold text-white mb-2">🃏 Texas Hold'em</h1>
+            <p className="text-white/70">Join a table and start playing!</p>
+          </div>
+
+          {/* Player Info */}
+          <div className="w-full max-w-md mb-6">
+            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-white font-semibold">Your Balance:</div>
                 <div className="text-emerald-400 text-xl font-bold">{fmt(vaultAmount)} MLEO</div>
@@ -1814,104 +1836,94 @@ export default function TexasHoldemCasinoPage() {
                 <div className="mt-2 text-red-400 text-sm">{error}</div>
               )}
             </div>
+          </div>
 
-            {/* Tables List */}
-            <div className="space-y-3">
-              {tables.map((table) => (
-                <div
-                  key={table.id}
-                  className="bg-gradient-to-br from-purple-900/50 to-slate-900/50 rounded-xl p-5 backdrop-blur-sm border border-white/10 hover:border-purple-400/50 transition-all"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <h3 className="text-xl font-bold text-white mb-1">
-                        🃏 {table.name}
-                      </h3>
-                      <div className="text-white/70 text-sm">
-                        Min Buy-in: <span className="text-emerald-400 font-semibold">{fmt(table.min_buyin)} MLEO</span>
-                      </div>
-                      <div className="text-white/70 text-sm">
-                        Blinds: <span className="text-amber-400">{fmt(table.small_blind)}</span> / <span className="text-amber-400">{fmt(table.big_blind)}</span>
-                      </div>
+          {/* Tables Grid */}
+          <div className="w-full max-w-4xl space-y-4">
+            {tables.map((table) => (
+              <div
+                key={table.id}
+                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 hover:border-purple-400/50 transition-all"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-1">
+                      🃏 {table.name}
+                    </h3>
+                    <div className="text-white/70 text-sm">
+                      Min Buy-in: <span className="text-emerald-400 font-semibold">{fmt(table.min_buyin)} MLEO</span>
                     </div>
-                    
-                    <div className="text-right">
-                      <div className="text-white/70 text-sm mb-2">
-                        Players: {table.current_players}/{table.max_players}
-                      </div>
-                      <div className="flex gap-1 mb-3">
-                        {Array.from({ length: table.max_players }).map((_, i) => (
-                          <div
-                            key={i}
-                            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${
-                              i < table.current_players
-                                ? 'bg-emerald-500 text-white'
-                                : 'bg-white/10 text-white/30'
-                            }`}
-                          >
-                            {i < table.current_players ? '👤' : '▫'}
-                          </div>
-                        ))}
-                      </div>
-                      <button
-                        onClick={() => handleJoinTable(table)}
-                        disabled={table.current_players >= table.max_players || vaultAmount < table.min_buyin}
-                        className={`px-6 py-3 rounded-lg font-bold transition-all ${
-                          table.current_players >= table.max_players || vaultAmount < table.min_buyin
-                            ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:shadow-lg hover:scale-105'
-                        }`}
-                      >
-                        {table.current_players >= table.max_players ? 'FULL' : 'JOIN TABLE'}
-                      </button>
+                    <div className="text-white/70 text-sm">
+                      Blinds: <span className="text-amber-400">{fmt(table.small_blind)}</span> / <span className="text-amber-400">{fmt(table.big_blind)}</span>
                     </div>
                   </div>
+                  
+                  <div className="text-right">
+                    <div className="text-white/70 text-sm mb-2">
+                      Players: {table.current_players}/{table.max_players}
+                    </div>
+                    <div className="flex gap-1 mb-3">
+                      {Array.from({ length: table.max_players }).map((_, i) => (
+                        <div
+                          key={i}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${
+                            i < table.current_players
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-white/10 text-white/30'
+                          }`}
+                        >
+                          {i < table.current_players ? '👤' : '▫'}
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => handleJoinTable(table)}
+                      disabled={table.current_players >= table.max_players || vaultAmount < table.min_buyin}
+                      className={`px-6 py-3 rounded-lg font-bold transition-all ${
+                        table.current_players >= table.max_players || vaultAmount < table.min_buyin
+                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:shadow-lg hover:scale-105'
+                      }`}
+                    >
+                      {table.current_players >= table.max_players ? 'FULL' : 'JOIN TABLE'}
+                    </button>
+                  </div>
                 </div>
-              ))}
-              
-              {tables.length === 0 && (
-                <div className="text-center py-12 text-white/50">
-                  <div className="text-4xl mb-3">🎴</div>
-                  <div>No tables available. Please check back later.</div>
-                </div>
-              )}
-            </div>
-
-            {/* Admin Controls */}
-            {isAdmin && (
-              <div className="mt-4 text-center">
-                <button
-                  onClick={resetAllTables}
-                  className="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all mr-4"
-                >
-                  🔄 Reset All Tables
-                </button>
-                <button
-                  onClick={async () => {
-                    await cleanupInactivePlayers();
-                    await cleanupEmptyGames();
-                    loadTables();
-                    setError("Cleanup completed!");
-                  }}
-                  className="px-6 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all"
-                >
-                  🧹 Cleanup Now
-                </button>
+              </div>
+            ))}
+            
+            {tables.length === 0 && (
+              <div className="text-center py-12 text-white/50">
+                <div className="text-4xl mb-3">🎴</div>
+                <div>No tables available. Please check back later.</div>
               </div>
             )}
+          </div>
 
-            {/* Back Button */}
+          {/* Admin Controls */}
+          {isAdmin && (
             <div className="mt-6 text-center">
               <button
-                onClick={() => router.push('/arcade')}
-                className="px-8 py-3 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold transition-all"
+                onClick={resetAllTables}
+                className="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all mr-4"
               >
-                ← Back to Arcade
+                🔄 Reset All Tables
+              </button>
+              <button
+                onClick={async () => {
+                  await cleanupInactivePlayers();
+                  await cleanupEmptyGames();
+                  loadTables();
+                  setError("Cleanup completed!");
+                }}
+                className="px-6 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all"
+              >
+                🧹 Cleanup Now
               </button>
             </div>
-          </div>
+          )}
         </div>
-      </Layout>
+      </div>
     );
   }
 
@@ -2026,71 +2038,86 @@ export default function TexasHoldemCasinoPage() {
     });
     
     return (
-      <Layout
-        address={address}
-        isConnected={isConnected}
-        openConnectModal={openConnectModal}
-        openAccountModal={openAccountModal}
-        disconnect={disconnect}
-        vaultAmount={vaultAmount}
-      >
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
-          {/* Header */}
-          <div className="max-w-6xl mx-auto mb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-white">
-                  🃏 {selectedTable?.name}
-                </h2>
-                <div className="text-white/70 text-sm">
-                  Round: {game?.round || 'preflop'} | Pot: {fmt(game?.pot || 0)} MLEO
-                </div>
+      <div className="relative w-full overflow-hidden bg-gradient-to-br from-indigo-900 via-black to-purple-900" style={{ height: '100svh' }}>
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)',
+            backgroundSize: '30px 30px'
+          }} />
+        </div>
+
+        {/* Top HUD Bar */}
+        <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+          <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
+            {/* Left: Game Info */}
+            <div className="absolute left-2 top-2 pointer-events-auto">
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2">
+                <div className="text-white/70 text-sm">Round: {game?.round || 'preflop'}</div>
+                <div className="text-white font-bold">Pot: {fmt(game?.pot || 0)} MLEO</div>
               </div>
-              
+            </div>
+            
+            {/* Right: Leave Button */}
+            <div className="absolute right-2 top-2 pointer-events-auto">
               <button
                 onClick={handleLeaveTable}
-                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all"
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition-all"
               >
                 Leave Table
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Game Table */}
-          <div className="max-w-6xl mx-auto">
-            <div className="bg-gradient-to-br from-green-800 to-green-900 rounded-2xl p-6 shadow-2xl border border-green-600/30">
+        {/* Game Table */}
+        <div className="flex-1 flex items-center justify-center px-4">
+          <div className="w-full max-w-6xl">
+            <div className="bg-green-900/50 backdrop-blur-sm border-4 border-amber-400 rounded-full aspect-[2/1] relative p-8">
               
               {/* Community Cards */}
-              <div className="text-center mb-8">
-                <div className="text-white/70 text-sm mb-3">Community Cards</div>
-                <div className="flex justify-center gap-2">
-                  {visibleCards.map((card, idx) => (
-                    <PlayingCard key={idx} card={card} delay={idx * 100} />
-                  ))}
-                  {Array.from({ length: 5 - visibleCards.length }).map((_, idx) => (
-                    <div key={idx} className="w-10 h-14 rounded bg-white/10 border border-white/20 flex items-center justify-center">
-                      ?
-                    </div>
-                  ))}
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                <div className="text-center">
+                  <div className="text-white/70 text-sm mb-3">Community Cards</div>
+                  <div className="flex justify-center gap-2">
+                    {visibleCards.map((card, idx) => (
+                      <PlayingCard key={idx} card={card} delay={idx * 100} />
+                    ))}
+                    {Array.from({ length: 5 - visibleCards.length }).map((_, idx) => (
+                      <div key={idx} className="w-10 h-14 rounded bg-white/10 border border-white/20 flex items-center justify-center">
+                        ?
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              {/* Players */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+              {/* Players positioned around the table */}
+              <div className="absolute inset-0">
                 {players.map((player, idx) => {
                   const isCurrentPlayer = game?.current_player_seat === player.seat_index;
                   const isMe = player.id === playerId;
                   
+                  // Position players around the table
+                  const angle = (idx * 360) / players.length;
+                  const radius = 40; // percentage from center
+                  const x = 50 + radius * Math.cos((angle - 90) * Math.PI / 180);
+                  const y = 50 + radius * Math.sin((angle - 90) * Math.PI / 180);
+                  
                   return (
                     <div
                       key={player.id}
-                      className={`p-4 rounded-lg border-2 transition-all ${
+                      className={`absolute transform -translate-x-1/2 -translate-y-1/2 p-3 rounded-lg border-2 transition-all ${
                         isCurrentPlayer
                           ? 'border-yellow-400 bg-yellow-400/20'
                           : isMe
                           ? 'border-purple-400 bg-purple-400/20'
                           : 'border-white/20 bg-white/5'
                       }`}
+                      style={{
+                        left: `${x}%`,
+                        top: `${y}%`
+                      }}
                     >
                       <div className="text-center">
                         <div className="text-white font-bold text-sm mb-1">
@@ -2131,98 +2158,107 @@ export default function TexasHoldemCasinoPage() {
                 })}
               </div>
 
-              {/* Action Buttons */}
-              {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && game?.round !== "finished" && game?.round !== 'showdown' && !winnerModal.open && (
-                <div className="text-center">
-                  <div className="text-white/70 text-sm mb-4">
-                    Your Turn {timeLeft > 0 && `(${timeLeft}s)`}
-                  </div>
-                  <div className="flex justify-center gap-3 flex-wrap">
-                    <button onClick={() => handlePlayerAction("fold")} className="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all">
-                      FOLD
-                    </button>
-
-                    <button
-                      onClick={() => handlePlayerAction(game?.current_bet > (myPlayer?.current_bet || 0) ? "call" : "check")}
-                      className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all"
-                    >
-                      {game?.current_bet > (myPlayer?.current_bet || 0) ? 'CALL' : 'CHECK'}
-                    </button>
-
-                    {/* RAISE CONTROL */}
-                    <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2">
-                      <input
-                        type="range"
-                        min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)}
-                        max={getMaxRaiseTo(myPlayer)}
-                        step={selectedTable?.big_blind || 1}
-                        value={raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))}
-                        onChange={(e) => setRaiseTo(Number(e.target.value))}
-                        className="w-40"
-                      />
-                      <input
-                        type="number"
-                        className="w-24 bg-black/40 border border-white/20 rounded px-2 py-1 text-white"
-                        value={raiseTo ?? ''}
-                        min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)}
-                        max={getMaxRaiseTo(myPlayer)}
-                        step={selectedTable?.big_blind || 1}
-                        onChange={(e) => setRaiseTo(Math.min(Math.max(Number(e.target.value) || 0, (game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)), getMaxRaiseTo(myPlayer)))}
-                      />
-                      <button
-                        onClick={() => handlePlayerAction("raise", raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)))}
-                        className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold"
-                      >
-                        RAISE TO
-                      </button>
-                    </div>
-
-                    <button onClick={() => handlePlayerAction("allin")} className="px-6 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all">
-                      ALL IN
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Game Messages */}
-              {gameMessage && (
-                <div className="text-center text-white/90 text-sm mb-4 bg-black/30 rounded-lg p-3">
-                  {gameMessage}
-                </div>
-              )}
-
-              {/* Winner Modal */}
-              {winnerModal.open && (
-                <div className="fixed inset-0 z-[11000] bg-black/70 flex items-center justify-center p-4">
-                  <div className="bg-zinc-900 text-white w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center">
-                    <div className="text-2xl font-extrabold mb-2">🎉 Hand Result</div>
-                    <div className="text-emerald-300 font-semibold">{winnerModal.text}</div>
-                    {winnerModal.hand && <div className="text-white/70 text-sm mt-1">{winnerModal.hand}</div>}
-                    {winnerModal.pot > 0 && <div className="text-amber-300 mt-2">Pot: {fmt(winnerModal.pot)}</div>}
-                    <div className="text-xs text-white/50 mt-3">
-                      Starting next hand...
-                    </div>
-                    <button
-                      onClick={() => setWinnerModal({ open: false, text: "", hand: "", pot: 0 })}
-                      className="mt-4 w-full py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold"
-                    >
-                      OK
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Game Status */}
-              {game?.status === 'finished' && (
-                <div className="text-center text-white/70">
-                  <div className="text-2xl mb-2">🎉</div>
-                  <div>Hand finished! Starting new hand...</div>
-                </div>
-              )}
             </div>
           </div>
         </div>
-      </Layout>
+
+        {/* Bottom Action Bar */}
+        {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && game?.round !== "finished" && game?.round !== 'showdown' && !winnerModal.open && (
+          <div className="absolute bottom-0 left-0 right-0 z-50 pointer-events-auto">
+            <div className="bg-white/10 backdrop-blur-sm border-t border-white/20 p-4">
+              <div className="text-center">
+                <div className="text-white/70 text-sm mb-4">
+                  Your Turn {timeLeft > 0 && `(${timeLeft}s)`}
+                </div>
+                <div className="flex justify-center gap-3 flex-wrap">
+                  <button onClick={() => handlePlayerAction("fold")} className="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all">
+                    FOLD
+                  </button>
+
+                  <button
+                    onClick={() => handlePlayerAction(game?.current_bet > (myPlayer?.current_bet || 0) ? "call" : "check")}
+                    className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all"
+                  >
+                    {game?.current_bet > (myPlayer?.current_bet || 0) ? 'CALL' : 'CHECK'}
+                  </button>
+
+                  {/* RAISE CONTROL */}
+                  <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2">
+                    <input
+                      type="range"
+                      min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)}
+                      max={getMaxRaiseTo(myPlayer)}
+                      step={selectedTable?.big_blind || 1}
+                      value={raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))}
+                      onChange={(e) => setRaiseTo(Number(e.target.value))}
+                      className="w-40"
+                    />
+                    <input
+                      type="number"
+                      className="w-24 bg-black/40 border border-white/20 rounded px-2 py-1 text-white"
+                      value={raiseTo ?? ''}
+                      min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)}
+                      max={getMaxRaiseTo(myPlayer)}
+                      step={selectedTable?.big_blind || 1}
+                      onChange={(e) => setRaiseTo(Math.min(Math.max(Number(e.target.value) || 0, (game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)), getMaxRaiseTo(myPlayer)))}
+                    />
+                    <button
+                      onClick={() => handlePlayerAction("raise", raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)))}
+                      className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold"
+                    >
+                      RAISE TO
+                    </button>
+                  </div>
+
+                  <button onClick={() => handlePlayerAction("allin")} className="px-6 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all">
+                    ALL IN
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Game Messages */}
+        {gameMessage && (
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+            <div className="text-center text-white/90 text-sm bg-black/30 rounded-lg p-3">
+              {gameMessage}
+            </div>
+          </div>
+        )}
+
+        {/* Winner Modal */}
+        {winnerModal.open && (
+          <div className="fixed inset-0 z-[11000] bg-black/70 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 text-white w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center">
+              <div className="text-2xl font-extrabold mb-2">🎉 Hand Result</div>
+              <div className="text-emerald-300 font-semibold">{winnerModal.text}</div>
+              {winnerModal.hand && <div className="text-white/70 text-sm mt-1">{winnerModal.hand}</div>}
+              {winnerModal.pot > 0 && <div className="text-amber-300 mt-2">Pot: {fmt(winnerModal.pot)}</div>}
+              <div className="text-xs text-white/50 mt-3">
+                Starting next hand...
+              </div>
+              <button
+                onClick={() => setWinnerModal({ open: false, text: "", hand: "", pot: 0 })}
+                className="mt-4 w-full py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Game Status */}
+        {game?.status === 'finished' && (
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+            <div className="text-center text-white/70">
+              <div className="text-2xl mb-2">🎉</div>
+              <div>Hand finished! Starting new hand...</div>
+            </div>
+          </div>
+        )}
+      </div>
     );
   }
 
