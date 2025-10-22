@@ -362,7 +362,7 @@ export default function Crash2Page() {
         !cashedOutAt &&
         m >= Number(autoCashOut)
       ) {
-        cashOut(m);
+        cashOut();
       }
 
       if (m >= crash) {
@@ -420,13 +420,12 @@ export default function Crash2Page() {
     }
   }, [phase, playerBet, cashedOutAt]);
 
-  const cashOut = (currentMultiplier = null) => {
+  const cashOut = () => {
     if (!canCashOut || !playerBet || cashedOutAt) return;
-    const mult = currentMultiplier || multiplier;
     playSfx(clickSound.current);
-    setCashedOutAt(mult);
+    setCashedOutAt(multiplier);
     setCanCashOut(false);
-    const payout = Math.floor(playerBet.amount * mult);
+    const payout = Math.floor(playerBet.amount * multiplier);
     setPayoutAmount(payout);
     const newVault = getVault() + payout;
     setVault(newVault);
@@ -440,7 +439,7 @@ export default function Crash2Page() {
     if (playerBet) {
       const bet = playerBet.amount;
       const cashed = cashedOutAt;
-      const prize = payoutAmount || 0; // Use already calculated payout
+      const prize = cashed ? Math.floor(bet * cashed) : 0;
       const win = prize > 0;
 
       const resultData = {
@@ -451,7 +450,6 @@ export default function Crash2Page() {
         profit: win ? prize - bet : -bet,
       };
       setGameResult(resultData);
-      setShowResultPopup(true);
 
       const newStats = {
         ...stats,
@@ -468,11 +466,6 @@ export default function Crash2Page() {
         lastBet: bet,
       };
       setStats(newStats);
-
-      // Hide popup after 3 seconds
-      setTimeout(() => {
-        setShowResultPopup(false);
-      }, 3000);
     }
 
     setTimeout(() => {
@@ -498,8 +491,6 @@ export default function Crash2Page() {
     setNonce((n) => n + 1);
     dataRef.current = [];
     setChartData([]);
-    setShowResultPopup(false);
-    setGameResult(null);
   };
 
   const backSafe = () => {
@@ -711,8 +702,8 @@ export default function Crash2Page() {
           {/* CHART */}
           <div
             id="crash-chart-wrap"
-            className="mb-1 w-full max-w-md flex flex-col items-center justify-center"
-            style={{ height: "var(--chart-h, 300px)" }}
+            className="mb-1 w-full max-w-md"
+            style={{ height: "var(--chart-h, 200px)" }}
           >
             <div className="relative w-full h-full bg-black/30 border border-white/10 rounded-lg p-2 pb-1 flex flex-col">
               <div className="relative flex-1 w-full">
@@ -722,11 +713,6 @@ export default function Crash2Page() {
                 >
                   {multiplier.toFixed(2)}x
                 </div>
-                {enableAutoCashOut && playerBet && phase === "running" && !cashedOutAt && (
-                  <div className="absolute top-2 right-2 z-10 bg-orange-500/90 px-2 py-1 rounded text-white text-xs font-bold animate-pulse">
-                    AUTO @ {Number(autoCashOut).toFixed(2)}×
-                  </div>
-                )}
                 <div 
                   className="absolute inset-0 flex items-center justify-center text-white/50 text-sm"
                   style={{ opacity: phase === "betting" ? 1 : 0, transition: "opacity 0.3s" }}
@@ -753,104 +739,78 @@ export default function Crash2Page() {
                 Round #{nonce} • {phase === "betting" ? "Placing bets..." : phase === "running" ? `Flying ${multiplier.toFixed(2)}x` : `Crashed @ ${crashPoint?.toFixed(2)}x`}
               </div>
             </div>
-
-            {/* AUTO CASH OUT CONTROL - Inside Game Area */}
-            <div className="flex items-center justify-center gap-2 mt-2">
-              <input
-                type="checkbox"
-                id="auto-cashout-toggle"
-                checked={enableAutoCashOut}
-                onChange={(e) => setEnableAutoCashOut(e.target.checked)}
-                className="w-4 h-4 accent-orange-500 cursor-pointer"
-                disabled={phase === "running"}
-              />
-              <label htmlFor="auto-cashout-toggle" className="text-white text-xs font-semibold cursor-pointer">
-                Auto Cash Out @
-              </label>
-              <input
-                type="number"
-                value={autoCashOut}
-                onChange={(e) => setAutoCashOut(e.target.value)}
-                disabled={phase === "running"}
-                className="w-16 h-7 bg-black/40 border border-orange-500/30 rounded text-center text-white text-xs font-bold focus:border-orange-500 focus:outline-none disabled:opacity-50"
-                step="0.1"
-                min="1.01"
-                max="100"
-              />
-              <span className="text-white/70 text-xs">×</span>
-            </div>
           </div>
 
-          <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button
-              onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                const newBet = current === MIN_BET 
-                  ? Math.min(vault, 1000)
-                  : Math.min(vault, current + 1000);
-                setBetAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              disabled={phase !== "betting" || playerBet}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
-            >
-              1K
-            </button>
-            <button
-              onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                const newBet = current === MIN_BET 
-                  ? Math.min(vault, 10000)
-                  : Math.min(vault, current + 10000);
-                setBetAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              disabled={phase !== "betting" || playerBet}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
-            >
-              10K
-            </button>
-            <button
-              onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                const newBet = current === MIN_BET 
-                  ? Math.min(vault, 100000)
-                  : Math.min(vault, current + 100000);
-                setBetAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              disabled={phase !== "betting" || playerBet}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
-            >
-              100K
-            </button>
-            <button
-              onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                const newBet = current === MIN_BET 
-                  ? Math.min(vault, 1000000)
-                  : Math.min(vault, current + 1000000);
-                setBetAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              disabled={phase !== "betting" || playerBet}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
-            >
-              1M
-            </button>
-            <button
-              onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                const newBet = Math.max(MIN_BET, current - 1000);
-                setBetAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              disabled={phase !== "betting" || playerBet}
-              className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
-            >
-              −
-            </button>
-            <div className="relative">
+          <div ref={betRef} className="w-full max-w-md mb-1 space-y-2">
+            <div className="flex items-center justify-center gap-1 flex-wrap">
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = current === MIN_BET 
+                    ? Math.min(vault, 1000)
+                    : Math.min(vault, current + 1000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              >
+                1K
+              </button>
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = current === MIN_BET 
+                    ? Math.min(vault, 10000)
+                    : Math.min(vault, current + 10000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              >
+                10K
+              </button>
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = current === MIN_BET 
+                    ? Math.min(vault, 100000)
+                    : Math.min(vault, current + 100000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              >
+                100K
+              </button>
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = current === MIN_BET 
+                    ? Math.min(vault, 1000000)
+                    : Math.min(vault, current + 1000000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              >
+                1M
+              </button>
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = Math.max(MIN_BET, current - 1000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
+              >
+                −
+              </button>
               <input
                 type="text"
                 value={isEditingBet ? betAmount : formatBetDisplay(betAmount)}
@@ -865,32 +825,50 @@ export default function Crash2Page() {
                   setBetAmount(String(Math.max(MIN_BET, current)));
                 }}
                 disabled={phase !== "betting" || playerBet}
-                className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6"
+                className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs"
               />
+              <button
+                onClick={() => {
+                  const current = Number(betAmount) || MIN_BET;
+                  const newBet = Math.min(vault, current + 1000);
+                  setBetAmount(String(newBet));
+                  playSfx(clickSound.current);
+                }}
+                disabled={phase !== "betting" || playerBet}
+                className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
+              >
+                +
+              </button>
               <button
                 onClick={() => {
                   setBetAmount(String(MIN_BET));
                   playSfx(clickSound.current);
                 }}
                 disabled={phase !== "betting" || playerBet}
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center"
+                className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50"
                 title="Reset to minimum bet"
               >
                 ↺
               </button>
             </div>
-            <button
-              onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                const newBet = Math.min(vault, current + 1000);
-                setBetAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              disabled={phase !== "betting" || playerBet}
-              className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
-            >
-              +
-            </button>
+            <div className="flex items-center justify-center gap-2">
+              <input
+                type="checkbox"
+                checked={enableAutoCashOut}
+                onChange={(e) => setEnableAutoCashOut(e.target.checked)}
+                className="w-4 h-4"
+              />
+              <span className="text-white text-xs">Auto Cash Out @</span>
+              <input
+                type="number"
+                value={autoCashOut}
+                onChange={(e) => setAutoCashOut(e.target.value)}
+                className="w-20 h-8 bg-black/30 border border-white/20 rounded text-center text-white text-xs"
+                step="0.1"
+                min="1.01"
+              />
+              <span className="text-white text-xs">x</span>
+            </div>
           </div>
 
           <div
