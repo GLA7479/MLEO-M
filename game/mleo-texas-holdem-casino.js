@@ -2010,7 +2010,12 @@ export default function TexasHoldemCasinoPage() {
   if (screen === "game") {
     const myIndex = players.findIndex(p => p.id === playerId);
     const mySeatInRender = myIndex >= 0 ? players[myIndex]?.seat_index : null;
-    const isMyTurn = !!(game && mySeatInRender != null && game.current_player_seat === mySeatInRender);
+    // Fallback: if current_player_seat is missing, derive from legacy current_player_index
+    const currentSeatFromIndex = Number.isInteger(game?.current_player_index)
+      ? players[game.current_player_index]?.seat_index
+      : null;
+    const effectiveCurrentSeat = game?.current_player_seat ?? currentSeatFromIndex ?? null;
+    const isMyTurn = !!(game && mySeatInRender != null && effectiveCurrentSeat === mySeatInRender);
     const communityCards = game?.community_cards || [];
     const visibleCards = communityCards.slice(0, game?.community_visible || 0);
     
@@ -2078,7 +2083,12 @@ export default function TexasHoldemCasinoPage() {
               {/* Players */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
                 {players.map((player, idx) => {
-                  const isCurrentPlayer = game?.current_player_seat === player.seat_index;
+                  // Fallback for legacy index-based state
+                  const seatFromIndex = Number.isInteger(game?.current_player_index)
+                    ? players[game.current_player_index]?.seat_index
+                    : null;
+                  const effSeat = game?.current_player_seat ?? seatFromIndex ?? null;
+                  const isCurrentPlayer = effSeat === player.seat_index;
                   const isMe = player.id === playerId;
                   
                   return (
