@@ -441,66 +441,8 @@ export default function TexasHoldemCasinoPage() {
   const [winnerModal, setWinnerModal] = useState({ open: false, text: "", hand: "", pot: 0 });
   const [isAdmin, setIsAdmin] = useState(false);
   const [raiseTo, setRaiseTo] = useState(null);
-
-  // --- Fullscreen layout refs (match Limbo/Diamonds pattern) ---
-  const wrapRef = useRef(null);
-  const headerRef = useRef(null);
-  const metersRef = useRef(null);
-  const listRef = useRef(null);
-  const ctaRef = useRef(null);
-
-  // Track fullscreen state changes (optional visual cue)
-  useEffect(() => {
-    const onFs = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onFs);
-    return () => document.removeEventListener("fullscreenchange", onFs);
-  }, []);
-
-  // Auto-fit layout so everything fits in one viewport height
-  useEffect(() => {
-    const calc = () => {
-      const rootH = window.visualViewport?.height ?? window.innerHeight;
-      const headH = headerRef.current?.offsetHeight || 0;
-      document.documentElement.style.setProperty("--head-h", headH + "px");
-      const topPad = headH + 8;
-
-      if (screen === "lobby") {
-        const used = headH + (ctaRef.current?.offsetHeight || 0) + topPad + 48;
-        const freeH = Math.max(160, rootH - used);
-        document.documentElement.style.setProperty("--lobby-list-h", freeH + "px");
-      } else {
-        // table/game
-        const used =
-          headH +
-          (metersRef.current?.offsetHeight || 0) +
-          (ctaRef.current?.offsetHeight || 0) +
-          topPad +
-          48;
-        const freeH = Math.max(200, rootH - used);
-        document.documentElement.style.setProperty("--table-area-h", freeH + "px");
-      }
-    };
-
-    const vv = window.visualViewport;
-    const onResize = () => requestAnimationFrame(() => setTimeout(calc, 50));
-
-    calc();
-    vv?.addEventListener("resize", onResize);
-    window.addEventListener("orientationchange", onResize);
-    return () => {
-      vv?.removeEventListener("resize", onResize);
-      window.removeEventListener("orientationchange", onResize);
-    };
-  }, [screen]);
-
-  const toggleFullscreen = () => {
-    const el = wrapRef.current || document.documentElement;
-    if (!document.fullscreenElement) {
-      el.requestFullscreen?.().catch(() => {});
-    } else {
-      document.exitFullscreen?.().catch(() => {});
-    }
-  };
+  // Guard against double-invocation in React StrictMode and multi-mount
+  const startOnceRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
@@ -966,18 +908,22 @@ export default function TexasHoldemCasinoPage() {
     return () => clearInterval(poll);
   }, [currentTableId, screen, currentGameId]);
 
-  // Auto-start game when 2+ players - only by player with lowest seat_index
+  // Auto-start game when 2+ players - only by lowest seat, with StrictMode guard
   useEffect(() => {
-    if (!currentGameId && players.length >= 2 && myPlayer) {
+    if (!currentGameId && players.length >= 2 && myPlayer && !startOnceRef.current && currentTableId) {
       const minSeat = Math.min(...players.map(p => p.seat_index));
       if (myPlayer.seat_index === minSeat) {
-        console.log("🟢 I'm the lowest seat, starting game...");
-        startGame();
+        console.log("🟢 I'm the lowest seat, starting game (RPC)...");
+        startOnceRef.current = true;
+        startGameAtomic(currentTableId).finally(() => {
+          // allow retry after a small window if needed
+          setTimeout(() => { startOnceRef.current = false; }, 3000);
+        });
       } else {
         console.log("🟡 Waiting for player in seat", minSeat, "to start...");
       }
     }
-  }, [currentGameId, players, myPlayer?.seat_index]);
+  }, [currentGameId, players, myPlayer?.seat_index, currentTableId]);
 
   // Subscribe to game updates
   useEffect(() => {
@@ -1109,7 +1055,7 @@ export default function TexasHoldemCasinoPage() {
     }
   };
 
-  // Start a new game
+  // Start a new game (legacy; kept but unused by default)
   const startGame = async () => {
     console.log("🎯 startGame() triggered for table", currentTableId);
 
@@ -1126,6 +1072,23 @@ export default function TexasHoldemCasinoPage() {
       await loadGameData();
       return;
     }
+
+    // אם כבר יש משחק במצב playing לאותו שולחן (שריד מנתונים ישנים/מרוץ) – הצטרף אליו
+    try {
+      const { data: existingPlaying } = await supabase
+        .from("casino_games")
+        .select("id")
+        .eq("table_id", currentTableId)
+        .eq("status", "playing")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (existingPlaying && existingPlaying.length > 0) {
+        setCurrentGameId(existingPlaying[0].id);
+        setScreen('game');
+        await loadGameData();
+        return;
+      }
+    } catch {}
 
     // שלוף את כל השחקנים בשולחן
     const { data: seatedPlayers } = await supabase
@@ -1170,6 +1133,22 @@ export default function TexasHoldemCasinoPage() {
 
     if (error) {
       console.error("❌ Error inserting new game:", error);
+      // אם שגיאת ייחודיות/409 – כנראה משחק כבר נוצר ע"י לקוח אחר; ננסה להצטרף אליו
+      const isUniqueConflict = String(error.code) === '23505' || String(error.status) === '409' || (error?.message || '').toLowerCase().includes('duplicate key');
+      if (isUniqueConflict) {
+        const { data: existsNow } = await supabase
+          .from("casino_games")
+          .select("id")
+          .eq("table_id", currentTableId)
+          .eq("status", "playing")
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (existsNow && existsNow.length > 0) {
+          setCurrentGameId(existsNow[0].id);
+          setScreen('game');
+          await loadGameData();
+        }
+      }
       return;
     }
 
@@ -1199,6 +1178,25 @@ export default function TexasHoldemCasinoPage() {
     setScreen("game");
     await loadGameData();
   };
+
+  // RPC-based atomic start (server-side CAS)
+  async function startGameAtomic(tableId) {
+    try {
+      const { data, error } = await supabase.rpc('start_game', { table_uuid: tableId });
+      if (error) {
+        console.error('start_game RPC error', error);
+        return;
+      }
+      const game = Array.isArray(data) ? data[0] : data;
+      if (game?.game_id) {
+        setCurrentGameId(game.game_id);
+        setScreen('game');
+        await loadGameData();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   const handlePlayerAction = async (action, amount = 0) => {
     if (!currentGameId) return;
@@ -1842,83 +1840,45 @@ export default function TexasHoldemCasinoPage() {
         disconnect={disconnect}
         vaultAmount={vaultAmount}
       >
-        <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-indigo-900 via-black to-purple-900" style={{ height: 'var(--app-100vh, 100svh)' }}>
-          {/* Background pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute inset-0" style={{
-              backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)',
-              backgroundSize: '30px 30px'
-            }} />
-          </div>
-
-          {/* Top HUD Bar */}
-          <div ref={headerRef} className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
-            <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
-              {/* Left: Back */}
-              <div className="absolute left-2 top-2 pointer-events-auto">
-                <button
-                  onClick={() => router.push('/arcade')}
-                  className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-3 text-white hover:bg-white/20 transition-all"
-                >
-                  ← Back
-                </button>
-              </div>
-              
-              {/* Right: Vault */}
-              <div className="absolute right-2 top-2 pointer-events-auto">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={toggleFullscreen}
-                    className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-3 text-white hover:bg-white/20 transition-all"
-                    aria-label="Toggle fullscreen"
-                  >⤢</button>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2">
-                  <div className="text-white/70 text-sm">Vault</div>
-                  <div className="text-white font-bold">{fmt(vaultAmount)} MLEO</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Main Content */}
-          <div className="relative w-full h-full flex flex-col items-center justify-start px-4 pt-[calc(var(--head-h,0px)+12px)] pb-4">
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold text-white mb-2">🃏 Texas Hold'em</h1>
-              <p className="text-white/70">Join a table and start playing!</p>
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+          {/* Header */}
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-6">
+              <h1 className="text-4xl font-extrabold text-white mb-2">
+                🎰 Texas Hold'em Rooms
+              </h1>
+              <p className="text-white/70">Join a table and play poker with real players!</p>
             </div>
 
             {/* Player Info */}
-            <div ref={metersRef} className="w-full max-w-md mb-2">
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-white font-semibold">Your Balance:</div>
-                  <div className="text-emerald-400 text-xl font-bold">{fmt(vaultAmount)} MLEO</div>
-                </div>
-                
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Enter your name..."
-                    value={playerName}
-                    onChange={(e) => setPlayerName(e.target.value)}
-                    className="flex-1 px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400"
-                    maxLength={20}
-                  />
-                </div>
-                
-                {error && (
-                  <div className="mt-2 text-red-400 text-sm">{error}</div>
-                )}
+            <div className="bg-black/30 rounded-xl p-4 mb-4 backdrop-blur-sm border border-white/10">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-white font-semibold">Your Balance:</div>
+                <div className="text-emerald-400 text-xl font-bold">{fmt(vaultAmount)} MLEO</div>
               </div>
+              
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter your name..."
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  className="flex-1 px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400"
+                  maxLength={20}
+                />
+              </div>
+              
+              {error && (
+                <div className="mt-2 text-red-400 text-sm">{error}</div>
+              )}
             </div>
 
-            {/* Tables Grid */}
-            <div ref={listRef} className="w-full max-w-4xl space-y-4 overflow-y-auto pr-1" style={{ maxHeight: 'var(--lobby-list-h, 60vh)' }}>
+            {/* Tables List */}
+            <div className="space-y-3">
               {tables.map((table) => (
                 <div
                   key={table.id}
-                  className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 hover:border-purple-400/50 transition-all"
+                  className="bg-gradient-to-br from-purple-900/50 to-slate-900/50 rounded-xl p-5 backdrop-blur-sm border border-white/10 hover:border-purple-400/50 transition-all"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div>
@@ -1977,7 +1937,7 @@ export default function TexasHoldemCasinoPage() {
 
             {/* Admin Controls */}
             {isAdmin && (
-              <div ref={ctaRef} className="mt-3 text-center w-full max-w-4xl">
+              <div className="mt-4 text-center">
                 <button
                   onClick={resetAllTables}
                   className="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all mr-4"
@@ -1997,6 +1957,16 @@ export default function TexasHoldemCasinoPage() {
                 </button>
               </div>
             )}
+
+            {/* Back Button */}
+            <div className="mt-6 text-center">
+              <button
+                onClick={() => router.push('/arcade')}
+                className="px-8 py-3 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold transition-all"
+              >
+                ← Back to Arcade
+              </button>
+            </div>
           </div>
         </div>
       </Layout>
@@ -2017,57 +1987,73 @@ export default function TexasHoldemCasinoPage() {
         disconnect={disconnect}
         vaultAmount={vaultAmount}
       >
-        <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-indigo-900 via-black to-purple-900" style={{ height: 'var(--app-100vh, 100svh)' }}>
-          {/* HEADER */}
-          <div ref={headerRef} className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
-            <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
-              <div className="flex items-center justify-between gap-2 pointer-events-auto">
-                <button onClick={() => router.push('/arcade')} className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm font-bold">← Arcade</button>
-                <div className="text-white font-extrabold text-lg truncate">🃏 {selectedTable?.name}</div>
-                <button onClick={handleLeaveTable} className="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold">Leave</button>
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 flex items-center justify-center">
+          <div className="max-w-2xl w-full">
+            {/* Table Info */}
+            <div className="bg-black/40 rounded-xl p-6 backdrop-blur-sm border border-white/10 mb-4">
+              <h2 className="text-2xl font-bold text-white mb-4 text-center">
+                🃏 {selectedTable?.name}
+              </h2>
+              
+              <div className="text-white/70 text-center mb-6">
+                <div className="mb-2">Blinds: {fmt(selectedTable?.small_blind)} / {fmt(selectedTable?.big_blind)}</div>
+                <div>Waiting for players to join...</div>
               </div>
-            </div>
-          </div>
 
-          {/* BODY */}
-          <div className="relative w-full h-full flex flex-col items-center justify-start pt-[calc(var(--head-h,0px)+8px)] px-2 pb-3">
-            <div ref={metersRef} className="w-full max-w-2xl bg-black/40 rounded-xl p-4 backdrop-blur-sm border border-white/10 mb-2 text-center">
-              <div className="text-white/70">Blinds: {fmt(selectedTable?.small_blind)} / {fmt(selectedTable?.big_blind)}</div>
-              <div className="text-white/50 text-sm">Waiting for players to join...</div>
-            </div>
-
-            <div className="w-full max-w-2xl overflow-y-auto" style={{ maxHeight: 'var(--table-area-h, 60vh)' }}>
-              <div className="space-y-2 mb-2">
-                {players.map((player) => (
+              {/* Players List */}
+              <div className="space-y-2 mb-6">
+                {players.map((player, idx) => (
                   <div
                     key={player.id}
                     className={`p-3 rounded-lg flex items-center justify-between ${
-                      player.id === playerId ? 'bg-purple-500/30 border border-purple-400' : 'bg-white/5 border border-white/10'
+                      player.id === playerId
+                        ? 'bg-purple-500/30 border border-purple-400'
+                        : 'bg-white/5 border border-white/10'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="text-2xl">{player.id === playerId ? '👑' : '👤'}</div>
+                      <div className="text-2xl">
+                        {player.id === playerId ? '👑' : '👤'}
+                      </div>
                       <div>
-                        <div className="text-white font-semibold">{player.player_name}{player.id === playerId && ' (You)'}</div>
-                        <div className="text-white/50 text-sm">Seat #{player.seat_index + 1}</div>
+                        <div className="text-white font-semibold">
+                          {player.player_name}
+                          {player.id === playerId && ' (You)'}
+                        </div>
+                        <div className="text-white/50 text-sm">
+                          Seat #{player.seat_index + 1}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-emerald-400 font-bold">{fmt(player.chips)} chips</div>
+                    <div className="text-emerald-400 font-bold">
+                      {fmt(player.chips)} chips
+                    </div>
                   </div>
                 ))}
               </div>
 
-              <div className="text-center text-white/70 mb-2">
+              {/* Game Status */}
+              <div className="text-center text-white/70 mb-4">
                 {players.length < 2 ? (
-                  <div className="text-amber-400">⏳ Waiting for at least 2 players to start...</div>
+                  <div className="text-amber-400">
+                    ⏳ Waiting for at least 2 players to start...
+                  </div>
                 ) : (
-                  <div className="text-emerald-400">✅ Ready to play! Game will start soon...</div>
+                  <div className="text-emerald-400">
+                    ✅ Ready to play! Game will start soon...
+                  </div>
                 )}
               </div>
             </div>
 
-            <div ref={ctaRef} className="w-full max-w-2xl mt-2 text-center">
-              <button onClick={handleLeaveTable} className="px-8 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all">Leave Table</button>
+            {/* Leave Button */}
+            <div className="text-center">
+              <button
+                onClick={handleLeaveTable}
+                className="px-8 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all"
+              >
+                Leave Table
+              </button>
             </div>
           </div>
         </div>
@@ -2082,7 +2068,12 @@ export default function TexasHoldemCasinoPage() {
   if (screen === "game") {
     const myIndex = players.findIndex(p => p.id === playerId);
     const mySeatInRender = myIndex >= 0 ? players[myIndex]?.seat_index : null;
-    const isMyTurn = !!(game && mySeatInRender != null && game.current_player_seat === mySeatInRender);
+    // Fallback: if current_player_seat is missing, derive from legacy current_player_index
+    const currentSeatFromIndex = Number.isInteger(game?.current_player_index)
+      ? players[game.current_player_index]?.seat_index
+      : null;
+    const effectiveCurrentSeat = game?.current_player_seat ?? currentSeatFromIndex ?? null;
+    const isMyTurn = !!(game && mySeatInRender != null && effectiveCurrentSeat === mySeatInRender);
     const communityCards = game?.community_cards || [];
     const visibleCards = communityCards.slice(0, game?.community_visible || 0);
     
@@ -2106,98 +2097,165 @@ export default function TexasHoldemCasinoPage() {
         disconnect={disconnect}
         vaultAmount={vaultAmount}
       >
-        <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-indigo-900 via-black to-purple-900" style={{ height: 'var(--app-100vh, 100svh)' }}>
-          {/* HEADER */}
-          <div ref={headerRef} className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
-            <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
-              <div className="flex items-center justify-between gap-2 pointer-events-auto">
-                <button onClick={() => router.push('/arcade')} className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm font-bold">← Arcade</button>
-                <div className="text-center flex-1">
-                  <div className="text-white font-extrabold text-lg truncate">🃏 {selectedTable?.name}</div>
-                  <div className="text-white/60 text-xs">Round: {game?.round || 'preflop'} | Pot: {fmt(game?.pot || 0)} MLEO</div>
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+          {/* Header */}
+          <div className="max-w-6xl mx-auto mb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-white">
+                  🃏 {selectedTable?.name}
+                </h2>
+                <div className="text-white/70 text-sm">
+                  Round: {game?.round || 'preflop'} | Pot: {fmt(game?.pot || 0)} MLEO
                 </div>
-                <button onClick={handleLeaveTable} className="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold">Leave</button>
               </div>
+              
+              <button
+                onClick={handleLeaveTable}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all"
+              >
+                Leave Table
+              </button>
             </div>
           </div>
 
-          {/* BODY */}
-          <div className="relative w-full h-full flex flex-col items-center justify-start pt-[calc(var(--head-h,0px)+8px)] px-2 pb-3">
-            <div ref={metersRef} className="w-full max-w-6xl bg-black/30 rounded-xl p-3 mb-2 backdrop-blur-sm border border-white/10 text-center">
-              <div className="text-white/70 text-xs">Round: {game?.round || 'preflop'} • Current bet: {fmt(game?.current_bet || 0)}</div>
-            </div>
-
-            {/* GAME AREA */}
-            <div className="w-full max-w-6xl overflow-hidden" style={{ maxHeight: 'var(--table-area-h, 60vh)' }}>
-              <div className="bg-green-900/50 backdrop-blur-sm border-4 border-amber-400 rounded-full aspect-[2/1] relative p-8">
-                {/* Community Cards */}
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                  <div className="text-center">
-                    <div className="text-white/70 text-sm mb-3">Community Cards</div>
-                    <div className="flex justify-center gap-2">
-                      {visibleCards.map((card, idx) => (
-                        <PlayingCard key={idx} card={card} delay={idx * 100} />
-                      ))}
-                      {Array.from({ length: 5 - visibleCards.length }).map((_, idx) => (
-                        <div key={idx} className="w-10 h-14 rounded bg-white/10 border border-white/20 flex items-center justify-center">?</div>
-                      ))}
+          {/* Game Table */}
+          <div className="max-w-6xl mx-auto">
+            <div className="bg-gradient-to-br from-green-800 to-green-900 rounded-2xl p-6 shadow-2xl border border-green-600/30">
+              
+              {/* Community Cards */}
+              <div className="text-center mb-8">
+                <div className="text-white/70 text-sm mb-3">Community Cards</div>
+                <div className="flex justify-center gap-2">
+                  {visibleCards.map((card, idx) => (
+                    <PlayingCard key={idx} card={card} delay={idx * 100} />
+                  ))}
+                  {Array.from({ length: 5 - visibleCards.length }).map((_, idx) => (
+                    <div key={idx} className="w-10 h-14 rounded bg-white/10 border border-white/20 flex items-center justify-center">
+                      ?
                     </div>
-                  </div>
-                </div>
-
-                {/* Players positioned around the table */}
-                <div className="absolute inset-0">
-                  {players.map((player, idx) => {
-                    const isCurrentPlayer = game?.current_player_seat === player.seat_index;
-                    const isMe = player.id === playerId;
-                    const angle = (idx * 360) / players.length;
-                    const radius = 40;
-                    const x = 50 + radius * Math.cos((angle - 90) * Math.PI / 180);
-                    const y = 50 + radius * Math.sin((angle - 90) * Math.PI / 180);
-                    return (
-                      <div
-                        key={player.id}
-                        className={`absolute transform -translate-x-1/2 -translate-y-1/2 p-3 rounded-lg border-2 transition-all ${
-                          isCurrentPlayer ? 'border-yellow-400 bg-yellow-400/20' : (isMe ? 'border-purple-400 bg-purple-400/20' : 'border-white/20 bg-white/5')
-                        }`}
-                        style={{ left: `${x}%`, top: `${y}%` }}
-                      >
-                        <div className="text-center">
-                          <div className="text-white font-bold text-sm mb-1">{player.player_name}{isMe && ' (You)'}{isCurrentPlayer && ' 👑'}</div>
-                          <div className="text-emerald-400 text-xs mb-2">{fmt(player.chips)} chips</div>
-                          {player.current_bet > 0 && (<div className="text-amber-400 text-xs">Bet: {fmt(player.current_bet)}</div>)}
-                          {player.status === 'folded' && (<div className="text-red-400 text-xs">FOLDED</div>)}
-                          {player.status === 'all_in' && (<div className="text-orange-400 text-xs">ALL IN</div>)}
-                        </div>
-                        {player.hole_cards && isMe && (
-                          <div className="flex justify-center gap-1 mt-2">
-                            {player.hole_cards.map((card, cardIdx) => (
-                              <PlayingCard key={cardIdx} card={card} delay={cardIdx * 100} />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                  ))}
                 </div>
               </div>
-            </div>
 
-            {/* CTA / Actions */}
-            <div ref={ctaRef} className="w-full max-w-6xl mt-2">
-              {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && game?.round !== 'finished' && game?.round !== 'showdown' && !winnerModal.open && (
-                <div className="text-center">
-                  <div className="text-white/70 text-sm mb-2">Your Turn {timeLeft > 0 && `(${timeLeft}s)`}</div>
-                  <div className="flex justify-center gap-3 flex-wrap">
-                    <button onClick={() => handlePlayerAction('fold')} className="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all">FOLD</button>
-                    <button onClick={() => handlePlayerAction(game?.current_bet > (myPlayer?.current_bet || 0) ? 'call' : 'check')} className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all">{game?.current_bet > (myPlayer?.current_bet || 0) ? 'CALL' : 'CHECK'}</button>
-                    <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2">
-                      <input type="range" min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)} max={getMaxRaiseTo(myPlayer)} step={selectedTable?.big_blind || 1} value={raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))} onChange={(e) => setRaiseTo(Number(e.target.value))} className="w-40" />
-                      <input type="number" className="w-24 bg-black/40 border border-white/20 rounded px-2 py-1 text-white" value={raiseTo ?? ''} min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)} max={getMaxRaiseTo(myPlayer)} step={selectedTable?.big_blind || 1} onChange={(e) => setRaiseTo(Math.min(Math.max(Number(e.target.value) || 0, (game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)), getMaxRaiseTo(myPlayer)))} />
-                      <button onClick={() => handlePlayerAction('raise', raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)))} className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold">RAISE TO</button>
+              {/* Players */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                {players.map((player, idx) => {
+                  // Fallback for legacy index-based state
+                  const seatFromIndex = Number.isInteger(game?.current_player_index)
+                    ? players[game.current_player_index]?.seat_index
+                    : null;
+                  const effSeat = game?.current_player_seat ?? seatFromIndex ?? null;
+                  const isCurrentPlayer = effSeat === player.seat_index;
+                  const isMe = player.id === playerId;
+                  
+                  return (
+                    <div
+                      key={player.id}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        isCurrentPlayer
+                          ? 'border-yellow-400 bg-yellow-400/20'
+                          : isMe
+                          ? 'border-purple-400 bg-purple-400/20'
+                          : 'border-white/20 bg-white/5'
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className="text-white font-bold text-sm mb-1">
+                          {player.player_name}
+                          {isMe && ' (You)'}
+                          {isCurrentPlayer && ' 👑'}
+                        </div>
+                        
+                        <div className="text-emerald-400 text-xs mb-2">
+                          {fmt(player.chips)} chips
+                        </div>
+                        
+                        {player.current_bet > 0 && (
+                          <div className="text-amber-400 text-xs">
+                            Bet: {fmt(player.current_bet)}
+                          </div>
+                        )}
+                        
+                        {player.status === 'folded' && (
+                          <div className="text-red-400 text-xs">FOLDED</div>
+                        )}
+                        
+                        {player.status === 'all_in' && (
+                          <div className="text-orange-400 text-xs">ALL IN</div>
+                        )}
+                      </div>
+                      
+                      {/* Player Cards */}
+                      {player.hole_cards && isMe && (
+                        <div className="flex justify-center gap-1 mt-2">
+                          {player.hole_cards.map((card, cardIdx) => (
+                            <PlayingCard key={cardIdx} card={card} delay={cardIdx * 100} />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <button onClick={() => handlePlayerAction('allin')} className="px-6 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all">ALL IN</button>
+                  );
+                })}
+              </div>
+
+              {/* Action Buttons */}
+              {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && game?.round !== "finished" && game?.round !== 'showdown' && !winnerModal.open && (
+                <div className="text-center">
+                  <div className="text-white/70 text-sm mb-4">
+                    Your Turn {timeLeft > 0 && `(${timeLeft}s)`}
                   </div>
+                  <div className="flex justify-center gap-3 flex-wrap">
+                    <button onClick={() => handlePlayerAction("fold")} className="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all">
+                      FOLD
+                    </button>
+
+                    <button
+                      onClick={() => handlePlayerAction(game?.current_bet > (myPlayer?.current_bet || 0) ? "call" : "check")}
+                      className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all"
+                    >
+                      {game?.current_bet > (myPlayer?.current_bet || 0) ? 'CALL' : 'CHECK'}
+                    </button>
+
+                    {/* RAISE CONTROL */}
+                    <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2">
+                      <input
+                        type="range"
+                        min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)}
+                        max={getMaxRaiseTo(myPlayer)}
+                        step={selectedTable?.big_blind || 1}
+                        value={raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))}
+                        onChange={(e) => setRaiseTo(Number(e.target.value))}
+                        className="w-40"
+                      />
+                      <input
+                        type="number"
+                        className="w-24 bg-black/40 border border-white/20 rounded px-2 py-1 text-white"
+                        value={raiseTo ?? ''}
+                        min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)}
+                        max={getMaxRaiseTo(myPlayer)}
+                        step={selectedTable?.big_blind || 1}
+                        onChange={(e) => setRaiseTo(Math.min(Math.max(Number(e.target.value) || 0, (game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)), getMaxRaiseTo(myPlayer)))}
+                      />
+                      <button
+                        onClick={() => handlePlayerAction("raise", raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)))}
+                        className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold"
+                      >
+                        RAISE TO
+                      </button>
+                    </div>
+
+                    <button onClick={() => handlePlayerAction("allin")} className="px-6 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all">
+                      ALL IN
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Game Messages */}
+              {gameMessage && (
+                <div className="text-center text-white/90 text-sm mb-4 bg-black/30 rounded-lg p-3">
+                  {gameMessage}
                 </div>
               )}
 
@@ -2209,12 +2267,20 @@ export default function TexasHoldemCasinoPage() {
                     <div className="text-emerald-300 font-semibold">{winnerModal.text}</div>
                     {winnerModal.hand && <div className="text-white/70 text-sm mt-1">{winnerModal.hand}</div>}
                     {winnerModal.pot > 0 && <div className="text-amber-300 mt-2">Pot: {fmt(winnerModal.pot)}</div>}
-                    <div className="text-xs text-white/50 mt-3">Starting next hand...</div>
-                    <button onClick={() => setWinnerModal({ open: false, text: '', hand: '', pot: 0 })} className="mt-4 w-full py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">OK</button>
+                    <div className="text-xs text-white/50 mt-3">
+                      Starting next hand...
+                    </div>
+                    <button
+                      onClick={() => setWinnerModal({ open: false, text: "", hand: "", pot: 0 })}
+                      className="mt-4 w-full py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold"
+                    >
+                      OK
+                    </button>
                   </div>
                 </div>
               )}
 
+              {/* Game Status */}
               {game?.status === 'finished' && (
                 <div className="text-center text-white/70">
                   <div className="text-2xl mb-2">🎉</div>
