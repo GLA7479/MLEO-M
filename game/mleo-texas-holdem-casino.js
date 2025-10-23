@@ -1907,11 +1907,11 @@ export default function TexasHoldemCasinoPage() {
             </div>
 
             {/* Player Info */}
-            <div ref={metersRef} className="w-full max-w-xs md:max-w-sm mb-2">
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4">
+            <div ref={metersRef} className="w-full max-w-[14rem] md:max-w-xs mb-2">
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-2.5 md:p-3">
                 <div className="flex items-center justify-between mb-3">
                   <div className="text-white font-semibold">Your Balance:</div>
-                  <div className="text-emerald-400 text-xl font-bold">{fmt(vaultAmount)} MLEO</div>
+                  <div className="text-emerald-400 text-base md:text-lg font-bold">{fmt(vaultAmount)} MLEO</div>
                 </div>
                 
                 <div className="flex gap-2">
@@ -1920,7 +1920,7 @@ export default function TexasHoldemCasinoPage() {
                     placeholder="Enter your name..."
                     value={playerName}
                     onChange={(e) => setPlayerName(e.target.value)}
-                    className="flex-1 px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400"
+                    className="flex-1 px-3 py-2 text-sm rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400"
                     maxLength={20}
                   />
                 </div>
