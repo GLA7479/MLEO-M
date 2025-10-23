@@ -1984,26 +1984,28 @@ export default function TexasHoldemCasinoPage() {
               )}
             </div>
 
-            {/* Bottom Controls - match Coin Flip style (colors/sizes) */}
-            <div className="w-full max-w-6xl mt-2 grid grid-cols-3 gap-2">
-              <button
-                onClick={() => setShowHowToPlay(true)}
-                className="py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all"
-              >
-                How to Play
-              </button>
-              <button
-                onClick={() => setShowStats(true)}
-                className="py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all"
-              >
-                Stats
-              </button>
-              <button
-                onClick={() => setShowVaultModal(true)}
-                className="py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all"
-              >
-                💰 Vault
-              </button>
+            {/* Bottom Controls - identical structure/colors to Coin Flip */}
+            <div className="w-full max-w-sm md:max-w-md mt-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowHowToPlay(true)}
+                  className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all"
+                >
+                  How to Play
+                </button>
+                <button
+                  onClick={() => setShowStats(true)}
+                  className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all"
+                >
+                  Stats
+                </button>
+                <button
+                  onClick={() => setShowVaultModal(true)}
+                  className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all"
+                >
+                  💰 Vault
+                </button>
+              </div>
             </div>
 
             {/* How to Play Modal */}
