@@ -2021,7 +2021,7 @@ export default function TexasHoldemCasinoPage() {
                 <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl">
                   <h2 className="text-2xl font-extrabold mb-4">🃏 How to Play</h2>
                   <div className="space-y-3 text-sm text-white/90">
-                    <p><strong>1. Enter your name:</strong> Type your player name in “Your Balance”.</p>
+                    <p><strong>1. Enter your name:</strong> Type your player name in "Your Balance".</p>
                     <p><strong>2. Join a table:</strong> Review Min Buy‑in and Blinds, then press <strong>JOIN TABLE</strong>.</p>
                     <p><strong>3. Gameplay:</strong> On your turn choose <strong>Fold</strong>, <strong>Check/Call</strong>, or <strong>Raise/All‑In</strong>. A turn timer applies.</p>
                     <p><strong>Goal:</strong> Win pots by making the best 5‑card hand or by all opponents folding.</p>
@@ -2260,11 +2260,15 @@ export default function TexasHoldemCasinoPage() {
                     const minPct = 4;  // left/top safe margin
                     const maxPct = 96; // right/bottom safe margin
 
+                    // Compute offset so that the local player (me) is at the bottom (180deg)
+                    const myIndex = Math.max(0, players.findIndex(p => p.id === playerId));
+                    const angleOffset = 180 - ((myIndex * 360) / n);
+
                     return players.map((player, idx) => {
                       const isCurrentPlayer = game?.current_player_seat === player.seat_index;
                       const isMe = player.id === playerId;
 
-                      const angle = (idx * 360) / players.length;
+                      const angle = ((idx * 360) / players.length) + angleOffset;
                       let x = 50 + radiusPct * Math.cos((angle - 90) * Math.PI / 180);
                       let y = 50 + radiusPct * Math.sin((angle - 90) * Math.PI / 180);
 
@@ -2285,7 +2289,7 @@ export default function TexasHoldemCasinoPage() {
                       return (
                         <div
                           key={player.id}
-                          className={`absolute rounded-lg border transition-all ${
+                          className={`absolute flex flex-col justify-between rounded-lg border transition-all ${
                             isCurrentPlayer ? 'border-yellow-400 bg-yellow-400/15' : (isMe ? 'border-purple-400 bg-purple-400/15' : 'border-white/15 bg-white/5')
                           }`}
                           style={{
@@ -2293,7 +2297,9 @@ export default function TexasHoldemCasinoPage() {
                             top: `${y}%`,
                             transform: `translate(-50%, -50%) scale(${scale})`,
                             transformOrigin: 'center center',
-                            padding: '0.5rem'
+                            padding: '0.5rem',
+                            minHeight: '60px',
+                            overflow: 'hidden'
                           }}
                         >
                           <div className="text-center">
@@ -2303,13 +2309,15 @@ export default function TexasHoldemCasinoPage() {
                             {player.status === 'folded' && (<div className="text-red-400 text-[9px]">FOLDED</div>)}
                             {player.status === 'all_in' && (<div className="text-orange-400 text-[9px]">ALL IN</div>)}
                           </div>
-                          {player.hole_cards && isMe && (
-                            <div className="flex justify-center gap-1 mt-1">
-                              {player.hole_cards.map((card, cardIdx) => (
-                                <PlayingCard key={cardIdx} card={card} delay={cardIdx * 100} />
-                              ))}
-                            </div>
-                          )}
+                          <div className="mt-1 h-4 md:h-5 flex items-end justify-center">
+                            {isMe && player.hole_cards && (
+                              <div className="flex justify-center gap-1">
+                                {player.hole_cards.map((card, cardIdx) => (
+                                  <PlayingCard key={cardIdx} card={card} delay={cardIdx * 100} />
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     });
@@ -2322,23 +2330,24 @@ export default function TexasHoldemCasinoPage() {
             <div ref={ctaRef} className="w-full max-w-6xl mt-2 min-h-[90px] flex items-center justify-center">
               {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && game?.round !== 'finished' && game?.round !== 'showdown' && !winnerModal.open && (
                 <div className="text-center">
-                  <div className="flex justify-center items-center gap-1.5 md:gap-2 flex-wrap">
+                  <div className="flex justify-center items-center gap-1.5 md:gap-2 flex-wrap md:flex-nowrap">
                     {/* Timer inline with controls */}
-                    <div className="px-2 py-1 rounded-md bg-white/10 text-white/80 text-xs md:text-sm">
+                    <div className="px-2 py-1 rounded-md bg-white/10 text-white/80 text-[10px] md:text-sm">
                       {timeLeft > 0 ? `Your Turn (${timeLeft}s)` : 'Your Turn'}
                     </div>
 
-                    <button onClick={() => handlePlayerAction('fold')} className="px-3 py-1.5 md:px-5 md:py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs md:text-sm transition-all">FOLD</button>
+                    <button onClick={() => handlePlayerAction('fold')} className="px-2 py-1.5 md:px-4 md:py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs md:text-sm transition-all">FOLD</button>
 
-                    <button onClick={() => handlePlayerAction(game?.current_bet > (myPlayer?.current_bet || 0) ? 'call' : 'check')} className="px-3 py-1.5 md:px-5 md:py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs md:text-sm transition-all">{game?.current_bet > (myPlayer?.current_bet || 0) ? 'CALL' : 'CHECK'}</button>
+                    <button onClick={() => handlePlayerAction(game?.current_bet > (myPlayer?.current_bet || 0) ? 'call' : 'check')} className="px-2 py-1.5 md:px-4 md:py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs md:text-sm transition-all">{game?.current_bet > (myPlayer?.current_bet || 0) ? 'CALL' : 'CHECK'}</button>
 
                     <div className="flex items-center gap-1.5 md:gap-2 bg-white/10 rounded-lg px-2 md:px-3 py-1 md:py-2">
-                      <input type="range" min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)} max={getMaxRaiseTo(myPlayer)} step={selectedTable?.big_blind || 1} value={raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))} onChange={(e) => setRaiseTo(Number(e.target.value))} className="w-28 md:w-36" />
-                      <input type="number" className="w-16 md:w-20 bg-black/40 border border-white/20 rounded px-2 py-1 text-white text-xs md:text-sm" value={raiseTo ?? ''} min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)} max={getMaxRaiseTo(myPlayer)} step={selectedTable?.big_blind || 1} onChange={(e) => setRaiseTo(Math.min(Math.max(Number(e.target.value) || 0, (game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)), getMaxRaiseTo(myPlayer)))} />
-                      <button onClick={() => handlePlayerAction('raise', (raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))))} className="px-3 py-1.5 md:px-4 md:py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold text-xs md:text-sm">RAISE TO</button>
+                      <span className="hidden md:inline text-white/70 text-[11px]">Raise</span>
+                      <input type="range" min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)} max={getMaxRaiseTo(myPlayer)} step={selectedTable?.big_blind || 1} value={raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))} onChange={(e) => setRaiseTo(Number(e.target.value))} className="w-20 md:w-36 h-1.5" />
+                      <input type="number" className="hidden md:block w-20 bg-black/40 border border-white/20 rounded px-2 py-1 text-right text-white text-sm" value={raiseTo ?? ''} min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)} max={getMaxRaiseTo(myPlayer)} step={selectedTable?.big_blind || 1} onChange={(e) => setRaiseTo(Math.min(Math.max(Number(e.target.value) || 0, (game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)), getMaxRaiseTo(myPlayer)))} />
+                      <button onClick={() => handlePlayerAction('raise', (raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))))} className="px-2 py-1.5 md:px-4 md:py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold text-xs md:text-sm">RAISE</button>
                     </div>
 
-                    <button onClick={() => handlePlayerAction('allin')} className="px-3 py-1.5 md:px-5 md:py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs md:text-sm transition-all">ALL IN</button>
+                    <button onClick={() => handlePlayerAction('allin')} className="px-2 py-1.5 md:px-4 md:py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs md:text-sm transition-all">ALL IN</button>
                   </div>
                 </div>
               )}
@@ -2366,15 +2375,7 @@ export default function TexasHoldemCasinoPage() {
             </div>
           </div>
 
-          {/* Bottom Utility Bar: BACK / FULL */}
-          <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
-            <div className="relative px-2 py-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 6px)" }}>
-              <div className="flex items-center justify-between gap-2 pointer-events-auto">
-                <button onClick={() => router.push('/arcade')} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10" title="Back to Arcade">BACK</button>
-                <button onClick={toggleFullscreen} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10" title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>{isFullscreen ? 'EXIT' : 'FULL'}</button>
-              </div>
-            </div>
-          </div>
+          {/* Bottom Utility Bar removed to free space (header buttons remain) */}
         </div>
       </Layout>
     );
