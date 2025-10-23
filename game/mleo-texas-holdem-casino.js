@@ -417,6 +417,17 @@ export default function TexasHoldemCasinoPage() {
   const [vaultAmount, setVaultAmount] = useState(0);
   const [playerName, setPlayerName] = useState("");
   
+  // Persist player name across refreshes
+  useEffect(() => {
+    const savedName = safeRead("mleo_poker_name", "");
+    if (typeof savedName === "string" && savedName.trim()) {
+      setPlayerName(savedName);
+    }
+  }, []);
+  useEffect(() => {
+    try { safeWrite("mleo_poker_name", String(playerName || "")); } catch {}
+  }, [playerName]);
+  
   // Lobby state
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState(null);
@@ -1891,7 +1902,7 @@ export default function TexasHoldemCasinoPage() {
           {/* Main Content */}
           <div className="relative w-full h-full flex flex-col items-center justify-start px-4 pt-[calc(var(--head-h,0px)+12px)] pb-4">
             <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold text-white mb-2">🃏 Texas Hold'em</h1>
+              <h1 className="text-2xl md:text-4xl font-bold text-white mb-2">🃏 Texas Hold'em</h1>
               <p className="text-white/70">Join a table and start playing!</p>
             </div>
 
@@ -1921,11 +1932,11 @@ export default function TexasHoldemCasinoPage() {
             </div>
 
             {/* Tables Grid */}
-            <div ref={listRef} className="w-full max-w-4xl space-y-4 overflow-y-auto pr-1" style={{ maxHeight: 'var(--lobby-list-h, 60vh)' }}>
+            <div ref={listRef} className="w-full max-w-md md:max-w-4xl space-y-4 overflow-y-auto pr-1" style={{ maxHeight: 'var(--lobby-list-h, 60vh)' }}>
               {tables.map((table) => (
                 <div
                   key={table.id}
-                  className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 hover:border-purple-400/50 transition-all"
+                  className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 md:p-6 hover:border-purple-400/50 transition-all"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div>
@@ -1948,7 +1959,7 @@ export default function TexasHoldemCasinoPage() {
                         {Array.from({ length: table.max_players }).map((_, i) => (
                           <div
                             key={i}
-                            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${
+                            className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-[10px] md:text-sm ${
                               i < table.current_players
                                 ? 'bg-emerald-500 text-white'
                                 : 'bg-white/10 text-white/30'
@@ -1961,7 +1972,7 @@ export default function TexasHoldemCasinoPage() {
                       <button
                         onClick={() => handleJoinTable(table)}
                         disabled={table.current_players >= table.max_players || vaultAmount < table.min_buyin}
-                        className={`px-6 py-3 rounded-lg font-bold transition-all ${
+                        className={`px-4 py-2 md:px-6 md:py-3 rounded-lg font-bold transition-all ${
                           table.current_players >= table.max_players || vaultAmount < table.min_buyin
                             ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                             : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:shadow-lg hover:scale-105'
@@ -1987,7 +1998,7 @@ export default function TexasHoldemCasinoPage() {
               <div ref={ctaRef} className="mt-3 text-center w-full max-w-4xl">
                 <button
                   onClick={resetAllTables}
-                  className="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all mr-4"
+                  className="px-4 py-2 md:px-6 md:py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all mr-2 md:mr-4"
                 >
                   🔄 Reset All Tables
                 </button>
@@ -1998,7 +2009,7 @@ export default function TexasHoldemCasinoPage() {
                     loadTables();
                     setError("Cleanup completed!");
                   }}
-                  className="px-6 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all"
+                  className="px-4 py-2 md:px-6 md:py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all"
                 >
                   🧹 Cleanup Now
                 </button>
@@ -2053,7 +2064,7 @@ export default function TexasHoldemCasinoPage() {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="text-2xl">{player.id === playerId ? '👑' : '👤'}</div>
+                      <div className="text-base md:text-2xl">{player.id === playerId ? '👑' : '👤'}</div>
                       <div>
                         <div className="text-white font-semibold">{player.player_name}{player.id === playerId && ' (You)'}</div>
                         <div className="text-white/50 text-sm">Seat #{player.seat_index + 1}</div>
