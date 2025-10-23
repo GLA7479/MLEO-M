@@ -61,6 +61,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
   const [betInput, setBetInput] = useState(0);
   const [msg, setMsg] = useState("");
   const tickRef = useRef(null);
+  const startingRef = useRef(false);
 
   // ===== Realtime session =====
   useEffect(() => {
@@ -145,10 +146,13 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
 
   async function advanceStreet(auto=false){
     if(!ses) return;
-    // אם רק אחד חי — קוצרים מיד
-    const alive = players.filter(p=>!p.folded);
-    if(alive.length<=1){
-      await showdownAndSettle();
+    // אם נשאר שחקן אחד — ניצחון אוטומטי ללא דירוג
+    const alive = players.filter(p => !p.folded);
+    if (alive.length <= 1) {
+      const winnerSeat = alive[0]?.seat_index;
+      await supabase.from("poker_sessions").update({
+        stage: "showdown", winners: winnerSeat!=null ? [winnerSeat] : [], current_turn: null, turn_deadline: null
+      }).eq("id", ses.id);
       return;
     }
 
@@ -177,18 +181,22 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
   }
 
   async function showdownAndSettle(){
-    const winners = determineWinnersAuto(players, ses.board||[]);
-    // לעדכן לכותרת + חלוקת קופות
-    await supabase.from("poker_sessions").update({ stage:"showdown", winners }).eq("id", ses.id);
+    // אם נשאר אחד – הוא המנצח
+    const alive = players.filter(p=>!p.folded);
+    const winners = (alive.length === 1)
+      ? [alive[0].seat_index]
+      : determineWinnersAuto(players, ses.board||[]);
+    await supabase.from("poker_sessions").update({ stage:"showdown", winners, current_turn:null, turn_deadline:null }).eq("id", ses.id);
     await settlePots(ses.id, ses.board||[], players);
-    // מצב סגור; יד חדשה ע״י Start/Next Hand
-    await supabase.from("poker_sessions").update({ current_turn: null, turn_deadline: null }).eq("id", ses.id);
   }
 
   // ===== Start / Next hand =====
   async function startHand(){
-    const deck = newDeck();
-    const { data: exist } = await supabase.from("poker_sessions").select("*").eq("room_id", roomId).maybeSingle();
+    if (startingRef.current) return;
+    startingRef.current = true;
+    try {
+      const deck = newDeck();
+      const { data: exist } = await supabase.from("poker_sessions").select("*").eq("room_id", roomId).maybeSingle();
 
     // קבע דילר/בליינדים
     const dealer = exist ? (exist.dealer_seat+1) % seats : 0;
@@ -225,16 +233,41 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
       session_id: sessionId, player_name: rp.player_name, seat_index:i,
       stack_live: 2000, bet_street:0, total_bet:0, folded:false, all_in:false, acted:false
     }));
-    if(sit.length<2) return;
-    await supabase.from("poker_players").insert(sit);
+    // לאפשר גם יד עם שחקן יחיד לצורכי פיתוח
+    if (sit.length < 1) return; // שמור על דרישה למינימום 1
+    await supabase
+      .from("poker_players")
+      .upsert(sit, { onConflict: "session_id,seat_index", ignoreDuplicates: true });
 
-    // מחלק Hole
-    let d = [...deck];
-    for(const p of sit){
-      const a=d.pop(), b=d.pop();
-      await supabase.from("poker_players").update({ hole_cards:[a,b] }).eq("session_id", sessionId).eq("seat_index", p.seat_index);
+    // מחלק Hole — גרסה באצווה (אמין ומהיר)
+    {
+      let d = [...deck];
+
+      // נקרא את השחקנים שזה עתה נוצרו כדי לקבל IDs
+      const { data: created } = await supabase
+        .from("poker_players")
+        .select("id, seat_index, hole_cards")
+        .eq("session_id", sessionId)
+        .order("seat_index");
+
+      const ups = [];
+      // שני סבבים: קלף ראשון לכל שחקן, ואז שני
+      for (let r = 0; r < 2; r++) {
+        for (const P of (created || [])) {
+          const c = d.pop();
+          const hand = Array.isArray(P.hole_cards) ? [...P.hole_cards, c] : [c];
+          ups.push({ id: P.id, hole_cards: hand });
+          P.hole_cards = hand; // לעדכון זיכרון מקומי ללולאה
+        }
+      }
+
+      // upsert באצוות קטנות כדי להימנע ממגבלת batch
+      for (let i = 0; i < ups.length; i += 50) {
+        await supabase.from("poker_players").upsert(ups.slice(i, i + 50));
+      }
+
+      await supabase.from("poker_sessions").update({ deck_remaining: d }).eq("id", sessionId);
     }
-    await supabase.from("poker_sessions").update({ deck_remaining:d }).eq("id", sessionId);
 
     // אנטה (אם יש)
     if((ses?.ante||0) > 0){
@@ -242,16 +275,22 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
         await takeChips(sessionId, p.seat_index, ses.ante, "ante");
       }
     }
-    // פוסט Blinds
-    await takeChips(sessionId, sb, Math.floor((ses?.min_bet||bb)/2), "post_sb");
-    await takeChips(sessionId, bbSeat, (ses?.min_bet||bb), "post_bb");
+    // פוסט Blinds – רק אם יש לפחות 2 שחקנים
+    if (sit.length >= 2) {
+      await takeChips(sessionId, sb, Math.floor((ses?.min_bet||bb)/2), "post_sb");
+      await takeChips(sessionId, bbSeat, (ses?.min_bet||bb), "post_bb");
+    }
+    } finally {
+      startingRef.current = false;
+    }
   }
 
   async function takeChips(sessionId, seatIndex, amount, action){
     const { data: pl } = await supabase.from("poker_players")
       .select("*").eq("session_id", sessionId).eq("seat_index", seatIndex).maybeSingle();
+    if(!pl) return; // <-- חשוב: אל תנסה לגבות על מושב שלא מאויש
+    
     const { data: pot } = await supabase.from("poker_pots").select("*").eq("session_id", sessionId).maybeSingle();
-    if(!pl) return;
 
     const pay = Math.min(amount, pl.stack_live);
     await supabase.from("poker_players").update({

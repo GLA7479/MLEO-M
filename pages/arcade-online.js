@@ -180,8 +180,38 @@ export default function ArcadeOnline(){
           </div>
         </div>
 
-        {/* BODY: Sidebar (games) + Viewport */}
-        <div className="relative w-full h-full flex gap-3 pt-[calc(52px+var(--satb,0px))] px-3 pb-3 md:px-4">
+        {/* BODY: Mobile-first layout */}
+        <div className="relative w-full h-full flex flex-col md:flex-row gap-2 md:gap-3 pt-[calc(52px+var(--satb,0px))] px-2 md:px-3 pb-2 md:pb-3">
+          
+          {/* MOBILE: Top bar with game selector and player info */}
+          <div className="md:hidden flex flex-col gap-2 mb-2">
+            {/* Game selector */}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-2">
+              <div className="text-white/80 text-xs mb-1">Select Game</div>
+              <select value={activeGame} onChange={(e)=>selectGame(e.target.value)} className="w-full bg-black/30 text-white text-sm rounded-lg px-2 py-2 border border-white/20">
+                {REGISTRY.map(g=> <option key={g.id} value={g.id}>{g.icon} {g.title}</option>)}
+              </select>
+            </div>
+            
+            {/* Player info mobile */}
+            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-2">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-white font-semibold text-sm">Balance</div>
+                <div className="text-emerald-400 text-lg font-extrabold">{fmt(vaultAmt)} MLEO</div>
+              </div>
+              <input type="text" placeholder="Your name…" value={playerName} onChange={(e)=>setPlayerName(e.target.value)} className="w-full px-2 py-1.5 text-xs rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400" maxLength={20} />
+            </div>
+            
+            {/* Room browser for MP games on mobile */}
+            {(activeGame === 'blackjack' || activeGame === 'poker') && (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-2">
+                <div className="text-white/80 text-xs mb-1">Rooms</div>
+                <RoomBrowser gameId={activeGame} playerName={playerName} onJoinRoom={onJoinRoom} />
+              </div>
+            )}
+          </div>
+
+          {/* DESKTOP: Left sidebar (games) */}
           <aside className="w-[260px] hidden md:flex flex-col gap-3 bg-white/5 border border-white/10 rounded-2xl p-3">
             <div className="text-white/80 text-xs mb-1">Games</div>
             {REGISTRY.map(g=> (
@@ -196,19 +226,14 @@ export default function ArcadeOnline(){
             )}
           </aside>
 
-          <main className="flex-1 border border-white/10 rounded-2xl backdrop-blur-md bg-gradient-to-b from-white/5 to-white/10 overflow-hidden">
-            {/* MOBILE game switcher */}
-            <div className="md:hidden p-2 border-b border-white/10 bg-white/5">
-              <select value={activeGame} onChange={(e)=>selectGame(e.target.value)} className="w-full bg-black/30 text-white text-sm rounded-lg px-2 py-2 border border-white/20">
-                {REGISTRY.map(g=> <option key={g.id} value={g.id}>{g.icon} {g.title}</option>)}
-              </select>
-            </div>
-            <div className="h-[calc(100%-44px)] md:h-full">
+          {/* Main game area */}
+          <main className="flex-1 border border-white/10 rounded-2xl backdrop-blur-md bg-gradient-to-b from-white/5 to-white/10 overflow-hidden min-h-0">
+            <div className="h-full">
               <GameViewport gameId={activeGame} vault={vaultAmt} setVaultBoth={setVaultBoth} roomId={roomId} playerName={playerName} />
             </div>
           </main>
 
-          {/* Right column: Player & Vault */}
+          {/* DESKTOP: Right column: Player & Vault */}
           <aside className="w-[260px] hidden lg:flex flex-col gap-3">
             <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-3">
               <div className="flex items-center justify-between mb-2">

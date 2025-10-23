@@ -145,8 +145,13 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   async function hit(){
     if (!session || !myRow || myRow.status!=="playing") return;
     let deck=session.shoe||newShoe(); let pos=session.shoe_pos||0;
-    const card=deck[pos++]; const next=[...(myRow.hand||[]), card];
-    const total=handValue(next.map(c=>c.slice(0,-1))); const bust=total>21;
+    const card=deck[pos++]; 
+    const next=[...(myRow.hand||[]), card];
+
+    // ❌ לא להשתמש ב- map(...slice(0,-1))
+    const total = handValue(next); 
+    const bust = total > 21;
+
     await supabase.from("bj_sessions").update({ shoe:deck, shoe_pos:pos }).eq("id", session.id);
     await supabase.from("bj_players").update({ hand:next, status:bust?"bust":"playing" }).eq("id", myRow.id);
   }
@@ -155,18 +160,32 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
   async function settle(){
     if(!session) return;
-    let deck=session.shoe||newShoe(); let pos=session.shoe_pos||0; let dealer=session.dealer_hand||[];
-    const dv = ()=> handValue(dealer.map(c=>c.slice(0,-1)));
+    let deck=session.shoe||newShoe(); let pos=session.shoe_pos||0; 
+    let dealer=session.dealer_hand||[];
+
+    const dv = () => handValue(dealer);
+
     while(dv()<17){ dealer=[...dealer, deck[pos++]]; }
+
     await supabase.from("bj_sessions").update({ stage:"settle", dealer_hand:dealer, shoe:deck, shoe_pos:pos }).eq("id", session.id);
+
     const dealerV = dv();
     for(const p of players){
       if(!p.bet || !p.hand) continue;
-      const pv = handValue((p.hand||[]).map(c=>c.slice(0,-1)));
+
+      // ❌ במקום handValue((p.hand||[]).map(...))
+      const pv = handValue(p.hand);
+
       let outcome="lose";
-      if(pv>21) outcome="lose"; else if(dealerV>21 || pv>dealerV) outcome="win"; else if(pv===dealerV) outcome="push";
+      if(pv>21) outcome="lose"; 
+      else if(dealerV>21 || pv>dealerV) outcome="win"; 
+      else if(pv===dealerV) outcome="push";
+
       if(p.player_name===name){
-        let next=vault; if(outcome==="win") next=vault + p.bet*2; if(outcome==="push") next=vault + p.bet; setVaultBoth(next);
+        let next=vault; 
+        if(outcome==="win")  next = vault + p.bet*2;
+        if(outcome==="push") next = vault + p.bet;
+        setVaultBoth(next);
       }
       await supabase.from("bj_players").update({ status:"idle", bet:0, hand:[] }).eq("id", p.id);
     }
@@ -175,7 +194,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
   // ---------- UI ----------
   if (!roomId) return <div className="w-full h-full flex items-center justify-center text-white/70 text-sm">Select or create a room to start.</div>;
-  const dealerV = handValue((session?.dealer_hand||[]).map(c=>c.slice(0,-1)));
+  const dealerV = handValue(session?.dealer_hand || []);
 
   return (
     <div className="w-full h-full flex flex-col p-2 md:p-4 gap-2 md:gap-4">
@@ -207,7 +226,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
           {Array.from({length: SEATS}).map((_,i)=>{
             const occupant = players.find(p=>p.seat===i);
             const isMe = occupant && occupant.player_name===name;
-            const hv = occupant?.hand ? handValue((occupant.hand||[]).map(c=>c.slice(0,-1))) : null;
+            const hv = occupant?.hand ? handValue(occupant.hand) : null;
             return (
               <div key={i} className={`rounded-lg border ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-2 md:p-4 min-h-[120px] md:min-h-[180px] transition-all hover:bg-white/10`}>
                 <div className="text-center">
