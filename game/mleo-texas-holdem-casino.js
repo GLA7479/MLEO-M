@@ -2285,6 +2285,7 @@ export default function TexasHoldemCasinoPage() {
                       y = Math.min(maxPct, Math.max(minPct, y));
 
                       const scale = baseScale * extraScale;
+                      const finalScale = scale * (isMe ? 1.2 : 0.7);
 
                       return (
                         <div
@@ -2295,22 +2296,22 @@ export default function TexasHoldemCasinoPage() {
                           style={{
                             left: `${x}%`,
                             top: `${y}%`,
-                            transform: `translate(-50%, -50%) scale(${scale})`,
+                            transform: `translate(-50%, -50%) scale(${finalScale})`,
                             transformOrigin: 'center center',
                             padding: '0.5rem',
-                            minHeight: '60px',
+                            minHeight: isMe ? '120px' : '60px',
                             overflow: 'hidden'
                           }}
                         >
-                          <div className="text-center">
+                          <div className="text-center leading-tight">
                             <div className="text-white font-bold text-[10px] md:text-[12px] mb-0.5">{player.player_name}{isMe && ' (You)'}{isCurrentPlayer && ' 👑'}</div>
                             <div className="text-emerald-400 text-[9px] md:text-[11px] mb-0.5">{fmt(player.chips)} chips</div>
                             {player.current_bet > 0 && (<div className="text-amber-300 text-[9px]">Bet: {fmt(player.current_bet)}</div>)}
                             {player.status === 'folded' && (<div className="text-red-400 text-[9px]">FOLDED</div>)}
                             {player.status === 'all_in' && (<div className="text-orange-400 text-[9px]">ALL IN</div>)}
                           </div>
-                          <div className="mt-1 h-4 md:h-5 flex items-end justify-center">
-                            {isMe && player.hole_cards && (
+                          <div className={`mt-1 ${isMe ? 'h-10 md:h-12' : 'h-4 md:h-5'} flex items-end justify-center`}>
+                             {isMe && player.hole_cards && (
                               <div className="flex justify-center gap-1">
                                 {player.hole_cards.map((card, cardIdx) => (
                                   <PlayingCard key={cardIdx} card={card} delay={cardIdx * 100} />
