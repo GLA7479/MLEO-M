@@ -2146,7 +2146,7 @@ export default function TexasHoldemCasinoPage() {
                         <div className="text-white/50 text-sm">Seat #{player.seat_index + 1}</div>
                       </div>
                     </div>
-                    <div className="text-emerald-400 font-bold">{fmt(player.chips)} chips</div>
+                    <div className="text-cyan-300 font-bold">{fmt(player.chips)} chips</div>
                   </div>
                 ))}
               </div>
@@ -2322,16 +2322,23 @@ export default function TexasHoldemCasinoPage() {
                             transform: `translate(-50%, -50%) scale(${finalScale})`,
                             transformOrigin: 'center center',
                             padding: '0.5rem',
-                            minHeight: isMe ? '120px' : '76px',
+                            minHeight: isMe ? '120px' : '92px',
                             minWidth: isMe ? undefined : '88px',
                             overflow: 'hidden'
                           }}
                         >
                           <div className={`text-center ${isMe ? 'leading-tight' : 'leading-none'}`}>
-                            <div className={`text-white font-bold ${isMe ? 'text-[10px] md:text-[12px]' : 'text-[12px] md:text-[13px]'} mb-0 ${isMe ? '' : 'overflow-hidden text-ellipsis whitespace-nowrap'}`}>{player.player_name}{isMe && ' (You)'}{isCurrentPlayer && ' 👑'}</div>
-                            <div className={`${isMe ? 'text-emerald-400 text-[9px] md:text-[11px]' : 'text-emerald-300 text-[12px] md:text-[13px]'} mb-0`}>{fmt(player.chips)} chips</div>
+                            <div className={`text-white font-bold ${isMe ? 'text-[10px] md:text-[12px]' : 'text-[13px] md:text-[15px]'} mb-0 ${isMe ? '' : 'overflow-hidden text-ellipsis whitespace-nowrap'}`}>{player.player_name}{isMe && ' (You)'}{isCurrentPlayer && ' 👑'}</div>
+                            {isMe ? (
+                              <div className={`text-cyan-300 text-[9px] md:text-[11px] mb-0`}>{fmt(player.chips)} chips</div>
+                            ) : (
+                              <>
+                                <div className={`text-cyan-200 font-bold text-[14px] md:text-[16px] mb-0`}>{fmt(player.chips)}</div>
+                                <div className={`text-white/60 text-[10px] md:text-[11px] tracking-wide mb-0`}>CHIPS</div>
+                              </>
+                            )}
                             {player.current_bet > 0 && (
-                              <div className={`${isMe ? 'text-amber-300 text-[9px]' : 'text-amber-200 text-[11px]'} mb-0`}>Bet: {fmt(player.current_bet)}</div>
+                              <div className={`${isMe ? 'text-amber-300 text-[9px]' : 'text-amber-200 text-[11px] md:text-[12px]'} mb-0`}>Bet: {fmt(player.current_bet)}</div>
                             )}
                             {player.status === 'folded' && (
                               <div className={`${isMe ? 'text-red-400 text-[9px]' : 'text-red-300 text-[11px]'} mb-0`}>FOLDED</div>
