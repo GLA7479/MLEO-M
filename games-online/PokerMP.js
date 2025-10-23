@@ -422,11 +422,11 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
   if (!roomId) return <div className="w-full h-full flex items-center justify-center text-white/70">Select or create a room to start.</div>;
 
   return (
-    <div className="w-full h-full flex flex-col p-4 gap-4">
+    <div className="w-full h-full flex flex-col p-1 md:p-2 gap-1 md:gap-2">
       {/* Header */}
-      <div className="flex items-center justify-between bg-white/5 rounded-xl p-4 border border-white/10">
-        <div className="text-white font-bold text-xl">♠️ Texas Hold'em (MP)</div>
-        <div className="flex items-center gap-4 text-white/80 text-sm">
+      <div className="flex items-center justify-between bg-white/5 rounded-xl p-1 md:p-2 border border-white/10">
+        <div className="text-white font-bold text-sm md:text-lg">♠️ Texas Hold'em (MP)</div>
+        <div className="flex items-center gap-1 md:gap-2 text-white/80 text-xs">
           <span>Hand #{ses?.hand_no||"-"}</span>
           <span>Stage: {ses?.stage||"lobby"}</span>
           <span>Pot: {fmt(pot)}</span>
@@ -434,11 +434,11 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
       </div>
 
       {/* Board */}
-      <div className="bg-gradient-to-r from-green-900/20 to-green-800/20 rounded-xl p-6 border border-green-400/30">
+      <div className="bg-gradient-to-r from-green-900/20 to-green-800/20 rounded-xl p-2 md:p-3 border border-green-400/30">
         <div className="text-center">
-          <div className="text-white font-bold text-lg mb-4">Community Cards</div>
+          <div className="text-white font-bold text-sm md:text-base mb-2">Community Cards</div>
           <HandView hand={board}/>
-          <div className="text-white/80 text-sm mt-2">
+          <div className="text-white/80 text-xs mt-1">
             {board.length === 0 ? "No cards yet" : 
              board.length === 3 ? "Flop" :
              board.length === 4 ? "Turn" : 
@@ -448,25 +448,25 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
       </div>
 
       {/* Players Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1 md:gap-2">
         {Array.from({length: seats}).map((_,i)=>{
           const p = seatMapMemo.get(i);
           const isTurn = ses?.current_turn===i && ["preflop","flop","turn","river"].includes(ses?.stage);
           const isMe = p?.player_name === name;
           return (
-            <div key={i} className={`rounded-xl border-2 ${isTurn?'border-emerald-400 bg-emerald-900/20':isMe?'border-blue-400 bg-blue-900/20':'border-white/20 bg-white/5'} p-4 min-h-[200px] transition-all hover:bg-white/10`}>
+            <div key={i} className={`rounded-xl border-2 ${isTurn?'border-emerald-400 bg-emerald-900/20':isMe?'border-blue-400 bg-blue-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[120px] md:min-h-[150px] transition-all hover:bg-white/10`}>
               <div className="text-center">
-                <div className="text-white/70 text-sm mb-2">
+                <div className="text-white/70 text-xs mb-1">
                   Seat #{i+1} 
                   {i===ses?.dealer_seat && " • D"} 
                   {i===ses?.sb_seat && " • SB"} 
                   {i===ses?.bb_seat && " • BB"}
                 </div>
                 {p ? (
-                  <div className="space-y-3">
-                    <div className="text-white font-bold text-lg truncate">{p.player_name}</div>
-                    <div className="text-emerald-300 text-sm font-semibold">Stack: {fmt(p.stack_live)}</div>
-                    <div className="text-cyan-300 text-sm">Bet: {fmt(p.bet_street||0)}</div>
+                  <div className="space-y-1 md:space-y-2">
+                    <div className="text-white font-bold text-xs md:text-sm truncate">{p.player_name}</div>
+                    <div className="text-emerald-300 text-xs font-semibold">Stack: {fmt(p.stack_live)}</div>
+                    <div className="text-cyan-300 text-xs">Bet: {fmt(p.bet_street||0)}</div>
                     <div className="text-yellow-300 text-sm">Total: {fmt(p.total_bet||0)}</div>
                     <HandView hand={p.hole_cards} hidden={!isMe}/>
                     {p.folded && <div className="text-red-400 text-sm font-bold">FOLDED</div>}
@@ -483,20 +483,20 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
       </div>
 
       {/* Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-          <div className="text-white/80 text-sm mb-2 font-semibold">Game Control</div>
-          <div className="flex gap-2 flex-wrap">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:gap-2">
+        <div className="bg-white/5 rounded-xl p-1 md:p-2 border border-white/10">
+          <div className="text-white/80 text-xs mb-1 font-semibold">Game Control</div>
+          <div className="flex gap-1 flex-wrap">
             <button 
               onClick={startHand}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-sm transition-all shadow-lg"
+              className="px-2 py-1 md:px-3 md:py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-xs transition-all shadow-lg"
             >
               Start / Next Hand
             </button>
             {["preflop","flop","turn","river"].includes(ses?.stage) && (
               <button 
                 onClick={()=>advanceStreet(true)}
-                className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold text-sm transition-all shadow-lg"
+                className="px-2 py-1 md:px-3 md:py-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold text-xs transition-all shadow-lg"
               >
                 Force Advance
               </button>
@@ -504,48 +504,48 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
           </div>
         </div>
 
-        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-          <div className="text-white/80 text-sm mb-2 font-semibold">Player Actions</div>
+        <div className="bg-white/5 rounded-xl p-1 md:p-2 border border-white/10">
+          <div className="text-white/80 text-xs mb-1 font-semibold">Player Actions</div>
           {["preflop","flop","turn","river"].includes(ses?.stage) && isMyTurn ? (
-            <div className="space-y-3">
-              <div className="flex gap-2 flex-wrap">
-                <button onClick={actFold} className="px-3 py-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-sm transition-all">
+            <div className="space-y-1 md:space-y-2">
+              <div className="flex gap-1 flex-wrap">
+                <button onClick={actFold} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all">
                   FOLD
                 </button>
-                <button onClick={actCheck} className="px-3 py-2 rounded-lg bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-sm transition-all">
+                <button onClick={actCheck} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all">
                   CHECK
                 </button>
-                <button onClick={actCall} className="px-3 py-2 rounded-lg bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-sm transition-all">
+                <button onClick={actCall} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all">
                   CALL
                 </button>
-                <button onClick={actAllIn} className="px-3 py-2 rounded-lg bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold text-sm transition-all">
+                <button onClick={actAllIn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold text-xs transition-all">
                   ALL-IN
                 </button>
               </div>
               
-              <div className="flex gap-2 items-center">
+              <div className="flex gap-1 items-center">
                 <input
                   type="number" min="0" step="10" value={betInput}
                   onChange={e=>setBetInput(Number(e.target.value||0))}
-                  className="flex-1 bg-black/40 text-white text-sm rounded-lg px-3 py-2 border border-white/20 focus:border-emerald-400 focus:outline-none"
+                  className="flex-1 bg-black/40 text-white text-xs rounded-lg px-1 py-0.5 md:px-2 md:py-1 border border-white/20 focus:border-emerald-400 focus:outline-none"
                   placeholder="Amount"
                 />
-                <button onClick={()=>actBet(betInput)} className="px-3 py-2 rounded-lg bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold text-sm transition-all">
+                <button onClick={()=>actBet(betInput)} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold text-xs transition-all">
                   BET
                 </button>
-                <button onClick={()=>actRaise(betInput)} className="px-3 py-2 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-sm transition-all">
+                <button onClick={()=>actRaise(betInput)} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all">
                   RAISE
                 </button>
               </div>
 
-              <div className="flex gap-2 text-xs">
-                <button onClick={()=>setBetInput(ses?.min_bet||20)} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
+              <div className="flex gap-1 text-xs">
+                <button onClick={()=>setBetInput(ses?.min_bet||20)} className="px-1 py-0.5 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
                   1×BB
                 </button>
-                <button onClick={()=>setBetInput(Math.floor(pot/2))} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
+                <button onClick={()=>setBetInput(Math.floor(pot/2))} className="px-1 py-0.5 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
                   ½ Pot
                 </button>
-                <button onClick={()=>setBetInput(pot)} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
+                <button onClick={()=>setBetInput(pot)} className="px-1 py-0.5 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
                   Pot
                 </button>
               </div>
