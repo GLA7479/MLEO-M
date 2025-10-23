@@ -244,37 +244,34 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
         returning: "minimal",
       });
 
-    // מחלק Hole — בטוח ומפורש
+    // מחלק Hole — עדכון per-row (מונע 400/409)
     {
-      // לפעמים ה-SELECT מגיע לפני שהשורות נכתבו בפועל; דילי קטן מונע מירוץ
-      await new Promise(r => setTimeout(r, 40));
-
-      const { data: created } = await supabase
+      // קרא את השחקנים שזה עתה נוצרו (עם ה-IDs)
+      const { data: created, error: selErr } = await supabase
         .from("poker_players")
         .select("id, seat_index, hole_cards")
         .eq("session_id", sessionId)
         .order("seat_index");
 
+      if (selErr) { console.error("select players error:", selErr); return; }
+
       let d = [...deck];
-      const ups = [];
+
+      // סבב 1 + 2: קלף לכל שחקן
       for (let r = 0; r < 2; r++) {
         for (const P of (created || [])) {
           const c = d.pop();
           const hand = Array.isArray(P.hole_cards) ? [...P.hole_cards, c] : [c];
-          ups.push({ id: P.id, hole_cards: hand });
+          const { error: upErr } = await supabase
+            .from("poker_players")
+            .update({ hole_cards: hand })
+            .eq("id", P.id);
+          if (upErr) console.error("hole-card update error:", upErr);
           P.hole_cards = hand;
         }
       }
 
-      // ⬅️ חשוב: לציין במפורש onConflict:'id' ולכבות ignoreDuplicates (גורם ל-409)
-      for (let i = 0; i < ups.length; i += 50) {
-        const chunk = ups.slice(i, i + 50);
-        const { error } = await supabase
-          .from("poker_players")
-          .upsert(chunk, { onConflict: "id", ignoreDuplicates: false, returning: "minimal" });
-        if (error) console.error("hole-cards upsert error:", error);
-      }
-
+      // שמור את החבילה שנותרה
       await supabase.from("poker_sessions").update({ deck_remaining: d }).eq("id", sessionId);
     }
 

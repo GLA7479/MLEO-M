@@ -112,10 +112,19 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     const used = new Set(players.map(p=>p.seat).filter(x=>typeof x==="number"));
     if (used.size >= SEATS) { setMsg("Table is full."); return null; }
     const seat = [0,1,2,3,4].find(i=>!used.has(i));
+    
+    // upsert בטוח עם קונפליקט על (session_id, seat)
     const { data: up, error } = await supabase.from("bj_players")
-      .upsert({ session_id: session.id, player_name: name, seat, status: "idle", bet: 0, hand: [] }, { onConflict: "session_id,player_name" })
+      .upsert(
+        { session_id: session.id, player_name: name, seat, status: "idle", bet: 0, hand: [] },
+        { onConflict: "session_id,seat", ignoreDuplicates: false }
+      )
       .select().single();
-    if (error) { setMsg("Join failed"); return null; }
+    if (error) { 
+      console.error("ensureSeated error:", error);
+      setMsg("Join failed"); 
+      return null; 
+    }
     return up;
   }
 
