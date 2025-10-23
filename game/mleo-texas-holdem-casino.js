@@ -70,6 +70,10 @@ function useIOSViewportFix() {
     const setVH = () => {
       const h = vv ? vv.height : window.innerHeight;
       root.style.setProperty("--app-100vh", `${Math.round(h)}px`);
+      root.style.setProperty(
+        "--satb",
+        getComputedStyle(root).getPropertyValue("env(safe-area-inset-bottom,0px)")
+      );
     };
     const onOrient = () => requestAnimationFrame(() => setTimeout(setVH, 250));
     setVH();
@@ -482,14 +486,17 @@ export default function TexasHoldemCasinoPage() {
         const freeH = Math.max(220, rootH - used);
         document.documentElement.style.setProperty("--lobby-list-h", freeH + "px");
       } else {
-        // table/game
+        // table/game — keep game surface constant regardless of CTA visibility
+        const safeBottom = Number(getComputedStyle(document.documentElement).getPropertyValue("--satb").replace("px","")) || 0;
+        const CTA_RESERVE = 120; // px reserved for action buttons
         const used =
           headH +
           (metersRef.current?.offsetHeight || 0) +
-          (ctaRef.current?.offsetHeight || 0) +
+          CTA_RESERVE +
           topPad +
-          48;
-        const freeH = Math.max(200, rootH - used);
+          24 +
+          safeBottom;
+        const freeH = Math.max(240, rootH - used);
         document.documentElement.style.setProperty("--table-area-h", freeH + "px");
       }
     };
@@ -2219,75 +2226,112 @@ export default function TexasHoldemCasinoPage() {
             </div>
 
             {/* GAME AREA */}
-            <div className="w-full max-w-6xl overflow-hidden" style={{ maxHeight: 'var(--table-area-h, 60vh)' }}>
-              <div className="bg-green-900/50 backdrop-blur-sm border-4 border-amber-400 rounded-full aspect-[2/1] relative p-8">
+            <div className="w-full max-w-6xl overflow-hidden" style={{ height: 'var(--table-area-h, 60vh)' }}>
+              <div className="w-full h-full bg-green-900/50 backdrop-blur-sm border border-amber-400/40 rounded-2xl p-3 md:p-6 relative">
                 {/* Community Cards */}
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
                   <div className="text-center">
-                    <div className="text-white/70 text-sm mb-3">Community Cards</div>
-                    <div className="flex justify-center gap-2">
+                    <div className="text-white/70 text-xs md:text-sm mb-2 md:mb-3">Community Cards</div>
+                    <div className="flex justify-center gap-1.5 md:gap-2">
                       {visibleCards.map((card, idx) => (
                         <PlayingCard key={idx} card={card} delay={idx * 100} />
                       ))}
                       {Array.from({ length: 5 - visibleCards.length }).map((_, idx) => (
-                        <div key={idx} className="w-10 h-14 rounded bg-white/10 border border-white/20 flex items-center justify-center">?</div>
+                        <div key={idx} className="w-9 h-12 md:w-10 md:h-14 rounded bg-white/10 border border-white/20 flex items-center justify-center text-white/60 text-xs">?</div>
                       ))}
                     </div>
                   </div>
                 </div>
 
                 {/* Players positioned around the table */}
-                <div className="absolute inset-0">
-                  {players.map((player, idx) => {
-                    const isCurrentPlayer = game?.current_player_seat === player.seat_index;
-                    const isMe = player.id === playerId;
-                    const angle = (idx * 360) / players.length;
-                    const radius = 40;
-                    const x = 50 + radius * Math.cos((angle - 90) * Math.PI / 180);
-                    const y = 50 + radius * Math.sin((angle - 90) * Math.PI / 180);
-                    return (
-                      <div
-                        key={player.id}
-                        className={`absolute transform -translate-x-1/2 -translate-y-1/2 p-3 rounded-lg border-2 transition-all ${
-                          isCurrentPlayer ? 'border-yellow-400 bg-yellow-400/20' : (isMe ? 'border-purple-400 bg-purple-400/20' : 'border-white/20 bg-white/5')
-                        }`}
-                        style={{ left: `${x}%`, top: `${y}%` }}
-                      >
-                        <div className="text-center">
-                          <div className="text-white font-bold text-sm mb-1">{player.player_name}{isMe && ' (You)'}{isCurrentPlayer && ' 👑'}</div>
-                          <div className="text-emerald-400 text-xs mb-2">{fmt(player.chips)} chips</div>
-                          {player.current_bet > 0 && (<div className="text-amber-400 text-xs">Bet: {fmt(player.current_bet)}</div>)}
-                          {player.status === 'folded' && (<div className="text-red-400 text-xs">FOLDED</div>)}
-                          {player.status === 'all_in' && (<div className="text-orange-400 text-xs">ALL IN</div>)}
-                        </div>
-                        {player.hole_cards && isMe && (
-                          <div className="flex justify-center gap-1 mt-2">
-                            {player.hole_cards.map((card, cardIdx) => (
-                              <PlayingCard key={cardIdx} card={card} delay={cardIdx * 100} />
-                            ))}
+                <div className="absolute inset-0 overflow-hidden">
+                  {(() => {
+                    const vpW = (typeof window !== 'undefined') ? window.innerWidth : 1024;
+                    const vpH = (typeof window !== 'undefined') ? window.innerHeight : 768;
+                    const isPortrait = vpH >= vpW;
+                    const n = Math.max(1, (players?.length || 1));
+
+                    // Base ring/scale tuned by player count + orientation
+                    const baseRadius = isPortrait ? 34 : 40; // עוד קצת פנימה
+                    const radiusPct = Math.max(22, baseRadius - Math.max(0, n - 4) * 3);
+                    const baseScale = Math.max(0.58, (isPortrait ? 0.92 : 0.98) - Math.max(0, n - 4) * 0.065);
+
+                    // Safe bounds to avoid cross-border cut
+                    const minPct = 4;  // left/top safe margin
+                    const maxPct = 96; // right/bottom safe margin
+
+                    return players.map((player, idx) => {
+                      const isCurrentPlayer = game?.current_player_seat === player.seat_index;
+                      const isMe = player.id === playerId;
+
+                      const angle = (idx * 360) / players.length;
+                      let x = 50 + radiusPct * Math.cos((angle - 90) * Math.PI / 180);
+                      let y = 50 + radiusPct * Math.sin((angle - 90) * Math.PI / 180);
+
+                      // Distance from edges (smaller spare -> more shrink)
+                      const spareLeft   = x - minPct;
+                      const spareRight  = maxPct - x;
+                      const spareTop    = y - minPct;
+                      const spareBottom = maxPct - y;
+                      const minSpare = Math.min(spareLeft, spareRight, spareTop, spareBottom);
+                      const extraScale = minSpare < 8 ? Math.max(0.82, minSpare / 8) : 1;
+
+                      // Clamp to safe bounds
+                      x = Math.min(maxPct, Math.max(minPct, x));
+                      y = Math.min(maxPct, Math.max(minPct, y));
+
+                      const scale = baseScale * extraScale;
+
+                      return (
+                        <div
+                          key={player.id}
+                          className={`absolute rounded-lg border transition-all ${
+                            isCurrentPlayer ? 'border-yellow-400 bg-yellow-400/15' : (isMe ? 'border-purple-400 bg-purple-400/15' : 'border-white/15 bg-white/5')
+                          }`}
+                          style={{
+                            left: `${x}%`,
+                            top: `${y}%`,
+                            transform: `translate(-50%, -50%) scale(${scale})`,
+                            transformOrigin: 'center center',
+                            padding: '0.5rem'
+                          }}
+                        >
+                          <div className="text-center">
+                            <div className="text-white font-bold text-[11px] md:text-sm mb-0.5">{player.player_name}{isMe && ' (You)'}{isCurrentPlayer && ' 👑'}</div>
+                            <div className="text-emerald-400 text-[10px] md:text-xs mb-1">{fmt(player.chips)} chips</div>
+                            {player.current_bet > 0 && (<div className="text-amber-300 text-[10px]">Bet: {fmt(player.current_bet)}</div>)}
+                            {player.status === 'folded' && (<div className="text-red-400 text-[10px]">FOLDED</div>)}
+                            {player.status === 'all_in' && (<div className="text-orange-400 text-[10px]">ALL IN</div>)}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                          {player.hole_cards && isMe && (
+                            <div className="flex justify-center gap-1 mt-1">
+                              {player.hole_cards.map((card, cardIdx) => (
+                                <PlayingCard key={cardIdx} card={card} delay={cardIdx * 100} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             </div>
 
             {/* CTA / Actions */}
-            <div ref={ctaRef} className="w-full max-w-6xl mt-2">
+            <div ref={ctaRef} className="w-full max-w-6xl mt-2 min-h-[120px] flex items-center justify-center">
               {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && game?.round !== 'finished' && game?.round !== 'showdown' && !winnerModal.open && (
                 <div className="text-center">
                   <div className="text-white/70 text-sm mb-2">Your Turn {timeLeft > 0 && `(${timeLeft}s)`}</div>
-                  <div className="flex justify-center gap-3 flex-wrap">
-                    <button onClick={() => handlePlayerAction('fold')} className="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all">FOLD</button>
-                    <button onClick={() => handlePlayerAction(game?.current_bet > (myPlayer?.current_bet || 0) ? 'call' : 'check')} className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all">{game?.current_bet > (myPlayer?.current_bet || 0) ? 'CALL' : 'CHECK'}</button>
-                    <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2">
-                      <input type="range" min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)} max={getMaxRaiseTo(myPlayer)} step={selectedTable?.big_blind || 1} value={raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))} onChange={(e) => setRaiseTo(Number(e.target.value))} className="w-40" />
-                      <input type="number" className="w-24 bg-black/40 border border-white/20 rounded px-2 py-1 text-white" value={raiseTo ?? ''} min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)} max={getMaxRaiseTo(myPlayer)} step={selectedTable?.big_blind || 1} onChange={(e) => setRaiseTo(Math.min(Math.max(Number(e.target.value) || 0, (game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)), getMaxRaiseTo(myPlayer)))} />
-                      <button onClick={() => handlePlayerAction('raise', raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)))} className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold">RAISE TO</button>
+                  <div className="flex justify-center gap-2 md:gap-3 flex-wrap">
+                    <button onClick={() => handlePlayerAction('fold')} className="px-4 py-2 md:px-6 md:py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all">FOLD</button>
+                    <button onClick={() => handlePlayerAction(game?.current_bet > (myPlayer?.current_bet || 0) ? 'call' : 'check')} className="px-4 py-2 md:px-6 md:py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all">{game?.current_bet > (myPlayer?.current_bet || 0) ? 'CALL' : 'CHECK'}</button>
+                    <div className="flex items-center gap-2 bg-white/10 rounded-lg px-2 md:px-3 py-1.5 md:py-2">
+                      <input type="range" min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)} max={getMaxRaiseTo(myPlayer)} step={selectedTable?.big_blind || 1} value={raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))} onChange={(e) => setRaiseTo(Number(e.target.value))} className="w-32 md:w-40" />
+                      <input type="number" className="w-20 md:w-24 bg-black/40 border border-white/20 rounded px-2 py-1 text-white" value={raiseTo ?? ''} min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)} max={getMaxRaiseTo(myPlayer)} step={selectedTable?.big_blind || 1} onChange={(e) => setRaiseTo(Math.min(Math.max(Number(e.target.value) || 0, (game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)), getMaxRaiseTo(myPlayer)))} />
+                      <button onClick={() => handlePlayerAction('raise', (raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))))} className="px-3 py-1.5 md:px-4 md:py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold">RAISE TO</button>
                     </div>
-                    <button onClick={() => handlePlayerAction('allin')} className="px-6 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all">ALL IN</button>
+                    <button onClick={() => handlePlayerAction('allin')} className="px-4 py-2 md:px-6 md:py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all">ALL IN</button>
                   </div>
                 </div>
               )}
