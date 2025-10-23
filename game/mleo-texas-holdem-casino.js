@@ -2014,10 +2014,11 @@ export default function TexasHoldemCasinoPage() {
                 <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl">
                   <h2 className="text-2xl font-extrabold mb-4">🃏 How to Play</h2>
                   <div className="space-y-3 text-sm text-white/90">
-                    <p><strong>1. Enter your name:</strong> כתוב שם בכרטיסית “Your Balance”.</p>
-                    <p><strong>2. Choose a table:</strong> בדוק Min Buy‑in ו‑Blinds, לחץ JOIN TABLE.</p>
-                    <p><strong>3. Play:</strong> כשתתחיל יד – פעל בתורך (Fold / Check/Call / Raise / All‑in).</p>
-                    <p><strong>Tip:</strong> השם נשמר אוטומטית גם לאחר רענון העמוד.</p>
+                    <p><strong>1. Enter your name:</strong> Type your player name in “Your Balance”.</p>
+                    <p><strong>2. Join a table:</strong> Review Min Buy‑in and Blinds, then press <strong>JOIN TABLE</strong>.</p>
+                    <p><strong>3. Gameplay:</strong> On your turn choose <strong>Fold</strong>, <strong>Check/Call</strong>, or <strong>Raise/All‑In</strong>. A turn timer applies.</p>
+                    <p><strong>Goal:</strong> Win pots by making the best 5‑card hand or by all opponents folding.</p>
+                    <p><strong>Tip:</strong> Your name is saved automatically across refresh.</p>
                   </div>
                   <button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">
                     Close
@@ -2032,8 +2033,8 @@ export default function TexasHoldemCasinoPage() {
                 <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
                   <h2 className="text-2xl font-extrabold mb-4">📊 Stats</h2>
                   <div className="space-y-3 text-sm text-white/90">
-                    <p>תמיכה בסטטיסטיקות אישיות למשחק חדרים תוסף בקרוב.</p>
-                    <p>כעת ניתן לעקוב ידנית אחרי הישגים/זכיות במהלך הסשן.</p>
+                    <p>Session statistics for room poker will appear here.</p>
+                    <p>Track wins, hands played, and profit per session.</p>
                   </div>
                   <button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">
                     Close
