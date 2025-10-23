@@ -488,7 +488,7 @@ export default function TexasHoldemCasinoPage() {
       } else {
         // table/game — keep game surface constant regardless of CTA visibility
         const safeBottom = Number(getComputedStyle(document.documentElement).getPropertyValue("--satb").replace("px","")) || 0;
-        const CTA_RESERVE = 120; // px reserved for action buttons
+        const CTA_RESERVE = 90; // px reserved for action buttons (smaller to grow game surface)
         const used =
           headH +
           (metersRef.current?.offsetHeight || 0) +
@@ -2319,19 +2319,26 @@ export default function TexasHoldemCasinoPage() {
             </div>
 
             {/* CTA / Actions */}
-            <div ref={ctaRef} className="w-full max-w-6xl mt-2 min-h-[120px] flex items-center justify-center">
+            <div ref={ctaRef} className="w-full max-w-6xl mt-2 min-h-[90px] flex items-center justify-center">
               {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && game?.round !== 'finished' && game?.round !== 'showdown' && !winnerModal.open && (
                 <div className="text-center">
-                  <div className="text-white/70 text-sm mb-2">Your Turn {timeLeft > 0 && `(${timeLeft}s)`}</div>
-                  <div className="flex justify-center gap-2 md:gap-3 flex-wrap">
-                    <button onClick={() => handlePlayerAction('fold')} className="px-4 py-2 md:px-6 md:py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all">FOLD</button>
-                    <button onClick={() => handlePlayerAction(game?.current_bet > (myPlayer?.current_bet || 0) ? 'call' : 'check')} className="px-4 py-2 md:px-6 md:py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all">{game?.current_bet > (myPlayer?.current_bet || 0) ? 'CALL' : 'CHECK'}</button>
-                    <div className="flex items-center gap-2 bg-white/10 rounded-lg px-2 md:px-3 py-1.5 md:py-2">
-                      <input type="range" min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)} max={getMaxRaiseTo(myPlayer)} step={selectedTable?.big_blind || 1} value={raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))} onChange={(e) => setRaiseTo(Number(e.target.value))} className="w-32 md:w-40" />
-                      <input type="number" className="w-20 md:w-24 bg-black/40 border border-white/20 rounded px-2 py-1 text-white" value={raiseTo ?? ''} min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)} max={getMaxRaiseTo(myPlayer)} step={selectedTable?.big_blind || 1} onChange={(e) => setRaiseTo(Math.min(Math.max(Number(e.target.value) || 0, (game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)), getMaxRaiseTo(myPlayer)))} />
-                      <button onClick={() => handlePlayerAction('raise', (raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))))} className="px-3 py-1.5 md:px-4 md:py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold">RAISE TO</button>
+                  <div className="flex justify-center items-center gap-1.5 md:gap-2 flex-wrap">
+                    {/* Timer inline with controls */}
+                    <div className="px-2 py-1 rounded-md bg-white/10 text-white/80 text-xs md:text-sm">
+                      {timeLeft > 0 ? `Your Turn (${timeLeft}s)` : 'Your Turn'}
                     </div>
-                    <button onClick={() => handlePlayerAction('allin')} className="px-4 py-2 md:px-6 md:py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all">ALL IN</button>
+
+                    <button onClick={() => handlePlayerAction('fold')} className="px-3 py-1.5 md:px-5 md:py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs md:text-sm transition-all">FOLD</button>
+
+                    <button onClick={() => handlePlayerAction(game?.current_bet > (myPlayer?.current_bet || 0) ? 'call' : 'check')} className="px-3 py-1.5 md:px-5 md:py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs md:text-sm transition-all">{game?.current_bet > (myPlayer?.current_bet || 0) ? 'CALL' : 'CHECK'}</button>
+
+                    <div className="flex items-center gap-1.5 md:gap-2 bg-white/10 rounded-lg px-2 md:px-3 py-1 md:py-2">
+                      <input type="range" min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)} max={getMaxRaiseTo(myPlayer)} step={selectedTable?.big_blind || 1} value={raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))} onChange={(e) => setRaiseTo(Number(e.target.value))} className="w-28 md:w-36" />
+                      <input type="number" className="w-16 md:w-20 bg-black/40 border border-white/20 rounded px-2 py-1 text-white text-xs md:text-sm" value={raiseTo ?? ''} min={(game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)} max={getMaxRaiseTo(myPlayer)} step={selectedTable?.big_blind || 1} onChange={(e) => setRaiseTo(Math.min(Math.max(Number(e.target.value) || 0, (game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0)), getMaxRaiseTo(myPlayer)))} />
+                      <button onClick={() => handlePlayerAction('raise', (raiseTo || ((game?.current_bet || 0) + getMinRaiseSize(game, selectedTable?.big_blind || 0))))} className="px-3 py-1.5 md:px-4 md:py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold text-xs md:text-sm">RAISE TO</button>
+                    </div>
+
+                    <button onClick={() => handlePlayerAction('allin')} className="px-3 py-1.5 md:px-5 md:py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs md:text-sm transition-all">ALL IN</button>
                   </div>
                 </div>
               )}
