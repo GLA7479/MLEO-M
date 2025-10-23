@@ -67,6 +67,19 @@ function HandView({ hand, size = "normal" }) {
 export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth }) {
   const name = playerName || "Guest";
 
+  // בדיקת חיבור מיידית
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase.from('bj_sessions').select('id').limit(1);
+        if (error) console.error('[MP ping] ERROR:', error);
+        else console.log('[MP ping] OK – rows:', data?.length ?? 0);
+      } catch (e) {
+        console.error('[MP ping] FAILED:', e);
+      }
+    })();
+  }, []);
+
   const [session, setSession] = useState(null);
   const [players, setPlayers] = useState([]);
   const [roomMembers, setRoomMembers] = useState([]);
@@ -84,14 +97,33 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   useEffect(() => {
     if (!roomId) return;
     (async () => {
-      const { data } = await supabase.from("bj_sessions").select("*").eq("room_code", roomId).maybeSingle();
-      if (!data) {
-        const shoe = freshShoe(4);
-        const { data: created } = await supabase.from("bj_sessions")
-          .insert({ room_code: roomId, state: 'lobby', shoe, dealer_hand: [], seat_count: SEATS, min_bet: MIN_BET })
-          .select().single();
-        setSession(created);
-      } else setSession(data);
+      const { data: selected, error: selErr } = await supabase.from("bj_sessions").select("*").eq("room_code", roomId).maybeSingle();
+      if (selErr) { console.error('[bj_sessions.select] error:', selErr); return; }
+      
+      if (selected) {
+        setSession(selected);
+      } else {
+        const payload = {
+          room_code: roomId,
+          state: 'lobby',
+          shoe: freshShoe(4),
+          dealer_hand: [],
+          seat_count: SEATS,
+          min_bet: MIN_BET
+        };
+
+        const { data: upserted, error: upErr } = await supabase
+          .from("bj_sessions")
+          .upsert(payload, { onConflict: "room_code" })
+          .select()
+          .single();
+
+        if (upErr) {
+          console.error("[bj_sessions.upsert] error:", upErr);
+          return;
+        }
+        setSession(upserted);
+      }
     })();
   }, [roomId]);
 
@@ -143,19 +175,31 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   // ---------- Actions ----------
   async function ensureSeated() {
     if (!session) return;
+
+    // כבר יש לי שורה?
     const existing = players.find(p => p.player_name === name);
     if (existing) return;
 
+    // מצא מושב פנוי
+    const used = new Set(players.map(p => p.seat));
+    let free = 0;
+    while (used.has(free) && free < (session.seat_count ?? SEATS)) free++;
+
+    if (free >= (session.seat_count ?? SEATS)) {
+      setMsg("No free seats");
+      return;
+    }
+
     const { data, error } = await supabase.from("bj_players").upsert({
       session_id: session.id,
-      seat: 0, // Auto-assign first available seat
+      seat: free,
       player_name: name,
       stack: Math.min(vault, 10000),
       bet: 0,
       hand: [],
       status: 'seated',
       acted: false
-    }, { onConflict: "session_id,seat", ignoreDuplicates: false }).select().single();
+    }, { onConflict: "session_id,seat" }).select().single();
 
     if (error) {
       console.error("Failed to join seat:", error);
@@ -172,7 +216,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     }).eq("id", myRow.id);
 
     if (error) {
-      console.error("Failed to place bet:", error);
+      console.error('[bj_players.update] placeBet error:', error);
       setMsg("Failed to place bet");
     }
   }
