@@ -202,11 +202,29 @@ export default function ArcadeOnline(){
               <input type="text" placeholder="Your name…" value={playerName} onChange={(e)=>setPlayerName(e.target.value)} className="w-full px-2 py-1.5 text-xs rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400" maxLength={20} />
             </div>
             
-            {/* Room browser for MP games on mobile */}
-            {(activeGame === 'blackjack' || activeGame === 'poker') && (
+            {/* Room browser for MP games on mobile - רק אם לא בחדר */}
+            {(activeGame === 'blackjack' || activeGame === 'poker') && !roomId && (
               <div className="bg-white/5 border border-white/10 rounded-xl p-2">
                 <div className="text-white/80 text-xs mb-1">Rooms</div>
                 <RoomBrowser gameId={activeGame} playerName={playerName} onJoinRoom={onJoinRoom} />
+              </div>
+            )}
+            
+            {/* כפתור יציאה מהחדר במובייל - רק אם בחדר */}
+            {(activeGame === 'blackjack' || activeGame === 'poker') && roomId && (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-2">
+                <div className="text-white/80 text-xs mb-1">In Room</div>
+                <button 
+                  onClick={() => {
+                    const url = { pathname: router.pathname, query: { ...router.query } };
+                    delete url.query.room;
+                    router.push(url, undefined, { shallow: true });
+                    setRoomId("");
+                  }}
+                  className="w-full px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold"
+                >
+                  Leave Room
+                </button>
               </div>
             )}
           </div>

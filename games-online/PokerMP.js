@@ -235,35 +235,44 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     }));
     // לאפשר גם יד עם שחקן יחיד לצורכי פיתוח
     if (sit.length < 1) return; // שמור על דרישה למינימום 1
+
     await supabase
       .from("poker_players")
-      .upsert(sit, { onConflict: "session_id,seat_index", ignoreDuplicates: true });
+      .upsert(sit, {
+        onConflict: "session_id,seat_index",
+        ignoreDuplicates: false,
+        returning: "minimal",
+      });
 
-    // מחלק Hole — גרסה באצווה (אמין ומהיר)
+    // מחלק Hole — בטוח ומפורש
     {
-      let d = [...deck];
+      // לפעמים ה-SELECT מגיע לפני שהשורות נכתבו בפועל; דילי קטן מונע מירוץ
+      await new Promise(r => setTimeout(r, 40));
 
-      // נקרא את השחקנים שזה עתה נוצרו כדי לקבל IDs
       const { data: created } = await supabase
         .from("poker_players")
         .select("id, seat_index, hole_cards")
         .eq("session_id", sessionId)
         .order("seat_index");
 
+      let d = [...deck];
       const ups = [];
-      // שני סבבים: קלף ראשון לכל שחקן, ואז שני
       for (let r = 0; r < 2; r++) {
         for (const P of (created || [])) {
           const c = d.pop();
           const hand = Array.isArray(P.hole_cards) ? [...P.hole_cards, c] : [c];
           ups.push({ id: P.id, hole_cards: hand });
-          P.hole_cards = hand; // לעדכון זיכרון מקומי ללולאה
+          P.hole_cards = hand;
         }
       }
 
-      // upsert באצוות קטנות כדי להימנע ממגבלת batch
+      // ⬅️ חשוב: לציין במפורש onConflict:'id' ולכבות ignoreDuplicates (גורם ל-409)
       for (let i = 0; i < ups.length; i += 50) {
-        await supabase.from("poker_players").upsert(ups.slice(i, i + 50));
+        const chunk = ups.slice(i, i + 50);
+        const { error } = await supabase
+          .from("poker_players")
+          .upsert(chunk, { onConflict: "id", ignoreDuplicates: false, returning: "minimal" });
+        if (error) console.error("hole-cards upsert error:", error);
       }
 
       await supabase.from("poker_sessions").update({ deck_remaining: d }).eq("id", sessionId);
@@ -288,7 +297,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
   async function takeChips(sessionId, seatIndex, amount, action){
     const { data: pl } = await supabase.from("poker_players")
       .select("*").eq("session_id", sessionId).eq("seat_index", seatIndex).maybeSingle();
-    if(!pl) return; // <-- חשוב: אל תנסה לגבות על מושב שלא מאויש
+    if(!pl) return; // ⬅️ אל תגבה ממושב ריק
     
     const { data: pot } = await supabase.from("poker_pots").select("*").eq("session_id", sessionId).maybeSingle();
 
