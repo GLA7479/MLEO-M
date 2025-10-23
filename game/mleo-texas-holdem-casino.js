@@ -476,7 +476,7 @@ export default function TexasHoldemCasinoPage() {
       const topPad = headH + 8;
 
       if (screen === "lobby") {
-        const used = headH + (ctaRef.current?.offsetHeight || 0) + topPad + 48;
+        const used = headH + (ctaRef.current?.offsetHeight || 0) + topPad + 12;
         const freeH = Math.max(160, rootH - used);
         document.documentElement.style.setProperty("--lobby-list-h", freeH + "px");
       } else {
