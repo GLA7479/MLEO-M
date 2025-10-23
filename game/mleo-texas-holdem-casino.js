@@ -488,7 +488,8 @@ export default function TexasHoldemCasinoPage() {
       } else {
         // table/game — keep game surface constant regardless of CTA visibility
         const safeBottom = Number(getComputedStyle(document.documentElement).getPropertyValue("--satb").replace("px","")) || 0;
-        const CTA_RESERVE = 98; // px reserved for action buttons (accounts for increased spacing)
+        // Reserve a modest, fixed space for CTA/actions (smaller to free game area)
+        const CTA_RESERVE = 72;
         const REMOVED_ROW_RECLAIM = 16;
         const used =
           headH +
@@ -2226,8 +2227,8 @@ export default function TexasHoldemCasinoPage() {
             </div>
 
             {/* GAME AREA */}
-            <div className="w-full max-w-6xl overflow-hidden" style={{ height: 'var(--table-area-h, 60vh)' }}>
-              <div className="w-full h-full bg-green-900/50 backdrop-blur-sm border border-amber-400/40 rounded-2xl p-3 md:p-6 relative" style={{ marginTop: '4px', marginBottom: '4px' }}>
+            <div className="w-full max-w-6xl overflow-visible" style={{ height: 'var(--table-area-h, 60vh)', paddingBottom: '10px' }}>
+              <div className="w-full h-full bg-green-900/50 backdrop-blur-sm border border-amber-400/40 rounded-2xl p-3 md:p-6 relative" style={{ marginTop: '6px', marginBottom: '0px' }}>
                 {/* Community Cards */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" style={{ top: 'calc(50% - 36px)' }}>
                   <div className="text-center">
@@ -2348,7 +2349,7 @@ export default function TexasHoldemCasinoPage() {
             </div>
 
             {/* CTA / Actions */}
-            <div ref={ctaRef} className="w-full max-w-6xl mt-3 md:mt-4 min-h-[90px] flex items-center justify-center">
+            <div ref={ctaRef} className="w-full max-w-6xl mt-2 md:mt-3 min-h-[90px] flex items-center justify-center">
               {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && game?.round !== 'finished' && game?.round !== 'showdown' && !winnerModal.open && (
                 <div className="text-center">
                   <div className="flex justify-center items-center gap-1.5 md:gap-2 flex-wrap md:flex-nowrap">
