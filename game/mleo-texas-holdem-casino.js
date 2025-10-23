@@ -488,14 +488,16 @@ export default function TexasHoldemCasinoPage() {
       } else {
         // table/game — keep game surface constant regardless of CTA visibility
         const safeBottom = Number(getComputedStyle(document.documentElement).getPropertyValue("--satb").replace("px","")) || 0;
-        const CTA_RESERVE = 90; // px reserved for action buttons (smaller to grow game surface)
+        const CTA_RESERVE = 98; // px reserved for action buttons (accounts for increased spacing)
+        const REMOVED_ROW_RECLAIM = 16;
         const used =
           headH +
           (metersRef.current?.offsetHeight || 0) +
           CTA_RESERVE +
           topPad +
           24 +
-          safeBottom;
+          safeBottom -
+          REMOVED_ROW_RECLAIM;
         const freeH = Math.max(240, rootH - used);
         document.documentElement.style.setProperty("--table-area-h", freeH + "px");
       }
@@ -2216,13 +2218,11 @@ export default function TexasHoldemCasinoPage() {
 
           {/* BODY */}
           <div className="relative w-full h-full flex flex-col items-center justify-start pt-[calc(var(--head-h,0px)+8px)] px-2 pb-3">
-            <div ref={metersRef} className="w-full max-w-6xl bg-black/30 rounded-xl p-3 mb-2 backdrop-blur-sm border border-white/10 text-center">
-              <div className="text-white/70 text-xs">Round: {game?.round || 'preflop'} • Current bet: {fmt(game?.current_bet || 0)}</div>
-            </div>
-
-            {/* Leave Table button (moved from header) */}
-            <div className="w-full max-w-6xl text-right mb-2">
-              <button onClick={handleLeaveTable} className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold">Leave Table</button>
+            <div ref={metersRef} className="w-full max-w-6xl bg-black/30 rounded-xl p-2.5 md:p-3 mb-2 backdrop-blur-sm border border-white/10">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-white/70 text-xs md:text-sm">Round: {game?.round || 'preflop'} • Current bet: {fmt(game?.current_bet || 0)}</div>
+                <button onClick={handleLeaveTable} className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs md:text-sm font-bold">Leave Table</button>
+              </div>
             </div>
 
             {/* GAME AREA */}
@@ -2348,7 +2348,7 @@ export default function TexasHoldemCasinoPage() {
             </div>
 
             {/* CTA / Actions */}
-            <div ref={ctaRef} className="w-full max-w-6xl mt-2 min-h-[90px] flex items-center justify-center">
+            <div ref={ctaRef} className="w-full max-w-6xl mt-3 md:mt-4 min-h-[90px] flex items-center justify-center">
               {isMyTurn && myPlayer?.status !== PLAYER_STATUS.FOLDED && game?.status === GAME_STATUS.PLAYING && game?.round !== 'finished' && game?.round !== 'showdown' && !winnerModal.open && (
                 <div className="text-center">
                   <div className="flex justify-center items-center gap-1.5 md:gap-2 flex-wrap md:flex-nowrap">
