@@ -2227,7 +2227,7 @@ export default function TexasHoldemCasinoPage() {
 
             {/* GAME AREA */}
             <div className="w-full max-w-6xl overflow-hidden" style={{ height: 'var(--table-area-h, 60vh)' }}>
-              <div className="w-full h-full bg-green-900/50 backdrop-blur-sm border border-amber-400/40 rounded-2xl p-3 md:p-6 relative">
+              <div className="w-full h-full bg-green-900/50 backdrop-blur-sm border border-amber-400/40 rounded-2xl p-3 md:p-6 relative" style={{ marginTop: '4px', marginBottom: '4px' }}>
                 {/* Community Cards */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
                   <div className="text-center">
@@ -2252,9 +2252,9 @@ export default function TexasHoldemCasinoPage() {
                     const n = Math.max(1, (players?.length || 1));
 
                     // Base ring/scale tuned by player count + orientation
-                    const baseRadius = isPortrait ? 34 : 40; // עוד קצת פנימה
-                    const radiusPct = Math.max(22, baseRadius - Math.max(0, n - 4) * 3);
-                    const baseScale = Math.max(0.58, (isPortrait ? 0.92 : 0.98) - Math.max(0, n - 4) * 0.065);
+                    const baseRadius = isPortrait ? 33 : 38; // עוד קצת פנימה
+                    const radiusPct = Math.max(20, baseRadius - Math.max(0, n - 4) * 3.2);
+                    const baseScale = Math.max(0.52, (isPortrait ? 0.88 : 0.94) - Math.max(0, n - 4) * 0.07);
 
                     // Safe bounds to avoid cross-border cut
                     const minPct = 4;  // left/top safe margin
@@ -2274,7 +2274,7 @@ export default function TexasHoldemCasinoPage() {
                       const spareTop    = y - minPct;
                       const spareBottom = maxPct - y;
                       const minSpare = Math.min(spareLeft, spareRight, spareTop, spareBottom);
-                      const extraScale = minSpare < 8 ? Math.max(0.82, minSpare / 8) : 1;
+                      const extraScale = minSpare < 10 ? Math.max(0.78, minSpare / 10) : 1;
 
                       // Clamp to safe bounds
                       x = Math.min(maxPct, Math.max(minPct, x));
@@ -2297,11 +2297,11 @@ export default function TexasHoldemCasinoPage() {
                           }}
                         >
                           <div className="text-center">
-                            <div className="text-white font-bold text-[11px] md:text-sm mb-0.5">{player.player_name}{isMe && ' (You)'}{isCurrentPlayer && ' 👑'}</div>
-                            <div className="text-emerald-400 text-[10px] md:text-xs mb-1">{fmt(player.chips)} chips</div>
-                            {player.current_bet > 0 && (<div className="text-amber-300 text-[10px]">Bet: {fmt(player.current_bet)}</div>)}
-                            {player.status === 'folded' && (<div className="text-red-400 text-[10px]">FOLDED</div>)}
-                            {player.status === 'all_in' && (<div className="text-orange-400 text-[10px]">ALL IN</div>)}
+                            <div className="text-white font-bold text-[10px] md:text-[12px] mb-0.5">{player.player_name}{isMe && ' (You)'}{isCurrentPlayer && ' 👑'}</div>
+                            <div className="text-emerald-400 text-[9px] md:text-[11px] mb-0.5">{fmt(player.chips)} chips</div>
+                            {player.current_bet > 0 && (<div className="text-amber-300 text-[9px]">Bet: {fmt(player.current_bet)}</div>)}
+                            {player.status === 'folded' && (<div className="text-red-400 text-[9px]">FOLDED</div>)}
+                            {player.status === 'all_in' && (<div className="text-orange-400 text-[9px]">ALL IN</div>)}
                           </div>
                           {player.hole_cards && isMe && (
                             <div className="flex justify-center gap-1 mt-1">
