@@ -2229,7 +2229,7 @@ export default function TexasHoldemCasinoPage() {
             <div className="w-full max-w-6xl overflow-hidden" style={{ height: 'var(--table-area-h, 60vh)' }}>
               <div className="w-full h-full bg-green-900/50 backdrop-blur-sm border border-amber-400/40 rounded-2xl p-3 md:p-6 relative" style={{ marginTop: '4px', marginBottom: '4px' }}>
                 {/* Community Cards */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" style={{ top: 'calc(50% - 24px)' }}>
                   <div className="text-center">
                     <div className="text-white/70 text-xs md:text-sm mb-2 md:mb-3">Community Cards</div>
                     <div className="flex justify-center gap-1.5 md:gap-2">
@@ -2272,6 +2272,12 @@ export default function TexasHoldemCasinoPage() {
                       let x = 50 + radiusPct * Math.cos((angle - 90) * Math.PI / 180);
                       let y = 50 + radiusPct * Math.sin((angle - 90) * Math.PI / 180);
 
+                      // Extra spacing between my cards and the community cards (push me slightly down)
+                      if (isMe) {
+                        const myExtraGapPct = isPortrait ? 6 : 4; // closer to flop and above bottom edge
+                        y -= myExtraGapPct; // move closer to center (flop)
+                      }
+
                       // Distance from edges (smaller spare -> more shrink)
                       const spareLeft   = x - minPct;
                       const spareRight  = maxPct - x;
@@ -2279,6 +2285,11 @@ export default function TexasHoldemCasinoPage() {
                       const spareBottom = maxPct - y;
                       const minSpare = Math.min(spareLeft, spareRight, spareTop, spareBottom);
                       const extraScale = minSpare < 10 ? Math.max(0.78, minSpare / 10) : 1;
+
+                      // If player is in the upper half (above the flop), nudge slightly downward to tighten gap
+                      if (y < 50) {
+                        y += 1.2;
+                      }
 
                       // Clamp to safe bounds
                       x = Math.min(maxPct, Math.max(minPct, x));
