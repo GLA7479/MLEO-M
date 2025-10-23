@@ -205,23 +205,37 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
 
     let sessionId;
     if(!exist){
-      const { data: ins } = await supabase.from("poker_sessions").insert({
+      const { data: ins, error: insErr } = await supabase.from("poker_sessions").insert({
         room_id: roomId, hand_no:1, stage:"preflop",
         dealer_seat: dealer, sb_seat: sb, bb_seat: bbSeat,
         board:[], deck_remaining: deck, pot_total:0,
         current_turn: (bbSeat+1)%seats,
         turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
       }).select().single();
+      
+      if (insErr || !ins) {
+        console.error("Failed to create poker session:", insErr);
+        setMsg("Failed to start hand");
+        return;
+      }
+      
       sessionId = ins.id;
       await supabase.from("poker_pots").insert({ session_id: sessionId, total: 0, eligible: [] });
     } else {
-      const { data: upd } = await supabase.from("poker_sessions").update({
+      const { data: upd, error: updErr } = await supabase.from("poker_sessions").update({
         hand_no: exist.hand_no+1, stage:"preflop",
         dealer_seat: dealer, sb_seat: sb, bb_seat: bbSeat,
         board:[], deck_remaining: deck, pot_total:0, winners:[],
         current_turn: (bbSeat+1)%seats,
         turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
       }).eq("id", exist.id).select().single();
+      
+      if (updErr || !upd) {
+        console.error("Failed to update poker session:", updErr);
+        setMsg("Failed to start hand");
+        return;
+      }
+      
       sessionId = upd.id;
       await supabase.from("poker_pots").update({ total:0, eligible:[] }).eq("session_id", sessionId);
       await supabase.from("poker_players").delete().eq("session_id", sessionId);

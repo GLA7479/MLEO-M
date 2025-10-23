@@ -101,6 +101,8 @@ export default function ArcadeOnline(){
   const [playerName,setPlayerName]=useState("");
   const [activeGame,setActiveGame]=useState("dice"); // default
   const [roomId, setRoomId] = useState("");
+  const [showRoomModal, setShowRoomModal] = useState(false);
+  const [showSeatModal, setShowSeatModal] = useState(false);
   const wrapRef=useRef(null);
 
   // read game from query (?game=)
@@ -180,59 +182,8 @@ export default function ArcadeOnline(){
           </div>
         </div>
 
-        {/* BODY: Mobile-first layout */}
-        <div className="relative w-full h-full flex flex-col md:flex-row gap-0.5 md:gap-3 pt-[calc(52px+var(--satb,0px))] px-0.5 md:px-3 pb-0.5 md:pb-3">
-          
-          {/* MOBILE: Top bar with game selector and player info - רק אם לא בחדר */}
-          {!roomId && (
-            <div className="md:hidden flex flex-col gap-0.5 mb-0.5">
-              {/* Game selector */}
-              <div className="bg-white/5 border border-white/10 rounded p-1">
-                <div className="text-white/80 text-[10px] mb-0.5">Select Game</div>
-                <select value={activeGame} onChange={(e)=>selectGame(e.target.value)} className="w-full bg-black/30 text-white text-xs rounded px-1.5 py-1 border border-white/20">
-                  {REGISTRY.map(g=> <option key={g.id} value={g.id}>{g.icon} {g.title}</option>)}
-                </select>
-              </div>
-              
-              {/* Player info mobile */}
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded p-1">
-                <div className="flex items-center justify-between mb-0.5">
-                  <div className="text-white font-semibold text-[10px]">Balance</div>
-                  <div className="text-emerald-400 text-xs font-extrabold">{fmt(vaultAmt)} MLEO</div>
-                </div>
-                <input type="text" placeholder="Your name…" value={playerName} onChange={(e)=>setPlayerName(e.target.value)} className="w-full px-1.5 py-0.5 text-[10px] rounded bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400" maxLength={20} />
-              </div>
-              
-              {/* Room browser for MP games on mobile */}
-              {(activeGame === 'blackjack' || activeGame === 'poker') && (
-                <div className="bg-white/5 border border-white/10 rounded p-1">
-                  <div className="text-white/80 text-[10px] mb-0.5">Rooms</div>
-                  <RoomBrowser gameId={activeGame} playerName={playerName} onJoinRoom={onJoinRoom} />
-                </div>
-              )}
-            </div>
-          )}
-          
-          {/* MOBILE: In-room header - רק אם בחדר */}
-          {roomId && (
-            <div className="md:hidden flex items-center justify-between bg-white/5 border border-white/10 rounded p-1 mb-0.5">
-              <div className="flex items-center gap-1">
-                <div className="text-white font-semibold text-xs">{activeGame === 'blackjack' ? '🃏' : '♠️'} {activeGame === 'blackjack' ? 'Blackjack' : 'Poker'}</div>
-                <div className="text-white/60 text-[10px]">Room</div>
-              </div>
-              <button 
-                onClick={() => {
-                  const url = { pathname: router.pathname, query: { ...router.query } };
-                  delete url.query.room;
-                  router.push(url, undefined, { shallow: true });
-                  setRoomId("");
-                }}
-                className="px-2 py-0.5 rounded bg-red-600 hover:bg-red-700 text-white text-[10px] font-semibold"
-              >
-                Leave
-              </button>
-            </div>
-          )}
+        {/* BODY: Responsive layout for all screen sizes */}
+        <div className="relative w-full h-full flex flex-col lg:flex-row gap-1 lg:gap-3 pt-[calc(52px+var(--satb,0px))] px-1 lg:px-3 pb-1 lg:pb-3">
 
           {/* DESKTOP: Left sidebar (games) */}
           <aside className="w-[260px] hidden md:flex flex-col gap-3 bg-white/5 border border-white/10 rounded-2xl p-3">
@@ -250,7 +201,36 @@ export default function ArcadeOnline(){
           </aside>
 
           {/* Main game area */}
-          <main className="flex-1 border border-white/10 rounded md:rounded-2xl backdrop-blur-md bg-gradient-to-b from-white/5 to-white/10 overflow-hidden min-h-0">
+          <main className="flex-1 border border-white/10 rounded md:rounded-2xl backdrop-blur-md bg-gradient-to-b from-white/5 to-white/10 overflow-hidden min-h-0 relative">
+            {/* Mobile game controls overlay */}
+            <div className="md:hidden absolute top-1 right-1 z-10 flex gap-1">
+              {roomId && (
+                <button 
+                  onClick={() => {
+                    const url = { pathname: router.pathname, query: { ...router.query } };
+                    delete url.query.room;
+                    router.push(url, undefined, { shallow: true });
+                    setRoomId("");
+                  }}
+                  className="px-2 py-1 rounded bg-red-600 text-white text-[10px] font-semibold"
+                >
+                  Leave
+                </button>
+              )}
+              <button 
+                onClick={() => setShowSeatModal(true)}
+                className="px-2 py-1 rounded bg-blue-600 text-white text-[10px] font-semibold"
+              >
+                Seats
+              </button>
+              <button 
+                onClick={() => setShowRoomModal(true)}
+                className="px-2 py-1 rounded bg-green-600 text-white text-[10px] font-semibold"
+              >
+                Rooms
+              </button>
+            </div>
+            
             <div className="h-full w-full">
               <GameViewport gameId={activeGame} vault={vaultAmt} setVaultBoth={setVaultBoth} roomId={roomId} playerName={playerName} />
             </div>
@@ -308,6 +288,63 @@ export default function ArcadeOnline(){
             )}
           </aside>
         </div>
+
+        {/* Room Selection Modal */}
+        {showRoomModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
+            <div className="bg-slate-800 border border-white/20 rounded-lg w-full max-w-sm max-h-[80vh] overflow-hidden">
+              <div className="flex items-center justify-between p-2 border-b border-white/10">
+                <div className="text-white font-semibold text-sm">Select Room</div>
+                <button 
+                  onClick={() => setShowRoomModal(false)}
+                  className="text-white/60 hover:text-white text-lg"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="p-2 max-h-[60vh] overflow-y-auto">
+                <RoomBrowser gameId={activeGame} playerName={playerName} onJoinRoom={(roomId) => {
+                  setRoomId(roomId);
+                  setShowRoomModal(false);
+                  onJoinRoom(roomId);
+                }} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Seat Selection Modal */}
+        {showSeatModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
+            <div className="bg-slate-800 border border-white/20 rounded-lg w-full max-w-xs">
+              <div className="flex items-center justify-between p-2 border-b border-white/10">
+                <div className="text-white font-semibold text-sm">Select Seat</div>
+                <button 
+                  onClick={() => setShowSeatModal(false)}
+                  className="text-white/60 hover:text-white text-lg"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="p-2">
+                <div className="grid grid-cols-2 gap-1">
+                  {[0,1,2,3,4,5].map(seat => (
+                    <button
+                      key={seat}
+                      onClick={() => {
+                        // לוגיקת בחירת מושב - יועבר למשחק
+                        setShowSeatModal(false);
+                      }}
+                      className="p-2 rounded bg-white/10 hover:bg-white/20 text-white text-xs"
+                    >
+                      Seat {seat + 1}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );
