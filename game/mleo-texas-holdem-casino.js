@@ -2249,7 +2249,7 @@ export default function TexasHoldemCasinoPage() {
 
             {/* GAME AREA */}
             <div className="w-full max-w-6xl overflow-visible" style={{ height: 'var(--table-area-h, 60vh)', paddingBottom: '10px' }}>
-              <div className="w-full h-full backdrop-blur-sm border border-amber-400/40 rounded-2xl p-3 md:p-6 relative" style={{ marginTop: '6px', marginBottom: '0px', background: (isNarrow ? TABLE_BG_MOBILE : TABLE_BG_DESKTOP) ? `linear-gradient(rgba(0,0,0,0.10), rgba(0,0,0,0.10)), url('${isNarrow ? TABLE_BG_MOBILE : TABLE_BG_DESKTOP}') ${isNarrow ? 'center 38%' : 'center 50%'} / contain no-repeat, radial-gradient(ellipse at 50% 35%, rgba(16,94,66,0.92), rgba(6,36,24,0.98) 65%)` : 'radial-gradient(ellipse at 50% 35%, rgba(16,94,66,0.92), rgba(6,36,24,0.98) 65%)' }}>
+              <div className="w-full h-full backdrop-blur-sm border border-amber-400/40 rounded-2xl p-3 md:p-6 relative" style={{ marginTop: '6px', marginBottom: '0px', background: (isNarrow ? TABLE_BG_MOBILE : TABLE_BG_DESKTOP) ? `linear-gradient(rgba(0,0,0,0.10), rgba(0,0,0,0.10)), url('${isNarrow ? TABLE_BG_MOBILE : TABLE_BG_DESKTOP}') center / 100% 100% no-repeat, radial-gradient(ellipse at 50% 35%, rgba(16,94,66,0.92), rgba(6,36,24,0.98) 65%)` : 'radial-gradient(ellipse at 50% 35%, rgba(16,94,66,0.92), rgba(6,36,24,0.98) 65%)' }}>
                 {/* Community Cards */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" style={{ top: 'calc(50% - 36px)' }}>
                   <div className="text-center">
