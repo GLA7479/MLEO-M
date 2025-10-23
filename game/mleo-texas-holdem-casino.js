@@ -2286,9 +2286,11 @@ export default function TexasHoldemCasinoPage() {
                       const minSpare = Math.min(spareLeft, spareRight, spareTop, spareBottom);
                       const extraScale = minSpare < 10 ? Math.max(0.78, minSpare / 10) : 1;
 
-                      // If player is in the upper half (above the flop), nudge slightly downward to tighten gap
+                      // If player is in the upper half (above the flop), push upward to keep distance from flop
                       if (y < 50) {
-                        y += 1.2;
+                        const crowdFactor = Math.max(0, n - 2); // stronger push when 3+ players
+                        const topPush = (isPortrait ? 2.2 : 1.6) + crowdFactor * 0.6;
+                        y -= topPush;
                       }
 
                       // Clamp to safe bounds
@@ -2296,7 +2298,7 @@ export default function TexasHoldemCasinoPage() {
                       y = Math.min(maxPct, Math.max(minPct, y));
 
                       const scale = baseScale * extraScale;
-                      const finalScale = scale * (isMe ? 1.2 : 0.8);
+                      const finalScale = scale * (isMe ? 1.2 : 0.85);
 
                       return (
                         <div
@@ -2310,16 +2312,23 @@ export default function TexasHoldemCasinoPage() {
                             transform: `translate(-50%, -50%) scale(${finalScale})`,
                             transformOrigin: 'center center',
                             padding: '0.5rem',
-                            minHeight: isMe ? '120px' : '68px',
+                            minHeight: isMe ? '120px' : '76px',
+                            minWidth: isMe ? undefined : '88px',
                             overflow: 'hidden'
                           }}
                         >
-                          <div className="text-center leading-tight">
-                            <div className="text-white font-bold text-[10px] md:text-[12px] mb-0.5">{player.player_name}{isMe && ' (You)'}{isCurrentPlayer && ' 👑'}</div>
-                            <div className="text-emerald-400 text-[9px] md:text-[11px] mb-0.5">{fmt(player.chips)} chips</div>
-                            {player.current_bet > 0 && (<div className="text-amber-300 text-[9px]">Bet: {fmt(player.current_bet)}</div>)}
-                            {player.status === 'folded' && (<div className="text-red-400 text-[9px]">FOLDED</div>)}
-                            {player.status === 'all_in' && (<div className="text-orange-400 text-[9px]">ALL IN</div>)}
+                          <div className={`text-center ${isMe ? 'leading-tight' : 'leading-none'}`}>
+                            <div className={`text-white font-bold ${isMe ? 'text-[10px] md:text-[12px]' : 'text-[12px] md:text-[13px]'} mb-0 ${isMe ? '' : 'overflow-hidden text-ellipsis whitespace-nowrap'}`}>{player.player_name}{isMe && ' (You)'}{isCurrentPlayer && ' 👑'}</div>
+                            <div className={`${isMe ? 'text-emerald-400 text-[9px] md:text-[11px]' : 'text-emerald-300 text-[12px] md:text-[13px]'} mb-0`}>{fmt(player.chips)} chips</div>
+                            {player.current_bet > 0 && (
+                              <div className={`${isMe ? 'text-amber-300 text-[9px]' : 'text-amber-200 text-[11px]'} mb-0`}>Bet: {fmt(player.current_bet)}</div>
+                            )}
+                            {player.status === 'folded' && (
+                              <div className={`${isMe ? 'text-red-400 text-[9px]' : 'text-red-300 text-[11px]'} mb-0`}>FOLDED</div>
+                            )}
+                            {player.status === 'all_in' && (
+                              <div className={`${isMe ? 'text-orange-400 text-[9px]' : 'text-orange-300 text-[11px]'} mb-0`}>ALL IN</div>
+                            )}
                           </div>
                           <div className={`mt-1 ${isMe ? 'h-10 md:h-12' : 'h-4 md:h-5'} flex items-end justify-center`}>
                              {isMe && player.hole_cards && (
