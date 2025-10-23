@@ -1983,11 +1983,26 @@ export default function TexasHoldemCasinoPage() {
               )}
             </div>
 
-            {/* Bottom Controls */}
-            <div className="w-full max-w-6xl mt-2 flex items-center justify-center gap-2 flex-wrap">
-              <button onClick={() => setShowHowToPlay(true)} className="min-w-[90px] px-3 py-2 rounded-lg text-sm font-bold bg-white/10 border border-white/20 hover:bg-white/20 text-white">How to Play</button>
-              <button onClick={() => setShowStats(true)} className="min-w-[90px] px-3 py-2 rounded-lg text-sm font-bold bg-white/10 border border-white/20 hover:bg-white/20 text-white">Stats</button>
-              <button onClick={() => setShowVaultModal(true)} className="min-w-[90px] px-3 py-2 rounded-lg text-sm font-bold bg-white/10 border border-white/20 hover:bg-white/20 text-white">💰 Vault</button>
+            {/* Bottom Controls - match Coin Flip style (colors/sizes) */}
+            <div className="w-full max-w-6xl mt-2 grid grid-cols-3 gap-2">
+              <button
+                onClick={() => setShowHowToPlay(true)}
+                className="py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all"
+              >
+                How to Play
+              </button>
+              <button
+                onClick={() => setShowStats(true)}
+                className="py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all"
+              >
+                Stats
+              </button>
+              <button
+                onClick={() => setShowVaultModal(true)}
+                className="py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all"
+              >
+                💰 Vault
+              </button>
             </div>
 
             {/* Admin Controls */}
