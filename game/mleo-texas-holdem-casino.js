@@ -443,6 +443,7 @@ export default function TexasHoldemCasinoPage() {
   // UI states
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [showVaultModal, setShowVaultModal] = useState(false);
   const [sfxMuted, setSfxMuted] = useState(false);
   const [error, setError] = useState("");
@@ -2004,6 +2005,56 @@ export default function TexasHoldemCasinoPage() {
                 💰 Vault
               </button>
             </div>
+
+            {/* How to Play Modal */}
+            {showHowToPlay && (
+              <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+                <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl">
+                  <h2 className="text-2xl font-extrabold mb-4">🃏 How to Play</h2>
+                  <div className="space-y-3 text-sm text-white/90">
+                    <p><strong>1. Enter your name:</strong> כתוב שם בכרטיסית “Your Balance”.</p>
+                    <p><strong>2. Choose a table:</strong> בדוק Min Buy‑in ו‑Blinds, לחץ JOIN TABLE.</p>
+                    <p><strong>3. Play:</strong> כשתתחיל יד – פעל בתורך (Fold / Check/Call / Raise / All‑in).</p>
+                    <p><strong>Tip:</strong> השם נשמר אוטומטית גם לאחר רענון העמוד.</p>
+                  </div>
+                  <button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Stats Modal */}
+            {showStats && (
+              <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+                <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+                  <h2 className="text-2xl font-extrabold mb-4">📊 Stats</h2>
+                  <div className="space-y-3 text-sm text-white/90">
+                    <p>תמיכה בסטטיסטיקות אישיות למשחק חדרים תוסף בקרוב.</p>
+                    <p>כעת ניתן לעקוב ידנית אחרי הישגים/זכיות במהלך הסשן.</p>
+                  </div>
+                  <button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Vault Modal */}
+            {showVaultModal && (
+              <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
+                <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
+                  <h2 className="text-2xl font-extrabold mb-4">💰 MLEO Vault</h2>
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-6 text-center">
+                    <div className="text-white/70 text-sm">Your Balance</div>
+                    <div className="text-2xl font-extrabold text-emerald-300 mt-1">{fmt(vaultAmount)} MLEO</div>
+                  </div>
+                  <button onClick={() => setShowVaultModal(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Admin Controls */}
             {isAdmin && (
