@@ -181,32 +181,32 @@ export default function ArcadeOnline(){
         </div>
 
         {/* BODY: Mobile-first layout */}
-        <div className="relative w-full h-full flex flex-col md:flex-row gap-1 md:gap-3 pt-[calc(52px+var(--satb,0px))] px-1 md:px-3 pb-1 md:pb-3">
+        <div className="relative w-full h-full flex flex-col md:flex-row gap-0.5 md:gap-3 pt-[calc(52px+var(--satb,0px))] px-0.5 md:px-3 pb-0.5 md:pb-3">
           
           {/* MOBILE: Top bar with game selector and player info - רק אם לא בחדר */}
           {!roomId && (
-            <div className="md:hidden flex flex-col gap-1 mb-1">
+            <div className="md:hidden flex flex-col gap-0.5 mb-0.5">
               {/* Game selector */}
-              <div className="bg-white/5 border border-white/10 rounded-lg p-1.5">
-                <div className="text-white/80 text-xs mb-1">Select Game</div>
-                <select value={activeGame} onChange={(e)=>selectGame(e.target.value)} className="w-full bg-black/30 text-white text-sm rounded-lg px-2 py-1.5 border border-white/20">
+              <div className="bg-white/5 border border-white/10 rounded p-1">
+                <div className="text-white/80 text-[10px] mb-0.5">Select Game</div>
+                <select value={activeGame} onChange={(e)=>selectGame(e.target.value)} className="w-full bg-black/30 text-white text-xs rounded px-1.5 py-1 border border-white/20">
                   {REGISTRY.map(g=> <option key={g.id} value={g.id}>{g.icon} {g.title}</option>)}
                 </select>
               </div>
               
               {/* Player info mobile */}
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-1.5">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="text-white font-semibold text-xs">Balance</div>
-                  <div className="text-emerald-400 text-sm font-extrabold">{fmt(vaultAmt)} MLEO</div>
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded p-1">
+                <div className="flex items-center justify-between mb-0.5">
+                  <div className="text-white font-semibold text-[10px]">Balance</div>
+                  <div className="text-emerald-400 text-xs font-extrabold">{fmt(vaultAmt)} MLEO</div>
                 </div>
-                <input type="text" placeholder="Your name…" value={playerName} onChange={(e)=>setPlayerName(e.target.value)} className="w-full px-2 py-1 text-xs rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400" maxLength={20} />
+                <input type="text" placeholder="Your name…" value={playerName} onChange={(e)=>setPlayerName(e.target.value)} className="w-full px-1.5 py-0.5 text-[10px] rounded bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400" maxLength={20} />
               </div>
               
               {/* Room browser for MP games on mobile */}
               {(activeGame === 'blackjack' || activeGame === 'poker') && (
-                <div className="bg-white/5 border border-white/10 rounded-lg p-1.5">
-                  <div className="text-white/80 text-xs mb-1">Rooms</div>
+                <div className="bg-white/5 border border-white/10 rounded p-1">
+                  <div className="text-white/80 text-[10px] mb-0.5">Rooms</div>
                   <RoomBrowser gameId={activeGame} playerName={playerName} onJoinRoom={onJoinRoom} />
                 </div>
               )}
@@ -215,10 +215,10 @@ export default function ArcadeOnline(){
           
           {/* MOBILE: In-room header - רק אם בחדר */}
           {roomId && (
-            <div className="md:hidden flex items-center justify-between bg-white/5 border border-white/10 rounded-lg p-2 mb-1">
-              <div className="flex items-center gap-2">
-                <div className="text-white font-semibold text-sm">{activeGame === 'blackjack' ? '🃏' : '♠️'} {activeGame === 'blackjack' ? 'Blackjack' : 'Poker'}</div>
-                <div className="text-white/60 text-xs">Room</div>
+            <div className="md:hidden flex items-center justify-between bg-white/5 border border-white/10 rounded p-1 mb-0.5">
+              <div className="flex items-center gap-1">
+                <div className="text-white font-semibold text-xs">{activeGame === 'blackjack' ? '🃏' : '♠️'} {activeGame === 'blackjack' ? 'Blackjack' : 'Poker'}</div>
+                <div className="text-white/60 text-[10px]">Room</div>
               </div>
               <button 
                 onClick={() => {
@@ -227,7 +227,7 @@ export default function ArcadeOnline(){
                   router.push(url, undefined, { shallow: true });
                   setRoomId("");
                 }}
-                className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
+                className="px-2 py-0.5 rounded bg-red-600 hover:bg-red-700 text-white text-[10px] font-semibold"
               >
                 Leave
               </button>
@@ -250,7 +250,7 @@ export default function ArcadeOnline(){
           </aside>
 
           {/* Main game area */}
-          <main className="flex-1 border border-white/10 rounded-xl md:rounded-2xl backdrop-blur-md bg-gradient-to-b from-white/5 to-white/10 overflow-hidden min-h-0">
+          <main className="flex-1 border border-white/10 rounded md:rounded-2xl backdrop-blur-md bg-gradient-to-b from-white/5 to-white/10 overflow-hidden min-h-0">
             <div className="h-full w-full">
               <GameViewport gameId={activeGame} vault={vaultAmt} setVaultBoth={setVaultBoth} roomId={roomId} playerName={playerName} />
             </div>
