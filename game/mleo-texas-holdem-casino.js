@@ -2229,7 +2229,7 @@ export default function TexasHoldemCasinoPage() {
             <div className="w-full max-w-6xl overflow-hidden" style={{ height: 'var(--table-area-h, 60vh)' }}>
               <div className="w-full h-full bg-green-900/50 backdrop-blur-sm border border-amber-400/40 rounded-2xl p-3 md:p-6 relative" style={{ marginTop: '4px', marginBottom: '4px' }}>
                 {/* Community Cards */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" style={{ top: 'calc(50% - 24px)' }}>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" style={{ top: 'calc(50% - 36px)' }}>
                   <div className="text-center">
                     <div className="text-white/70 text-xs md:text-sm mb-2 md:mb-3">Community Cards</div>
                     <div className="flex justify-center gap-1.5 md:gap-2">
@@ -2274,7 +2274,7 @@ export default function TexasHoldemCasinoPage() {
 
                       // Extra spacing between my cards and the community cards (push me slightly down)
                       if (isMe) {
-                        const myExtraGapPct = isPortrait ? 6 : 4; // closer to flop and above bottom edge
+                        const myExtraGapPct = isPortrait ? 8.5 : 6; // closer to flop and above bottom edge
                         y -= myExtraGapPct; // move closer to center (flop)
                       }
 
@@ -2296,7 +2296,7 @@ export default function TexasHoldemCasinoPage() {
                       y = Math.min(maxPct, Math.max(minPct, y));
 
                       const scale = baseScale * extraScale;
-                      const finalScale = scale * (isMe ? 1.2 : 0.7);
+                      const finalScale = scale * (isMe ? 1.2 : 0.8);
 
                       return (
                         <div
@@ -2310,7 +2310,7 @@ export default function TexasHoldemCasinoPage() {
                             transform: `translate(-50%, -50%) scale(${finalScale})`,
                             transformOrigin: 'center center',
                             padding: '0.5rem',
-                            minHeight: isMe ? '120px' : '60px',
+                            minHeight: isMe ? '120px' : '68px',
                             overflow: 'hidden'
                           }}
                         >
