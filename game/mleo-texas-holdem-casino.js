@@ -476,8 +476,8 @@ export default function TexasHoldemCasinoPage() {
       const topPad = headH + 8;
 
       if (screen === "lobby") {
-        const used = headH + (ctaRef.current?.offsetHeight || 0) + topPad + 12;
-        const freeH = Math.max(160, rootH - used);
+        const used = headH + (ctaRef.current?.offsetHeight || 0) + topPad + 4;
+        const freeH = Math.max(220, rootH - used);
         document.documentElement.style.setProperty("--lobby-list-h", freeH + "px");
       } else {
         // table/game
@@ -1901,13 +1901,13 @@ export default function TexasHoldemCasinoPage() {
 
           {/* Main Content */}
           <div className="relative w-full h-full flex flex-col items-center justify-start px-4 pt-[calc(var(--head-h,0px)+12px)] pb-4">
-            <div className="text-center mb-8">
-              <h1 className="text-2xl md:text-4xl font-bold text-white mb-2">🃏 Texas Hold'em</h1>
-              <p className="text-white/70">Join a table and start playing!</p>
+            <div className="text-center mb-4">
+              <h1 className="text-xl md:text-2xl font-bold text-white mb-1">🃏 Texas Hold'em</h1>
+              <p className="text-white/70 text-sm md:text-base">Join a table and start playing!</p>
             </div>
 
             {/* Player Info */}
-            <div ref={metersRef} className="w-full max-w-md mb-2">
+            <div ref={metersRef} className="w-full max-w-xs md:max-w-sm mb-2">
               <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="text-white font-semibold">Your Balance:</div>
@@ -1932,34 +1932,34 @@ export default function TexasHoldemCasinoPage() {
             </div>
 
             {/* Tables Grid */}
-            <div ref={listRef} className="w-full max-w-md md:max-w-4xl space-y-4 overflow-y-auto pr-1" style={{ maxHeight: 'var(--lobby-list-h, 60vh)' }}>
+            <div ref={listRef} className="w-full max-w-sm md:max-w-md lg:max-w-lg space-y-3 overflow-y-auto pr-1" style={{ maxHeight: 'calc(var(--lobby-list-h, 70vh) + 16vh)' }}>
               {tables.map((table) => (
                 <div
                   key={table.id}
-                  className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 md:p-6 hover:border-purple-400/50 transition-all"
+                  className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-2.5 md:p-3 hover:border-purple-400/50 transition-all"
                 >
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-2">
                     <div>
-                      <h3 className="text-xl font-bold text-white mb-1">
+                      <h3 className="text-base md:text-lg font-bold text-white mb-0.5">
                         🃏 {table.name}
                       </h3>
-                      <div className="text-white/70 text-sm">
+                      <div className="text-white/70 text-xs">
                         Min Buy-in: <span className="text-emerald-400 font-semibold">{fmt(table.min_buyin)} MLEO</span>
                       </div>
-                      <div className="text-white/70 text-sm">
+                      <div className="text-white/70 text-xs">
                         Blinds: <span className="text-amber-400">{fmt(table.small_blind)}</span> / <span className="text-amber-400">{fmt(table.big_blind)}</span>
                       </div>
                     </div>
                     
                     <div className="text-right">
-                      <div className="text-white/70 text-sm mb-2">
+                      <div className="text-white/60 text-xs mb-1">
                         Players: {table.current_players}/{table.max_players}
                       </div>
-                      <div className="flex gap-1 mb-3">
+                      <div className="flex gap-1 mb-2">
                         {Array.from({ length: table.max_players }).map((_, i) => (
                           <div
                             key={i}
-                            className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-[10px] md:text-sm ${
+                            className={`w-4 h-4 md:w-5 md:h-5 rounded-full flex items-center justify-center text-[8px] md:text-[9px] ${
                               i < table.current_players
                                 ? 'bg-emerald-500 text-white'
                                 : 'bg-white/10 text-white/30'
@@ -1972,7 +1972,7 @@ export default function TexasHoldemCasinoPage() {
                       <button
                         onClick={() => handleJoinTable(table)}
                         disabled={table.current_players >= table.max_players || vaultAmount < table.min_buyin}
-                        className={`px-4 py-2 md:px-6 md:py-3 rounded-lg font-bold transition-all ${
+                        className={`px-2.5 py-1.5 md:px-3 md:py-1.5 rounded-lg font-bold text-xs md:text-sm transition-all ${
                           table.current_players >= table.max_players || vaultAmount < table.min_buyin
                             ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                             : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:shadow-lg hover:scale-105'
