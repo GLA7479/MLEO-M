@@ -1931,56 +1931,45 @@ export default function TexasHoldemCasinoPage() {
               </div>
             </div>
 
-            {/* Tables Grid */}
-            <div ref={listRef} className="w-full max-w-sm md:max-w-md lg:max-w-lg space-y-3 overflow-y-auto pr-1" style={{ maxHeight: 'calc(var(--lobby-list-h, 70vh) + 16vh)' }}>
+            {/* Tables Grid - horizontal grid of compact cards */}
+            <div ref={listRef} className="w-full max-w-6xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 overflow-y-auto pr-1" style={{ maxHeight: 'calc(var(--lobby-list-h, 70vh) + 16vh)' }}>
               {tables.map((table) => (
                 <div
                   key={table.id}
                   className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-2.5 md:p-3 hover:border-purple-400/50 transition-all"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <h3 className="text-base md:text-lg font-bold text-white mb-0.5">
-                        🃏 {table.name}
-                      </h3>
-                      <div className="text-white/70 text-xs">
-                        Min Buy-in: <span className="text-emerald-400 font-semibold">{fmt(table.min_buyin)} MLEO</span>
-                      </div>
-                      <div className="text-white/70 text-xs">
-                        Blinds: <span className="text-amber-400">{fmt(table.small_blind)}</span> / <span className="text-amber-400">{fmt(table.big_blind)}</span>
-                      </div>
+                  <div className="space-y-1">
+                    <div className="text-sm md:text-base font-bold text-white">🃏 {table.name}</div>
+                    <div className="text-white/70 text-xs">
+                      Min Buy-in: <span className="text-emerald-400 font-semibold">{fmt(table.min_buyin)} MLEO</span>
                     </div>
-                    
-                    <div className="text-right">
-                      <div className="text-white/60 text-xs mb-1">
-                        Players: {table.current_players}/{table.max_players}
-                      </div>
-                      <div className="flex gap-1 mb-2">
-                        {Array.from({ length: table.max_players }).map((_, i) => (
-                          <div
-                            key={i}
-                            className={`w-4 h-4 md:w-5 md:h-5 rounded-full flex items-center justify-center text-[8px] md:text-[9px] ${
-                              i < table.current_players
-                                ? 'bg-emerald-500 text-white'
-                                : 'bg-white/10 text-white/30'
-                            }`}
-                          >
-                            {i < table.current_players ? '👤' : '▫'}
-                          </div>
-                        ))}
-                      </div>
-                      <button
-                        onClick={() => handleJoinTable(table)}
-                        disabled={table.current_players >= table.max_players || vaultAmount < table.min_buyin}
-                        className={`px-2.5 py-1.5 md:px-3 md:py-1.5 rounded-lg font-bold text-xs md:text-sm transition-all ${
-                          table.current_players >= table.max_players || vaultAmount < table.min_buyin
-                            ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:shadow-lg hover:scale-105'
-                        }`}
-                      >
-                        {table.current_players >= table.max_players ? 'FULL' : 'JOIN TABLE'}
-                      </button>
+                    <div className="text-white/70 text-xs">
+                      Blinds: <span className="text-amber-400">{fmt(table.small_blind)}</span> / <span className="text-amber-400">{fmt(table.big_blind)}</span>
                     </div>
+
+                    {/* Player indicators (tiny leds) */}
+                    <div className="flex items-center gap-1 flex-wrap pt-1">
+                      {Array.from({ length: table.max_players }).map((_, i) => (
+                        <span
+                          key={i}
+                          className={`block rounded-full ${i < table.current_players ? 'bg-emerald-400' : 'bg-white/15'} w-2 h-2 md:w-2.5 md:h-2.5`}
+                          title={i < table.current_players ? 'occupied' : 'empty'}
+                        />
+                      ))}
+                      <span className="ml-auto text-white/50 text-[10px]">{table.current_players}/{table.max_players}</span>
+                    </div>
+
+                    <button
+                      onClick={() => handleJoinTable(table)}
+                      disabled={table.current_players >= table.max_players || vaultAmount < table.min_buyin}
+                      className={`w-full px-2 py-1.5 md:px-3 md:py-1.5 rounded-lg font-bold text-xs md:text-sm transition-all ${
+                        table.current_players >= table.max_players || vaultAmount < table.min_buyin
+                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:shadow-lg hover:scale-105'
+                      }`}
+                    >
+                      {table.current_players >= table.max_players ? 'FULL' : 'JOIN TABLE'}
+                    </button>
                   </div>
                 </div>
               ))}
