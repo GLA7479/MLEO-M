@@ -218,9 +218,9 @@ export default function HoldemPage() {
   useEffect(() => {
     if (!currentHandId || typeof window === "undefined") return;
     
-    // Initialize Supabase client
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    // Initialize Supabase client (V1 - Legacy)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL_V1;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY_V1;
     
     if (!supabaseUrl || !supabaseKey) {
       console.log("Supabase not configured, using polling only");

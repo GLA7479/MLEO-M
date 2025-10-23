@@ -18,6 +18,10 @@
 /* ===== Base document ===== */
 html, body, #__next { height: 100%; }
 html { scroll-behavior: smooth; }
+
+/* ===== Card display improvements ===== */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 body {
   background: #0b1220;                /* solid base so no “gaps” on iOS bars resize */
   color: #fff;

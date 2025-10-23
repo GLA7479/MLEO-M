@@ -1,8 +1,21 @@
+// ============================================================================
+// MLEO Arcade-Online Hub — Single Page (Next.js /pages/arcade-online.js)
+// One page runs all online games via lazy-loaded modules from /games-online/*
+// • Query param routing: /arcade-online?game=dice
+// • Shared Vault (localStorage: mleo_rush_core_v4) — no real winnings
+// • English UI, Hebrew comments here only
+// ============================================================================
+
 import { useEffect, useRef, useState } from "react";
 import Layout from "../components/Layout";
 import { useRouter } from "next/router";
 import { useAccount } from "wagmi";
+import RoomBrowser from "../components/online/RoomBrowser";
+import RoomChat from "../components/online/RoomChat";
+import RoomPresence from "../components/online/RoomPresence";
+import { supabaseMP as supabase } from "../lib/supabaseClients";
 
+// --------------------------- Shared LocalStorage helpers --------------------
 function safeRead(key, fallback) {
   if (typeof window === "undefined") return fallback;
   try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
@@ -12,7 +25,8 @@ function safeWrite(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
 }
 
-const VAULT_KEY = "mleo_rush_core_v4";
+// Shared Vault — same key used across site
+const VAULT_KEY = "mleo_rush_core_v4"; // preserves { vault: number, ... }
 function getVault() { const data = safeRead(VAULT_KEY, {}); return Math.max(0, Number(data?.vault || 0)); }
 function setVault(next) { const data = safeRead(VAULT_KEY, {}); data.vault = Math.max(0, Math.floor(Number(next||0))); safeWrite(VAULT_KEY, data); }
 
@@ -28,81 +42,14 @@ function useIOSViewportFix(){
   },[]);
 }
 
-const DICE_KEY = "mleo_dice_v2"; const DICE_MIN=1000; const DICE_CAP=100000;
-const todayISO=()=>{const d=new Date();const y=d.getFullYear();const m=String(d.getMonth()+1).padStart(2,"0");const day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`;};
-function loadDice(){ const st=safeRead(DICE_KEY,{dailyWon:0,lastPlayed:todayISO()}); if(st.lastPlayed!==todayISO()) return {dailyWon:0,lastPlayed:todayISO()}; return {dailyWon:Math.max(0,Number(st.dailyWon||0)),lastPlayed:st.lastPlayed}; }
-function saveDice(s){ safeWrite(DICE_KEY,s); }
-const rollDie=()=>Math.floor(Math.random()*6)+1; const isHigh=v=>v>=4; const isLow=v=>v<=3;
-
-function DiceGame({ vault, setVaultBoth }){
-  const [bet,setBet]=useState(DICE_MIN); const [pick,setPick]=useState("high");
-  const [state,setState]=useState(loadDice()); const [spin,setSpin]=useState(false);
-  const [roll,setRoll]=useState(null); const [msg,setMsg]=useState(""); const [err,setErr]=useState("");
-  const remaining=Math.max(0,DICE_CAP-(state.dailyWon||0));
-  const clamp=(n)=>{const v=Math.floor(Number(n||0)); if(!Number.isFinite(v)||v<DICE_MIN) return DICE_MIN; const mv=Math.max(0,vault); const byCap=Math.max(0,remaining); return Math.min(v,mv,byCap>0?byCap:v); };
-  function setAllIn(){ const m=Math.max(0,Math.min(vault,remaining)); setBet(Math.max(DICE_MIN,Math.floor(m))); }
-  function setHalf(){ const m=Math.max(0,Math.min(vault,remaining||vault)); setBet(Math.max(DICE_MIN,Math.floor(m/2))); }
-  function setMin(){ setBet(DICE_MIN); }
-  function resetDaily(){ const s={dailyWon:0,lastPlayed:todayISO()}; setState(s); saveDice(s); }
-
-  async function onRoll(){
-    setErr(""); setMsg(""); const amount=clamp(bet);
-    if(amount<DICE_MIN){ setErr(`Minimum ${fmt(DICE_MIN)} MLEO`); return; }
-    if(vault<amount){ setErr("Insufficient Vault balance"); return; }
-    if(amount>remaining){ setErr(`Daily win cap reached. You can win up to ${fmt(remaining)} MLEO right now`); return; }
-
-    setVaultBoth(vault-amount); setSpin(true);
-    const t0=Date.now();
-    const tick=()=>{ if(Date.now()-t0>1000){ finish(); } else { setRoll(r=>((r||1)%6)+1); requestAnimationFrame(tick);} };
-    function finish(){ const r=rollDie(); setRoll(r); const win=(pick==='high'?isHigh(r):isLow(r)); if(win){ const profit=amount; setVaultBoth(vault-amount+amount+profit); const next=Math.min(DICE_CAP,(state.dailyWon||0)+profit); const s={dailyWon:next,lastPlayed:todayISO()}; setState(s); saveDice(s); setMsg(`🎉 You won: ${fmt(profit)} MLEO (roll: ${r})`);} else { setMsg(`😬 You lost: ${fmt(amount)} MLEO (roll: ${r})`);} setSpin(false);} 
-    requestAnimationFrame(tick);
-  }
-
-  return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-4">
-      <div className="mb-3 text-center">
-        <div className="text-white/70 text-sm mb-2">Roll result</div>
-        <div className={`mx-auto w-24 h-24 md:w-28 md:h-28 rounded-2xl border border-white/20 flex items-center justify-center text-4xl md:text-5xl font-extrabold text-white ${spin?'animate-pulse':''}`} style={{background:'radial-gradient(circle at 30% 30%, rgba(255,255,255,.15), rgba(0,0,0,.2))'}}>
-          {roll ?? '—'}
-        </div>
-        {roll!=null && <div className="mt-1 text-xs text-white/60">{roll<=3?'LOW (1‑3)':'HIGH (4‑6)'}</div>}
-      </div>
-
-      <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-xl p-3">
-        <div className="flex items-center justify-center gap-2 mb-3">
-          <button onClick={()=>setPick('low')} className={`px-3 py-2 rounded-lg font-bold text-sm border ${'low'=== 'low' && pick==='low' ? 'bg-blue-600 text-white border-blue-500':'bg-white/5 text-white/80 border-white/15 hover:bg-white/10'}`}>LOW (1‑3)</button>
-          <button onClick={()=>setPick('high')} className={`px-3 py-2 rounded-lg font-bold text-sm border ${'high'=== 'high' && pick==='high' ? 'bg-green-600 text-white border-green-500':'bg-white/5 text-white/80 border-white/15 hover:bg-white/10'}`}>HIGH (4‑6)</button>
-        </div>
-        <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
-          <div className="flex items-center gap-2 bg-black/30 border border-white/15 rounded-lg px-2 py-2">
-            <span className="text-white/70 text-xs">Bet</span>
-            <input type="number" value={bet} min={DICE_MIN} step={DICE_MIN} onChange={(e)=>setBet(clamp(e.target.value))} className="flex-1 bg-transparent text-right text-white text-sm outline-none" />
-          </div>
-          <button onClick={onRoll} disabled={spin} className={`px-4 py-2 rounded-lg font-bold text-sm ${spin?'bg-gray-600 text-gray-300':'bg-emerald-600 hover:bg-emerald-700 text-white'}`}>{spin?'Rolling…':'ROLL'}</button>
-        </div>
-        <div className="mt-2 flex gap-2">
-          <button onClick={setMin} className="flex-1 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/80 text-xs hover:bg-white/10">MIN</button>
-          <button onClick={setHalf} className="flex-1 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/80 text-xs hover:bg-white/10">HALF</button>
-          <button onClick={setAllIn} className="flex-1 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/80 text-xs hover:bg-white/10">ALL‑IN</button>
-        </div>
-        <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-white/80">
-          <div className="bg-white/5 border border-white/10 rounded-lg p-2">Min bet: <span className="text-amber-300 font-semibold">{fmt(DICE_MIN)}</span></div>
-          <div className="bg-white/5 border border-white/10 rounded-lg p-2">Daily Cap: <span className="text-emerald-300 font-semibold">{fmt(DICE_CAP)}</span></div>
-          <div className="bg-white/5 border border-white/10 rounded-lg p-2">Today won: <span className="text-cyan-300 font-semibold">{fmt(state.dailyWon)}</span></div>
-          <div className="bg-white/5 border border-white/10 rounded-lg p-2">Cap left: <span className="text-emerald-300 font-semibold">{fmt(Math.max(0,DICE_CAP-(state.dailyWon||0)))} </span></div>
-        </div>
-        <div className="mt-2 flex justify-end"><button onClick={resetDaily} className="px-2 py-1 text-[11px] rounded bg-white/5 border border-white/10 text-white/60 hover:text-white/90">Reset daily (debug)</button></div>
-        {err && <div className="mt-2 text-red-400 text-sm">{err}</div>}
-        {msg && <div className="mt-2 text-emerald-300 text-sm">{msg}</div>}
-      </div>
-
-      <div className="mt-3 text-center text-xs text-white/60">Zero‑edge 1:1 payout • Fun mode only • No real winnings</div>
-    </div>
-  );
-}
-
+// --------------------------- Lazy registry (code-splitting) -----------------
+// Add games here. Each game is lazy-loaded only when selected.
 const REGISTRY = [
-  { id: "dice", title: "Dice", icon: "🎲", component: DiceGame },
+  { id: "dice", title: "Dice", icon: "🎲", loader: () => import("../games-online/DiceGame").then(m => m.default) },
+  { id: "blackjack", title: "Blackjack (MP)", icon: "🃏", loader: () => import("../games-online/BlackjackMP").then(m => m.default) },
+  // Next games examples:
+  // { id: "plinko", title: "Plinko", icon: "🟡", loader: () => import("../games-online/PlinkoGame").then(m => m.default) },
+  // { id: "hilo",   title: "Hi-Lo", icon: "⬆️⬇️", loader: () => import("../games-online/HiLoGame").then(m => m.default) },
 ];
 
 function GameCard({ game, active, onSelect }){
@@ -118,14 +65,31 @@ function GameCard({ game, active, onSelect }){
   );
 }
 
-function GameViewport({ gameId, vault, setVaultBoth }){
+function GameViewport({ gameId, vault, setVaultBoth, roomId, playerName }){
+  const [Comp, setComp] = useState(null);
+  const [loading, setLoading] = useState(false);
   const entry = REGISTRY.find(g=>g.id===gameId);
-  if(!entry) return <div className="flex items-center justify-center h-full text-white/70">Select a game on the left</div>;
-  const Comp = entry.component;
-  return <Comp vault={vault} setVaultBoth={setVaultBoth} />;
+
+  useEffect(()=>{
+    let alive = true;
+    async function load(){
+      if(!entry){ setComp(null); return; }
+      setLoading(true);
+      try {
+        const C = await entry.loader();
+        if(alive) setComp(() => C);
+      } finally { if(alive) setLoading(false); }
+    }
+    load();
+    return ()=>{ alive = false; };
+  }, [entry?.id]);
+
+  if(!entry) return <div className="flex items-center justify-center h-full text-white/70">Pick a game</div>;
+  if(loading || !Comp) return <div className="flex items-center justify-center h-full text-white/70">Loading {entry.title}…</div>;
+  return <Comp vault={vault} setVaultBoth={setVaultBoth} roomId={roomId} playerName={playerName} />;
 }
 
-export default function ArcadeHub(){
+export default function ArcadeOnline(){
   useIOSViewportFix();
   const { address, isConnected } = useAccount();
   const router = useRouter();
@@ -134,16 +98,62 @@ export default function ArcadeHub(){
   const [isFs,setFs]=useState(false);
   const [vaultAmt,setVaultAmt]=useState(0);
   const [playerName,setPlayerName]=useState("");
-  const [activeGame,setActiveGame]=useState("dice");
+  const [activeGame,setActiveGame]=useState("dice"); // default
+  const [roomId, setRoomId] = useState("");
   const wrapRef=useRef(null);
 
-  useEffect(()=>{ setMounted(true); setVaultAmt(getVault()); const saved = safeRead("mleo_player_name", ""); if(typeof saved==="string" && saved.trim()) setPlayerName(saved.trim()); },[]);
+  // read game from query (?game=)
+  useEffect(()=>{
+    const q = (router.query?.game || '').toString();
+    if(q && REGISTRY.some(g=>g.id===q)) setActiveGame(q);
+  }, [router.query?.game]);
+
+  // read roomId from query (?room=)
+  useEffect(()=>{
+    const rid = (router.query?.room || '').toString();
+    if (rid) setRoomId(rid);
+  }, [router.query?.room]);
+
+  // mount & shared state
+  useEffect(()=>{
+    setMounted(true);
+    setVaultAmt(getVault());
+    const saved = safeRead("mleo_player_name", "");
+    if(typeof saved==="string" && saved.trim()) setPlayerName(saved.trim());
+  },[]);
   useEffect(()=>{ safeWrite("mleo_player_name", playerName || ""); },[playerName]);
 
+  // ensure membership on deep-link (user opens URL with room directly)
+  useEffect(()=>{
+    if (!roomId) return;
+    (async()=>{
+      // attempt to upsert membership by (room_id, player_name) uniqueness
+      const name = playerName || 'Guest';
+      // upsert will handle existing membership gracefully
+      await supabase.from('arcade_room_players').upsert({ room_id: roomId, player_name: name }, { onConflict: "room_id,player_name" });
+    })();
+  }, [roomId, playerName]);
+
+  // fullscreen
   useEffect(()=>{ const onFs=()=>setFs(!!document.fullscreenElement); document.addEventListener("fullscreenchange", onFs); return ()=>document.removeEventListener("fullscreenchange", onFs); },[]);
   const toggleFs=()=>{ const el=wrapRef.current||document.documentElement; if(!document.fullscreenElement) el.requestFullscreen?.().catch(()=>{}); else document.exitFullscreen?.().catch(()=>{}); };
 
   function setVaultBoth(next){ setVault(next); setVaultAmt(getVault()); }
+
+  // switch game and update URL (shallow)
+  function selectGame(id){
+    const valid = REGISTRY.some(g=>g.id===id) ? id : "dice";
+    setActiveGame(valid);
+    const url = { pathname: router.pathname, query: { ...router.query, game: valid } };
+    router.push(url, undefined, { shallow: true });
+  }
+
+  // join room helper from RoomBrowser
+  function onJoinRoom(rid){
+    setRoomId(rid);
+    const url = { pathname: router.pathname, query: { ...router.query, game: activeGame, room: rid } };
+    router.push(url, undefined, { shallow: true });
+  }
 
   if(!mounted){
     return (
@@ -157,43 +167,54 @@ export default function ArcadeHub(){
 
   return (
     <Layout address={address} isConnected={isConnected} vaultAmount={vaultAmt}>
-      <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-indigo-900 via_black to-purple-900" style={{height:'var(--app-100vh,100svh)'}}>
+      <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-indigo-900 via-black to-purple-900" style={{height:'var(--app-100vh,100svh)'}}>
+        {/* HUD */}
         <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
           <div className="relative px-2 py-3" style={{paddingTop:"calc(env(safe-area-inset-top,0px) + 10px)"}}>
             <div className="flex items-center justify-between gap-2 pointer-events-auto">
               <button onClick={()=>router.push('/')} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">BACK</button>
-              <div className="text-white font-extrabold text-lg truncate">🎮 ARCADE - ONLINE</div>
+              <div className="text-white font-extrabold text-lg truncate">🎮 MLEO Arcade Online</div>
               <button onClick={toggleFs} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFs?'EXIT':'FULL'}</button>
             </div>
           </div>
         </div>
 
+        {/* BODY: Sidebar (games) + Viewport */}
         <div className="relative w-full h-full flex gap-3 pt-[calc(52px+var(--satb,0px))] px-3 pb-3 md:px-4">
-          <aside className="w-[220px] hidden md:flex flex-col gap-2 bg-white/5 border border-white/10 rounded_2xl p-3">
+          <aside className="w-[260px] hidden md:flex flex-col gap-3 bg-white/5 border border-white/10 rounded-2xl p-3">
             <div className="text-white/80 text-xs mb-1">Games</div>
             {REGISTRY.map(g=> (
-              <GameCard key={g.id} game={g} active={activeGame===g.id} onSelect={setActiveGame} />
+              <GameCard key={g.id} game={g} active={activeGame===g.id} onSelect={(id)=>selectGame(id)} />
             ))}
+            {/* Room browser appears only for MP titles */}
+            {activeGame === 'blackjack' && (
+              <div className="mt-3">
+                <div className="text-white/80 text-xs mb-1">Rooms</div>
+                <RoomBrowser gameId="blackjack" playerName={playerName} onJoinRoom={onJoinRoom} />
+              </div>
+            )}
           </aside>
 
           <main className="flex-1 border border-white/10 rounded-2xl backdrop-blur-md bg-gradient-to-b from-white/5 to-white/10 overflow-hidden">
+            {/* MOBILE game switcher */}
             <div className="md:hidden p-2 border-b border-white/10 bg-white/5">
-              <select value={activeGame} onChange={(e)=>setActiveGame(e.target.value)} className="w-full bg-black/30 text-white text-sm rounded-lg px-2 py-2 border border-white/20">
+              <select value={activeGame} onChange={(e)=>selectGame(e.target.value)} className="w-full bg-black/30 text-white text-sm rounded-lg px-2 py-2 border border-white/20">
                 {REGISTRY.map(g=> <option key={g.id} value={g.id}>{g.icon} {g.title}</option>)}
               </select>
             </div>
             <div className="h-[calc(100%-44px)] md:h-full">
-              <GameViewport gameId={activeGame} vault={vaultAmt} setVaultBoth={setVaultBoth} />
+              <GameViewport gameId={activeGame} vault={vaultAmt} setVaultBoth={setVaultBoth} roomId={roomId} playerName={playerName} />
             </div>
           </main>
 
-          <aside className="w-[240px] hidden lg:flex flex-col gap-2">
+          {/* Right column: Player & Vault */}
+          <aside className="w-[260px] hidden lg:flex flex-col gap-3">
             <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-3">
               <div className="flex items-center justify-between mb-2">
                 <div className="text-white font-semibold">Your Balance</div>
                 <div className="text-emerald-400 text-lg font-extrabold">{fmt(vaultAmt)} MLEO</div>
               </div>
-              <input type="text" placeholder="Enter your name…" value={playerName} onChange={(e)=>setPlayerName(e.target.value)} className="w-full px-2 py-1.5 text-xs rounded-lg bg-white/10 border border-white/20 text_white placeholder-white/50 focus:outline-none focus:border-purple-400" maxLength={20} />
+              <input type="text" placeholder="Enter your name…" value={playerName} onChange={(e)=>setPlayerName(e.target.value)} className="w-full px-2 py-1.5 text-xs rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400" maxLength={20} />
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-white/80">
                 <div className="bg-white/5 border border-white/10 rounded-lg p-2">Vault Key: <span className="text-cyan-300 break-all">{VAULT_KEY}</span></div>
                 <div className="bg-white/5 border border-white/10 rounded-lg p-2">Games: <span className="text-amber-300 font-semibold">{REGISTRY.length}</span></div>
@@ -203,6 +224,32 @@ export default function ArcadeHub(){
                 <button onClick={()=>setVaultBoth(Math.max(0, vaultAmt - 100_000))} className="flex-1 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-xs">-100K (debug)</button>
               </div>
             </div>
+
+            {activeGame === 'blackjack' && roomId && (
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-3">
+                <RoomPresence roomId={roomId} playerName={playerName} onLeave={() => {
+                  // clear room from URL
+                  const url = { pathname: router.pathname, query: { ...router.query } };
+                  delete url.query.room;
+                  router.push(url, undefined, { shallow: true });
+                  setRoomId("");
+                  // best-effort: clear bj seat
+                  (async()=>{
+                    try {
+                      const name = playerName || 'Guest';
+                      const { data: sess } = await supabase.from('bj_sessions').select('id').eq('room_id', roomId).maybeSingle();
+                      if(sess?.id){
+                        const { data: mine } = await supabase.from('bj_players').select('id').eq('session_id', sess.id).eq('player_name', name).maybeSingle();
+                        if(mine?.id){ await supabase.from('bj_players').delete().eq('id', mine.id); }
+                      }
+                    } catch(e) {}
+                  })();
+                }} />
+                <div className="mt-3">
+                  <RoomChat roomId={roomId} playerName={playerName} />
+                </div>
+              </div>
+            )}
           </aside>
         </div>
       </div>
@@ -210,6 +257,5 @@ export default function ArcadeHub(){
   );
 }
 
-if (typeof document!=='undefined'){ const css=`@keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}`; const el=document.createElement('style'); el.textContent=css; document.head.appendChild(el);}
-
-
+// Minimal injected CSS keyframes (optional)
+if (typeof document!=='undefined'){ const css=`@keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}`; const el=document.createElement('style'); el.textContent=css; document.head.appendChild(el); }

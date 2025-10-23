@@ -3,7 +3,7 @@
 // דרישות: הספרייה של Supabase טעונה באפליקציה שלך (supabase-js).
 
 import { createClient } from '@supabase/supabase-js';
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL_V1, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY_V1);
 
 // ===== קבועים =====
 const BETTING_TIME_LIMIT_MS = 25_000; // 25 שניות לתור
