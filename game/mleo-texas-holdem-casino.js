@@ -458,6 +458,11 @@ export default function TexasHoldemCasinoPage() {
   const [winnerModal, setWinnerModal] = useState({ open: false, text: "", hand: "", pot: 0 });
   const [isAdmin, setIsAdmin] = useState(false);
   const [raiseTo, setRaiseTo] = useState(null);
+  
+  // Table background responsiveness (mobile vs desktop)
+  const TABLE_BG_DESKTOP = '/images/table-desktop.jpg';
+  const TABLE_BG_MOBILE  = '/images/table-mobile.jpg';
+  const [isNarrow, setIsNarrow] = useState(false);
 
   // --- Fullscreen layout refs (match Limbo/Diamonds pattern) ---
   const wrapRef = useRef(null);
@@ -467,6 +472,22 @@ export default function TexasHoldemCasinoPage() {
   const ctaRef = useRef(null);
 
   // Track fullscreen state changes (optional visual cue)
+  useEffect(() => {
+    // Responsive check for table background
+    const updateVw = () => {
+      const vw = window.visualViewport?.width ?? window.innerWidth;
+      setIsNarrow(vw < 768);
+    };
+    updateVw();
+    window.addEventListener('resize', updateVw);
+    window.addEventListener('orientationchange', updateVw);
+    
+    return () => {
+      window.removeEventListener('resize', updateVw);
+      window.removeEventListener('orientationchange', updateVw);
+    };
+  }, []);
+
   useEffect(() => {
     const onFs = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", onFs);
@@ -2228,7 +2249,7 @@ export default function TexasHoldemCasinoPage() {
 
             {/* GAME AREA */}
             <div className="w-full max-w-6xl overflow-visible" style={{ height: 'var(--table-area-h, 60vh)', paddingBottom: '10px' }}>
-              <div className="w-full h-full bg-green-900/50 backdrop-blur-sm border border-amber-400/40 rounded-2xl p-3 md:p-6 relative" style={{ marginTop: '6px', marginBottom: '0px' }}>
+              <div className="w-full h-full backdrop-blur-sm border border-amber-400/40 rounded-2xl p-3 md:p-6 relative" style={{ marginTop: '6px', marginBottom: '0px', background: (isNarrow ? TABLE_BG_MOBILE : TABLE_BG_DESKTOP) ? `linear-gradient(rgba(0,0,0,0.10), rgba(0,0,0,0.10)), url('${isNarrow ? TABLE_BG_MOBILE : TABLE_BG_DESKTOP}') ${isNarrow ? 'center 38%' : 'center 50%'} / contain no-repeat, radial-gradient(ellipse at 50% 35%, rgba(16,94,66,0.92), rgba(6,36,24,0.98) 65%)` : 'radial-gradient(ellipse at 50% 35%, rgba(16,94,66,0.92), rgba(6,36,24,0.98) 65%)' }}>
                 {/* Community Cards */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" style={{ top: 'calc(50% - 36px)' }}>
                   <div className="text-center">
@@ -2327,7 +2348,7 @@ export default function TexasHoldemCasinoPage() {
                             overflow: 'hidden'
                           }}
                         >
-                          <div className={`text-center ${isMe ? 'leading-tight' : 'leading-none'}`}>
+                          <div className={`text-center ${isMe ? 'leading-tight' : 'leading-none'} space-y-0.5 md:space-y-1`}>
                             <div className={`text-white font-bold ${isMe ? 'text-[10px] md:text-[12px]' : 'text-[13px] md:text-[15px]'} mb-0 ${isMe ? '' : 'overflow-hidden text-ellipsis whitespace-nowrap'}`}>{player.player_name}{isMe && ' (You)'}{isCurrentPlayer && ' 👑'}</div>
                             {isMe ? (
                               <div className={`text-cyan-300 text-[9px] md:text-[11px] mb-0`}>{fmt(player.chips)} chips</div>
