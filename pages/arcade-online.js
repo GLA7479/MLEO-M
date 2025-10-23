@@ -11,34 +11,65 @@ import Layout from "../components/Layout";
 import { useRouter } from "next/router";
 import { useAccount } from "wagmi";
 import RoomBrowser from "../components/online/RoomBrowser";
-import RoomChat from "../components/online/RoomChat";
-import RoomPresence from "../components/online/RoomPresence";
-import { supabaseMP as supabase } from "../lib/supabaseClients";
 
 // --------------------------- Shared LocalStorage helpers --------------------
 function safeRead(key, fallback) {
   if (typeof window === "undefined") return fallback;
-  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
 }
+
 function safeWrite(key, val) {
   if (typeof window === "undefined") return;
-  try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+  try {
+    localStorage.setItem(key, JSON.stringify(val));
+  } catch {}
 }
 
 // Shared Vault — same key used across site
 const VAULT_KEY = "mleo_rush_core_v4"; // preserves { vault: number, ... }
-function getVault() { const data = safeRead(VAULT_KEY, {}); return Math.max(0, Number(data?.vault || 0)); }
-function setVault(next) { const data = safeRead(VAULT_KEY, {}); data.vault = Math.max(0, Math.floor(Number(next||0))); safeWrite(VAULT_KEY, data); }
+function getVault() {
+  const data = safeRead(VAULT_KEY, {});
+  return Math.max(0, Number(data?.vault || 0));
+}
 
-function fmt(n){ n=Math.floor(Number(n||0)); if(n>=1e9)return(n/1e9).toFixed(2)+"B"; if(n>=1e6)return(n/1e6).toFixed(2)+"M"; if(n>=1e3)return(n/1e3).toFixed(2)+"K"; return String(n); }
+function setVault(next) {
+  const data = safeRead(VAULT_KEY, {});
+  data.vault = Math.max(0, Math.floor(Number(next||0)));
+  safeWrite(VAULT_KEY, data);
+}
+
+function fmt(n){
+  n=Math.floor(Number(n||0));
+  if(n>=1e9)return(n/1e9).toFixed(2)+"B";
+  if(n>=1e6)return(n/1e6).toFixed(2)+"M";
+  if(n>=1e3)return(n/1e3).toFixed(2)+"K";
+  return String(n);
+}
 
 function useIOSViewportFix(){
   useEffect(()=>{
-    const root=document.documentElement; const vv=window.visualViewport;
-    const setVH=()=>{ const h=vv?vv.height:window.innerHeight; root.style.setProperty("--app-100vh", `${Math.round(h)}px`); root.style.setProperty("--satb", getComputedStyle(root).getPropertyValue("env(safe-area-inset-bottom,0px)")); };
+    const root=document.documentElement;
+    const vv=window.visualViewport;
+    const setVH=()=>{
+      const h=vv?vv.height:window.innerHeight;
+      root.style.setProperty("--app-100vh", `${Math.round(h)}px`);
+      root.style.setProperty("--satb", getComputedStyle(root).getPropertyValue("env(safe-area-inset-bottom,0px)"));
+    };
     const onOrient=()=>requestAnimationFrame(()=>setTimeout(setVH,250));
-    setVH(); vv?.addEventListener("resize",setVH); vv?.addEventListener("scroll",setVH); window.addEventListener("orientationchange",onOrient);
-    return()=>{ vv?.removeEventListener("resize",setVH); vv?.removeEventListener("scroll",setVH); window.removeEventListener("orientationchange",onOrient); };
+    setVH();
+    vv?.addEventListener("resize",setVH);
+    vv?.addEventListener("scroll",setVH);
+    window.addEventListener("orientationchange",onOrient);
+    return()=>{
+      vv?.removeEventListener("resize",setVH);
+      vv?.removeEventListener("scroll",setVH);
+      window.removeEventListener("orientationchange",onOrient);
+    };
   },[]);
 }
 
@@ -48,23 +79,7 @@ const REGISTRY = [
   { id: "dice", title: "Dice", icon: "🎲", loader: () => import("../games-online/DiceGame").then(m => m.default) },
   { id: "blackjack", title: "Blackjack (MP)", icon: "🃏", loader: () => import("../games-online/BlackjackMP").then(m => m.default) },
   { id: "poker", title: "Texas Hold'em (MP)", icon: "♠️", loader: () => import("../games-online/PokerMP").then(m => m.default) },
-  // Next games examples:
-  // { id: "plinko", title: "Plinko", icon: "🟡", loader: () => import("../games-online/PlinkoGame").then(m => m.default) },
-  // { id: "hilo",   title: "Hi-Lo", icon: "⬆️⬇️", loader: () => import("../games-online/HiLoGame").then(m => m.default) },
 ];
-
-function GameCard({ game, active, onSelect }){
-  return (
-    <button onClick={()=>onSelect(game.id)} className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-xl border ${active? 'border-emerald-400 bg-emerald-400/10':'border-white/10 hover:bg-white/5'} text-white/90`}>
-      <span className="text-xl">{game.icon}</span>
-      <div className="flex-1">
-        <div className="font-bold">{game.title}</div>
-        <div className="text-xs text-white/60">Fun mode · Local vault</div>
-      </div>
-      <span className="text-xs px-2 py-0.5 rounded bg-white/10 border border-white/10">OPEN</span>
-    </button>
-  );
-}
 
 function GameViewport({ gameId, vault, setVaultBoth, roomId, playerName }){
   const [Comp, setComp] = useState(null);
@@ -74,12 +89,17 @@ function GameViewport({ gameId, vault, setVaultBoth, roomId, playerName }){
   useEffect(()=>{
     let alive = true;
     async function load(){
-      if(!entry){ setComp(null); return; }
+      if(!entry){
+        setComp(null);
+        return;
+      }
       setLoading(true);
       try {
         const C = await entry.loader();
         if(alive) setComp(() => C);
-      } finally { if(alive) setLoading(false); }
+      } finally {
+        if(alive) setLoading(false);
+      }
     }
     load();
     return ()=>{ alive = false; };
@@ -96,13 +116,11 @@ export default function ArcadeOnline(){
   const router = useRouter();
 
   const [mounted,setMounted]=useState(false);
-  const [isFs,setFs]=useState(false);
   const [vaultAmt,setVaultAmt]=useState(0);
   const [playerName,setPlayerName]=useState("");
   const [activeGame,setActiveGame]=useState("dice"); // default
   const [roomId, setRoomId] = useState("");
-  const [showRoomModal, setShowRoomModal] = useState(false);
-  const [showSeatModal, setShowSeatModal] = useState(false);
+  const [showGameSelector, setShowGameSelector] = useState(false);
   const wrapRef=useRef(null);
 
   // read game from query (?game=)
@@ -126,22 +144,10 @@ export default function ArcadeOnline(){
   },[]);
   useEffect(()=>{ safeWrite("mleo_player_name", playerName || ""); },[playerName]);
 
-  // ensure membership on deep-link (user opens URL with room directly)
-  useEffect(()=>{
-    if (!roomId) return;
-    (async()=>{
-      // attempt to upsert membership by (room_id, player_name) uniqueness
-      const name = playerName || 'Guest';
-      // upsert will handle existing membership gracefully
-      await supabase.from('arcade_room_players').upsert({ room_id: roomId, player_name: name }, { onConflict: "room_id,player_name" });
-    })();
-  }, [roomId, playerName]);
-
-  // fullscreen
-  useEffect(()=>{ const onFs=()=>setFs(!!document.fullscreenElement); document.addEventListener("fullscreenchange", onFs); return ()=>document.removeEventListener("fullscreenchange", onFs); },[]);
-  const toggleFs=()=>{ const el=wrapRef.current||document.documentElement; if(!document.fullscreenElement) el.requestFullscreen?.().catch(()=>{}); else document.exitFullscreen?.().catch(()=>{}); };
-
-  function setVaultBoth(next){ setVault(next); setVaultAmt(getVault()); }
+  function setVaultBoth(next){
+    setVault(next);
+    setVaultAmt(getVault());
+  }
 
   // switch game and update URL (shallow)
   function selectGame(id){
@@ -151,10 +157,10 @@ export default function ArcadeOnline(){
     router.push(url, undefined, { shallow: true });
   }
 
-  // join room helper from RoomBrowser
-  function onJoinRoom(rid){
-    setRoomId(rid);
-    const url = { pathname: router.pathname, query: { ...router.query, game: activeGame, room: rid } };
+  // handle room joining
+  function onJoinRoom(roomId) {
+    setRoomId(roomId);
+    const url = { pathname: router.pathname, query: { ...router.query, room: roomId } };
     router.push(url, undefined, { shallow: true });
   }
 
@@ -171,40 +177,81 @@ export default function ArcadeOnline(){
   return (
     <Layout address={address} isConnected={isConnected} vaultAmount={vaultAmt}>
       <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-indigo-900 via-black to-purple-900" style={{height:'var(--app-100vh,100svh)'}}>
-        {/* HUD */}
+        
+        {/* HEADER - בסגנון mleo-texas-holdem-casino */}
         <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
           <div className="relative px-2 py-3" style={{paddingTop:"calc(env(safe-area-inset-top,0px) + 10px)"}}>
             <div className="flex items-center justify-between gap-2 pointer-events-auto">
               <button onClick={()=>router.push('/')} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">BACK</button>
-              <div className="text-white font-extrabold text-lg truncate">🎮 MLEO Arcade Online</div>
-              <button onClick={toggleFs} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFs?'EXIT':'FULL'}</button>
+              <div className="text-center flex-1">
+                <div className="text-white font-extrabold text-lg truncate">🎮 MLEO Arcade Online</div>
+                <div className="text-white/60 text-xs">
+                  {activeGame === 'blackjack' ? '🃏 Blackjack' : activeGame === 'poker' ? '♠️ Poker' : '🎲 Dice'}
+                  {roomId && ' • In Room'}
+                </div>
+              </div>
+              <button onClick={()=>setShowGameSelector(!showGameSelector)} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">GAMES</button>
             </div>
           </div>
         </div>
 
-        {/* BODY: Responsive layout for all screen sizes */}
-        <div className="relative w-full h-full flex flex-col lg:flex-row gap-1 lg:gap-3 pt-[calc(52px+var(--satb,0px))] px-1 lg:px-3 pb-1 lg:pb-3">
-
-          {/* DESKTOP: Left sidebar (games) */}
-          <aside className="w-[260px] hidden md:flex flex-col gap-3 bg-white/5 border border-white/10 rounded-2xl p-3">
-            <div className="text-white/80 text-xs mb-1">Games</div>
-            {REGISTRY.map(g=> (
-              <GameCard key={g.id} game={g} active={activeGame===g.id} onSelect={(id)=>selectGame(id)} />
-            ))}
-            {/* Room browser appears only for MP titles */}
-            {(activeGame === 'blackjack' || activeGame === 'poker') && (
-              <div className="mt-3">
-                <div className="text-white/80 text-xs mb-1">Rooms</div>
-                <RoomBrowser gameId={activeGame} playerName={playerName} onJoinRoom={onJoinRoom} />
+        {/* BODY - בסגנון mleo-texas-holdem-casino */}
+        <div className="relative w-full h-full flex flex-col items-center justify-start pt-[calc(52px+var(--satb,0px))] px-2 pb-3">
+          
+          {/* Game Selector Modal */}
+          {showGameSelector && (
+            <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+              <div className="bg-slate-800 border border-white/20 rounded-2xl w-full max-w-sm p-4">
+                <div className="text-white font-semibold text-lg mb-4 text-center">Select Game</div>
+                <div className="space-y-2">
+                  {REGISTRY.map(g=> (
+                    <button
+                      key={g.id}
+                      onClick={() => {
+                        selectGame(g.id);
+                        setShowGameSelector(false);
+                      }}
+                      className={`w-full p-3 rounded-lg text-left ${activeGame===g.id ? 'bg-emerald-600 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{g.icon}</span>
+                        <div>
+                          <div className="font-semibold">{g.title}</div>
+                          <div className="text-xs opacity-70">Fun mode · Local vault</div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <button 
+                  onClick={() => setShowGameSelector(false)}
+                  className="w-full mt-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white"
+                >
+                  Close
+                </button>
               </div>
-            )}
-          </aside>
+            </div>
+          )}
 
-          {/* Main game area */}
-          <main className="flex-1 border border-white/10 rounded md:rounded-2xl backdrop-blur-md bg-gradient-to-b from-white/5 to-white/10 overflow-hidden min-h-0 relative">
-            {/* Mobile game controls overlay */}
-            <div className="md:hidden absolute top-1 right-1 z-10 flex gap-1">
-              {roomId && (
+          {/* Room Selection for MP games */}
+          {(activeGame === 'blackjack' || activeGame === 'poker') && !roomId && (
+            <div className="w-full max-w-2xl bg-black/30 rounded-xl p-4 mb-4 backdrop-blur-sm border border-white/10">
+              <div className="text-white font-semibold text-lg mb-3 text-center">Select Room</div>
+              <RoomBrowser 
+                gameId={activeGame} 
+                playerName={playerName} 
+                onJoinRoom={onJoinRoom} 
+              />
+            </div>
+          )}
+
+          {/* In Room Header */}
+          {roomId && (
+            <div className="w-full max-w-2xl bg-black/30 rounded-xl p-3 mb-4 backdrop-blur-sm border border-white/10">
+              <div className="flex items-center justify-between">
+                <div className="text-white font-semibold">
+                  {activeGame === 'blackjack' ? '🃏 Blackjack Room' : '♠️ Poker Room'}
+                </div>
                 <button 
                   onClick={() => {
                     const url = { pathname: router.pathname, query: { ...router.query } };
@@ -212,143 +259,36 @@ export default function ArcadeOnline(){
                     router.push(url, undefined, { shallow: true });
                     setRoomId("");
                   }}
-                  className="px-2 py-1 rounded bg-red-600 text-white text-[10px] font-semibold"
+                  className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold"
                 >
-                  Leave
+                  Leave Room
                 </button>
-              )}
-              <button 
-                onClick={() => setShowSeatModal(true)}
-                className="px-2 py-1 rounded bg-blue-600 text-white text-[10px] font-semibold"
-              >
-                Seats
-              </button>
-              <button 
-                onClick={() => setShowRoomModal(true)}
-                className="px-2 py-1 rounded bg-green-600 text-white text-[10px] font-semibold"
-              >
-                Rooms
-              </button>
+              </div>
             </div>
-            
-            <div className="h-full w-full">
-              <GameViewport gameId={activeGame} vault={vaultAmt} setVaultBoth={setVaultBoth} roomId={roomId} playerName={playerName} />
-            </div>
-          </main>
+          )}
 
-          {/* DESKTOP: Right column: Player & Vault */}
-          <aside className="w-[260px] hidden lg:flex flex-col gap-3">
-            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-white font-semibold">Your Balance</div>
-                <div className="text-emerald-400 text-lg font-extrabold">{fmt(vaultAmt)} MLEO</div>
-              </div>
-              <input type="text" placeholder="Enter your name…" value={playerName} onChange={(e)=>setPlayerName(e.target.value)} className="w-full px-2 py-1.5 text-xs rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400" maxLength={20} />
-              <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-white/80">
-                <div className="bg-white/5 border border-white/10 rounded-lg p-2">Vault Key: <span className="text-cyan-300 break-all">{VAULT_KEY}</span></div>
-                <div className="bg-white/5 border border-white/10 rounded-lg p-2">Games: <span className="text-amber-300 font-semibold">{REGISTRY.length}</span></div>
-              </div>
-              <div className="mt-2 flex gap-2">
-                <button onClick={()=>setVaultBoth(vaultAmt + 100_000)} className="flex-1 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs">+100K (debug)</button>
-                <button onClick={()=>setVaultBoth(Math.max(0, vaultAmt - 100_000))} className="flex-1 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-xs">-100K (debug)</button>
-              </div>
-            </div>
+          {/* Main Game Area */}
+          <div className="w-full max-w-6xl flex-1 border border-white/10 rounded-2xl backdrop-blur-md bg-gradient-to-b from-white/5 to-white/10 overflow-hidden">
+            <GameViewport gameId={activeGame} vault={vaultAmt} setVaultBoth={setVaultBoth} roomId={roomId} playerName={playerName} />
+          </div>
 
-            {(activeGame === 'blackjack' || activeGame === 'poker') && roomId && (
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-3">
-                <RoomPresence roomId={roomId} playerName={playerName} onLeave={() => {
-                  // clear room from URL
-                  const url = { pathname: router.pathname, query: { ...router.query } };
-                  delete url.query.room;
-                  router.push(url, undefined, { shallow: true });
-                  setRoomId("");
-                  // best-effort: clear game seats
-                  (async()=>{
-                    try {
-                      const name = playerName || 'Guest';
-                      // Clear Blackjack seat
-                      const { data: bjSess } = await supabase.from('bj_sessions').select('id').eq('room_id', roomId).maybeSingle();
-                      if(bjSess?.id){
-                        const { data: bjMine } = await supabase.from('bj_players').select('id').eq('session_id', bjSess.id).eq('player_name', name).maybeSingle();
-                        if(bjMine?.id){ await supabase.from('bj_players').delete().eq('id', bjMine.id); }
-                      }
-                      // Clear Poker seat
-                      const { data: pokerSess } = await supabase.from('poker_sessions').select('id').eq('room_id', roomId).maybeSingle();
-                      if(pokerSess?.id){
-                        const { data: pokerMine } = await supabase.from('poker_players').select('id').eq('session_id', pokerSess.id).eq('player_name', name).maybeSingle();
-                        if(pokerMine?.id){ await supabase.from('poker_players').delete().eq('id', pokerMine.id); }
-                      }
-                    } catch(e) {}
-                  })();
-                }} />
-                <div className="mt-3">
-                  <RoomChat roomId={roomId} playerName={playerName} />
-                </div>
-              </div>
-            )}
-          </aside>
+          {/* Player Info - רק במובייל */}
+          <div className="md:hidden w-full max-w-2xl bg-black/30 rounded-xl p-3 mt-4 backdrop-blur-sm border border-white/10">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-white font-semibold text-sm">Balance</div>
+              <div className="text-emerald-400 text-lg font-extrabold">{fmt(vaultAmt)} MLEO</div>
+            </div>
+            <input 
+              type="text" 
+              placeholder="Your name…" 
+              value={playerName} 
+              onChange={(e)=>setPlayerName(e.target.value)} 
+              className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400" 
+              maxLength={20} 
+            />
+          </div>
         </div>
-
-        {/* Room Selection Modal */}
-        {showRoomModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
-            <div className="bg-slate-800 border border-white/20 rounded-lg w-full max-w-sm max-h-[80vh] overflow-hidden">
-              <div className="flex items-center justify-between p-2 border-b border-white/10">
-                <div className="text-white font-semibold text-sm">Select Room</div>
-                <button 
-                  onClick={() => setShowRoomModal(false)}
-                  className="text-white/60 hover:text-white text-lg"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="p-2 max-h-[60vh] overflow-y-auto">
-                <RoomBrowser gameId={activeGame} playerName={playerName} onJoinRoom={(roomId) => {
-                  setRoomId(roomId);
-                  setShowRoomModal(false);
-                  onJoinRoom(roomId);
-                }} />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Seat Selection Modal */}
-        {showSeatModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
-            <div className="bg-slate-800 border border-white/20 rounded-lg w-full max-w-xs">
-              <div className="flex items-center justify-between p-2 border-b border-white/10">
-                <div className="text-white font-semibold text-sm">Select Seat</div>
-                <button 
-                  onClick={() => setShowSeatModal(false)}
-                  className="text-white/60 hover:text-white text-lg"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="p-2">
-                <div className="grid grid-cols-2 gap-1">
-                  {[0,1,2,3,4,5].map(seat => (
-                    <button
-                      key={seat}
-                      onClick={() => {
-                        // לוגיקת בחירת מושב - יועבר למשחק
-                        setShowSeatModal(false);
-                      }}
-                      className="p-2 rounded bg-white/10 hover:bg-white/20 text-white text-xs"
-                    >
-                      Seat {seat + 1}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </Layout>
   );
 }
-
-// Minimal injected CSS keyframes (optional)
-if (typeof document!=='undefined'){ const css=`@keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}`; const el=document.createElement('style'); el.textContent=css; document.head.appendChild(el); }
