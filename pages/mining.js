@@ -2357,11 +2357,18 @@ export default function GamesHub() {
                       </button>
                     </div>
 
-                  <Link href="/arcade">
-                    <button className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
-                      Play Arcade Games
-          </button>
-                  </Link>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Link href="/arcade">
+                      <button className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
+                        GAMES
+                      </button>
+                    </Link>
+                    <Link href="/arcade-online">
+                      <button className="w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
+                        ONLINE
+                      </button>
+                    </Link>
+                  </div>
     </div>
   </article>
 </section>
