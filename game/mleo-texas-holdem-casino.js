@@ -2245,7 +2245,7 @@ export default function TexasHoldemCasinoPage() {
                 </div>
 
                 {/* Players positioned around the table */}
-                <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute inset-0 overflow-visible">
                   {(() => {
                     const vpW = (typeof window !== 'undefined') ? window.innerWidth : 1024;
                     const vpH = (typeof window !== 'undefined') ? window.innerHeight : 768;
@@ -2253,13 +2253,13 @@ export default function TexasHoldemCasinoPage() {
                     const n = Math.max(1, (players?.length || 1));
 
                     // Base ring/scale tuned by player count + orientation
-                    const baseRadius = isPortrait ? 33 : 38; // עוד קצת פנימה
+                    const baseRadius = isPortrait ? 36 : 42; // push players a bit closer to edges
                     const radiusPct = Math.max(20, baseRadius - Math.max(0, n - 4) * 3.2);
                     const baseScale = Math.max(0.52, (isPortrait ? 0.88 : 0.94) - Math.max(0, n - 4) * 0.07);
 
-                    // Safe bounds to avoid cross-border cut
-                    const minPct = 4;  // left/top safe margin
-                    const maxPct = 96; // right/bottom safe margin
+                    // Safe bounds to avoid cross-border cut (allow closer to edges)
+                    const minPct = 2;   // left/top safe margin
+                    const maxPct = 98;  // right/bottom safe margin
 
                     // Compute offset so that the local player (me) is at the bottom (180deg)
                     const myIndex = Math.max(0, players.findIndex(p => p.id === playerId));
@@ -2270,8 +2270,14 @@ export default function TexasHoldemCasinoPage() {
                       const isMe = player.id === playerId;
 
                       const angle = ((idx * 360) / players.length) + angleOffset;
-                      let x = 50 + radiusPct * Math.cos((angle - 90) * Math.PI / 180);
-                      let y = 50 + radiusPct * Math.sin((angle - 90) * Math.PI / 180);
+                      const angRad = (angle - 90) * Math.PI / 180;
+                      // Detect top/bottom positions (near vertical axis)
+                      const isVertical = Math.abs(Math.cos(angRad)) < 0.35;
+                      // Push opponents outward, but not top/bottom ones
+                      const radialBoost = isMe ? 0 : (isVertical ? 0 : (isPortrait ? 5 : 7));
+                      const r = radiusPct + radialBoost;
+                      let x = 50 + r * Math.cos(angRad);
+                      let y = 50 + r * Math.sin(angRad);
 
                       // Extra spacing between my cards and the community cards (push me slightly down)
                       if (isMe) {
@@ -2287,10 +2293,13 @@ export default function TexasHoldemCasinoPage() {
                       const minSpare = Math.min(spareLeft, spareRight, spareTop, spareBottom);
                       const extraScale = minSpare < 10 ? Math.max(0.78, minSpare / 10) : 1;
 
-                      // If player is in the upper half (above the flop), push upward to keep distance from flop
-                      if (y < 50) {
+                      // Bring only top/bottom players closer to the flop; keep others pushed away
+                      if (isVertical) {
+                        const centerPull = (isPortrait ? 5 : 6); // pull toward center
+                        y += (y < 50 ? centerPull : -centerPull);
+                      } else if (y < 50) {
                         const crowdFactor = Math.max(0, n - 2); // stronger push when 3+ players
-                        const topPush = (isPortrait ? 2.2 : 1.6) + crowdFactor * 0.6;
+                        const topPush = (isPortrait ? 3.0 : 2.2) + crowdFactor * 0.8;
                         y -= topPush;
                       }
 
