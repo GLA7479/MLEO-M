@@ -443,6 +443,7 @@ export default function TexasHoldemCasinoPage() {
   // UI states
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [showVaultModal, setShowVaultModal] = useState(false);
   const [sfxMuted, setSfxMuted] = useState(false);
   const [error, setError] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -1920,7 +1921,7 @@ export default function TexasHoldemCasinoPage() {
                     placeholder="Enter your name..."
                     value={playerName}
                     onChange={(e) => setPlayerName(e.target.value)}
-                    className="flex-1 px-3 py-2 text-sm rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400"
+                    className="flex-1 min-w-0 px-2.5 py-1.5 text-xs md:text-sm rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400"
                     maxLength={20}
                   />
                 </div>
@@ -1980,6 +1981,13 @@ export default function TexasHoldemCasinoPage() {
                   <div>No tables available. Please check back later.</div>
                 </div>
               )}
+            </div>
+
+            {/* Bottom Controls */}
+            <div className="w-full max-w-6xl mt-2 flex items-center justify-center gap-2 flex-wrap">
+              <button onClick={() => setShowHowToPlay(true)} className="min-w-[90px] px-3 py-2 rounded-lg text-sm font-bold bg-white/10 border border-white/20 hover:bg-white/20 text-white">How to Play</button>
+              <button onClick={() => setShowStats(true)} className="min-w-[90px] px-3 py-2 rounded-lg text-sm font-bold bg-white/10 border border-white/20 hover:bg-white/20 text-white">Stats</button>
+              <button onClick={() => setShowVaultModal(true)} className="min-w-[90px] px-3 py-2 rounded-lg text-sm font-bold bg-white/10 border border-white/20 hover:bg-white/20 text-white">💰 Vault</button>
             </div>
 
             {/* Admin Controls */}
