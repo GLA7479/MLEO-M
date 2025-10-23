@@ -1,4 +1,4 @@
-// Blackjack (MP) — fixed layout (cards view, responsive seats)
+// Blackjack (MP) — improved layout with better spacing and card sizes
 // Uses supabaseMP (new project) + local Vault
 
 import { useEffect, useMemo, useState } from "react";
@@ -21,22 +21,22 @@ function newShoe() {
 function cardValue(r){ if(r==="A") return 11; if(["K","Q","J"].includes(r)) return 10; return parseInt(r,10); }
 function handValue(hand){ let t=0,a=0; for(const c of hand){ const r=c.slice(0,-1); t+=cardValue(r); if(r==="A")a++; } while(t>21&&a>0){ t-=10;a--; } return t; }
 const suitIcon = (s)=> s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
-const suitClass = (s)=> (s==="h"||s==="d") ? "text-rose-300" : "text-sky-300";
+const suitClass = (s)=> (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
 
 function Card({ code }) {
   if (!code) return null;
   const r = code.slice(0,-1), s = code.slice(-1);
   return (
-    <span className={`inline-flex items-center justify-center border border-white/20 rounded-md w-8 h-10 mx-0.5 text-xs font-semibold bg-white/5 ${suitClass(s)}`}>
+    <div className={`inline-flex items-center justify-center border-2 border-white/30 rounded-lg w-12 h-16 mx-1 text-sm font-bold bg-gradient-to-b from-white/10 to-white/5 shadow-lg ${suitClass(s)}`}>
       <span className="leading-none">{r}{suitIcon(s)}</span>
-    </span>
+    </div>
   );
 }
 function HandView({ hand }) {
   const h = hand || [];
   return (
-    <div className="flex items-center overflow-x-auto whitespace-nowrap no-scrollbar pr-1">
-      {h.length===0 ? <span className="text-white/60 text-xs">—</span> : h.map((c,i)=><Card key={i} code={c}/>)}
+    <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap no-scrollbar py-2">
+      {h.length===0 ? <span className="text-white/60 text-sm">—</span> : h.map((c,i)=><Card key={i} code={c}/>)}
     </div>
   );
 }
@@ -177,76 +177,100 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const dealerV = handValue((session?.dealer_hand||[]).map(c=>c.slice(0,-1)));
 
   return (
-    <div className="w-full h-full grid grid-rows-[auto_1fr_auto] p-3 gap-3">
+    <div className="w-full h-full flex flex-col p-4 gap-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="text-white font-semibold">Blackjack (MP) — Room {roomId.slice(0,8)}</div>
-        <div className="flex items-center gap-3 text-white/70 text-sm">
+      <div className="flex items-center justify-between bg-white/5 rounded-xl p-4 border border-white/10">
+        <div className="text-white font-bold text-xl">🃏 Blackjack (MP)</div>
+        <div className="flex items-center gap-4 text-white/80 text-sm">
+          <span>Room: {roomId.slice(0,8)}</span>
           <span>Stage: {session?.stage||"…"}</span>
           <span>Players: {roomMembers.length}</span>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="flex flex-col md:flex-row gap-3">
-        {/* Seats (responsive grid) */}
-        <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+      {/* Main Game Area */}
+      <div className="flex-1 flex flex-col gap-6">
+        {/* Dealer Section */}
+        <div className="bg-gradient-to-r from-red-900/20 to-red-800/20 rounded-xl p-6 border border-red-400/30">
+          <div className="text-center mb-4">
+            <div className="text-white font-bold text-lg mb-2">Dealer</div>
+            <HandView hand={session?.dealer_hand||[]}/>
+            <div className="text-white/80 text-sm mt-2">Total: {dealerV||"—"}</div>
+          </div>
+        </div>
+
+        {/* Players Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           {Array.from({length: SEATS}).map((_,i)=>{
             const occupant = players.find(p=>p.seat===i);
             const isMe = occupant && occupant.player_name===name;
             const hv = occupant?.hand ? handValue((occupant.hand||[]).map(c=>c.slice(0,-1))) : null;
             return (
-              <div key={i} className={`rounded-xl border ${isMe?'border-emerald-400':'border-white/10'} bg-white/5 p-2 min-h-[110px]`}>
-                <div className="text-xs text-white/70 mb-1">Seat {i+1}</div>
-                {occupant ? (
-                  <div className="space-y-1">
-                    <div className="text-white text-sm font-semibold truncate">{occupant.player_name}</div>
-                    <div className="text-white/70 text-xs">Bet: {fmt(occupant.bet||0)}</div>
-                    <HandView hand={occupant.hand}/>
-                    <div className="text-white/70 text-xs">Total: {hv??"—"} ({occupant.status})</div>
-                  </div>
-                ) : (
-                  <button onClick={ensureSeated} className="mt-1 px-2 py-1 rounded bg-white/10 border border-white/10 text-white/80 text-xs w-full">TAKE</button>
-                )}
+              <div key={i} className={`rounded-xl border-2 ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-4 min-h-[180px] transition-all hover:bg-white/10`}>
+                <div className="text-center mb-3">
+                  <div className="text-white/70 text-sm mb-2">Seat {i+1}</div>
+                  {occupant ? (
+                    <div className="space-y-3">
+                      <div className="text-white font-bold text-lg truncate">{occupant.player_name}</div>
+                      <div className="text-emerald-300 text-sm font-semibold">Bet: {fmt(occupant.bet||0)}</div>
+                      <HandView hand={occupant.hand}/>
+                      <div className="text-white/80 text-sm">
+                        Total: {hv??"—"} 
+                        <span className={`ml-2 px-2 py-1 rounded text-xs ${occupant.status==='playing'?'bg-blue-600':occupant.status==='stood'?'bg-gray-600':'bg-red-600'}`}>
+                          {occupant.status}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={ensureSeated} className="mt-4 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-sm transition-all shadow-lg">
+                      TAKE SEAT
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
         </div>
-
-        {/* Dealer panel */}
-        <div className="w-full md:w-[300px] rounded-xl border border-white/10 bg-white/5 p-3">
-          <div className="text-white font-semibold mb-1">Dealer</div>
-          <HandView hand={session?.dealer_hand||[]}/>
-          <div className="text-white/60 text-xs mt-1">Total: {dealerV||"—"}</div>
-        </div>
       </div>
 
       {/* Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-2">
-          <div className="text-white/80 text-xs mb-1">Bet</div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+          <div className="text-white/80 text-sm mb-2 font-semibold">Place Bet</div>
           <div className="flex gap-2">
             <input type="number" value={bet} min={MIN_BET} step={MIN_BET}
               onChange={(e)=>setBet(Math.max(MIN_BET, Math.floor(e.target.value)))}
-              className="flex-1 bg-black/30 text-white text-sm rounded-lg px-2 py-1 border border-white/15" />
-            <button onClick={placeBet} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm">PLACE</button>
+              className="flex-1 bg-black/40 text-white text-sm rounded-lg px-3 py-2 border border-white/20 focus:border-emerald-400 focus:outline-none" />
+            <button onClick={placeBet} className="px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold text-sm transition-all shadow-lg">
+              PLACE
+            </button>
           </div>
-          <div className="text-white/60 text-xs mt-1">Vault: {fmt(vault)}</div>
+          <div className="text-white/60 text-xs mt-2">Vault: {fmt(vault)} MLEO</div>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-white/5 p-2">
-          <div className="text-white/80 text-xs mb-1">Round</div>
-          <div className="flex gap-2">
-            <button onClick={deal}   className="flex-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm">DEAL</button>
-            <button onClick={hit}    className="flex-1 px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-sm">HIT</button>
-            <button onClick={stand}  className="flex-1 px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-700 text-white text-sm">STAND</button>
-            <button onClick={settle} className="flex-1 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm">SETTLE</button>
+        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+          <div className="text-white/80 text-sm mb-2 font-semibold">Game Actions</div>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={deal} className="px-3 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-sm transition-all">
+              DEAL
+            </button>
+            <button onClick={hit} className="px-3 py-2 rounded-lg bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-sm transition-all">
+              HIT
+            </button>
+            <button onClick={stand} className="px-3 py-2 rounded-lg bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-sm transition-all">
+              STAND
+            </button>
+            <button onClick={settle} className="px-3 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold text-sm transition-all">
+              SETTLE
+            </button>
           </div>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-white/5 p-2">
-          <div className="text-white/80 text-xs mb-1">Status</div>
-          <div className="text-emerald-300 text-xs min-h-[20px]">{msg}</div>
+        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+          <div className="text-white/80 text-sm mb-2 font-semibold">Status</div>
+          <div className="text-emerald-300 text-sm min-h-[40px] flex items-center">
+            {msg || "Ready to play"}
+          </div>
         </div>
       </div>
     </div>

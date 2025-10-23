@@ -47,6 +47,7 @@ function useIOSViewportFix(){
 const REGISTRY = [
   { id: "dice", title: "Dice", icon: "🎲", loader: () => import("../games-online/DiceGame").then(m => m.default) },
   { id: "blackjack", title: "Blackjack (MP)", icon: "🃏", loader: () => import("../games-online/BlackjackMP").then(m => m.default) },
+  { id: "poker", title: "Texas Hold'em (MP)", icon: "♠️", loader: () => import("../games-online/PokerMP").then(m => m.default) },
   // Next games examples:
   // { id: "plinko", title: "Plinko", icon: "🟡", loader: () => import("../games-online/PlinkoGame").then(m => m.default) },
   // { id: "hilo",   title: "Hi-Lo", icon: "⬆️⬇️", loader: () => import("../games-online/HiLoGame").then(m => m.default) },
@@ -187,10 +188,10 @@ export default function ArcadeOnline(){
               <GameCard key={g.id} game={g} active={activeGame===g.id} onSelect={(id)=>selectGame(id)} />
             ))}
             {/* Room browser appears only for MP titles */}
-            {activeGame === 'blackjack' && (
+            {(activeGame === 'blackjack' || activeGame === 'poker') && (
               <div className="mt-3">
                 <div className="text-white/80 text-xs mb-1">Rooms</div>
-                <RoomBrowser gameId="blackjack" playerName={playerName} onJoinRoom={onJoinRoom} />
+                <RoomBrowser gameId={activeGame} playerName={playerName} onJoinRoom={onJoinRoom} />
               </div>
             )}
           </aside>
@@ -225,7 +226,7 @@ export default function ArcadeOnline(){
               </div>
             </div>
 
-            {activeGame === 'blackjack' && roomId && (
+            {(activeGame === 'blackjack' || activeGame === 'poker') && roomId && (
               <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-3">
                 <RoomPresence roomId={roomId} playerName={playerName} onLeave={() => {
                   // clear room from URL
@@ -233,14 +234,21 @@ export default function ArcadeOnline(){
                   delete url.query.room;
                   router.push(url, undefined, { shallow: true });
                   setRoomId("");
-                  // best-effort: clear bj seat
+                  // best-effort: clear game seats
                   (async()=>{
                     try {
                       const name = playerName || 'Guest';
-                      const { data: sess } = await supabase.from('bj_sessions').select('id').eq('room_id', roomId).maybeSingle();
-                      if(sess?.id){
-                        const { data: mine } = await supabase.from('bj_players').select('id').eq('session_id', sess.id).eq('player_name', name).maybeSingle();
-                        if(mine?.id){ await supabase.from('bj_players').delete().eq('id', mine.id); }
+                      // Clear Blackjack seat
+                      const { data: bjSess } = await supabase.from('bj_sessions').select('id').eq('room_id', roomId).maybeSingle();
+                      if(bjSess?.id){
+                        const { data: bjMine } = await supabase.from('bj_players').select('id').eq('session_id', bjSess.id).eq('player_name', name).maybeSingle();
+                        if(bjMine?.id){ await supabase.from('bj_players').delete().eq('id', bjMine.id); }
+                      }
+                      // Clear Poker seat
+                      const { data: pokerSess } = await supabase.from('poker_sessions').select('id').eq('room_id', roomId).maybeSingle();
+                      if(pokerSess?.id){
+                        const { data: pokerMine } = await supabase.from('poker_players').select('id').eq('session_id', pokerSess.id).eq('player_name', name).maybeSingle();
+                        if(pokerMine?.id){ await supabase.from('poker_players').delete().eq('id', pokerMine.id); }
                       }
                     } catch(e) {}
                   })();
