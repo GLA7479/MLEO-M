@@ -1932,7 +1932,7 @@ export default function TexasHoldemCasinoPage() {
             </div>
 
             {/* Tables Grid - horizontal grid of compact cards */}
-            <div ref={listRef} className="w-full max-w-6xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 overflow-y-auto pr-1" style={{ maxHeight: 'calc(var(--lobby-list-h, 70vh) + 16vh)' }}>
+            <div ref={listRef} className="w-full max-w-6xl grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 gap-2 overflow-y-auto pr-1" style={{ maxHeight: 'calc(var(--lobby-list-h, 70vh) + 16vh)' }}>
               {tables.map((table) => (
                 <div
                   key={table.id}
