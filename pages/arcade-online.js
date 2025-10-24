@@ -272,6 +272,12 @@ export default function ArcadeOnline() {
   }
 
   function selectGame(gameId) {
+    // Check if player name is entered
+    if (!playerName || playerName.trim() === '') {
+      alert('Please enter your player name to start playing!');
+      return;
+    }
+
     const game = GAME_REGISTRY.find(g => g.id === gameId);
     
     if (game?.isMultiplayer) {
@@ -289,6 +295,12 @@ export default function ArcadeOnline() {
   }
 
   function handleJoinRoom(roomId) {
+    // Check if player name is entered
+    if (!playerName || playerName.trim() === '') {
+      alert('Please enter your player name to join a room!');
+      return;
+    }
+
     setSelectedRoomId(roomId);
     setShowRoomBrowser(false);
     const url = {
@@ -345,7 +357,7 @@ export default function ArcadeOnline() {
       setSelectedRoomId(null);
       router.push('/arcade-online', undefined, { shallow: true });
     } else {
-      router.push('/');
+      router.push('/mining');
     }
   }
 
@@ -381,7 +393,7 @@ export default function ArcadeOnline() {
                selectedGame ? '← BACK TO GAMES' : '← BACK'}
             </button>
             <div className="text-center">
-              <h1 className="text-3xl font-extrabold text-white mb-2">🎮 MLEO Arcade Online</h1>
+              <h1 className="text-3xl font-extrabold text-white mb-2">🎮 MLEO-Online</h1>
               <p className="text-white/60">
                 {showRoomBrowser ? `Choose Room for ${GAME_REGISTRY.find(g => g.id === selectedGame)?.title || 'Game'}` : 
                  selectedGame ? `Playing ${GAME_REGISTRY.find(g => g.id === selectedGame)?.title || 'Game'}` : 
@@ -396,13 +408,17 @@ export default function ArcadeOnline() {
 
           {/* Player Name Input - Only show when no game is selected */}
           {!selectedGame && (
-            <div className="max-w-md mx-auto mb-6">
+            <div className="max-w-sm mx-auto mb-4">
+              <div className="text-center mb-2">
+                <label className="text-white/80 text-sm font-medium">Player Registration</label>
+                <p className="text-white/60 text-xs mt-1">Enter your name to start playing</p>
+              </div>
               <input
                 type="text"
                 placeholder="Enter your player name..."
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-emerald-400 text-center"
+                className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-emerald-400 text-center text-sm"
                 maxLength={20}
               />
             </div>

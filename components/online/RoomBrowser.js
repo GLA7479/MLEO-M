@@ -61,6 +61,12 @@ export default function RoomBrowser({ gameId, playerName, onJoinRoom }) {
   }
 
   async function joinRoom(room) {
+    // Check if player name is entered
+    if (!playerName || playerName.trim() === '') {
+      alert('Please enter your player name to join a room!');
+      return;
+    }
+
     // If room is passcode-protected, ask for code
     if (room.is_locked) {
       const code = prompt("Enter room passcode:") || "";
