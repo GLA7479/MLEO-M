@@ -315,17 +315,19 @@ export default function ArcadeOnline() {
             </div>
           </div>
 
-          {/* Player Name Input */}
-          <div className="max-w-md mx-auto mb-6">
-            <input
-              type="text"
-              placeholder="Enter your player name..."
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-emerald-400 text-center"
-              maxLength={20}
-            />
-          </div>
+          {/* Player Name Input - Only show when no game is selected */}
+          {!selectedGame && (
+            <div className="max-w-md mx-auto mb-6">
+              <input
+                type="text"
+                placeholder="Enter your player name..."
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-emerald-400 text-center"
+                maxLength={20}
+              />
+            </div>
+          )}
         </header>
 
         {/* Content */}
