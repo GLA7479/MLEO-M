@@ -11,11 +11,12 @@ const TURN_SECONDS = Number(process.env.NEXT_PUBLIC_POKER_TURN_SECONDS||20);
 // Helper functions
 function fmt(n){ n=Math.floor(Number(n||0)); if(n>=1e9)return(n/1e9).toFixed(2)+"B"; if(n>=1e6)return(n/1e6).toFixed(2)+"M"; if(n>=1e3)return(n/1e3).toFixed(2)+"K"; return String(n); }
 
-const suitIcon = s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
-const suitClass = (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
-
 function Card({ code, hidden = false, isDealing = false }) {
   if (!code) return null;
+  
+  const r = code.slice(0,-1), s = code.slice(-1);
+  const suitIcon = s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
+  const suitClass = (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
   
   // Dynamic sizing based on game state
   const cardSize = isDealing ? "w-12 h-16 mx-1 text-sm" : "w-10 h-14 mx-1 text-xs";
@@ -27,8 +28,6 @@ function Card({ code, hidden = false, isDealing = false }) {
       </div>
     );
   }
-  
-  const r = code.slice(0,-1), s = code.slice(-1);
   
   return (
     <div className={`inline-flex items-center justify-center border-2 border-white/30 rounded-lg ${cardSize} font-bold bg-gradient-to-b from-white/10 to-white/5 shadow-lg ${suitClass}`}>
@@ -82,6 +81,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
 
   const [ses, setSes] = useState(null);
   const [players, setPlayers] = useState([]);
+  const [roomMembers, setRoomMembers] = useState([]);
   const [betInput, setBetInput] = useState(0);
   const [msg, setMsg] = useState("");
   const tickRef = useRef(null);
@@ -96,10 +96,16 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
           const { data } = await supabase.from("poker_sessions").select("*").eq("room_id", roomId).maybeSingle();
           setSes(data||null);
         })
+      .on('presence', { event: 'sync' }, () => {
+        const state = ch.presenceState();
+        const members = Object.values(state).flat();
+        setRoomMembers(members);
+      })
       .subscribe(async (st)=>{
         if(st==="SUBSCRIBED"){
           const { data } = await supabase.from("poker_sessions").select("*").eq("room_id", roomId).maybeSingle();
           setSes(data||null);
+          await ch.track({ player_name: name, online_at: new Date().toISOString() });
         }
       });
     return ()=> ch.unsubscribe();
@@ -296,7 +302,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
       let d = [...deck];
 
       // סבב 1 + 2: קלף לכל שחקן
-      for (let r = 0; r < 2; r++) {
+      for (let round = 0; round < 2; round++) {
         for (const P of (created || [])) {
           const c = d.pop();
           const hand = Array.isArray(P.hole_cards) ? [...P.hole_cards, c] : [c];
@@ -465,7 +471,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     <div className="w-full h-full flex flex-col p-1 md:p-2 gap-1 md:gap-2 -mt-1">
       {/* Header */}
       <div className="flex items-center justify-between bg-white/5 rounded-xl p-1 md:p-2 border border-white/10">
-        <div className="text-white font-bold text-sm md:text-lg">♠️ Texas Hold'em</div>
+        <div className="text-white font-bold text-sm md:text-lg">MLEO Online</div>
         <div className="flex items-center gap-1 md:gap-2 text-white/80 text-xs">
           <span>Hand #{ses?.hand_no||"-"}</span>
           <span>Stage: {ses?.stage||"lobby"}</span>
@@ -544,14 +550,14 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
           </div>
           <div className="text-white/60 text-xs mb-2">Vault: {fmt(getVault())} MLEO</div>
           {/* Waiting Players Info */}
-          {roomMembers.length > sit.length && (
+          {roomMembers.length > players.length && (
             <div>
               <div className="text-xs text-blue-400 font-semibold mb-1">
-                👥 Waiting ({roomMembers.length - sit.length})
+                👥 Waiting ({roomMembers.length - players.length})
               </div>
               <div className="flex flex-wrap gap-1">
                 {roomMembers
-                  .filter(member => !sit.some(p => p.player_name === member.player_name))
+                  .filter(member => !players.some(p => p.player_name === member.player_name))
                   .slice(0, 3)
                   .map((member, idx) => (
                     <div key={idx} className="px-1 py-0.5 bg-white/10 rounded text-xs text-white/80 border border-white/20">
@@ -559,9 +565,9 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
                     </div>
                   ))
                 }
-                {roomMembers.filter(member => !sit.some(p => p.player_name === member.player_name)).length > 3 && (
+                {roomMembers.filter(member => !players.some(p => p.player_name === member.player_name)).length > 3 && (
                   <div className="px-1 py-0.5 bg-white/10 rounded text-xs text-white/80 border border-white/20">
-                    +{roomMembers.filter(member => !sit.some(p => p.player_name === member.player_name)).length - 3}
+                    +{roomMembers.filter(member => !players.some(p => p.player_name === member.player_name)).length - 3}
                   </div>
                 )}
               </div>

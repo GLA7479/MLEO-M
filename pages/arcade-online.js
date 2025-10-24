@@ -388,9 +388,9 @@ export default function ArcadeOnline() {
                   : 'bg-white/5 border-white/10 hover:bg-white/10 text-white'
               }`}
             >
-              {showRoomBrowser ? '← BACK TO GAMES' : 
+              {showRoomBrowser ? 'BACK' : 
                selectedGame && selectedRoomId ? 'LEAVE' : 
-               selectedGame ? '← BACK TO GAMES' : '← BACK'}
+               selectedGame ? 'BACK' : 'BACK'}
             </button>
             <div className="text-center">
               <h1 className="text-3xl font-extrabold text-white mb-2">MLEO Online</h1>
