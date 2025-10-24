@@ -44,10 +44,22 @@ function handValue(hand){ let t=0,a=0; for(const c of hand){ const r=c.slice(0,-
 const suitIcon = (s)=> s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
 const suitClass = (s)=> (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
 
-function Card({ code, size = "normal" }) {
-  if (!code) return null;
-  const r = code.slice(0,-1), s = code.slice(-1);
+function Card({ code, size = "normal", hidden = false }) {
+  if (!code && !hidden) return null;
   const sizeClasses = size === "small" ? "w-6 h-8 text-xs" : "w-8 h-10 text-sm";
+
+  if (hidden) {
+    return (
+      <div className={`inline-flex items-center justify-center border border-white/30 rounded ${sizeClasses} font-bold bg-white/10`}>
+        <span className="leading-none">🂠</span>
+      </div>
+    );
+  }
+
+  const r = code.slice(0,-1), s = code.slice(-1);
+  const suitIcon = (s)=> s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
+  const suitClass = (s)=> (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
+
   return (
     <div className={`inline-flex items-center justify-center border border-white/30 rounded ${sizeClasses} font-bold bg-gradient-to-b from-white/10 to-white/5 shadow ${suitClass(s)}`}>
       <span className="leading-none">{r}{suitIcon(s)}</span>
@@ -93,6 +105,11 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   };
   const myRow = useMemo(() => players.find(p => p.player_name === name) || null, [players, name]);
 
+  // Button availability helpers
+  const canPlaceBet = !!myRow && (session?.state === 'lobby' || session?.state === 'betting');
+  const canDeal = (session?.state === 'betting') && players.length > 0 && players.every(p => (p.bet||0) >= MIN_BET && p.status !== 'left');
+  const canAct = !!myRow && session?.state === 'acting' && myRow.status === 'acting';
+
   // bootstrap session with new schema
   useEffect(() => {
     if (!roomId) return;
@@ -126,6 +143,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       }
     })();
   }, [roomId]);
+
 
   // presence
   useEffect(() => {
@@ -211,8 +229,8 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     if (!myRow || bet < MIN_BET) return;
     const { error } = await supabase.from("bj_players").update({
       bet: bet,
-      status: 'betting',
-      acted: true
+      status: 'betting'
+      // acted: true  <-- removed, so player can act in 'acting' phase
     }).eq("id", myRow.id);
 
     if (error) {
@@ -221,34 +239,53 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     }
   }
 
+  async function openBetting() {
+    if (!session?.id) return;
+    const { error } = await supabase
+      .from('bj_sessions')
+      .update({ state: 'betting' })
+      .eq('id', session.id);
+    if (error) console.error('[openBetting] error:', error);
+  }
+
   async function deal() {
     if (!session) return;
-    const ready = players.every(p => p.bet >= MIN_BET && p.status !== 'left');
-    if (!ready) {
-      setMsg("Not all players have placed minimum bet");
-      return;
+
+    // אם עדיין בלובי — פתח הימורים תחילה
+    if (session.state === 'lobby') {
+      await supabase.from('bj_sessions').update({ state: 'betting' }).eq('id', session.id);
+      // הבא session מעודכן
+      const { data: s2 } = await supabase.from('bj_sessions').select('*').eq('id', session.id).single();
+      if (s2) setSession(s2);
     }
 
-    let shoe = session.shoe && session.shoe.length ? [...session.shoe] : freshShoe(4);
+    // משוך את רשימת השחקנים טרייה
+    const { data: ps, error: pe } = await supabase
+      .from("bj_players")
+      .select("*")
+      .eq("session_id", session.id)
+      .order("seat");
+    if (pe) { console.error('[deal] players error:', pe); return; }
+
+    const ready = (ps||[]).length>0 && ps.every(p => (p.bet||0) >= MIN_BET && p.status !== 'left');
+    if (!ready) { setMsg("Not all players have placed minimum bet"); return; }
+
+    let shoe = session.shoe?.length ? [...session.shoe] : freshShoe(4);
     const draw = () => shoe.pop();
 
-    // Deal to players
-    for (const p of players) {
+    for (const p of ps) {
       const hand = [draw(), draw()];
-      const isBlackjack = handValue(hand) === 21;
+      const bj = handValue(hand) === 21;
       await supabase.from("bj_players").update({
-        hand: hand,
-        status: isBlackjack ? 'blackjack' : 'acting',
-        acted: false
+        hand, status: bj ? 'blackjack' : 'acting', acted: false
       }).eq("id", p.id);
     }
 
-    // Deal to dealer
     const dealerHand = [draw(), draw()];
     await supabase.from("bj_sessions").update({
       state: 'acting',
       dealer_hand: dealerHand,
-      dealer_hidden: true,
+      dealer_hidden: true,  // << נשאר מכוסה
       shoe: shoe,
       round_no: (session.round_no || 0) + 1,
       current_seat: 0
@@ -302,67 +339,61 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     await supabase.from("bj_sessions").update({ shoe }).eq("id", session.id);
   }
 
-  async function settle() {
+  async function dealerAndSettle() {
     if (!session) return;
-    
-    const players = await supabase.from("bj_players").select("*").eq("session_id", session.id);
-    if (players.error) return;
-    
-    const dealerScore = handValue(session.dealer_hand || []);
+
+    // Check if everyone is done (stood/busted/blackjack)
+    const { data: ps, error: pe } = await supabase.from("bj_players")
+      .select("*").eq("session_id", session.id);
+    if (pe) return;
+
+    const done = (ps||[]).every(p => ['stood','busted','blackjack','settled'].includes(p.status));
+    if (!done) { setMsg("Players still acting"); return; }
+
+    // Dealer phase
+    let dealer = [...(session.dealer_hand||[])];
+    let shoe = [...(session.shoe||[])];
+    const needHit = () => handValue(dealer) < 17; // S17
+
+    while (needHit() && shoe.length) dealer.push(shoe.pop());
+
+    await supabase.from('bj_sessions').update({
+      dealer_hand: dealer,
+      dealer_hidden: false,
+      shoe,
+      state: 'settling'
+    }).eq('id', session.id);
+
+    // settle
+    const dealerScore = handValue(dealer);
     const dealerBust = dealerScore > 21;
-    
-    for (const p of players.data) {
-      const score = handValue(p.hand || []);
-      let result = 'lose';
-      let payout = 0;
-      
-      if (p.status === 'blackjack') {
-        result = 'blackjack';
-        payout = Math.floor(p.bet * 3 / 2);
-      } else if (dealerBust && score <= 21) {
-        result = 'win';
-        payout = p.bet;
-      } else if (score > 21) {
-        result = 'lose';
-      } else if (score > dealerScore) {
-        result = 'win';
-        payout = p.bet;
-      } else if (score === dealerScore) {
-        result = 'push';
-        payout = 0;
-      } else {
-        result = 'lose';
-      }
-      
-      const newStack = p.stack + payout - p.bet;
-      await supabase.from("bj_players").update({
-        result: result,
-        stack: newStack,
-        status: 'settled',
-        bet: 0
-      }).eq("id", p.id);
+
+    for (const p of ps||[]) {
+      const s = handValue(p.hand||[]);
+      let result = 'lose', payout = 0;
+      if (p.status==='blackjack') { result='blackjack'; payout=Math.floor(p.bet*3/2); }
+      else if (dealerBust && s<=21) { result='win'; payout=p.bet; }
+      else if (s>21) { result='lose'; }
+      else if (s>dealerScore) { result='win'; payout=p.bet; }
+      else if (s===dealerScore) { result='push'; payout=0; }
+      else { result='lose'; }
+      const newStack = (p.stack||0) + payout - (p.bet||0);
+
+      await supabase.from('bj_players').update({
+        result, stack: newStack, status: 'settled', bet: 0
+      }).eq('id', p.id);
     }
-    
-    await supabase.from("bj_sessions").update({
-      state: 'ended',
-      dealer_hidden: false
-    }).eq("id", session.id);
+
+    await supabase.from('bj_sessions').update({ state: 'ended' }).eq('id', session.id);
   }
 
   async function resetRound() {
     if (!session) return;
     await supabase.from("bj_players").update({
-      hand: [],
-      bet: 0,
-      result: null,
-      status: 'seated',
-      acted: false
+      hand: [], bet: 0, result: null, status: 'seated', acted: false
     }).eq("session_id", session.id);
-    
     await supabase.from("bj_sessions").update({
-      state: 'lobby',
-      dealer_hand: [],
-      dealer_hidden: true
+      state: 'lobby', dealer_hand: [], dealer_hidden: true
     }).eq("id", session.id);
   }
 
@@ -390,8 +421,14 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         <div className="bg-gradient-to-r from-red-900/20 to-red-800/20 rounded-lg p-2 md:p-3 border border-red-400/30">
           <div className="text-center">
             <div className="text-white font-bold text-sm md:text-base mb-1">Dealer</div>
-            <HandView hand={session?.dealer_hand||[]}/>
-            <div className="text-white/80 text-xs mt-1">Total: {dealerV||"—"}</div>
+            <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-1">
+              {(session?.dealer_hand||[]).map((c,i)=>(
+                <Card key={i} code={c} hidden={session?.dealer_hidden && i===1} />
+              ))}
+            </div>
+            <div className="text-white/80 text-xs mt-1">
+              Total: {session?.dealer_hidden ? "—" : (handValue(session?.dealer_hand||[]) || "—")}
+            </div>
           </div>
         </div>
 
@@ -412,7 +449,14 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
                       <HandView hand={occupant.hand} size="small"/>
                       <div className="text-white/80 text-xs">
                         Total: {hv??"—"} 
-                        <span className={`ml-1 px-1 py-0.5 rounded text-xs ${occupant.status==='playing'?'bg-blue-600':occupant.status==='stood'?'bg-gray-600':'bg-red-600'}`}>
+                        <span className={
+                          "ml-1 px-1 py-0.5 rounded text-xs " +
+                          (occupant.status==='acting' ? 'bg-blue-600' :
+                           occupant.status==='stood' ? 'bg-gray-600' :
+                           occupant.status==='busted' ? 'bg-red-700' :
+                           occupant.status==='blackjack' ? 'bg-emerald-700' :
+                           occupant.status==='settled' ? 'bg-purple-700' : 'bg-slate-600')
+                        }>
                           {occupant.status}
                         </span>
                       </div>
@@ -437,7 +481,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
             <input type="number" value={bet} min={MIN_BET} step={MIN_BET}
               onChange={(e)=>setBet(Math.max(MIN_BET, Math.floor(e.target.value)))}
               className="flex-1 bg-black/40 text-white text-xs rounded px-1 py-0.5 md:px-2 md:py-1 border border-white/20 focus:border-emerald-400 focus:outline-none" />
-            <button onClick={placeBet} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold text-xs transition-all">
+            <button onClick={placeBet} disabled={!canPlaceBet} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">
               PLACE
             </button>
           </div>
@@ -447,18 +491,17 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
           <div className="text-white/80 text-xs mb-1 font-semibold">Game Actions</div>
           <div className="grid grid-cols-2 gap-1">
-            <button onClick={deal} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-xs transition-all">
+            <button onClick={openBetting}
+              className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white font-semibold text-xs transition-all">
+              OPEN BETTING
+            </button>
+            <button onClick={deal} disabled={!canDeal}
+              className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">
               DEAL
             </button>
-            <button onClick={hit} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all">
-              HIT
-            </button>
-            <button onClick={stand} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all">
-              STAND
-            </button>
-            <button onClick={settle} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold text-xs transition-all">
-              SETTLE
-            </button>
+            <button onClick={hit} disabled={!canAct} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">HIT</button>
+            <button onClick={stand} disabled={!canAct} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">STAND</button>
+            <button onClick={dealerAndSettle} disabled={!(session?.state==='acting')} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">SETTLE</button>
           </div>
         </div>
 
