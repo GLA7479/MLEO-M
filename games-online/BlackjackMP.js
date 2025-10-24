@@ -780,6 +780,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       // Create split hand (second card + new card)
       const { error: upsertErr } = await supabase.from('bj_players').upsert({
         session_id: session.id,
+        client_id: myRow.client_id,
         seat: myRow.seat,
         player_name: myRow.player_name,
         bet: newBet,
@@ -1043,24 +1044,41 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         {/* Players Grid - Mobile Responsive */}
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1 md:gap-2">
           {Array.from({length: SEATS}).map((_,i)=>{
-            const occupant = players.find(p=>p.seat===i);
-            const isMe = occupant && occupant.player_name===name;
-            const isActive = session?.current_player_id && occupant?.id === session.current_player_id;
-            const hv = occupant?.hand && Array.isArray(occupant.hand) ? handValue(occupant.hand) : null;
+            // מצא את כל הידיים של המושב הזה
+            const seatHands = players.filter(p => p.seat === i).sort((a,b) => a.hand_idx - b.hand_idx);
+            const primaryHand = seatHands[0]; // היד הראשונה
+            const isMe = primaryHand && primaryHand.player_name === name;
+            const isActive = session?.current_player_id && seatHands.some(h => h.id === session.current_player_id);
+            
             return (
               <div key={i} className={`rounded-lg border ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[80px] md:min-h-[120px] transition-all hover:bg-white/10 ${isActive ? 'ring-2 ring-amber-400' : ''} relative`}>
                 {/* Turn indicator button - top right corner */}
-                {occupant && (
+                {primaryHand && (
                   <div className={`absolute top-1 right-1 w-3 h-3 rounded-full ${isActive ? 'bg-green-500' : 'bg-red-500'} ${isActive ? 'animate-pulse' : ''}`}></div>
                 )}
                 <div className="text-center">
-                  {occupant ? (
+                  {primaryHand ? (
                     <div className="space-y-0.5 md:space-y-1">
-                      <div className="text-white font-bold text-xs md:text-sm truncate">{occupant.player_name}</div>
-                      <div className="text-emerald-300 text-xs font-semibold">Bet: {fmt(occupant.bet||0)}</div>
-                      <HandView hand={occupant.hand} size="small" isDealing={session?.state === 'dealing' || session?.state === 'acting'}/>
-                      <div className="text-white/80 text-xs">
-                        Total: {hv??"—"}
+                      <div className="text-white font-bold text-xs md:text-sm truncate">
+                        {primaryHand.player_name}
+                        {seatHands.length > 1 && ` (${seatHands.length})`}
+                      </div>
+                      <div className="text-emerald-300 text-xs font-semibold">Bet: {fmt(primaryHand.bet||0)}</div>
+                      
+                      {/* הצג את כל הידיים באותו שורה */}
+                      <div className="flex flex-wrap justify-center gap-1">
+                        {seatHands.map((hand, handIdx) => {
+                          const hv = hand?.hand && Array.isArray(hand.hand) ? handValue(hand.hand) : null;
+                          const isCurrentHand = session?.current_player_id === hand.id;
+                          return (
+                            <div key={handIdx} className={`${isCurrentHand ? 'ring-1 ring-yellow-400' : ''} rounded p-1`}>
+                              <HandView hand={hand.hand} size="small" isDealing={session?.state === 'dealing' || session?.state === 'acting'}/>
+                              <div className="text-white/80 text-xs">
+                                {hv??"—"}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ) : (
