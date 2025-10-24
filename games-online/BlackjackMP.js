@@ -121,6 +121,21 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const [bet, setBet] = useState(MIN_BET);
   const [displayValue, setDisplayValue] = useState('');
   const [msg, setMsg] = useState("");
+  
+  // מזהה קבוע לקומפוננטה
+  const clientId = useMemo(() => {
+    try {
+      if (typeof window === 'undefined') return '00000000-0000-0000-0000-000000000000';
+      return getClientId();
+    } catch {
+      return '00000000-0000-0000-0000-000000000000';
+    }
+  }, []);
+  
+  // בדיקת client_id
+  useEffect(() => {
+    console.log('🔍 Client ID check:', { clientId });
+  }, []);
   const [banner, setBanner] = useState(null); // {title, lines: []}
   const [timerTick, setTimerTick] = useState(0);
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
@@ -300,7 +315,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   // mark 'left' on tab close (best-effort)
   useEffect(() => {
     if (!session?.id) return;
-    const client_id = getClientId();
+    const client_id = clientId;
     const onLeave = async () => {
       try {
         await supabase.from("bj_players")
@@ -321,7 +336,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   async function ensureSeated() {
     if (!session?.id || !name) return;
 
-    const client_id = getClientId();
+    const client_id = clientId;
 
     // אם כבר יש לי שורה בסשן — לצאת
     const existing = players.find(p => p.client_id === client_id);
