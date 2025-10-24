@@ -1010,6 +1010,9 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
         <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10 h-full">
           <div className="text-white/80 text-xs mb-1 font-semibold">Status</div>
+          <div className="text-xs text-white/60 mb-1">
+            Room: {roomId.slice(0,8)} • State: {session?.state||"…"} • Players: {roomMembers.length}
+          </div>
           {isLeader && (
             <div className="text-xs text-emerald-400 font-semibold mb-1">
               🎮 Leader
