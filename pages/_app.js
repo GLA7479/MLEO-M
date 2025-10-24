@@ -8,11 +8,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { wagmiConfig } from "../lib/wagmi";
 
 import { useEffect } from "react";
+import { migrateVaultOnce } from "../lib/vault";
 
 const queryClient = new QueryClient();
 
 export default function App({ Component, pageProps }) {
   useEffect(() => {
+    // --- Vault Migration ---
+    migrateVaultOnce();
+    
     // --- Service Worker: disable in dev, enable in prod ---
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       if (process.env.NODE_ENV !== "production") {

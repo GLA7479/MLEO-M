@@ -11,6 +11,7 @@ import Layout from "../components/Layout";
 import { useRouter } from "next/router";
 import { useAccount } from "wagmi";
 import RoomBrowser from "../components/online/RoomBrowser";
+import { readVault, writeVault } from "../lib/vault";
 
 // --------------------------- Shared LocalStorage helpers --------------------
 function safeRead(key, fallback) {
@@ -30,17 +31,13 @@ function safeWrite(key, val) {
   } catch {}
 }
 
-// Shared Vault — same key used across site
-const VAULT_KEY = "mleo_rush_core_v4"; // preserves { vault: number, ... }
+// Shared Vault — using vault.js for migration and protection
 function getVault() {
-  const data = safeRead(VAULT_KEY, {});
-  return Math.max(0, Number(data?.vault || 0));
+  return readVault();
 }
 
 function setVault(next) {
-  const data = safeRead(VAULT_KEY, {});
-  data.vault = Math.max(0, Math.floor(Number(next||0)));
-  safeWrite(VAULT_KEY, data);
+  writeVault(next);
 }
 
 function fmt(n){

@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
+import { readVault, writeVault } from "../lib/vault";
 
 const MIN_BET = 1000;
 const SEATS = 5;
@@ -132,7 +133,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const clampBet = (n) => {
     const v = Math.floor(Number(n || 0));
     if (!Number.isFinite(v) || v < MIN_BET) return MIN_BET;
-    return Math.min(v, vault);
+    return Math.min(v, readVault());
   };
   // Button availability helpers
   const canPlaceBet = !!myRow && ['lobby','betting'].includes(session?.state);
@@ -333,7 +334,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       client_id,
       player_name: name,
       seat: free,
-      stack: Math.min(vault, 10000),
+      stack: Math.min(readVault(), 10000),
       bet: 0,
       hand: [],
       status: "seated",
@@ -894,7 +895,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
               PLACE
             </button>
           </div>
-          <div className="text-white/60 text-xs mt-1">Vault: {fmt(vault)} MLEO</div>
+          <div className="text-white/60 text-xs mt-1">Vault: {fmt(readVault())} MLEO</div>
         </div>
 
         <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
