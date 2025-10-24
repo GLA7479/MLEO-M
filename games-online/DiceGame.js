@@ -18,6 +18,17 @@ const rollDie=()=>Math.floor(Math.random()*6)+1; const isHigh=(v)=>v>=4; const i
 function fmt(n){ n=Math.floor(Number(n||0)); if(n>=1e9)return(n/1e9).toFixed(2)+"B"; if(n>=1e6)return(n/1e6).toFixed(2)+"M"; if(n>=1e3)return(n/1e3).toFixed(2)+"K"; return String(n); }
 
 export default function DiceGame({ vault, setVaultBoth }){
+  // Use same vault functions as existing games
+  function getVault() {
+    const rushData = safeRead("mleo_rush_core_v4", {});
+    return rushData.vault || 0;
+  }
+
+  function setVault(amount) {
+    const rushData = safeRead("mleo_rush_core_v4", {});
+    rushData.vault = amount;
+    safeWrite("mleo_rush_core_v4", rushData);
+  }
   const [bet,setBet]=useState(DICE_MIN); 
   const [pick,setPick]=useState("high");
   const [state,setState]=useState(loadDice());
@@ -27,20 +38,20 @@ export default function DiceGame({ vault, setVaultBoth }){
   const [err,setErr]=useState("");
 
   const remaining=Math.max(0,DICE_CAP-(state.dailyWon||0));
-  const clamp=(n)=>{const v=Math.floor(Number(n||0)); if(!Number.isFinite(v)||v<DICE_MIN) return DICE_MIN; const mv=Math.max(0,vault); const byCap=Math.max(0,remaining); return Math.min(v,mv,byCap>0?byCap:v); };
+  const clamp=(n)=>{const v=Math.floor(Number(n||0)); if(!Number.isFinite(v)||v<DICE_MIN) return DICE_MIN; const mv=Math.max(0,getVault()); const byCap=Math.max(0,remaining); return Math.min(v,mv,byCap>0?byCap:v); };
 
-  function setAllIn(){ const m=Math.max(0,Math.min(vault,remaining)); setBet(Math.max(DICE_MIN,Math.floor(m))); }
-  function setHalf(){ const m=Math.max(0,Math.min(vault,remaining||vault)); setBet(Math.max(DICE_MIN,Math.floor(m/2))); }
+  function setAllIn(){ const m=Math.max(0,Math.min(getVault(),remaining)); setBet(Math.max(DICE_MIN,Math.floor(m))); }
+  function setHalf(){ const m=Math.max(0,Math.min(getVault(),remaining||getVault())); setBet(Math.max(DICE_MIN,Math.floor(m/2))); }
   function setMin(){ setBet(DICE_MIN); }
   function resetDaily(){ const s={dailyWon:0,lastPlayed:todayISO()}; setState(s); saveDice(s); }
 
   async function onRoll(){
     setErr(""); setMsg(""); const amount=clamp(bet);
     if(amount<DICE_MIN){ setErr(`Minimum is ${fmt(DICE_MIN)} MLEO`); return; }
-    if(vault<amount){ setErr("Insufficient Vault balance"); return; }
+    if(getVault()<amount){ setErr("Insufficient Vault balance"); return; }
     if(amount>remaining){ setErr(`Daily win cap reached. You can bet up to ${fmt(remaining)} MLEO right now.`); return; }
 
-    setVaultBoth(vault-amount); setSpin(true);
+    setVault(getVault()-amount); setSpin(true);
     const t0=Date.now();
     const tick=()=>{ if(Date.now()-t0>1000){ finish(); } else { setRoll(r=>(((r??1)%6)+1)); requestAnimationFrame(tick);} };
     function finish(){ 
@@ -48,7 +59,7 @@ export default function DiceGame({ vault, setVaultBoth }){
       const win=(pick==='high'?isHigh(r):isLow(r)); 
       if(win){ 
         const profit=amount; 
-        setVaultBoth(vault-amount+amount+profit); 
+        setVault(getVault()-amount+amount+profit); 
         const next=Math.min(DICE_CAP,(state.dailyWon||0)+profit); 
         const s={dailyWon:next,lastPlayed:todayISO()};
         setState(s); saveDice(s); 
@@ -89,10 +100,10 @@ export default function DiceGame({ vault, setVaultBoth }){
           <button onClick={setAllIn} className="flex-1 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/80 text-xs hover:bg-white/10">ALL-IN</button>
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-white/80">
-          <div className="bg-white/5 border border-white/10 rounded-lg p-2">Min bet:  <span className="text-amber-300  font-semibold">{fmt(DICE_MIN)}</span></div>
+          <div className="bg-white/5 border border-white/10 rounded-lg p-2">Vault: <span className="text-emerald-300 font-semibold">{fmt(getVault())}</span></div>
+          <div className="bg-white/5 border border-white/10 rounded-lg p-2">Min bet: <span className="text-amber-300 font-semibold">{fmt(DICE_MIN)}</span></div>
           <div className="bg-white/5 border border-white/10 rounded-lg p-2">Daily Cap: <span className="text-emerald-300 font-semibold">{fmt(DICE_CAP)}</span></div>
-          <div className="bg-white/5 border border-white/10 rounded-lg p-2">Today won: <span className="text-cyan-300   font-semibold">{fmt(state.dailyWon)}</span></div>
-          <div className="bg-white/5 border border-white/10 rounded-lg p-2">Cap left:  <span className="text-emerald-300 font-semibold">{fmt(Math.max(0,DICE_CAP-(state.dailyWon||0)))}</span></div>
+          <div className="bg-white/5 border border-white/10 rounded-lg p-2">Today won: <span className="text-cyan-300 font-semibold">{fmt(state.dailyWon)}</span></div>
         </div>
         <div className="mt-2 flex justify-end">
           <button onClick={resetDaily} className="px-2 py-1 text-[11px] rounded bg-white/5 border border-white/10 text-white/60 hover:text-white/90">Reset daily (debug)</button>

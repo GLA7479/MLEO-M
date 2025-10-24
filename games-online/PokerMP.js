@@ -53,6 +53,17 @@ function TurnCountdown({ deadline }) {
 }
 
 export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
+  // Use same vault functions as existing games
+  function getVault() {
+    const rushData = JSON.parse(localStorage.getItem("mleo_rush_core_v4") || "{}");
+    return rushData.vault || 0;
+  }
+
+  function setVault(amount) {
+    const rushData = JSON.parse(localStorage.getItem("mleo_rush_core_v4") || "{}");
+    rushData.vault = amount;
+    localStorage.setItem("mleo_rush_core_v4", JSON.stringify(rushData));
+  }
   const name = playerName || "Guest";
   const seats = 6;
 
@@ -313,6 +324,17 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     const { data: pot } = await supabase.from("poker_pots").select("*").eq("session_id", sessionId).maybeSingle();
 
     const pay = Math.min(amount, pl.stack_live);
+    
+    // אם זה השחקן המקומי, הוצא כסף מה-vault
+    if (pl.player_name === name) {
+      const currentVault = getVault();
+      if (currentVault < pay) {
+        setMsg("Insufficient vault balance");
+        return;
+      }
+      setVault(currentVault - pay);
+    }
+    
     await supabase.from("poker_players").update({
       stack_live: pl.stack_live - pay,
       bet_street: (pl.bet_street||0) + pay,

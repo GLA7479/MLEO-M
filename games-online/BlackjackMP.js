@@ -3,7 +3,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
-import { readVault, writeVault } from "../lib/vault";
 
 const MIN_BET = 1000;
 const SEATS = 5;
@@ -88,6 +87,17 @@ function HandView({ hand, size = "normal" }) {
 
 // ---------- Component ----------
 export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth }) {
+  // Use same vault functions as existing games
+  function getVault() {
+    const rushData = JSON.parse(localStorage.getItem("mleo_rush_core_v4") || "{}");
+    return rushData.vault || 0;
+  }
+
+  function setVault(amount) {
+    const rushData = JSON.parse(localStorage.getItem("mleo_rush_core_v4") || "{}");
+    rushData.vault = amount;
+    localStorage.setItem("mleo_rush_core_v4", JSON.stringify(rushData));
+  }
   const name = playerName || "Guest";
 
   // בדיקת חיבור מיידית
@@ -133,7 +143,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const clampBet = (n) => {
     const v = Math.floor(Number(n || 0));
     if (!Number.isFinite(v) || v < MIN_BET) return MIN_BET;
-    return Math.min(v, readVault());
+    return Math.min(v, getVault());
   };
   // Button availability helpers
   const canPlaceBet = !!myRow && ['lobby','betting'].includes(session?.state);
@@ -334,7 +344,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       client_id,
       player_name: name,
       seat: free,
-      stack: Math.min(readVault(), 10000),
+      stack: Math.min(getVault(), 10000),
       bet: 0,
       hand: [],
       status: "seated",
@@ -371,6 +381,16 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     const row = myRow || (await supabase.from("bj_players").select("*").eq("session_id", session.id).eq("player_name", name).maybeSingle()).data;
     if (!row || bet < MIN_BET) return;
 
+    // בדוק שיש מספיק כסף ב-vault
+    const currentVault = getVault();
+    if (currentVault < bet) {
+      setMsg("Insufficient vault balance");
+      return;
+    }
+
+    // הוצא כסף מה-vault
+    setVault(currentVault - bet);
+
     const { error } = await supabase.from("bj_players").update({
       bet: bet,
       status: 'betting'
@@ -380,6 +400,8 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     if (error) {
       console.error('[bj_players.update] placeBet error:', error);
       setMsg("Failed to place bet");
+      // החזר כסף ל-vault אם ההימור נכשל
+      setVault(currentVault);
     }
   }
 
@@ -768,6 +790,12 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       const delta = payout - (p.bet||0); // כמה השתנה הסטאק בסיבוב
       const newStack = (p.stack||0) + delta;
 
+      // עדכן את ה-vault אם זה השחקן המקומי
+      if (p.player_name === name) {
+        const currentVault = getVault();
+        setVault(currentVault + delta);
+      }
+
       await supabase.from('bj_players').update({
         result, stack:newStack, status:'settled', bet:0
       }).eq('id', p.id);
@@ -895,7 +923,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
               PLACE
             </button>
           </div>
-          <div className="text-white/60 text-xs mt-1">Vault: {fmt(readVault())} MLEO</div>
+          <div className="text-white/60 text-xs mt-1">Vault: {fmt(getVault())} MLEO</div>
         </div>
 
         <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">

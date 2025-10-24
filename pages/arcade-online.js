@@ -1,19 +1,37 @@
-// ============================================================================
-// MLEO Arcade-Online Hub — Single Page (Next.js /pages/arcade-online.js)
-// One page runs all online games via lazy-loaded modules from /games-online/*
-// • Query param routing: /arcade-online?game=dice
-// • Shared Vault (localStorage: mleo_rush_core_v4) — no real winnings
-// • English UI, Hebrew comments here only
-// ============================================================================
-
+// pages/arcade-online.js - MLEO Arcade Online Hub
+// בסגנון דף Arcade הקיים עם GameCard components
 import { useEffect, useRef, useState } from "react";
 import Layout from "../components/Layout";
 import { useRouter } from "next/router";
 import { useAccount } from "wagmi";
-import RoomBrowser from "../components/online/RoomBrowser";
-import { readVault, writeVault } from "../lib/vault";
 
-// --------------------------- Shared LocalStorage helpers --------------------
+// iOS Viewport Fix (כמו במשחקים הקיימים)
+function useIOSViewportFix() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const vv = window.visualViewport;
+    const setVH = () => {
+      const h = vv ? vv.height : window.innerHeight;
+      root.style.setProperty("--app-100vh", `${Math.round(h)}px`);
+    };
+    const onOrient = () => requestAnimationFrame(() => setTimeout(setVH, 250));
+    setVH();
+    if (vv) {
+      vv.addEventListener("resize", setVH);
+      vv.addEventListener("scroll", setVH);
+    }
+    window.addEventListener("orientationchange", onOrient);
+    return () => {
+      if (vv) {
+        vv.removeEventListener("resize", setVH);
+        vv.removeEventListener("scroll", setVH);
+      }
+      window.removeEventListener("orientationchange", onOrient);
+    };
+  }, []);
+}
+
+// Helper functions (כמו במשחקים הקיימים)
 function safeRead(key, fallback) {
   if (typeof window === "undefined") return fallback;
   try {
@@ -31,137 +49,236 @@ function safeWrite(key, val) {
   } catch {}
 }
 
-// Shared Vault — using vault.js for migration and protection
 function getVault() {
-  return readVault();
+  const rushData = safeRead("mleo_rush_core_v4", {});
+  return rushData.vault || 0;
 }
 
-function setVault(next) {
-  writeVault(next);
+function setVault(amount) {
+  const rushData = safeRead("mleo_rush_core_v4", {});
+  rushData.vault = amount;
+  safeWrite("mleo_rush_core_v4", rushData);
 }
 
-function fmt(n){
-  n=Math.floor(Number(n||0));
-  if(n>=1e9)return(n/1e9).toFixed(2)+"B";
-  if(n>=1e6)return(n/1e6).toFixed(2)+"M";
-  if(n>=1e3)return(n/1e3).toFixed(2)+"K";
+function fmt(n) {
+  n = Math.floor(Number(n || 0));
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
   return String(n);
 }
 
-function useIOSViewportFix(){
-  useEffect(()=>{
-    const root=document.documentElement;
-    const vv=window.visualViewport;
-    const setVH=()=>{
-      const h=vv?vv.height:window.innerHeight;
-      root.style.setProperty("--app-100vh", `${Math.round(h)}px`);
-      root.style.setProperty("--satb", getComputedStyle(root).getPropertyValue("env(safe-area-inset-bottom,0px)"));
-    };
-    const onOrient=()=>requestAnimationFrame(()=>setTimeout(setVH,250));
-    setVH();
-    vv?.addEventListener("resize",setVH);
-    vv?.addEventListener("scroll",setVH);
-    window.addEventListener("orientationchange",onOrient);
-    return()=>{
-      vv?.removeEventListener("resize",setVH);
-      vv?.removeEventListener("scroll",setVH);
-      window.removeEventListener("orientationchange",onOrient);
-    };
-  },[]);
-}
-
-// --------------------------- Lazy registry (code-splitting) -----------------
-// Add games here. Each game is lazy-loaded only when selected.
-const REGISTRY = [
-  { id: "dice", title: "Dice", icon: "🎲", loader: () => import("../games-online/DiceGame").then(m => m.default) },
-  { id: "blackjack", title: "Blackjack (MP)", icon: "🃏", loader: () => import("../games-online/BlackjackMP").then(m => m.default) },
-  { id: "poker", title: "Texas Hold'em (MP)", icon: "♠️", loader: () => import("../games-online/PokerMP").then(m => m.default) },
+// Game Registry with lazy loading
+const GAME_REGISTRY = [
+  {
+    id: "dice",
+    title: "Dice",
+    emoji: "🎲",
+    description: "Roll the dice! Choose high or low and win big!",
+    color: "#3B82F6",
+    isMultiplayer: false,
+    loader: () => import("../games-online/DiceGame").then(m => m.default)
+  },
+  {
+    id: "blackjack",
+    title: "Blackjack",
+    emoji: "🃏",
+    description: "Beat the dealer to 21! Multiplayer blackjack with friends.",
+    color: "#10B981",
+    isMultiplayer: true,
+    loader: () => import("../games-online/BlackjackMP").then(m => m.default)
+  },
+  {
+    id: "poker",
+    title: "Texas Hold'em",
+    emoji: "♠️",
+    description: "Texas Hold'em poker! Multiplayer poker with friends.",
+    color: "#8B5CF6",
+    isMultiplayer: true,
+    loader: () => import("../games-online/PokerMP").then(m => m.default)
+  },
 ];
 
-function GameViewport({ gameId, vault, setVaultBoth, roomId, playerName }){
-  const [Comp, setComp] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const entry = REGISTRY.find(g=>g.id===gameId);
+// GameCard component (כמו בדף Arcade)
+function GameCard({ game, onSelect }) {
+  return (
+    <article 
+      className="rounded-lg border border-white/10 backdrop-blur-md shadow-lg p-4 flex flex-col transition-all hover:scale-105 hover:border-white/30 relative overflow-hidden cursor-pointer"
+      style={{
+        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)',
+        height: '187px',
+      }}
+      onClick={() => onSelect(game.id)}
+    >
+      {/* Multiplayer Badge */}
+      {game.isMultiplayer && (
+        <div className="absolute top-2 left-2 px-2 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-xs font-bold text-emerald-300">
+          MP
+        </div>
+      )}
 
-  useEffect(()=>{
-    let alive = true;
-    async function load(){
-      if(!entry){
-        setComp(null);
-        return;
-      }
-      setLoading(true);
-      try {
-        const C = await entry.loader();
-        if(alive) setComp(() => C);
-      } finally {
-        if(alive) setLoading(false);
-      }
-    }
-    load();
-    return ()=>{ alive = false; };
-  }, [entry?.id]);
+      {/* Icon */}
+      <div className="text-center absolute left-0 right-0" style={{ top: '15px' }}>
+        <div className="text-5xl leading-none">{game.emoji}</div>
+      </div>
 
-  if(!entry) return <div className="flex items-center justify-center h-full text-white/70">Pick a game</div>;
-  if(loading || !Comp) return <div className="flex items-center justify-center h-full text-white/70">Loading {entry.title}…</div>;
-  return <Comp vault={vault} setVaultBoth={setVaultBoth} roomId={roomId} playerName={playerName} />;
+      {/* Title */}
+      <div 
+        className="text-center absolute left-0 right-0 px-2 flex items-center justify-center" 
+        style={{ 
+          top: '80px',
+          height: '45px'
+        }}
+      >
+        <h2 className="text-base font-bold line-clamp-2 leading-tight">{game.title}</h2>
+      </div>
+
+      {/* Play button */}
+      <div className="absolute left-4 right-4" style={{ bottom: '12px' }}>
+        <div
+          className="block w-full text-center px-4 py-2.5 rounded text-sm font-bold text-white shadow-lg transition-all hover:scale-105"
+          style={{
+            background: `linear-gradient(135deg, ${game.color} 0%, ${game.color}dd 100%)`,
+          }}
+        >
+          PLAY
+        </div>
+      </div>
+    </article>
+  );
 }
 
-export default function ArcadeOnline(){
+// Game Viewport Component
+function GameViewport({ gameId, vault, setVaultBoth, playerName, roomId }) {
+  const [GameComponent, setGameComponent] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!gameId) {
+      setGameComponent(null);
+      return;
+    }
+
+    const game = GAME_REGISTRY.find(g => g.id === gameId);
+    if (!game) {
+      setError(`Game "${gameId}" not found`);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    game.loader()
+      .then((Component) => {
+        setGameComponent(() => Component);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error(`Failed to load game ${gameId}:`, err);
+        setError(`Failed to load ${game.title}`);
+        setLoading(false);
+      });
+  }, [gameId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full text-white/70">
+        <div className="text-center">
+          <div className="text-2xl mb-2">🎮</div>
+          <div>Loading {GAME_REGISTRY.find(g => g.id === gameId)?.title || 'Game'}...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full text-red-400">
+        <div className="text-center">
+          <div className="text-2xl mb-2">❌</div>
+          <div>{error}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!GameComponent) {
+    return (
+      <div className="flex items-center justify-center h-full text-white/70">
+        <div className="text-center">
+          <div className="text-2xl mb-2">🎯</div>
+          <div>Select a game to play</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <GameComponent 
+      vault={vault} 
+      setVaultBoth={setVaultBoth}
+      playerName={playerName}
+      roomId={roomId}
+    />
+  );
+}
+
+export default function ArcadeOnline() {
   useIOSViewportFix();
   const { address, isConnected } = useAccount();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+  const [vaultAmt, setVaultAmt] = useState(0);
+  const [playerName, setPlayerName] = useState("");
+  const [selectedGame, setSelectedGame] = useState(null);
 
-  const [mounted,setMounted]=useState(false);
-  const [vaultAmt,setVaultAmt]=useState(0);
-  const [playerName,setPlayerName]=useState("");
-  const [activeGame,setActiveGame]=useState("dice"); // default
-  const [roomId, setRoomId] = useState("");
-  const [showGameSelector, setShowGameSelector] = useState(false);
-  const wrapRef=useRef(null);
-
-  // read game from query (?game=)
-  useEffect(()=>{
-    const q = (router.query?.game || '').toString();
-    if(q && REGISTRY.some(g=>g.id===q)) setActiveGame(q);
-  }, [router.query?.game]);
-
-  // read roomId from query (?room=)
-  useEffect(()=>{
-    const rid = (router.query?.room || '').toString();
-    if (rid) setRoomId(rid);
-  }, [router.query?.room]);
-
-  // mount & shared state
-  useEffect(()=>{
+  useEffect(() => {
     setMounted(true);
     setVaultAmt(getVault());
-    const saved = safeRead("mleo_player_name", "");
-    if(typeof saved==="string" && saved.trim()) setPlayerName(saved.trim());
-  },[]);
-  useEffect(()=>{ safeWrite("mleo_player_name", playerName || ""); },[playerName]);
+    const saved = localStorage.getItem("mleo_player_name") || "";
+    if (saved) setPlayerName(saved);
+  }, []);
 
-  function setVaultBoth(next){
+  useEffect(() => {
+    if (playerName) {
+      localStorage.setItem("mleo_player_name", playerName);
+    }
+  }, [playerName]);
+
+  // Handle game selection from URL or clicks
+  useEffect(() => {
+    const gameId = router.query.game;
+    if (gameId && GAME_REGISTRY.some(g => g.id === gameId)) {
+      setSelectedGame(gameId);
+    } else {
+      setSelectedGame(null);
+    }
+  }, [router.query.game]);
+
+  function setVaultBoth(next) {
     setVault(next);
     setVaultAmt(getVault());
   }
 
-  // switch game and update URL (shallow)
-  function selectGame(id){
-    const valid = REGISTRY.some(g=>g.id===id) ? id : "dice";
-    setActiveGame(valid);
-    const url = { pathname: router.pathname, query: { ...router.query, game: valid } };
+  function selectGame(gameId) {
+    const url = {
+      pathname: router.pathname,
+      query: { ...router.query, game: gameId }
+    };
     router.push(url, undefined, { shallow: true });
   }
 
-  // handle room joining
-  function onJoinRoom(roomId) {
-    setRoomId(roomId);
-    const url = { pathname: router.pathname, query: { ...router.query, room: roomId } };
-    router.push(url, undefined, { shallow: true });
+  function goBack() {
+    if (selectedGame) {
+      setSelectedGame(null);
+      router.push('/arcade-online', undefined, { shallow: true });
+    } else {
+      router.push('/');
+    }
   }
 
-  if(!mounted){
+  if (!mounted) {
     return (
       <Layout address={address} isConnected={isConnected} vaultAmount={0}>
         <div className="flex items-center justify-center h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -173,130 +290,68 @@ export default function ArcadeOnline(){
 
   return (
     <Layout address={address} isConnected={isConnected} vaultAmount={vaultAmt}>
-      <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-indigo-900 via-black to-purple-900" style={{height:'var(--app-100vh,100svh)'}}>
-        
-        {/* HEADER - בסגנון mleo-texas-holdem-casino */}
-        <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
-          <div className="relative px-2 py-3" style={{paddingTop:"calc(env(safe-area-inset-top,0px) + 10px)"}}>
-            <div className="flex items-center justify-between gap-2 pointer-events-auto">
-              <button onClick={()=>router.push('/')} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">BACK</button>
-              <div className="text-center flex-1">
-                <div className="text-white font-extrabold text-lg truncate">🎮 MLEO Arcade Online</div>
-                <div className="text-white/60 text-xs">
-                  {activeGame === 'blackjack' ? '🃏 Blackjack' : activeGame === 'poker' ? '♠️ Poker' : '🎲 Dice'}
-                  {roomId && ' • In Room'}
-                </div>
-              </div>
-              <button onClick={()=>setShowGameSelector(!showGameSelector)} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">GAMES</button>
+      <div 
+        className="relative w-full overflow-hidden bg-gradient-to-br from-indigo-900 via-black to-purple-900" 
+        style={{ height: 'var(--app-100vh,100svh)' }}
+      >
+        {/* Header */}
+        <header className="relative px-4 py-6 text-center">
+          <div className="flex items-center justify-between mb-6">
+            <button 
+              onClick={goBack}
+              className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold"
+            >
+              ← {selectedGame ? 'BACK TO GAMES' : 'BACK'}
+            </button>
+            <div className="text-center">
+              <h1 className="text-3xl font-extrabold text-white mb-2">🎮 MLEO Arcade Online</h1>
+              <p className="text-white/60">
+                {selectedGame ? `Playing ${GAME_REGISTRY.find(g => g.id === selectedGame)?.title || 'Game'}` : 'Multiplayer & Single Player Games'}
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-white/60 text-sm">Vault</div>
+              <div className="text-emerald-400 text-lg font-bold">{fmt(vaultAmt)} MLEO</div>
             </div>
           </div>
-        </div>
 
-        {/* BODY - בסגנון mleo-texas-holdem-casino */}
-        <div className="relative w-full h-full flex flex-col items-center justify-start pt-[calc(52px+var(--satb,0px))] px-2 pb-3">
-          
-          {/* Game Selector Modal */}
-          {showGameSelector && (
-            <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-              <div className="bg-slate-800 border border-white/20 rounded-2xl w-full max-w-sm p-4">
-                <div className="text-white font-semibold text-lg mb-4 text-center">Select Game</div>
-                <div className="space-y-2">
-                  {REGISTRY.map(g=> (
-                    <button
-                      key={g.id}
-                      onClick={() => {
-                        selectGame(g.id);
-                        setShowGameSelector(false);
-                      }}
-                      className={`w-full p-3 rounded-lg text-left ${activeGame===g.id ? 'bg-emerald-600 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{g.icon}</span>
-                        <div>
-                          <div className="font-semibold">{g.title}</div>
-                          <div className="text-xs opacity-70">Fun mode · Local vault</div>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                <button 
-                  onClick={() => setShowGameSelector(false)}
-                  className="w-full mt-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Room Selection for MP games */}
-          {(activeGame === 'blackjack' || activeGame === 'poker') && !roomId && (
-            <div className="w-full max-w-2xl bg-black/30 rounded-xl p-4 mb-4 backdrop-blur-sm border border-white/10">
-              <div className="text-white font-semibold text-lg mb-3 text-center">Select Room</div>
-              <RoomBrowser 
-                gameId={activeGame} 
-                playerName={playerName} 
-                onJoinRoom={onJoinRoom} 
-              />
-            </div>
-          )}
-
-          {/* In Room Header */}
-          {roomId && (
-            <div className="w-full max-w-2xl bg-black/30 rounded-xl p-3 mb-4 backdrop-blur-sm border border-white/10">
-              <div className="flex items-center justify-between">
-                <div className="text-white font-semibold">
-                  {activeGame === 'blackjack' ? '🃏 Blackjack Room' : '♠️ Poker Room'}
-                </div>
-                <button 
-                  onClick={async () => {
-                    try {
-                      const rid = roomId;
-                      if (rid) {
-                        // מחיקה "Best-effort" של נוכחות בטבלת שחקני חדר
-                        const { getClientId } = await import("../lib/supabaseClients");
-                        const { supabaseMP } = await import("../lib/supabaseClients");
-                        await supabaseMP
-                          .from("arcade_room_players")
-                          .delete()
-                          .match({ room_id: rid, client_id: getClientId() });
-                      }
-                    } catch {}
-                    const url = { pathname: router.pathname, query: { ...router.query } };
-                    delete url.query.room;
-                    router.push(url, undefined, { shallow: true });
-                    setRoomId("");
-                  }}
-                  className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold"
-                >
-                  Leave Room
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Main Game Area */}
-          <div className="w-full max-w-6xl flex-1 border border-white/10 rounded-2xl backdrop-blur-md bg-gradient-to-b from-white/5 to-white/10 overflow-hidden">
-            <GameViewport gameId={activeGame} vault={vaultAmt} setVaultBoth={setVaultBoth} roomId={roomId} playerName={playerName} />
-          </div>
-
-          {/* Player Info - רק במובייל */}
-          <div className="md:hidden w-full max-w-2xl bg-black/30 rounded-xl p-3 mt-4 backdrop-blur-sm border border-white/10">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-white font-semibold text-sm">Balance</div>
-              <div className="text-emerald-400 text-lg font-extrabold">{fmt(vaultAmt)} MLEO</div>
-            </div>
-            <input 
-              type="text" 
-              placeholder="Your name…" 
-              value={playerName} 
-              onChange={(e)=>setPlayerName(e.target.value)} 
-              className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400" 
-              maxLength={20} 
+          {/* Player Name Input */}
+          <div className="max-w-md mx-auto mb-6">
+            <input
+              type="text"
+              placeholder="Enter your player name..."
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-emerald-400 text-center"
+              maxLength={20}
             />
           </div>
-        </div>
+        </header>
+
+        {/* Content */}
+        {selectedGame ? (
+          /* Game Viewport */
+          <div className="flex-1 px-4 pb-8">
+            <div className="max-w-6xl mx-auto h-full">
+              <GameViewport 
+                gameId={selectedGame}
+                vault={vaultAmt}
+                setVaultBoth={setVaultBoth}
+                playerName={playerName}
+                roomId={selectedGame === 'dice' ? null : 'default-room'}
+              />
+            </div>
+          </div>
+        ) : (
+          /* Games Grid */
+          <section className="px-4 pb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto">
+              {GAME_REGISTRY.map((game, idx) => (
+                <GameCard key={idx} game={game} onSelect={selectGame} />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </Layout>
   );
