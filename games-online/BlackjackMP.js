@@ -262,7 +262,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       ) {
         autopilot(session);
       }
-    }, 1000);
+    }, 500);
 
     return () => clearInterval(tick);
   }, [isLeader, session?.id, session?.state, session?.bet_deadline, session?.turn_deadline, session?.next_round_at]);
@@ -647,7 +647,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
           .update({ current_player_id: myRow.id, turn_deadline: deadline })
           .eq('id', session.id);
         // המתנה קצרה לרפליקה/Realtime ואז ודא שלא "נפל" התור
-        setTimeout(() => advanceTurn(), 120);
+        setTimeout(() => advanceTurn(), 50);
       }
       return; // אל תעביר תור
     }
@@ -846,25 +846,37 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       lines.push(`Seat ${p.seat+1} • ${p.player_name} — ${result.toUpperCase()} (${tag}${fmt(Math.abs(delta))})`);
     }
 
+    // הצג את התוצאות למשך 3 שניות לפני סיום המשחק
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
     await supabase.from('bj_sessions').update({ 
       state:'ended',
       next_round_at: new Date(Date.now() + 15000).toISOString() // 15 שניות לסיבוב הבא
     }).eq('id', session.id);
 
-    // באנר מקומי - רק לשחקן המקומי
-    if (myResult) {
-      const { result, delta, dealerBust, dealerScore, originalBet } = myResult;
-      setBanner({
-        title: result === 'win' ? '🎉 YOU WIN!' : 
-               result === 'blackjack' ? '🎉 BLACKJACK!' :
-               result === 'push' ? '🤝 PUSH' : '💔 YOU LOSE',
-        lines: [
-          `Dealer: ${dealerBust ? 'BUST' : dealerScore}`,
-          result === 'win' || result === 'blackjack' ? `+${fmt(originalBet + delta)} MLEO` :
-          result === 'push' ? 'No change' : `Lost ${fmt(originalBet)} MLEO`
-        ]
-      });
+    // הצג הודעות גלובליות לכל השחקנים
+    const winCount = participants.filter(p => ['win', 'blackjack'].includes(p.result)).length;
+    const pushCount = participants.filter(p => p.result === 'push').length;
+    const loseCount = participants.filter(p => p.result === 'lose').length;
+    
+    let globalTitle = '';
+    if (winCount > 0 && loseCount === 0) {
+      globalTitle = '🎉 ALL WIN!';
+    } else if (winCount > 0) {
+      globalTitle = `🎉 ${winCount} WIN${winCount > 1 ? 'S' : ''}!`;
+    } else if (pushCount > 0 && loseCount === 0) {
+      globalTitle = '🤝 ALL PUSH!';
+    } else {
+      globalTitle = '💔 DEALER WINS!';
     }
+    
+    setBanner({
+      title: globalTitle,
+      lines: [
+        `Dealer: ${dealerBust ? 'BUST' : dealerScore}`,
+        `Results: ${winCount}W ${pushCount}P ${loseCount}L`
+      ]
+    });
   }
 
   async function resetRound() {
@@ -904,6 +916,20 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
                 Total: {session?.dealer_hidden ? "—" : (handValue(session?.dealer_hand||[]) || "—")}
               </div>
             )}
+            
+            {/* Timers in dealer window - bottom left */}
+            <div className="absolute bottom-1 left-1 text-xs">
+              {session?.state === 'betting' && session?.bet_deadline && (
+                <div className="text-amber-400 font-semibold">
+                  🕒 {timerTick >= 0 && Math.max(0, Math.ceil((new Date(session.bet_deadline).getTime() - Date.now()) / 1000))}s
+                </div>
+              )}
+              {session?.turn_deadline && session?.current_player_id === myRow?.id && (
+                <div className="text-amber-300 font-semibold">
+                  ⏰ {timerTick >= 0 && Math.max(0, Math.ceil((new Date(session.turn_deadline).getTime() - Date.now())/1000))}s
+                </div>
+              )}
+            </div>
             
             {/* SURRENDER button in top-right corner */}
             {myTurn && myRow?.status === 'acting' && myRow?.hand?.length === 2 && (
@@ -1016,26 +1042,6 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
           {isLeader && (
             <div className="text-xs text-emerald-400 font-semibold mb-1">
               🎮 Leader
-            </div>
-          )}
-          {myTurn && session?.turn_deadline && (
-            <div className="w-full h-1 bg-black/30 rounded overflow-hidden mb-1">
-              <div
-                className="h-full bg-emerald-500 transition-all"
-                style={{
-                  width: `${timerTick >= 0 && Math.max(0, 100 * (new Date(session.turn_deadline).getTime() - Date.now()) / ((session.turn_seconds||20)*1000))}%`
-                }}
-              />
-            </div>
-          )}
-          {session?.state === 'betting' && session?.bet_deadline && (
-            <div className="text-xs text-amber-400 font-semibold">
-              🕒 {timerTick >= 0 && Math.max(0, Math.ceil((new Date(session.bet_deadline).getTime() - Date.now()) / 1000))}s
-            </div>
-          )}
-          {session?.turn_deadline && session?.current_player_id === myRow?.id && (
-            <div className="text-xs text-amber-300 font-semibold">
-              ⏰ {timerTick >= 0 && Math.max(0, Math.ceil((new Date(session.turn_deadline).getTime() - Date.now())/1000))}s
             </div>
           )}
           {/* Waiting Players Info */}
