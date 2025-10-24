@@ -11,32 +11,37 @@ const TURN_SECONDS = Number(process.env.NEXT_PUBLIC_POKER_TURN_SECONDS||20);
 // Helper functions
 function fmt(n){ n=Math.floor(Number(n||0)); if(n>=1e9)return(n/1e9).toFixed(2)+"B"; if(n>=1e6)return(n/1e6).toFixed(2)+"M"; if(n>=1e3)return(n/1e3).toFixed(2)+"K"; return String(n); }
 
-function Card({ code, hidden = false }) {
+const suitIcon = s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
+const suitClass = (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
+
+function Card({ code, hidden = false, isDealing = false }) {
   if (!code) return null;
-  const r = code.slice(0,-1), s = code.slice(-1);
-  const suitIcon = s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
-  const suitClass = (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
+  
+  // Dynamic sizing based on game state
+  const cardSize = isDealing ? "w-12 h-16 mx-1 text-sm" : "w-10 h-14 mx-1 text-xs";
   
   if (hidden) {
     return (
-      <div className="inline-flex items-center justify-center border-2 border-white/30 rounded-lg w-10 h-14 mx-1 text-xs font-bold bg-gradient-to-b from-gray-600 to-gray-800 text-white">
+      <div className={`inline-flex items-center justify-center border-2 border-white/30 rounded-lg ${cardSize} font-bold bg-gradient-to-b from-gray-600 to-gray-800 text-white`}>
         <span className="leading-none">?</span>
       </div>
     );
   }
   
+  const r = code.slice(0,-1), s = code.slice(-1);
+  
   return (
-    <div className={`inline-flex items-center justify-center border-2 border-white/30 rounded-lg w-10 h-14 mx-1 text-xs font-bold bg-gradient-to-b from-white/10 to-white/5 shadow-lg ${suitClass}`}>
+    <div className={`inline-flex items-center justify-center border-2 border-white/30 rounded-lg ${cardSize} font-bold bg-gradient-to-b from-white/10 to-white/5 shadow-lg ${suitClass}`}>
       <span className="leading-none">{r}{suitIcon}</span>
     </div>
   );
 }
 
-function HandView({ hand, hidden = false }) {
+function HandView({ hand, hidden = false, isDealing = false }) {
   const h = hand || [];
   return (
-    <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap no-scrollbar py-2">
-      {h.length===0 ? <span className="text-white/60 text-sm">—</span> : h.map((c,i)=><Card key={i} code={c} hidden={hidden}/>)}
+    <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap no-scrollbar py-0.5 gap-0.5">
+      {h.length===0 ? <span className="text-white/60 text-sm">—</span> : h.map((c,i)=><Card key={i} code={c} hidden={hidden} isDealing={isDealing}/>)}
     </div>
   );
 }
@@ -471,14 +476,19 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
       {/* Board - Fixed Height */}
       <div className="bg-gradient-to-r from-green-900/20 to-green-800/20 rounded-xl p-2 md:p-3 border border-green-400/30 h-32 sm:h-40">
         <div className="text-center h-full flex flex-col justify-center">
-          <div className="text-white font-bold text-sm md:text-base mb-1">Community Cards</div>
-          <HandView hand={board}/>
-          <div className="text-white/80 text-xs mt-1">
-            {board.length === 0 ? "No cards yet" : 
-             board.length === 3 ? "Flop" :
-             board.length === 4 ? "Turn" : 
-             board.length === 5 ? "River" : ""}
-          </div>
+          {/* Hide text during active game for more card space */}
+          {!(ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river') && (
+            <div className="text-white font-bold text-xs mb-0.5">Community Cards</div>
+          )}
+          <HandView hand={board} isDealing={ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river'}/>
+          {!(ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river') && (
+            <div className="text-white/80 text-xs mt-0.5">
+              {board.length === 0 ? "No cards yet" : 
+               board.length === 3 ? "Flop" :
+               board.length === 4 ? "Turn" : 
+               board.length === 5 ? "River" : ""}
+            </div>
+          )}
         </div>
       </div>
 
@@ -491,19 +501,13 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
           return (
             <div key={i} className={`rounded-xl border-2 ${isTurn?'border-emerald-400 bg-emerald-900/20':isMe?'border-blue-400 bg-blue-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[120px] md:min-h-[150px] transition-all hover:bg-white/10`}>
               <div className="text-center">
-                <div className="text-white/70 text-xs mb-1">
-                  Seat #{i+1} 
-                  {i===ses?.dealer_seat && " • D"} 
-                  {i===ses?.sb_seat && " • SB"} 
-                  {i===ses?.bb_seat && " • BB"}
-                </div>
                 {p ? (
                   <div className="space-y-1 md:space-y-2">
                     <div className="text-white font-bold text-xs md:text-sm truncate">{p.player_name}</div>
                     <div className="text-emerald-300 text-xs font-semibold">Stack: {fmt(p.stack_live)}</div>
                     <div className="text-cyan-300 text-xs">Bet: {fmt(p.bet_street||0)}</div>
                     <div className="text-yellow-300 text-sm">Total: {fmt(p.total_bet||0)}</div>
-                    <HandView hand={p.hole_cards} hidden={!isMe}/>
+                    <HandView hand={p.hole_cards} hidden={!isMe} isDealing={ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river'}/>
                     {p.folded && <div className="text-red-400 text-sm font-bold">FOLDED</div>}
                     {p.all_in && <div className="text-yellow-400 text-sm font-bold">ALL-IN</div>}
                     {isTurn && <div className="text-emerald-400 text-sm font-bold">YOUR TURN</div>}

@@ -54,9 +54,13 @@ function handValue(hand){
 const suitIcon = (s)=> s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
 const suitClass = (s)=> (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
 
-function Card({ code, size = "normal", hidden = false }) {
+function Card({ code, size = "normal", hidden = false, isDealing = false }) {
   if (!code && !hidden) return null;
-  const sizeClasses = size === "small" ? "w-6 h-8 text-xs" : "w-8 h-10 text-sm";
+  
+  // Dynamic sizing based on game state
+  const sizeClasses = size === "small" ? 
+    (isDealing ? "w-10 h-14 text-sm" : "w-6 h-8 text-xs") : 
+    (isDealing ? "w-12 h-16 text-base" : "w-8 h-10 text-sm");
 
   if (hidden) {
     return (
@@ -67,20 +71,18 @@ function Card({ code, size = "normal", hidden = false }) {
   }
 
   const r = code.slice(0,-1), s = code.slice(-1);
-  const suitIcon = (s)=> s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
-  const suitClass = (s)=> (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
-
+  
   return (
     <div className={`inline-flex items-center justify-center border border-white/30 rounded ${sizeClasses} font-bold bg-gradient-to-b from-white/10 to-white/5 shadow ${suitClass(s)}`}>
       <span className="leading-none">{r}{suitIcon(s)}</span>
     </div>
   );
 }
-function HandView({ hand, size = "normal" }) {
+function HandView({ hand, size = "normal", isDealing = false }) {
   const h = hand || [];
   return (
-    <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-1">
-      {h.length===0 ? <span className="text-white/60 text-xs">—</span> : h.map((c,i)=><Card key={i} code={c} size={size}/>)}
+    <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-0.5 gap-0.5">
+      {h.length===0 ? <span className="text-white/60 text-xs">—</span> : h.map((c,i)=><Card key={i} code={c} size={size} isDealing={isDealing}/>)}
     </div>
   );
 }
@@ -873,17 +875,32 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       {/* Main Game Area */}
       <div className="flex-1 flex flex-col gap-1 md:gap-2">
         {/* Dealer Section - Fixed Height */}
-        <div className="bg-gradient-to-r from-red-900/20 to-red-800/20 rounded-lg p-2 md:p-3 border border-red-400/30 h-32 sm:h-40">
+        <div className="bg-gradient-to-r from-red-900/20 to-red-800/20 rounded-lg p-2 md:p-3 border border-red-400/30 h-32 sm:h-40 relative">
           <div className="text-center h-full flex flex-col justify-center">
-            <div className="text-white font-bold text-sm md:text-base mb-1">Dealer</div>
-            <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-1">
+            {/* Hide text during dealing/acting for more card space */}
+            {!(session?.state === 'dealing' || session?.state === 'acting') && (
+              <div className="text-white font-bold text-xs mb-0.5">Dealer</div>
+            )}
+            <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-0.5 gap-0.5">
               {(session?.dealer_hand||[]).map((c,i)=>(
-                <Card key={i} code={c} hidden={session?.dealer_hidden && i===1} />
+                <Card key={i} code={c} hidden={session?.dealer_hidden && i===1} isDealing={session?.state === 'dealing' || session?.state === 'acting'} />
               ))}
             </div>
-            <div className="text-white/80 text-xs mt-1">
-              Total: {session?.dealer_hidden ? "—" : (handValue(session?.dealer_hand||[]) || "—")}
-            </div>
+            {!(session?.state === 'dealing' || session?.state === 'acting') && (
+              <div className="text-white/80 text-xs mt-0.5">
+                Total: {session?.dealer_hidden ? "—" : (handValue(session?.dealer_hand||[]) || "—")}
+              </div>
+            )}
+            
+            {/* SURRENDER button in top-right corner */}
+            {myTurn && myRow?.status === 'acting' && myRow?.hand?.length === 2 && (
+              <button 
+                onClick={surrender}
+                className="absolute top-2 right-2 px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded border border-red-400 transition-all"
+              >
+                SURRENDER
+              </button>
+            )}
           </div>
         </div>
 
@@ -897,12 +914,11 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
             return (
               <div key={i} className={`rounded-lg border ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[80px] md:min-h-[120px] transition-all hover:bg-white/10 ${isActive ? 'ring-2 ring-amber-400' : ''}`}>
                 <div className="text-center">
-                  <div className="text-white/70 text-xs mb-1">Seat {i+1}</div>
                   {occupant ? (
                     <div className="space-y-0.5 md:space-y-1">
                       <div className="text-white font-bold text-xs md:text-sm truncate">{occupant.player_name}</div>
                       <div className="text-emerald-300 text-xs font-semibold">Bet: {fmt(occupant.bet||0)}</div>
-                      <HandView hand={occupant.hand} size="small"/>
+                      <HandView hand={occupant.hand} size="small" isDealing={session?.state === 'dealing' || session?.state === 'acting'}/>
                       <div className="text-white/80 text-xs">
                         Total: {hv??"—"} 
                         <span className={
@@ -969,34 +985,28 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
           <div className="text-white/80 text-xs mb-1 font-semibold">Game Actions</div>
           <div className="grid grid-cols-2 gap-1">
             <button onClick={hit} disabled={!myTurn}
-              className={`px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-orange-600 to-orange-700
-                        hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all
+              className={`px-2 py-2 md:px-3 md:py-3 rounded bg-gradient-to-r from-emerald-600 to-emerald-700
+                        hover:from-emerald-700 hover:to-emerald-800 text-white font-bold text-sm transition-all
                         disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
               HIT
             </button>
             <button onClick={stand} disabled={!myTurn}
-              className={`px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-gray-600 to-gray-700
-                        hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all
+              className={`px-2 py-2 md:px-3 md:py-3 rounded bg-gradient-to-r from-blue-600 to-blue-700
+                        hover:from-blue-700 hover:to-blue-800 text-white font-bold text-sm transition-all
                         disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
               STAND
             </button>
             <button onClick={double} disabled={!myTurn || (myRow?.hand?.length !== 2)}
-              className={`px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-cyan-600 to-cyan-700
-                        hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all
+              className={`px-2 py-2 md:px-3 md:py-3 rounded bg-gradient-to-r from-amber-600 to-amber-700
+                        hover:from-amber-700 hover:to-amber-800 text-white font-bold text-sm transition-all
                         disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
               DOUBLE
             </button>
             <button onClick={splitHand} disabled={!myTurn || !canSplit(myRow)}
-              className={`px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-pink-600 to-pink-700
-                        hover:from-pink-700 hover:to-pink-800 text-white font-semibold text-xs transition-all
+              className={`px-2 py-2 md:px-3 md:py-3 rounded bg-gradient-to-r from-purple-600 to-purple-700
+                        hover:from-purple-700 hover:to-purple-800 text-white font-bold text-sm transition-all
                         disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
               SPLIT
-            </button>
-            <button onClick={surrender} disabled={!myTurn || (myRow?.hand?.length !== 2)}
-              className={`px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-red-600 to-red-700
-                        hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all
-                        disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
-              SURRENDER
             </button>
           </div>
         </div>
