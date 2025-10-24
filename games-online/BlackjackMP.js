@@ -99,20 +99,31 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const [msg, setMsg] = useState("");
   const [banner, setBanner] = useState(null); // {title, lines: []}
 
+  const myRow = useMemo(
+    () => players.find(p => p.player_name === name) || null,
+    [players, name]
+  );
+
   // Leader detection
   const isLeader = useMemo(() => {
-    if (!roomMembers?.length) return true; // אם רק שחקן אחד — הוא המארח
-    const names = roomMembers.map(m => (m.player_name || '') + '').filter(Boolean).sort();
-    return (names[0] || '') === (playerName || name || '');
-  }, [roomMembers, playerName, name]);
+    if (!roomMembers?.length) return true;
+
+    const names = roomMembers
+      .map(m => (m.player_name || '').toString())
+      .filter(Boolean)
+      .sort((a,b)=>a.localeCompare(b));
+    if ((names[0] || '') === (playerName || name || '')) return true;
+
+    const ids   = players.map(p=>p.id).filter(Boolean).sort();
+    const mine  = players.find(p => p.player_name === name)?.id; // חישוב מקומי
+    return ids.length && mine && ids[0] === mine;
+  }, [roomMembers, playerName, name, players]); // בלי myRow בתלויות
 
   const clampBet = (n) => {
     const v = Math.floor(Number(n || 0));
     if (!Number.isFinite(v) || v < MIN_BET) return MIN_BET;
     return Math.min(v, vault);
   };
-  const myRow = useMemo(() => players.find(p => p.player_name === name) || null, [players, name]);
-
   // Button availability helpers
   const canPlaceBet = !!myRow && ['lobby','betting'].includes(session?.state);
   const canDeal = session?.state === 'betting';
@@ -158,27 +169,24 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   // presence
   useEffect(() => {
     if (!roomId) return;
-    const channel = supabase.channel(`room_${roomId}`)
+
+    const channel = supabase.channel(`room_${roomId}`, {
+      config: { presence: { key: name || "Guest" } }   // חשוב: מפתח לנוכחות
+    });
+
+    channel
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
         const members = Object.values(state).flat();
         setRoomMembers(members);
       })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        console.log('join', key, newPresences);
-      })
-      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-        console.log('leave', key, leftPresences);
-      })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          await channel.track({ online_at: new Date().toISOString(), player_name: name });
+          await channel.track({ player_name: name, online_at: new Date().toISOString() });
         }
       });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [roomId, name]);
 
   // realtime updates
@@ -232,6 +240,15 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     session?.turn_deadline,
     session?.next_round_at
   ]);
+
+  // "דחיפה" לפתיחת BETTING אם נשארים ב-lobby יותר מכמה שניות
+  useEffect(() => {
+    if (!session?.id || !isLeader) return;
+    if (session.state === 'lobby') {
+      const deadline = new Date(Date.now() + 15000).toISOString();
+      supabase.from('bj_sessions').update({ state:'betting', bet_deadline: deadline, dealer_hand:[], dealer_hidden:true }).eq('id', session.id);
+    }
+  }, [isLeader, session?.id, session?.state]);
 
   // Turn timeout (AFK Auto-Stand)
   useEffect(() => {
@@ -292,12 +309,15 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   }
 
   async function placeBet() {
-    if (!myRow || bet < MIN_BET) return;
+    if (!myRow) await ensureSeated();          // ודא שיש שורה לשחקן
+    const row = myRow || (await supabase.from("bj_players").select("*").eq("session_id", session.id).eq("player_name", name).maybeSingle()).data;
+    if (!row || bet < MIN_BET) return;
+
     const { error } = await supabase.from("bj_players").update({
       bet: bet,
       status: 'betting'
       // acted: true  <-- removed, so player can act in 'acting' phase
-    }).eq("id", myRow.id);
+    }).eq("id", row.id);
 
     if (error) {
       console.error('[bj_players.update] placeBet error:', error);
@@ -386,12 +406,12 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
   // After player move - clear turn and advance
   async function afterMyMove() {
-    if (isLeader) {
-      await supabase.from('bj_sessions')
-        .update({ current_player_id: null, turn_deadline: null })
-        .eq('id', session.id);
-      await advanceTurn();
-    }
+    if (!isLeader || !session?.id) return;
+    // שחרר את התור ואז מצא הבא בתור
+    await supabase.from('bj_sessions')
+      .update({ current_player_id: null, turn_deadline: null })
+      .eq('id', session.id);
+    await advanceTurn();
   }
 
   // Autopilot function - only leader runs automation
@@ -399,6 +419,22 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     if (!isLeader) return;
     const s = sessionSnap || session;
     if (!s?.id) return;
+
+    // 0) אם המצב לא חוקי (acting אבל אין current_player_id או אין ידיים) – חזור ל-BETTING
+    if (s.state === 'acting') {
+      const { data: ps } = await supabase.from('bj_players').select('id,hand,bet,status').eq('session_id', s.id);
+      const anyHands = (ps || []).some(p => (p.hand?.length || 0) > 0);
+      const someoneActing = (ps || []).some(p => p.status === 'acting');
+      if (!anyHands || (!someoneActing && !s.current_player_id)) {
+        const deadline = new Date(Date.now() + 15000).toISOString();
+        await supabase.from('bj_players').update({ hand: [], status: 'seated', acted: false, bet: 0 }).eq('session_id', s.id);
+        await supabase.from('bj_sessions').update({
+          state: 'betting', dealer_hand: [], dealer_hidden: true,
+          bet_deadline: deadline, current_player_id: null, turn_deadline: null, next_round_at: null
+        }).eq('id', s.id);
+        return;
+      }
+    }
 
     // טען מצב עדכני
     const { data: ps } = await supabase
@@ -513,6 +549,20 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
     await supabase.from("bj_players").update({ hand, status }).eq("id", myRow.id);
     await supabase.from("bj_sessions").update({ shoe }).eq("id", session.id);
+
+    if (status === 'acting') {
+      // נשאר אותו שחקן בתור – רק לרענן דדליין ולהבטיח שה-ID נשאר עליו
+      if (isLeader) {
+        const deadline = new Date(Date.now() + (session?.turn_seconds || 20) * 1000).toISOString();
+        await supabase
+          .from('bj_sessions')
+          .update({ current_player_id: myRow.id, turn_deadline: deadline })
+          .eq('id', session.id);
+      }
+      return; // אל תעביר תור
+    }
+
+    // בסט/21 => התור הסתיים לשחקן הזה
     await afterMyMove();
   }
 
