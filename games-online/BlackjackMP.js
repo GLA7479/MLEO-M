@@ -884,17 +884,6 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
   return (
     <div className="w-full h-full flex flex-col p-1 md:p-2 gap-1 md:gap-2 -mt-1">
-      {/* Header - Mobile Optimized */}
-      <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
-          <div className="text-white font-bold text-sm md:text-lg">🃏 Blackjack</div>
-          <div className="flex flex-wrap items-center gap-1 md:gap-2 text-white/80 text-xs">
-            <span>Room: {roomId.slice(0,8)}</span>
-            <span>State: {session?.state||"…"}</span>
-            <span>Players: {roomMembers.length}</span>
-          </div>
-        </div>
-      </div>
 
       {/* Main Game Area */}
       <div className="flex-1 flex flex-col gap-1 md:gap-2">
