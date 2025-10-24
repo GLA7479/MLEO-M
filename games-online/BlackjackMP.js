@@ -941,7 +941,8 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       }
 
       await supabase.from('bj_players').update({
-        result, status:'settled', bet:0, insurance_bet:0
+        result, status:'settled', insurance_bet:0
+        // לא מאפס את bet ו-hand עד אחרי ההצגה
       }).eq('id', p.id);
 
       const tag = result==='win' ? '+'
@@ -951,13 +952,18 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       lines.push(`Seat ${p.seat+1} • ${p.player_name} — ${result.toUpperCase()} (${tag}${fmt(Math.abs(delta))})`);
     }
 
-    // הצג את התוצאות למשך 3 שניות לפני סיום המשחק
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
+    // עדכן למצב ended מיד (להתחיל ספירה)
     await supabase.from('bj_sessions').update({ 
       state:'ended',
       next_round_at: new Date(Date.now() + 15000).toISOString() // 15 שניות לסיבוב הבא
     }).eq('id', session.id);
+
+    // אפס את הקלפים וההימורים אחרי 14 שניות (שנייה לפני סיום הספירה)
+    setTimeout(async () => {
+      await supabase.from('bj_players').update({
+        hand: [], bet: 0
+      }).eq('session_id', session.id);
+    }, 14000);
 
     // הצג הודעות אישיות לכל שחקן
     if (myResult) {
