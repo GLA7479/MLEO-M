@@ -153,7 +153,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const canDeal = session?.state === 'betting';
   const myTurn = !!myRow && session?.current_player_id === myRow.id && session?.state === 'acting' && myRow.status === 'acting';
   const canSettle = session?.state === 'acting'; // האוטופיילוט יעשה לבד, זה רק fallback ידני
-  const turnGlow = myTurn ? 'ring-2 ring-emerald-400 animate-pulse' : '';
+  const turnGlow = myTurn ? 'ring-2 ring-emerald-400' : '';
 
   // bootstrap session with new schema
   useEffect(() => {
@@ -854,29 +854,20 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       next_round_at: new Date(Date.now() + 15000).toISOString() // 15 שניות לסיבוב הבא
     }).eq('id', session.id);
 
-    // הצג הודעות גלובליות לכל השחקנים
-    const winCount = participants.filter(p => ['win', 'blackjack'].includes(p.result)).length;
-    const pushCount = participants.filter(p => p.result === 'push').length;
-    const loseCount = participants.filter(p => p.result === 'lose').length;
-    
-    let globalTitle = '';
-    if (winCount > 0 && loseCount === 0) {
-      globalTitle = '🎉 ALL WIN!';
-    } else if (winCount > 0) {
-      globalTitle = `🎉 ${winCount} WIN${winCount > 1 ? 'S' : ''}!`;
-    } else if (pushCount > 0 && loseCount === 0) {
-      globalTitle = '🤝 ALL PUSH!';
-    } else {
-      globalTitle = '💔 DEALER WINS!';
+    // הצג הודעות אישיות לכל שחקן
+    if (myResult) {
+      const { result, delta, dealerBust, dealerScore, originalBet } = myResult;
+      setBanner({
+        title: result === 'win' ? '🎉 YOU WIN!' : 
+               result === 'blackjack' ? '🎉 BLACKJACK!' :
+               result === 'push' ? '🤝 PUSH' : '💔 YOU LOSE',
+        lines: [
+          `Dealer: ${dealerBust ? 'BUST' : dealerScore}`,
+          result === 'win' || result === 'blackjack' ? `+${fmt(originalBet + delta)} MLEO` :
+          result === 'push' ? 'No change' : `Lost ${fmt(originalBet)} MLEO`
+        ]
+      });
     }
-    
-    setBanner({
-      title: globalTitle,
-      lines: [
-        `Dealer: ${dealerBust ? 'BUST' : dealerScore}`,
-        `Results: ${winCount}W ${pushCount}P ${loseCount}L`
-      ]
-    });
   }
 
   async function resetRound() {
@@ -951,7 +942,11 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
             const isActive = session?.current_player_id && occupant?.id === session.current_player_id;
             const hv = occupant?.hand && Array.isArray(occupant.hand) ? handValue(occupant.hand) : null;
             return (
-              <div key={i} className={`rounded-lg border ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[80px] md:min-h-[120px] transition-all hover:bg-white/10 ${isActive ? 'ring-2 ring-amber-400' : ''}`}>
+              <div key={i} className={`rounded-lg border ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[80px] md:min-h-[120px] transition-all hover:bg-white/10 ${isActive ? 'ring-2 ring-amber-400' : ''} relative`}>
+                {/* Turn indicator button - top right corner */}
+                {occupant && (
+                  <div className={`absolute top-1 right-1 w-3 h-3 rounded-full ${isActive ? 'bg-green-500' : 'bg-red-500'} ${isActive ? 'animate-pulse' : ''}`}></div>
+                )}
                 <div className="text-center">
                   {occupant ? (
                     <div className="space-y-0.5 md:space-y-1">
