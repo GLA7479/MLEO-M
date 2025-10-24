@@ -273,6 +273,24 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     return () => clearInterval(t);
   }, [isLeader, session?.id, session?.turn_deadline, session?.current_player_id]);
 
+  // mark 'left' on tab close (best-effort)
+  useEffect(() => {
+    if (!session?.id || !myRow?.id) return;
+    const onLeave = async () => {
+      try {
+        await supabase.from("bj_players")
+          .update({ status: "left" })
+          .eq("id", myRow.id);
+      } catch {}
+    };
+    window.addEventListener("pagehide", onLeave);
+    window.addEventListener("beforeunload", onLeave);
+    return () => {
+      window.removeEventListener("pagehide", onLeave);
+      window.removeEventListener("beforeunload", onLeave);
+    };
+  }, [session?.id, myRow?.id]);
+
   // ---------- Actions ----------
   async function ensureSeated() {
     if (!session) return;
@@ -291,7 +309,16 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       return;
     }
 
-    const { data, error } = await supabase.from("bj_players").upsert({
+    // הכנסה בטוחה: אם יש כבר לפי (session_id, player_name) — אל תיצור כפילות
+    const { data: maybeMine } = await supabase
+      .from("bj_players")
+      .select("*")
+      .eq("session_id", session.id)
+      .eq("player_name", name)
+      .maybeSingle();
+    if (maybeMine) return;
+
+    const { error } = await supabase.from("bj_players").insert({
       session_id: session.id,
       seat: free,
       player_name: name,
@@ -299,8 +326,9 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       bet: 0,
       hand: [],
       status: 'seated',
-      acted: false
-    }, { onConflict: "session_id,seat" }).select().single();
+      acted: false,
+      hand_idx: 0
+    });
 
     if (error) {
       console.error("Failed to join seat:", error);
@@ -558,6 +586,8 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
           .from('bj_sessions')
           .update({ current_player_id: myRow.id, turn_deadline: deadline })
           .eq('id', session.id);
+        // המתנה קצרה לרפליקה/Realtime ואז ודא שלא "נפל" התור
+        setTimeout(() => advanceTurn(), 120);
       }
       return; // אל תעביר תור
     }

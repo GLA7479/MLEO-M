@@ -253,7 +253,18 @@ export default function ArcadeOnline(){
                   {activeGame === 'blackjack' ? '🃏 Blackjack Room' : '♠️ Poker Room'}
                 </div>
                 <button 
-                  onClick={() => {
+                  onClick={async () => {
+                    try {
+                      const rid = roomId;
+                      const pname = (playerName || "Guest");
+                      if (rid) {
+                        // מחיקה "Best-effort" של נוכחות בטבלת שחקני חדר
+                        await (await import("../lib/supabaseClients")).supabaseMP
+                          .from("arcade_room_players")
+                          .delete()
+                          .match({ room_id: rid, player_name: pname });
+                      }
+                    } catch {}
                     const url = { pathname: router.pathname, query: { ...router.query } };
                     delete url.query.room;
                     router.push(url, undefined, { shallow: true });
