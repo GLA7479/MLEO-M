@@ -389,11 +389,11 @@ export default function ArcadeOnline() {
               }`}
             >
               {showRoomBrowser ? '← BACK TO GAMES' : 
-               selectedGame && selectedRoomId ? 'LEAVE TABLE' : 
+               selectedGame && selectedRoomId ? 'LEAVE' : 
                selectedGame ? '← BACK TO GAMES' : '← BACK'}
             </button>
             <div className="text-center">
-              <h1 className="text-3xl font-extrabold text-white mb-2">🎮 MLEO-Online</h1>
+              <h1 className="text-3xl font-extrabold text-white mb-2">MLEO Online</h1>
               <p className="text-white/60">
                 {showRoomBrowser ? `Choose Room for ${GAME_REGISTRY.find(g => g.id === selectedGame)?.title || 'Game'}` : 
                  selectedGame ? `Playing ${GAME_REGISTRY.find(g => g.id === selectedGame)?.title || 'Game'}` : 
@@ -447,7 +447,7 @@ export default function ArcadeOnline() {
           </div>
         ) : selectedGame ? (
           /* Game Viewport */
-          <div className="flex-1 px-4 pb-8">
+          <div className="flex-1 px-4 pb-8 -mt-2">
             <div className="max-w-6xl mx-auto h-full">
               <GameViewport 
                 gameId={selectedGame}

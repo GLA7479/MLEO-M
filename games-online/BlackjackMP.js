@@ -859,7 +859,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const dealerV = handValue(session?.dealer_hand || []);
 
   return (
-    <div className="w-full h-full flex flex-col p-1 md:p-2 gap-1 md:gap-2">
+    <div className="w-full h-full flex flex-col p-1 md:p-2 gap-1 md:gap-2 -mt-1">
       {/* Header - Mobile Optimized */}
       <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
@@ -948,22 +948,6 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
           })}
         </div>
 
-        {/* Spectators - Players in room but not seated */}
-        {roomMembers.length > players.length && (
-          <div className="mt-4 bg-white/5 rounded-lg p-2 md:p-3 border border-white/10">
-            <div className="text-white/80 text-sm mb-2 font-semibold">👥 Waiting Players ({roomMembers.length - players.length})</div>
-            <div className="flex flex-wrap gap-1 md:gap-2">
-              {roomMembers
-                .filter(member => !players.some(p => p.player_name === member.player_name))
-                .map((member, idx) => (
-                  <div key={idx} className="px-2 py-1 bg-white/10 rounded text-xs text-white/80 border border-white/20">
-                    {member.player_name}
-                  </div>
-                ))
-              }
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Controls - Fixed Layout */}
@@ -1036,6 +1020,30 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
           {session?.turn_deadline && session?.current_player_id === myRow?.id && (
             <div className="text-xs text-amber-300 font-semibold">
               ⏰ {Math.max(0, Math.ceil((new Date(session.turn_deadline).getTime() - Date.now())/1000))}s
+            </div>
+          )}
+          {/* Waiting Players Info */}
+          {roomMembers.length > players.length && (
+            <div className="mt-2">
+              <div className="text-xs text-blue-400 font-semibold mb-1">
+                👥 Waiting ({roomMembers.length - players.length})
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {roomMembers
+                  .filter(member => !players.some(p => p.player_name === member.player_name))
+                  .slice(0, 3)
+                  .map((member, idx) => (
+                    <div key={idx} className="px-1 py-0.5 bg-white/10 rounded text-xs text-white/80 border border-white/20">
+                      {member.player_name}
+                    </div>
+                  ))
+                }
+                {roomMembers.filter(member => !players.some(p => p.player_name === member.player_name)).length > 3 && (
+                  <div className="px-1 py-0.5 bg-white/10 rounded text-xs text-white/80 border border-white/20">
+                    +{roomMembers.filter(member => !players.some(p => p.player_name === member.player_name)).length - 3}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

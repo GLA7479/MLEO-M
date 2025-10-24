@@ -462,7 +462,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
   if (!roomId) return <div className="w-full h-full flex items-center justify-center text-white/70">Select or create a room to start.</div>;
 
   return (
-    <div className="w-full h-full flex flex-col p-1 md:p-2 gap-1 md:gap-2">
+    <div className="w-full h-full flex flex-col p-1 md:p-2 gap-1 md:gap-2 -mt-1">
       {/* Header */}
       <div className="flex items-center justify-between bg-white/5 rounded-xl p-1 md:p-2 border border-white/10">
         <div className="text-white font-bold text-sm md:text-lg">♠️ Texas Hold'em</div>
@@ -521,22 +521,6 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
         })}
       </div>
 
-      {/* Spectators - Players in room but not seated */}
-      {roomMembers.length > sit.length && (
-        <div className="mt-4 bg-white/5 rounded-lg p-2 md:p-3 border border-white/10">
-          <div className="text-white/80 text-sm mb-2 font-semibold">👥 Waiting Players ({roomMembers.length - sit.length})</div>
-          <div className="flex flex-wrap gap-1 md:gap-2">
-            {roomMembers
-              .filter(member => !sit.some(p => p.player_name === member.player_name))
-              .map((member, idx) => (
-                <div key={idx} className="px-2 py-1 bg-white/10 rounded text-xs text-white/80 border border-white/20">
-                  {member.player_name}
-                </div>
-              ))
-            }
-          </div>
-        </div>
-      )}
 
       {/* Controls - Fixed Layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:gap-2 h-40 md:h-44">
@@ -558,7 +542,31 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
               </button>
             )}
           </div>
-          <div className="text-white/60 text-xs">Vault: {fmt(getVault())} MLEO</div>
+          <div className="text-white/60 text-xs mb-2">Vault: {fmt(getVault())} MLEO</div>
+          {/* Waiting Players Info */}
+          {roomMembers.length > sit.length && (
+            <div>
+              <div className="text-xs text-blue-400 font-semibold mb-1">
+                👥 Waiting ({roomMembers.length - sit.length})
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {roomMembers
+                  .filter(member => !sit.some(p => p.player_name === member.player_name))
+                  .slice(0, 3)
+                  .map((member, idx) => (
+                    <div key={idx} className="px-1 py-0.5 bg-white/10 rounded text-xs text-white/80 border border-white/20">
+                      {member.player_name}
+                    </div>
+                  ))
+                }
+                {roomMembers.filter(member => !sit.some(p => p.player_name === member.player_name)).length > 3 && (
+                  <div className="px-1 py-0.5 bg-white/10 rounded text-xs text-white/80 border border-white/20">
+                    +{roomMembers.filter(member => !sit.some(p => p.player_name === member.player_name)).length - 3}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="bg-white/5 rounded-xl p-1 md:p-2 border border-white/10 h-full">
