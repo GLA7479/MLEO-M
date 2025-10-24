@@ -256,13 +256,14 @@ export default function ArcadeOnline(){
                   onClick={async () => {
                     try {
                       const rid = roomId;
-                      const pname = (playerName || "Guest");
                       if (rid) {
                         // מחיקה "Best-effort" של נוכחות בטבלת שחקני חדר
-                        await (await import("../lib/supabaseClients")).supabaseMP
+                        const { getClientId } = await import("../lib/supabaseClients");
+                        const { supabaseMP } = await import("../lib/supabaseClients");
+                        await supabaseMP
                           .from("arcade_room_players")
                           .delete()
-                          .match({ room_id: rid, player_name: pname });
+                          .match({ room_id: rid, client_id: getClientId() });
                       }
                     } catch {}
                     const url = { pathname: router.pathname, query: { ...router.query } };

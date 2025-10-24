@@ -2,7 +2,7 @@
 // Uses supabaseMP (new project) + local Vault
 
 import { useEffect, useMemo, useState } from "react";
-import { supabaseMP as supabase } from "../lib/supabaseClients";
+import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 
 const MIN_BET = 1000;
 const SEATS = 5;
@@ -40,7 +40,17 @@ function handScore(cards) {
 }
 
 function cardValue(r){ if(r==="A") return 11; if(["K","Q","J"].includes(r)) return 10; return parseInt(r,10); }
-function handValue(hand){ let t=0,a=0; for(const c of hand){ const r=c.slice(0,-1); t+=cardValue(r); if(r==="A")a++; } while(t>21&&a>0){ t-=10;a--; } return t; }
+function handValue(hand){ 
+  if (!hand || !Array.isArray(hand)) return 0;
+  let t=0,a=0; 
+  for(const c of hand){ 
+    const r=c.slice(0,-1); 
+    t+=cardValue(r); 
+    if(r==="A")a++; 
+  } 
+  while(t>21&&a>0){ t-=10;a--; } 
+  return t; 
+}
 const suitIcon = (s)=> s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
 const suitClass = (s)=> (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
 
@@ -275,12 +285,14 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
   // mark 'left' on tab close (best-effort)
   useEffect(() => {
-    if (!session?.id || !myRow?.id) return;
+    if (!session?.id) return;
+    const client_id = getClientId();
     const onLeave = async () => {
       try {
         await supabase.from("bj_players")
           .update({ status: "left" })
-          .eq("id", myRow.id);
+          .eq("session_id", session.id)
+          .eq("client_id", client_id);
       } catch {}
     };
     window.addEventListener("pagehide", onLeave);
@@ -289,47 +301,64 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       window.removeEventListener("pagehide", onLeave);
       window.removeEventListener("beforeunload", onLeave);
     };
-  }, [session?.id, myRow?.id]);
+  }, [session?.id]);
 
   // ---------- Actions ----------
   async function ensureSeated() {
-    if (!session) return;
+    if (!session?.id || !name) return;
 
-    // כבר יש לי שורה?
-    const existing = players.find(p => p.player_name === name);
+    const client_id = getClientId();
+
+    // אם כבר יש לי שורה בסשן — לצאת
+    const existing = players.find(p => p.client_id === client_id);
     if (existing) return;
 
-    // מצא מושב פנוי
-    const used = new Set(players.map(p => p.seat));
-    let free = 0;
-    while (used.has(free) && free < (session.seat_count ?? SEATS)) free++;
-
-    if (free >= (session.seat_count ?? SEATS)) {
-      setMsg("No free seats");
-      return;
-    }
-
-    // הכנסה בטוחה: אם יש כבר לפי (session_id, player_name) — אל תיצור כפילות
-    const { data: maybeMine } = await supabase
+    // קח תמונת מצב עדכנית מה-DB (לא מ-state) כדי להימנע מהתנגשויות
+    const { data: rows, error: e1 } = await supabase
       .from("bj_players")
-      .select("*")
-      .eq("session_id", session.id)
-      .eq("player_name", name)
-      .maybeSingle();
-    if (maybeMine) return;
+      .select("seat")
+      .eq("session_id", session.id);
+    if (e1) { console.error(e1); setMsg("Seat query failed"); return; }
+    const used = new Set((rows || []).map(r => r.seat));
 
-    const { error } = await supabase.from("bj_players").insert({
+    let free = -1;
+    for (let i = 0; i < (session.seat_count ?? 5); i++) {
+      if (!used.has(i)) { free = i; break; }
+    }
+    if (free < 0) { setMsg("No free seats"); return; }
+
+    // upsert לפי (session_id, client_id) – אם קיימת שורה שלי, תתעדכן; אחרת תיווצר
+    const payload = {
       session_id: session.id,
-      seat: free,
+      client_id,
       player_name: name,
+      seat: free,
       stack: Math.min(vault, 10000),
       bet: 0,
       hand: [],
-      status: 'seated',
+      status: "seated",
       acted: false,
-      hand_idx: 0
-    });
+      hand_idx: 0,
+    };
+    let { error } = await supabase
+      .from("bj_players")
+      .upsert(payload, { onConflict: "session_id,client_id" });
 
+    // אם מישהו חטף את המושב בין הבדיקה להכנסה (409/23505) — ננסה פעם נוספת עם מושב אחר
+    if (error && (error.code === "23505" || String(error.message||"").includes("uq_bj_players_session_seat"))) {
+      const { data: rows2 } = await supabase
+        .from("bj_players")
+        .select("seat")
+        .eq("session_id", session.id);
+      const used2 = new Set((rows2 || []).map(r => r.seat));
+      let free2 = -1;
+      for (let i = 0; i < (session.seat_count ?? 5); i++) if (!used2.has(i)) { free2 = i; break; }
+      if (free2 >= 0) {
+        payload.seat = free2;
+        const r = await supabase.from("bj_players").upsert(payload, { onConflict: "session_id,client_id" });
+        error = r.error;
+      }
+    }
     if (error) {
       console.error("Failed to join seat:", error);
       setMsg("Failed to join seat");
@@ -725,7 +754,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
     const lines = [];
     for (const p of participants) {
-      const s = handValue(p.hand||[]);
+      const s = handValue(Array.isArray(p.hand) ? p.hand : []);
       let result='lose', payout=0;
 
       if (p.status==='blackjack') { result='blackjack'; payout=Math.floor(p.bet*3/2); }
@@ -813,7 +842,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
             const occupant = players.find(p=>p.seat===i);
             const isMe = occupant && occupant.player_name===name;
             const isActive = session?.current_player_id && occupant?.id === session.current_player_id;
-            const hv = occupant?.hand ? handValue(occupant.hand) : null;
+            const hv = occupant?.hand && Array.isArray(occupant.hand) ? handValue(occupant.hand) : null;
             return (
               <div key={i} className={`rounded-lg border ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[80px] md:min-h-[120px] transition-all hover:bg-white/10 ${isActive ? 'ring-2 ring-amber-400' : ''}`}>
                 <div className="text-center">
@@ -838,7 +867,11 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
                       </div>
                     </div>
                   ) : (
-                    <button onClick={ensureSeated} className="mt-1 px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-xs transition-all">
+                    <button 
+                      onClick={ensureSeated} 
+                      disabled={!session || !name}
+                      className="mt-1 px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-semibold text-xs transition-all"
+                    >
                       TAKE SEAT
                     </button>
                   )}

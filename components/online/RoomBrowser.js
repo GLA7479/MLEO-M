@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabaseMP as supabase } from "../../lib/supabaseClients";
+import { supabaseMP as supabase, getClientId } from "../../lib/supabaseClients";
 
 export default function RoomBrowser({ gameId, playerName, onJoinRoom }) {
   const [rooms, setRooms] = useState([]);
@@ -52,9 +52,15 @@ export default function RoomBrowser({ gameId, playerName, onJoinRoom }) {
         return;
       }
     }
+    const client_id = getClientId();
     await supabase
       .from("arcade_room_players")
-      .upsert({ room_id: room.id, player_name: playerName || "Guest" }, { onConflict: "room_id,player_name" });
+      .upsert({ 
+        room_id: room.id, 
+        client_id, 
+        player_name: playerName || "Guest", 
+        joined_at: new Date().toISOString() 
+      }, { onConflict: "room_id,client_id" });
     onJoinRoom?.(room.id);
   }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabaseMP as supabase } from "../../lib/supabaseClients";
+import { supabaseMP as supabase, getClientId } from "../../lib/supabaseClients";
 
 export default function RoomPresence({ roomId, playerName, onLeave }) {
   const [members, setMembers] = useState([]);
@@ -26,8 +26,9 @@ export default function RoomPresence({ roomId, playerName, onLeave }) {
   }, [roomId]);
 
   async function leaveRoom() {
-    // best-effort: delete by (room_id, player_name)
-    await supabase.from("arcade_room_players").delete().match({ room_id: roomId, player_name: playerName || "Guest" });
+    // best-effort: delete by (room_id, client_id)
+    const client_id = getClientId();
+    await supabase.from("arcade_room_players").delete().match({ room_id: roomId, client_id });
     onLeave?.();
   }
 
