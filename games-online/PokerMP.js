@@ -129,6 +129,37 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     return ()=> ch.unsubscribe();
   },[ses?.id]);
 
+  // ===== Autopilot =====
+  const isLeader = useMemo(() => {
+    if (!roomMembers.length || !name) return false;
+    const sorted = [...roomMembers].sort((a, b) => a.player_name.localeCompare(b.player_name));
+    return sorted[0]?.player_name === name;
+  }, [roomMembers, name]);
+
+  async function autopilot() {
+    if (!isLeader) return;
+    
+    // אם יש 2+ שחקנים ואין סשן פעיל, התחל משחק
+    if (players.length >= 2 && (!ses || ses.stage === 'lobby')) {
+      await startHand();
+    }
+  }
+
+  // ===== Auto-start game when 2+ players =====
+  useEffect(() => {
+    if (!ses || ses.stage !== 'lobby') return;
+    if (players.length >= 2) {
+      // התחל את המשחק אוטומטית
+      startHand();
+    }
+  }, [ses, players.length]);
+
+  // ===== Autopilot heartbeat =====
+  useEffect(() => {
+    const interval = setInterval(autopilot, 1000);
+    return () => clearInterval(interval);
+  }, [isLeader, players.length, ses]);
+
   // ===== Timer tick (client-side auto action) =====
   useEffect(() => {
     clearInterval(tickRef.current);
@@ -147,6 +178,14 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
   const seatMap = useMemo(()=> new Map(players.map(p=>[p.seat_index, p])), [players]);
   const turnPlayer = ses?.current_turn!=null ? seatMap.get(ses.current_turn) : null;
   const bb = ses?.min_bet || 20;
+
+  // בדיקה שהמשחק לא נגמר בטרם עת
+  function canAct(player) {
+    if (!player || player.folded || player.all_in) return false;
+    if (ses?.current_turn !== player.seat_index) return false;
+    if (ses?.stage === 'showdown') return false;
+    return true;
+  }
 
   // ===== Take Seat =====
   async function takeSeat(seatIndex) {
@@ -203,7 +242,9 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     const alive = players.filter(p=>!p.folded && p.stack_live>0);
     const maxBet = maxStreetBet(players);
     if(alive.length<=1) return true;
-    return alive.every(p => (p.bet_street||0)===maxBet || p.all_in);
+    
+    // בדוק אם כולם פעלו או ALL-IN או שההימור שלהם שווה למקסימום
+    return alive.every(p => p.acted || p.all_in || (p.bet_street||0) === maxBet);
   }
 
   async function resetStreetActs(){
@@ -213,6 +254,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
 
   async function advanceStreet(auto=false){
     if(!ses) return;
+    
     // אם נשאר שחקן אחד — ניצחון אוטומטי ללא דירוג
     const alive = players.filter(p => !p.folded);
     if (alive.length <= 1) {
@@ -228,10 +270,22 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
 
     let { board = [], deck_remaining = [], stage, dealer_seat } = ses;
     const d = [...deck_remaining];
-    if(stage==="preflop"){ board = [...board, d.pop(), d.pop(), d.pop()]; stage="flop"; }
-    else if(stage==="flop"){ board = [...board, d.pop()]; stage="turn"; }
-    else if(stage==="turn"){ board = [...board, d.pop()]; stage="river"; }
-    else if(stage==="river"){ stage="showdown"; }
+    
+    if(stage==="preflop"){ 
+      board = [...board, d.pop(), d.pop(), d.pop()]; 
+      stage="flop"; 
+    }
+    else if(stage==="flop"){ 
+      board = [...board, d.pop()]; 
+      stage="turn"; 
+    }
+    else if(stage==="turn"){ 
+      board = [...board, d.pop()]; 
+      stage="river"; 
+    }
+    else if(stage==="river"){ 
+      stage="showdown"; 
+    }
 
     let next = null;
     if(stage!=="showdown"){
@@ -239,7 +293,8 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     }
 
     await supabase.from("poker_sessions").update({
-      board, deck_remaining: d, stage, current_turn: next, turn_deadline: next? new Date(Date.now()+TURN_SECONDS*1000).toISOString() : null
+      board, deck_remaining: d, stage, current_turn: next, 
+      turn_deadline: next? new Date(Date.now()+TURN_SECONDS*1000).toISOString() : null
     }).eq("id", ses.id);
 
     if(stage==="showdown"){
@@ -276,6 +331,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
         room_id: roomId, hand_no:1, stage:"preflop",
         dealer_seat: dealer, sb_seat: sb, bb_seat: bbSeat,
         board:[], deck_remaining: deck, pot_total:0,
+        min_bet: 20, // הוסף min_bet
         current_turn: (bbSeat+1)%seats,
         turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
       }).select().single();
@@ -293,6 +349,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
         hand_no: exist.hand_no+1, stage:"preflop",
         dealer_seat: dealer, sb_seat: sb, bb_seat: bbSeat,
         board:[], deck_remaining: deck, pot_total:0, winners:[],
+        min_bet: 20, // הוסף min_bet
         current_turn: (bbSeat+1)%seats,
         turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
       }).eq("id", exist.id).select().single();
@@ -305,30 +362,47 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
       
       sessionId = upd.id;
       await supabase.from("poker_pots").update({ total:0, eligible:[] }).eq("session_id", sessionId);
-      await supabase.from("poker_players").delete().eq("session_id", sessionId);
+      // במקום למחוק שחקנים, רק ננקה את הנתונים שלהם
+      await supabase.from("poker_players").update({
+        hole_cards: [],
+        bet_street: 0,
+        total_bet: 0,
+        folded: false,
+        all_in: false,
+        acted: false
+      }).eq("session_id", sessionId);
     }
 
-    // מושיבים מהחדר
-    const { data: roomPlayers } = await supabase.from("arcade_room_players").select("*").eq("room_id", roomId).order("joined_at");
-    const sit = (roomPlayers||[]).slice(0, seats).map((rp,i)=>({
-      session_id: sessionId, player_name: rp.player_name, seat_index:i,
-      stack_live: 2000, bet_street:0, total_bet:0, folded:false, all_in:false, acted:false
-    }));
-    // לאפשר גם יד עם שחקן יחיד לצורכי פיתוח
-    if (sit.length < 1) return; // שמור על דרישה למינימום 1
+    // בדוק אם יש שחקנים קיימים
+    const { data: existingPlayers } = await supabase.from("poker_players").select("*").eq("session_id", sessionId);
+    
+    let sit = [];
+    if (!existingPlayers || existingPlayers.length === 0) {
+      // אם אין שחקנים, צור שחקנים חדשים מהחדר
+      const { data: roomPlayers } = await supabase.from("arcade_room_players").select("*").eq("room_id", roomId).order("joined_at");
+      sit = (roomPlayers||[]).slice(0, seats).map((rp,i)=>({
+        session_id: sessionId, player_name: rp.player_name, seat_index:i,
+        stack_live: 2000, bet_street:0, total_bet:0, folded:false, all_in:false, acted:false
+      }));
+      
+      if (sit.length < 1) return; // שמור על דרישה למינימום 1
 
-    await supabase
-      .from("poker_players")
-      .upsert(sit, {
-        onConflict: "session_id,seat_index",
-        ignoreDuplicates: false,
-        returning: "minimal",
-      });
+      await supabase
+        .from("poker_players")
+        .upsert(sit, {
+          onConflict: "session_id,seat_index",
+          ignoreDuplicates: false,
+          returning: "minimal",
+        });
+    } else {
+      // אם יש שחקנים קיימים, השתמש בהם
+      sit = existingPlayers;
+    }
 
     // מחלק Hole — עדכון per-row (מונע 400/409)
     {
-      // קרא את השחקנים שזה עתה נוצרו (עם ה-IDs)
-      const { data: created, error: selErr } = await supabase
+      // קרא את כל השחקנים (לא רק חדשים)
+      const { data: allPlayers, error: selErr } = await supabase
         .from("poker_players")
         .select("id, seat_index, hole_cards")
         .eq("session_id", sessionId)
@@ -340,7 +414,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
 
       // סבב 1 + 2: קלף לכל שחקן
       for (let round = 0; round < 2; round++) {
-        for (const P of (created || [])) {
+        for (const P of (allPlayers || [])) {
           const c = d.pop();
           const hand = Array.isArray(P.hole_cards) ? [...P.hole_cards, c] : [c];
           const { error: upErr } = await supabase
@@ -364,8 +438,11 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     }
     // פוסט Blinds – רק אם יש לפחות 2 שחקנים
     if (sit.length >= 2) {
-      await takeChips(sessionId, sb, Math.floor((ses?.min_bet||bb)/2), "post_sb");
-      await takeChips(sessionId, bbSeat, (ses?.min_bet||bb), "post_bb");
+      const sbAmount = Math.floor((ses?.min_bet||20)/2);
+      const bbAmount = (ses?.min_bet||20);
+      
+      await takeChips(sessionId, sb, sbAmount, "post_sb");
+      await takeChips(sessionId, bbSeat, bbAmount, "post_bb");
     }
     } finally {
       startingRef.current = false;
@@ -409,14 +486,14 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
 
   // ===== Player Acts =====
   async function actFold(){
-    if(!turnPlayer || !ses) return;
+    if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
     await supabase.from("poker_players").update({ folded:true, acted:true }).eq("id", turnPlayer.id);
     await supabase.from("poker_actions").insert({ session_id: ses.id, seat_index: turnPlayer.seat_index, action:"fold" });
     await afterActionAdvance();
   }
 
   async function actCheck(){
-    if(!turnPlayer || !ses) return;
+    if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
     if(!canCheck(turnPlayer, players)) return; // לא חוקי
     await supabase.from("poker_players").update({ acted:true }).eq("id", turnPlayer.id);
     await supabase.from("poker_actions").insert({ session_id: ses.id, seat_index: turnPlayer.seat_index, action:"check" });
@@ -424,7 +501,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
   }
 
   async function actCall(){
-    if(!turnPlayer || !ses) return;
+    if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
     const maxBet = maxStreetBet(players);
     const need = Math.max(0, maxBet - (turnPlayer.bet_street||0));
     if(need<=0) return actCheck();
@@ -434,7 +511,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
   }
 
   async function actBet(amount){
-    if(!turnPlayer || !ses) return;
+    if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
     const maxBet = maxStreetBet(players);
     if(maxBet>0) return; // אם כבר יש העלאה/הימור קיים — זה בעצם רייז
     const minBet = ses.min_bet || 20;
@@ -448,7 +525,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
   }
 
   async function actRaise(amount){
-    if(!turnPlayer || !ses) return;
+    if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
     const maxBet = maxStreetBet(players);
     const needToCall = Math.max(0, maxBet - (turnPlayer.bet_street||0));
     const minR = minRaiseAmount(players, ses.min_bet||20);
@@ -462,26 +539,38 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
   }
 
   async function actAllIn(){
-    if(!turnPlayer || !ses) return;
+    if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
+    if(turnPlayer.stack_live <= 0) return; // בדיקה נוספת
+    
     const pay = turnPlayer.stack_live;
-    if(pay<=0) return;
     const actType = (maxStreetBet(players)===0 ? "bet" : "raise");
+    
+    // עדכן את השחקן ל-ALL-IN
+    await supabase.from("poker_players").update({
+      all_in: true,
+      acted: true
+    }).eq("id", turnPlayer.id);
+    
     await takeChips(ses.id, turnPlayer.seat_index, pay, "allin");
+    
+    // איפוס acted לכל האחרים (שיצטרכו להגיב)
     const others = players.filter(p=>p.id!==turnPlayer.id && !p.folded && !p.all_in).map(p=>p.id);
     if(others.length) await supabase.from("poker_players").update({ acted:false }).in("id", others);
+    
     await supabase.from("poker_actions").insert({ session_id: ses.id, seat_index: turnPlayer.seat_index, action: actType, amount: pay });
     await afterActionAdvance(true);
   }
 
   async function afterActionAdvance(resetOthers=false){
-    // סגירת סטריט? אם כן → advanceStreet
-    const maxBet = maxStreetBet(players);
-    const nextIdx = nextSeatAlive(ses.current_turn);
+    // בדוק אם כולם פעלו או ALL-IN
     if(everyoneActedOrAllIn()){
       await advanceStreet();
       return;
     }
-    if(nextIdx!==null){
+    
+    // מעבר לשחקן הבא
+    const nextIdx = nextSeatAlive(ses.current_turn);
+    if(nextIdx !== null){
       await supabase.from("poker_sessions").update({
         current_turn: nextIdx,
         turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
