@@ -121,6 +121,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const [bet, setBet] = useState(MIN_BET);
   const [msg, setMsg] = useState("");
   const [banner, setBanner] = useState(null); // {title, lines: []}
+  const [timerTick, setTimerTick] = useState(0);
 
   const myRow = useMemo(
     () => players.find(p => p.player_name === name) || null,
@@ -238,6 +239,15 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     const t = setTimeout(() => { autopilot(session); }, 150);
     return () => clearTimeout(t);
   }, [session?.id, session?.state, players.length, players.map?.(p=>p.status + ':' + p.bet).join('|'), isLeader]);
+
+  // Timer tick for UI updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimerTick(prev => prev + 1);
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Heartbeat: מריץ autopilot כשיש דדליין פעיל (הימורים/תור/הפסקה בין סיבובים)
   useEffect(() => {
@@ -1021,19 +1031,19 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
               <div
                 className="h-full bg-emerald-500 transition-all"
                 style={{
-                  width: `${Math.max(0, 100 * (new Date(session.turn_deadline).getTime() - Date.now()) / ((session.turn_seconds||20)*1000))}%`
+                  width: `${timerTick >= 0 && Math.max(0, 100 * (new Date(session.turn_deadline).getTime() - Date.now()) / ((session.turn_seconds||20)*1000))}%`
                 }}
               />
             </div>
           )}
           {session?.state === 'betting' && session?.bet_deadline && (
             <div className="text-xs text-amber-400 font-semibold">
-              🕒 {Math.max(0, Math.ceil((new Date(session.bet_deadline).getTime() - Date.now()) / 1000))}s
+              🕒 {timerTick >= 0 && Math.max(0, Math.ceil((new Date(session.bet_deadline).getTime() - Date.now()) / 1000))}s
             </div>
           )}
           {session?.turn_deadline && session?.current_player_id === myRow?.id && (
             <div className="text-xs text-amber-300 font-semibold">
-              ⏰ {Math.max(0, Math.ceil((new Date(session.turn_deadline).getTime() - Date.now())/1000))}s
+              ⏰ {timerTick >= 0 && Math.max(0, Math.ceil((new Date(session.turn_deadline).getTime() - Date.now())/1000))}s
             </div>
           )}
           {/* Waiting Players Info */}
