@@ -164,17 +164,6 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     [players, name, session?.current_player_id]
   );
 
-  // ניהול הכפתורים – חישוב חד-משמעי לשימוש כפול
-  const meNow = useMemo(() => 
-    players.find(p => p.id === session?.current_player_id && p.player_name === name), 
-    [players, session?.current_player_id, name]
-  );
-
-  const canDouble = !!meNow && session?.state === 'acting' &&
-                    meNow.status === 'acting' &&
-                    Array.isArray(meNow.hand) && meNow.hand.length === 2;
-
-  const canSurrender = canDouble; // אותם תנאים
 
   // Leader detection
   const isLeader = useMemo(() => {
@@ -202,6 +191,14 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const myTurn = !!myRow && session?.current_player_id === myRow.id && session?.state === 'acting' && myRow.status === 'acting';
   const canSettle = session?.state === 'acting'; // האוטופיילוט יעשה לבד, זה רק fallback ידני
   const turnGlow = myTurn ? 'ring-2 ring-emerald-400' : '';
+
+  // ניהול הכפתורים – חישוב חד-משמעי לשימוש כפול
+  const canDouble =
+    myTurn &&
+    Array.isArray(myRow?.hand) &&
+    myRow.hand.length === 2;
+
+  const canSurrender = canDouble; // אותם תנאים
 
   // bootstrap session with new schema
   useEffect(() => {
@@ -297,14 +294,19 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     return () => clearInterval(interval);
   }, []);
 
-  // Show insurance modal when dealer shows Ace
+  // ביטוח מופיע רק פעם אחת בתחילת הסיבוב כשהדילר מראה אס
   useEffect(() => {
-    if (myTurn && session?.dealer_hand?.[0]?.startsWith('A') && !myRow?.insurance_bet && session?.state === 'acting') {
+    if (
+      session?.state === 'acting' &&
+      session?.dealer_hand?.[0]?.startsWith('A') &&
+      !myRow?.insurance_bet &&
+      !session?.insuranceOffered // דגל חדש שמונע כפילויות
+    ) {
       setShowInsuranceModal(true);
-    } else {
-      setShowInsuranceModal(false);
+      // סמן שהביטוח כבר הוצע
+      supabase.from('bj_sessions').update({ insuranceOffered: true }).eq('id', session.id);
     }
-  }, [myTurn, session?.dealer_hand, myRow?.insurance_bet, session?.state]);
+  }, [session?.state]);
 
   // Heartbeat: מריץ autopilot כשיש דדליין פעיל (הימורים/תור/הפסקה בין סיבובים)
   useEffect(() => {
@@ -729,7 +731,9 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   }
 
   async function double() {
-    if (!session) return;
+    if (!session || !myTurn) return;
+    if (!Array.isArray(myRow?.hand) || myRow.hand.length !== 2) return;
+    if (getVault() < (myRow?.bet || 0)) { setMsg("Insufficient vault balance to double"); return; }
 
     // משוך שורה עדכנית מה-DB (ולא מ-state) כדי לא לטעות עם lag
     const row = await withFreshMyRow();
@@ -975,6 +979,34 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     const dealerScore = handValue(dealer);
     const dealerBust  = dealerScore > 21;
     const dealerBlackjack = dealer.length === 2 && dealerScore === 21;
+
+    // אם לדילר יש Blackjack - חושף מיד ומפסיק את היד
+    if (session?.dealer_hidden && dealerBlackjack) {
+      // חושף מיד אם יש 21
+      await supabase.from('bj_sessions').update({
+        dealer_hidden: false,
+        state: 'settling'
+      }).eq('id', session.id);
+
+      // עדכן תוצאות מיידיות לשחקנים (לפני שלב acting)
+      for (const p of participants) {
+        const s = handValue(p.hand);
+        const result = (p.status === 'blackjack')
+          ? 'push' // גם הוא וגם הדילר ב-21
+          : 'lose';
+        await supabase.from('bj_players')
+          .update({ result, status: 'settled', bet: 0 })
+          .eq('id', p.id);
+      }
+
+      // קבע סוף סיבוב מהיר
+      await supabase.from('bj_sessions').update({
+        state: 'ended',
+        next_round_at: new Date(Date.now() + 10000).toISOString() // סיום תוך 10 שניות
+      }).eq('id', session.id);
+
+      return; // מסיים פה
+    }
 
     const lines = [];
     let myResult = null; // רק לשחקן המקומי
@@ -1249,7 +1281,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
           <div className="text-white/60 text-xs">Vault: {fmt(getVault())} MLEO</div>
         </div>
 
-        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10 h-full">
+        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10 h-full relative z-10 pointer-events-auto">
           <div className="text-white/80 text-xs mb-1 font-semibold">Game Actions</div>
           <div className="grid grid-cols-2 gap-1">
             <button onClick={hit} disabled={!myTurn}
@@ -1264,13 +1296,16 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
                         disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
               STAND
             </button>
-            <button onClick={double} disabled={!canDouble}
+            <button 
+              onClick={double}
+              onTouchStart={double}
+              disabled={!canDouble}
               className={`px-2 py-2 md:px-3 md:py-3 rounded bg-gradient-to-r from-amber-600 to-amber-700
                         hover:from-amber-700 hover:to-amber-800 text-white font-bold text-sm transition-all
                         disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
               DOUBLE
             </button>
-            <button onClick={splitHand} disabled={!meNow || !canSplit(meNow)}
+            <button onClick={splitHand} disabled={!myRow || !canSplit(myRow)}
               className={`px-2 py-2 md:px-3 md:py-3 rounded bg-gradient-to-r from-purple-600 to-purple-700
                         hover:from-purple-700 hover:to-purple-800 text-white font-bold text-sm transition-all
                         disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
