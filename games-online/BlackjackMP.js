@@ -781,6 +781,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     const dealerBust  = dealerScore > 21;
 
     const lines = [];
+    let myResult = null; // רק לשחקן המקומי
     for (const p of participants) {
       const s = handValue(Array.isArray(p.hand) ? p.hand : []);
       let result='lose', payout=0;
@@ -804,6 +805,8 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         if (setVaultBoth) {
           setVaultBoth(newVault);
         }
+        // שמור את התוצאה שלי להודעה מקומית
+        myResult = { result, delta, dealerBust, dealerScore };
       }
 
       await supabase.from('bj_players').update({
@@ -822,11 +825,20 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       next_round_at: new Date(Date.now() + 30000).toISOString() // 30 שניות לסיבוב הבא
     }).eq('id', session.id);
 
-    // באנר מקומי (לכל קליינט)
-    setBanner({
-      title: `Dealer ${dealerBust ? 'BUST' : 'Total ' + dealerScore}`,
-      lines
-    });
+    // באנר מקומי - רק לשחקן המקומי
+    if (myResult) {
+      const { result, delta, dealerBust, dealerScore } = myResult;
+      setBanner({
+        title: result === 'win' ? '🎉 YOU WIN!' : 
+               result === 'blackjack' ? '🎉 BLACKJACK!' :
+               result === 'push' ? '🤝 PUSH' : '💔 YOU LOSE',
+        lines: [
+          `Dealer: ${dealerBust ? 'BUST' : dealerScore}`,
+          result === 'win' || result === 'blackjack' ? `+${fmt(delta)} MLEO` :
+          result === 'push' ? 'No change' : `Lost ${fmt(Math.abs(delta))} MLEO`
+        ]
+      });
+    }
   }
 
   async function resetRound() {
@@ -938,11 +950,11 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         )}
       </div>
 
-      {/* Controls - Mobile Optimized */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-2">
-        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
+      {/* Controls - Fixed Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-2 h-32 md:h-36">
+        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10 h-full">
           <div className="text-white/80 text-xs mb-1 font-semibold">Place Bet</div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 mb-1">
             <input type="number" value={bet} min={MIN_BET} step={MIN_BET}
               onChange={(e)=>setBet(Math.max(MIN_BET, Math.floor(e.target.value)))}
               className="flex-1 bg-black/40 text-white text-xs rounded px-1 py-0.5 md:px-2 md:py-1 border border-white/20 focus:border-emerald-400 focus:outline-none" />
@@ -950,10 +962,10 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
               PLACE
             </button>
           </div>
-          <div className="text-white/60 text-xs mt-1">Vault: {fmt(getVault())} MLEO</div>
+          <div className="text-white/60 text-xs">Vault: {fmt(getVault())} MLEO</div>
         </div>
 
-        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
+        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10 h-full">
           <div className="text-white/80 text-xs mb-1 font-semibold">Game Actions</div>
           <div className="grid grid-cols-2 gap-1">
             <button onClick={hit} disabled={!myTurn}
@@ -989,10 +1001,11 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
           </div>
         </div>
 
-        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
+        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10 h-full">
+          <div className="text-white/80 text-xs mb-1 font-semibold">Status</div>
           {isLeader && (
-            <div className="mt-2 text-xs text-emerald-400 font-semibold">
-              🎮 You are the Leader (Autopilot Active)
+            <div className="text-xs text-emerald-400 font-semibold mb-1">
+              🎮 Leader
             </div>
           )}
           {myTurn && session?.turn_deadline && (
@@ -1006,13 +1019,13 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
             </div>
           )}
           {session?.state === 'betting' && session?.bet_deadline && (
-            <div className="text-xs text-amber-400 font-semibold mt-1">
-              🕒 Betting ends in {Math.max(0, Math.ceil((new Date(session.bet_deadline).getTime() - Date.now()) / 1000))}s
+            <div className="text-xs text-amber-400 font-semibold">
+              🕒 {Math.max(0, Math.ceil((new Date(session.bet_deadline).getTime() - Date.now()) / 1000))}s
             </div>
           )}
           {session?.turn_deadline && session?.current_player_id === myRow?.id && (
-            <div className="mt-2 text-xs text-amber-300 font-semibold">
-              ⏰ Time left: {Math.max(0, Math.ceil((new Date(session.turn_deadline).getTime() - Date.now())/1000))}s
+            <div className="text-xs text-amber-300 font-semibold">
+              ⏰ {Math.max(0, Math.ceil((new Date(session.turn_deadline).getTime() - Date.now())/1000))}s
             </div>
           )}
         </div>
@@ -1024,14 +1037,17 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         </div>
       )}
 
-      {banner && (
-        <div className="mt-2 bg-emerald-900/25 border border-emerald-500/40 rounded-lg p-2">
-          <div className="text-emerald-300 font-bold text-sm">{banner.title}</div>
-          <ul className="mt-1 text-emerald-200 text-xs space-y-0.5">
-            {banner.lines.map((t,i)=><li key={i}>{t}</li>)}
-          </ul>
-        </div>
-      )}
+      {/* Fixed Banner Position */}
+      <div className="h-20 flex items-center justify-center">
+        {banner && (
+          <div className="bg-emerald-900/25 border border-emerald-500/40 rounded-lg p-2 max-w-md mx-auto">
+            <div className="text-emerald-300 font-bold text-sm text-center">{banner.title}</div>
+            <ul className="mt-1 text-emerald-200 text-xs space-y-0.5 text-center">
+              {banner.lines.map((t,i)=><li key={i}>{t}</li>)}
+            </ul>
+          </div>
+        )}
+      </div>
 
       {session?.state === 'ended' && session?.next_round_at && (
         <div className="text-center text-emerald-400 text-xs font-semibold mt-2">

@@ -534,11 +534,11 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
         </div>
       )}
 
-      {/* Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:gap-2">
-        <div className="bg-white/5 rounded-xl p-1 md:p-2 border border-white/10">
+      {/* Controls - Fixed Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:gap-2 h-40 md:h-44">
+        <div className="bg-white/5 rounded-xl p-1 md:p-2 border border-white/10 h-full">
           <div className="text-white/80 text-xs mb-1 font-semibold">Game Control</div>
-          <div className="flex gap-1 flex-wrap">
+          <div className="flex gap-1 flex-wrap mb-2">
             <button 
               onClick={startHand}
               className="px-2 py-1 md:px-3 md:py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-xs transition-all shadow-lg"
@@ -554,75 +554,74 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
               </button>
             )}
           </div>
+          <div className="text-white/60 text-xs">Vault: {fmt(getVault())} MLEO</div>
         </div>
 
-        <div className="bg-white/5 rounded-xl p-1 md:p-2 border border-white/10">
+        <div className="bg-white/5 rounded-xl p-1 md:p-2 border border-white/10 h-full">
           <div className="text-white/80 text-xs mb-1 font-semibold">Player Actions</div>
-          {["preflop","flop","turn","river"].includes(ses?.stage) && isMyTurn ? (
-            <div className="space-y-1 md:space-y-2">
-              <div className="flex gap-1 flex-wrap">
-                <button onClick={actFold} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all">
-                  FOLD
-                </button>
-                <button onClick={actCheck} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all">
-                  CHECK
-                </button>
-                <button onClick={actCall} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all">
-                  CALL
-                </button>
-                <button onClick={actAllIn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold text-xs transition-all">
-                  ALL-IN
-                </button>
-              </div>
-              
-              <div className="flex gap-1 items-center">
-                <input
-                  type="number" min="0" step="10" value={betInput}
-                  onChange={e=>setBetInput(Number(e.target.value||0))}
-                  className="flex-1 bg-black/40 text-white text-xs rounded-lg px-1 py-0.5 md:px-2 md:py-1 border border-white/20 focus:border-emerald-400 focus:outline-none"
-                  placeholder="Amount"
-                />
-                <button onClick={()=>actBet(betInput)} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold text-xs transition-all">
-                  BET
-                </button>
-                <button onClick={()=>actRaise(betInput)} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all">
-                  RAISE
-                </button>
-              </div>
-
-              <div className="flex gap-1 text-xs">
-                <button onClick={()=>setBetInput(ses?.min_bet||20)} className="px-1 py-0.5 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
-                  1×BB
-                </button>
-                <button onClick={()=>setBetInput(Math.floor(pot/2))} className="px-1 py-0.5 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
-                  ½ Pot
-                </button>
-                <button onClick={()=>setBetInput(pot)} className="px-1 py-0.5 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
-                  Pot
-                </button>
-              </div>
+          <div className="space-y-1">
+            <div className="flex gap-1 flex-wrap">
+              <button onClick={actFold} disabled={!isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                FOLD
+              </button>
+              <button onClick={actCheck} disabled={!isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                CHECK
+              </button>
+              <button onClick={actCall} disabled={!isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                CALL
+              </button>
+              <button onClick={actAllIn} disabled={!isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                ALL-IN
+              </button>
             </div>
-          ) : ses?.stage==="showdown" ? (
-            <div className="text-emerald-300 text-sm">Showdown complete. Press "Start / Next Hand".</div>
-          ) : (
-            <div className="text-white/60 text-sm">Waiting for your turn...</div>
-          )}
+            
+            <div className="flex gap-1 items-center">
+              <input
+                type="number" min="0" step="10" value={betInput}
+                onChange={e=>setBetInput(Number(e.target.value||0))}
+                className="flex-1 bg-black/40 text-white text-xs rounded-lg px-1 py-0.5 md:px-2 md:py-1 border border-white/20 focus:border-emerald-400 focus:outline-none"
+                placeholder="Amount"
+              />
+              <button onClick={()=>actBet(betInput)} disabled={!isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                BET
+              </button>
+              <button onClick={()=>actRaise(betInput)} disabled={!isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                RAISE
+              </button>
+            </div>
+
+            <div className="flex gap-1 text-xs">
+              <button onClick={()=>setBetInput(ses?.min_bet||20)} className="px-1 py-0.5 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
+                1×BB
+              </button>
+              <button onClick={()=>setBetInput(Math.floor(pot/2))} className="px-1 py-0.5 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
+                ½ Pot
+              </button>
+              <button onClick={()=>setBetInput(pot)} className="px-1 py-0.5 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
+                Pot
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Timer */}
-      {ses?.current_turn!=null && ses?.turn_deadline && (
-        <div className="bg-white/5 rounded-xl p-4 border border-white/10 text-center">
-          <TurnCountdown deadline={ses.turn_deadline} />
-        </div>
-      )}
+      {/* Fixed Timer Position */}
+      <div className="h-16 flex items-center justify-center">
+        {ses?.current_turn!=null && ses?.turn_deadline && (
+          <div className="bg-white/5 rounded-xl p-4 border border-white/10 text-center">
+            <TurnCountdown deadline={ses.turn_deadline} />
+          </div>
+        )}
+      </div>
 
-      {/* Status Message */}
-      {msg && (
-        <div className="bg-emerald-900/20 rounded-xl p-4 border border-emerald-400/30 text-center">
-          <div className="text-emerald-300 text-sm">{msg}</div>
-        </div>
-      )}
+      {/* Fixed Status Message Position */}
+      <div className="h-16 flex items-center justify-center">
+        {msg && (
+          <div className="bg-emerald-900/20 rounded-xl p-4 border border-emerald-400/30 text-center max-w-md mx-auto">
+            <div className="text-emerald-300 text-sm">{msg}</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
