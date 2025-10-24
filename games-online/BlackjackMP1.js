@@ -57,9 +57,9 @@ const suitClass = (s)=> (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
 function Card({ code, size = "normal", hidden = false, isDealing = false }) {
   if (!code && !hidden) return null;
   
-  // Dynamic sizing based on game state
+  // Dynamic sizing based on game state - תיקון למובייל
   const sizeClasses = size === "small" ? 
-    (isDealing ? "w-10 h-14 text-sm" : "w-6 h-8 text-xs") : 
+    (isDealing ? "w-10 h-14 text-sm" : "w-8 h-10 text-xs") : // שינוי מ w-6 h-8 ל w-8 h-10
     (isDealing ? "w-12 h-16 text-base" : "w-8 h-10 text-sm");
 
   if (hidden) {
@@ -81,7 +81,7 @@ function Card({ code, size = "normal", hidden = false, isDealing = false }) {
 function HandView({ hand, size = "normal", isDealing = false }) {
   const h = hand || [];
   return (
-    <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-0.5 gap-0.5">
+    <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-0.5 gap-0.5 max-w-full">
       {h.length===0 ? <span className="text-white/60 text-xs">—</span> : h.map((c,i)=><Card key={i} code={c} size={size} isDealing={isDealing}/>)}
     </div>
   );
@@ -126,13 +126,18 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
   const myRow = useMemo(
     () => {
-      // מצא את השורה הנוכחית של השחקן (עם hand_idx הנוכחי)
-      const currentPlayerRow = players.find(p => p.id === session?.current_player_id);
-      if (currentPlayerRow && currentPlayerRow.player_name === name) {
-        return currentPlayerRow;
+      // מצא את כל השורות של השחקן
+      const myPlayerRows = players.filter(p => p.player_name === name);
+      if (myPlayerRows.length === 0) return null;
+      
+      // אם יש תור נוכחי, תחזיר את השורה הנוכחית
+      if (session?.current_player_id) {
+        const currentRow = myPlayerRows.find(p => p.id === session.current_player_id);
+        if (currentRow) return currentRow;
       }
-      // אם אין תור נוכחי, חזור לשורה הראשונה של השחקן
-      return players.find(p => p.player_name === name) || null;
+      
+      // אחרת, תחזיר את השורה הראשונה
+      return myPlayerRows[0];
     },
     [players, name, session?.current_player_id]
   );
@@ -780,6 +785,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       // Create split hand (second card + new card)
       const { error: upsertErr } = await supabase.from('bj_players').upsert({
         session_id: session.id,
+        client_id: myRow.client_id,
         seat: myRow.seat,
         player_name: myRow.player_name,
         bet: newBet,
@@ -935,7 +941,8 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       }
 
       await supabase.from('bj_players').update({
-        result, status:'settled', bet:0, insurance_bet:0
+        result, status:'settled', insurance_bet:0
+        // לא מאפס את bet ו-hand עד אחרי ההצגה
       }).eq('id', p.id);
 
       const tag = result==='win' ? '+'
@@ -945,13 +952,18 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       lines.push(`Seat ${p.seat+1} • ${p.player_name} — ${result.toUpperCase()} (${tag}${fmt(Math.abs(delta))})`);
     }
 
-    // הצג את התוצאות למשך 3 שניות לפני סיום המשחק
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
+    // עדכן למצב ended מיד (להתחיל ספירה)
     await supabase.from('bj_sessions').update({ 
       state:'ended',
       next_round_at: new Date(Date.now() + 15000).toISOString() // 15 שניות לסיבוב הבא
     }).eq('id', session.id);
+
+    // אפס את הקלפים וההימורים אחרי 14 שניות (שנייה לפני סיום הספירה)
+    setTimeout(async () => {
+      await supabase.from('bj_players').update({
+        hand: [], bet: 0
+      }).eq('session_id', session.id);
+    }, 14000);
 
     // הצג הודעות אישיות לכל שחקן
     if (myResult) {
@@ -1043,24 +1055,41 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         {/* Players Grid - Mobile Responsive */}
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1 md:gap-2">
           {Array.from({length: SEATS}).map((_,i)=>{
-            const occupant = players.find(p=>p.seat===i);
-            const isMe = occupant && occupant.player_name===name;
-            const isActive = session?.current_player_id && occupant?.id === session.current_player_id;
-            const hv = occupant?.hand && Array.isArray(occupant.hand) ? handValue(occupant.hand) : null;
+            // מצא את כל הידיים של המושב הזה
+            const seatHands = players.filter(p => p.seat === i).sort((a,b) => a.hand_idx - b.hand_idx);
+            const primaryHand = seatHands[0]; // היד הראשונה
+            const isMe = primaryHand && primaryHand.player_name === name;
+            const isActive = session?.current_player_id && seatHands.some(h => h.id === session.current_player_id);
+            
             return (
-              <div key={i} className={`rounded-lg border ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[80px] md:min-h-[120px] transition-all hover:bg-white/10 ${isActive ? 'ring-2 ring-amber-400' : ''} relative`}>
+              <div key={i} className={`rounded-lg border ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[80px] md:min-h-[120px] transition-all hover:bg-white/10 ${isActive ? 'ring-2 ring-amber-400' : ''} relative overflow-hidden`}>
                 {/* Turn indicator button - top right corner */}
-                {occupant && (
+                {primaryHand && (
                   <div className={`absolute top-1 right-1 w-3 h-3 rounded-full ${isActive ? 'bg-green-500' : 'bg-red-500'} ${isActive ? 'animate-pulse' : ''}`}></div>
                 )}
                 <div className="text-center">
-                  {occupant ? (
+                  {primaryHand ? (
                     <div className="space-y-0.5 md:space-y-1">
-                      <div className="text-white font-bold text-xs md:text-sm truncate">{occupant.player_name}</div>
-                      <div className="text-emerald-300 text-xs font-semibold">Bet: {fmt(occupant.bet||0)}</div>
-                      <HandView hand={occupant.hand} size="small" isDealing={session?.state === 'dealing' || session?.state === 'acting'}/>
-                      <div className="text-white/80 text-xs">
-                        Total: {hv??"—"}
+                      <div className="text-white font-bold text-xs md:text-sm truncate">
+                        {primaryHand.player_name}
+                        {seatHands.length > 1 && ` (${seatHands.length})`}
+                      </div>
+                      <div className="text-emerald-300 text-xs font-semibold">Bet: {fmt(primaryHand.bet||0)}</div>
+                      
+                      {/* הצג את כל הידיים באותו שורה */}
+                      <div className="flex flex-wrap justify-center gap-1 max-w-full">
+                        {seatHands.map((hand, handIdx) => {
+                          const hv = hand?.hand && Array.isArray(hand.hand) ? handValue(hand.hand) : null;
+                          const isCurrentHand = session?.current_player_id === hand.id;
+                          return (
+                            <div key={handIdx} className={`${isCurrentHand ? 'ring-1 ring-yellow-400' : ''} rounded p-1 max-w-full`}>
+                              <HandView hand={hand.hand} size="small" isDealing={session?.state === 'dealing' || session?.state === 'acting'}/>
+                              <div className="text-white/80 text-xs">
+                                {hv??"—"}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ) : (
@@ -1085,11 +1114,23 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10 h-full">
           <div className="text-white/80 text-xs mb-1 font-semibold">Place Bet</div>
           <div className="flex gap-1 mb-1">
-            <input type="number" value={bet} min={MIN_BET} step={MIN_BET}
-              onChange={(e)=>setBet(Math.max(MIN_BET, Math.floor(e.target.value)))}
-              className="flex-1 bg-black/40 text-white text-xs rounded px-1 py-0.5 md:px-2 md:py-1 border border-white/20 focus:border-emerald-400 focus:outline-none" />
-            <button onClick={placeBet} disabled={!canPlaceBet} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            <input type="number" value={bet} min={1}
+              onChange={(e)=>setBet(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+              className="w-20 bg-black/40 text-white text-xs rounded px-1 py-1 border border-white/20 focus:border-emerald-400 focus:outline-none" />
+            <button onClick={placeBet} disabled={!canPlaceBet} className="w-12 px-2 py-1 rounded bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">
               PLACE
+            </button>
+            <button onClick={()=>setBet(1000)} className="w-12 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+              1K
+            </button>
+            <button onClick={()=>setBet(10000)} className="w-12 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+              10K
+            </button>
+            <button onClick={()=>setBet(100000)} className="w-12 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+              100K
+            </button>
+            <button onClick={()=>setBet(1000000)} className="w-12 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+              1M
             </button>
           </div>
           <div className="text-white/60 text-xs">Vault: {fmt(getVault())} MLEO</div>
