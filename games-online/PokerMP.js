@@ -517,6 +517,23 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
         })}
       </div>
 
+      {/* Spectators - Players in room but not seated */}
+      {roomMembers.length > sit.length && (
+        <div className="mt-4 bg-white/5 rounded-lg p-2 md:p-3 border border-white/10">
+          <div className="text-white/80 text-sm mb-2 font-semibold">👥 Waiting Players ({roomMembers.length - sit.length})</div>
+          <div className="flex flex-wrap gap-1 md:gap-2">
+            {roomMembers
+              .filter(member => !sit.some(p => p.player_name === member.player_name))
+              .map((member, idx) => (
+                <div key={idx} className="px-2 py-1 bg-white/10 rounded text-xs text-white/80 border border-white/20">
+                  {member.player_name}
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
+
       {/* Controls */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:gap-2">
         <div className="bg-white/5 rounded-xl p-1 md:p-2 border border-white/10">

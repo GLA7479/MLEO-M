@@ -9,12 +9,27 @@ export default function RoomBrowser({ gameId, playerName, onJoinRoom }) {
   const [creating, setCreating] = useState(false);
 
   async function loadRooms() {
-    const { data, error } = await supabase
+    const { data: roomsData, error: roomsError } = await supabase
       .from("arcade_rooms")
       .select("id, title, is_locked, passcode, created_at")
       .eq("game_id", gameId)
       .order("created_at", { ascending: false });
-    if (!error) setRooms(data || []);
+    
+    if (roomsError) return;
+    
+    // Get player count for each room
+    const roomsWithPlayers = await Promise.all(
+      (roomsData || []).map(async (room) => {
+        const { count } = await supabase
+          .from("arcade_room_players")
+          .select("*", { count: "exact", head: true })
+          .eq("room_id", room.id);
+        
+        return { ...room, player_count: count || 0 };
+      })
+    );
+    
+    setRooms(roomsWithPlayers);
   }
 
   useEffect(() => {
@@ -23,6 +38,8 @@ export default function RoomBrowser({ gameId, playerName, onJoinRoom }) {
       .channel(`rooms:${gameId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "arcade_rooms", filter: `game_id=eq.${gameId}` }, loadRooms)
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "arcade_rooms", filter: `game_id=eq.${gameId}` }, loadRooms)
+      // Add player count updates
+      .on("postgres_changes", { event: "*", schema: "public", table: "arcade_room_players" }, loadRooms)
       .subscribe();
     return () => supabase.removeChannel(ch);
   }, [gameId]);
@@ -75,7 +92,11 @@ export default function RoomBrowser({ gameId, playerName, onJoinRoom }) {
           <div key={r.id} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-2">
             <div className="flex-1">
               <div className="text-white font-semibold text-sm truncate">{r.title}</div>
-              <div className="text-white/50 text-[11px]">{new Date(r.created_at).toLocaleString()}</div>
+              <div className="flex items-center gap-2 text-white/50 text-[11px]">
+                <span>{new Date(r.created_at).toLocaleString()}</span>
+                <span className="text-emerald-400">•</span>
+                <span className="text-emerald-400">{r.player_count} players</span>
+              </div>
             </div>
             {r.is_locked && <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300">LOCKED</span>}
             <button onClick={() => joinRoom(r)} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs">JOIN</button>
