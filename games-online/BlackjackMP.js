@@ -126,13 +126,18 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
   const myRow = useMemo(
     () => {
-      // מצא את השורה הנוכחית של השחקן (עם hand_idx הנוכחי)
-      const currentPlayerRow = players.find(p => p.id === session?.current_player_id);
-      if (currentPlayerRow && currentPlayerRow.player_name === name) {
-        return currentPlayerRow;
+      // מצא את כל השורות של השחקן
+      const myPlayerRows = players.filter(p => p.player_name === name);
+      if (myPlayerRows.length === 0) return null;
+      
+      // אם יש תור נוכחי, תחזיר את השורה הנוכחית
+      if (session?.current_player_id) {
+        const currentRow = myPlayerRows.find(p => p.id === session.current_player_id);
+        if (currentRow) return currentRow;
       }
-      // אם אין תור נוכחי, חזור לשורה הראשונה של השחקן
-      return players.find(p => p.player_name === name) || null;
+      
+      // אחרת, תחזיר את השורה הראשונה
+      return myPlayerRows[0];
     },
     [players, name, session?.current_player_id]
   );
@@ -1105,20 +1110,20 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
           <div className="flex gap-1 mb-1">
             <input type="number" value={bet} min={1}
               onChange={(e)=>setBet(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
-              className="w-20 bg-black/40 text-white text-xs rounded px-1 py-0.5 border border-white/20 focus:border-emerald-400 focus:outline-none" />
-            <button onClick={placeBet} disabled={!canPlaceBet} className="px-1 py-0.5 rounded bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+              className="w-20 bg-black/40 text-white text-xs rounded px-1 py-1 border border-white/20 focus:border-emerald-400 focus:outline-none" />
+            <button onClick={placeBet} disabled={!canPlaceBet} className="w-12 px-2 py-1 rounded bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">
               PLACE
             </button>
-            <button onClick={()=>setBet(1000)} className="px-1 py-0.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+            <button onClick={()=>setBet(1000)} className="w-12 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
               1K
             </button>
-            <button onClick={()=>setBet(10000)} className="px-1 py-0.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+            <button onClick={()=>setBet(10000)} className="w-12 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
               10K
             </button>
-            <button onClick={()=>setBet(100000)} className="px-1 py-0.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+            <button onClick={()=>setBet(100000)} className="w-12 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
               100K
             </button>
-            <button onClick={()=>setBet(1000000)} className="px-1 py-0.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+            <button onClick={()=>setBet(1000000)} className="w-12 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
               1M
             </button>
           </div>
