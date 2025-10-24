@@ -1,6 +1,6 @@
 // games-online/PokerMP.js
 import { useEffect, useMemo, useRef, useState } from "react";
-import { supabaseMP as supabase } from "../lib/supabaseClients";
+import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 import {
   newDeck, maxStreetBet, canCheck, minRaiseAmount,
   determineWinnersAuto, settlePots
@@ -136,23 +136,22 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     return sorted[0]?.player_name === name;
   }, [roomMembers, name]);
 
+  const clientId = useMemo(() => getClientId(), []);
+
   async function autopilot() {
     if (!isLeader) return;
     
     // אם יש 2+ שחקנים ואין סשן פעיל, התחל משחק
     if (players.length >= 2 && (!ses || ses.stage === 'lobby')) {
       await startHand();
+      return;
+    }
+    
+    // אם כולם פעלו, עבור לשלב הבא
+    if (ses && ses.stage !== 'showdown' && everyoneActedOrAllIn()) {
+      await advanceStreet();
     }
   }
-
-  // ===== Auto-start game when 2+ players =====
-  useEffect(() => {
-    if (!ses || ses.stage !== 'lobby') return;
-    if (players.length >= 2) {
-      // התחל את המשחק אוטומטית
-      startHand();
-    }
-  }, [ses, players.length]);
 
   // ===== Autopilot heartbeat =====
   useEffect(() => {
@@ -189,39 +188,84 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
 
   // ===== Take Seat =====
   async function takeSeat(seatIndex) {
-    // בדוק שיש סשן פעיל
+    if (!clientId) { setMsg("Client not recognized"); return; }
+
+    // ודא שיש סשן – אם אין, התחל ואז נסה שוב
     if (!ses || !ses.id) {
-      setMsg("No active game session");
+      await startHand();
+      setTimeout(() => takeSeat(seatIndex), 800);
       return;
     }
-    
-    // בדוק שיש מספיק כסף ב-vault
-    const currentVault = getVault();
-    if (currentVault < 1000) {
-      setMsg("Insufficient vault balance (min 1000 MLEO)");
+
+    // האם כבר יש לי שורה בסשן?
+    const { data: mine } = await supabase
+      .from("poker_players")
+      .select("id, seat_index")
+      .eq("session_id", ses.id)
+      .eq("client_id", clientId)
+      .maybeSingle();
+
+    // בדוק תפוסת מושב היעד
+    const { data: occ } = await supabase
+      .from("poker_players")
+      .select("id, client_id")
+      .eq("session_id", ses.id)
+      .eq("seat_index", seatIndex)
+      .maybeSingle();
+
+    // אם תפוס ע"י אחר
+    if (occ && occ.client_id && occ.client_id !== clientId) {
+      setMsg("Seat is taken");
       return;
     }
-    
-    // הוצא כסף מה-vault
-    const newVault = currentVault - 1000;
-    setVault(newVault);
-    if (setVaultBoth) setVaultBoth(newVault);
-    
-    // צור שחקן חדש
-    await supabase.from("poker_players").upsert({
-      session_id: ses.id,
-      seat_index: seatIndex,
-      player_name: name,
-      stack_live: 1000,
-      bet_street: 0,
-      total_bet: 0,
-      hole_cards: [],
-      folded: false,
-      all_in: false,
-      acted: false
-    }, {
-      onConflict: 'session_id,seat_index'
-    });
+
+    // מעבר מושב אם יש לי שורה קיימת
+    if (mine && mine.seat_index !== seatIndex) {
+      if (!occ) {
+        await supabase.from("poker_players").update({ seat_index: seatIndex }).eq("id", mine.id);
+        setMsg("");
+        return;
+      } else {
+        setMsg("Seat is taken");
+        return;
+      }
+    }
+
+    // יצירה חדשה אם אין לי
+    if (!mine) {
+      // בדיקת יתרה
+      const currentVault = getVault();
+      if (currentVault < 1000) { setMsg("Insufficient vault balance (min 1000 MLEO)"); return; }
+
+      const { error: upErr } = await supabase.from("poker_players").upsert({
+        session_id: ses.id,
+        seat_index: seatIndex,
+        player_name: name,
+        client_id: clientId,
+        stack_live: 1000,
+        bet_street: 0,
+        total_bet: 0,
+        hole_cards: [],
+        folded: false,
+        all_in: false,
+        acted: false
+      }, {
+        onConflict: 'session_id,seat_index',
+        ignoreDuplicates: false
+      });
+
+      if (upErr) {
+        setMsg(upErr.message?.includes('duplicate') ? "Seat is taken" : upErr.message);
+        return;
+      }
+
+      // ניכוי מה-vault רק אחרי הצלחה
+      const newVault = currentVault - 1000;
+      setVault(newVault);
+      if (setVaultBoth) setVaultBoth(newVault);
+    }
+
+    setMsg("");
   }
 
   function nextSeatAlive(startIdx){
@@ -382,6 +426,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
       const { data: roomPlayers } = await supabase.from("arcade_room_players").select("*").eq("room_id", roomId).order("joined_at");
       sit = (roomPlayers||[]).slice(0, seats).map((rp,i)=>({
         session_id: sessionId, player_name: rp.player_name, seat_index:i,
+        client_id: rp.client_id || null,
         stack_live: 2000, bet_street:0, total_bet:0, folded:false, all_in:false, acted:false
       }));
       
@@ -391,7 +436,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
         .from("poker_players")
         .upsert(sit, {
           onConflict: "session_id,seat_index",
-          ignoreDuplicates: false,
+          ignoreDuplicates: true,
           returning: "minimal",
         });
     } else {
@@ -400,6 +445,8 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     }
 
     // מחלק Hole — עדכון per-row (מונע 400/409)
+    let d = [...deck]; // הוצא את d מחוץ לבלוק
+    
     {
       // קרא את כל השחקנים (לא רק חדשים)
       const { data: allPlayers, error: selErr } = await supabase
@@ -409,8 +456,6 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
         .order("seat_index");
 
       if (selErr) { console.error("select players error:", selErr); return; }
-
-      let d = [...deck];
 
       // סבב 1 + 2: קלף לכל שחקן
       for (let round = 0; round < 2; round++) {
@@ -425,10 +470,15 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
           P.hole_cards = hand;
         }
       }
-
-      // שמור את החבילה שנותרה
-      await supabase.from("poker_sessions").update({ deck_remaining: d }).eq("id", sessionId);
     }
+
+    // עדכן את הסשן לשלב preflop
+    await supabase.from("poker_sessions").update({
+      stage: "preflop",
+      current_turn: (bbSeat+1)%seats,
+      turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString(),
+      deck_remaining: d
+    }).eq("id", sessionId);
 
     // אנטה (אם יש)
     if((ses?.ante||0) > 0){
@@ -438,8 +488,8 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     }
     // פוסט Blinds – רק אם יש לפחות 2 שחקנים
     if (sit.length >= 2) {
-      const sbAmount = Math.floor((ses?.min_bet||20)/2);
-      const bbAmount = (ses?.min_bet||20);
+      const sbAmount = Math.floor((exist?.min_bet || 20) / 2);
+      const bbAmount = (exist?.min_bet || 20);
       
       await takeChips(sessionId, sb, sbAmount, "post_sb");
       await takeChips(sessionId, bbSeat, bbAmount, "post_bb");
@@ -458,8 +508,8 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
 
     const pay = Math.min(amount, pl.stack_live);
     
-    // אם זה השחקן המקומי, הוצא כסף מה-vault
-    if (pl.player_name === name) {
+    // אם זה השחקן המקומי, הוצא כסף מה-vault (השוואה לפי client_id)
+    if (pl.client_id && pl.client_id === clientId) {
       const currentVault = getVault();
       if (currentVault < pay) {
         setMsg("Insufficient vault balance");
@@ -659,14 +709,12 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
                 ) : (
                   <div className="text-center">
                     <div className="text-white/50 text-sm mb-2">Empty Seat</div>
-                    {ses && ses.id && (
-                      <button 
-                        onClick={() => takeSeat(i)}
-                        className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-all"
-                      >
-                        TAKE SEAT
-                      </button>
-                    )}
+                    <button 
+                      onClick={() => takeSeat(i)}
+                      className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-all"
+                    >
+                      TAKE SEAT
+                    </button>
                   </div>
                 )}
               </div>

@@ -122,10 +122,19 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const [msg, setMsg] = useState("");
   const [banner, setBanner] = useState(null); // {title, lines: []}
   const [timerTick, setTimerTick] = useState(0);
+  const [showInsuranceModal, setShowInsuranceModal] = useState(false);
 
   const myRow = useMemo(
-    () => players.find(p => p.player_name === name) || null,
-    [players, name]
+    () => {
+      // מצא את השורה הנוכחית של השחקן (עם hand_idx הנוכחי)
+      const currentPlayerRow = players.find(p => p.id === session?.current_player_id);
+      if (currentPlayerRow && currentPlayerRow.player_name === name) {
+        return currentPlayerRow;
+      }
+      // אם אין תור נוכחי, חזור לשורה הראשונה של השחקן
+      return players.find(p => p.player_name === name) || null;
+    },
+    [players, name, session?.current_player_id]
   );
 
   // Leader detection
@@ -248,6 +257,15 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     
     return () => clearInterval(interval);
   }, []);
+
+  // Show insurance modal when dealer shows Ace
+  useEffect(() => {
+    if (myTurn && session?.dealer_hand?.[0]?.startsWith('A') && !myRow?.insurance_bet && session?.state === 'acting') {
+      setShowInsuranceModal(true);
+    } else {
+      setShowInsuranceModal(false);
+    }
+  }, [myTurn, session?.dealer_hand, myRow?.insurance_bet, session?.state]);
 
   // Heartbeat: מריץ autopilot כשיש דדליין פעיל (הימורים/תור/הפסקה בין סיבובים)
   useEffect(() => {
@@ -667,11 +685,24 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
   async function double() {
     if (!session || !myRow || myRow.status !== 'acting') return;
-    const newBet = myRow.bet * 2;
-    if (myRow.stack < (newBet - myRow.bet)) {
-      setMsg("Insufficient stack to double");
+    
+    // בדוק שיש מספיק כסף ב-vault
+    const currentVault = getVault();
+    const additionalBet = myRow.bet; // הסכום הנוסף שצריך לשלם
+    if (currentVault < additionalBet) {
+      setMsg("Insufficient vault balance to double");
       return;
     }
+    
+    // הוצא כסף מה-vault
+    const newVault = currentVault - additionalBet;
+    setVault(newVault);
+    // עדכן גם את ה-state בדף הראשי
+    if (setVaultBoth) {
+      setVaultBoth(newVault);
+    }
+    
+    const newBet = myRow.bet * 2;
     
     let shoe = [...session.shoe];
     const card = shoe.pop();
@@ -681,8 +712,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       bet: newBet,
       hand: hand,
       status: 'stood',
-      acted: true,
-      stack: myRow.stack - (newBet - myRow.bet)
+      acted: true
     }).eq("id", myRow.id);
     
     await supabase.from("bj_sessions").update({ shoe }).eq("id", session.id);
@@ -713,10 +743,20 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     const h = myRow.hand;
     if (h.length !== 2) return;
     
+    // בדוק שיש מספיק כסף ב-vault
+    const currentVault = getVault();
     const newBet = myRow.bet;
-    if (myRow.stack < newBet) {
-      setMsg("Insufficient chips for split");
+    if (currentVault < newBet) {
+      setMsg("Insufficient vault balance for split");
       return;
+    }
+    
+    // הוצא כסף מה-vault
+    const newVault = currentVault - newBet;
+    setVault(newVault);
+    // עדכן גם את ה-state בדף הראשי
+    if (setVaultBoth) {
+      setVaultBoth(newVault);
     }
     
     try {
@@ -728,7 +768,6 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       const { error: updateErr } = await supabase.from("bj_players").update({
         hand: [h[0], newCard1],
         bet: newBet,
-        stack: myRow.stack - newBet,
         hand_idx: 0
       }).eq("id", myRow.id);
       
@@ -747,8 +786,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         hand: [h[1], newCard2],
         status: 'acting',
         split_from: myRow.id,
-        hand_idx: 1,
-        stack: 0 // Split hand doesn't get additional stack
+        hand_idx: 1
       }, {
         onConflict: 'session_id,seat'
       });
@@ -771,14 +809,65 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     }
   }
 
+  // Insurance function
+  async function buyInsurance() {
+    if (!session || !myRow || myRow.status !== 'acting') return;
+    
+    // בדוק שהדילר מראה Ace
+    const dealerFirstCard = session.dealer_hand?.[0];
+    if (!dealerFirstCard || !dealerFirstCard.startsWith('A')) {
+      setMsg("Insurance only available when dealer shows Ace");
+      return;
+    }
+    
+    // בדוק שלא קנה כבר ביטוח
+    if (myRow.insurance_bet > 0) {
+      setMsg("Insurance already purchased");
+      return;
+    }
+    
+    // בדוק שיש מספיק כסף
+    const currentVault = getVault();
+    const insuranceAmount = Math.floor(myRow.bet / 2);
+    if (currentVault < insuranceAmount) {
+      setMsg("Insufficient vault balance for insurance");
+      return;
+    }
+    
+    // הוצא כסף מה-vault
+    const newVault = currentVault - insuranceAmount;
+    setVault(newVault);
+    // עדכן גם את ה-state בדף הראשי
+    if (setVaultBoth) {
+      setVaultBoth(newVault);
+    }
+    
+    // עדכן את הביטוח במסד הנתונים
+    await supabase.from("bj_players").update({
+      insurance_bet: insuranceAmount
+    }).eq("id", myRow.id);
+    
+    setMsg(`Insurance purchased: ${fmt(insuranceAmount)} MLEO`);
+    setShowInsuranceModal(false);
+  }
+
   // Surrender function
   async function surrender() {
     if (!myRow || myRow.status !== 'acting' || myRow.hand?.length !== 2) return;
     
+    // החזר חצי מההימור ל-vault
+    const currentVault = getVault();
+    const refund = Math.floor(myRow.bet / 2);
+    const newVault = currentVault + refund;
+    setVault(newVault);
+    // עדכן גם את ה-state בדף הראשי
+    if (setVaultBoth) {
+      setVaultBoth(newVault);
+    }
+    
     await supabase.from("bj_players").update({
       status: 'surrendered',
-      acted: true,
-      stack: myRow.stack + Math.floor(myRow.bet / 2) // Get back half the bet
+      acted: true
     }).eq("id", myRow.id);
     
     await afterMyMove();
@@ -805,6 +894,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
     const dealerScore = handValue(dealer);
     const dealerBust  = dealerScore > 21;
+    const dealerBlackjack = dealer.length === 2 && dealerScore === 21;
 
     const lines = [];
     let myResult = null; // רק לשחקן המקומי
@@ -819,8 +909,17 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       else if (s===dealerScore) { result='push'; payout=p.bet; }
       else { result='lose'; }
 
-      const delta = payout; // רק הזכייה - ההימור כבר ירד בהתחלה
-      const newStack = (p.stack||0) + delta;
+      let delta = payout; // רק הזכייה - ההימור כבר ירד בהתחלה
+
+      // חישוב ביטוח
+      if (p.insurance_bet > 0) {
+        if (dealerBlackjack) {
+          // זכייה בביטוח - 2:1
+          const insuranceWin = p.insurance_bet * 2;
+          delta += insuranceWin;
+        }
+        // אם הדילר לא עשה 21, הביטוח נפסד (כבר ירד מה-vault)
+      }
 
       // עדכן את ה-vault אם זה השחקן המקומי
       if (p.player_name === name) {
@@ -832,11 +931,11 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
           setVaultBoth(newVault);
         }
         // שמור את התוצאה שלי להודעה מקומית
-        myResult = { result, delta, dealerBust, dealerScore, originalBet: p.bet };
+        myResult = { result, delta, dealerBust, dealerScore, originalBet: p.bet, insuranceWin: p.insurance_bet > 0 && dealerBlackjack ? p.insurance_bet * 2 : 0 };
       }
 
       await supabase.from('bj_players').update({
-        result, stack:newStack, status:'settled', bet:0
+        result, status:'settled', bet:0, insurance_bet:0
       }).eq('id', p.id);
 
       const tag = result==='win' ? '+'
@@ -856,16 +955,23 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
     // הצג הודעות אישיות לכל שחקן
     if (myResult) {
-      const { result, delta, dealerBust, dealerScore, originalBet } = myResult;
+      const { result, delta, dealerBust, dealerScore, originalBet, insuranceWin } = myResult;
+      const lines = [
+        `Dealer: ${dealerBust ? 'BUST' : dealerScore}`,
+        result === 'win' || result === 'blackjack' ? `+${fmt(originalBet + delta)} MLEO` :
+        result === 'push' ? 'No change' : `Lost ${fmt(originalBet)} MLEO`
+      ];
+      
+      // הוסף הודעה על ביטוח אם רלוונטי
+      if (insuranceWin > 0) {
+        lines.push(`Insurance win: +${fmt(insuranceWin)} MLEO`);
+      }
+      
       setBanner({
         title: result === 'win' ? '🎉 YOU WIN!' : 
                result === 'blackjack' ? '🎉 BLACKJACK!' :
                result === 'push' ? '🤝 PUSH' : '💔 YOU LOSE',
-        lines: [
-          `Dealer: ${dealerBust ? 'BUST' : dealerScore}`,
-          result === 'win' || result === 'blackjack' ? `+${fmt(originalBet + delta)} MLEO` :
-          result === 'push' ? 'No change' : `Lost ${fmt(originalBet)} MLEO`
-        ]
+        lines: lines
       });
     }
   }
@@ -873,7 +979,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   async function resetRound() {
     if (!session) return;
     await supabase.from("bj_players").update({
-      hand: [], bet: 0, result: null, status: 'seated', acted: false
+      hand: [], bet: 0, result: null, status: 'seated', acted: false, insurance_bet: 0
     }).eq("session_id", session.id);
     await supabase.from("bj_sessions").update({
       state: 'lobby', dealer_hand: [], dealer_hidden: true
@@ -954,17 +1060,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
                       <div className="text-emerald-300 text-xs font-semibold">Bet: {fmt(occupant.bet||0)}</div>
                       <HandView hand={occupant.hand} size="small" isDealing={session?.state === 'dealing' || session?.state === 'acting'}/>
                       <div className="text-white/80 text-xs">
-                        Total: {hv??"—"} 
-                        <span className={
-                          "ml-1 px-1 py-0.5 rounded text-xs " +
-                          (occupant.status==='acting' ? 'bg-blue-600' :
-                           occupant.status==='stood' ? 'bg-gray-600' :
-                           occupant.status==='busted' ? 'bg-red-700' :
-                           occupant.status==='blackjack' ? 'bg-emerald-700' :
-                           occupant.status==='settled' ? 'bg-purple-700' : 'bg-slate-600')
-                        }>
-                          {occupant.status}
-                        </span>
+                        Total: {hv??"—"}
                       </div>
                     </div>
                   ) : (
@@ -1087,6 +1183,36 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       {session?.state === 'ended' && session?.next_round_at && (
         <div className="text-center text-emerald-400 text-xs font-semibold mt-2">
           🔄 Next round starts in {Math.max(0, Math.ceil((new Date(session.next_round_at).getTime() - Date.now()) / 1000))}s
+        </div>
+      )}
+
+      {/* Insurance Modal */}
+      {showInsuranceModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-yellow-400/30 rounded-lg p-6 max-w-sm mx-4">
+            <div className="text-center">
+              <div className="text-yellow-400 font-bold text-lg mb-2">🛡️ Insurance Available</div>
+              <div className="text-white/80 text-sm mb-4">
+                Dealer shows Ace!<br/>
+                Insurance: {fmt(Math.floor((myRow?.bet || 0) / 2))} MLEO<br/>
+                Payout: 2:1 if dealer has 21
+              </div>
+              <div className="flex gap-3 justify-center">
+                <button 
+                  onClick={buyInsurance}
+                  className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-bold rounded transition-all"
+                >
+                  BUY INSURANCE
+                </button>
+                <button 
+                  onClick={() => setShowInsuranceModal(false)}
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded transition-all"
+                >
+                  DECLINE
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
