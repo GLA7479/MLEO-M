@@ -1103,11 +1103,23 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10 h-full">
           <div className="text-white/80 text-xs mb-1 font-semibold">Place Bet</div>
           <div className="flex gap-1 mb-1">
-            <input type="number" value={bet} min={MIN_BET} step={MIN_BET}
-              onChange={(e)=>setBet(Math.max(MIN_BET, Math.floor(e.target.value)))}
-              className="flex-1 bg-black/40 text-white text-xs rounded px-1 py-0.5 md:px-2 md:py-1 border border-white/20 focus:border-emerald-400 focus:outline-none" />
-            <button onClick={placeBet} disabled={!canPlaceBet} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            <input type="number" value={bet} min={1}
+              onChange={(e)=>setBet(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+              className="w-20 bg-black/40 text-white text-xs rounded px-1 py-0.5 border border-white/20 focus:border-emerald-400 focus:outline-none" />
+            <button onClick={placeBet} disabled={!canPlaceBet} className="px-1 py-0.5 rounded bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">
               PLACE
+            </button>
+            <button onClick={()=>setBet(1000)} className="px-1 py-0.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+              1K
+            </button>
+            <button onClick={()=>setBet(10000)} className="px-1 py-0.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+              10K
+            </button>
+            <button onClick={()=>setBet(100000)} className="px-1 py-0.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+              100K
+            </button>
+            <button onClick={()=>setBet(1000000)} className="px-1 py-0.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+              1M
             </button>
           </div>
           <div className="text-white/60 text-xs">Vault: {fmt(getVault())} MLEO</div>
