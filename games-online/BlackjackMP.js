@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 
 const MIN_BET = 1000;
-const SEATS = 5;
+const SEATS = 6;
 
 // ---------- Utils ----------
 function safeRead(key, fallback){ try { const raw = localStorage.getItem(key); return raw? JSON.parse(raw) : fallback; } catch { return fallback; } }
@@ -255,14 +255,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     }, 1000);
 
     return () => clearInterval(tick);
-  }, [
-    isLeader,
-    session?.id,
-    session?.state,
-    session?.bet_deadline,
-    session?.turn_deadline,
-    session?.next_round_at
-  ]);
+  }, [isLeader, session?.id, session?.state, session?.bet_deadline, session?.turn_deadline, session?.next_round_at]);
 
   // "דחיפה" לפתיחת BETTING אם נשארים ב-lobby יותר מכמה שניות
   useEffect(() => {
@@ -273,28 +266,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     }
   }, [isLeader, session?.id, session?.state]);
 
-  // Turn timeout (AFK Auto-Stand)
-  useEffect(() => {
-    if (!isLeader || !session?.id) return;
-    const t = setInterval(async () => {
-      if (!session.turn_deadline || !session.current_player_id) return;
-      const now = Date.now();
-      const dl  = new Date(session.turn_deadline).getTime();
-      if (now < dl) return;
-
-      // Auto-stand על השחקן הנוכחי
-      const { data: cur } = await supabase.from('bj_players').select('*').eq('id', session.current_player_id).maybeSingle();
-      if (cur && cur.status === 'acting') {
-        await supabase.from('bj_players').update({ status: 'stood', acted: true })
-          .eq('id', cur.id);
-      }
-      // advance
-      await supabase.from('bj_sessions').update({ current_player_id: null, turn_deadline: null })
-        .eq('id', session.id);
-      await advanceTurn();
-    }, 1000);
-    return () => clearInterval(t);
-  }, [isLeader, session?.id, session?.turn_deadline, session?.current_player_id]);
+  // Turn timeout is now handled by the Heartbeat timer above
 
   // mark 'left' on tab close (best-effort)
   useEffect(() => {
@@ -570,7 +542,26 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       }
     }
 
-    // 3) ACTING -> SETTLE (כשכולם סיימו)
+    // 3) ACTING -> Auto-stand for AFK players
+    if (s.state === 'acting' && s.turn_deadline && s.current_player_id) {
+      const now = Date.now();
+      const dl = new Date(s.turn_deadline).getTime();
+      if (now >= dl) {
+        // Auto-stand על השחקן הנוכחי
+        const { data: cur } = await supabase.from('bj_players').select('*').eq('id', s.current_player_id).maybeSingle();
+        if (cur && cur.status === 'acting') {
+          await supabase.from('bj_players').update({ status: 'stood', acted: true })
+            .eq('id', cur.id);
+        }
+        // advance
+        await supabase.from('bj_sessions').update({ current_player_id: null, turn_deadline: null })
+          .eq('id', s.id);
+        await advanceTurn();
+        return;
+      }
+    }
+
+    // 4) ACTING -> SETTLE (כשכולם סיימו)
     if (s.state === 'acting' && everyoneDone) {
       await dealerAndSettle();
       return;
@@ -718,33 +709,56 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       return;
     }
     
-    let shoe = [...session.shoe];
-    const newCard1 = shoe.pop();
-    const newCard2 = shoe.pop();
-    
-    // Update original hand (first card + new card)
-    await supabase.from("bj_players").update({
-      hand: [h[0], newCard1],
-      bet: newBet,
-      stack: myRow.stack - newBet,
-      hand_idx: 0
-    }).eq("id", myRow.id);
-    
-    // Create split hand (second card + new card)
-    await supabase.from('bj_players').insert({
-      session_id: session.id,
-      seat: myRow.seat,
-      player_name: myRow.player_name,
-      bet: newBet,
-      hand: [h[1], newCard2],
-      status: 'acting',
-      split_from: myRow.id,
-      hand_idx: 1,
-      stack: 0 // Split hand doesn't get additional stack
-    });
-    
-    await supabase.from("bj_sessions").update({ shoe }).eq("id", session.id);
-    await afterMyMove();
+    try {
+      let shoe = [...session.shoe];
+      const newCard1 = shoe.pop();
+      const newCard2 = shoe.pop();
+      
+      // Update original hand (first card + new card)
+      const { error: updateErr } = await supabase.from("bj_players").update({
+        hand: [h[0], newCard1],
+        bet: newBet,
+        stack: myRow.stack - newBet,
+        hand_idx: 0
+      }).eq("id", myRow.id);
+      
+      if (updateErr) {
+        console.error('[splitHand] update error:', updateErr);
+        setMsg("Split failed - please try again");
+        return;
+      }
+      
+      // Create split hand (second card + new card)
+      const { error: upsertErr } = await supabase.from('bj_players').upsert({
+        session_id: session.id,
+        seat: myRow.seat,
+        player_name: myRow.player_name,
+        bet: newBet,
+        hand: [h[1], newCard2],
+        status: 'acting',
+        split_from: myRow.id,
+        hand_idx: 1,
+        stack: 0 // Split hand doesn't get additional stack
+      }, {
+        onConflict: 'session_id,seat'
+      });
+      
+      if (upsertErr) {
+        console.error('[splitHand] upsert error:', upsertErr);
+        setMsg("Split failed - please try again");
+        return;
+      }
+      
+      const { error: shoeErr } = await supabase.from("bj_sessions").update({ shoe }).eq("id", session.id);
+      if (shoeErr) {
+        console.error('[splitHand] shoe error:', shoeErr);
+      }
+      
+      await afterMyMove();
+    } catch (error) {
+      console.error('[splitHand] unexpected error:', error);
+      setMsg("Split failed - please try again");
+    }
   }
 
   // Surrender function
@@ -792,7 +806,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       else if (dealerBust && s<=21) { result='win'; payout=p.bet; }
       else if (s>21) { result='lose'; }
       else if (s>dealerScore) { result='win'; payout=p.bet; }
-      else if (s===dealerScore) { result='push'; payout=0; }
+      else if (s===dealerScore) { result='push'; payout=p.bet; }
       else { result='lose'; }
 
       const delta = payout; // רק הזכייה - ההימור כבר ירד בהתחלה
@@ -824,7 +838,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
     await supabase.from('bj_sessions').update({ 
       state:'ended',
-      next_round_at: new Date(Date.now() + 30000).toISOString() // 30 שניות לסיבוב הבא
+      next_round_at: new Date(Date.now() + 15000).toISOString() // 15 שניות לסיבוב הבא
     }).eq('id', session.id);
 
     // באנר מקומי - רק לשחקן המקומי
