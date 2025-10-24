@@ -98,6 +98,13 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const [bet, setBet] = useState(MIN_BET);
   const [msg, setMsg] = useState("");
 
+  // Leader detection
+  const isLeader = useMemo(() => {
+    if (!roomMembers?.length) return true; // אם רק שחקן אחד — הוא המארח
+    const names = roomMembers.map(m => (m.player_name || '') + '').filter(Boolean).sort();
+    return (names[0] || '') === (playerName || name || '');
+  }, [roomMembers, playerName, name]);
+
   const clampBet = (n) => {
     const v = Math.floor(Number(n || 0));
     if (!Number.isFinite(v) || v < MIN_BET) return MIN_BET;
@@ -106,9 +113,10 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const myRow = useMemo(() => players.find(p => p.player_name === name) || null, [players, name]);
 
   // Button availability helpers
-  const canPlaceBet = !!myRow && (session?.state === 'lobby' || session?.state === 'betting');
-  const canDeal = (session?.state === 'betting') && players.length > 0 && players.every(p => (p.bet||0) >= MIN_BET && p.status !== 'left');
-  const canAct = !!myRow && session?.state === 'acting' && myRow.status === 'acting';
+  const canPlaceBet = !!myRow && ['lobby','betting'].includes(session?.state);
+  const canDeal = session?.state === 'betting';
+  const myTurn = !!myRow && session?.current_player_id === myRow.id && session?.state === 'acting' && myRow.status === 'acting';
+  const canSettle = session?.state === 'acting'; // האוטופיילוט יעשה לבד, זה רק fallback ידני
 
   // bootstrap session with new schema
   useEffect(() => {
@@ -190,6 +198,37 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     };
   }, [session?.id]);
 
+  // Autopilot trigger
+  useEffect(() => {
+    if (!session?.id) return;
+    // השהייה זעירה למנוע רצף פעולות כפול בזמן realtime
+    const t = setTimeout(() => { autopilot(session); }, 150);
+    return () => clearTimeout(t);
+  }, [session?.id, session?.state, players.length, players.map?.(p=>p.status + ':' + p.bet).join('|'), isLeader]);
+
+  // Turn timeout (AFK Auto-Stand)
+  useEffect(() => {
+    if (!isLeader || !session?.id) return;
+    const t = setInterval(async () => {
+      if (!session.turn_deadline || !session.current_player_id) return;
+      const now = Date.now();
+      const dl  = new Date(session.turn_deadline).getTime();
+      if (now < dl) return;
+
+      // Auto-stand על השחקן הנוכחי
+      const { data: cur } = await supabase.from('bj_players').select('*').eq('id', session.current_player_id).maybeSingle();
+      if (cur && cur.status === 'acting') {
+        await supabase.from('bj_players').update({ status: 'stood', acted: true })
+          .eq('id', cur.id);
+      }
+      // advance
+      await supabase.from('bj_sessions').update({ current_player_id: null, turn_deadline: null })
+        .eq('id', session.id);
+      await advanceTurn();
+    }, 1000);
+    return () => clearInterval(t);
+  }, [isLeader, session?.id, session?.turn_deadline, session?.current_player_id]);
+
   // ---------- Actions ----------
   async function ensureSeated() {
     if (!session) return;
@@ -248,6 +287,124 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     if (error) console.error('[openBetting] error:', error);
   }
 
+  // Helper: Build action queue (including split hands)
+  function buildActionQueue(players = []) {
+    // סדר: seat עולה, ואז hand_idx (0 לפני 1)
+    const alive = players
+      .filter(p => ['acting','betting','seated','blackjack','stood','busted','surrendered','settled'].includes(p.status))
+      .sort((a,b) => (a.seat - b.seat) || (a.hand_idx - b.hand_idx));
+
+    // מי בפועל צריך לפעול (acting בלבד)
+    const needAct = alive.filter(p => p.status === 'acting');
+
+    return { alive, needAct };
+  }
+
+  // Begin acting phase - set first player + deadline
+  async function beginActingPhase(sessionId) {
+    const { data: ps } = await supabase.from('bj_players').select('*').eq('session_id', sessionId).order('seat,hand_idx');
+    const { needAct } = buildActionQueue(ps || []);
+    const first = needAct[0];
+    const deadline = new Date(Date.now() + (session?.turn_seconds || 20) * 1000).toISOString();
+
+    await supabase.from('bj_sessions').update({
+      state: 'acting',
+      dealer_hidden: true,
+      current_player_id: first ? first.id : null,
+      turn_deadline: first ? deadline : null
+    }).eq('id', sessionId);
+  }
+
+  // Advance turn (automatic)
+  async function advanceTurn() {
+    if (!isLeader || !session?.id) return;
+
+    const { data: ps } = await supabase.from('bj_players').select('*').eq('session_id', session.id);
+    const { needAct } = buildActionQueue(ps || []);
+    if (needAct.length === 0) {
+      // כולם סיימו ⇒ Dealer & Settle
+      await dealerAndSettle();
+      return;
+    }
+
+    // אם current_player כבר בסטטוס acting – השאר; אם לא, הבא הבא בתור
+    const curId = session.current_player_id;
+    const cur = (ps || []).find(p => p.id === curId);
+    if (cur && cur.status === 'acting') {
+      // רק עדכן דדליין אם חסר
+      if (!session.turn_deadline) {
+        const deadline = new Date(Date.now() + (session.turn_seconds || 20) * 1000).toISOString();
+        await supabase.from('bj_sessions').update({ turn_deadline: deadline }).eq('id', session.id);
+      }
+      return;
+    }
+
+    const next = needAct[0];
+    const deadline = new Date(Date.now() + (session.turn_seconds || 20) * 1000).toISOString();
+
+    await supabase.from('bj_sessions').update({
+      current_player_id: next.id,
+      turn_deadline: deadline
+    }).eq('id', session.id);
+  }
+
+  // After player move - clear turn and advance
+  async function afterMyMove() {
+    if (isLeader) {
+      await supabase.from('bj_sessions')
+        .update({ current_player_id: null, turn_deadline: null })
+        .eq('id', session.id);
+      await advanceTurn();
+    }
+  }
+
+  // Autopilot function - only leader runs automation
+  async function autopilot(sessionSnap) {
+    if (!isLeader) return;              // רק המארח מריץ אוטומציה
+    const s = sessionSnap || session;
+    if (!s?.id) return;
+
+    // שלוף מצב שחקנים טרי
+    const { data: ps, error: pe } = await supabase
+      .from('bj_players').select('*')
+      .eq('session_id', s.id).order('seat');
+    if (pe) return;
+
+    const hasPlayers = (ps||[]).length > 0;
+    const everyoneMinBet = hasPlayers && ps.every(p => (p.bet||0) >= (s.min_bet||MIN_BET) && p.status !== 'left');
+    const everyoneDone = hasPlayers && ps.every(p => ['stood','busted','blackjack','settled'].includes(p.status));
+
+    // 1) lobby -> betting (ברגע שיש הימור ראשון)
+    if (s.state === 'lobby') {
+      const someoneBet = ps.some(p => (p.bet||0) > 0);
+      if (someoneBet) {
+        await supabase.from('bj_sessions').update({ state: 'betting' }).eq('id', s.id);
+        return;
+      }
+    }
+
+    // 2) betting -> deal (כשכולם עומדים במינימום)
+    if (s.state === 'betting' && everyoneMinBet) {
+      await deal();  // פונקציית deal שלך
+      return;
+    }
+
+    // 3) acting -> dealer+settle (כשכולם גמרו לפעול)
+    if (s.state === 'acting' && everyoneDone) {
+      await dealerAndSettle(); // הפונקציה המאוחדת שסוגרת יד
+      return;
+    }
+
+    // 4) ended -> lobby (כשאין קלפים על השולחן – נפתח סיבוב חדש)
+    if (s.state === 'ended') {
+      const allHandsEmpty = ps.every(p => !p.hand || p.hand.length === 0);
+      if (allHandsEmpty && (!s.dealer_hand || s.dealer_hand.length === 0)) {
+        await supabase.from('bj_sessions').update({ state: 'lobby', dealer_hidden: true }).eq('id', s.id);
+        return;
+      }
+    }
+  }
+
   async function deal() {
     if (!session) return;
 
@@ -283,29 +440,29 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
     const dealerHand = [draw(), draw()];
     await supabase.from("bj_sessions").update({
-      state: 'acting',
       dealer_hand: dealerHand,
       dealer_hidden: true,  // << נשאר מכוסה
       shoe: shoe,
       round_no: (session.round_no || 0) + 1,
       current_seat: 0
     }).eq("id", session.id);
+
+    // Begin acting phase with turn management
+    await beginActingPhase(session.id);
   }
 
   async function hit() {
     if (!session || !myRow || myRow.status !== 'acting') return;
     
-    let shoe = [...session.shoe];
+    let shoe = [...(session.shoe||[])];
     const card = shoe.pop();
-    const hand = [...myRow.hand, card];
-    const isBust = handValue(hand) > 21;
-    
-    await supabase.from("bj_players").update({
-      hand: hand,
-      status: isBust ? 'busted' : 'acting'
-    }).eq("id", myRow.id);
-    
+    const hand = [...(myRow.hand||[]), card];
+    const v = handValue(hand);
+    const status = (v > 21) ? 'busted' : (v === 21 ? 'stood' : 'acting');
+
+    await supabase.from("bj_players").update({ hand, status }).eq("id", myRow.id);
     await supabase.from("bj_sessions").update({ shoe }).eq("id", session.id);
+    await afterMyMove();
   }
 
   async function stand() {
@@ -314,6 +471,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       status: 'stood',
       acted: true
     }).eq("id", myRow.id);
+    await afterMyMove();
   }
 
   async function double() {
@@ -337,6 +495,79 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     }).eq("id", myRow.id);
     
     await supabase.from("bj_sessions").update({ shoe }).eq("id", session.id);
+    await afterMyMove();
+  }
+
+  // Helper: Get card value for comparison
+  function cardValue(card) {
+    if (!card) return 0;
+    const rank = card.slice(0, -1);
+    if (rank === 'A') return 1;
+    if (['J', 'Q', 'K'].includes(rank)) return 10;
+    return parseInt(rank) || 0;
+  }
+
+  // Helper: Check if can split
+  function canSplit(p) {
+    const h = p?.hand || [];
+    if (h.length !== 2) return false;
+    const v = cardValue(h[0]) === cardValue(h[1]);
+    return v;
+  }
+
+  // Split hand function
+  async function splitHand() {
+    if (!session || !myRow || myRow.status !== 'acting' || !canSplit(myRow)) return;
+    
+    const h = myRow.hand;
+    if (h.length !== 2) return;
+    
+    const newBet = myRow.bet;
+    if (myRow.stack < newBet) {
+      setMsg("Insufficient chips for split");
+      return;
+    }
+    
+    let shoe = [...session.shoe];
+    const newCard1 = shoe.pop();
+    const newCard2 = shoe.pop();
+    
+    // Update original hand (first card + new card)
+    await supabase.from("bj_players").update({
+      hand: [h[0], newCard1],
+      bet: newBet,
+      stack: myRow.stack - newBet,
+      hand_idx: 0
+    }).eq("id", myRow.id);
+    
+    // Create split hand (second card + new card)
+    await supabase.from('bj_players').insert({
+      session_id: session.id,
+      seat: myRow.seat,
+      player_name: myRow.player_name,
+      bet: newBet,
+      hand: [h[1], newCard2],
+      status: 'acting',
+      split_from: myRow.id,
+      hand_idx: 1,
+      stack: 0 // Split hand doesn't get additional stack
+    });
+    
+    await supabase.from("bj_sessions").update({ shoe }).eq("id", session.id);
+    await afterMyMove();
+  }
+
+  // Surrender function
+  async function surrender() {
+    if (!myRow || myRow.status !== 'acting' || myRow.hand?.length !== 2) return;
+    
+    await supabase.from("bj_players").update({
+      status: 'surrendered',
+      acted: true,
+      stack: myRow.stack + Math.floor(myRow.bet / 2) // Get back half the bet
+    }).eq("id", myRow.id);
+    
+    await afterMyMove();
   }
 
   async function dealerAndSettle() {
@@ -499,9 +730,12 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
               className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">
               DEAL
             </button>
-            <button onClick={hit} disabled={!canAct} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">HIT</button>
-            <button onClick={stand} disabled={!canAct} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">STAND</button>
-            <button onClick={dealerAndSettle} disabled={!(session?.state==='acting')} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">SETTLE</button>
+            <button onClick={hit} disabled={!myTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">HIT</button>
+            <button onClick={stand} disabled={!myTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">STAND</button>
+            <button onClick={double} disabled={!myTurn || (myRow?.hand?.length !== 2)} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">DOUBLE</button>
+            <button onClick={splitHand} disabled={!myTurn || !canSplit(myRow)} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">SPLIT</button>
+            <button onClick={surrender} disabled={!myTurn || (myRow?.hand?.length !== 2)} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">SURRENDER</button>
+            <button onClick={dealerAndSettle} disabled={!canSettle} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">SETTLE</button>
           </div>
         </div>
 
@@ -512,6 +746,16 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
               NEW ROUND
             </button>
           </div>
+          {isLeader && (
+            <div className="mt-2 text-xs text-emerald-400 font-semibold">
+              🎮 You are the Leader (Autopilot Active)
+            </div>
+          )}
+          {session?.turn_deadline && session?.current_player_id === myRow?.id && (
+            <div className="mt-2 text-xs text-amber-300 font-semibold">
+              ⏰ Time left: {Math.max(0, Math.ceil((new Date(session.turn_deadline).getTime() - Date.now())/1000))}s
+            </div>
+          )}
         </div>
       </div>
 
