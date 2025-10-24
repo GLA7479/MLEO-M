@@ -5,6 +5,7 @@ import Layout from "../components/Layout";
 import { useRouter } from "next/router";
 import { useAccount } from "wagmi";
 import RoomBrowser from "../components/online/RoomBrowser";
+import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 
 // iOS Viewport Fix (כמו במשחקים הקיימים)
 function useIOSViewportFix() {
@@ -297,6 +298,44 @@ export default function ArcadeOnline() {
     router.push(url, undefined, { shallow: true });
   }
 
+  async function leaveTable() {
+    if (selectedRoomId) {
+      try {
+        const client_id = getClientId();
+        // Remove player from room
+        await supabase
+          .from("arcade_room_players")
+          .delete()
+          .eq("room_id", selectedRoomId)
+          .eq("client_id", client_id);
+        
+        // For Blackjack, also remove from bj_players
+        if (selectedGame === 'blackjack') {
+          await supabase
+            .from("bj_players")
+            .delete()
+            .eq("client_id", client_id);
+        }
+        
+        // For Poker, also remove from poker_players
+        if (selectedGame === 'poker') {
+          await supabase
+            .from("poker_players")
+            .delete()
+            .eq("client_id", client_id);
+        }
+      } catch (error) {
+        console.error("Error leaving table:", error);
+      }
+    }
+    
+    // Reset state and go back to games
+    setSelectedGame(null);
+    setSelectedRoomId(null);
+    setShowRoomBrowser(false);
+    router.push('/arcade-online', undefined, { shallow: true });
+  }
+
   function goBack() {
     if (showRoomBrowser) {
       setShowRoomBrowser(false);
@@ -330,10 +369,16 @@ export default function ArcadeOnline() {
         <header className="relative px-4 py-6 text-center">
           <div className="flex items-center justify-between mb-6">
             <button 
-              onClick={goBack}
-              className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold"
+              onClick={selectedGame && selectedRoomId ? leaveTable : goBack}
+              className={`px-4 py-2 rounded-lg border font-semibold ${
+                selectedGame && selectedRoomId 
+                  ? 'bg-red-600/20 border-red-500/40 hover:bg-red-600/30 text-red-300' 
+                  : 'bg-white/5 border-white/10 hover:bg-white/10 text-white'
+              }`}
             >
-              ← {showRoomBrowser ? 'BACK TO GAMES' : selectedGame ? 'BACK TO GAMES' : 'BACK'}
+              {showRoomBrowser ? '← BACK TO GAMES' : 
+               selectedGame && selectedRoomId ? 'LEAVE TABLE' : 
+               selectedGame ? '← BACK TO GAMES' : '← BACK'}
             </button>
             <div className="text-center">
               <h1 className="text-3xl font-extrabold text-white mb-2">🎮 MLEO Arcade Online</h1>
