@@ -200,7 +200,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     // האם כבר יש לי שורה בסשן?
     const { data: mine } = await supabase
       .from("poker_players")
-      .select("id, seat_index")
+      .select("id, seat_index, client_id")
       .eq("session_id", ses.id)
       .eq("client_id", clientId)
       .maybeSingle();
@@ -425,9 +425,16 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
       // אם אין שחקנים, צור שחקנים חדשים מהחדר
       const { data: roomPlayers } = await supabase.from("arcade_room_players").select("*").eq("room_id", roomId).order("joined_at");
       sit = (roomPlayers||[]).slice(0, seats).map((rp,i)=>({
-        session_id: sessionId, player_name: rp.player_name, seat_index:i,
+        session_id: sessionId, 
+        player_name: rp.player_name, 
+        seat_index: i,
         client_id: rp.client_id || null,
-        stack_live: 2000, bet_street:0, total_bet:0, folded:false, all_in:false, acted:false
+        stack_live: 2000, 
+        bet_street: 0, 
+        total_bet: 0, 
+        folded: false, 
+        all_in: false, 
+        acted: false
       }));
       
       if (sit.length < 1) return; // שמור על דרישה למינימום 1
@@ -638,7 +645,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
   // ===== UI =====
   const board = ses?.board||[];
   const seatMapMemo = useMemo(()=> new Map(players.map(p=>[p.seat_index,p])), [players]);
-  const isMyTurn = !!turnPlayer; // (ב-MVP אין auth משתמש—זה תור השחקן במושב הנוכחי)
+  const isMyTurn = !!turnPlayer && turnPlayer.client_id === clientId;
   const pot = ses?.pot_total || players.reduce((sum,p)=> sum + (p.total_bet||0), 0);
 
   if (!roomId) return <div className="w-full h-full flex items-center justify-center text-white/70">Select or create a room to start.</div>;
@@ -687,7 +694,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
         {Array.from({length: seats}).map((_,i)=>{
           const p = seatMapMemo.get(i);
           const isTurn = ses?.current_turn===i && ["preflop","flop","turn","river"].includes(ses?.stage);
-          const isMe = p?.player_name === name;
+          const isMe = p?.client_id === clientId;
           return (
             <div key={i} className={`rounded-xl border-2 ${isTurn?'border-emerald-400 bg-emerald-900/20':isMe?'border-blue-400 bg-blue-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[120px] md:min-h-[150px] transition-all hover:bg-white/10 relative`}>
               {/* Turn indicator button - top right corner */}

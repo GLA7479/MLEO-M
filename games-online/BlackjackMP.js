@@ -57,9 +57,9 @@ const suitClass = (s)=> (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
 function Card({ code, size = "normal", hidden = false, isDealing = false }) {
   if (!code && !hidden) return null;
   
-  // Dynamic sizing based on game state
+  // Dynamic sizing based on game state - תיקון למובייל
   const sizeClasses = size === "small" ? 
-    (isDealing ? "w-10 h-14 text-sm" : "w-6 h-8 text-xs") : 
+    (isDealing ? "w-10 h-14 text-sm" : "w-8 h-10 text-xs") : // שינוי מ w-6 h-8 ל w-8 h-10
     (isDealing ? "w-12 h-16 text-base" : "w-8 h-10 text-sm");
 
   if (hidden) {
@@ -81,7 +81,7 @@ function Card({ code, size = "normal", hidden = false, isDealing = false }) {
 function HandView({ hand, size = "normal", isDealing = false }) {
   const h = hand || [];
   return (
-    <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-0.5 gap-0.5">
+    <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-0.5 gap-0.5 max-w-full">
       {h.length===0 ? <span className="text-white/60 text-xs">—</span> : h.map((c,i)=><Card key={i} code={c} size={size} isDealing={isDealing}/>)}
     </div>
   );
@@ -1062,7 +1062,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
             const isActive = session?.current_player_id && seatHands.some(h => h.id === session.current_player_id);
             
             return (
-              <div key={i} className={`rounded-lg border ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[80px] md:min-h-[120px] transition-all hover:bg-white/10 ${isActive ? 'ring-2 ring-amber-400' : ''} relative`}>
+              <div key={i} className={`rounded-lg border ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[80px] md:min-h-[120px] transition-all hover:bg-white/10 ${isActive ? 'ring-2 ring-amber-400' : ''} relative overflow-hidden`}>
                 {/* Turn indicator button - top right corner */}
                 {primaryHand && (
                   <div className={`absolute top-1 right-1 w-3 h-3 rounded-full ${isActive ? 'bg-green-500' : 'bg-red-500'} ${isActive ? 'animate-pulse' : ''}`}></div>
@@ -1077,12 +1077,12 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
                       <div className="text-emerald-300 text-xs font-semibold">Bet: {fmt(primaryHand.bet||0)}</div>
                       
                       {/* הצג את כל הידיים באותו שורה */}
-                      <div className="flex flex-wrap justify-center gap-1">
+                      <div className="flex flex-wrap justify-center gap-1 max-w-full">
                         {seatHands.map((hand, handIdx) => {
                           const hv = hand?.hand && Array.isArray(hand.hand) ? handValue(hand.hand) : null;
                           const isCurrentHand = session?.current_player_id === hand.id;
                           return (
-                            <div key={handIdx} className={`${isCurrentHand ? 'ring-1 ring-yellow-400' : ''} rounded p-1`}>
+                            <div key={handIdx} className={`${isCurrentHand ? 'ring-1 ring-yellow-400' : ''} rounded p-1 max-w-full`}>
                               <HandView hand={hand.hand} size="small" isDealing={session?.state === 'dealing' || session?.state === 'acting'}/>
                               <div className="text-white/80 text-xs">
                                 {hv??"—"}

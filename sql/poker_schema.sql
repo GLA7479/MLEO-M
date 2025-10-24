@@ -78,23 +78,43 @@ alter table poker_pots enable row level security;
 alter table poker_actions enable row level security;
 
 -- === RLS Policies (Open for MVP) ===
-create policy if not exists "poker_sessions_read" on poker_sessions for select using (true);
-create policy if not exists "poker_sessions_write" on poker_sessions for insert with check (true);
-create policy if not exists "poker_sessions_update" on poker_sessions for update using (true) with check (true);
-create policy if not exists "poker_sessions_delete" on poker_sessions for delete using (true);
+-- Drop existing policies first to avoid conflicts
+drop policy if exists "poker_sessions_read" on poker_sessions;
+drop policy if exists "poker_sessions_write" on poker_sessions;
+drop policy if exists "poker_sessions_update" on poker_sessions;
+drop policy if exists "poker_sessions_delete" on poker_sessions;
 
-create policy if not exists "poker_players_read" on poker_players for select using (true);
-create policy if not exists "poker_players_write" on poker_players for insert with check (true);
-create policy if not exists "poker_players_update" on poker_players for update using (true) with check (true);
-create policy if not exists "poker_players_delete" on poker_players for delete using (true);
+drop policy if exists "poker_players_read" on poker_players;
+drop policy if exists "poker_players_write" on poker_players;
+drop policy if exists "poker_players_update" on poker_players;
+drop policy if exists "poker_players_delete" on poker_players;
 
-create policy if not exists "poker_pots_read" on poker_pots for select using (true);
-create policy if not exists "poker_pots_write" on poker_pots for insert with check (true);
-create policy if not exists "poker_pots_update" on poker_pots for update using (true) with check (true);
-create policy if not exists "poker_pots_delete" on poker_pots for delete using (true);
+drop policy if exists "poker_pots_read" on poker_pots;
+drop policy if exists "poker_pots_write" on poker_pots;
+drop policy if exists "poker_pots_update" on poker_pots;
+drop policy if exists "poker_pots_delete" on poker_pots;
 
-create policy if not exists "poker_actions_read" on poker_actions for select using (true);
-create policy if not exists "poker_actions_write" on poker_actions for insert with check (true);
+drop policy if exists "poker_actions_read" on poker_actions;
+drop policy if exists "poker_actions_write" on poker_actions;
+
+-- Create new policies
+create policy "poker_sessions_read" on poker_sessions for select using (true);
+create policy "poker_sessions_write" on poker_sessions for insert with check (true);
+create policy "poker_sessions_update" on poker_sessions for update using (true) with check (true);
+create policy "poker_sessions_delete" on poker_sessions for delete using (true);
+
+create policy "poker_players_read" on poker_players for select using (true);
+create policy "poker_players_write" on poker_players for insert with check (true);
+create policy "poker_players_update" on poker_players for update using (true) with check (true);
+create policy "poker_players_delete" on poker_players for delete using (true);
+
+create policy "poker_pots_read" on poker_pots for select using (true);
+create policy "poker_pots_write" on poker_pots for insert with check (true);
+create policy "poker_pots_update" on poker_pots for update using (true) with check (true);
+create policy "poker_pots_delete" on poker_pots for delete using (true);
+
+create policy "poker_actions_read" on poker_actions for select using (true);
+create policy "poker_actions_write" on poker_actions for insert with check (true);
 
 -- === Auto-update Triggers ===
 create or replace function set_updated_at()
@@ -124,11 +144,28 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 -- === Realtime Publications ===
--- Add tables to realtime publication
-alter publication supabase_realtime add table poker_sessions;
-alter publication supabase_realtime add table poker_players;
-alter publication supabase_realtime add table poker_pots;
-alter publication supabase_realtime add table poker_actions;
+-- Add tables to realtime publication (with error handling)
+do $$ begin
+  begin
+    alter publication supabase_realtime add table poker_sessions;
+  exception when duplicate_object then null;
+  end;
+  
+  begin
+    alter publication supabase_realtime add table poker_players;
+  exception when duplicate_object then null;
+  end;
+  
+  begin
+    alter publication supabase_realtime add table poker_pots;
+  exception when duplicate_object then null;
+  end;
+  
+  begin
+    alter publication supabase_realtime add table poker_actions;
+  exception when duplicate_object then null;
+  end;
+end $$;
 
 -- === Sample Data (Optional - for testing) ===
 -- Uncomment to create a test room and session
