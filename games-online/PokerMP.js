@@ -64,6 +64,14 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     rushData.vault = amount;
     localStorage.setItem("mleo_rush_core_v4", JSON.stringify(rushData));
   }
+
+  // הגדר callback לעדכון vault
+  useEffect(() => {
+    window.updateVaultCallback = setVaultBoth;
+    return () => {
+      delete window.updateVaultCallback;
+    };
+  }, [setVaultBoth]);
   const name = playerName || "Guest";
   const seats = 6;
 
@@ -332,7 +340,12 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
         setMsg("Insufficient vault balance");
         return;
       }
-      setVault(currentVault - pay);
+      const newVault = currentVault - pay;
+      setVault(newVault);
+      // עדכן גם את ה-state בדף הראשי
+      if (setVaultBoth) {
+        setVaultBoth(newVault);
+      }
     }
     
     await supabase.from("poker_players").update({

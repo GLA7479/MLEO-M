@@ -389,7 +389,12 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     }
 
     // הוצא כסף מה-vault
-    setVault(currentVault - bet);
+    const newVault = currentVault - bet;
+    setVault(newVault);
+    // עדכן גם את ה-state בדף הראשי
+    if (setVaultBoth) {
+      setVaultBoth(newVault);
+    }
 
     const { error } = await supabase.from("bj_players").update({
       bet: bet,
@@ -787,13 +792,18 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       else if (s===dealerScore) { result='push'; payout=0; }
       else { result='lose'; }
 
-      const delta = payout - (p.bet||0); // כמה השתנה הסטאק בסיבוב
+      const delta = payout; // רק הזכייה - ההימור כבר ירד בהתחלה
       const newStack = (p.stack||0) + delta;
 
       // עדכן את ה-vault אם זה השחקן המקומי
       if (p.player_name === name) {
         const currentVault = getVault();
-        setVault(currentVault + delta);
+        const newVault = currentVault + delta;
+        setVault(newVault);
+        // עדכן גם את ה-state בדף הראשי
+        if (setVaultBoth) {
+          setVaultBoth(newVault);
+        }
       }
 
       await supabase.from('bj_players').update({
