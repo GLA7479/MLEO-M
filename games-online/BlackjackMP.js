@@ -747,12 +747,12 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const dealerV = handValue(session?.dealer_hand || []);
 
   return (
-    <div className="w-full h-full flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Header - Mobile First */}
-      <div className="bg-white/5 rounded-lg p-3 border border-white/10 m-2">
-        <div className="flex flex-col items-center gap-2">
-          <div className="text-white font-bold text-lg">🃏 Blackjack (MP)</div>
-          <div className="flex flex-wrap items-center gap-3 text-white/80 text-sm">
+    <div className="w-full h-full flex flex-col p-1 md:p-2 gap-1 md:gap-2">
+      {/* Header - Mobile Optimized */}
+      <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+          <div className="text-white font-bold text-sm md:text-lg">🃏 Blackjack (MP)</div>
+          <div className="flex flex-wrap items-center gap-1 md:gap-2 text-white/80 text-xs">
             <span>Room: {roomId.slice(0,8)}</span>
             <span>State: {session?.state||"…"}</span>
             <span>Players: {roomMembers.length}</span>
@@ -760,48 +760,55 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         </div>
       </div>
 
-      {/* Main Game Area - Mobile Optimized */}
-      <div className="flex-1 flex flex-col gap-3 p-2">
-        {/* Dealer Section */}
-        <div className="bg-gradient-to-r from-red-900/20 to-red-800/20 rounded-lg p-4 border border-red-400/30">
+      {/* Main Game Area */}
+      <div className="flex-1 flex flex-col gap-1 md:gap-2">
+        {/* Dealer Section - Mobile Optimized */}
+        <div className="bg-gradient-to-r from-red-900/20 to-red-800/20 rounded-lg p-2 md:p-3 border border-red-400/30">
           <div className="text-center">
-            <div className="text-white font-bold text-lg mb-2">Dealer</div>
-            <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-2">
+            <div className="text-white font-bold text-sm md:text-base mb-1">Dealer</div>
+            <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-1">
               {(session?.dealer_hand||[]).map((c,i)=>(
-                <Card key={i} code={c} hidden={session?.dealer_hidden && i===1} size="medium" />
+                <Card key={i} code={c} hidden={session?.dealer_hidden && i===1} />
               ))}
             </div>
-            <div className="text-white/80 text-sm mt-2">
+            <div className="text-white/80 text-xs mt-1">
               Total: {session?.dealer_hidden ? "—" : (handValue(session?.dealer_hand||[]) || "—")}
             </div>
           </div>
         </div>
 
-        {/* Players - Mobile Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        {/* Players Grid - Mobile Responsive */}
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1 md:gap-2">
           {Array.from({length: SEATS}).map((_,i)=>{
             const occupant = players.find(p=>p.seat===i);
             const isMe = occupant && occupant.player_name===name;
             const isActive = session?.current_player_id && occupant?.id === session.current_player_id;
             const hv = occupant?.hand ? handValue(occupant.hand) : null;
             return (
-              <div key={i} className={`rounded-lg border ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-3 min-h-[120px] transition-all hover:bg-white/10 ${isActive ? 'ring-2 ring-amber-400' : ''}`}>
+              <div key={i} className={`rounded-lg border ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[80px] md:min-h-[120px] transition-all hover:bg-white/10 ${isActive ? 'ring-2 ring-amber-400' : ''}`}>
                 <div className="text-center">
-                  <div className="text-white/70 text-sm mb-2">Seat {i+1}</div>
+                  <div className="text-white/70 text-xs mb-1">Seat {i+1}</div>
                   {occupant ? (
-                    <div className="space-y-1">
-                      <div className="text-white font-bold text-sm truncate">{occupant.player_name}</div>
-                      <div className="text-emerald-300 text-sm font-semibold">Bet: {fmt(occupant.bet||0)}</div>
+                    <div className="space-y-0.5 md:space-y-1">
+                      <div className="text-white font-bold text-xs md:text-sm truncate">{occupant.player_name}</div>
+                      <div className="text-emerald-300 text-xs font-semibold">Bet: {fmt(occupant.bet||0)}</div>
                       <HandView hand={occupant.hand} size="small"/>
-                      <div className="text-white/80 text-sm">
+                      <div className="text-white/80 text-xs">
                         Total: {hv??"—"} 
-                        <span className={`ml-1 px-2 py-1 rounded text-xs ${occupant.status==='acting' ? 'bg-blue-600' : occupant.status==='stood' ? 'bg-gray-600' : occupant.status==='busted' ? 'bg-red-700' : occupant.status==='blackjack' ? 'bg-emerald-700' : occupant.status==='settled' ? 'bg-purple-700' : 'bg-slate-600'}`}>
+                        <span className={
+                          "ml-1 px-1 py-0.5 rounded text-xs " +
+                          (occupant.status==='acting' ? 'bg-blue-600' :
+                           occupant.status==='stood' ? 'bg-gray-600' :
+                           occupant.status==='busted' ? 'bg-red-700' :
+                           occupant.status==='blackjack' ? 'bg-emerald-700' :
+                           occupant.status==='settled' ? 'bg-purple-700' : 'bg-slate-600')
+                        }>
                           {occupant.status}
                         </span>
                       </div>
                     </div>
                   ) : (
-                    <button onClick={ensureSeated} className="mt-2 px-3 py-2 rounded bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-sm transition-all">
+                    <button onClick={ensureSeated} className="mt-1 px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-xs transition-all">
                       TAKE SEAT
                     </button>
                   )}
@@ -812,58 +819,65 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         </div>
       </div>
 
-      {/* Controls - Mobile First Design */}
-      <div className="p-3 space-y-3">
-        {/* Place Bet */}
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="text-white/80 text-sm mb-2 font-semibold">Place Bet</div>
-          <div className="flex gap-2">
+      {/* Controls - Mobile Optimized */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-2">
+        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
+          <div className="text-white/80 text-xs mb-1 font-semibold">Place Bet</div>
+          <div className="flex gap-1">
             <input type="number" value={bet} min={MIN_BET} step={MIN_BET}
               onChange={(e)=>setBet(Math.max(MIN_BET, Math.floor(e.target.value)))}
-              className="flex-1 bg-black/40 text-white text-sm rounded px-3 py-2 border border-white/20 focus:border-emerald-400 focus:outline-none" />
-            <button onClick={placeBet} disabled={!canPlaceBet} className="px-4 py-2 rounded bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+              className="flex-1 bg-black/40 text-white text-xs rounded px-1 py-0.5 md:px-2 md:py-1 border border-white/20 focus:border-emerald-400 focus:outline-none" />
+            <button onClick={placeBet} disabled={!canPlaceBet} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">
               PLACE
             </button>
           </div>
-          <div className="text-white/60 text-sm mt-2">Vault: {fmt(vault)} MLEO</div>
+          <div className="text-white/60 text-xs mt-1">Vault: {fmt(vault)} MLEO</div>
         </div>
 
-        {/* Game Actions - Mobile Optimized */}
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="text-white/80 text-sm mb-3 font-semibold">Game Actions</div>
-          <div className="grid grid-cols-2 gap-2">
+        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
+          <div className="text-white/80 text-xs mb-1 font-semibold">Game Actions</div>
+          <div className="grid grid-cols-2 gap-1">
             <button onClick={hit} disabled={!myTurn}
-              className={`px-4 py-3 rounded bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
+              className={`px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-orange-600 to-orange-700
+                        hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all
+                        disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
               HIT
             </button>
             <button onClick={stand} disabled={!myTurn}
-              className={`px-4 py-3 rounded bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
+              className={`px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-gray-600 to-gray-700
+                        hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all
+                        disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
               STAND
             </button>
             <button onClick={double} disabled={!myTurn || (myRow?.hand?.length !== 2)}
-              className={`px-4 py-3 rounded bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
+              className={`px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-cyan-600 to-cyan-700
+                        hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all
+                        disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
               DOUBLE
             </button>
             <button onClick={splitHand} disabled={!myTurn || !canSplit(myRow)}
-              className={`px-4 py-3 rounded bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 text-white font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
+              className={`px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-pink-600 to-pink-700
+                        hover:from-pink-700 hover:to-pink-800 text-white font-semibold text-xs transition-all
+                        disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
               SPLIT
             </button>
             <button onClick={surrender} disabled={!myTurn || (myRow?.hand?.length !== 2)}
-              className={`px-4 py-3 rounded bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
+              className={`px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-red-600 to-red-700
+                        hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all
+                        disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
               SURRENDER
             </button>
           </div>
         </div>
 
-        {/* Status Messages */}
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
           {isLeader && (
-            <div className="text-xs text-emerald-400 font-semibold mb-2">
+            <div className="mt-2 text-xs text-emerald-400 font-semibold">
               🎮 You are the Leader (Autopilot Active)
             </div>
           )}
           {myTurn && session?.turn_deadline && (
-            <div className="w-full h-2 bg-black/30 rounded overflow-hidden mb-2">
+            <div className="w-full h-1 bg-black/30 rounded overflow-hidden mb-1">
               <div
                 className="h-full bg-emerald-500 transition-all"
                 style={{
@@ -873,41 +887,38 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
             </div>
           )}
           {session?.state === 'betting' && session?.bet_deadline && (
-            <div className="text-sm text-amber-400 font-semibold">
+            <div className="text-xs text-amber-400 font-semibold mt-1">
               🕒 Betting ends in {Math.max(0, Math.ceil((new Date(session.bet_deadline).getTime() - Date.now()) / 1000))}s
             </div>
           )}
           {session?.turn_deadline && session?.current_player_id === myRow?.id && (
-            <div className="text-sm text-amber-300 font-semibold">
+            <div className="mt-2 text-xs text-amber-300 font-semibold">
               ⏰ Time left: {Math.max(0, Math.ceil((new Date(session.turn_deadline).getTime() - Date.now())/1000))}s
             </div>
           )}
         </div>
-
-        {/* Error Messages */}
-        {msg && (
-          <div className="bg-red-900/20 border border-red-400/30 rounded-lg p-3 text-red-300 text-sm">
-            {msg}
-          </div>
-        )}
-
-        {/* Result Banner */}
-        {banner && (
-          <div className="mt-2 bg-emerald-900/25 border border-emerald-500/40 rounded-lg p-3">
-            <div className="text-emerald-300 font-bold text-sm">{banner.title}</div>
-            <ul className="mt-1 text-emerald-200 text-sm space-y-1">
-              {banner.lines.map((t,i)=><li key={i}>{t}</li>)}
-            </ul>
-          </div>
-        )}
-
-        {/* Next Round Timer */}
-        {session?.state === 'ended' && session?.next_round_at && (
-          <div className="text-center text-emerald-400 text-sm font-semibold">
-            🔄 Next round starts in {Math.max(0, Math.ceil((new Date(session.next_round_at).getTime() - Date.now()) / 1000))}s
-          </div>
-        )}
       </div>
+
+      {msg && (
+        <div className="bg-red-900/20 border border-red-400/30 rounded-lg p-2 text-red-300 text-xs">
+          {msg}
+        </div>
+      )}
+
+      {banner && (
+        <div className="mt-2 bg-emerald-900/25 border border-emerald-500/40 rounded-lg p-2">
+          <div className="text-emerald-300 font-bold text-sm">{banner.title}</div>
+          <ul className="mt-1 text-emerald-200 text-xs space-y-0.5">
+            {banner.lines.map((t,i)=><li key={i}>{t}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {session?.state === 'ended' && session?.next_round_at && (
+        <div className="text-center text-emerald-400 text-xs font-semibold mt-2">
+          🔄 Next round starts in {Math.max(0, Math.ceil((new Date(session.next_round_at).getTime() - Date.now()) / 1000))}s
+        </div>
+      )}
     </div>
   );
 }
