@@ -918,14 +918,14 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
             )}
             
             {/* Timers in dealer window - bottom left */}
-            <div className="absolute bottom-1 left-1 text-xs">
+            <div className="absolute bottom-2 left-2 text-sm">
               {session?.state === 'betting' && session?.bet_deadline && (
-                <div className="text-amber-400 font-semibold">
+                <div className="text-amber-400 font-bold text-lg">
                   🕒 {timerTick >= 0 && Math.max(0, Math.ceil((new Date(session.bet_deadline).getTime() - Date.now()) / 1000))}s
                 </div>
               )}
               {session?.turn_deadline && session?.current_player_id === myRow?.id && (
-                <div className="text-amber-300 font-semibold">
+                <div className="text-amber-300 font-bold text-lg">
                   ⏰ {timerTick >= 0 && Math.max(0, Math.ceil((new Date(session.turn_deadline).getTime() - Date.now())/1000))}s
                 </div>
               )}
