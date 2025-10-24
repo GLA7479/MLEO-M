@@ -460,7 +460,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     <div className="w-full h-full flex flex-col p-1 md:p-2 gap-1 md:gap-2">
       {/* Header */}
       <div className="flex items-center justify-between bg-white/5 rounded-xl p-1 md:p-2 border border-white/10">
-        <div className="text-white font-bold text-sm md:text-lg">♠️ Texas Hold'em (MP)</div>
+        <div className="text-white font-bold text-sm md:text-lg">♠️ Texas Hold'em</div>
         <div className="flex items-center gap-1 md:gap-2 text-white/80 text-xs">
           <span>Hand #{ses?.hand_no||"-"}</span>
           <span>Stage: {ses?.stage||"lobby"}</span>
@@ -468,10 +468,10 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
         </div>
       </div>
 
-      {/* Board */}
-      <div className="bg-gradient-to-r from-green-900/20 to-green-800/20 rounded-xl p-2 md:p-3 border border-green-400/30">
-        <div className="text-center">
-          <div className="text-white font-bold text-sm md:text-base mb-2">Community Cards</div>
+      {/* Board - Fixed Height */}
+      <div className="bg-gradient-to-r from-green-900/20 to-green-800/20 rounded-xl p-2 md:p-3 border border-green-400/30 h-32 sm:h-40">
+        <div className="text-center h-full flex flex-col justify-center">
+          <div className="text-white font-bold text-sm md:text-base mb-1">Community Cards</div>
           <HandView hand={board}/>
           <div className="text-white/80 text-xs mt-1">
             {board.length === 0 ? "No cards yet" : 

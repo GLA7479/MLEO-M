@@ -806,7 +806,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
           setVaultBoth(newVault);
         }
         // שמור את התוצאה שלי להודעה מקומית
-        myResult = { result, delta, dealerBust, dealerScore };
+        myResult = { result, delta, dealerBust, dealerScore, originalBet: p.bet };
       }
 
       await supabase.from('bj_players').update({
@@ -827,15 +827,15 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
     // באנר מקומי - רק לשחקן המקומי
     if (myResult) {
-      const { result, delta, dealerBust, dealerScore } = myResult;
+      const { result, delta, dealerBust, dealerScore, originalBet } = myResult;
       setBanner({
         title: result === 'win' ? '🎉 YOU WIN!' : 
                result === 'blackjack' ? '🎉 BLACKJACK!' :
                result === 'push' ? '🤝 PUSH' : '💔 YOU LOSE',
         lines: [
           `Dealer: ${dealerBust ? 'BUST' : dealerScore}`,
-          result === 'win' || result === 'blackjack' ? `+${fmt(delta)} MLEO` :
-          result === 'push' ? 'No change' : `Lost ${fmt(Math.abs(delta))} MLEO`
+          result === 'win' || result === 'blackjack' ? `+${fmt(originalBet + delta)} MLEO` :
+          result === 'push' ? 'No change' : `Lost ${fmt(originalBet)} MLEO`
         ]
       });
     }
@@ -861,7 +861,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       {/* Header - Mobile Optimized */}
       <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
-          <div className="text-white font-bold text-sm md:text-lg">🃏 Blackjack (MP)</div>
+          <div className="text-white font-bold text-sm md:text-lg">🃏 Blackjack</div>
           <div className="flex flex-wrap items-center gap-1 md:gap-2 text-white/80 text-xs">
             <span>Room: {roomId.slice(0,8)}</span>
             <span>State: {session?.state||"…"}</span>
@@ -872,9 +872,9 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
       {/* Main Game Area */}
       <div className="flex-1 flex flex-col gap-1 md:gap-2">
-        {/* Dealer Section - Mobile Optimized */}
-        <div className="bg-gradient-to-r from-red-900/20 to-red-800/20 rounded-lg p-2 md:p-3 border border-red-400/30">
-          <div className="text-center">
+        {/* Dealer Section - Fixed Height */}
+        <div className="bg-gradient-to-r from-red-900/20 to-red-800/20 rounded-lg p-2 md:p-3 border border-red-400/30 h-32 sm:h-40">
+          <div className="text-center h-full flex flex-col justify-center">
             <div className="text-white font-bold text-sm md:text-base mb-1">Dealer</div>
             <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-1">
               {(session?.dealer_hand||[]).map((c,i)=>(
@@ -1040,9 +1040,9 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       {/* Fixed Banner Position */}
       <div className="h-20 flex items-center justify-center">
         {banner && (
-          <div className="bg-emerald-900/25 border border-emerald-500/40 rounded-lg p-2 max-w-md mx-auto">
-            <div className="text-emerald-300 font-bold text-sm text-center">{banner.title}</div>
-            <ul className="mt-1 text-emerald-200 text-xs space-y-0.5 text-center">
+          <div className={`${banner.title.includes('LOSE') ? 'bg-red-900/25 border-red-500/40' : 'bg-emerald-900/25 border-emerald-500/40'} border rounded-lg p-2 max-w-md mx-auto`}>
+            <div className={`${banner.title.includes('LOSE') ? 'text-red-300' : 'text-emerald-300'} font-bold text-sm text-center`}>{banner.title}</div>
+            <ul className={`mt-1 ${banner.title.includes('LOSE') ? 'text-red-200' : 'text-emerald-200'} text-xs space-y-0.5 text-center`}>
               {banner.lines.map((t,i)=><li key={i}>{t}</li>)}
             </ul>
           </div>

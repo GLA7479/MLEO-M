@@ -370,7 +370,7 @@ export default function ArcadeOnline() {
           <div className="flex items-center justify-between mb-6">
             <button 
               onClick={selectedGame && selectedRoomId ? leaveTable : goBack}
-              className={`px-4 py-2 rounded-lg border font-semibold ${
+              className={`px-3 py-1.5 rounded-lg border text-sm font-semibold ${
                 selectedGame && selectedRoomId 
                   ? 'bg-red-600/20 border-red-500/40 hover:bg-red-600/30 text-red-300' 
                   : 'bg-white/5 border-white/10 hover:bg-white/10 text-white'
@@ -389,8 +389,8 @@ export default function ArcadeOnline() {
               </p>
             </div>
             <div className="text-right">
-              <div className="text-white/60 text-sm">Vault</div>
-              <div className="text-emerald-400 text-lg font-bold">{fmt(vaultAmt)} MLEO</div>
+              <div className="text-white/60 text-xs">Vault</div>
+              <div className="text-emerald-400 text-sm font-bold">{fmt(vaultAmt)} MLEO</div>
             </div>
           </div>
 
