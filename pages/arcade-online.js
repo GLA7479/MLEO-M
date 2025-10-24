@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Layout from "../components/Layout";
 import { useRouter } from "next/router";
 import { useAccount } from "wagmi";
+import RoomBrowser from "../components/online/RoomBrowser";
 
 // iOS Viewport Fix (כמו במשחקים הקיימים)
 function useIOSViewportFix() {
@@ -232,6 +233,8 @@ export default function ArcadeOnline() {
   const [vaultAmt, setVaultAmt] = useState(0);
   const [playerName, setPlayerName] = useState("");
   const [selectedGame, setSelectedGame] = useState(null);
+  const [selectedRoomId, setSelectedRoomId] = useState(null);
+  const [showRoomBrowser, setShowRoomBrowser] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -249,12 +252,18 @@ export default function ArcadeOnline() {
   // Handle game selection from URL or clicks
   useEffect(() => {
     const gameId = router.query.game;
+    const roomId = router.query.room;
+    
     if (gameId && GAME_REGISTRY.some(g => g.id === gameId)) {
       setSelectedGame(gameId);
+      if (roomId) {
+        setSelectedRoomId(roomId);
+      }
     } else {
       setSelectedGame(null);
+      setSelectedRoomId(null);
     }
-  }, [router.query.game]);
+  }, [router.query.game, router.query.room]);
 
   function setVaultBoth(next) {
     setVault(next);
@@ -262,16 +271,39 @@ export default function ArcadeOnline() {
   }
 
   function selectGame(gameId) {
+    const game = GAME_REGISTRY.find(g => g.id === gameId);
+    
+    if (game?.isMultiplayer) {
+      // For multiplayer games, show room browser first
+      setSelectedGame(gameId);
+      setShowRoomBrowser(true);
+    } else {
+      // For single player games, go directly to game
+      const url = {
+        pathname: router.pathname,
+        query: { ...router.query, game: gameId }
+      };
+      router.push(url, undefined, { shallow: true });
+    }
+  }
+
+  function handleJoinRoom(roomId) {
+    setSelectedRoomId(roomId);
+    setShowRoomBrowser(false);
     const url = {
       pathname: router.pathname,
-      query: { ...router.query, game: gameId }
+      query: { ...router.query, game: selectedGame, room: roomId }
     };
     router.push(url, undefined, { shallow: true });
   }
 
   function goBack() {
-    if (selectedGame) {
+    if (showRoomBrowser) {
+      setShowRoomBrowser(false);
       setSelectedGame(null);
+    } else if (selectedGame) {
+      setSelectedGame(null);
+      setSelectedRoomId(null);
       router.push('/arcade-online', undefined, { shallow: true });
     } else {
       router.push('/');
@@ -301,12 +333,14 @@ export default function ArcadeOnline() {
               onClick={goBack}
               className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold"
             >
-              ← {selectedGame ? 'BACK TO GAMES' : 'BACK'}
+              ← {showRoomBrowser ? 'BACK TO GAMES' : selectedGame ? 'BACK TO GAMES' : 'BACK'}
             </button>
             <div className="text-center">
               <h1 className="text-3xl font-extrabold text-white mb-2">🎮 MLEO Arcade Online</h1>
               <p className="text-white/60">
-                {selectedGame ? `Playing ${GAME_REGISTRY.find(g => g.id === selectedGame)?.title || 'Game'}` : 'Multiplayer & Single Player Games'}
+                {showRoomBrowser ? `Choose Room for ${GAME_REGISTRY.find(g => g.id === selectedGame)?.title || 'Game'}` : 
+                 selectedGame ? `Playing ${GAME_REGISTRY.find(g => g.id === selectedGame)?.title || 'Game'}` : 
+                 'Multiplayer & Single Player Games'}
               </p>
             </div>
             <div className="text-right">
@@ -331,7 +365,26 @@ export default function ArcadeOnline() {
         </header>
 
         {/* Content */}
-        {selectedGame ? (
+        {showRoomBrowser ? (
+          /* Room Browser for Multiplayer Games */
+          <div className="flex-1 px-4 pb-8">
+            <div className="max-w-4xl mx-auto h-full">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6 h-full">
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-bold text-white mb-2">
+                    {GAME_REGISTRY.find(g => g.id === selectedGame)?.emoji} {GAME_REGISTRY.find(g => g.id === selectedGame)?.title}
+                  </h2>
+                  <p className="text-white/60">Choose a room to join or create a new one</p>
+                </div>
+                <RoomBrowser 
+                  gameId={selectedGame}
+                  playerName={playerName}
+                  onJoinRoom={handleJoinRoom}
+                />
+              </div>
+            </div>
+          </div>
+        ) : selectedGame ? (
           /* Game Viewport */
           <div className="flex-1 px-4 pb-8">
             <div className="max-w-6xl mx-auto h-full">
@@ -340,7 +393,7 @@ export default function ArcadeOnline() {
                 vault={vaultAmt}
                 setVaultBoth={setVaultBoth}
                 playerName={playerName}
-                roomId={selectedGame === 'dice' ? null : 'default-room'}
+                roomId={selectedGame === 'dice' ? null : selectedRoomId}
               />
             </div>
           </div>
