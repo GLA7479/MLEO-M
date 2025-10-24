@@ -97,6 +97,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const [roomMembers, setRoomMembers] = useState([]);
   const [bet, setBet] = useState(MIN_BET);
   const [msg, setMsg] = useState("");
+  const [banner, setBanner] = useState(null); // {title, lines: []}
 
   // Leader detection
   const isLeader = useMemo(() => {
@@ -117,6 +118,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const canDeal = session?.state === 'betting';
   const myTurn = !!myRow && session?.current_player_id === myRow.id && session?.state === 'acting' && myRow.status === 'acting';
   const canSettle = session?.state === 'acting'; // האוטופיילוט יעשה לבד, זה רק fallback ידני
+  const turnGlow = myTurn ? 'ring-2 ring-emerald-400 animate-pulse' : '';
 
   // bootstrap session with new schema
   useEffect(() => {
@@ -206,6 +208,31 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     return () => clearTimeout(t);
   }, [session?.id, session?.state, players.length, players.map?.(p=>p.status + ':' + p.bet).join('|'), isLeader]);
 
+  // Heartbeat: מריץ autopilot כשיש דדליין פעיל (הימורים/תור/הפסקה בין סיבובים)
+  useEffect(() => {
+    if (!isLeader || !session?.id) return;
+
+    const tick = setInterval(() => {
+      // אם יש חלון הימורים, תור שחקן, או טיימר לסיבוב הבא — תריץ אוטומציה
+      if (
+        (session.state === 'betting' && session.bet_deadline) ||
+        (session.state === 'acting'  && session.turn_deadline) ||
+        (session.state === 'ended'   && session.next_round_at)
+      ) {
+        autopilot(session);
+      }
+    }, 1000);
+
+    return () => clearInterval(tick);
+  }, [
+    isLeader,
+    session?.id,
+    session?.state,
+    session?.bet_deadline,
+    session?.turn_deadline,
+    session?.next_round_at
+  ]);
+
   // Turn timeout (AFK Auto-Stand)
   useEffect(() => {
     if (!isLeader || !session?.id) return;
@@ -280,9 +307,10 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
   async function openBetting() {
     if (!session?.id) return;
+    const deadline = new Date(Date.now() + 15000).toISOString(); // 15 שניות הימור
     const { error } = await supabase
       .from('bj_sessions')
-      .update({ state: 'betting' })
+      .update({ state: 'betting', bet_deadline: deadline })
       .eq('id', session.id);
     if (error) console.error('[openBetting] error:', error);
   }
@@ -302,16 +330,24 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
   // Begin acting phase - set first player + deadline
   async function beginActingPhase(sessionId) {
-    const { data: ps } = await supabase.from('bj_players').select('*').eq('session_id', sessionId).order('seat,hand_idx');
-    const { needAct } = buildActionQueue(ps || []);
-    const first = needAct[0];
+    const { data: ps } = await supabase.from('bj_players')
+      .select('*').eq('session_id', sessionId).order('seat,hand_idx');
+
+    // רק משתתפים של הסיבוב (מי שהימרו)
+    const actables = (ps || []).filter(p => (p.bet || 0) > 0 && p.status === 'acting');
+    if (!actables.length) {
+      // כולם BJ/סטוד/באסט ⇒ סגור יד
+      await dealerAndSettle();
+      return;
+    }
+    const first = actables[0];
     const deadline = new Date(Date.now() + (session?.turn_seconds || 20) * 1000).toISOString();
 
     await supabase.from('bj_sessions').update({
       state: 'acting',
       dealer_hidden: true,
-      current_player_id: first ? first.id : null,
-      turn_deadline: first ? deadline : null
+      current_player_id: first.id,
+      turn_deadline: deadline
     }).eq('id', sessionId);
   }
 
@@ -360,77 +396,87 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
   // Autopilot function - only leader runs automation
   async function autopilot(sessionSnap) {
-    if (!isLeader) return;              // רק המארח מריץ אוטומציה
+    if (!isLeader) return;
     const s = sessionSnap || session;
     if (!s?.id) return;
 
-    // שלוף מצב שחקנים טרי
-    const { data: ps, error: pe } = await supabase
+    // טען מצב עדכני
+    const { data: ps } = await supabase
       .from('bj_players').select('*')
-      .eq('session_id', s.id).order('seat');
-    if (pe) return;
+      .eq('session_id', s.id).order('seat,hand_idx');
 
-    const hasPlayers = (ps||[]).length > 0;
-    const everyoneMinBet = hasPlayers && ps.every(p => (p.bet||0) >= (s.min_bet||MIN_BET) && p.status !== 'left');
-    const everyoneDone = hasPlayers && ps.every(p => ['stood','busted','blackjack','settled'].includes(p.status));
+    const participants = (ps || []).filter(p => (p.bet || 0) > 0 && p.status !== 'left');
+    const hasBets      = participants.length > 0;
+    const everyoneDone = hasBets && participants.every(p => ['stood','busted','blackjack','settled'].includes(p.status));
 
-    // 1) lobby -> betting (ברגע שיש הימור ראשון)
-    if (s.state === 'lobby') {
-      const someoneBet = ps.some(p => (p.bet||0) > 0);
-      if (someoneBet) {
-        await supabase.from('bj_sessions').update({ state: 'betting' }).eq('id', s.id);
+    // 1) LOBBY / ENDED -> BETTING (אוטומטי)
+    if (s.state === 'lobby' || (s.state === 'ended' && s.next_round_at && new Date() > new Date(s.next_round_at))) {
+      // אפס לכולם את היד הקודמת אם צריך (ב-ENDED)
+      if (s.state === 'ended') {
+        await supabase.from('bj_players').update({
+          hand: [], bet: 0, result: null, status: 'seated', acted: false
+        }).eq('session_id', s.id);
+      }
+
+      // פתח חלון הימורים חדש ל־15 שניות
+      const deadline = new Date(Date.now() + 15000).toISOString();
+      await supabase.from('bj_sessions').update({
+        state: 'betting',
+        dealer_hand: [],
+        dealer_hidden: true,
+        current_player_id: null,
+        turn_deadline: null,
+        bet_deadline: deadline,
+        next_round_at: null
+      }).eq('id', s.id);
+      return;
+    }
+
+    // 2) BETTING -> DEAL (כשעבר הדדליין ויש לפחות משתתף אחד)
+    if (s.state === 'betting') {
+      const dlPassed = s.bet_deadline && new Date() > new Date(s.bet_deadline);
+      if (dlPassed && hasBets) {
+        await deal();           // יתחיל ACTING וינעל את ה-Dealer hidden
+        return;
+      }
+      // אם אף אחד לא הימר עד הדדליין — פתח חלון חדש (שקט) לעוד 15 שניות
+      if (dlPassed && !hasBets) {
+        const deadline = new Date(Date.now() + 15000).toISOString();
+        await supabase.from('bj_sessions').update({ bet_deadline: deadline }).eq('id', s.id);
         return;
       }
     }
 
-    // 2) betting -> deal (כשכולם עומדים במינימום)
-    if (s.state === 'betting' && everyoneMinBet) {
-      await deal();  // פונקציית deal שלך
-      return;
-    }
-
-    // 3) acting -> dealer+settle (כשכולם גמרו לפעול)
+    // 3) ACTING -> SETTLE (כשכולם סיימו)
     if (s.state === 'acting' && everyoneDone) {
-      await dealerAndSettle(); // הפונקציה המאוחדת שסוגרת יד
+      await dealerAndSettle();
       return;
     }
 
-    // 4) ended -> lobby (כשאין קלפים על השולחן – נפתח סיבוב חדש)
-    if (s.state === 'ended') {
-      const allHandsEmpty = ps.every(p => !p.hand || p.hand.length === 0);
-      if (allHandsEmpty && (!s.dealer_hand || s.dealer_hand.length === 0)) {
-        await supabase.from('bj_sessions').update({ state: 'lobby', dealer_hidden: true }).eq('id', s.id);
-        return;
-      }
-    }
+    // 4) SETTLING/ENDED — מנוהל בפונקציות עצמן
   }
 
   async function deal() {
     if (!session) return;
 
-    // אם עדיין בלובי — פתח הימורים תחילה
-    if (session.state === 'lobby') {
-      await supabase.from('bj_sessions').update({ state: 'betting' }).eq('id', session.id);
-      // הבא session מעודכן
-      const { data: s2 } = await supabase.from('bj_sessions').select('*').eq('id', session.id).single();
-      if (s2) setSession(s2);
-    }
+    setBanner(null); // אפס באנר בתחילת סיבוב
 
-    // משוך את רשימת השחקנים טרייה
-    const { data: ps, error: pe } = await supabase
+    // משוך שחקנים
+    const { data: ps } = await supabase
       .from("bj_players")
       .select("*")
       .eq("session_id", session.id)
       .order("seat");
-    if (pe) { console.error('[deal] players error:', pe); return; }
 
-    const ready = (ps||[]).length>0 && ps.every(p => (p.bet||0) >= MIN_BET && p.status !== 'left');
-    if (!ready) { setMsg("Not all players have placed minimum bet"); return; }
+    // משתתפים אמיתיים בלבד
+    const participants = (ps || []).filter(p => (p.bet || 0) >= (session.min_bet || MIN_BET) && p.status !== 'left');
+    if (participants.length === 0) return; // סתם בטחון
 
     let shoe = session.shoe?.length ? [...session.shoe] : freshShoe(4);
     const draw = () => shoe.pop();
 
-    for (const p of ps) {
+    // חלק לשחקנים שהמרו
+    for (const p of participants) {
       const hand = [draw(), draw()];
       const bj = handValue(hand) === 21;
       await supabase.from("bj_players").update({
@@ -438,16 +484,21 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       }).eq("id", p.id);
     }
 
+    // השאר (שלא הימרו) נשארים 'seated' עם יד ריקה
+
+    // דילר
     const dealerHand = [draw(), draw()];
     await supabase.from("bj_sessions").update({
       dealer_hand: dealerHand,
-      dealer_hidden: true,  // << נשאר מכוסה
+      dealer_hidden: true,
       shoe: shoe,
       round_no: (session.round_no || 0) + 1,
-      current_seat: 0
+      current_seat: 0,
+      state: 'acting',
+      bet_deadline: null
     }).eq("id", session.id);
 
-    // Begin acting phase with turn management
+    // הפעל תור ראשון
     await beginActingPhase(session.id);
   }
 
@@ -573,49 +624,61 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   async function dealerAndSettle() {
     if (!session) return;
 
-    // Check if everyone is done (stood/busted/blackjack)
-    const { data: ps, error: pe } = await supabase.from("bj_players")
-      .select("*").eq("session_id", session.id);
-    if (pe) return;
+    const { data: ps } = await supabase.from("bj_players")
+      .select("*").eq("session_id", session.id).order('seat,hand_idx');
 
-    const done = (ps||[]).every(p => ['stood','busted','blackjack','settled'].includes(p.status));
+    const participants = (ps || []).filter(p => (p.bet || 0) > 0 && p.status !== 'left');
+    const done = participants.every(p => ['stood','busted','blackjack','settled'].includes(p.status));
     if (!done) { setMsg("Players still acting"); return; }
 
-    // Dealer phase
+    // דילר משחק
     let dealer = [...(session.dealer_hand||[])];
-    let shoe = [...(session.shoe||[])];
-    const needHit = () => handValue(dealer) < 17; // S17
-
-    while (needHit() && shoe.length) dealer.push(shoe.pop());
+    let shoe   = [...(session.shoe||[])];
+    while (handValue(dealer) < 17 && shoe.length) dealer.push(shoe.pop());
 
     await supabase.from('bj_sessions').update({
-      dealer_hand: dealer,
-      dealer_hidden: false,
-      shoe,
-      state: 'settling'
+      dealer_hand: dealer, dealer_hidden: false, shoe, state: 'settling'
     }).eq('id', session.id);
 
-    // settle
     const dealerScore = handValue(dealer);
-    const dealerBust = dealerScore > 21;
+    const dealerBust  = dealerScore > 21;
 
-    for (const p of ps||[]) {
+    const lines = [];
+    for (const p of participants) {
       const s = handValue(p.hand||[]);
-      let result = 'lose', payout = 0;
+      let result='lose', payout=0;
+
       if (p.status==='blackjack') { result='blackjack'; payout=Math.floor(p.bet*3/2); }
       else if (dealerBust && s<=21) { result='win'; payout=p.bet; }
       else if (s>21) { result='lose'; }
       else if (s>dealerScore) { result='win'; payout=p.bet; }
       else if (s===dealerScore) { result='push'; payout=0; }
       else { result='lose'; }
-      const newStack = (p.stack||0) + payout - (p.bet||0);
+
+      const delta = payout - (p.bet||0); // כמה השתנה הסטאק בסיבוב
+      const newStack = (p.stack||0) + delta;
 
       await supabase.from('bj_players').update({
-        result, stack: newStack, status: 'settled', bet: 0
+        result, stack:newStack, status:'settled', bet:0
       }).eq('id', p.id);
+
+      const tag = result==='win' ? '+'
+               : result==='blackjack' ? '+'
+               : result==='push' ? '±'
+               : '-';
+      lines.push(`Seat ${p.seat+1} • ${p.player_name} — ${result.toUpperCase()} (${tag}${fmt(Math.abs(delta))})`);
     }
 
-    await supabase.from('bj_sessions').update({ state: 'ended' }).eq('id', session.id);
+    await supabase.from('bj_sessions').update({ 
+      state:'ended',
+      next_round_at: new Date(Date.now() + 30000).toISOString() // 30 שניות לסיבוב הבא
+    }).eq('id', session.id);
+
+    // באנר מקומי (לכל קליינט)
+    setBanner({
+      title: `Dealer ${dealerBust ? 'BUST' : 'Total ' + dealerScore}`,
+      lines
+    });
   }
 
   async function resetRound() {
@@ -626,6 +689,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     await supabase.from("bj_sessions").update({
       state: 'lobby', dealer_hand: [], dealer_hidden: true
     }).eq("id", session.id);
+    setBanner(null);
   }
 
   // ---------- UI ----------
@@ -668,9 +732,10 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
           {Array.from({length: SEATS}).map((_,i)=>{
             const occupant = players.find(p=>p.seat===i);
             const isMe = occupant && occupant.player_name===name;
+            const isActive = session?.current_player_id && occupant?.id === session.current_player_id;
             const hv = occupant?.hand ? handValue(occupant.hand) : null;
             return (
-              <div key={i} className={`rounded-lg border ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[80px] md:min-h-[120px] transition-all hover:bg-white/10`}>
+              <div key={i} className={`rounded-lg border ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[80px] md:min-h-[120px] transition-all hover:bg-white/10 ${isActive ? 'ring-2 ring-amber-400' : ''}`}>
                 <div className="text-center">
                   <div className="text-white/70 text-xs mb-1">Seat {i+1}</div>
                   {occupant ? (
@@ -722,33 +787,58 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
           <div className="text-white/80 text-xs mb-1 font-semibold">Game Actions</div>
           <div className="grid grid-cols-2 gap-1">
-            <button onClick={openBetting}
-              className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white font-semibold text-xs transition-all">
-              OPEN BETTING
+            <button onClick={hit} disabled={!myTurn}
+              className={`px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-orange-600 to-orange-700
+                        hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all
+                        disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
+              HIT
             </button>
-            <button onClick={deal} disabled={!canDeal}
-              className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-              DEAL
+            <button onClick={stand} disabled={!myTurn}
+              className={`px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-gray-600 to-gray-700
+                        hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all
+                        disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
+              STAND
             </button>
-            <button onClick={hit} disabled={!myTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">HIT</button>
-            <button onClick={stand} disabled={!myTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">STAND</button>
-            <button onClick={double} disabled={!myTurn || (myRow?.hand?.length !== 2)} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">DOUBLE</button>
-            <button onClick={splitHand} disabled={!myTurn || !canSplit(myRow)} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">SPLIT</button>
-            <button onClick={surrender} disabled={!myTurn || (myRow?.hand?.length !== 2)} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">SURRENDER</button>
-            <button onClick={dealerAndSettle} disabled={!canSettle} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">SETTLE</button>
+            <button onClick={double} disabled={!myTurn || (myRow?.hand?.length !== 2)}
+              className={`px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-cyan-600 to-cyan-700
+                        hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all
+                        disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
+              DOUBLE
+            </button>
+            <button onClick={splitHand} disabled={!myTurn || !canSplit(myRow)}
+              className={`px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-pink-600 to-pink-700
+                        hover:from-pink-700 hover:to-pink-800 text-white font-semibold text-xs transition-all
+                        disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
+              SPLIT
+            </button>
+            <button onClick={surrender} disabled={!myTurn || (myRow?.hand?.length !== 2)}
+              className={`px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-red-600 to-red-700
+                        hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all
+                        disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
+              SURRENDER
+            </button>
           </div>
         </div>
 
         <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
-          <div className="text-white/80 text-xs mb-1 font-semibold">Round Control</div>
-          <div className="flex gap-1">
-            <button onClick={resetRound} className="flex-1 px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold text-xs transition-all">
-              NEW ROUND
-            </button>
-          </div>
           {isLeader && (
             <div className="mt-2 text-xs text-emerald-400 font-semibold">
               🎮 You are the Leader (Autopilot Active)
+            </div>
+          )}
+          {myTurn && session?.turn_deadline && (
+            <div className="w-full h-1 bg-black/30 rounded overflow-hidden mb-1">
+              <div
+                className="h-full bg-emerald-500 transition-all"
+                style={{
+                  width: `${Math.max(0, 100 * (new Date(session.turn_deadline).getTime() - Date.now()) / ((session.turn_seconds||20)*1000))}%`
+                }}
+              />
+            </div>
+          )}
+          {session?.state === 'betting' && session?.bet_deadline && (
+            <div className="text-xs text-amber-400 font-semibold mt-1">
+              🕒 Betting ends in {Math.max(0, Math.ceil((new Date(session.bet_deadline).getTime() - Date.now()) / 1000))}s
             </div>
           )}
           {session?.turn_deadline && session?.current_player_id === myRow?.id && (
@@ -762,6 +852,21 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       {msg && (
         <div className="bg-red-900/20 border border-red-400/30 rounded-lg p-2 text-red-300 text-xs">
           {msg}
+        </div>
+      )}
+
+      {banner && (
+        <div className="mt-2 bg-emerald-900/25 border border-emerald-500/40 rounded-lg p-2">
+          <div className="text-emerald-300 font-bold text-sm">{banner.title}</div>
+          <ul className="mt-1 text-emerald-200 text-xs space-y-0.5">
+            {banner.lines.map((t,i)=><li key={i}>{t}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {session?.state === 'ended' && session?.next_round_at && (
+        <div className="text-center text-emerald-400 text-xs font-semibold mt-2">
+          🔄 Next round starts in {Math.max(0, Math.ceil((new Date(session.next_round_at).getTime() - Date.now()) / 1000))}s
         </div>
       )}
     </div>
