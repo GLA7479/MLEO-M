@@ -119,6 +119,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const [players, setPlayers] = useState([]);
   const [roomMembers, setRoomMembers] = useState([]);
   const [bet, setBet] = useState(MIN_BET);
+  const [displayValue, setDisplayValue] = useState('');
   const [msg, setMsg] = useState("");
   const [banner, setBanner] = useState(null); // {title, lines: []}
   const [timerTick, setTimerTick] = useState(0);
@@ -409,6 +410,8 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       setMsg("Failed to place bet");
       // החזר כסף ל-vault אם ההימור נכשל
       setVault(currentVault);
+    } else {
+      setDisplayValue(''); // נקה את התצוגה אחרי הימור מוצלח
     }
   }
 
@@ -1085,11 +1088,43 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10 h-full">
           <div className="text-white/80 text-xs mb-1 font-semibold">Place Bet</div>
           <div className="flex gap-1 mb-1">
-            <input type="number" value={bet} min={MIN_BET} step={MIN_BET}
-              onChange={(e)=>setBet(Math.max(MIN_BET, Math.floor(e.target.value)))}
-              className="flex-1 bg-black/40 text-white text-xs rounded px-1 py-0.5 md:px-2 md:py-1 border border-white/20 focus:border-emerald-400 focus:outline-none" />
-            <button onClick={placeBet} disabled={!canPlaceBet} className="px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            <input 
+              type="text" 
+              value={displayValue || (bet >= 1000 ? fmt(bet) : bet.toString())} 
+              placeholder="Amount"
+              onChange={(e) => {
+                const input = e.target.value;
+                setDisplayValue(input); // שמור את מה שהמשתמש הקליד
+                
+                // המר למספר
+                let num = 0;
+                if (input.endsWith('K')) {
+                  num = parseFloat(input.slice(0, -1)) * 1000;
+                } else if (input.endsWith('M')) {
+                  num = parseFloat(input.slice(0, -1)) * 1000000;
+                } else if (input.endsWith('B')) {
+                  num = parseFloat(input.slice(0, -1)) * 1000000000;
+                } else {
+                  num = parseFloat(input) || 0;
+                }
+                setBet(Math.max(1, Math.floor(num)));
+              }}
+              className="w-20 bg-black/40 text-white text-xs rounded px-1 py-1 border border-white/20 focus:border-emerald-400 focus:outline-none placeholder-white/50" 
+            />
+            <button onClick={placeBet} disabled={!canPlaceBet} className="w-12 px-2 py-1 rounded bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">
               PLACE
+            </button>
+            <button onClick={()=>{setBet(1000); setDisplayValue('1K');}} className="w-12 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+              1K
+            </button>
+            <button onClick={()=>{setBet(10000); setDisplayValue('10K');}} className="w-12 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+              10K
+            </button>
+            <button onClick={()=>{setBet(100000); setDisplayValue('100K');}} className="w-12 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+              100K
+            </button>
+            <button onClick={()=>{setBet(1000000); setDisplayValue('1M');}} className="w-12 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
+              1M
             </button>
           </div>
           <div className="text-white/60 text-xs">Vault: {fmt(getVault())} MLEO</div>
