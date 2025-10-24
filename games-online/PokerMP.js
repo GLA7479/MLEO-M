@@ -138,6 +138,9 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
 
   const clientId = useMemo(() => getClientId(), []);
 
+  // מניעת מירוצים בהתקדמות רחובות (flop/turn/river)
+  const advancingRef = useRef(false);
+
   async function autopilot() {
     if (!isLeader) return;
     
@@ -297,52 +300,81 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
   }
 
   async function advanceStreet(auto=false){
-    if(!ses) return;
-    
-    // אם נשאר שחקן אחד — ניצחון אוטומטי ללא דירוג
-    const alive = players.filter(p => !p.folded);
-    if (alive.length <= 1) {
-      const winnerSeat = alive[0]?.seat_index;
-      await supabase.from("poker_sessions").update({
-        stage: "showdown", winners: winnerSeat!=null ? [winnerSeat] : [], current_turn: null, turn_deadline: null
-      }).eq("id", ses.id);
-      return;
-    }
+    if(!ses || advancingRef.current) return;
+    advancingRef.current = true;
+    try {
+      // קרא סטייט עדכני מה-DB כדי למנוע החלטות על בסיס זיכרון ישן
+      const { data: s } = await supabase
+        .from("poker_sessions")
+        .select("id, stage, board, deck_remaining, dealer_seat, current_turn, turn_deadline")
+        .eq("id", ses.id)
+        .single();
+      if (!s) return;
 
-    // אפס מצב סטריט
-    await resetStreetActs();
+      // אם נשאר שחקן אחד — ניצחון אוטומטי ללא דירוג
+      const aliveNow = players.filter(p => !p.folded);
+      if (aliveNow.length <= 1) {
+        const winnerSeat = aliveNow[0]?.seat_index;
+        await supabase.from("poker_sessions").update({
+          stage: "showdown", winners: winnerSeat!=null ? [winnerSeat] : [], current_turn: null, turn_deadline: null
+        }).eq("id", s.id);
+        return;
+      }
 
-    let { board = [], deck_remaining = [], stage, dealer_seat } = ses;
-    const d = [...deck_remaining];
-    
-    if(stage==="preflop"){ 
-      board = [...board, d.pop(), d.pop(), d.pop()]; 
-      stage="flop"; 
-    }
-    else if(stage==="flop"){ 
-      board = [...board, d.pop()]; 
-      stage="turn"; 
-    }
-    else if(stage==="turn"){ 
-      board = [...board, d.pop()]; 
-      stage="river"; 
-    }
-    else if(stage==="river"){ 
-      stage="showdown"; 
-    }
+      const board = Array.isArray(s.board) ? [...s.board] : [];
+      let d = Array.isArray(s.deck_remaining) ? [...s.deck_remaining] : [];
 
-    let next = null;
-    if(stage!=="showdown"){
-      next = nextSeatAlive(dealer_seat); // first to act after flop: left of dealer
-    }
+      // אל תאפשר יותר מ-5
+      if (board.length >= 5) return;
 
-    await supabase.from("poker_sessions").update({
-      board, deck_remaining: d, stage, current_turn: next, 
-      turn_deadline: next? new Date(Date.now()+TURN_SECONDS*1000).toISOString() : null
-    }).eq("id", ses.id);
+      let nextStage = s.stage;
 
-    if(stage==="showdown"){
-      await showdownAndSettle();
+      if (s.stage === "preflop") {
+        if (board.length !== 0 || d.length < 3) return; // פלופ פעם אחת בלבד
+        board.push(d.pop(), d.pop(), d.pop());
+        nextStage = "flop";
+      } else if (s.stage === "flop") {
+        if (board.length !== 3 || d.length < 1) return;
+        board.push(d.pop());
+        nextStage = "turn";
+      } else if (s.stage === "turn") {
+        if (board.length !== 4 || d.length < 1) return;
+        board.push(d.pop());
+        nextStage = "river";
+      } else if (s.stage === "river") {
+        nextStage = "showdown";
+      } else {
+        return;
+      }
+
+      let next = null;
+      if (nextStage !== "showdown") {
+        next = nextSeatAlive(s.dealer_seat);
+      }
+
+      // עדכון מותנה: רק אם ה-stage לא השתנה מאז הקריאה (מונע ריבוי פתיחות)
+      const { error: updErr } = await supabase
+        .from("poker_sessions")
+        .update({
+          board,
+          deck_remaining: d,
+          stage: nextStage,
+          current_turn: next,
+          turn_deadline: next ? new Date(Date.now()+TURN_SECONDS*1000).toISOString() : null
+        })
+        .eq("id", s.id)
+        .eq("stage", s.stage);
+
+      if (!updErr) {
+        // אפס מצב סטריט רק לאחר התקדמות מוצלחת
+        await resetStreetActs();
+      }
+
+      if (nextStage === "showdown") {
+        await showdownAndSettle();
+      }
+    } finally {
+      advancingRef.current = false;
     }
   }
 
