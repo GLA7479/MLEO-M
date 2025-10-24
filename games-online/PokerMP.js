@@ -148,6 +148,43 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
   const turnPlayer = ses?.current_turn!=null ? seatMap.get(ses.current_turn) : null;
   const bb = ses?.min_bet || 20;
 
+  // ===== Take Seat =====
+  async function takeSeat(seatIndex) {
+    // בדוק שיש סשן פעיל
+    if (!ses || !ses.id) {
+      setMsg("No active game session");
+      return;
+    }
+    
+    // בדוק שיש מספיק כסף ב-vault
+    const currentVault = getVault();
+    if (currentVault < 1000) {
+      setMsg("Insufficient vault balance (min 1000 MLEO)");
+      return;
+    }
+    
+    // הוצא כסף מה-vault
+    const newVault = currentVault - 1000;
+    setVault(newVault);
+    if (setVaultBoth) setVaultBoth(newVault);
+    
+    // צור שחקן חדש
+    await supabase.from("poker_players").upsert({
+      session_id: ses.id,
+      seat_index: seatIndex,
+      player_name: name,
+      stack_live: 1000,
+      bet_street: 0,
+      total_bet: 0,
+      hole_cards: [],
+      folded: false,
+      all_in: false,
+      acted: false
+    }, {
+      onConflict: 'session_id,seat_index'
+    });
+  }
+
   function nextSeatAlive(startIdx){
     for(let k=1;k<=seats;k++){
       const idx = (startIdx + k) % seats;
@@ -480,7 +517,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
       </div>
 
       {/* Board - Fixed Height */}
-      <div className="bg-gradient-to-r from-green-900/20 to-green-800/20 rounded-xl p-2 md:p-3 border border-green-400/30 h-32 sm:h-40">
+      <div className="bg-gradient-to-r from-green-900/20 to-green-800/20 rounded-xl p-2 md:p-3 border border-green-400/30 h-32 sm:h-40 relative">
         <div className="text-center h-full flex flex-col justify-center">
           {/* Hide text during active game for more card space */}
           {!(ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river') && (
@@ -496,6 +533,14 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
             </div>
           )}
         </div>
+        {/* Timer in bottom-left corner */}
+        {ses?.turn_deadline && (
+          <div className="absolute bottom-2 left-2 text-sm">
+            <div className="text-amber-300 font-bold text-lg">
+              ⏰ {Math.max(0, Math.ceil((new Date(ses.turn_deadline).getTime() - Date.now())/1000))}s
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Players Grid */}
@@ -505,7 +550,11 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
           const isTurn = ses?.current_turn===i && ["preflop","flop","turn","river"].includes(ses?.stage);
           const isMe = p?.player_name === name;
           return (
-            <div key={i} className={`rounded-xl border-2 ${isTurn?'border-emerald-400 bg-emerald-900/20':isMe?'border-blue-400 bg-blue-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[120px] md:min-h-[150px] transition-all hover:bg-white/10`}>
+            <div key={i} className={`rounded-xl border-2 ${isTurn?'border-emerald-400 bg-emerald-900/20':isMe?'border-blue-400 bg-blue-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[120px] md:min-h-[150px] transition-all hover:bg-white/10 relative`}>
+              {/* Turn indicator button - top right corner */}
+              {p && (
+                <div className={`absolute top-1 right-1 w-3 h-3 rounded-full ${isTurn ? 'bg-green-500' : 'bg-red-500'} ${isTurn ? 'animate-pulse' : ''}`}></div>
+              )}
               <div className="text-center">
                 {p ? (
                   <div className="space-y-1 md:space-y-2">
@@ -519,7 +568,17 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
                     {isTurn && <div className="text-emerald-400 text-sm font-bold">YOUR TURN</div>}
                   </div>
                 ) : (
-                  <div className="text-white/50 text-sm">Empty Seat</div>
+                  <div className="text-center">
+                    <div className="text-white/50 text-sm mb-2">Empty Seat</div>
+                    {ses && ses.id && (
+                      <button 
+                        onClick={() => takeSeat(i)}
+                        className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-all"
+                      >
+                        TAKE SEAT
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
