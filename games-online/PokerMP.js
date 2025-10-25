@@ -444,11 +444,90 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     await supabase.from("poker_actions").insert({ session_id: sessionId, seat_index: seatIndex, action, amount: pay });
   }
 
+  // ===== Quick Win Helper =====
+  async function quickWin(sessionId, winnerSeat) {
+    // 1) קרא מצב עדכני
+    const { data: ses } = await supabase
+      .from('poker_sessions')
+      .select('id, pot_total')
+      .eq('id', sessionId)
+      .single();
+
+    const { data: pot } = await supabase
+      .from('poker_pots')
+      .select('total')
+      .eq('session_id', sessionId)
+      .maybeSingle();
+
+    const { data: players } = await supabase
+      .from('poker_players')
+      .select('seat_index, bet_street, stack_live, total_bet')
+      .eq('session_id', sessionId);
+
+    // 2) חשב סך הכל על השולחן (pot + כל ההימורים הנוכחיים)
+    const streetSum = players.reduce((s,p)=> s + Number(p.bet_street||0), 0);
+    const potTotal = Number(ses.pot_total||0) + Number(pot?.total||0);
+    const totalPot = potTotal + streetSum;
+
+    // 3) אפס הימור נוכחי אצל כולם (כדי שלא "יישאר על השולחן")
+    await supabase
+      .from('poker_players')
+      .update({ bet_street: 0 })
+      .eq('session_id', sessionId);
+
+    // 4) העבר את כל הפוט למנצח
+    const winner = players.find(p => p.seat_index === winnerSeat);
+    if (winner) {
+      await supabase
+        .from('poker_players')
+        .update({ stack_live: winner.stack_live + totalPot })
+        .match({ session_id: sessionId, seat_index: winnerSeat });
+    }
+
+    // 5) נקה את מצב הסשן — אין תור, אין דדליין, הפוט ריק
+    await supabase
+      .from('poker_sessions')
+      .update({
+        pot_total: 0,
+        stage: 'showdown',
+        current_turn: null,
+        turn_deadline: null,
+      })
+      .eq('id', sessionId);
+
+    await supabase
+      .from('poker_pots')
+      .update({ total: 0 })
+      .eq('session_id', sessionId);
+
+    // 6) רשום לוג פעולה "win"
+    await supabase.from('poker_actions').insert({
+      session_id: sessionId,
+      action: 'win',
+      amount: totalPot,
+      note: `winner seat=${winnerSeat} by fold`,
+    });
+  }
+
   // ===== Player Acts =====
   async function actFold(){
     if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
     await supabase.from("poker_players").update({ folded:true, acted:true }).eq("id", turnPlayer.id);
     await supabase.from("poker_actions").insert({ session_id: ses.id, seat_index: turnPlayer.seat_index, action:"fold" });
+    
+    // בדוק אם נשאר רק שחקן פעיל אחד (Heads-Up Fold)
+    const { data: pls } = await supabase
+      .from('poker_players').select('seat_index, folded, bet_street, stack_live, total_bet')
+      .eq('session_id', ses.id);
+    
+    const alive = (pls || []).filter(p => !p.folded && p.seat_index !== null);
+    if (alive.length === 1) {
+      // ✅ Heads-Up: FOLD -> סגירה מיידית של היד והעברת כל הפוט למנצח
+      const winnerSeat = alive[0].seat_index;
+      await quickWin(ses.id, winnerSeat);
+      return;
+    }
+    
     await afterActionAdvanceStrict();
   }
 
@@ -527,6 +606,46 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
 
     const active = (pls || []).filter(p => !p.folded && p.seat_index !== null);
     if (!active.length) return;
+
+    // ✅ אם נשאר שחקן פעיל אחד – סגירה מיידית והעברת כל הכסף למנצח
+    if (active.length === 1) {
+      const winnerSeat = active[0].seat_index;
+      // חשב את כל הכסף על השולחן: pot_total + סך bet_street של כולם
+      const streetSum = (pls || []).reduce((s,p) => s + Number(p.bet_street||0), 0);
+      const totalPot  = Number(sesNow.pot_total||0) + streetSum;
+
+      // אפס הימור רחוב אצל כולם
+      await supabase.from('poker_players')
+        .update({ bet_street: 0 })
+        .eq('session_id', ses.id);
+
+      // הוסף את כל הקופה ל-stack_live של המנצח
+      const winnerRow = (pls || []).find(p => p.seat_index === winnerSeat);
+      if (winnerRow) {
+        await supabase.from('poker_players')
+          .update({ stack_live: Number(winnerRow.stack_live||0) + totalPot })
+          .eq('id', winnerRow.id);
+      }
+
+      // אפס את הפוט וסיים יד
+      await supabase.from('poker_sessions').update({
+        pot_total: 0,
+        stage: 'showdown',        // או 'lobby' אם אתה פותח יד הבאה מבחוץ
+        current_turn: null,
+        to_call: 0,
+        turn_deadline: null
+      }).eq('id', ses.id);
+
+      // לוג זכייה
+      await supabase.from('poker_actions').insert({
+        session_id: ses.id,
+        seat_index: winnerSeat,
+        action: 'win',
+        amount: totalPot,
+        note: 'winner by fold'
+      });
+      return; // לא ממשיכים חישובי תור/רחוב
+    }
 
     // 2) חשב הימור-שיא ברחוב
     const maxBet = Math.max(0, ...active.map(p => Number(p.bet_street || 0)));
