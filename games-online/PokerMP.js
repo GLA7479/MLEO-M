@@ -122,6 +122,9 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   const [roomMembers, setRoomMembers] = useState([]);
   const [betInput, setBetInput] = useState(0);
   const [msg, setMsg] = useState("");
+  const [showRebuy, setShowRebuy] = useState(false);
+  const [rebuyAmt, setRebuyAmt] = useState(1000);
+  const [rebuyBusy, setRebuyBusy] = useState(false);
   const tickRef = useRef(null);
   const startingRef = useRef(false);
   const advancingRef = useRef(false);
@@ -269,6 +272,59 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     return created;
   }
 
+  // ===== Vault Management =====
+  function safeRead(k, d){ try{ const r=localStorage.getItem(k); return r? JSON.parse(r):d }catch{ return d } }
+  function safeWrite(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)) }catch{} }
+
+  function readVault(){ 
+    const rushData = safeRead("mleo_rush_core_v4", {});
+    return Math.max(0, Number(rushData.vault || 0));
+  }
+  
+  function writeVault(v){ 
+    const rushData = safeRead("mleo_rush_core_v4", {});
+    rushData.vault = Math.max(0, Math.floor(v));
+    safeWrite("mleo_rush_core_v4", rushData);
+    
+    // Update main page state if callback exists
+    if (window.updateVaultCallback) {
+      window.updateVaultCallback(rushData.vault);
+    }
+  }
+
+  // ===== Re-buy Management =====
+  const MIN_REBUY = 100;        // Can be changed
+  const DEFAULT_REBUY = 1000;   // Default for quick button
+
+  async function doRebuy(amount) {
+    if (!ses?.stage === 'lobby' || !myRow?.id) return;
+    const vault = readVault();
+    const amt = Math.min(Math.max(MIN_REBUY, Math.floor(Number(amount||0))), vault);
+    if (amt <= 0) return;
+    try{
+      setRebuyBusy(true);
+      writeVault(vault - amt);
+      await supabase.from('poker_players')
+        .update({ stack_live: Number(myRow.stack_live||0) + amt })
+        .eq('id', myRow.id);
+      setShowRebuy(false);
+    } finally {
+      setRebuyBusy(false);
+    }
+  }
+
+  async function rebuy(amount){
+    await doRebuy(amount);
+  }
+
+  // ===== Leave Seat =====
+  async function leaveSeat(){
+    if(!ses || !myRow) return;
+    await supabase.from('poker_players')
+      .update({ seat_index: null })
+      .eq('id', myRow.id);
+  }
+
   // ===== Take Seat =====
   async function takeSeat(seatIndex) {
     if (!clientId) { setMsg("Client not recognized"); return; }
@@ -285,7 +341,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     // בדיקת יתרה - minimum buy-in
     const minBuyin = Math.max(Number(session?.min_buyin || 0), 1000);
     const want = Math.floor(Math.max(minBuyin, minBuyin));
-    const currentVault = getVaultFromProps(vault);
+    const currentVault = readVault();
     
     if (currentVault < want) { 
       setMsg(`Insufficient vault balance (min ${minBuyin} MLEO)`); 
@@ -351,7 +407,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       }
 
       // ניכוי מה-vault רק אחרי הצלחה
-      setVaultFromProps(setVaultBoth, currentVault - want);
+      writeVault(currentVault - want);
     }
 
     setMsg("");
@@ -871,14 +927,54 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     }
   }
 
+  // ===== Helper Functions =====
+  function isMyTurn(ses, me) {
+    if (!ses || !me) return false;
+    return ses.current_turn === me.seat_index;
+  }
+
   // ===== UI =====
   const board = ses?.board||[];
   const seatMapMemo = useMemo(()=> new Map(players.map(p=>[p.seat_index,p])), [players]);
   const myRow = players.find(p => p.client_id === clientId) || null;
-  const myTurn = canActNow(ses, myRow);
-  const canCall = Number(ses?.to_call || 0) > 0;   // לקריאה ויזואלית בלבד
+
+  // ===== Bust-out Check =====
+  useEffect(()=>{
+    if (!ses?.stage || !myRow) return;
+
+    // End of hand: lobby or showdown that ended (without turn_deadline)
+    const handOver = ses.stage === 'lobby' || (ses.stage === 'showdown' && !ses.turn_deadline);
+    if (!handOver) return;
+
+    const vault = readVault();
+    const stack = Number(myRow.stack_live||0);
+
+    // No chips on table
+    if (stack <= 0) {
+      if (vault > 0) {
+        setRebuyAmt(Math.min(DEFAULT_REBUY, vault));
+        setShowRebuy(true);         // ✅ Opens rebuy popup
+      } else {
+        // No Vault -> can only offer seat exit/info
+        setShowRebuy(false);
+        if (myRow.seat_index != null) {
+          leaveSeat();
+          setMsg("Left table: No coins in Vault");
+        }
+      }
+    }
+  }, [ses?.stage, ses?.turn_deadline, myRow?.stack_live]);
+  
+  const myTurn = isMyTurn(ses, myRow);
+  const canCall = Number(ses?.to_call || 0) > 0;   // For visual display only
   const canCheck = !canCall;
   const pot = ses?.pot_total || players.reduce((sum,p)=> sum + (p.total_bet||0), 0);
+  
+  // ===== Vault and Stack Management =====
+  const myVault = readVault();
+  const myStack = Number(myRow?.stack_live||0);
+  const canActNow = myTurn && myStack > 0;          // During hand - must have chips on table
+  const inLobby = ses?.stage === 'lobby';
 
   if (!roomId) return <div className="w-full h-full flex items-center justify-center text-white/70">Select or create a room to start.</div>;
 
@@ -1024,16 +1120,16 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
           <div className="text-white/80 text-xs mb-1 font-semibold">Player Actions</div>
           <div className="space-y-1">
             <div className="flex gap-1 flex-wrap">
-              <button onClick={actFold} disabled={!myTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={actFold} disabled={!canActNow} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 FOLD
               </button>
-              <button onClick={actCheck} disabled={!myTurn || !canCheck} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={actCheck} disabled={!canActNow || !canCheck} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 CHECK
               </button>
-              <button onClick={actCall} disabled={!myTurn || !canCall} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={actCall} disabled={!canActNow || !canCall} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 CALL
               </button>
-              <button onClick={actAllIn} disabled={!myTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={actAllIn} disabled={!canActNow} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 ALL-IN
               </button>
             </div>
@@ -1046,10 +1142,10 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
                 placeholder="Amount"
               disabled={!myTurn}
               />
-              <button onClick={()=>actBet(betInput)} disabled={!myTurn || canCall || betInput<=0} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={()=>actBet(betInput)} disabled={!canActNow || canCall || betInput<=0} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 BET
               </button>
-              <button onClick={()=>actRaise(betInput)} disabled={!myTurn || !canCall || betInput<=0} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={()=>actRaise(betInput)} disabled={!canActNow || !canCall || betInput<=0} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 RAISE
               </button>
             </div>
@@ -1065,6 +1161,20 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
                 Pot
               </button>
             </div>
+
+            {/* Vault and Re-buy Messages */}
+            {!canActNow && !inLobby && myStack<=0 && (
+              <div className="text-xs text-red-400 mt-2">Busted from table • Add coins to Vault to continue</div>
+            )}
+            {inLobby && myVault > 0 && (
+              <button 
+                className="px-3 py-2 rounded-md bg-indigo-600 text-white ml-2 text-xs"
+                onClick={()=>{ setRebuyAmt(Math.min(DEFAULT_REBUY, readVault())); setShowRebuy(true); }}
+                title={`Vault: ${myVault.toLocaleString()} MLEO`}
+              >
+                Load from Vault
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1086,6 +1196,50 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
           </div>
         )}
       </div>
+
+      {/* Re-buy Modal */}
+      {showRebuy && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="w-[92%] max-w-md rounded-2xl bg-[#121220] p-5 shadow-xl border border-white/10">
+            <h3 className="text-lg font-semibold text-white mb-3">Load from Vault</h3>
+            <p className="text-sm text-white/70 mb-4">
+              Vault Balance: <b>{readVault().toLocaleString()} MLEO</b>
+            </p>
+
+            <div className="flex items-center gap-2 mb-3">
+              <input
+                type="number"
+                min={MIN_REBUY}
+                max={readVault()}
+                value={rebuyAmt}
+                onChange={e=>setRebuyAmt(Number(e.target.value||0))}
+                className="flex-1 bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-white outline-none"
+              />
+              <button className="px-2 py-2 rounded-lg bg-white/10 text-white"
+                      onClick={()=>setRebuyAmt(Math.min(500, readVault()))}>500</button>
+              <button className="px-2 py-2 rounded-lg bg-white/10 text-white"
+                      onClick={()=>setRebuyAmt(Math.min(1000, readVault()))}>1K</button>
+              <button className="px-2 py-2 rounded-lg bg-white/10 text-white"
+                      onClick={()=>setRebuyAmt(readVault())}>MAX</button>
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <button className="px-3 py-2 rounded-lg bg-white/10 text-white"
+                      onClick={()=>setShowRebuy(false)} disabled={rebuyBusy}>Cancel</button>
+              <button className="px-3 py-2 rounded-lg bg-emerald-600 text-white"
+                      onClick={()=>doRebuy(rebuyAmt)} disabled={rebuyBusy || !inLobby}>
+                {rebuyBusy ? 'Loading…' : 'Load to Table'}
+              </button>
+            </div>
+
+            {!inLobby && (
+              <div className="text-xs text-yellow-400 mt-3">
+                Can only load from Vault between hands (in Lobby).
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
