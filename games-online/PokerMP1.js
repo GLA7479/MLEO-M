@@ -750,9 +750,115 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     });
   }
 
+  // ===== All-In Capped Helper =====
+  async function applyAllInCapped(sessionId, actorSeat) {
+    // קרא מצב נוכחי
+    const { data: ses } = await supabase
+      .from('poker_sessions').select('id').eq('id', sessionId).single();
+
+    const { data: pls } = await supabase
+      .from('poker_players')
+      .select('id, seat_index, bet_street, stack_live, folded')
+      .eq('session_id', sessionId);
+
+    const me = pls.find(p => p.seat_index === actorSeat);
+    if (!me || me.folded) return { ok: false, reason: 'no-actor' };
+
+    // גובה ההשקעה המקסימלית שהיריבים יכולים לכסות (Heads-Up זה פשוט)
+    const opps = pls.filter(p => p.seat_index !== actorSeat && !p.folded);
+    const oppMaxCommit = Math.max(
+      0,
+      ...opps.map(o => Number(o.bet_street||0) + Number(o.stack_live||0))
+    );
+
+    // כמה אני יכול "להתחייב" סה"כ ביד: מה שכבר שמתי + כמה שנשאר לי
+    const myMaxCommit = Number(me.bet_street||0) + Number(me.stack_live||0);
+
+    // ה"התחייבות" החדשה לא יכולה לעבור את מה שהיריבים מסוגלים לכסות
+    const targetCommit = Math.min(myMaxCommit, oppMaxCommit);
+
+    // כמה עוד צריך להוסיף כרגע (מעל מה שכבר שמתי)
+    const addNow = Math.max(0, targetCommit - Number(me.bet_street||0));
+
+    if (addNow > 0) {
+      // מזיזים לקופה רק את הסכום המכוסה
+      await takeChips(sessionId, actorSeat, addNow);
+    }
+
+    // אם תרמתי את כל מה שהיה לי – אני באמת ALL-IN, אחרת אני לא ALL-IN
+    const { data: meAfter } = await supabase
+      .from('poker_players')
+      .select('stack_live')
+      .eq('id', me.id)
+      .single();
+
+    const reallyAllIn = Number(meAfter?.stack_live||0) === 0;
+
+    await supabase
+      .from('poker_players')
+      .update({ all_in: reallyAllIn, acted: true })
+      .eq('id', me.id);
+
+    return { ok: true, all_in: reallyAllIn };
+  }
+
+  // ===== Auto Runout Helper =====
+  async function maybeAutoRunoutToShowdown(sessionId) {
+    const { data: ses } = await supabase
+      .from('poker_sessions')
+      .select('id, stage, board, deck_remaining, pot_total')
+      .eq('id', sessionId).single();
+
+    const { data: pls } = await supabase
+      .from('poker_players')
+      .select('folded, all_in, seat_index, bet_street')
+      .eq('session_id', sessionId);
+
+    const alive = (pls||[]).filter(p => !p.folded);
+    if (!alive.length) return;
+    const everyoneLocked = alive.every(p => p.all_in === true);
+
+    if (!everyoneLocked) return; // עדיין יש שחקן שיכול לפעול
+
+    // אסוף גם הימור רחוב שעוד לא הוזז לפוט
+    const streetSum = (pls||[]).reduce((s,p)=> s + Number(p.bet_street||0), 0);
+    if (streetSum > 0) {
+      await supabase.from('poker_players')
+        .update({ bet_street: 0 })
+        .eq('session_id', sessionId);
+
+      await supabase.from('poker_sessions')
+        .update({ pot_total: Number(ses.pot_total||0) + streetSum, to_call: 0 })
+        .eq('id', sessionId);
+    }
+
+    // השלם לוח עד 5 קלפים
+    let board = [...(ses.board||[])];
+    let deck  = [...(ses.deck_remaining||[])];
+
+    if (board.length === 0 && deck.length >= 3) { board.push(...deck.splice(0,3)); } // פלופ
+    if (board.length === 3 && deck.length >= 1) { board.push(...deck.splice(0,1)); } // טרן
+    if (board.length === 4 && deck.length >= 1) { board.push(...deck.splice(0,1)); } // ריבר
+
+    await supabase.from('poker_sessions').update({
+      board,
+      deck_remaining: deck,
+      stage: 'showdown',
+      current_turn: null,
+      to_call: 0,
+      turn_deadline: null
+    }).eq('id', sessionId);
+
+    // בשואודאון: הצגת קלפים לשחקנים שלא קיפלו נעשית כבר ב־UI (לפי ses.stage==='showdown' && !folded)
+    // ואם יש לך פונקציית settlePots – קרא אותה:
+    if (typeof settlePots === 'function') {
+      await settlePots(sessionId);
+    }
+  }
+
   async function actFold(){
     if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
-    await supabase.from("poker_players").update({ folded:true, acted:true }).eq("id", turnPlayer.id);
+    await supabase.from("poker_players").update({ folded:true, acted:true, hole_cards: [] }).eq("id", turnPlayer.id);
     await supabase.from("poker_actions").insert({ session_id: ses.id, seat_index: turnPlayer.seat_index, action:"fold" });
     
     // בדוק אם נשאר רק שחקן פעיל אחד (Heads-Up Fold)
@@ -826,23 +932,24 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
   async function actAllIn(){
     if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
     if(turnPlayer.stack_live <= 0) return; // Additional check
-    
-    const pay = turnPlayer.stack_live;
-    const actType = (maxStreetBet(players)===0 ? "bet" : "raise");
-    
-    // Update player to ALL-IN
-    await supabase.from("poker_players").update({
-      all_in: true,
-      acted: true
-    }).eq("id", turnPlayer.id);
-    
-    await takeChips(ses.id, turnPlayer.seat_index, pay, "allin");
-    
+
+    // ✅ תן לשחקן לתרום רק מה שמכוסה מול היריב/ים
+    await applyAllInCapped(ses.id, turnPlayer.seat_index);
+
+    await supabase.from('poker_actions').insert({
+      session_id: ses.id, 
+      seat_index: turnPlayer.seat_index, 
+      action: 'allin', 
+      amount: null
+    });
+
+    // אם כולם נעולים (או מקופלים), מריצים ראנאאוט אוטומטי
+    await maybeAutoRunoutToShowdown(ses.id);
+
     // Reset acted for all others (who will need to respond)
     const others = players.filter(p=>p.id!==turnPlayer.id && !p.folded && !p.all_in).map(p=>p.id);
     if(others.length) await supabase.from("poker_players").update({ acted:false }).in("id", others);
     
-    await supabase.from("poker_actions").insert({ session_id: ses.id, seat_index: turnPlayer.seat_index, action: actType, amount: pay });
     await afterActionAdvance(true);
   }
 
@@ -905,7 +1012,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
 
     await supabase.from("poker_sessions").update({
       pot_total: 0,
-      stage:"showdown", 
+      stage:"lobby",         // ✅ אין שואודאון – ניצחון בקיפול
       current_turn:null, 
       turn_deadline:null
     }).eq("id", sessionId);
@@ -1005,7 +1112,11 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
                     <div className="text-emerald-300 text-xs font-semibold">Stack: {fmt(p.stack_live)}</div>
                     <div className="text-cyan-300 text-xs">Bet: {fmt(p.bet_street||0)}</div>
                     <div className="text-yellow-300 text-sm">Total: {fmt(p.total_bet||0)}</div>
-                    <HandView hand={p.hole_cards} hidden={!isMe} isDealing={ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river'}/>
+                    <HandView 
+                      hand={p.hole_cards} 
+                      hidden={!(isMe || (ses?.stage === 'showdown' && Array.isArray(ses?.board) && ses.board.length === 5 && !p?.folded))} 
+                      isDealing={ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river'}
+                    />
                     {p.folded && <div className="text-red-400 text-sm font-bold">FOLDED</div>}
                     {p.all_in && <div className="text-yellow-400 text-sm font-bold">ALL-IN</div>}
                     {isTurn && <div className="text-emerald-400 text-sm font-bold">YOUR TURN</div>}
