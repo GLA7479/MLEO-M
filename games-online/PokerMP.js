@@ -124,6 +124,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   const [msg, setMsg] = useState("");
   const tickRef = useRef(null);
   const startingRef = useRef(false);
+  const advancingRef = useRef(false);
 
   // ===== Realtime session =====
   useEffect(() => {
@@ -176,9 +177,6 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
 
   const clientId = useMemo(() => getClientId(), []);
 
-  // מניעת מירוצים בהתקדמות רחובות (flop/turn/river)
-  const advancingRef = useRef(false);
-
   async function autopilot() {
     if (!isLeader) return;
     const seatedCount = players.filter(p => p.seat_index !== null).length;
@@ -189,17 +187,6 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       return;
     }
 
-    // אם הרחוב התייצב (אין to_call וכולם השוו) — עבור
-    if (ses && ['preflop','flop','turn','river'].includes(ses.stage)) {
-      const { data: pls } = await supabase
-        .from('poker_players').select('seat_index,folded,bet_street').eq('session_id', ses.id);
-      const active = (pls||[]).filter(p => !p.folded && p.seat_index !== null);
-      const maxBet = Math.max(0, ...active.map(p=>Number(p.bet_street||0)));
-      const unsettled = active.some(p => Number(p.bet_street||0) !== maxBet);
-      if (!unsettled && Number(ses.to_call||0) === 0) {
-        await engineAdvanceStreet(ses.id);
-      }
-    }
 
     // אחרי showdown — המתן קצת ואז התחל יד חדשה
     if (ses && ses.stage === 'showdown') {
@@ -480,20 +467,18 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   }
 
   async function actCall(){
-    // חישוב החוב אליי לפי DB עדכני
-    const { data: sesNow } = await supabase
-      .from('poker_sessions').select('id,to_call').eq('id', ses.id).single();
     if (!isMyTurn(ses, myRow)) return;
-
-    const need = Math.max(0, Number(sesNow.to_call || 0));
+    // חישוב חוב אליי: max(bet_street) - שלי
+    const { data: pls } = await supabase
+      .from('poker_players').select('seat_index,folded,bet_street').eq('session_id', ses.id);
+    const active = (pls||[]).filter(p => !p.folded && p.seat_index !== null);
+    const maxBet = Math.max(0, ...active.map(p => Number(p.bet_street||0)));
+    const mine = Number(myRow.bet_street || 0);
+    const need = Math.max(0, maxBet - mine);
     if (need <= 0) return;
 
     await takeChips(ses.id, myRow.seat_index, need, 'call');
-
-    await supabase.from('poker_players')
-      .update({ bet_street: Number(myRow.bet_street || 0) + need, acted: true })
-      .eq('id', myRow.id);
-
+    // הסר את העדכון הכפול של bet_street - takeChips כבר עושה את זה
     await afterActionAdvanceStrict();
   }
 
@@ -507,10 +492,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     if (amt <= 0) return;
 
     await takeChips(ses.id, myRow.seat_index, amt, 'bet');
-    await supabase.from('poker_players')
-      .update({ bet_street: Number(myRow.bet_street || 0) + amt, acted: true })
-      .eq('id', myRow.id);
-
+    await supabase.from('poker_sessions').update({ last_raiser: myRow.seat_index }).eq('id', ses.id);
     await afterActionAdvanceStrict();
   }
 
@@ -520,10 +502,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     if (add <= 0) return;
 
     await takeChips(ses.id, myRow.seat_index, add, 'raise');
-    await supabase.from('poker_players')
-      .update({ bet_street: Number(myRow.bet_street || 0) + add, acted: true })
-      .eq('id', myRow.id);
-
+    await supabase.from('poker_sessions').update({ last_raiser: myRow.seat_index }).eq('id', ses.id);
     await afterActionAdvanceStrict();
   }
 
@@ -533,11 +512,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     if (pay <= 0) return;
 
     await takeChips(ses.id, myRow.seat_index, pay, 'allin');
-    // אל תרשום insert כפול ללוג אם takeChips כבר רושמת
-
-    await supabase.from('poker_players')
-      .update({ bet_street: Number(myRow.bet_street || 0) + pay, acted: true })
-      .eq('id', myRow.id);
+    // הסר את העדכון הכפול של bet_street - takeChips כבר עושה את זה
 
     await afterActionAdvanceStrict();
   }
@@ -571,13 +546,32 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     }
 
     if (nextSeat === null) {
-      // כולם שווים -> לנקות חוב לפני מעבר רחוב
-      await supabase.from('poker_sessions')
-        .update({ to_call: 0, current_turn: null })
-        .eq('id', ses.id);
+      // כולם השוו: הרחוב מסתיים רק כשחזרנו ל-Last Aggressor והוא פעל (למשל CHECK).
+      const last = sesNow.last_raiser ?? null;
+      const lastRow = last!=null ? active.find(p=>p.seat_index===last) : null;
 
-      // ה-engine יבדוק settled ויחלק קלפים (flop/turn/river/showdown)
-      await engineAdvanceStreet(ses.id);
+      // אם עדיין לא חזרנו אליו – העבר לו את התור עם to_call=0 והמתן לפעולה שלו.
+      if (last!=null && sesNow.current_turn !== last) {
+        await supabase.from('poker_sessions').update({
+          current_turn: last,
+          to_call: 0,
+          turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
+        }).eq('id', ses.id);
+        return;
+      }
+
+      // אם זה התור של ה-Last Aggressor והוא כבר 'acted' (למשל עשה CHECK) – התקדמות רחוב.
+      if (lastRow?.acted) {
+        if (advancingRef.current) return;
+        advancingRef.current = true;
+        try {
+          await supabase.from('poker_sessions').update({ to_call: 0 }).eq('id', ses.id);
+          await engineAdvanceStreet(ses.id);
+        } finally {
+          advancingRef.current = false;
+        }
+      }
+      // אחרת – מחכים לפעולה שלו (אין advance עצמאי)
       return;
     }
 
