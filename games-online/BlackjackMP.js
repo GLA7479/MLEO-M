@@ -177,13 +177,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     console.log('[BJ] state=', session?.state);
   }, [session?.state]);
 
-  // חלון חסד למניעת ג'יטר ברילטיים
-  useEffect(() => {
-    if (session?.current_player_id === myRow?.id && session?.state === 'acting' && myRow?.status === 'acting') {
-      setTurnSince(Date.now());
-    }
-  }, [session?.current_player_id, session?.state, myRow?.status, myRow?.id]);
-
+  // 1) מחשבים קודם את myRow
   const myRow = useMemo(
     () => {
       // מצא את השורה הנוכחית של השחקן (עם hand_idx הנוכחי)
@@ -196,6 +190,19 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     },
     [players, name, session?.current_player_id]
   );
+
+  // 2) גוזרים את myTurn מ-myRow
+  const myTurn = useMemo(() => (
+    !!myRow &&
+    session?.current_player_id === myRow.id &&
+    session?.state === 'acting' &&
+    myRow.status === 'acting'
+  ), [session?.current_player_id, session?.state, myRow?.id, myRow?.status]);
+
+  // 3) חלון חסד קצר לפלטר ג'יטר ברילטיים
+  useEffect(() => {
+    if (myTurn) setTurnSince(Date.now());
+  }, [myTurn]);
 
 
   // Leader detection
@@ -218,22 +225,16 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     if (!Number.isFinite(v) || v < MIN_BET) return MIN_BET;
     return Math.min(v, getVault());
   };
+  // 4) שאר הנגזרות משתמשות ב-canActNow / myTurn
+  const canActNow = myTurn || (turnSince && Date.now() - turnSince < 200);
+  const turnGlow = myTurn ? 'ring-2 ring-emerald-400' : '';
+  const canDouble = myTurn && Array.isArray(myRow?.hand) && myRow.hand.length === 2;
+  const canSurrender = canDouble;
+
   // Button availability helpers
   const canPlaceBet = !!myRow && ['lobby','betting'].includes(session?.state);
   const canDeal = session?.state === 'betting';
-  const myTurn = !!myRow && session?.current_player_id === myRow.id && session?.state === 'acting' && myRow.status === 'acting';
   const canSettle = session?.state === 'acting'; // האוטופיילוט יעשה לבד, זה רק fallback ידני
-  const turnGlow = myTurn ? 'ring-2 ring-emerald-400' : '';
-
-  const canActNow = myTurn || (turnSince && Date.now() - turnSince < 200);
-
-  // ניהול הכפתורים – חישוב חד-משמעי לשימוש כפול
-  const canDouble =
-    canActNow &&
-    Array.isArray(myRow?.hand) &&
-    myRow.hand.length === 2;
-
-  const canSurrender = canDouble; // אותם תנאים
 
   // tap actions למניעת לחיצה כפולה
   const hitTap = useTapAction(hit);
