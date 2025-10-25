@@ -142,14 +142,47 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const [banner, setBanner] = useState(null); // {title, lines: []}
   const [timerTick, setTimerTick] = useState(0);
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
+  const [turnSince, setTurnSince] = useState(0);
 
-  // נקה snapshot כשחוזרים לשלב ההימורים
+  // hook קטן למניעת לחיצה כפולה ולביטול mouse emulation
+  function useTapAction(action) {
+    const [busy, setBusy] = useState(false);
+    return {
+      busy,
+      handler: async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (busy) return;
+        setBusy(true);
+        try { await action(); } finally {
+          // השהיה קצרה כדי למנוע שליחה כפולה מרילטיים
+          setTimeout(()=>setBusy(false), 150);
+        }
+      }
+    };
+  }
+
+  // נקה snapshot רק כשנכנסים לסיבוב חדש (betting / lobby / dealing)
   useEffect(() => {
-    if (session?.state === 'betting' && endedSnapshot) {
-      // מנקה snapshot רק כשחוזרים לשלב ההימורים
+    if (session?.state === 'betting' || session?.state === 'lobby' || session?.state === 'dealing') {
       setEndedSnapshot(null);
     }
   }, [session?.state]);
+
+  // לוגים לבדיקות
+  useEffect(() => {
+    if (endedSnapshot) console.log('[BJ] snapshot set at', endedSnapshot.takenAt);
+  }, [endedSnapshot]);
+  useEffect(() => {
+    console.log('[BJ] state=', session?.state);
+  }, [session?.state]);
+
+  // חלון חסד למניעת ג'יטר ברילטיים
+  useEffect(() => {
+    if (session?.current_player_id === myRow?.id && session?.state === 'acting' && myRow?.status === 'acting') {
+      setTurnSince(Date.now());
+    }
+  }, [session?.current_player_id, session?.state, myRow?.status, myRow?.id]);
 
   const myRow = useMemo(
     () => {
@@ -192,13 +225,21 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const canSettle = session?.state === 'acting'; // האוטופיילוט יעשה לבד, זה רק fallback ידני
   const turnGlow = myTurn ? 'ring-2 ring-emerald-400' : '';
 
+  const canActNow = myTurn || (turnSince && Date.now() - turnSince < 200);
+
   // ניהול הכפתורים – חישוב חד-משמעי לשימוש כפול
   const canDouble =
-    myTurn &&
+    canActNow &&
     Array.isArray(myRow?.hand) &&
     myRow.hand.length === 2;
 
   const canSurrender = canDouble; // אותם תנאים
+
+  // tap actions למניעת לחיצה כפולה
+  const hitTap = useTapAction(hit);
+  const standTap = useTapAction(stand);
+  const doubleTap = useTapAction(double);
+  const splitTap = useTapAction(splitHand);
 
   // bootstrap session with new schema
   useEffect(() => {
@@ -463,7 +504,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     const deadline = new Date(Date.now() + 15000).toISOString(); // 15 שניות הימור
     const { error } = await supabase
       .from('bj_sessions')
-      .update({ state: 'betting', bet_deadline: deadline })
+      .update({ state: 'betting', bet_deadline: deadline, insuranceOffered: false })
       .eq('id', session.id);
     if (error) console.error('[openBetting] error:', error);
   }
@@ -1131,21 +1172,21 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
               <div className="text-white font-bold text-xs mb-0.5">Dealer</div>
             )}
             <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-0.5 gap-0.5">
-              {(
-                (session?.state === 'ended')
-                  ? (endedSnapshot?.dealer || [])
-                  : (session?.dealer_hand || [])
-              ).map((c,i)=>(
-                <Card key={i} code={c} hidden={session?.dealer_hidden && i===1 && session?.state!=='ended'} isDealing={session?.state === 'dealing' || session?.state === 'acting'} />
-              ))}
+              {(() => {
+                const showDealerFromSnap = (session?.state === 'settling' || session?.state === 'ended') && endedSnapshot;
+                const dealerCards = showDealerFromSnap ? (endedSnapshot?.dealer || []) : (session?.dealer_hand || []);
+                return dealerCards.map((c,i)=>(
+                  <Card key={i} code={c} hidden={session?.dealer_hidden && i===1 && !showDealerFromSnap} isDealing={session?.state === 'dealing' || session?.state === 'acting'} />
+                ));
+              })()}
             </div>
             {!(session?.state === 'dealing' || session?.state === 'acting') && (
               <div className="text-white/80 text-xs mt-0.5">
-                Total: {session?.dealer_hidden ? "—" : (handValue(
-                  (session?.state === 'ended')
-                    ? (endedSnapshot?.dealer || [])
-                    : (session?.dealer_hand || [])
-                ) || "—")}
+                {(() => {
+                  const showDealerFromSnap = (session?.state === 'settling' || session?.state === 'ended') && endedSnapshot;
+                  const dealerCards = showDealerFromSnap ? (endedSnapshot?.dealer || []) : (session?.dealer_hand || []);
+                  return `Total: ${session?.dealer_hidden && !showDealerFromSnap ? "—" : (handValue(dealerCards) || "—")}`;
+                })()}
               </div>
             )}
             
@@ -1183,10 +1224,11 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
             let betToShow = occupant?.bet || 0;
             let handToShow = occupant?.hand;
 
-            if (session?.state === 'ended') {
+            const useSnap = (session?.state === 'settling' || session?.state === 'ended') && endedSnapshot;
+            if (useSnap) {
               const snap = endedSnapshot?.players?.find(sp => sp.seat === i);
               if (snap) {
-                // בזמן ENDED – תמיד snapshot!
+                // בזמן settling/ended – תמיד snapshot!
                 nameToShow = snap.player_name;
                 betToShow = snap.bet || 0;
                 handToShow = snap.hand;
@@ -1281,32 +1323,45 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
           <div className="text-white/60 text-xs">Vault: {fmt(getVault())} MLEO</div>
         </div>
 
-        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10 h-full relative z-10 pointer-events-auto">
+        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10 h-full relative z-20 pointer-events-auto select-none">
           <div className="text-white/80 text-xs mb-1 font-semibold">Game Actions</div>
           <div className="grid grid-cols-2 gap-1">
-            <button onClick={hit} disabled={!myTurn}
-              className={`px-2 py-2 md:px-3 md:py-3 rounded bg-gradient-to-r from-emerald-600 to-emerald-700
+            <button 
+              onPointerDown={hitTap.handler}
+              disabled={!canActNow || hitTap.busy}
+              aria-disabled={!canActNow || hitTap.busy}
+              style={{ touchAction: 'manipulation' }}
+              className={`px-2 py-3 md:px-3 md:py-4 rounded bg-gradient-to-r from-emerald-600 to-emerald-700
                         hover:from-emerald-700 hover:to-emerald-800 text-white font-bold text-sm transition-all
                         disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
               HIT
             </button>
-            <button onClick={stand} disabled={!myTurn}
-              className={`px-2 py-2 md:px-3 md:py-3 rounded bg-gradient-to-r from-blue-600 to-blue-700
+            <button 
+              onPointerDown={standTap.handler}
+              disabled={!canActNow || standTap.busy}
+              aria-disabled={!canActNow || standTap.busy}
+              style={{ touchAction: 'manipulation' }}
+              className={`px-2 py-3 md:px-3 md:py-4 rounded bg-gradient-to-r from-blue-600 to-blue-700
                         hover:from-blue-700 hover:to-blue-800 text-white font-bold text-sm transition-all
                         disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
               STAND
             </button>
             <button 
-              onClick={double}
-              onTouchStart={double}
-              disabled={!canDouble}
-              className={`px-2 py-2 md:px-3 md:py-3 rounded bg-gradient-to-r from-amber-600 to-amber-700
+              onPointerDown={doubleTap.handler}
+              disabled={!canDouble || doubleTap.busy}
+              aria-disabled={!canDouble || doubleTap.busy}
+              style={{ touchAction: 'manipulation' }}
+              className={`px-2 py-3 md:px-3 md:py-4 rounded bg-gradient-to-r from-amber-600 to-amber-700
                         hover:from-amber-700 hover:to-amber-800 text-white font-bold text-sm transition-all
                         disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
               DOUBLE
             </button>
-            <button onClick={splitHand} disabled={!myRow || !canSplit(myRow)}
-              className={`px-2 py-2 md:px-3 md:py-3 rounded bg-gradient-to-r from-purple-600 to-purple-700
+            <button 
+              onPointerDown={splitTap.handler}
+              disabled={!myRow || !canSplit(myRow) || splitTap.busy}
+              aria-disabled={!myRow || !canSplit(myRow) || splitTap.busy}
+              style={{ touchAction: 'manipulation' }}
+              className={`px-2 py-3 md:px-3 md:py-4 rounded bg-gradient-to-r from-purple-600 to-purple-700
                         hover:from-purple-700 hover:to-purple-800 text-white font-bold text-sm transition-all
                         disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
               SPLIT
