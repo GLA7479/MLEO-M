@@ -236,11 +236,19 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   const canDeal = session?.state === 'betting';
   const canSettle = session?.state === 'acting'; // האוטופיילוט יעשה לבד, זה רק fallback ידני
 
+  // tap guard למניעת לחיצה כפולה
+  const [lock, setLock] = useState(false);
+  const guard = (fn) => async (...args) => {
+    if (lock) return;
+    try { setLock(true); await fn(...args); }
+    finally { setTimeout(()=>setLock(false), 200); }
+  };
+
   // tap actions למניעת לחיצה כפולה
-  const hitTap = useTapAction(hit);
-  const standTap = useTapAction(stand);
-  const doubleTap = useTapAction(double);
-  const splitTap = useTapAction(splitHand);
+  const hitTap = useTapAction(guard(hit));
+  const standTap = useTapAction(guard(stand));
+  const doubleTap = useTapAction(guard(double));
+  const splitTap = useTapAction(guard(splitHand));
 
   // bootstrap session with new schema
   useEffect(() => {
@@ -402,10 +410,15 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   // ---------- Actions ----------
   async function withFreshMyRow() {
     if (!session?.id) return null;
+    if (myRow?.id) {
+      const { data } = await supabase.from("bj_players").select("*").eq("id", myRow.id).maybeSingle();
+      return data || null;
+    }
     const { data } = await supabase.from("bj_players")
       .select("*")
       .eq("session_id", session.id)
       .eq("client_id", clientId)
+      .eq("hand_idx", 0)
       .maybeSingle();
     return data || null;
   }
@@ -448,11 +461,11 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       hand_idx: 0,
     };
 
-    const up = await supabase
-      .from("bj_players")
-      .upsert(payload, { onConflict: "session_id,client_id" })
-      .select("*")
-      .maybeSingle();
+  const up = await supabase
+    .from("bj_players")
+    .upsert(payload, { onConflict: "session_id,client_id,hand_idx" })
+    .select("*")
+    .maybeSingle();
 
     if (up.error) {
       console.error("Failed to join seat:", up.error);
@@ -887,11 +900,10 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       const newCard1 = shoe.pop();
       const newCard2 = shoe.pop();
       
-      // Update original hand (first card + new card)
+      // עדכון היד הראשונה (נשארת בתור)
       const { error: updateErr } = await supabase.from("bj_players").update({
         hand: [h[0], newCard1],
-        bet: newBet,
-        hand_idx: 0
+        // לא משנים status כאן – נשאר 'acting'
       }).eq("id", row.id);
       
       if (updateErr) {
@@ -902,7 +914,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         return;
       }
       
-      // Create split hand (second card + new card)
+      // יצירת יד שניה
       const { error: insertErr } = await supabase.from('bj_players').insert({
         session_id: session.id,
         seat: row.seat,
@@ -923,12 +935,20 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         return;
       }
       
+      // עדכון הנעל
       const { error: shoeErr } = await supabase.from("bj_sessions").update({ shoe }).eq("id", session.id);
       if (shoeErr) {
         console.error('[splitHand] shoe error:', shoeErr);
       }
       
-      await afterMyMove();
+      // השאר את התור על היד הראשונה ורענן דדליין
+      if (isLeader) {
+        const deadline = new Date(Date.now() + (session?.turn_seconds || 20) * 1000).toISOString();
+        await supabase.from('bj_sessions')
+          .update({ current_player_id: row.id, turn_deadline: deadline })
+          .eq('id', session.id);
+      }
+      // אל תקרא ל-afterMyMove כאן
     } catch (error) {
       console.error('[splitHand] unexpected error:', error);
       setMsg("Split failed - please try again");
@@ -1334,7 +1354,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
               style={{ touchAction: 'manipulation' }}
               className={`px-2 py-3 md:px-3 md:py-4 rounded bg-gradient-to-r from-emerald-600 to-emerald-700
                         hover:from-emerald-700 hover:to-emerald-800 text-white font-bold text-sm transition-all
-                        disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
+                        disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation select-none active:scale-95 ${turnGlow}`}>
               HIT
             </button>
             <button 
@@ -1344,7 +1364,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
               style={{ touchAction: 'manipulation' }}
               className={`px-2 py-3 md:px-3 md:py-4 rounded bg-gradient-to-r from-blue-600 to-blue-700
                         hover:from-blue-700 hover:to-blue-800 text-white font-bold text-sm transition-all
-                        disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
+                        disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation select-none active:scale-95 ${turnGlow}`}>
               STAND
             </button>
             <button 
@@ -1354,7 +1374,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
               style={{ touchAction: 'manipulation' }}
               className={`px-2 py-3 md:px-3 md:py-4 rounded bg-gradient-to-r from-amber-600 to-amber-700
                         hover:from-amber-700 hover:to-amber-800 text-white font-bold text-sm transition-all
-                        disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
+                        disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation select-none active:scale-95 ${turnGlow}`}>
               DOUBLE
             </button>
             <button 
@@ -1364,7 +1384,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
               style={{ touchAction: 'manipulation' }}
               className={`px-2 py-3 md:px-3 md:py-4 rounded bg-gradient-to-r from-purple-600 to-purple-700
                         hover:from-purple-700 hover:to-purple-800 text-white font-bold text-sm transition-all
-                        disabled:opacity-40 disabled:cursor-not-allowed ${turnGlow}`}>
+                        disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation select-none active:scale-95 ${turnGlow}`}>
               SPLIT
             </button>
           </div>
