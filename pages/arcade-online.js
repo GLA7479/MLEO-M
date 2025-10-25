@@ -151,7 +151,7 @@ function GameCard({ game, onSelect }) {
 }
 
 // Game Viewport Component
-function GameViewport({ gameId, vault, setVaultBoth, playerName, roomId }) {
+function GameViewport({ gameId, vault, setVaultBoth, playerName, roomId, tierCode }) {
   const [GameComponent, setGameComponent] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -222,6 +222,7 @@ function GameViewport({ gameId, vault, setVaultBoth, playerName, roomId }) {
       setVaultBoth={setVaultBoth}
       playerName={playerName}
       roomId={roomId}
+      tierCode={tierCode}
     />
   );
 }
@@ -235,6 +236,7 @@ export default function ArcadeOnline() {
   const [playerName, setPlayerName] = useState("");
   const [selectedGame, setSelectedGame] = useState(null);
   const [selectedRoomId, setSelectedRoomId] = useState(null);
+  const [selectedTier, setSelectedTier] = useState(null);
   const [showRoomBrowser, setShowRoomBrowser] = useState(false);
 
   useEffect(() => {
@@ -254,17 +256,22 @@ export default function ArcadeOnline() {
   useEffect(() => {
     const gameId = router.query.game;
     const roomId = router.query.room;
+    const tierParam = router.query.tier;
     
     if (gameId && GAME_REGISTRY.some(g => g.id === gameId)) {
       setSelectedGame(gameId);
       if (roomId) {
         setSelectedRoomId(roomId);
       }
+      if (tierParam) {
+        setSelectedTier(String(tierParam));
+      }
     } else {
       setSelectedGame(null);
       setSelectedRoomId(null);
+      setSelectedTier(null);
     }
-  }, [router.query.game, router.query.room]);
+  }, [router.query.game, router.query.room, router.query.tier]);
 
   function setVaultBoth(next) {
     setVault(next);
@@ -294,7 +301,7 @@ export default function ArcadeOnline() {
     }
   }
 
-  function handleJoinRoom(roomId) {
+  function handleJoinRoom(roomId, tierCode) {
     // Check if player name is entered
     if (!playerName || playerName.trim() === '') {
       alert('Please enter your player name to join a room!');
@@ -302,12 +309,11 @@ export default function ArcadeOnline() {
     }
 
     setSelectedRoomId(roomId);
+    setSelectedTier(tierCode || '10K');
     setShowRoomBrowser(false);
-    const url = {
-      pathname: router.pathname,
-      query: { ...router.query, game: selectedGame, room: roomId }
-    };
-    router.push(url, undefined, { shallow: true });
+    const query = { ...router.query, game: selectedGame, room: roomId };
+    if (selectedGame === 'poker' && tierCode) query.tier = tierCode;
+    router.push({ pathname: router.pathname, query }, undefined, { shallow: true });
   }
 
   async function leaveTable() {
@@ -455,6 +461,7 @@ export default function ArcadeOnline() {
                 setVaultBoth={setVaultBoth}
                 playerName={playerName}
                 roomId={selectedGame === 'dice' ? null : selectedRoomId}
+                tierCode={selectedGame === 'poker' ? selectedTier : undefined}
               />
             </div>
           </div>

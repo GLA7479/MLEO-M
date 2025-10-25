@@ -7,6 +7,43 @@ import {
 } from "../lib/pokerEngine";
 
 const TURN_SECONDS = Number(process.env.NEXT_PUBLIC_POKER_TURN_SECONDS||20);
+const MIN_PLAYERS_TO_START = 2;     // start when 2 are seated
+
+// ===== Vault from props (Arcade Online) - single source of truth =====
+function getVaultFromProps(vaultProp) {
+  return Math.max(0, Number(vaultProp || 0));
+}
+function setVaultFromProps(setVaultBoth, nextAmount) {
+  if (typeof setVaultBoth === 'function') {
+    setVaultBoth(Math.max(0, Math.floor(Number(nextAmount || 0))));
+  }
+}
+
+// ===== Fixed Tiers (client mapping) =====
+const FIXED_TIERS = {
+  '1K':    { min_buyin: 1_000,        sb: 10,       bb: 20 },
+  '10K':   { min_buyin: 10_000,       sb: 100,      bb: 200 },
+  '100K':  { min_buyin: 100_000,      sb: 1_000,    bb: 2_000 },
+  '1M':    { min_buyin: 1_000_000,    sb: 10_000,   bb: 20_000 },
+  '10M':   { min_buyin: 10_000_000,   sb: 100_000,  bb: 200_000 },
+  '100M':  { min_buyin: 100_000_000,  sb: 1_000_000,bb: 2_000_000 },
+};
+
+// returns true if I am seated and it's my turn on an acting street
+function isMyTurn(ses, meRow) {
+  if (!ses || !meRow) return false;
+  const actingStreet = ['preflop','flop','turn','river'].includes(ses.stage);
+  return actingStreet && meRow.seat_index !== null && ses.current_turn === meRow.seat_index;
+}
+
+// display-oriented guard for action buttons
+function canActNow(ses, meRow) {
+  if (!ses || !meRow) return false;
+  if (meRow.seat_index === null) return false;
+  // no actions in lobby/showdown
+  if (ses.stage === 'lobby' || ses.stage === 'showdown') return false;
+  return isMyTurn(ses, meRow);
+}
 
 // Helper functions
 function fmt(n){ n=Math.floor(Number(n||0)); if(n>=1e9)return(n/1e9).toFixed(2)+"B"; if(n>=1e6)return(n/1e6).toFixed(2)+"M"; if(n>=1e3)return(n/1e3).toFixed(2)+"K"; return String(n); }
@@ -56,18 +93,7 @@ function TurnCountdown({ deadline }) {
   return <div className="text-xs text-emerald-300 font-bold">⏱️ {left}s</div>;
 }
 
-export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
-  // Use same vault functions as existing games
-  function getVault() {
-    const rushData = JSON.parse(localStorage.getItem("mleo_rush_core_v4") || "{}");
-    return rushData.vault || 0;
-  }
-
-  function setVault(amount) {
-    const rushData = JSON.parse(localStorage.getItem("mleo_rush_core_v4") || "{}");
-    rushData.vault = amount;
-    localStorage.setItem("mleo_rush_core_v4", JSON.stringify(rushData));
-  }
+export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierCode = '10K' }) {
 
   // הגדר callback לעדכון vault
   useEffect(() => {
@@ -143,16 +169,31 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
 
   async function autopilot() {
     if (!isLeader) return;
-    
-    // אם יש 2+ שחקנים ואין סשן פעיל, התחל משחק
-    if (players.length >= 2 && (!ses || ses.stage === 'lobby')) {
+    const seatedCount = players.filter(p => p.seat_index !== null).length;
+
+    // כשיש 2 שחקנים יושבים — התחל משחק
+    if (seatedCount >= MIN_PLAYERS_TO_START && (!ses || ses.stage === 'lobby')) {
       await startHand();
       return;
     }
-    
-    // אם כולם פעלו, עבור לשלב הבא
-    if (ses && ses.stage !== 'showdown' && everyoneActedOrAllIn()) {
-      await advanceStreet();
+
+    // אם הרחוב התייצב (אין to_call וכולם השוו) — עבור
+    if (ses && ['preflop','flop','turn','river'].includes(ses.stage)) {
+      const active = players.filter(p => !p.folded && p.seat_index !== null);
+      const maxBet = Math.max(...active.map(p=>Number(p.bet_street||0)), 0);
+      const unsettled = active.some(p => Number(p.bet_street||0) !== maxBet);
+      if (!unsettled && Number(ses.to_call||0) === 0) {
+        await advanceStreet();
+      }
+    }
+
+    // אחרי showdown — המתן קצת ואז התחל יד חדשה
+    if (ses && ses.stage === 'showdown') {
+      await new Promise(r => setTimeout(r, 1200));
+      if (players.filter(p => p.seat_index !== null).length >= MIN_PLAYERS_TO_START) {
+        await startHand();
+      }
+      return;
     }
   }
 
@@ -189,22 +230,72 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     return true;
   }
 
+  // ===== Ensure Session exists for room =====
+  async function ensureSession(roomId, tierCode = '10K') {
+    // try get existing session for this room
+    const { data: existing, error: selErr } = await supabase
+      .from('poker_sessions')
+      .select('*')
+      .eq('room_id', roomId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (selErr) {
+      console.warn('ensureSession select error', selErr);
+    }
+    if (existing && existing.length) return existing[0];
+
+    // create fresh session in lobby per selected tier
+    const T = FIXED_TIERS[tierCode] || FIXED_TIERS['10K'];
+    const { data: created, error: insErr } = await supabase
+      .from('poker_sessions')
+      .insert({
+        room_id: roomId,
+        stage: 'lobby',
+        tier_code: tierCode,
+        min_buyin: T.min_buyin,
+        sb: T.sb,
+        bb: T.bb,
+        pot_total: 0,
+      })
+      .select()
+      .single();
+
+    if (insErr) {
+      console.error('ensureSession insert error', insErr);
+      throw insErr;
+    }
+    return created;
+  }
+
   // ===== Take Seat =====
   async function takeSeat(seatIndex) {
     if (!clientId) { setMsg("Client not recognized"); return; }
 
-    // ודא שיש סשן – אם אין, התחל ואז נסה שוב
-    if (!ses || !ses.id) {
-      await startHand();
-      setTimeout(() => takeSeat(seatIndex), 800);
-      return;
+    // מייצר session אם אין - אבל לא משתמש ב-ses המקומי עד ש-הוא refreshing
+    let session = ses;
+    if (!session || !session.id) {
+      session = await ensureSession(roomId, tierCode);
+    }
+
+    // במקביל, עדכן את ה-state המקומי
+    setSes(session);
+
+    // בדיקת יתרה - minimum buy-in
+    const minBuyin = Math.max(Number(session?.min_buyin || 0), 1000);
+    const want = Math.floor(Math.max(minBuyin, minBuyin));
+    const currentVault = getVaultFromProps(vault);
+    
+    if (currentVault < want) { 
+      setMsg(`Insufficient vault balance (min ${minBuyin} MLEO)`); 
+      return; 
     }
 
     // האם כבר יש לי שורה בסשן?
     const { data: mine } = await supabase
       .from("poker_players")
       .select("id, seat_index, client_id")
-      .eq("session_id", ses.id)
+      .eq("session_id", session.id)
       .eq("client_id", clientId)
       .maybeSingle();
 
@@ -212,7 +303,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     const { data: occ } = await supabase
       .from("poker_players")
       .select("id, client_id")
-      .eq("session_id", ses.id)
+      .eq("session_id", session.id)
       .eq("seat_index", seatIndex)
       .maybeSingle();
 
@@ -236,16 +327,12 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
 
     // יצירה חדשה אם אין לי
     if (!mine) {
-      // בדיקת יתרה
-      const currentVault = getVault();
-      if (currentVault < 1000) { setMsg("Insufficient vault balance (min 1000 MLEO)"); return; }
-
       const { error: upErr } = await supabase.from("poker_players").upsert({
-        session_id: ses.id,
+        session_id: session.id,
         seat_index: seatIndex,
         player_name: name,
         client_id: clientId,
-        stack_live: 1000,
+        stack_live: want,
         bet_street: 0,
         total_bet: 0,
         hole_cards: [],
@@ -263,9 +350,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
       }
 
       // ניכוי מה-vault רק אחרי הצלחה
-      const newVault = currentVault - 1000;
-      setVault(newVault);
-      if (setVaultBoth) setVaultBoth(newVault);
+      setVaultFromProps(setVaultBoth, currentVault - want);
     }
 
     setMsg("");
@@ -407,7 +492,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
         room_id: roomId, hand_no:1, stage:"preflop",
         dealer_seat: dealer, sb_seat: sb, bb_seat: bbSeat,
         board:[], deck_remaining: deck, pot_total:0,
-        min_bet: 20, // הוסף min_bet
+        min_bet: 20, // fallback; real bb may be in session if created via ensureSession
         current_turn: (bbSeat+1)%seats,
         turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
       }).select().single();
@@ -425,7 +510,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
         hand_no: exist.hand_no+1, stage:"preflop",
         dealer_seat: dealer, sb_seat: sb, bb_seat: bbSeat,
         board:[], deck_remaining: deck, pot_total:0, winners:[],
-        min_bet: 20, // הוסף min_bet
+        min_bet: (exist?.bb || exist?.min_bet || 20),
         current_turn: (bbSeat+1)%seats,
         turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
       }).eq("id", exist.id).select().single();
@@ -527,11 +612,15 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     }
     // פוסט Blinds – רק אם יש לפחות 2 שחקנים
     if (sit.length >= 2) {
-      const sbAmount = Math.floor((exist?.min_bet || 20) / 2);
-      const bbAmount = (exist?.min_bet || 20);
+      const bbConf = exist?.bb || exist?.min_bet || 20;
+      const sbConf = exist?.sb || Math.floor(bbConf/2);
+      const sbAmount = Math.max(1, Math.floor(sbConf));
+      const bbAmount = Math.max(1, Math.floor(bbConf));
       
       await takeChips(sessionId, sb, sbAmount, "post_sb");
       await takeChips(sessionId, bbSeat, bbAmount, "post_bb");
+      // set to_call to BB so UTG must call/act against it
+      await supabase.from("poker_sessions").update({ to_call: bbAmount }).eq("id", sessionId);
     }
     } finally {
       startingRef.current = false;
@@ -547,20 +636,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
 
     const pay = Math.min(amount, pl.stack_live);
     
-    // אם זה השחקן המקומי, הוצא כסף מה-vault (השוואה לפי client_id)
-    if (pl.client_id && pl.client_id === clientId) {
-      const currentVault = getVault();
-      if (currentVault < pay) {
-        setMsg("Insufficient vault balance");
-        return;
-      }
-      const newVault = currentVault - pay;
-      setVault(newVault);
-      // עדכן גם את ה-state בדף הראשי
-      if (setVaultBoth) {
-        setVaultBoth(newVault);
-      }
-    }
+    // No vault charging during gameplay - only at seat entry
     
     await supabase.from("poker_players").update({
       stack_live: pl.stack_live - pay,
@@ -646,22 +722,34 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     const others = players.filter(p=>p.id!==turnPlayer.id && !p.folded && !p.all_in).map(p=>p.id);
     if(others.length) await supabase.from("poker_players").update({ acted:false }).in("id", others);
     
-    await supabase.from("poker_actions").insert({ session_id: ses.id, seat_index: turnPlayer.seat_index, action: actType, amount: pay });
+    // avoid double logging (takeChips already logs via poker_actions)
     await afterActionAdvance(true);
   }
 
   async function afterActionAdvance(resetOthers=false){
     // בדוק אם כולם פעלו או ALL-IN
     if(everyoneActedOrAllIn()){
-      await advanceStreet();
-      return;
+      // guard settlement: no to_call and equalized bets
+      const active = players.filter(p => !p.folded && p.seat_index !== null);
+      const maxBet = Math.max(...active.map(p=>Number(p.bet_street||0)), 0);
+      const unsettled = active.some(p => Number(p.bet_street||0) !== maxBet);
+      if (!unsettled && Number(ses?.to_call||0) === 0) {
+        await advanceStreet();
+        return;
+      }
     }
     
     // מעבר לשחקן הבא
     const nextIdx = nextSeatAlive(ses.current_turn);
     if(nextIdx !== null){
+      const active = players.filter(p => !p.folded && p.seat_index !== null);
+      const maxBet = Math.max(...active.map(p=>Number(p.bet_street||0)), 0);
+      const nextPlayer = players.find(p => p.seat_index === nextIdx);
+      const nextBet = Number(nextPlayer?.bet_street||0);
+      const newToCall = Math.max(0, maxBet - nextBet);
       await supabase.from("poker_sessions").update({
         current_turn: nextIdx,
+        to_call: newToCall,
         turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
       }).eq("id", ses.id);
     }
@@ -674,10 +762,24 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
     else await actFold();
   }
 
+  // ===== Leave Seat (refund to vault) =====
+  async function leaveSeat(){
+    const me = players.find(p => p.client_id === clientId);
+    if (!me || me.seat_index === null) return;
+    const refund = Number(me.stack_live || 0);
+    await supabase.from('poker_players').update({ seat_index: null }).eq('id', me.id);
+    if (refund > 0) {
+      const now = getVaultFromProps(vault);
+      setVaultFromProps(setVaultBoth, now + refund);
+    }
+  }
+
   // ===== UI =====
   const board = ses?.board||[];
   const seatMapMemo = useMemo(()=> new Map(players.map(p=>[p.seat_index,p])), [players]);
-  const isMyTurn = !!turnPlayer && turnPlayer.client_id === clientId;
+  const myRow = players.find(p => p.client_id === clientId) || null;
+  const isMyTurn = canActNow(ses, myRow);
+  const toCallNow = Number(ses?.to_call || 0);
   const pot = ses?.pot_total || players.reduce((sum,p)=> sum + (p.total_bet||0), 0);
 
   if (!roomId) return <div className="w-full h-full flex items-center justify-center text-white/70">Select or create a room to start.</div>;
@@ -774,6 +876,12 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
             >
               Start / Next Hand
             </button>
+            <button 
+              onClick={leaveSeat}
+              className="px-2 py-1 md:px-3 md:py-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all shadow-lg"
+            >
+              Leave Seat
+            </button>
             {["preflop","flop","turn","river"].includes(ses?.stage) && (
               <button 
                 onClick={()=>advanceStreet(true)}
@@ -783,7 +891,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
               </button>
             )}
           </div>
-          <div className="text-white/60 text-xs mb-2">Vault: {fmt(getVault())} MLEO</div>
+          <div className="text-white/60 text-xs mb-2">Vault: {fmt(getVaultFromProps(vault))} MLEO</div>
           {/* Waiting Players Info */}
           {roomMembers.length > players.length && (
             <div>
@@ -817,10 +925,10 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
               <button onClick={actFold} disabled={!isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 FOLD
               </button>
-              <button onClick={actCheck} disabled={!isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={actCheck} disabled={!isMyTurn || toCallNow>0} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 CHECK
               </button>
-              <button onClick={actCall} disabled={!isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={actCall} disabled={!isMyTurn || toCallNow===0} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 CALL
               </button>
               <button onClick={actAllIn} disabled={!isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
@@ -834,11 +942,12 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
                 onChange={e=>setBetInput(Number(e.target.value||0))}
                 className="flex-1 bg-black/40 text-white text-xs rounded-lg px-1 py-0.5 md:px-2 md:py-1 border border-white/20 focus:border-emerald-400 focus:outline-none"
                 placeholder="Amount"
+              disabled={!isMyTurn}
               />
-              <button onClick={()=>actBet(betInput)} disabled={!isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={()=>actBet(betInput)} disabled={!isMyTurn || toCallNow>0} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 BET
               </button>
-              <button onClick={()=>actRaise(betInput)} disabled={!isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={()=>actRaise(betInput)} disabled={!isMyTurn || toCallNow===0} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 RAISE
               </button>
             </div>
