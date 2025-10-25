@@ -99,6 +99,16 @@ const GAME_REGISTRY = [
     isMultiplayer: true,
     loader: () => import("../games-online/PokerMP").then(m => m.default)
   },
+  {
+    id: "poker-tables",
+    title: "Poker Tables",
+    emoji: "🎰",
+    description: "Texas Hold'em vs Dealer! Strategic betting rounds - PRE-FLOP, FLOP, TURN, RIVER. Best hand wins the pot!",
+    color: "#10B981",
+    isMultiplayer: false,
+    isExternal: true,
+    href: "/tournament"
+  },
 ];
 
 // GameCard component (כמו בדף Arcade)
@@ -286,6 +296,12 @@ export default function ArcadeOnline() {
     }
 
     const game = GAME_REGISTRY.find(g => g.id === gameId);
+    
+    if (game?.isExternal) {
+      // For external games, navigate to the page (replace current page)
+      window.location.href = game.href;
+      return;
+    }
     
     if (game?.isMultiplayer) {
       // For multiplayer games, show room browser first
