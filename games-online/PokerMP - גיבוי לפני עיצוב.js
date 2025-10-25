@@ -60,38 +60,36 @@ function canCheckNow(ses, pls, seatIndex){
   return Number(ses.to_call || 0) === 0 && Number(me.bet_street || 0) === maxBet;
 }
 
-function Card({ code, hidden = false, isDealing = false, size = "normal" }) {
-  if (!code && !hidden) return null;
+function Card({ code, hidden = false, isDealing = false }) {
+  if (!code) return null;
   
-  const r = code ? code.slice(0,-1) : "?", s = code ? code.slice(-1) : "";
+  const r = code.slice(0,-1), s = code.slice(-1);
   const suitIcon = s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
   const suitClass = (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
   
-  // Dynamic sizing based on size prop and game state
-  const sizeClasses = size === "small" ? 
-    (isDealing ? "w-10 h-14 text-sm" : "w-6 h-8 text-xs") : 
-    (isDealing ? "w-12 h-16 text-base" : "w-8 h-10 text-sm");
+  // Dynamic sizing based on game state
+  const cardSize = isDealing ? "w-12 h-16 mx-1 text-sm" : "w-10 h-14 mx-1 text-xs";
   
   if (hidden) {
     return (
-      <div className={`inline-flex items-center justify-center border border-white/30 rounded ${sizeClasses} font-bold bg-white/10`}>
-        <span className="leading-none">🂠</span>
+      <div className={`inline-flex items-center justify-center border-2 border-white/30 rounded-lg ${cardSize} font-bold bg-gradient-to-b from-gray-600 to-gray-800 text-white`}>
+        <span className="leading-none">?</span>
       </div>
     );
   }
   
   return (
-    <div className={`inline-flex items-center justify-center border border-white/30 rounded ${sizeClasses} font-bold bg-gradient-to-b from-white/10 to-white/5 shadow ${suitClass}`}>
+    <div className={`inline-flex items-center justify-center border-2 border-white/30 rounded-lg ${cardSize} font-bold bg-gradient-to-b from-white/10 to-white/5 shadow-lg ${suitClass}`}>
       <span className="leading-none">{r}{suitIcon}</span>
     </div>
   );
 }
 
-function HandView({ hand, hidden = false, isDealing = false, size = "normal" }) {
+function HandView({ hand, hidden = false, isDealing = false }) {
   const h = hand || [];
   return (
     <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap no-scrollbar py-0.5 gap-0.5">
-      {h.length===0 ? <span className="text-white/60 text-xs">—</span> : h.map((c,i)=><Card key={i} code={c} hidden={hidden} isDealing={isDealing} size={size}/>)}
+      {h.length===0 ? <span className="text-white/60 text-sm">—</span> : h.map((c,i)=><Card key={i} code={c} hidden={hidden} isDealing={isDealing}/>)}
     </div>
   );
 }
@@ -982,257 +980,219 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
 
   return (
     <div className="w-full h-full flex flex-col p-1 md:p-2 gap-1 md:gap-2 -mt-1">
+      {/* Header */}
+      <div className="flex items-center justify-between bg-white/5 rounded-xl p-1 md:p-2 border border-white/10">
+        <div className="text-white font-bold text-sm md:text-lg">MLEO Online</div>
+        <div className="flex items-center gap-1 md:gap-2 text-white/80 text-xs">
+          <span>Hand #{ses?.hand_no||"-"}</span>
+          <span>Stage: {ses?.stage||"lobby"}</span>
+          <span>Pot: {fmt(pot)}</span>
+        </div>
+      </div>
 
-      {/* Main Game Area */}
-      <div className="flex-1 flex flex-col gap-1 md:gap-2">
-        {/* Board Section - Fixed Height (like Dealer in BlackjackMP) */}
-        <div className="bg-gradient-to-r from-green-900/20 to-green-800/20 rounded-lg p-2 md:p-3 border border-green-400/30 h-32 sm:h-40 relative">
-          <div className="text-center h-full flex flex-col justify-center">
-            {/* Hide text during active game for more card space */}
-            {!(ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river') && (
-              <div className="text-white font-bold text-xs mb-0.5">Community Cards</div>
-            )}
-            <HandView hand={board} isDealing={ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river'}/>
-            {!(ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river') && (
-              <div className="text-white/80 text-xs mt-0.5">
-                {board.length === 0 ? "No cards yet" : 
-                 board.length === 3 ? "Flop" :
-                 board.length === 4 ? "Turn" : 
-                 board.length === 5 ? "River" : ""}
-              </div>
-            )}
-            
-            {/* Timer in bottom-left corner (like BlackjackMP) */}
-            <div className="absolute bottom-2 left-2 text-sm">
-              {ses?.turn_deadline && (
-                <div className="text-amber-300 font-bold text-lg">
-                  ⏰ {Math.max(0, Math.ceil((new Date(ses.turn_deadline).getTime() - Date.now())/1000))}s
-                </div>
-              )}
+      {/* Board - Fixed Height */}
+      <div className="bg-gradient-to-r from-green-900/20 to-green-800/20 rounded-xl p-2 md:p-3 border border-green-400/30 h-32 sm:h-40 relative">
+        <div className="text-center h-full flex flex-col justify-center">
+          {/* Hide text during active game for more card space */}
+          {!(ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river') && (
+            <div className="text-white font-bold text-xs mb-0.5">Community Cards</div>
+          )}
+          <HandView hand={board} isDealing={ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river'}/>
+          {!(ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river') && (
+            <div className="text-white/80 text-xs mt-0.5">
+              {board.length === 0 ? "No cards yet" : 
+               board.length === 3 ? "Flop" :
+               board.length === 4 ? "Turn" : 
+               board.length === 5 ? "River" : ""}
             </div>
-            
-            {/* Game Info in top-right corner */}
-            <div className="absolute top-2 right-2 text-xs">
-              <div className="bg-white/10 px-2 py-1 rounded text-white/80">
-                #{ses?.hand_no||"-"} • {ses?.stage||"lobby"} • {fmt(pot)}
-              </div>
+          )}
+        </div>
+        {/* Timer in bottom-left corner */}
+        {ses?.turn_deadline && (
+          <div className="absolute bottom-2 left-2 text-sm">
+            <div className="text-amber-300 font-bold text-lg">
+              ⏰ {Math.max(0, Math.ceil((new Date(ses.turn_deadline).getTime() - Date.now())/1000))}s
             </div>
           </div>
-        </div>
+        )}
+      </div>
 
-        {/* Players Grid - Mobile Responsive (same as BlackjackMP) */}
-        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1 md:gap-2">
-          {Array.from({length: seats}).map((_,i)=>{
-            const p = seatMapMemo.get(i);
-            const isTurn = ses?.current_turn===i && ["preflop","flop","turn","river"].includes(ses?.stage);
-            const isMe = p?.client_id === clientId;
-            return (
-              <div key={i} className={`rounded-lg border ${isMe?'border-emerald-400 bg-emerald-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[80px] md:min-h-[120px] transition-all hover:bg-white/10 ${isTurn ? 'ring-2 ring-amber-400' : ''} relative`}>
-                {/* Turn indicator - top right corner */}
-                {p && (
-                  <div className={`absolute top-1 right-1 w-3 h-3 rounded-full ${isTurn ? 'bg-green-500' : 'bg-red-500'} ${isTurn ? 'animate-pulse' : ''}`}></div>
-                )}
-                <div className="text-center">
-                  {p ? (
-                    <div className="space-y-0.5 md:space-y-1">
-                      <div className="text-white font-bold text-xs md:text-sm truncate">{p.player_name}</div>
-                      <div className="text-emerald-300 text-xs font-semibold">Stack: {fmt(p.stack_live)}</div>
-                      <div className="text-cyan-300 text-xs">Bet: {fmt(p.bet_street||0)}</div>
-                      <HandView 
-                        hand={p.hole_cards} 
-                        hidden={!(isMe || (ses?.stage === 'showdown' && Array.isArray(ses?.board) && ses.board.length === 5 && !p?.folded))} 
-                        size="small"
-                        isDealing={ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river'}
-                      />
-                      <div className="text-white/80 text-xs">
-                        Total: {fmt(p.total_bet||0)}
-                      </div>
-                      {p.folded && <div className="text-red-400 text-xs font-bold">FOLDED</div>}
-                      {p.all_in && <div className="text-yellow-400 text-xs font-bold">ALL-IN</div>}
-                      {isTurn && <div className="text-emerald-400 text-xs font-bold">YOUR TURN</div>}
-                    </div>
-                  ) : (
+      {/* Players Grid */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1 md:gap-2">
+        {Array.from({length: seats}).map((_,i)=>{
+          const p = seatMapMemo.get(i);
+          const isTurn = ses?.current_turn===i && ["preflop","flop","turn","river"].includes(ses?.stage);
+          const isMe = p?.client_id === clientId;
+          return (
+            <div key={i} className={`rounded-xl border-2 ${isTurn?'border-emerald-400 bg-emerald-900/20':isMe?'border-blue-400 bg-blue-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[120px] md:min-h-[150px] transition-all hover:bg-white/10 relative`}>
+              {/* Turn indicator button - top right corner */}
+              {p && (
+                <div className={`absolute top-1 right-1 w-3 h-3 rounded-full ${isTurn ? 'bg-green-500' : 'bg-red-500'} ${isTurn ? 'animate-pulse' : ''}`}></div>
+              )}
+              <div className="text-center">
+                {p ? (
+                  <div className="space-y-1 md:space-y-2">
+                    <div className="text-white font-bold text-xs md:text-sm truncate">{p.player_name}</div>
+                    <div className="text-emerald-300 text-xs font-semibold">Stack: {fmt(p.stack_live)}</div>
+                    <div className="text-cyan-300 text-xs">Bet: {fmt(p.bet_street||0)}</div>
+                    <div className="text-yellow-300 text-sm">Total: {fmt(p.total_bet||0)}</div>
+                    <HandView 
+                      hand={p.hole_cards} 
+                      hidden={!(isMe || (ses?.stage === 'showdown' && Array.isArray(ses?.board) && ses.board.length === 5 && !p?.folded))} 
+                      isDealing={ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river'}
+                    />
+                    {p.folded && <div className="text-red-400 text-sm font-bold">FOLDED</div>}
+                    {p.all_in && <div className="text-yellow-400 text-sm font-bold">ALL-IN</div>}
+                    {isTurn && <div className="text-emerald-400 text-sm font-bold">YOUR TURN</div>}
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <div className="text-white/50 text-sm mb-2">Empty Seat</div>
                     <button 
                       onClick={() => takeSeat(i)}
-                      disabled={!ses || !name}
-                      className="mt-1 px-1 py-0.5 md:px-2 md:py-1 rounded bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-semibold text-xs transition-all"
+                      className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-all"
                     >
                       TAKE SEAT
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
-            );
-          })}
-        </div>
-
+            </div>
+          );
+        })}
       </div>
 
 
-      {/* Controls - 3 Columns Layout (same as BlackjackMP) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-2 h-32 md:h-36">
-        
-        {/* Column 1: Game Control */}
-        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10 h-full">
+      {/* Controls - Fixed Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:gap-2 h-40 md:h-44">
+        <div className="bg-white/5 rounded-xl p-1 md:p-2 border border-white/10 h-full">
           <div className="text-white/80 text-xs mb-1 font-semibold">Game Control</div>
-          <div className="flex flex-col gap-1">
+          <div className="flex gap-1 flex-wrap mb-2">
             <button 
               onClick={startHand}
-              className="w-full px-2 py-1 rounded bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-xs transition-all"
+              className="px-2 py-1 md:px-3 md:py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-xs transition-all shadow-lg"
             >
               Start / Next Hand
             </button>
             <button 
               onClick={leaveSeat}
-              className="w-full px-2 py-1 rounded bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all"
+              className="px-2 py-1 md:px-3 md:py-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all shadow-lg"
             >
               Leave Seat
             </button>
             {["preflop","flop","turn","river"].includes(ses?.stage) && (
               <button 
                 onClick={()=>engineAdvanceStreet(ses.id)}
-                className="w-full px-2 py-1 rounded bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold text-xs transition-all"
+                className="px-2 py-1 md:px-3 md:py-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold text-xs transition-all shadow-lg"
               >
                 Force Advance
               </button>
             )}
           </div>
-          <div className="text-white/60 text-xs mt-2">Vault: {fmt(getVaultFromProps(vault))} MLEO</div>
-        </div>
-
-        {/* Column 2: Player Actions */}
-        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10 h-full relative z-20 pointer-events-auto select-none">
-          <div className="text-white/80 text-xs mb-1 font-semibold">Player Actions</div>
-          <div className="grid grid-cols-2 gap-1">
-            <button 
-              onClick={actFold} 
-              disabled={!canActNow}
-              className={`px-2 py-3 md:px-3 md:py-4 rounded bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation select-none active:scale-95 ${myTurn ? 'ring-2 ring-emerald-400' : ''}`}>
-              FOLD
-            </button>
-            <button 
-              onClick={actCheck} 
-              disabled={!canActNow || !canCheck}
-              className={`px-2 py-3 md:px-3 md:py-4 rounded bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation select-none active:scale-95 ${myTurn ? 'ring-2 ring-emerald-400' : ''}`}>
-              CHECK
-            </button>
-            <button 
-              onClick={actCall} 
-              disabled={!canActNow || !canCall}
-              className={`px-2 py-3 md:px-3 md:py-4 rounded bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation select-none active:scale-95 ${myTurn ? 'ring-2 ring-emerald-400' : ''}`}>
-              CALL
-            </button>
-            <button 
-              onClick={actAllIn} 
-              disabled={!canActNow}
-              className={`px-2 py-3 md:px-3 md:py-4 rounded bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation select-none active:scale-95 ${myTurn ? 'ring-2 ring-emerald-400' : ''}`}>
-              ALL-IN
-            </button>
-          </div>
-          
-          {/* Bet Controls */}
-          <div className="flex gap-1 items-center mt-1">
-            <input
-              type="number" 
-              min="0" 
-              step="10" 
-              value={betInput}
-              onChange={e=>setBetInput(Number(e.target.value||0))}
-              className="flex-1 bg-black/40 text-white text-xs rounded px-1 py-1 border border-white/20 focus:border-emerald-400 focus:outline-none"
-              placeholder="Amount"
-              disabled={!myTurn}
-            />
-            <button 
-              onClick={()=>actBet(betInput)} 
-              disabled={!canActNow || canCall || betInput<=0}
-              className="px-2 py-1 rounded bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-              BET
-            </button>
-            <button 
-              onClick={()=>actRaise(betInput)} 
-              disabled={!canActNow || !canCall || betInput<=0}
-              className="px-2 py-1 rounded bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-bold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-              RAISE
-            </button>
-          </div>
-        </div>
-
-        {/* Column 3: Status & Quick Bets */}
-        <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10 h-full">
-          <div className="text-white/80 text-xs mb-1 font-semibold">Quick Bets</div>
-          <div className="grid grid-cols-3 gap-1 mb-2">
-            <button 
-              onClick={()=>setBetInput(ses?.min_bet||20)} 
-              className="px-1 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
-              1×BB
-            </button>
-            <button 
-              onClick={()=>setBetInput(Math.floor(pot/2))} 
-              className="px-1 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
-              ½ Pot
-            </button>
-            <button 
-              onClick={()=>setBetInput(pot)} 
-              className="px-1 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
-              Pot
-            </button>
-          </div>
-          
-          <div className="text-xs text-white/60 mb-1">
-            Room: {roomId?.slice(0,8)} • Players: {roomMembers.length}
-          </div>
-          
+          <div className="text-white/60 text-xs mb-2">Vault: {fmt(getVaultFromProps(vault))} MLEO</div>
           {/* Waiting Players Info */}
           {roomMembers.length > players.length && (
-            <div className="mt-2">
+            <div>
               <div className="text-xs text-blue-400 font-semibold mb-1">
                 👥 Waiting ({roomMembers.length - players.length})
               </div>
               <div className="flex flex-wrap gap-1">
                 {roomMembers
                   .filter(member => !players.some(p => p.player_name === member.player_name))
-                  .slice(0, 2)
+                  .slice(0, 3)
                   .map((member, idx) => (
                     <div key={idx} className="px-1 py-0.5 bg-white/10 rounded text-xs text-white/80 border border-white/20">
                       {member.player_name}
                     </div>
                   ))
                 }
-                {roomMembers.filter(member => !players.some(p => p.player_name === member.player_name)).length > 2 && (
+                {roomMembers.filter(member => !players.some(p => p.player_name === member.player_name)).length > 3 && (
                   <div className="px-1 py-0.5 bg-white/10 rounded text-xs text-white/80 border border-white/20">
-                    +{roomMembers.filter(member => !players.some(p => p.player_name === member.player_name)).length - 2}
+                    +{roomMembers.filter(member => !players.some(p => p.player_name === member.player_name)).length - 3}
                   </div>
                 )}
               </div>
             </div>
           )}
-          
-          {/* Load from Vault */}
-          {inLobby && myVault > 0 && (
-            <button 
-              className="w-full mt-2 py-1 rounded bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-semibold text-xs transition-all"
-              onClick={()=>{ setRebuyAmt(Math.min(DEFAULT_REBUY, readVault())); setShowRebuy(true); }}
-              title={`Vault: ${myVault.toLocaleString()} MLEO`}
-            >
-              💰 Load from Vault
-            </button>
-          )}
+        </div>
+
+        <div className="bg-white/5 rounded-xl p-1 md:p-2 border border-white/10 h-full">
+          <div className="text-white/80 text-xs mb-1 font-semibold">Player Actions</div>
+          <div className="space-y-1">
+            <div className="flex gap-1 flex-wrap">
+              <button onClick={actFold} disabled={!canActNow} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                FOLD
+              </button>
+              <button onClick={actCheck} disabled={!canActNow || !canCheck} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                CHECK
+              </button>
+              <button onClick={actCall} disabled={!canActNow || !canCall} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                CALL
+              </button>
+              <button onClick={actAllIn} disabled={!canActNow} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                ALL-IN
+              </button>
+            </div>
+            
+            <div className="flex gap-1 items-center">
+              <input
+                type="number" min="0" step="10" value={betInput}
+                onChange={e=>setBetInput(Number(e.target.value||0))}
+                className="flex-1 bg-black/40 text-white text-xs rounded-lg px-1 py-0.5 md:px-2 md:py-1 border border-white/20 focus:border-emerald-400 focus:outline-none"
+                placeholder="Amount"
+              disabled={!myTurn}
+              />
+              <button onClick={()=>actBet(betInput)} disabled={!canActNow || canCall || betInput<=0} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                BET
+              </button>
+              <button onClick={()=>actRaise(betInput)} disabled={!canActNow || !canCall || betInput<=0} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                RAISE
+              </button>
+            </div>
+
+            <div className="flex gap-1 text-xs">
+              <button onClick={()=>setBetInput(ses?.min_bet||20)} className="px-1 py-0.5 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
+                1×BB
+              </button>
+              <button onClick={()=>setBetInput(Math.floor(pot/2))} className="px-1 py-0.5 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
+                ½ Pot
+              </button>
+              <button onClick={()=>setBetInput(pot)} className="px-1 py-0.5 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
+                Pot
+              </button>
+            </div>
+
+            {/* Vault and Re-buy Messages */}
+            {!canActNow && !inLobby && myStack<=0 && (
+              <div className="text-xs text-red-400 mt-2">Busted from table • Add coins to Vault to continue</div>
+            )}
+            {inLobby && myVault > 0 && (
+              <button 
+                className="px-3 py-2 rounded-md bg-indigo-600 text-white ml-2 text-xs"
+                onClick={()=>{ setRebuyAmt(Math.min(DEFAULT_REBUY, readVault())); setShowRebuy(true); }}
+                title={`Vault: ${myVault.toLocaleString()} MLEO`}
+              >
+                Load from Vault
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Message Area */}
-      {msg && (
-        <div className="bg-red-900/20 border border-red-400/30 rounded-lg p-2 text-red-300 text-xs">
-          {msg}
-        </div>
-      )}
+      {/* Fixed Timer Position */}
+      <div className="h-16 flex items-center justify-center">
+        {ses?.current_turn!=null && ses?.turn_deadline && (
+          <div className="bg-white/5 rounded-xl p-4 border border-white/10 text-center">
+            <TurnCountdown deadline={ses.turn_deadline} />
+          </div>
+        )}
+      </div>
 
-      {/* Fixed Banner Position */}
-      <div className="h-20 flex items-center justify-center">
-        {!canActNow && !inLobby && myStack<=0 && (
-          <div className="bg-red-900/25 border border-red-500/40 rounded-lg p-2 max-w-md mx-auto">
-            <div className="text-red-300 font-bold text-sm text-center">💀 Busted from table</div>
-            <div className="text-red-200 text-xs text-center mt-1">Add coins to Vault to continue</div>
+      {/* Fixed Status Message Position */}
+      <div className="h-16 flex items-center justify-center">
+        {msg && (
+          <div className="bg-emerald-900/20 rounded-xl p-4 border border-emerald-400/30 text-center max-w-md mx-auto">
+            <div className="text-emerald-300 text-sm">{msg}</div>
           </div>
         )}
       </div>

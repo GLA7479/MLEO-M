@@ -915,6 +915,48 @@ export default function TexasHoldemCasinoPage() {
     }
   };
 
+  const handleRebuy = async (amount) => {
+    if (!playerId || !currentTableId) return;
+    if (!selectedTable) return;
+
+    // סכום מינימלי: buy-in מינימלי של השולחן
+    const min = selectedTable.min_buyin;
+    const toBuy = Math.max(min, Math.floor(amount || 0));
+
+    if (vaultAmount < toBuy) {
+      setError(`Not enough balance in Vault for rebuy of ${fmt(toBuy)} MLEO`);
+      return;
+    }
+
+    try {
+      setError("");
+
+      // הורד מה־Vault
+      const newVault = vaultAmount - toBuy;
+      setVault(newVault);
+      setVaultAmount(newVault);
+
+      // הוסף ל־stack של השחקן
+      const { data: me } = await supabase
+        .from('casino_players')
+        .select('chips')
+        .eq('id', playerId)
+        .single();
+
+      await supabase
+        .from('casino_players')
+        .update({ chips: (me?.chips || 0) + toBuy })
+        .eq('id', playerId);
+
+      // רענון
+      await loadGameData();
+      setGameMessage(`✅ Rebuy ${fmt(toBuy)} MLEO successful`);
+    } catch (err) {
+      console.error("Rebuy error:", err);
+      setError("Rebuy failed: " + err.message);
+    }
+  };
+
   const handleLeaveTable = async () => {
     if (!playerId || !currentTableId) return;
     
@@ -2258,7 +2300,20 @@ export default function TexasHoldemCasinoPage() {
             </div>
 
             <div ref={ctaRef} className="w-full max-w-2xl mt-2 text-center">
-              <button onClick={handleLeaveTable} className="px-8 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-all">Leave Table</button>
+              <div className="flex items-center justify-center gap-2">
+                <button onClick={handleLeaveTable} className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs md:text-sm font-bold">
+                  Leave Table
+                </button>
+
+                {myPlayer && myPlayer.chips < (selectedTable?.min_buyin || 0) && (
+                  <button
+                    onClick={() => handleRebuy(selectedTable.min_buyin)}
+                    className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-bold"
+                  >
+                    Rebuy {fmt(selectedTable.min_buyin)}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
