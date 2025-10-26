@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 import {
   maxStreetBet, minRaiseAmount,
-  startHand as engineStartHand, advanceStreet as engineAdvanceStreet
+  startHand as engineStartHand, advanceStreet as engineAdvanceStreet,
+  settlePots as engineSettlePots
 } from "../lib/pokerEngine";
 
 const TURN_SECONDS = Number(process.env.NEXT_PUBLIC_POKER_TURN_SECONDS||20);
@@ -56,7 +57,7 @@ function canCheckNow(ses, pls, seatIndex){
   if (!['preflop','flop','turn','river'].includes(ses.stage)) return false;
   const me = (pls||[]).find(p => p.seat_index === seatIndex);
   if (!me) return false;
-  const maxBet = maxStreetBet(pls); // מהמנוע
+  const maxBet = maxStreetBet(pls); // from engine
   return Number(ses.to_call || 0) === 0 && Number(me.bet_street || 0) === maxBet;
 }
 
@@ -107,7 +108,7 @@ function TurnCountdown({ deadline }) {
 
 export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierCode = '10K' }) {
 
-  // הגדר callback לעדכון vault
+  // Set callback for vault updates
   useEffect(() => {
     window.updateVaultCallback = setVaultBoth;
     return () => {
@@ -120,6 +121,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   const [ses, setSes] = useState(null);
   const [players, setPlayers] = useState([]);
   const [roomMembers, setRoomMembers] = useState([]);
+  const [potRow, setPotRow] = useState(null);
   const [betInput, setBetInput] = useState(0);
   const [msg, setMsg] = useState("");
   const [showRebuy, setShowRebuy] = useState(false);
@@ -171,6 +173,24 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     return ()=> ch.unsubscribe();
   },[ses?.id]);
 
+  // ===== Realtime pot =====
+  useEffect(() => {
+    if(!ses?.id) return;
+    const ch = supabase.channel("poker_pots:"+ses.id)
+      .on("postgres_changes",{event:"*",schema:"public",table:"poker_pots",filter:`session_id=eq.${ses.id}`},
+        async ()=>{
+          const { data } = await supabase.from("poker_pots").select("*").eq("session_id", ses.id).maybeSingle();
+          setPotRow(data||{ total:0 });
+        })
+      .subscribe(async (st)=>{
+        if(st==="SUBSCRIBED"){
+          const { data } = await supabase.from("poker_pots").select("*").eq("session_id", ses.id).maybeSingle();
+          setPotRow(data||{ total:0 });
+        }
+      });
+    return ()=> ch.unsubscribe();
+  },[ses?.id]);
+
   // ===== Autopilot =====
   const isLeader = useMemo(() => {
     if (!roomMembers.length || !name) return false;
@@ -182,19 +202,20 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
 
   async function autopilot() {
     if (!isLeader) return;
-    const seatedCount = players.filter(p => p.seat_index !== null).length;
+    const readyPlayers = players.filter(p => p.seat_index !== null && Number(p.stack_live||0) > 0);
+    const seatedCount  = readyPlayers.length;
 
-    // כשיש 2 שחקנים יושבים — התחל משחק
+    // When 2 players are seated — start game
     if (seatedCount >= MIN_PLAYERS_TO_START && (!ses || ses.stage === 'lobby')) {
       await startHand();
       return;
     }
 
 
-    // אחרי showdown — המתן קצת ואז התחל יד חדשה
+    // After showdown — wait a bit then start new hand
     if (ses && ses.stage === 'showdown') {
-      await new Promise(r => setTimeout(r, 1200));
-      if (players.filter(p => p.seat_index !== null).length >= MIN_PLAYERS_TO_START) {
+      await new Promise(r => setTimeout(r, 3000)); // Small delay before new hand
+      if (players.filter(p => p.seat_index !== null && Number(p.stack_live||0) > 0).length >= MIN_PLAYERS_TO_START) {
         await startHand();
       }
       return;
@@ -226,7 +247,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   const turnPlayer = ses?.current_turn!=null ? seatMap.get(ses.current_turn) : null;
   const bb = ses?.min_bet || 20;
 
-  // בדיקה שהמשחק לא נגמר בטרם עת
+  // Check that game hasn't ended prematurely
   function canAct(player) {
     if (!player || player.folded || player.all_in) return false;
     if (ses?.current_turn !== player.seat_index) return false;
@@ -297,16 +318,37 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   const DEFAULT_REBUY = 1000;   // Default for quick button
 
   async function doRebuy(amount) {
-    if (!ses?.stage === 'lobby' || !myRow?.id) return;
+    const canLoad = !!ses && (ses.stage === 'lobby' || (ses.stage === 'showdown' && !ses.turn_deadline));
+    if (!canLoad) return;
     const vault = readVault();
     const amt = Math.min(Math.max(MIN_REBUY, Math.floor(Number(amount||0))), vault);
     if (amt <= 0) return;
+
     try{
       setRebuyBusy(true);
       writeVault(vault - amt);
-      await supabase.from('poker_players')
-        .update({ stack_live: Number(myRow.stack_live||0) + amt })
-        .eq('id', myRow.id);
+      if (myRow?.id && myRow?.seat_index != null) {
+        // ✅ Seated: load chips to table
+        await supabase.from('poker_players')
+          .update({ stack_live: Number(myRow.stack_live||0) + amt })
+          .eq('id', myRow.id);
+      } else {
+        // ✅ Not seated: do Buy-in from Vault and seat
+        const targetSeat = 0; // Find first available seat or use preferred logic
+        await supabase.from('poker_players').upsert({
+          session_id: ses.id,
+          seat_index: targetSeat,
+          player_name: name,
+          client_id: clientId,
+          stack_live: amt,
+          bet_street: 0,
+          total_bet: 0,
+          hole_cards: [],
+          folded: false,
+          all_in: false,
+          acted: false
+        }, { onConflict: 'session_id,seat_index' });
+      }
       setShowRebuy(false);
     } finally {
       setRebuyBusy(false);
@@ -329,16 +371,16 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   async function takeSeat(seatIndex) {
     if (!clientId) { setMsg("Client not recognized"); return; }
 
-    // מייצר session אם אין - אבל לא משתמש ב-ses המקומי עד ש-הוא refreshing
+    // Create session if none exists - but don't use local ses until it's refreshing
     let session = ses;
     if (!session || !session.id) {
       session = await ensureSession(roomId, tierCode);
     }
 
-    // במקביל, עדכן את ה-state המקומי
+    // Meanwhile, update local state
     setSes(session);
 
-    // בדיקת יתרה - minimum buy-in
+    // Check balance - minimum buy-in
     const minBuyin = Math.max(Number(session?.min_buyin || 0), 1000);
     const want = Math.floor(Math.max(minBuyin, minBuyin));
     const currentVault = readVault();
@@ -348,7 +390,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       return; 
     }
 
-    // האם כבר יש לי שורה בסשן?
+    // Do I already have a row in the session?
     const { data: mine } = await supabase
       .from("poker_players")
       .select("id, seat_index, client_id")
@@ -356,7 +398,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       .eq("client_id", clientId)
       .maybeSingle();
 
-    // בדוק תפוסת מושב היעד
+    // Check target seat occupancy
     const { data: occ } = await supabase
       .from("poker_players")
       .select("id, client_id")
@@ -364,13 +406,13 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       .eq("seat_index", seatIndex)
       .maybeSingle();
 
-    // אם תפוס ע"י אחר
+    // If occupied by someone else
     if (occ && occ.client_id && occ.client_id !== clientId) {
       setMsg("Seat is taken");
       return;
     }
 
-    // מעבר מושב אם יש לי שורה קיימת
+    // Move seat if I have existing row
     if (mine && mine.seat_index !== seatIndex) {
       if (!occ) {
         await supabase.from("poker_players").update({ seat_index: seatIndex }).eq("id", mine.id);
@@ -382,7 +424,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       }
     }
 
-    // יצירה חדשה אם אין לי
+    // Create new if I don't have one
     if (!mine) {
       const { error: upErr } = await supabase.from("poker_players").upsert({
         session_id: session.id,
@@ -406,7 +448,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
         return;
       }
 
-      // ניכוי מה-vault רק אחרי הצלחה
+      // Deduct from vault only after success
       writeVault(currentVault - want);
     }
 
@@ -432,7 +474,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     const maxBet = maxStreetBet(players);
     if(alive.length<=1) return true;
     
-    // בדוק אם כולם פעלו או ALL-IN או שההימור שלהם שווה למקסימום
+    // Check if everyone acted or ALL-IN or their bet equals maximum
     return alive.every(p => p.acted || p.all_in || (p.bet_street||0) === maxBet);
   }
 
@@ -443,7 +485,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
 
 
   async function showdownAndSettle(){
-    // אם נשאר אחד – הוא המנצח
+    // If one remains - he's the winner
     const alive = players.filter(p=>!p.folded);
     const winners = (alive.length === 1)
       ? [alive[0].seat_index]
@@ -455,9 +497,13 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   // ===== Start / Next hand =====
   async function startHand(){
     if (startingRef.current) return;
+    // ✅ Don't start if less than 2 with stack_live>0
+    const ready = players.filter(p => p.seat_index!==null && Number(p.stack_live||0)>0);
+    if (ready.length < 2) { setMsg("Need two players with chips on table to start"); return; }
+
     startingRef.current = true;
     try {
-      // ודא שיש Session (אם שחקן ראשון נכנס וזה עדיין 'null')
+      // Ensure there's a Session (if first player enters and it's still 'null')
       let sessionId = ses?.id;
       if (!sessionId) {
         const { data } = await supabase.from("poker_sessions").select("id").eq("room_id", roomId).maybeSingle();
@@ -481,7 +527,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   async function takeChips(sessionId, seatIndex, amount, action){
     const { data: pl } = await supabase.from("poker_players")
       .select("*").eq("session_id", sessionId).eq("seat_index", seatIndex).maybeSingle();
-    if(!pl) return; // ⬅️ אל תגבה ממושב ריק
+    if(!pl) return; // ⬅️ Don't backup from empty session
     
     const { data: pot } = await supabase.from("poker_pots").select("*").eq("session_id", sessionId).maybeSingle();
 
@@ -502,7 +548,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
 
   // ===== Quick Win Helper =====
   async function quickWin(sessionId, winnerSeat) {
-    // 1) קרא מצב עדכני
+    // 1) Read current state
     const { data: ses } = await supabase
       .from('poker_sessions')
       .select('id, pot_total')
@@ -520,18 +566,18 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       .select('seat_index, bet_street, stack_live, total_bet')
       .eq('session_id', sessionId);
 
-    // 2) חשב סך הכל על השולחן (pot + כל ההימורים הנוכחיים)
+    // 2) Calculate total on table (pot + all current bets)
     const streetSum = players.reduce((s,p)=> s + Number(p.bet_street||0), 0);
     const potTotal = Number(ses.pot_total||0) + Number(pot?.total||0);
     const totalPot = potTotal + streetSum;
 
-    // 3) אפס הימור נוכחי אצל כולם (כדי שלא "יישאר על השולחן")
+    // 3) Reset current bet for everyone (so it doesn't "remain on table")
     await supabase
       .from('poker_players')
       .update({ bet_street: 0 })
       .eq('session_id', sessionId);
 
-    // 4) העבר את כל הפוט למנצח
+    // 4) Transfer all pot to winner
     const winner = players.find(p => p.seat_index === winnerSeat);
     if (winner) {
       await supabase
@@ -540,12 +586,12 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
         .match({ session_id: sessionId, seat_index: winnerSeat });
     }
 
-    // 5) נקה את מצב הסשן — אין תור, אין דדליין, הפוט ריק
+    // 5) Clear session state — no turn, no deadline, pot empty
     await supabase
       .from('poker_sessions')
       .update({
         pot_total: 0,
-        stage: 'lobby',         // ✅ אין שואודאון – ניצחון בקיפול
+        stage: 'lobby',         // ✅ No showdown – win by fold
         current_turn: null,
         turn_deadline: null,
       })
@@ -556,7 +602,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       .update({ total: 0 })
       .eq('session_id', sessionId);
 
-    // 6) רשום לוג פעולה "win"
+    // 6) Log "win" action
     await supabase.from('poker_actions').insert({
       session_id: sessionId,
       action: 'win',
@@ -567,7 +613,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
 
   // ===== All-In Capped Helper =====
   async function applyAllInCapped(sessionId, actorSeat) {
-    // קרא מצב נוכחי
+    // Read current state
     const { data: ses } = await supabase
       .from('poker_sessions').select('id').eq('id', sessionId).single();
 
@@ -579,28 +625,28 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     const me = pls.find(p => p.seat_index === actorSeat);
     if (!me || me.folded) return { ok: false, reason: 'no-actor' };
 
-    // גובה ההשקעה המקסימלית שהיריבים יכולים לכסות (Heads-Up זה פשוט)
+    // Maximum investment opponents can cover (Heads-Up is simple)
     const opps = pls.filter(p => p.seat_index !== actorSeat && !p.folded);
     const oppMaxCommit = Math.max(
       0,
       ...opps.map(o => Number(o.bet_street||0) + Number(o.stack_live||0))
     );
 
-    // כמה אני יכול "להתחייב" סה"כ ביד: מה שכבר שמתי + כמה שנשאר לי
+    // How much I can "commit" total in hand: what I already put + what I have left
     const myMaxCommit = Number(me.bet_street||0) + Number(me.stack_live||0);
 
-    // ה"התחייבות" החדשה לא יכולה לעבור את מה שהיריבים מסוגלים לכסות
+    // New "commitment" cannot exceed what opponents can cover
     const targetCommit = Math.min(myMaxCommit, oppMaxCommit);
 
-    // כמה עוד צריך להוסיף כרגע (מעל מה שכבר שמתי)
+    // How much more to add now (above what I already put)
     const addNow = Math.max(0, targetCommit - Number(me.bet_street||0));
 
     if (addNow > 0) {
-      // מזיזים לקופה רק את הסכום המכוסה
+      // Move to pot only the covered amount
       await takeChips(sessionId, actorSeat, addNow);
     }
 
-    // אם תרמתי את כל מה שהיה לי – אני באמת ALL-IN, אחרת אני לא ALL-IN
+    // If I contributed everything I had - I'm really ALL-IN, otherwise I'm not ALL-IN
     const { data: meAfter } = await supabase
       .from('poker_players')
       .select('stack_live')
@@ -633,9 +679,9 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     if (!alive.length) return;
     const everyoneLocked = alive.every(p => p.all_in === true);
 
-    if (!everyoneLocked) return; // עדיין יש שחקן שיכול לפעול
+    if (!everyoneLocked) return; // Still have player who can act
 
-    // אסוף גם הימור רחוב שעוד לא הוזז לפוט
+    // Collect street bet that hasn't been moved to pot yet
     const streetSum = (pls||[]).reduce((s,p)=> s + Number(p.bet_street||0), 0);
     if (streetSum > 0) {
       await supabase.from('poker_players')
@@ -647,13 +693,13 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
         .eq('id', sessionId);
     }
 
-    // השלם לוח עד 5 קלפים
+    // Complete board to 5 cards
     let board = [...(ses.board||[])];
     let deck  = [...(ses.deck_remaining||[])];
 
-    if (board.length === 0 && deck.length >= 3) { board.push(...deck.splice(0,3)); } // פלופ
-    if (board.length === 3 && deck.length >= 1) { board.push(...deck.splice(0,1)); } // טרן
-    if (board.length === 4 && deck.length >= 1) { board.push(...deck.splice(0,1)); } // ריבר
+    if (board.length === 0 && deck.length >= 3) { board.push(...deck.splice(0,3)); } // flop
+    if (board.length === 3 && deck.length >= 1) { board.push(...deck.splice(0,1)); } // turn
+    if (board.length === 4 && deck.length >= 1) { board.push(...deck.splice(0,1)); } // river
 
     await supabase.from('poker_sessions').update({
       board,
@@ -664,11 +710,9 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       turn_deadline: null
     }).eq('id', sessionId);
 
-    // בשואודאון: הצגת קלפים לשחקנים שלא קיפלו נעשית כבר ב־UI (לפי ses.stage==='showdown' && !folded)
-    // ואם יש לך פונקציית settlePots – קרא אותה:
-    if (typeof settlePots === 'function') {
-      await settlePots(sessionId);
-    }
+    // In showdown: card display for non-folded players is already handled in UI (based on ses.stage==='showdown' && !folded)
+    // And if you have a settlePots function - call it:
+    await engineSettlePots(sessionId, ses.board || [], pls); // ✅ Always run actual pot distribution
   }
 
   // ===== Player Acts =====
@@ -677,31 +721,18 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     await supabase.from("poker_players").update({ folded:true, acted:true, hole_cards: [] }).eq("id", turnPlayer.id);
     await supabase.from("poker_actions").insert({ session_id: ses.id, seat_index: turnPlayer.seat_index, action:"fold" });
     
-    // בדוק אם נשאר רק שחקן פעיל אחד (Heads-Up Fold)
-    const { data: pls } = await supabase
-      .from('poker_players').select('seat_index, folded, bet_street, stack_live, total_bet')
-      .eq('session_id', ses.id);
-    
-    const alive = (pls || []).filter(p => !p.folded && p.seat_index !== null);
-    if (alive.length === 1) {
-      // ✅ Heads-Up: FOLD -> סגירה מיידית של היד והעברת כל הפוט למנצח
-      const winnerSeat = alive[0].seat_index;
-      await quickWin(ses.id, winnerSeat);
-      return;
-    }
-    
     await afterActionAdvanceStrict();
   }
 
   async function actCheck(){
-    // משוך מצב עדכני כדי לא ליפול על state ישן
+    // Pull current state to avoid falling on old state
     const { data: sesNow } = await supabase
       .from('poker_sessions').select('id,to_call').eq('id', ses.id).single();
     if (!isMyTurn(ses, myRow)) return;
-    if (Number(sesNow.to_call || 0) > 0) return; // אסור check כשיש חוב
+    if (Number(sesNow.to_call || 0) > 0) return; // Can't check when there's debt
 
     await supabase.from('poker_players')
-      .update({ acted: true })   // לא משנים bet_street ב-check
+      .update({ acted: true })   // Don't change bet_street in check
       .eq('id', myRow.id);
 
     await afterActionAdvanceStrict();
@@ -709,7 +740,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
 
   async function actCall(){
     if (!isMyTurn(ses, myRow)) return;
-    // חישוב חוב אליי: max(bet_street) - שלי
+    // Calculate debt to me: max(bet_street) - mine
     const { data: pls } = await supabase
       .from('poker_players').select('seat_index,folded,bet_street').eq('session_id', ses.id);
     const active = (pls||[]).filter(p => !p.folded && p.seat_index !== null);
@@ -719,7 +750,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     if (need <= 0) return;
 
     await takeChips(ses.id, myRow.seat_index, need, 'call');
-    // הסר את העדכון הכפול של bet_street - takeChips כבר עושה את זה
+    // Remove double bet_street update - takeChips already does this
     await afterActionAdvanceStrict();
   }
 
@@ -727,7 +758,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     if (!isMyTurn(ses, myRow)) return;
     const { data: sesNow } = await supabase
       .from('poker_sessions').select('to_call').eq('id', ses.id).single();
-    if (Number(sesNow.to_call || 0) > 0) return; // כשיש חוב אסור "bet", רק call/raise
+    if (Number(sesNow.to_call || 0) > 0) return; // When there's debt can't "bet", only call/raise
 
     const amt = Math.max(0, Math.floor(Number(amount || 0)));
     if (amt <= 0) return;
@@ -752,7 +783,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     const pay = Number(myRow.stack_live || 0);
     if (pay <= 0) return;
 
-    // ✅ תן לשחקן לתרום רק מה שמכוסה מול היריב/ים
+    // ✅ Let player contribute only what's covered against opponent/s
     await applyAllInCapped(ses.id, myRow.seat_index);
 
     await supabase.from('poker_actions').insert({
@@ -762,15 +793,15 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       amount: null
     });
 
-    // אם כולם נעולים (או מקופלים), מריצים ראנאאוט אוטומטי
+    // If everyone is locked (or folded), run automatic runout
     await maybeAutoRunoutToShowdown(ses.id);
 
     await afterActionAdvanceStrict();
   }
 
-  // ===== פונקציה מרכזית: לחשב שחקן תור־הבא ו־to_call =====
+  // ===== Main function: calculate next turn player and to_call =====
   async function afterActionAdvanceStrict() {
-    // 1) קרא מצב עדכני מה-DB (לא להסתמך על state ישן)
+    // 1) Read current state from DB (don't rely on old state)
     const { data: sesNow } = await supabase
       .from('poker_sessions').select('*').eq('id', ses.id).single();
     const { data: pls } = await supabase
@@ -779,19 +810,20 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     const active = (pls || []).filter(p => !p.folded && p.seat_index !== null);
     if (!active.length) return;
 
-    // ✅ אם נשאר שחקן פעיל אחד – סגירה מיידית והעברת כל הכסף למנצח
-    if (active.length === 1) {
+    // ✅ If only one active player remains, close hand only if not already closed (avoid double payout)
+    if (active.length === 1 && sesNow.stage !== 'showdown') {
       const winnerSeat = active[0].seat_index;
-      // חשב את כל הכסף על השולחן: pot_total + סך bet_street של כולם
+      // Calculate all money on table: from table + sum of bet_street from everyone
       const streetSum = (pls || []).reduce((s,p) => s + Number(p.bet_street||0), 0);
-      const totalPot  = Number(sesNow.pot_total||0) + streetSum;
+      const { data: potTbl } = await supabase.from('poker_pots').select('total').eq('session_id', ses.id).maybeSingle();
+      const totalPot  = Number(potTbl?.total||0) + streetSum;
 
-      // אפס הימור רחוב אצל כולם
+      // Reset street bet for everyone
       await supabase.from('poker_players')
         .update({ bet_street: 0 })
         .eq('session_id', ses.id);
 
-      // הוסף את כל הקופה ל-stack_live של המנצח
+      // Add all pot to winner's stack_live
       const winnerRow = (pls || []).find(p => p.seat_index === winnerSeat);
       if (winnerRow) {
         await supabase.from('poker_players')
@@ -799,16 +831,17 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
           .eq('id', winnerRow.id);
       }
 
-      // אפס את הפוט וסיים יד
+      // Reset pot in table
+      await supabase.from('poker_pots').update({ total: 0 }).eq('session_id', ses.id);
+      // End hand
       await supabase.from('poker_sessions').update({
-        pot_total: 0,
-        stage: 'showdown',        // או 'lobby' אם אתה פותח יד הבאה מבחוץ
+        stage: 'showdown',        // or 'lobby' if you're starting next hand from outside
         current_turn: null,
         to_call: 0,
         turn_deadline: null
       }).eq('id', ses.id);
 
-      // לוג זכייה
+      // Win log
       await supabase.from('poker_actions').insert({
         session_id: ses.id,
         seat_index: winnerSeat,
@@ -816,13 +849,16 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
         amount: totalPot,
         note: 'winner by fold'
       });
-      return; // לא ממשיכים חישובי תור/רחוב
+      
+      // Use engine to settle pots properly
+      await engineSettlePots(ses.id, sesNow.board || [], pls);
+      return; // Don't continue turn/street calculations
     }
 
-    // 2) חשב הימור-שיא ברחוב
+    // 2) Calculate max bet in street
     const maxBet = Math.max(0, ...active.map(p => Number(p.bet_street || 0)));
 
-    // 3) מצא מי הבא בתור: השחקן הפעיל הבא אחרי current_turn שעדיין לא השווה ל-maxBet
+    // 3) Find who's next in turn: next active player after current_turn who hasn't matched maxBet
     const order = active.map(p => p.seat_index).sort((a, b) => a - b);
     const cur = Number(sesNow.current_turn);
     const ring = order.filter(s => s > cur).concat(order.filter(s => s <= cur));
@@ -837,11 +873,11 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     }
 
     if (nextSeat === null) {
-      // כולם השוו: הרחוב מסתיים רק כשחזרנו ל-Last Aggressor והוא פעל (למשל CHECK).
+      // Everyone matched: street ends only when we return to Last Aggressor and he acted (e.g. CHECK).
       const last = sesNow.last_raiser ?? null;
       const lastRow = last!=null ? active.find(p=>p.seat_index===last) : null;
 
-      // אם עדיין לא חזרנו אליו – העבר לו את התור עם to_call=0 והמתן לפעולה שלו.
+      // If we haven't returned to him yet – pass turn to him with to_call=0 and wait for his action.
       if (last!=null && sesNow.current_turn !== last) {
         await supabase.from('poker_sessions').update({
           current_turn: last,
@@ -851,7 +887,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
         return;
       }
 
-      // אם זה התור של ה-Last Aggressor והוא כבר 'acted' (למשל עשה CHECK) – התקדמות רחוב.
+      // If it's Last Aggressor's turn and he already 'acted' (e.g. did CHECK) – advance street.
       if (lastRow?.acted) {
         if (advancingRef.current) return;
         advancingRef.current = true;
@@ -862,11 +898,11 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
           advancingRef.current = false;
         }
       }
-      // אחרת – מחכים לפעולה שלו (אין advance עצמאי)
+      // Otherwise – wait for his action (no independent advance)
       return;
     }
 
-    // 4) יש שחקן בתור: חשב כמה חסר לו
+    // 4) There's a player in turn: calculate how much he owes
     const nextRow = active.find(p => p.seat_index === nextSeat);
     const need = Math.max(0, maxBet - Number(nextRow?.bet_street || 0));
 
@@ -878,7 +914,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   }
 
   async function afterActionAdvance(resetOthers=false){
-    // בדוק אם כולם פעלו או ALL-IN
+    // Check if everyone acted or ALL-IN
     if(everyoneActedOrAllIn()){
       // guard settlement: no to_call and equalized bets
       const active = players.filter(p => !p.folded && p.seat_index !== null);
@@ -890,7 +926,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       }
     }
     
-    // מעבר לשחקן הבא
+    // Move to next player
     const nextIdx = nextSeatAlive(ses.current_turn);
     if(nextIdx !== null){
       const active = players.filter(p => !p.folded && p.seat_index !== null);
@@ -910,7 +946,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     const turnSeat = ses?.current_turn;
     const turnPlayer = players.find(p => p.seat_index === turnSeat);
     if(!turnPlayer || !ses) return;
-    // Auto: אם אפשר check → check; אחרת fold
+    // Auto: if can check → check; otherwise fold
     if (canCheckNow(ses, players, turnPlayer.seat_index)) await actCheck();
     else await actFold();
   }
@@ -941,40 +977,37 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   // ===== Bust-out Check =====
   useEffect(()=>{
     if (!ses?.stage || !myRow) return;
+    if (myRow.client_id !== clientId) return; // ✅ Only for me
 
-    // End of hand: lobby or showdown that ended (without turn_deadline)
     const handOver = ses.stage === 'lobby' || (ses.stage === 'showdown' && !ses.turn_deadline);
     if (!handOver) return;
 
-    const vault = readVault();
-    const stack = Number(myRow.stack_live||0);
+    // ✅ Opens only if I'm actually seated at table and have no chips on it
+    const seated = myRow.seat_index != null;
+    const broke  = seated && Number(myRow.stack_live || 0) <= 0;
+    const v      = readVault();
 
-    // No chips on table
-    if (stack <= 0) {
-      if (vault > 0) {
-        setRebuyAmt(Math.min(DEFAULT_REBUY, vault));
-        setShowRebuy(true);         // ✅ Opens rebuy popup
-      } else {
-        // No Vault -> can only offer seat exit/info
-        setShowRebuy(false);
-        if (myRow.seat_index != null) {
-          leaveSeat();
-          setMsg("Left table: No coins in Vault");
-        }
-      }
+    if (broke && v > 0) {
+      setRebuyAmt(Math.min(DEFAULT_REBUY, v));
+      setShowRebuy(true);
+    } else {
+      setShowRebuy(false);
     }
-  }, [ses?.stage, ses?.turn_deadline, myRow?.stack_live]);
+  }, [ses?.stage, ses?.turn_deadline, myRow?.stack_live, myRow?.seat_index, myRow?.client_id]);
   
   const myTurn = isMyTurn(ses, myRow);
   const canCall = Number(ses?.to_call || 0) > 0;   // For visual display only
   const canCheck = !canCall;
-  const pot = ses?.pot_total || players.reduce((sum,p)=> sum + (p.total_bet||0), 0);
+  // ✅ Real pot: from table + street bets not yet collected
+  const streetSum = players.reduce((s,p)=> s + Number(p.bet_street||0), 0);
+  const pot = Number(potRow?.total||0) + streetSum;
   
   // ===== Vault and Stack Management =====
   const myVault = readVault();
   const myStack = Number(myRow?.stack_live||0);
   const canActNow = myTurn && myStack > 0;          // During hand - must have chips on table
   const inLobby = ses?.stage === 'lobby';
+  const seated  = !!myRow && myRow.seat_index != null;
 
   if (!roomId) return <div className="w-full h-full flex items-center justify-center text-white/70">Select or create a room to start.</div>;
 
@@ -1074,6 +1107,9 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
             >
               Start / Next Hand
             </button>
+            {players.filter(p=>p.seat_index!==null && Number(p.stack_live||0)>0).length < 2 && (
+              <div className="text-xs text-yellow-300 mt-1">Need another player with chips to start</div>
+            )}
             <button 
               onClick={leaveSeat}
               className="px-2 py-1 md:px-3 md:py-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all shadow-lg"
@@ -1166,7 +1202,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
             {!canActNow && !inLobby && myStack<=0 && (
               <div className="text-xs text-red-400 mt-2">Busted from table • Add coins to Vault to continue</div>
             )}
-            {inLobby && myVault > 0 && (
+            {inLobby && seated && myVault > 0 && (   // ✅ Only if I'm seated
               <button 
                 className="px-3 py-2 rounded-md bg-indigo-600 text-white ml-2 text-xs"
                 onClick={()=>{ setRebuyAmt(Math.min(DEFAULT_REBUY, readVault())); setShowRebuy(true); }}
@@ -1227,7 +1263,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
               <button className="px-3 py-2 rounded-lg bg-white/10 text-white"
                       onClick={()=>setShowRebuy(false)} disabled={rebuyBusy}>Cancel</button>
               <button className="px-3 py-2 rounded-lg bg-emerald-600 text-white"
-                      onClick={()=>doRebuy(rebuyAmt)} disabled={rebuyBusy || !inLobby}>
+                      onClick={()=>doRebuy(rebuyAmt)} disabled={rebuyBusy || !(inLobby || (ses?.stage==='showdown' && !ses?.turn_deadline)) || !seated}>
                 {rebuyBusy ? 'Loading…' : 'Load to Table'}
               </button>
             </div>

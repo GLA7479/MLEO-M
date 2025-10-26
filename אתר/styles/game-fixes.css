@@ -1,0 +1,82 @@
+/* Game Display Fixes for MLEO-GAME */
+
+/* Global fixes for all games */
+.game-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+  z-index: 1 !important;
+}
+
+/* Force full screen for games */
+.game-container * {
+  box-sizing: border-box !important;
+}
+
+/* Ensure canvas fills screen */
+.game-container canvas {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Prevent body scroll when game is active - REMOVED */
+
+/* Canvas fixes */
+canvas {
+  display: block !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+}
+
+/* Mobile viewport fixes - REMOVED */
+
+/* Landscape mobile fixes */
+@media (max-height: 500px) and (orientation: landscape) {
+  .game-container {
+    height: 100vh !important;
+    height: calc(var(--app-100vh, 100vh)) !important;
+  }
+}
+
+/* Prevent zoom on mobile */
+input, select, textarea {
+  font-size: 16px !important;
+}
+
+/* Touch action fixes */
+* {
+  touch-action: manipulation !important;
+}
+
+/* Prevent text selection in games */
+.game-container * {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+}
+
+/* Force full viewport for games - REMOVED */
+
+/* Fix for game wrapper */
+.game-container > div {
+  width: 100% !important;
+  height: 100% !important;
+  position: relative !important;
+}
+
+/* Specific fix for miners game */
+.miners-game-container {
+  width: 100vw !important;
+  height: 100vh !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  overflow: hidden !important;
+}

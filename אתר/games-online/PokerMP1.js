@@ -2,63 +2,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 import {
-  maxStreetBet, minRaiseAmount,
-  startHand as engineStartHand, advanceStreet as engineAdvanceStreet
+  newDeck, maxStreetBet, canCheck, minRaiseAmount,
+  determineWinnersAuto, settlePots
 } from "../lib/pokerEngine";
 
 const TURN_SECONDS = Number(process.env.NEXT_PUBLIC_POKER_TURN_SECONDS||20);
-const MIN_PLAYERS_TO_START = 2;     // start when 2 are seated
-
-// ===== Vault from props (Arcade Online) - single source of truth =====
-function getVaultFromProps(vaultProp) {
-  return Math.max(0, Number(vaultProp || 0));
-}
-function setVaultFromProps(setVaultBoth, nextAmount) {
-  if (typeof setVaultBoth === 'function') {
-    setVaultBoth(Math.max(0, Math.floor(Number(nextAmount || 0))));
-  }
-}
-
-// ===== Fixed Tiers (client mapping) =====
-const FIXED_TIERS = {
-  '1K':    { min_buyin: 1_000,        sb: 10,       bb: 20 },
-  '10K':   { min_buyin: 10_000,       sb: 100,      bb: 200 },
-  '100K':  { min_buyin: 100_000,      sb: 1_000,    bb: 2_000 },
-  '1M':    { min_buyin: 1_000_000,    sb: 10_000,   bb: 20_000 },
-  '10M':   { min_buyin: 10_000_000,   sb: 100_000,  bb: 200_000 },
-  '100M':  { min_buyin: 100_000_000,  sb: 1_000_000,bb: 2_000_000 },
-};
-
-// returns true if I am seated and it's my turn on an acting street
-function isMyTurn(ses, meRow) {
-  if (!ses || !meRow) return false;
-  const actingStreet = ['preflop','flop','turn','river'].includes(ses.stage);
-  return actingStreet && meRow.seat_index !== null && ses.current_turn === meRow.seat_index;
-}
-
-// display-oriented guard for action buttons
-function canActNow(ses, meRow) {
-  if (!ses || !meRow) return false;
-  if (meRow.seat_index === null) return false;
-  // no actions in lobby/showdown
-  if (ses.stage === 'lobby' || ses.stage === 'showdown') return false;
-  return isMyTurn(ses, meRow);
-}
 
 // Helper functions
 function fmt(n){ n=Math.floor(Number(n||0)); if(n>=1e9)return(n/1e9).toFixed(2)+"B"; if(n>=1e6)return(n/1e6).toFixed(2)+"M"; if(n>=1e3)return(n/1e3).toFixed(2)+"K"; return String(n); }
-
-function activePlayers(pls){
-  return (pls||[]).filter(p => !p.folded && p.seat_index !== null);
-}
-function canCheckNow(ses, pls, seatIndex){
-  if (!ses) return false;
-  if (!['preflop','flop','turn','river'].includes(ses.stage)) return false;
-  const me = (pls||[]).find(p => p.seat_index === seatIndex);
-  if (!me) return false;
-  const maxBet = maxStreetBet(pls); // מהמנוע
-  return Number(ses.to_call || 0) === 0 && Number(me.bet_street || 0) === maxBet;
-}
 
 function Card({ code, hidden = false, isDealing = false }) {
   if (!code) return null;
@@ -99,15 +50,26 @@ function TurnCountdown({ deadline }) {
   useEffect(() => {
     const t = setInterval(() => {
       setLeft(Math.max(0, Math.floor((new Date(deadline).getTime() - Date.now())/1000)));
-    }, 100);
+    }, 250);
     return () => clearInterval(t);
   }, [deadline]);
   return <div className="text-xs text-emerald-300 font-bold">⏱️ {left}s</div>;
 }
 
-export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierCode = '10K' }) {
+export default function PokerMP({ roomId, playerName, vault, setVaultBoth }) {
+  // Use same vault functions as existing games
+  function getVault() {
+    const rushData = JSON.parse(localStorage.getItem("mleo_rush_core_v4") || "{}");
+    return rushData.vault || 0;
+  }
 
-  // הגדר callback לעדכון vault
+  function setVault(amount) {
+    const rushData = JSON.parse(localStorage.getItem("mleo_rush_core_v4") || "{}");
+    rushData.vault = amount;
+    localStorage.setItem("mleo_rush_core_v4", JSON.stringify(rushData));
+  }
+
+  // Set callback for vault update
   useEffect(() => {
     window.updateVaultCallback = setVaultBoth;
     return () => {
@@ -122,12 +84,9 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   const [roomMembers, setRoomMembers] = useState([]);
   const [betInput, setBetInput] = useState(0);
   const [msg, setMsg] = useState("");
-  const [showRebuy, setShowRebuy] = useState(false);
-  const [rebuyAmt, setRebuyAmt] = useState(1000);
-  const [rebuyBusy, setRebuyBusy] = useState(false);
+  const [busy, setBusy] = useState(false);
   const tickRef = useRef(null);
   const startingRef = useRef(false);
-  const advancingRef = useRef(false);
 
   // ===== Realtime session =====
   useEffect(() => {
@@ -180,24 +139,28 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
 
   const clientId = useMemo(() => getClientId(), []);
 
+  // Prevent races in street advancement (flop/turn/river)
+  const advancingRef = useRef(false);
+
   async function autopilot() {
     if (!isLeader) return;
-    const seatedCount = players.filter(p => p.seat_index !== null).length;
-
-    // כשיש 2 שחקנים יושבים — התחל משחק
-    if (seatedCount >= MIN_PLAYERS_TO_START && (!ses || ses.stage === 'lobby')) {
+    
+    // If there are 2+ players and no active session, start game
+    if (players.length >= 2 && (!ses || ses.stage === 'lobby')) {
       await startHand();
       return;
     }
-
-
-    // אחרי showdown — המתן קצת ואז התחל יד חדשה
-    if (ses && ses.stage === 'showdown') {
-      await new Promise(r => setTimeout(r, 1200));
-      if (players.filter(p => p.seat_index !== null).length >= MIN_PLAYERS_TO_START) {
-        await startHand();
-      }
-      return;
+    
+    // Only run autopilot if turn deadline has passed
+    if (ses?.turn_deadline) {
+      const now = Date.now();
+      const deadline = new Date(ses.turn_deadline).getTime();
+      if (now < deadline) return; // Don't run if deadline hasn't passed
+    }
+    
+    // If everyone acted, move to next stage
+    if (ses && ses.stage !== 'showdown' && everyoneActedOrAllIn()) {
+      await advanceStreet();
     }
   }
 
@@ -217,7 +180,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       if(Date.now() >= deadline){
         await autoAct();
       }
-    }, 100);
+    }, 250);
     return ()=> clearInterval(tickRef.current);
   },[ses?.turn_deadline, ses?.current_turn, players]);
 
@@ -226,7 +189,82 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   const turnPlayer = ses?.current_turn!=null ? seatMap.get(ses.current_turn) : null;
   const bb = ses?.min_bet || 20;
 
-  // בדיקה שהמשחק לא נגמר בטרם עת
+  // Helper functions for checking seated players
+  async function seatedPlayersOf(sessionId) {
+    const { data } = await supabase
+      .from("poker_players")
+      .select("id, seat_index, folded, stack_live, acted, bet_street, all_in")
+      .eq("session_id", sessionId);
+    return data || [];
+  }
+
+  async function requireAtLeastTwo(sessionId) {
+    const seated = await seatedPlayersOf(sessionId);
+    // "Seated" = has seat_index (regardless of stack_live)
+    return seated.filter(p => p.seat_index !== null && p.seat_index !== undefined).length >= 2;
+  }
+
+  // Find the first alive seat after BB
+  async function firstAliveAfterBB(sessionId, bbSeat) {
+    const seated = await seatedPlayersOf(sessionId);
+    const maxBet = Math.max(...seated.map(p => p.bet_street || 0), 0);
+    for (let k = 1; k <= seats; k++) {
+      const idx = (bbSeat + k) % seats;
+      const p = seated.find(x => x.seat_index === idx);
+      if (p && !p.folded && !p.all_in && (p.stack_live || 0) > 0) {
+        // Check if this player needs to act (not aligned or not acted)
+        const needsAction = (p.bet_street||0) !== maxBet || !p.acted;
+        if(needsAction) return idx;
+      }
+    }
+    return null;
+  }
+
+  // Helper functions for proper hand start
+  function orderBySeat(startSeat, seats) {
+    return Array.from({length: seats}, (_, i) => (startSeat + i) % seats);
+  }
+
+  function firstAliveAfter(seated, fromSeat, seats) {
+    const order = orderBySeat(fromSeat + 1, seats);
+    for (const idx of order) {
+      const p = seated.find(x => x.seat_index === idx);
+      if (p && !p.folded && !p.all_in && (p.stack_live ?? 0) > 0) return idx;
+    }
+    return null;
+  }
+
+  // Post blinds without touching acted
+  async function postBlinds(sessionId, sbSeat, bbSeat, sbAmt, bbAmt) {
+    const { data: players } = await supabase
+      .from("poker_players")
+      .select("id,seat_index,stack_live,bet_street,total_bet")
+      .eq("session_id", sessionId);
+
+    const sb = players.find(p => p.seat_index === sbSeat);
+    const bb = players.find(p => p.seat_index === bbSeat);
+    const sPay = Math.min(sbAmt, sb?.stack_live ?? 0);
+    const bPay = Math.min(bbAmt, bb?.stack_live ?? 0);
+
+    if (sb) await supabase.from("poker_players").update({
+      stack_live: sb.stack_live - sPay,
+      bet_street: (sb.bet_street||0) + sPay,
+      total_bet: (sb.total_bet||0) + sPay
+    }).eq("id", sb.id);
+
+    if (bb) await supabase.from("poker_players").update({
+      stack_live: bb.stack_live - bPay,
+      bet_street: (bb.bet_street||0) + bPay,
+      total_bet: (bb.total_bet||0) + bPay
+    }).eq("id", bb.id);
+
+    await supabase.from("poker_actions").insert([
+      { session_id: sessionId, seat_index: sbSeat, action: "blind_sb", amount: sPay },
+      { session_id: sessionId, seat_index: bbSeat, action: "blind_bb", amount: bPay }
+    ]);
+  }
+
+  // Check that the game hasn't ended prematurely
   function canAct(player) {
     if (!player || player.folded || player.all_in) return false;
     if (ses?.current_turn !== player.seat_index) return false;
@@ -234,121 +272,17 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     return true;
   }
 
-  // ===== Ensure Session exists for room =====
-  async function ensureSession(roomId, tierCode = '10K') {
-    // try get existing session for this room
-    const { data: existing, error: selErr } = await supabase
-      .from('poker_sessions')
-      .select('*')
-      .eq('room_id', roomId)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (selErr) {
-      console.warn('ensureSession select error', selErr);
-    }
-    if (existing && existing.length) return existing[0];
-
-    // create fresh session in lobby per selected tier
-    const T = FIXED_TIERS[tierCode] || FIXED_TIERS['10K'];
-    const { data: created, error: insErr } = await supabase
-      .from('poker_sessions')
-      .insert({
-        room_id: roomId,
-        stage: 'lobby',
-        tier_code: tierCode,
-        min_buyin: T.min_buyin,
-        sb: T.sb,
-        bb: T.bb,
-        pot_total: 0,
-      })
-      .select()
-      .single();
-
-    if (insErr) {
-      console.error('ensureSession insert error', insErr);
-      throw insErr;
-    }
-    return created;
-  }
-
-  // ===== Vault Management =====
-  function safeRead(k, d){ try{ const r=localStorage.getItem(k); return r? JSON.parse(r):d }catch{ return d } }
-  function safeWrite(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)) }catch{} }
-
-  function readVault(){ 
-    const rushData = safeRead("mleo_rush_core_v4", {});
-    return Math.max(0, Number(rushData.vault || 0));
-  }
-  
-  function writeVault(v){ 
-    const rushData = safeRead("mleo_rush_core_v4", {});
-    rushData.vault = Math.max(0, Math.floor(v));
-    safeWrite("mleo_rush_core_v4", rushData);
-    
-    // Update main page state if callback exists
-    if (window.updateVaultCallback) {
-      window.updateVaultCallback(rushData.vault);
-    }
-  }
-
-  // ===== Re-buy Management =====
-  const MIN_REBUY = 100;        // Can be changed
-  const DEFAULT_REBUY = 1000;   // Default for quick button
-
-  async function doRebuy(amount) {
-    if (!ses?.stage === 'lobby' || !myRow?.id) return;
-    const vault = readVault();
-    const amt = Math.min(Math.max(MIN_REBUY, Math.floor(Number(amount||0))), vault);
-    if (amt <= 0) return;
-    try{
-      setRebuyBusy(true);
-      writeVault(vault - amt);
-      await supabase.from('poker_players')
-        .update({ stack_live: Number(myRow.stack_live||0) + amt })
-        .eq('id', myRow.id);
-      setShowRebuy(false);
-    } finally {
-      setRebuyBusy(false);
-    }
-  }
-
-  async function rebuy(amount){
-    await doRebuy(amount);
-  }
-
-  // ===== Leave Seat =====
-  async function leaveSeat(){
-    if(!ses || !myRow) return;
-    await supabase.from('poker_players')
-      .update({ seat_index: null })
-      .eq('id', myRow.id);
-  }
-
   // ===== Take Seat =====
   async function takeSeat(seatIndex) {
     if (!clientId) { setMsg("Client not recognized"); return; }
 
-    // מייצר session אם אין - אבל לא משתמש ב-ses המקומי עד ש-הוא refreshing
+    // Ensure there's a session in LOBBY state – don't start hand here
     let session = ses;
     if (!session || !session.id) {
-      session = await ensureSession(roomId, tierCode);
+      session = await ensureSession(roomId);
     }
 
-    // במקביל, עדכן את ה-state המקומי
-    setSes(session);
-
-    // בדיקת יתרה - minimum buy-in
-    const minBuyin = Math.max(Number(session?.min_buyin || 0), 1000);
-    const want = Math.floor(Math.max(minBuyin, minBuyin));
-    const currentVault = readVault();
-    
-    if (currentVault < want) { 
-      setMsg(`Insufficient vault balance (min ${minBuyin} MLEO)`); 
-      return; 
-    }
-
-    // האם כבר יש לי שורה בסשן?
+    // Do I already have a row in the session?
     const { data: mine } = await supabase
       .from("poker_players")
       .select("id, seat_index, client_id")
@@ -356,7 +290,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       .eq("client_id", clientId)
       .maybeSingle();
 
-    // בדוק תפוסת מושב היעד
+    // Check target seat occupancy
     const { data: occ } = await supabase
       .from("poker_players")
       .select("id, client_id")
@@ -364,13 +298,13 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       .eq("seat_index", seatIndex)
       .maybeSingle();
 
-    // אם תפוס ע"י אחר
+    // If occupied by someone else
     if (occ && occ.client_id && occ.client_id !== clientId) {
       setMsg("Seat is taken");
       return;
     }
 
-    // מעבר מושב אם יש לי שורה קיימת
+    // Move seat if I have an existing row
     if (mine && mine.seat_index !== seatIndex) {
       if (!occ) {
         await supabase.from("poker_players").update({ seat_index: seatIndex }).eq("id", mine.id);
@@ -382,14 +316,18 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       }
     }
 
-    // יצירה חדשה אם אין לי
+    // Create new if I don't have one
     if (!mine) {
+      // Check balance
+      const currentVault = getVault();
+      if (currentVault < 1000) { setMsg("Insufficient vault balance (min 1000 MLEO)"); return; }
+
       const { error: upErr } = await supabase.from("poker_players").upsert({
         session_id: session.id,
         seat_index: seatIndex,
         player_name: name,
         client_id: clientId,
-        stack_live: want,
+        stack_live: 1000,
         bet_street: 0,
         total_bet: 0,
         hole_cards: [],
@@ -406,18 +344,25 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
         return;
       }
 
-      // ניכוי מה-vault רק אחרי הצלחה
-      writeVault(currentVault - want);
+      // Deduct from vault only after success
+      const newVault = currentVault - 1000;
+      setVault(newVault);
+      if (setVaultBoth) setVaultBoth(newVault);
     }
 
     setMsg("");
   }
 
   function nextSeatAlive(startIdx){
+    const maxBet = maxStreetBet(players);
     for(let k=1;k<=seats;k++){
       const idx = (startIdx + k) % seats;
       const p = seatMap.get(idx);
-      if(p && !p.folded && p.stack_live>0) return idx;
+      if(p && !p.folded && !p.all_in && p.stack_live>0) {
+        // Check if this player needs to act (not aligned or not acted)
+        const needsAction = (p.bet_street||0) !== maxBet || !p.acted;
+        if(needsAction) return idx;
+      }
     }
     return null;
   }
@@ -432,18 +377,115 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     const maxBet = maxStreetBet(players);
     if(alive.length<=1) return true;
     
-    // בדוק אם כולם פעלו או ALL-IN או שההימור שלהם שווה למקסימום
-    return alive.every(p => p.acted || p.all_in || (p.bet_street||0) === maxBet);
+    // Check if everyone actually acted AND bets are aligned
+    const allActed = alive.every(p => p.acted === true || p.all_in);
+    const betsAligned = alive.every(p => (p.bet_street||0) === maxBet);
+    
+    return allActed && betsAligned;
   }
 
   async function resetStreetActs(){
-    await supabase.from("poker_players").update({ bet_street:0, acted:false })
-      .eq("session_id", ses.id);
+    // Reset only for alive players (not folded, not all-in)
+    const alivePlayers = players.filter(p => !p.folded && !p.all_in && (p.stack_live || 0) > 0);
+    if (alivePlayers.length > 0) {
+      const aliveIds = alivePlayers.map(p => p.id);
+      await supabase.from("poker_players").update({ 
+        bet_street: 0, 
+        acted: false 
+      }).in("id", aliveIds);
+    }
   }
 
+  async function advanceStreet(auto=false){
+    if(!ses || advancingRef.current) return;
+    advancingRef.current = true;
+    try {
+      // Read current state from DB to prevent decisions based on old memory
+      const { data: s } = await supabase
+        .from("poker_sessions")
+        .select("id, stage, board, deck_remaining, dealer_seat, current_turn, turn_deadline")
+        .eq("id", ses.id)
+        .single();
+      if (!s) return;
+
+      // If only one player remains — automatic win without ranking
+      const aliveNow = players.filter(p => !p.folded);
+      if (aliveNow.length <= 1) {
+        const winnerSeat = aliveNow[0]?.seat_index;
+        await supabase.from("poker_sessions").update({
+          stage: "showdown", winners: winnerSeat!=null ? [winnerSeat] : [], current_turn: null, turn_deadline: null
+        }).eq("id", s.id);
+        return;
+      }
+
+      const board = Array.isArray(s.board) ? [...s.board] : [];
+      let d = Array.isArray(s.deck_remaining) ? [...s.deck_remaining] : [];
+
+      // Don't allow more than 5
+      if (board.length >= 5) return;
+
+      let nextStage = s.stage;
+
+      if (s.stage === "preflop") {
+        if (board.length !== 0 || d.length < 3) return; // Flop only once
+        board.push(d.pop(), d.pop(), d.pop());
+        nextStage = "flop";
+      } else if (s.stage === "flop") {
+        if (board.length !== 3 || d.length < 1) return;
+        board.push(d.pop());
+        nextStage = "turn";
+      } else if (s.stage === "turn") {
+        if (board.length !== 4 || d.length < 1) return;
+        board.push(d.pop());
+        nextStage = "river";
+      } else if (s.stage === "river") {
+        nextStage = "showdown";
+      } else {
+        return;
+      }
+
+      let next = null;
+      if (nextStage !== "showdown") {
+        // Use the new function for selecting alive player
+        const seated = await seatedPlayersOf(s.id);
+        for (let k = 1; k <= seats; k++) {
+          const idx = (s.dealer_seat + k) % seats;
+          const p = seated.find(x => x.seat_index === idx);
+          if (p && !p.folded && (p.stack_live || 0) > 0) {
+            next = idx;
+            break;
+          }
+        }
+      }
+
+      // Conditional update: only if stage hasn't changed since the call (prevents multiple openings)
+      const { error: updErr } = await supabase
+        .from("poker_sessions")
+        .update({
+          board,
+          deck_remaining: d,
+          stage: nextStage,
+          current_turn: next,
+          turn_deadline: next ? new Date(Date.now()+TURN_SECONDS*1000).toISOString() : null
+        })
+        .eq("id", s.id)
+        .eq("stage", s.stage);
+
+      if (!updErr) {
+        // Reset street state only after successful advancement
+        await resetStreetActs();
+      }
+
+      if (nextStage === "showdown") {
+        await showdownAndSettle();
+      }
+    } finally {
+      advancingRef.current = false;
+    }
+  }
 
   async function showdownAndSettle(){
-    // אם נשאר אחד – הוא המנצח
+    // If only one remains – they are the winner
     const alive = players.filter(p=>!p.folded);
     const winners = (alive.length === 1)
       ? [alive[0].seat_index]
@@ -452,27 +494,146 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     await settlePots(ses.id, ses.board||[], players);
   }
 
+  // ===== Ensure Session (create lobby if none exists) =====
+  async function ensureSession(roomId) {
+    // If session already exists for this room – return it
+    const { data: exist } = await supabase
+      .from("poker_sessions")
+      .select("*")
+      .eq("room_id", roomId)
+      .maybeSingle();
+    if (exist) return exist;
+
+    // Create new session in LOBBY state only (don't start hand!)
+    const deck = newDeck();
+    const { data: ins, error } = await supabase
+      .from("poker_sessions")
+      .insert({
+        room_id: roomId,
+        hand_no: 1,
+        stage: "lobby",
+        dealer_seat: 0,
+        sb_seat: 0,
+        bb_seat: 0,
+        board: [],
+        deck_remaining: deck,
+        pot_total: 0,
+        min_bet: 20,
+        current_turn: null,
+        turn_deadline: null,
+        winners: []
+      })
+      .select()
+      .single();
+    if (error || !ins) throw error || new Error("failed to create session");
+    // Main pot
+    await supabase.from("poker_pots").insert({ session_id: ins.id, total: 0, eligible: [] });
+    // Update local state so UI sees there's a session
+    setSes(ins);
+    return ins;
+  }
+
   // ===== Start / Next hand =====
   async function startHand(){
     if (startingRef.current) return;
     startingRef.current = true;
     try {
-      // ודא שיש Session (אם שחקן ראשון נכנס וזה עדיין 'null')
-      let sessionId = ses?.id;
-      if (!sessionId) {
-        const { data } = await supabase.from("poker_sessions").select("id").eq("room_id", roomId).maybeSingle();
-        sessionId = data?.id;
-        if (!sessionId) {
-          const created = await ensureSession(roomId, tierCode);
-          sessionId = created.id;
-          setSes(created);
+      const deck = newDeck();
+      
+      // Ensure there's a session (lobby). If not – create one but don't start hand immediately.
+      const exist = await ensureSession(roomId);
+      const sessionId = exist.id;
+
+      // Get seated players
+      const seated = await seatedPlayersOf(sessionId);
+      const seatedCount = seated.filter(p => p.seat_index !== null && p.seat_index !== undefined).length;
+      if (seatedCount < 2) {
+        setMsg("Need at least two players seated at the table to start.");
+        return; // Stay in lobby; players can still sit
+      }
+
+      // Auto-topup players with 0 or negative stack
+      const BB = 20;
+      const SB = Math.floor(BB / 2);
+      const MIN_STACK = Math.max(1000, BB * 10);
+
+      const needTopup = seated.filter(p => (p.stack_live || 0) <= 0);
+      if (needTopup.length > 0) {
+        await supabase.from("poker_players")
+          .update({ stack_live: MIN_STACK })
+          .in("id", needTopup.map(p => p.id));
+      }
+
+      // Now get active players (after topup)
+      const active = seated.filter(p => p.stack_live > 0);
+
+      // Determine dealer - keep from session if exists, otherwise use first active
+      let dealer = exist ? (exist.dealer_seat + 1) % seats : 0;
+      if (!active.find(p => p.seat_index === dealer)) {
+        dealer = active[0].seat_index;
+      }
+
+      // Heads-up rule: SB = dealer, BB = the other; otherwise SB=left of dealer, BB=left of SB
+      let sbSeat, bbSeat;
+      if (active.length === 2) {
+        sbSeat = dealer;
+        bbSeat = active.find(p => p.seat_index !== dealer).seat_index;
+      } else {
+        sbSeat = firstAliveAfter(seated, dealer, seats);
+        bbSeat = firstAliveAfter(seated, sbSeat, seats);
+      }
+
+      // Update session with proper dealer/blinds
+      if(exist) {
+        await supabase.from("poker_sessions").update({
+          hand_no: exist.hand_no+1, stage:"lobby",
+          dealer_seat: dealer, sb_seat: sbSeat, bb_seat: bbSeat,
+          board:[], deck_remaining: deck, pot_total:0, winners:[],
+          min_bet: 20,
+          current_turn: null,
+          turn_deadline: null
+        }).eq("id", sessionId);
+        await supabase.from("poker_pots").update({ total:0, eligible:[] }).eq("session_id", sessionId);
+      }
+
+      // Reset players for new hand (no one acted yet)
+      await supabase.from("poker_players").update({
+        folded: false, all_in: false, acted: false, bet_street: 0, total_bet: 0, hole_cards: []
+      }).eq("session_id", sessionId);
+
+      // Post blinds without touching acted
+      await postBlinds(sessionId, sbSeat, bbSeat, SB, BB);
+
+      // Deal hole cards
+      let d = [...deck];
+      const { data: allPlayers } = await supabase
+        .from("poker_players")
+        .select("id, seat_index, hole_cards")
+        .eq("session_id", sessionId)
+        .order("seat_index");
+
+      for (let round = 0; round < 2; round++) {
+        for (const P of (allPlayers || [])) {
+          const c = d.pop();
+          const hand = Array.isArray(P.hole_cards) ? [...P.hole_cards, c] : [c];
+          await supabase.from("poker_players").update({ hole_cards: hand }).eq("id", P.id);
         }
       }
-      const result = await engineStartHand(sessionId);
-      if (!result?.ok) {
-        setMsg(result?.reason || "Failed to start hand");
-        return;
-      }
+
+      // First to act preflop:
+      // - 2-handed: SB (dealer) acts first
+      // - 3+ players: first alive left of BB
+      const preflopFirst = (active.length === 2)
+        ? sbSeat
+        : firstAliveAfter(seated, bbSeat, seats);
+
+      await supabase.from("poker_sessions").update({
+        stage: "preflop",
+        current_turn: preflopFirst,
+        turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString(),
+        deck_remaining: d
+      }).eq("id", sessionId);
+
     } finally {
       startingRef.current = false;
     }
@@ -481,23 +642,47 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   async function takeChips(sessionId, seatIndex, amount, action){
     const { data: pl } = await supabase.from("poker_players")
       .select("*").eq("session_id", sessionId).eq("seat_index", seatIndex).maybeSingle();
-    if(!pl) return; // ⬅️ אל תגבה ממושב ריק
+    if(!pl) return; // ⬅️ Don't charge from empty seat
     
     const { data: pot } = await supabase.from("poker_pots").select("*").eq("session_id", sessionId).maybeSingle();
 
     const pay = Math.min(amount, pl.stack_live);
     
-    // No vault charging during gameplay - only at seat entry
+    // If this is the local player, deduct money from vault (compare by client_id)
+    if (pl.client_id && pl.client_id === clientId) {
+      const currentVault = getVault();
+      if (currentVault < pay) {
+        setMsg("Insufficient vault balance");
+        return;
+      }
+      const newVault = currentVault - pay;
+      setVault(newVault);
+      // Also update the state on the main page
+      if (setVaultBoth) {
+        setVaultBoth(newVault);
+      }
+    }
     
     await supabase.from("poker_players").update({
       stack_live: pl.stack_live - pay,
       bet_street: (pl.bet_street||0) + pay,
       total_bet:  (pl.total_bet||0)  + pay,
-      acted: true,
       all_in: (pl.stack_live - pay)===0
+      // Note: Don't set acted=true here - let the specific action functions handle it
     }).eq("id", pl.id);
     await supabase.from("poker_pots").update({ total: (pot?.total||0) + pay }).eq("session_id", sessionId);
     await supabase.from("poker_actions").insert({ session_id: sessionId, seat_index: seatIndex, action, amount: pay });
+  }
+
+  // ===== Player Acts =====
+  async function doAction(act, amount = 0) {
+    if (busy) return;
+    try {
+      setBusy(true);
+      await act(amount);
+    } finally {
+      setBusy(false);
+    }
   }
 
   // ===== Quick Win Helper =====
@@ -545,7 +730,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       .from('poker_sessions')
       .update({
         pot_total: 0,
-        stage: 'lobby',         // ✅ אין שואודאון – ניצחון בקיפול
+        stage: 'showdown',
         current_turn: null,
         turn_deadline: null,
       })
@@ -671,7 +856,6 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     }
   }
 
-  // ===== Player Acts =====
   async function actFold(){
     if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
     await supabase.from("poker_players").update({ folded:true, acted:true, hole_cards: [] }).eq("id", turnPlayer.id);
@@ -690,74 +874,71 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       return;
     }
     
-    await afterActionAdvanceStrict();
+    await afterActionAdvance();
   }
 
   async function actCheck(){
-    // משוך מצב עדכני כדי לא ליפול על state ישן
-    const { data: sesNow } = await supabase
-      .from('poker_sessions').select('id,to_call').eq('id', ses.id).single();
-    if (!isMyTurn(ses, myRow)) return;
-    if (Number(sesNow.to_call || 0) > 0) return; // אסור check כשיש חוב
-
-    await supabase.from('poker_players')
-      .update({ acted: true })   // לא משנים bet_street ב-check
-      .eq('id', myRow.id);
-
-    await afterActionAdvanceStrict();
+    if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
+    if(!canCheck(turnPlayer, players)) return; // Not legal
+    await supabase.from("poker_players").update({ acted:true }).eq("id", turnPlayer.id);
+    await supabase.from("poker_actions").insert({ session_id: ses.id, seat_index: turnPlayer.seat_index, action:"check" });
+    await afterActionAdvance();
   }
 
   async function actCall(){
-    if (!isMyTurn(ses, myRow)) return;
-    // חישוב חוב אליי: max(bet_street) - שלי
-    const { data: pls } = await supabase
-      .from('poker_players').select('seat_index,folded,bet_street').eq('session_id', ses.id);
-    const active = (pls||[]).filter(p => !p.folded && p.seat_index !== null);
-    const maxBet = Math.max(0, ...active.map(p => Number(p.bet_street||0)));
-    const mine = Number(myRow.bet_street || 0);
-    const need = Math.max(0, maxBet - mine);
-    if (need <= 0) return;
-
-    await takeChips(ses.id, myRow.seat_index, need, 'call');
-    // הסר את העדכון הכפול של bet_street - takeChips כבר עושה את זה
-    await afterActionAdvanceStrict();
+    if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
+    const maxBet = maxStreetBet(players);
+    const need = Math.max(0, maxBet - (turnPlayer.bet_street||0));
+    if(need<=0) return actCheck();
+    const pay = Math.min(need, turnPlayer.stack_live);
+    await takeChips(ses.id, turnPlayer.seat_index, pay, "call");
+    // Mark as acted after taking chips
+    await supabase.from("poker_players").update({ acted:true }).eq("id", turnPlayer.id);
+    await afterActionAdvance();
   }
 
   async function actBet(amount){
-    if (!isMyTurn(ses, myRow)) return;
-    const { data: sesNow } = await supabase
-      .from('poker_sessions').select('to_call').eq('id', ses.id).single();
-    if (Number(sesNow.to_call || 0) > 0) return; // כשיש חוב אסור "bet", רק call/raise
-
-    const amt = Math.max(0, Math.floor(Number(amount || 0)));
-    if (amt <= 0) return;
-
-    await takeChips(ses.id, myRow.seat_index, amt, 'bet');
-    await supabase.from('poker_sessions').update({ last_raiser: myRow.seat_index }).eq('id', ses.id);
-    await afterActionAdvanceStrict();
+    if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
+    const maxBet = maxStreetBet(players);
+    if(maxBet>0) return; // If there's already a raise/bet — this is actually a raise
+    const minBet = ses.min_bet || 20;
+    if(amount < minBet) amount = minBet;
+    amount = Math.min(amount, turnPlayer.stack_live);
+    await takeChips(ses.id, turnPlayer.seat_index, amount, "bet");
+    // Mark as acted after taking chips
+    await supabase.from("poker_players").update({ acted:true }).eq("id", turnPlayer.id);
+    // Reset acted for all others (who will need to respond)
+    const others = players.filter(p=>p.id!==turnPlayer.id && !p.folded && !p.all_in).map(p=>p.id);
+    if(others.length) await supabase.from("poker_players").update({ acted:false }).in("id", others);
+    await afterActionAdvance(true);
   }
 
   async function actRaise(amount){
-    if (!isMyTurn(ses, myRow)) return;
-    const add = Math.max(0, Math.floor(Number(amount || 0)));
-    if (add <= 0) return;
-
-    await takeChips(ses.id, myRow.seat_index, add, 'raise');
-    await supabase.from('poker_sessions').update({ last_raiser: myRow.seat_index }).eq('id', ses.id);
-    await afterActionAdvanceStrict();
+    if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
+    const maxBet = maxStreetBet(players);
+    const needToCall = Math.max(0, maxBet - (turnPlayer.bet_street||0));
+    const minR = minRaiseAmount(players, ses.min_bet||20);
+    const raiseBy = Math.max(minR, amount); // Size of the raise
+    const pay = Math.min(needToCall + raiseBy, turnPlayer.stack_live);
+    if(pay<=0) return;
+    await takeChips(ses.id, turnPlayer.seat_index, pay, "raise");
+    // Mark as acted after taking chips
+    await supabase.from("poker_players").update({ acted:true }).eq("id", turnPlayer.id);
+    const others = players.filter(p=>p.id!==turnPlayer.id && !p.folded && !p.all_in).map(p=>p.id);
+    if(others.length) await supabase.from("poker_players").update({ acted:false }).in("id", others);
+    await afterActionAdvance(true);
   }
 
   async function actAllIn(){
-    if (!isMyTurn(ses, myRow)) return;
-    const pay = Number(myRow.stack_live || 0);
-    if (pay <= 0) return;
+    if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
+    if(turnPlayer.stack_live <= 0) return; // Additional check
 
     // ✅ תן לשחקן לתרום רק מה שמכוסה מול היריב/ים
-    await applyAllInCapped(ses.id, myRow.seat_index);
+    await applyAllInCapped(ses.id, turnPlayer.seat_index);
 
     await supabase.from('poker_actions').insert({
       session_id: ses.id, 
-      seat_index: myRow.seat_index, 
+      seat_index: turnPlayer.seat_index, 
       action: 'allin', 
       amount: null
     });
@@ -765,216 +946,111 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     // אם כולם נעולים (או מקופלים), מריצים ראנאאוט אוטומטי
     await maybeAutoRunoutToShowdown(ses.id);
 
-    await afterActionAdvanceStrict();
-  }
-
-  // ===== פונקציה מרכזית: לחשב שחקן תור־הבא ו־to_call =====
-  async function afterActionAdvanceStrict() {
-    // 1) קרא מצב עדכני מה-DB (לא להסתמך על state ישן)
-    const { data: sesNow } = await supabase
-      .from('poker_sessions').select('*').eq('id', ses.id).single();
-    const { data: pls } = await supabase
-      .from('poker_players').select('*').eq('session_id', ses.id);
-
-    const active = (pls || []).filter(p => !p.folded && p.seat_index !== null);
-    if (!active.length) return;
-
-    // ✅ אם נשאר שחקן פעיל אחד – סגירה מיידית והעברת כל הכסף למנצח
-    if (active.length === 1) {
-      const winnerSeat = active[0].seat_index;
-      // חשב את כל הכסף על השולחן: pot_total + סך bet_street של כולם
-      const streetSum = (pls || []).reduce((s,p) => s + Number(p.bet_street||0), 0);
-      const totalPot  = Number(sesNow.pot_total||0) + streetSum;
-
-      // אפס הימור רחוב אצל כולם
-      await supabase.from('poker_players')
-        .update({ bet_street: 0 })
-        .eq('session_id', ses.id);
-
-      // הוסף את כל הקופה ל-stack_live של המנצח
-      const winnerRow = (pls || []).find(p => p.seat_index === winnerSeat);
-      if (winnerRow) {
-        await supabase.from('poker_players')
-          .update({ stack_live: Number(winnerRow.stack_live||0) + totalPot })
-          .eq('id', winnerRow.id);
-      }
-
-      // אפס את הפוט וסיים יד
-      await supabase.from('poker_sessions').update({
-        pot_total: 0,
-        stage: 'showdown',        // או 'lobby' אם אתה פותח יד הבאה מבחוץ
-        current_turn: null,
-        to_call: 0,
-        turn_deadline: null
-      }).eq('id', ses.id);
-
-      // לוג זכייה
-      await supabase.from('poker_actions').insert({
-        session_id: ses.id,
-        seat_index: winnerSeat,
-        action: 'win',
-        amount: totalPot,
-        note: 'winner by fold'
-      });
-      return; // לא ממשיכים חישובי תור/רחוב
-    }
-
-    // 2) חשב הימור-שיא ברחוב
-    const maxBet = Math.max(0, ...active.map(p => Number(p.bet_street || 0)));
-
-    // 3) מצא מי הבא בתור: השחקן הפעיל הבא אחרי current_turn שעדיין לא השווה ל-maxBet
-    const order = active.map(p => p.seat_index).sort((a, b) => a - b);
-    const cur = Number(sesNow.current_turn);
-    const ring = order.filter(s => s > cur).concat(order.filter(s => s <= cur));
-
-    let nextSeat = null;
-    for (const s of ring) {
-      const pr = active.find(p => p.seat_index === s);
-      if (pr && !pr.folded && Number(pr.bet_street || 0) < maxBet) {
-        nextSeat = s;
-        break;
-      }
-    }
-
-    if (nextSeat === null) {
-      // כולם השוו: הרחוב מסתיים רק כשחזרנו ל-Last Aggressor והוא פעל (למשל CHECK).
-      const last = sesNow.last_raiser ?? null;
-      const lastRow = last!=null ? active.find(p=>p.seat_index===last) : null;
-
-      // אם עדיין לא חזרנו אליו – העבר לו את התור עם to_call=0 והמתן לפעולה שלו.
-      if (last!=null && sesNow.current_turn !== last) {
-        await supabase.from('poker_sessions').update({
-          current_turn: last,
-          to_call: 0,
-          turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
-        }).eq('id', ses.id);
-        return;
-      }
-
-      // אם זה התור של ה-Last Aggressor והוא כבר 'acted' (למשל עשה CHECK) – התקדמות רחוב.
-      if (lastRow?.acted) {
-        if (advancingRef.current) return;
-        advancingRef.current = true;
-        try {
-          await supabase.from('poker_sessions').update({ to_call: 0 }).eq('id', ses.id);
-          await engineAdvanceStreet(ses.id);
-        } finally {
-          advancingRef.current = false;
-        }
-      }
-      // אחרת – מחכים לפעולה שלו (אין advance עצמאי)
-      return;
-    }
-
-    // 4) יש שחקן בתור: חשב כמה חסר לו
-    const nextRow = active.find(p => p.seat_index === nextSeat);
-    const need = Math.max(0, maxBet - Number(nextRow?.bet_street || 0));
-
-    await supabase.from('poker_sessions').update({
-      current_turn: nextSeat,
-      to_call: need,
-      turn_deadline: new Date(Date.now() + TURN_SECONDS * 1000).toISOString()
-    }).eq('id', ses.id);
+    // Reset acted for all others (who will need to respond)
+    const others = players.filter(p=>p.id!==turnPlayer.id && !p.folded && !p.all_in).map(p=>p.id);
+    if(others.length) await supabase.from("poker_players").update({ acted:false }).in("id", others);
+    
+    await afterActionAdvance(true);
   }
 
   async function afterActionAdvance(resetOthers=false){
-    // בדוק אם כולם פעלו או ALL-IN
-    if(everyoneActedOrAllIn()){
-      // guard settlement: no to_call and equalized bets
-      const active = players.filter(p => !p.folded && p.seat_index !== null);
-      const maxBet = Math.max(...active.map(p=>Number(p.bet_street||0)), 0);
-      const unsettled = active.some(p => Number(p.bet_street||0) !== maxBet);
-      if (!unsettled && Number(ses?.to_call||0) === 0) {
-        await engineAdvanceStreet(ses.id);
-        return;
-      }
+    // Check if hand should end immediately (only one player left)
+    if (await afterActionMaybeEnd(ses.id)) {
+      return;
     }
     
-    // מעבר לשחקן הבא
+    // Check if everyone acted or ALL-IN
+    if(everyoneActedOrAllIn()){
+      await advanceStreet();
+      return;
+    }
+    
+    // Move to next player
     const nextIdx = nextSeatAlive(ses.current_turn);
     if(nextIdx !== null){
-      const active = players.filter(p => !p.folded && p.seat_index !== null);
-      const maxBet = Math.max(...active.map(p=>Number(p.bet_street||0)), 0);
-      const nextPlayer = players.find(p => p.seat_index === nextIdx);
-      const nextBet = Number(nextPlayer?.bet_street||0);
-      const newToCall = Math.max(0, maxBet - nextBet);
       await supabase.from("poker_sessions").update({
         current_turn: nextIdx,
-        to_call: newToCall,
         turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
       }).eq("id", ses.id);
     }
   }
 
-  async function autoAct(){
-    const turnSeat = ses?.current_turn;
-    const turnPlayer = players.find(p => p.seat_index === turnSeat);
-    if(!turnPlayer || !ses) return;
-    // Auto: אם אפשר check → check; אחרת fold
-    if (canCheckNow(ses, players, turnPlayer.seat_index)) await actCheck();
-    else await actFold();
+  // Check if hand should end immediately
+  function alive(players) {
+    return players.filter(p => !p.folded && (p.stack_live ?? 0) >= 0);
   }
 
-  // ===== Leave Seat (refund to vault) =====
-  async function leaveSeat(){
-    const me = players.find(p => p.client_id === clientId);
-    if (!me || me.seat_index === null) return;
-    const refund = Number(me.stack_live || 0);
-    await supabase.from('poker_players').update({ seat_index: null }).eq('id', me.id);
-    if (refund > 0) {
-      const now = getVaultFromProps(vault);
-      setVaultFromProps(setVaultBoth, now + refund);
+  async function awardPotAndClose(sessionId, winnerSeatIdx) {
+    const { data: sess } = await supabase.from("poker_sessions").select("pot_total").eq("id", sessionId).single();
+    const { data: pls } = await supabase.from("poker_players")
+      .select("id,seat_index,stack_live,bet_street").eq("session_id", sessionId);
+
+    const w = pls.find(p => p.seat_index === winnerSeatIdx);
+    if (!w) return;
+
+    // חשב את כל הכסף על השולחן: pot_total + סך bet_street של כולם
+    const streetSum = pls.reduce((s,p) => s + Number(p.bet_street||0), 0);
+    const totalPot = Number(sess?.pot_total||0) + streetSum;
+
+    // אפס הימור רחוב אצל כולם
+    await supabase.from('poker_players')
+      .update({ bet_street: 0 })
+      .eq('session_id', sessionId);
+
+    // הוסף את כל הקופה ל-stack_live של המנצח
+    await supabase.from("poker_players").update({
+      stack_live: (w.stack_live||0) + totalPot
+    }).eq("id", w.id);
+
+    await supabase.from("poker_actions").insert({ 
+      session_id: sessionId, 
+      seat_index: winnerSeatIdx, 
+      action:"win", 
+      amount: totalPot,
+      note: 'winner by fold'
+    });
+
+    await supabase.from("poker_sessions").update({
+      pot_total: 0,
+      stage:"lobby",         // ✅ אין שואודאון – ניצחון בקיפול
+      current_turn:null, 
+      turn_deadline:null
+    }).eq("id", sessionId);
+  }
+
+  async function afterActionMaybeEnd(sessionId) {
+    const { data: players } = await supabase.from("poker_players")
+      .select("seat_index,folded,all_in,bet_street").eq("session_id", sessionId);
+    const live = alive(players);
+
+    // If only one player left -> immediate win
+    if (live.length === 1) {
+      await awardPotAndClose(sessionId, live[0].seat_index);
+      return true;
     }
+    return false;
   }
 
-  // ===== Helper Functions =====
-  function isMyTurn(ses, me) {
-    if (!ses || !me) return false;
-    return ses.current_turn === me.seat_index;
+  async function autoAct(){
+    if(!turnPlayer || !ses) return;
+    
+    // Only auto-act if deadline has passed
+    if (ses.turn_deadline) {
+      const now = Date.now();
+      const deadline = new Date(ses.turn_deadline).getTime();
+      if (now < deadline) return; // Don't auto-act if deadline hasn't passed
+    }
+    
+    // Auto: if can check → check; otherwise fold
+    if(canCheck(turnPlayer, players)) await actCheck();
+    else await actFold();
   }
 
   // ===== UI =====
   const board = ses?.board||[];
   const seatMapMemo = useMemo(()=> new Map(players.map(p=>[p.seat_index,p])), [players]);
-  const myRow = players.find(p => p.client_id === clientId) || null;
-
-  // ===== Bust-out Check =====
-  useEffect(()=>{
-    if (!ses?.stage || !myRow) return;
-
-    // End of hand: lobby or showdown that ended (without turn_deadline)
-    const handOver = ses.stage === 'lobby' || (ses.stage === 'showdown' && !ses.turn_deadline);
-    if (!handOver) return;
-
-    const vault = readVault();
-    const stack = Number(myRow.stack_live||0);
-
-    // No chips on table
-    if (stack <= 0) {
-      if (vault > 0) {
-        setRebuyAmt(Math.min(DEFAULT_REBUY, vault));
-        setShowRebuy(true);         // ✅ Opens rebuy popup
-      } else {
-        // No Vault -> can only offer seat exit/info
-        setShowRebuy(false);
-        if (myRow.seat_index != null) {
-          leaveSeat();
-          setMsg("Left table: No coins in Vault");
-        }
-      }
-    }
-  }, [ses?.stage, ses?.turn_deadline, myRow?.stack_live]);
-  
-  const myTurn = isMyTurn(ses, myRow);
-  const canCall = Number(ses?.to_call || 0) > 0;   // For visual display only
-  const canCheck = !canCall;
+  const isMyTurn = !!turnPlayer && turnPlayer.client_id === clientId;
   const pot = ses?.pot_total || players.reduce((sum,p)=> sum + (p.total_bet||0), 0);
-  
-  // ===== Vault and Stack Management =====
-  const myVault = readVault();
-  const myStack = Number(myRow?.stack_live||0);
-  const canActNow = myTurn && myStack > 0;          // During hand - must have chips on table
-  const inLobby = ses?.stage === 'lobby';
 
   if (!roomId) return <div className="w-full h-full flex items-center justify-center text-white/70">Select or create a room to start.</div>;
 
@@ -1069,27 +1145,39 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
           <div className="text-white/80 text-xs mb-1 font-semibold">Game Control</div>
           <div className="flex gap-1 flex-wrap mb-2">
             <button 
-              onClick={startHand}
-              className="px-2 py-1 md:px-3 md:py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-xs transition-all shadow-lg"
+              disabled={busy}
+              onClick={async ()=>{
+                if (busy) return;
+                setBusy(true);
+                try {
+                  if (!ses?.id) { 
+                    await startHand(); 
+                    return; 
+                  }
+                  const ok = await requireAtLeastTwo(ses.id);
+                  if (!ok) { 
+                    setMsg("Need at least two players seated to start."); 
+                    return; 
+                  }
+                  await startHand();
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              className="px-2 py-1 md:px-3 md:py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-xs transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Start / Next Hand
             </button>
-            <button 
-              onClick={leaveSeat}
-              className="px-2 py-1 md:px-3 md:py-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all shadow-lg"
-            >
-              Leave Seat
-            </button>
             {["preflop","flop","turn","river"].includes(ses?.stage) && (
               <button 
-                onClick={()=>engineAdvanceStreet(ses.id)}
+                onClick={()=>advanceStreet(true)}
                 className="px-2 py-1 md:px-3 md:py-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold text-xs transition-all shadow-lg"
               >
                 Force Advance
               </button>
             )}
           </div>
-          <div className="text-white/60 text-xs mb-2">Vault: {fmt(getVaultFromProps(vault))} MLEO</div>
+          <div className="text-white/60 text-xs mb-2">Vault: {fmt(getVault())} MLEO</div>
           {/* Waiting Players Info */}
           {roomMembers.length > players.length && (
             <div>
@@ -1120,16 +1208,16 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
           <div className="text-white/80 text-xs mb-1 font-semibold">Player Actions</div>
           <div className="space-y-1">
             <div className="flex gap-1 flex-wrap">
-              <button onClick={actFold} disabled={!canActNow} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={()=>doAction(actFold)} disabled={busy || !isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 FOLD
               </button>
-              <button onClick={actCheck} disabled={!canActNow || !canCheck} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={()=>doAction(actCheck)} disabled={busy || !isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 CHECK
               </button>
-              <button onClick={actCall} disabled={!canActNow || !canCall} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={()=>doAction(actCall)} disabled={busy || !isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 CALL
               </button>
-              <button onClick={actAllIn} disabled={!canActNow} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={()=>doAction(actAllIn)} disabled={busy || !isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 ALL-IN
               </button>
             </div>
@@ -1140,12 +1228,11 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
                 onChange={e=>setBetInput(Number(e.target.value||0))}
                 className="flex-1 bg-black/40 text-white text-xs rounded-lg px-1 py-0.5 md:px-2 md:py-1 border border-white/20 focus:border-emerald-400 focus:outline-none"
                 placeholder="Amount"
-              disabled={!myTurn}
               />
-              <button onClick={()=>actBet(betInput)} disabled={!canActNow || canCall || betInput<=0} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={()=>doAction(actBet, betInput)} disabled={busy || !isMyTurn || betInput <= 0} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 BET
               </button>
-              <button onClick={()=>actRaise(betInput)} disabled={!canActNow || !canCall || betInput<=0} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={()=>doAction(actRaise, betInput)} disabled={busy || !isMyTurn} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 RAISE
               </button>
             </div>
@@ -1161,20 +1248,6 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
                 Pot
               </button>
             </div>
-
-            {/* Vault and Re-buy Messages */}
-            {!canActNow && !inLobby && myStack<=0 && (
-              <div className="text-xs text-red-400 mt-2">Busted from table • Add coins to Vault to continue</div>
-            )}
-            {inLobby && myVault > 0 && (
-              <button 
-                className="px-3 py-2 rounded-md bg-indigo-600 text-white ml-2 text-xs"
-                onClick={()=>{ setRebuyAmt(Math.min(DEFAULT_REBUY, readVault())); setShowRebuy(true); }}
-                title={`Vault: ${myVault.toLocaleString()} MLEO`}
-              >
-                Load from Vault
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -1196,50 +1269,6 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
           </div>
         )}
       </div>
-
-      {/* Re-buy Modal */}
-      {showRebuy && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="w-[92%] max-w-md rounded-2xl bg-[#121220] p-5 shadow-xl border border-white/10">
-            <h3 className="text-lg font-semibold text-white mb-3">Load from Vault</h3>
-            <p className="text-sm text-white/70 mb-4">
-              Vault Balance: <b>{readVault().toLocaleString()} MLEO</b>
-            </p>
-
-            <div className="flex items-center gap-2 mb-3">
-              <input
-                type="number"
-                min={MIN_REBUY}
-                max={readVault()}
-                value={rebuyAmt}
-                onChange={e=>setRebuyAmt(Number(e.target.value||0))}
-                className="flex-1 bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-white outline-none"
-              />
-              <button className="px-2 py-2 rounded-lg bg-white/10 text-white"
-                      onClick={()=>setRebuyAmt(Math.min(500, readVault()))}>500</button>
-              <button className="px-2 py-2 rounded-lg bg-white/10 text-white"
-                      onClick={()=>setRebuyAmt(Math.min(1000, readVault()))}>1K</button>
-              <button className="px-2 py-2 rounded-lg bg-white/10 text-white"
-                      onClick={()=>setRebuyAmt(readVault())}>MAX</button>
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <button className="px-3 py-2 rounded-lg bg-white/10 text-white"
-                      onClick={()=>setShowRebuy(false)} disabled={rebuyBusy}>Cancel</button>
-              <button className="px-3 py-2 rounded-lg bg-emerald-600 text-white"
-                      onClick={()=>doRebuy(rebuyAmt)} disabled={rebuyBusy || !inLobby}>
-                {rebuyBusy ? 'Loading…' : 'Load to Table'}
-              </button>
-            </div>
-
-            {!inLobby && (
-              <div className="text-xs text-yellow-400 mt-3">
-                Can only load from Vault between hands (in Lobby).
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

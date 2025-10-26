@@ -1029,33 +1029,14 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     const done = participants.every(p => ['stood','busted','blackjack','settled'].includes(p.status));
     if (!done) { setMsg("Players still acting"); return; }
 
-    // תחילה חושף את הקלף הנסתר של הדילר
+    // דילר משחק
     let dealer = [...(session.dealer_hand||[])];
     let shoe   = [...(session.shoe||[])];
-    
-    // חישוף הקלף הנסתר
+    while (handValue(dealer) < 17 && shoe.length) dealer.push(shoe.pop());
+
     await supabase.from('bj_sessions').update({
-      dealer_hidden: false, 
-      state: 'settling'
+      dealer_hand: dealer, dealer_hidden: false, shoe, state: 'settling'
     }).eq('id', session.id);
-    
-    // המתנה קצרה לאחר חישוף הקלף הנסתר
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // הוספת קלפים לדילר אחד אחד עם השהיות
-    while (handValue(dealer) < 17 && shoe.length) {
-      const newCard = shoe.pop();
-      dealer.push(newCard);
-      
-      // עדכון מיידי של היד במסד הנתונים
-      await supabase.from('bj_sessions').update({
-        dealer_hand: dealer,
-        shoe: shoe
-      }).eq('id', session.id);
-      
-      // השהיה של 1.5 שניות בין קלפים
-      await new Promise(resolve => setTimeout(resolve, 1500));
-    }
 
     const dealerScore = handValue(dealer);
     const dealerBust  = dealerScore > 21;
@@ -1158,7 +1139,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
     await supabase.from('bj_sessions').update({ 
       state:'ended',
-      next_round_at: new Date(Date.now() + 5000).toISOString() // 5 שניות לסיבוב הבא
+      next_round_at: new Date(Date.now() + 15000).toISOString() // 15 שניות לסיבוב הבא
     }).eq('id', session.id);
 
     // הצג הודעות אישיות לכל שחקן

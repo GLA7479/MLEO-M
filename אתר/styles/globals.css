@@ -1,0 +1,140 @@
+/* styles/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import game fixes */
+@import './game-fixes.css';
+
+/* ===== iOS/Android real viewport height (updated by JS too) ===== */
+:root {
+  /* start with small-viewport unit; JS will overwrite to visualViewport height on iOS */
+  --app-100vh: 100svh;
+}
+@supports (height: 100dvh) {
+  :root { --app-100vh: 100dvh; }
+}
+
+/* ===== Base document ===== */
+html, body, #__next { height: 100%; }
+html { scroll-behavior: smooth; }
+
+/* ===== Card display improvements ===== */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+body {
+  background: #0b1220;                /* solid base so no “gaps” on iOS bars resize */
+  color: #fff;
+  overscroll-behavior: none;           /* stop rubber-band around canvas */
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Hide scrollbars when needed */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ===== Simple transitions/animations you already use ===== */
+.splash-enter { opacity: 0; transform: translateY(8px) scale(0.98); }
+.splash-enter-active {
+  opacity: 1; transform: translateY(0) scale(1);
+  transition: opacity .5s ease, transform .5s ease;
+}
+
+@keyframes popfade {
+  0% { opacity: 0; transform: translateY(6px) scale(0.96); }
+  15% { opacity: 1; transform: translateY(0) scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-6px) scale(0.98); }
+}
+
+@keyframes mleo-pop {
+  0% { transform: scale(.92) rotate(-2deg); opacity: 0; }
+  60% { transform: scale(1.02) rotate(0); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.animate-mleo-pop { animation: mleo-pop 700ms cubic-bezier(.2,.9,.2,1) both; }
+
+@keyframes mleo-fadeUp {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-mleo-fadeUp { animation: mleo-fadeUp 700ms ease-out both; }
+
+@keyframes mleo-loader {
+  0% { transform: translateX(-150%); }
+  50% { transform: translateX(20%); }
+  100% { transform: translateX(120%); }
+}
+.animate-mleo-loader { animation: mleo-loader 1200ms ease-in-out infinite; }
+
+/* Floating token teaser (optional) */
+@keyframes tokenFloat {
+  0% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-6px) scale(1.02); }
+  100% { transform: translateY(0) scale(1); }
+}
+.animate-token-float { animation: tokenFloat 3s ease-in-out infinite; }
+
+/* Nice splash background you used */
+.mleo-splash-bg {
+  background-image:
+    radial-gradient(62% 62% at 50% 38%, rgba(255,220,120,.15) 0%, rgba(255,220,120,0) 60%),
+    linear-gradient(135deg, #0b1220, #0e1729 60%, #0b1220);
+}
+
+/* Safe areas only in PWA (standalone). Safari usually 0 anyway */
+@media (display-mode: standalone) {
+  .app-shell {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Canvas ergonomics */
+#miners-canvas { touch-action: none; display: block; }
+
+/* --- UI over canvas layering (iOS-safe) --- */
+.mleo-wrap { position: relative; }
+.mleo-canvas { position: absolute; inset: 0; z-index: 0; }
+.mleo-ui     { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+.mleo-ui [data-clickable], 
+.mleo-ui button, 
+.mleo-ui a { pointer-events: auto; touch-action: manipulation; }
+
+/* אם יש לך מודלים/טוסטים צפים */
+.mleo-modal, .mleo-toast { position: absolute; inset: 0; z-index: 20; pointer-events: none; }
+.mleo-modal * , .mleo-toast * { pointer-events: auto; }
+
+/* Toast notification bounce-in animation */
+@keyframes bounce-in {
+  0% { 
+    opacity: 0; 
+    transform: translate(-50%, -20px) scale(0.9); 
+  }
+  50% { 
+    transform: translate(-50%, 5px) scale(1.05); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: translate(-50%, 0) scale(1); 
+  }
+}
+.animate-bounce-in { 
+  animation: bounce-in 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55) both; 
+}
+
+/* Fade-in animation for result popups */
+@keyframes fadeIn {
+  from { 
+    opacity: 0; 
+  }
+  to { 
+    opacity: 1; 
+  }
+}
+.animate-fade-in { 
+  animation: fadeIn 0.3s ease-in-out; 
+}
+
