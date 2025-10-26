@@ -1,6 +1,6 @@
 // ============================================================================
 // MLEO Texas Hold'em Rooms - Drop-in/Drop-out Multiplayer
-// Built with Supabase for permanent poker rooms
+// Built with Supabase for persistent poker rooms
 // ============================================================================
 
 import { useEffect, useRef, useState, useMemo } from "react";
@@ -43,6 +43,25 @@ function loadPlayerIdentity(tableId) {
 function clearPlayerIdentity(tableId) {
   if (typeof window === "undefined") return;
   try { localStorage.removeItem(`mleo_poker_player_${tableId}`); } catch {}
+}
+
+// ----------------------------------------------------------------------------
+// Supabase error → friendly message (full-table / seat race)
+// ----------------------------------------------------------------------------
+function mapSupabaseJoinError(err) {
+  const msg = (err?.message || "").toLowerCase();
+  const code = err?.code || "";
+
+  // Triggered by capacity guard in DB
+  if (msg.includes("table is full")) {
+    return "Table is full (max 6 players).";
+  }
+  // Unique index on (table_id, seat_index) — two users grabbed the same seat
+  if (code === "23505" || msg.includes("duplicate key")) {
+    return "That seat was just taken. Please try again.";
+  }
+  // Fallback
+  return "Failed to join table. Please try again.";
 }
 
 function getVault() {
@@ -111,6 +130,43 @@ const SUIT_SYMBOL = { S:'♠', H:'♥', D:'♦', C:'♣' };
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 const RANKS_ORDER = { A:14,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,J:11,Q:12,K:13 };
 const BETTING_TIME_LIMIT = 30000; // 30 seconds
+// מגבלה קשיחה בצד הלקוח – לא יותר מ-6 שחקנים
+const HARD_MAX_PLAYERS = 6;
+
+// Helper functions for dealer rotation and positions
+function seatRing(players) {
+  return players.map(p => p.seat_index).sort((a, b) => a - b);
+}
+
+function nextSeat(ring, currentSeat) {
+  const idx = ring.indexOf(currentSeat);
+  if (idx === -1) return ring[0] || 0;
+  return ring[(idx + 1) % ring.length];
+}
+
+function computePreflopPositions(playersSorted, dealerSeat) {
+  const n = playersSorted.length;
+  if (n < 2) return { smallBlindIdx: 0, bigBlindIdx: 0, firstToActIdx: 0 };
+  
+  const dealerIdx = playersSorted.findIndex(p => p.seat_index === dealerSeat);
+  if (dealerIdx === -1) return { smallBlindIdx: 0, bigBlindIdx: 1 % n, firstToActIdx: 2 % n };
+  
+  if (n === 2) {
+    // Heads-up: dealer is small blind
+    return {
+      smallBlindIdx: dealerIdx,
+      bigBlindIdx: (dealerIdx + 1) % n,
+      firstToActIdx: dealerIdx // dealer acts first preflop in heads-up
+    };
+  } else {
+    // 3+ players: normal positions
+    return {
+      smallBlindIdx: (dealerIdx + 1) % n,
+      bigBlindIdx: (dealerIdx + 2) % n,
+      firstToActIdx: (dealerIdx + 3) % n
+    };
+  }
+}
 
 // Game status constants
 const GAME_STATUS = {
@@ -464,6 +520,8 @@ export default function TexasHoldemCasinoPage() {
   const [error, setError] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [gameMessage, setGameMessage] = useState("");
+  // Bonus UX: prompt user to rebuy after bust
+  const [showRebuyPrompt, setShowRebuyPrompt] = useState(false);
   const [actionTimer, setActionTimer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [winnerModal, setWinnerModal] = useState({ open: false, text: "", hand: "", pot: 0 });
@@ -588,12 +646,12 @@ export default function TexasHoldemCasinoPage() {
   const getMinRaiseSize = (g, tableBB = 0) => {
     const lastRaiseTo = g?.last_raise_to || 0;
     const curBet = g?.current_bet || 0;
-    // אם עוד לא הייתה העלאה ברחוב: מינימום = BB; אחרת = גודל ההעלאה הקודמת
+    // If no raise yet on this street: minimum = BB; otherwise = previous raise size
     return Math.max(lastRaiseTo - curBet, tableBB);
   };
 
   const getMaxRaiseTo = (me) => {
-    // לא לעבור ALL-IN מלא (מותר כמובן, אבל זה הגבול העליון)
+    // Logical upper bound is a full all-in for this player
     return (me?.current_bet || 0) + (me?.chips || 0);
   };
 
@@ -703,7 +761,7 @@ export default function TexasHoldemCasinoPage() {
   // CLEANUP FUNCTIONS
   // ============================================================================
 
-  // Cleanup inactive players (not active for 5+ minutes)
+  // Cleanup inactive players (no activity for 5+ minutes)
   const cleanupInactivePlayers = async () => {
     try {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
@@ -794,7 +852,7 @@ export default function TexasHoldemCasinoPage() {
   useEffect(() => {
     if (screen !== "lobby") return;
     
-    loadTables();
+    loadTables(); // subscribe to active tables snapshot
     
     const subscription = supabase
       .channel('casino_tables_changes')
@@ -850,44 +908,38 @@ export default function TexasHoldemCasinoPage() {
     
     try {
       setError("");
-      
-      // Check if table is full
+
+      // Best-effort capacity check (DB is the source of truth)
       const { count } = await supabase
         .from('casino_players')
         .select('id', { count: 'exact' })
         .eq('table_id', table.id);
-      
-      if (count >= table.max_players) {
-        setError("Table is full");
+      if ((count || 0) >= table.max_players) {
+        setError("Table is full (max 6 players).");
         return;
       }
-      
-      // Find available seat
+
+      // Seat selection (race-safe thanks to DB unique constraint)
       const { data: existingPlayers } = await supabase
         .from('casino_players')
         .select('seat_index')
         .eq('table_id', table.id);
-      
       const occupiedSeats = new Set(existingPlayers?.map(p => p.seat_index) || []);
       let seatIndex = -1;
       for (let i = 0; i < table.max_players; i++) {
-        if (!occupiedSeats.has(i)) {
-          seatIndex = i;
-          break;
-        }
+        if (!occupiedSeats.has(i)) { seatIndex = i; break; }
       }
-      
       if (seatIndex === -1) {
-        setError("No available seats");
+        setError("Table is full (max 6 players).");
         return;
       }
-      
-      // Deduct from vault
+
+      // Deduct from Vault locally
       const newVault = vaultAmount - table.min_buyin;
       setVault(newVault);
       setVaultAmount(newVault);
-      
-      // Add player to table
+
+      // Insert player (DB may still reject because of a seat race)
       const { data: newPlayer, error: playerError } = await supabase
         .from('casino_players')
         .insert({
@@ -900,22 +952,31 @@ export default function TexasHoldemCasinoPage() {
         })
         .select()
         .single();
-      
-      if (playerError) throw playerError;
-      
+      if (playerError) {
+        // Roll back the local Vault deduction on failure
+        const rollback = newVault + table.min_buyin;
+        setVault(rollback);
+        setVaultAmount(rollback);
+        setError(mapSupabaseJoinError(playerError));
+        return;
+      }
+
       setPlayerId(newPlayer.id);
-      savePlayerIdentity(table.id, newPlayer.id);
+      savePlayerIdentity(table.id, newPlayer.id); // persist seat identity per table
       setCurrentTableId(table.id);
       setSelectedTable(table);
       setScreen("table");
-      
     } catch (err) {
-      console.error("Error joining table:", err);
-      setError("Failed to join table: " + err.message);
+      // Roll back Vault on unexpected errors
+      const rollback = vaultAmount + table.min_buyin;
+      setVault(rollback);
+      setVaultAmount(rollback);
+      setError(mapSupabaseJoinError(err));
     }
   };
 
   const handleRebuy = async (amount) => {
+    // Enforce minimum rebuy = table min_buyin
     if (!playerId || !currentTableId) return;
     if (!selectedTable) return;
 
@@ -990,7 +1051,7 @@ export default function TexasHoldemCasinoPage() {
       // If no players left, mark game as waiting
       if (!remainingPlayers || remainingPlayers.length === 0) {
         await supabase.from('casino_games').update({
-          status: GAME_STATUS.WAITING,
+          status: GAME_STATUS.WAITING, // soft reset, keep table alive
           round: 'preflop',
           pot: 0,
           current_bet: 0
@@ -1094,7 +1155,7 @@ export default function TexasHoldemCasinoPage() {
     loadGameData();
     
     const gameChannel = supabase
-      .channel(`game_${currentGameId}`)
+      .channel(`game_${currentGameId}`) // watch both game row and its players
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'casino_games', filter: `id=eq.${currentGameId}` },
         () => loadGameData()
@@ -1217,93 +1278,108 @@ export default function TexasHoldemCasinoPage() {
     }
   };
 
-  // Start a new game
   const startGame = async () => {
     console.log("🎯 startGame() triggered for table", currentTableId);
 
-    // הגנה כפולה שלא יתחיל פעמיים
+    // אל תתחיל אם כבר יש משחק
     const { data: table } = await supabase
       .from("casino_tables")
-      .select("current_game_id")
+      .select("current_game_id, small_blind, big_blind")
       .eq("id", currentTableId)
       .single();
     if (table?.current_game_id) {
-      console.log("⚠️ Table already has active game:", table.current_game_id);
       setCurrentGameId(table.current_game_id);
       setScreen('game');
       await loadGameData();
       return;
     }
 
-    // שלוף את כל השחקנים בשולחן
+    // שחקנים מסודרים
     const { data: seatedPlayers } = await supabase
       .from("casino_players")
       .select("*")
       .eq("table_id", currentTableId)
       .order("seat_index");
+    if (!seatedPlayers || seatedPlayers.length < 2) return;
 
-    if (!seatedPlayers || seatedPlayers.length < 2) {
-      console.log("⏸️ Not enough players to start.");
-      return;
-    }
-
-    // צור חפיסת קלפים חדשה
+    // חפיסה חדשה
     const deck = shuffleDeck(createDeck());
-    const dealerIndex = 0;
-    const smallBlindIndex = 0;
-    const bigBlindIndex = 1;
-    const firstToAct = 0;
+    const playersSorted = [...seatedPlayers].sort((a,b)=>a.seat_index - b.seat_index);
 
-    // צור משחק חדש
-    const { data: game, error } = await supabase
+    // דילר ליד הראשונה = המושב הנמוך (אפשר לשמור את ההיסטוריה אם תרצה, לא חובה)
+    const dealerSeat = playersSorted[0].seat_index;
+    const pos = computePreflopPositions(playersSorted, dealerSeat);
+
+    // צור רשומת משחק
+    const { data: newGame, error } = await supabase
       .from("casino_games")
       .insert({
         table_id: currentTableId,
-        status: "playing", // <==== חשוב מאוד
+        status: "playing",
         round: "preflop",
-        dealer_index: dealerIndex,
-        current_player_index: firstToAct,
-        current_player_seat: seatedPlayers[firstToAct].seat_index,
-        last_raiser_index: bigBlindIndex,
-        last_raiser_seat: seatedPlayers[bigBlindIndex].seat_index,
+        dealer_index: dealerSeat,                                      // seat_index
+        current_player_seat: playersSorted[pos.firstToActIdx].seat_index,
+        last_raiser_seat: playersSorted[pos.bigBlindIdx].seat_index,    // ה-BB הוא האגרסור הראשוני
         community_cards: [],
         community_visible: 0,
         pot: 0,
         current_bet: 0,
+        last_raise_to: 0,
         deck,
-        turn_deadline: new Date(Date.now() + 20000).toISOString()
+        turn_deadline: new Date(Date.now() + BETTING_TIME_LIMIT).toISOString()
       })
       .select()
       .single();
+    if (error) { console.error("❌ Error inserting new game:", error); return; }
 
-    if (error) {
-      console.error("❌ Error inserting new game:", error);
-      return;
-    }
-
-    // עדכן את השולחן
-    await supabase
-      .from("casino_tables")
-      .update({ current_game_id: game.id })
+    await supabase.from("casino_tables")
+      .update({ current_game_id: newGame.id })
       .eq("id", currentTableId);
 
-    // עדכן את כל השחקנים שייכים למשחק הזה
-    for (const p of seatedPlayers) {
-      const cards = [deck.pop(), deck.pop()];
-      await supabase
-        .from("casino_players")
-        .update({
-          game_id: game.id,
-          hole_cards: cards,
-          current_bet: 0,
-          hand_invested: 0,
-          status: "active"
-        })
-        .eq("id", p.id);
+    // חלוקת קלפים (כמו startNewHand: אינדוקס i*2, לא pop)
+    for (let i = 0; i < playersSorted.length; i++) {
+      const p = playersSorted[i];
+      const cards = [deck[i*2], deck[i*2+1]];
+      await supabase.from("casino_players").update({
+        game_id: newGame.id,
+        hole_cards: cards,
+        current_bet: 0,
+        hand_invested: 0,
+        status: PLAYER_STATUS.ACTIVE,
+        revealed: false
+      }).eq("id", p.id);
     }
 
-    console.log("✅ New game started:", game.id);
-    setCurrentGameId(game.id);
+    // פרסום בליינדים (ללא שינוי UI/לוגיקה אחרת)
+    const sbP = playersSorted[pos.smallBlindIdx];
+    const bbP = playersSorted[pos.bigBlindIdx];
+    const SB = Math.min(table.small_blind, sbP.chips);
+    const BB = Math.min(table.big_blind,  bbP.chips);
+
+    await supabase.from("casino_players").update({
+      current_bet: SB,
+      chips: (sbP.chips - SB),
+      hand_invested: SB
+    }).eq("id", sbP.id);
+
+    await supabase.from("casino_players").update({
+      current_bet: BB,
+      chips: (bbP.chips - BB),
+      hand_invested: BB
+    }).eq("id", bbP.id);
+
+    const pot0 = SB + BB;
+
+    // לאתחל מצב המשחק כך שה-UI ידע שיש מה להשוות (CALL)
+    await supabase.from("casino_games").update({
+      pot: pot0,
+      current_bet: BB,
+      last_raise_to: BB,   // נקודת הייחוס למינ-רייז
+      // הראשון לדבר כבר הוגדר למעלה
+    }).eq("id", newGame.id);
+
+    console.log("✅ New game started with blinds:", newGame.id, "pot:", pot0);
+    setCurrentGameId(newGame.id);
     setScreen("game");
     await loadGameData();
   };
@@ -1331,7 +1407,7 @@ export default function TexasHoldemCasinoPage() {
 
       const toCall = Math.max(0, (gNow.current_bet ?? 0) - (me.current_bet ?? 0));
 
-      // 2) יישום הפעולה מקומית
+      // 2) Apply action locally
       let newBet = me.current_bet ?? 0;
       let newChips = me.chips ?? 0;
       let newStatus = me.status;
@@ -1346,7 +1422,7 @@ export default function TexasHoldemCasinoPage() {
         newBet += put; newChips -= put;
         if (put < toCall) newStatus = PLAYER_STATUS.ALL_IN;
       } else if (action === "raise") {
-        // מינימום העלאה = ההעלאה האחרונה ברחוב (או BB אם עוד לא הייתה העלאה)
+        // Minimum raise = last raise size on this street (or BB if no raise yet)
         const lastRaiseTo = gNow.last_raise_to || 0;
         const minRaiseSize = Math.max((lastRaiseTo - (gNow.current_bet || 0)), selectedTable?.big_blind || 0);
         let raiseTo = Math.max((gNow.current_bet || 0) + minRaiseSize, amount);
@@ -1359,10 +1435,10 @@ export default function TexasHoldemCasinoPage() {
       } else if (action === "allin") {
         put = newChips;
         newBet += put; newChips = 0;
-        newStatus = PLAYER_STATUS.ALL_IN;
+        newStatus = PLAYER_STATUS.ALL_IN; // all-in can be a call or a (short/full) raise
       }
 
-      // עדכון hand_invested מצטבר
+      // Update cumulative per-hand investment (for side pots)
       const newInvested = (me.hand_invested || 0) + (put || 0);
 
       // 3) עדכון השחקן
@@ -1375,17 +1451,37 @@ export default function TexasHoldemCasinoPage() {
         last_action_time: new Date().toISOString(),
       }).eq('id', playerId);
 
-      // 4) תמונת מצב אחרי העדכון
+      // 4) Snapshot after update
       const { data: freshPlayers } = await supabase
         .from('casino_players').select('*').eq('game_id', currentGameId).order('seat_index');
 
       const pot = freshPlayers.reduce((s, p) => s + (p.current_bet || 0), 0);
       const currentBet = Math.max(...freshPlayers.map(p => p.current_bet || 0), 0);
 
-      // אם הייתה העלאה אמיתית – עדכן אגרסור וגובה ההעלאה
-      const didRaise = (action === "raise") || (action === "allin" && newBet > (gNow.current_bet || 0));
-      const newLastRaiserSeat = didRaise ? me.seat_index : (gNow.last_raiser_seat ?? me.seat_index);
-      const newLastRaiseTo     = didRaise ? newBet  : (gNow.last_raise_to ?? (gNow.current_bet || 0));
+      // --- NEW: full-raise vs short all-in handling ---
+      // previous benchmark and min raise size for this street
+      const prevBet = gNow.current_bet || 0;
+      const lastRaiseTo = gNow.last_raise_to || 0;
+      const minRaiseSize = Math.max((lastRaiseTo - prevBet), selectedTable?.big_blind || 0);
+      // how much this action actually raised above previous current_bet
+      const raiseSize = Math.max(0, (newBet - prevBet));
+
+      // כללים:
+      // - אול-אין קצר (raiseSize < minRaiseSize) לא פותח רייז מחדש, אבל כן מעלה את ה-current_bet.
+      // - רייז מלא (כולל אול-אין בגובה מינ-רייז ומעלה) מגדיר "האגרסור האחרון".
+      const didFullRaise =
+        (action === "raise") ||
+        (action === "allin" && raiseSize >= minRaiseSize);
+
+      // Always push the pot and current_bet first so the next player sees the right toCall.
+      await supabase.from('casino_games').update({
+        pot,
+        current_bet: currentBet
+      }).eq('id', currentGameId);
+
+      // Only a full raise changes last_raiser_seat / last_raise_to.
+      const newLastRaiserSeat = didFullRaise ? me.seat_index : (gNow.last_raiser_seat ?? me.seat_index);
+      const newLastRaiseTo    = didFullRaise ? newBet         : (gNow.last_raise_to ?? (gNow.current_bet || 0));
 
       // מי הבא שיכול לפעול?
       const canAct = (p) => p.status !== PLAYER_STATUS.FOLDED && p.status !== PLAYER_STATUS.ALL_IN;
@@ -1395,7 +1491,7 @@ export default function TexasHoldemCasinoPage() {
         if (nextIdx === curIdx) break;
       }
 
-      // אם נשאר שחקן יחיד
+      // If only one player remains (all others folded)
       const stillIn = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED);
       if (stillIn.length === 1) {
         stopActionTimer();
@@ -1406,13 +1502,22 @@ export default function TexasHoldemCasinoPage() {
         return;
       }
 
-      // האם כולם מיושרים לגובה ההימור (מלבד אול-אין/פולד)?
+      // Check if no one can act anymore (all folded or all-in) → fast forward to showdown
+      const actors = stillIn.filter(canAct);
+      if (actors.length === 0) {
+        stopActionTimer();
+        await supabase.from('casino_games').update({ pot, current_bet: currentBet }).eq('id', currentGameId);
+        await fastForwardToShowdown(gNow);
+        return;
+      }
+
+      // Are all remaining players matched to currentBet? (ignoring all-in/fold)
       const activeNotFolded = freshPlayers.filter(p => p.status !== PLAYER_STATUS.FOLDED);
       const everyoneMatched = activeNotFolded.every(p =>
         p.status === PLAYER_STATUS.ALL_IN || (p.current_bet || 0) === currentBet
       );
 
-      // סגירת רחוב: כולם מיושרים **והתור חוזר לאגרסור האחרון**
+      // End of street: everyone matched AND action has returned to the last aggressor
       const reachedAggressor = (freshPlayers[nextIdx]?.seat_index ?? null) === newLastRaiserSeat;
       const moreThanOneCanAct = activeNotFolded.filter(canAct).length > 1;
       const bettingDone = (!moreThanOneCanAct) || (everyoneMatched && reachedAggressor);
@@ -1420,7 +1525,7 @@ export default function TexasHoldemCasinoPage() {
       stopActionTimer();
 
       if (!bettingDone) {
-        // ממשיכים להמר באותו רחוב
+        // Continue betting on this street (last aggressor updates only on a full raise)
         await supabase.from('casino_games').update({
           pot,
           current_bet: currentBet,
@@ -1432,37 +1537,39 @@ export default function TexasHoldemCasinoPage() {
         return;
       }
 
-      // מעבר לרחוב הבא – מחשבים לוח עם "burn" תקין
+      // Move to next street — compute board with proper burn cards
       const nextRound = getNextRound(gNow.round);
       const deck = gNow.deck || [];
       const n = freshPlayers.length;
       const base = n * 2;
 
       let nextCommunity = gNow.community_cards || [];
-      if (nextRound === "flop"  && gNow.round === "preflop") nextCommunity = [deck[base+1], deck[base+2], deck[base+3]]; // burn: base+0
-      if (nextRound === "turn"  && gNow.round === "flop")    nextCommunity = [...nextCommunity, deck[base+5]];          // burn: base+4
-      if (nextRound === "river" && gNow.round === "turn")    nextCommunity = [...nextCommunity, deck[base+7]];          // burn: base+6
+      if (nextRound === "flop"  && gNow.round === "preflop") nextCommunity = [deck[base+1], deck[base+2], deck[base+3]]; // burn: deck[base+0]
+      if (nextRound === "turn"  && gNow.round === "flop")    nextCommunity = [...nextCommunity, deck[base+5]];          // burn: deck[base+4]
+      if (nextRound === "river" && gNow.round === "turn")    nextCommunity = [...nextCommunity, deck[base+7]];          // burn: deck[base+6]
 
-      // מאפסים הימורי רחוב לכל מי שלא קיפל
+      // Reset per-street bets for everyone who didn't fold
       for (const p of freshPlayers) {
         if (p.status !== PLAYER_STATUS.FOLDED) {
           await supabase.from('casino_players').update({ current_bet: 0 }).eq('id', p.id);
         }
       }
 
-      // --- בתוך handlePlayerAction, לפני עדכון המשחק לרחוב הבא ---
-      // players ברגע זה מסודרים לפי seat_index (נבנה מערך מסודר)
+      // --- Before updating the game to the next street ---
+      // Ensure players are ordered by seat_index
       const playersSorted = [...freshPlayers].sort((a,b)=>a.seat_index - b.seat_index);
 
-      // dealerSeat נשמר ב-games.dealer_index (seat_index)
+      // Dealer seat is stored in games.dealer_index (seat_index)
       const dealerSeat = gNow?.dealer_index ?? playersSorted[0]?.seat_index ?? 0;
 
-      // מי פותח פעולה ברחוב הבא? משמאל לדילר שלא Fold/All-in
+      // Who acts first on the next post-flop street?
+      // Answer: the first active (not folded/all-in) seat to the left of the dealer
       const startIdx = firstToActIndex(playersSorted, dealerSeat);
       const startSeat = playersSorted[startIdx]?.seat_index ?? playersSorted[0]?.seat_index ?? 0;
 
-      // עדכון משחק לרחוב הבא:
-      // בפלופ/טרן/ריבר current_bet=0 ואין אגרסור עד שתהיה העלאה → last_raiser_seat=startSeat, last_raise_to=0
+      // Update game for the next street:
+      // On flop/turn/river, current_bet=0; no aggressor until a raise occurs
+      // Initialize last_raiser_seat to startSeat and last_raise_to to 0
       await supabase.from('casino_games').update({
         pot,
         current_bet: 0,
@@ -1475,13 +1582,13 @@ export default function TexasHoldemCasinoPage() {
         turn_deadline: new Date(Date.now() + BETTING_TIME_LIMIT).toISOString()
       }).eq('id', currentGameId);
 
-      // אם עברנו לשואודאון בלי ALL-IN גורף – הכרז מנצח
+      // If we just entered showdown without everyone all-in — settle now
       if (nextRound === 'showdown') {
         await determineWinner();
         return;
       }
 
-      // אם כולם באול-אין – פותחים הכל ומסיימים
+      // If all remaining players are all-in — reveal all community cards and settle
       const allAllIn = activeNotFolded.every(p => p.status === PLAYER_STATUS.ALL_IN);
       if (allAllIn) {
         await supabase.from('casino_games')
@@ -1494,11 +1601,20 @@ export default function TexasHoldemCasinoPage() {
     }
   };
 
+  // --- Fast Forward to Showdown -----------------------------------------------
+  
+  async function fastForwardToShowdown(g) {
+    await supabase.from('casino_games')
+      .update({ community_visible: 5, round: 'showdown' })
+      .eq('id', g.id);
+    await determineWinner();
+  }
+
   // --- Side Pots --------------------------------------------------------------
 
   function buildSidePots(players) {
-    // players: [{ id, seat_index, status, hand_invested, hole_cards }]
-    // נבנה שכבות לפי ההשקעה המצטברת ביד
+  // players: [{ id, seat_index, status, hand_invested, hole_cards }]
+  // Build pot layers from cumulative per-hand investments
     const contrib = players.map(p => ({ id: p.id, folded: p.status === 'folded', v: Math.max(0, p.hand_invested || 0) }));
     const pots = [];
 
@@ -1507,11 +1623,11 @@ export default function TexasHoldemCasinoPage() {
       if (active.length === 0) break;
 
       const minLayer = Math.min(...active.map(c => c.v));
-      const layerParticipants = contrib.filter(c => c.v > 0); // כל מי שעדיין יש לו תרומה > 0 משתתף בשכבה הזו
+      const layerParticipants = contrib.filter(c => c.v > 0); // all with remaining contribution join this layer
       const amount = minLayer * layerParticipants.length;
 
       const eligibleIds = layerParticipants
-        .filter(c => !c.folded)      // רק מי שלא קיפל זכאי לזכייה
+        .filter(c => !c.folded)      // only not-folded players are eligible to win
         .map(c => c.id);
 
       pots.push({
@@ -1519,7 +1635,7 @@ export default function TexasHoldemCasinoPage() {
         eligibleIds
       });
 
-      // הורד את השכבה מכל המשתתפים בשכבה
+      // Subtract the layer from each participant
       for (const lp of layerParticipants) lp.v -= minLayer;
     }
 
@@ -1527,8 +1643,8 @@ export default function TexasHoldemCasinoPage() {
   }
 
   function orderSeatsForRemainders(players, dealerIndex) {
-    // החזרת מערך מזהי שחקנים לפי סדר קבלת "צ'יפ מוזר" (odd chip):
-    // החל מהשחקן משמאל לדילר, עם wrap-around
+  // Return player-id order for odd-chip distribution:
+  // start at seat to the left of the dealer, wrap around
     const sorted = [...players].sort((a, b) => a.seat_index - b.seat_index);
     const start = (dealerIndex + 1) % sorted.length;
     const ring = [];
@@ -1538,7 +1654,7 @@ export default function TexasHoldemCasinoPage() {
     return ring;
   }
 
-  // מחלק את ה-pot למנצח, מאפס current_bet לכולם ומאפס pot במשחק
+  // Award entire pot to a single winner, reset all current_bet, and zero the game pot
   async function awardPotToWinner(currentGameId, winnerPlayerId) {
     // תמונת מצב עדכנית
     const { data: g } = await supabase
@@ -1551,7 +1667,7 @@ export default function TexasHoldemCasinoPage() {
 
     const potAmount = g.pot || 0;
 
-    // מוצאים את המנצח (בשביל ה-chips העדכני)
+    // Read winner row to get current chip stack
     const { data: w } = await supabase
       .from('casino_players')
       .select('id,chips')
@@ -1566,13 +1682,13 @@ export default function TexasHoldemCasinoPage() {
         .eq('id', winnerPlayerId);
     }
 
-    // 2) מאפסים current_bet לכל שחקני היד
+    // 2) Reset current_bet for all players in this hand
     await supabase
       .from('casino_players')
       .update({ current_bet: 0 })
       .eq('game_id', currentGameId);
 
-    // 3) מאפסים את ה-pot במשחק
+    // 3) Zero game pot/current_bet
     await supabase
       .from('casino_games')
       .update({ pot: 0, current_bet: 0 })
@@ -1580,7 +1696,7 @@ export default function TexasHoldemCasinoPage() {
   }
 
   async function settleSidePots(currentGameId, dealerIndex, board5) {
-    // טען מצב נוכחי
+    // Load current state
     const { data: pls } = await supabase
       .from('casino_players')
       .select('id,player_name,seat_index,status,hole_cards,hand_invested,chips,game_id')
@@ -1590,7 +1706,7 @@ export default function TexasHoldemCasinoPage() {
     const players = pls || [];
     const totalPot = players.reduce((s, p) => s + Math.max(0, p.hand_invested || 0), 0);
 
-    const pots = buildSidePots(players); // [{amount, eligibleIds}]
+    const pots = buildSidePots(players); // [{ amount, eligibleIds }]
 
     // הכנה לסדר שאריות
     const oddOrder = orderSeatsForRemainders(players, dealerIndex);
@@ -1602,18 +1718,18 @@ export default function TexasHoldemCasinoPage() {
       const elig = players.filter(p => pot.eligibleIds.includes(p.id));
       if (elig.length === 0 || pot.amount <= 0) continue;
 
-      // דירוג ידיים לזכאים
+      // Rank hands of all eligible players
       const ranked = elig.map(p => {
         const all = [...(p.hole_cards || []), ...board5];
         const evalRes = evaluateHand(all);
         return { p, evalRes };
       }).sort((a, b) => compareRankTuple(b.evalRes.score, a.evalRes.score));
 
-      // מצא את הניקוד הטוב ביותר
+      // Best score among eligibles
       const bestScore = ranked[0].evalRes.score;
       const winners = ranked.filter(r => compareRankTuple(r.evalRes.score, bestScore) === 0).map(r => r.p);
 
-      // חלוקה שווה + שאריות לפי oddOrder
+      // Even split + remainders by oddOrder
       const baseShare = Math.floor(pot.amount / winners.length);
       let remainder = pot.amount - baseShare * winners.length;
 
@@ -1622,7 +1738,7 @@ export default function TexasHoldemCasinoPage() {
       }
 
       if (remainder > 0) {
-        // חלק שאריות לפי סדר oddOrder (משמאל לדילר)
+        // Distribute odd chips by oddOrder (to the left of the dealer)
         for (const pid of oddOrder) {
           if (remainder === 0) break;
           if (winners.find(w => w.id === pid)) {
@@ -1633,14 +1749,14 @@ export default function TexasHoldemCasinoPage() {
       }
     }
 
-    // בצע העדכונים
+    // Apply DB updates
     for (const [pid, inc] of chipIncrements.entries()) {
       await supabase.from('casino_players').update({
         chips: (players.find(p => p.id === pid)?.chips || 0) + inc
       }).eq('id', pid);
     }
 
-    // איפוס הימורים/השקעה ידנית של כולם (יד נגמרה)
+    // Reset per-street and per-hand investments (hand is over)
     await supabase.from('casino_players')
       .update({ current_bet: 0, hand_invested: 0 })
       .eq('game_id', currentGameId);
@@ -1667,16 +1783,16 @@ export default function TexasHoldemCasinoPage() {
 
       const active = pls.filter(p => p.status !== PLAYER_STATUS.FOLDED);
       
-      // --- זכייה ע"י קיפול ---
+      // --- Win by everyone else folding ---
       if (active.length === 1) {
         const w = active[0];
         const potAmount = gNow.pot || 0;
 
-        // נשתמש ב-settleSidePots כדי לזכות את השחקן היחיד שנותר (לא נוגעים ב-Vault)
+        // Use settleSidePots to award the remaining player (no Vault transfers here)
         const boardNow = (gNow.community_cards || []).slice(0, 5);
         await settleSidePots(currentGameId, gNow.dealer_index ?? 0, boardNow);
 
-        // לוג אימות - וודא שהסטאקים נשמרים
+        // Debug log — verify stacks
         const { data: afterSettle } = await supabase
           .from('casino_players')
           .select('player_name, chips')
@@ -1684,23 +1800,39 @@ export default function TexasHoldemCasinoPage() {
           .order('seat_index');
         console.log('AFTER SETTLE (fold win) - stacks:', afterSettle);
 
-        // רענון + מודאל
+        // Refresh + winner modal
         await loadGameData();
         setGameMessage(`🎉 ${w.player_name} wins by fold! Pot: ${fmt(potAmount)} MLEO`);
         setWinnerModal({ open: true, text: `🎉 ${w.player_name} wins by fold!`, hand: "", pot: potAmount });
 
-        // התחל יד חדשה...
+        // Check for rebuy prompt after fold win too
+        try {
+          const { data: meRow } = await supabase
+            .from('casino_players')
+            .select('chips')
+            .eq('id', playerId)
+            .single();
+
+          const myChipsAfter = meRow?.chips ?? 0;
+          if (myChipsAfter <= 0 && vaultAmount >= (selectedTable?.min_buyin || 0)) {
+            setShowRebuyPrompt(true);
+          } else {
+            setShowRebuyPrompt(false);
+          }
+        } catch {}
+
+        // הארכה קלה כדי לאפשר להגיב לפופאפ ריביי
         setTimeout(() => {
           setWinnerModal({ open: false, text: "", hand: "", pot: 0 });
           startNewHand();
-        }, 5000);
+        }, 6000);
         return;
       }
 
-      // --- SHOWDOWN מלא ---
+      // --- Full showdown ---
       const board5 = (gNow.community_cards || []).slice(0, 5);
 
-      // חלוקת קופות בצד הקליינט בלבד (לא RPC)
+      // Side-pot settlement client-side (no RPC)
       await settleSidePots(currentGameId, gNow.dealer_index ?? 0, board5);
 
       // לוג אימות - וודא שהסטאקים נשמרים
@@ -1711,13 +1843,30 @@ export default function TexasHoldemCasinoPage() {
         .order('seat_index');
       console.log('AFTER SETTLE (showdown) - stacks:', afterSettle);
 
-      // חשיפת קלפים (רק UI)
+      // Reveal cards (UI hint)
       await supabase.from('casino_players')
         .update({ revealed: true })
         .eq('game_id', currentGameId);
 
       // רענון + טקסט מנצחים לתצוגה (אותו קוד חישוב כפי שהיה)
       await loadGameData();
+
+      // --- BONUS UX: If I busted and I have enough in Vault, offer instant rebuy prompt ---
+      // Check actual chips after settlement (not stale data)
+      try {
+        const { data: meRow } = await supabase
+          .from('casino_players')
+          .select('chips')
+          .eq('id', playerId)
+          .single();
+
+        const myChipsAfter = meRow?.chips ?? 0;
+        if (myChipsAfter <= 0 && vaultAmount >= (selectedTable?.min_buyin || 0)) {
+          setShowRebuyPrompt(true);
+        } else {
+          setShowRebuyPrompt(false);
+        }
+      } catch {}
 
       let topWinnersText = '';
       const rankedTop = (pls || [])
@@ -1736,11 +1885,10 @@ export default function TexasHoldemCasinoPage() {
       setGameMessage(`🏆 Pots settled. ${topWinnersText ? 'Winners: ' + topWinnersText : ''}`);
       setWinnerModal({ open: true, text: "🏆 Side pots settled", hand: topWinnersText, pot: (gNow.pot || 0) });
 
-      // התחל יד חדשה
       setTimeout(() => {
         setWinnerModal({ open: false, text: "", hand: "", pot: 0 });
         startNewHand();
-      }, 5000);
+      }, 6000);
 
     } catch (err) {
       console.error("Error determining winner:", err);
@@ -1752,7 +1900,7 @@ export default function TexasHoldemCasinoPage() {
     const { data: g } = await supabase.from('casino_games').select('*').eq('id', currentGameId).single();
     if (!g || g.status !== GAME_STATUS.PLAYING) return;
 
-    // אם לא עבר הדדליין – אל תתערב
+    // If deadline not reached — do nothing
     const deadline = g.turn_deadline ? new Date(g.turn_deadline).getTime() : 0;
     if (!deadline || Date.now() <= deadline) return;
 
@@ -1763,7 +1911,7 @@ export default function TexasHoldemCasinoPage() {
     const cur = curIdx >= 0 ? pls[curIdx] : null;
     if (!cur) return;
 
-    // קפל את הנוכחי
+    // Auto-fold current player
     await supabase.from('casino_players')
       .update({ status: PLAYER_STATUS.FOLDED, last_action: 'timeout_fold', current_bet: cur.current_bet || 0 })
       .eq('id', cur.id);
@@ -1776,7 +1924,7 @@ export default function TexasHoldemCasinoPage() {
       if (nextIdx === (curIdx >= 0 ? curIdx : 0)) break;
     }
 
-    // אם נשאר שחקן יחיד → סיים
+    // If only one player remains → settle immediately
     const stillIn = (pls || []).filter(p => p.status !== PLAYER_STATUS.FOLDED);
     if (stillIn.length <= 1) {
       await supabase.from('casino_games').update({
@@ -1786,7 +1934,7 @@ export default function TexasHoldemCasinoPage() {
       return;
     }
 
-    // עדכן תור + דדליין חדש
+    // Advance turn + set a new deadline
     await supabase.from('casino_games').update({
       current_player_seat: pls[nextIdx]?.seat_index ?? null,
       turn_deadline: new Date(Date.now() + BETTING_TIME_LIMIT).toISOString()
@@ -1800,15 +1948,17 @@ export default function TexasHoldemCasinoPage() {
     try {
       const deck = shuffleDeck(createDeck());
 
-      // 1) טען את כל היושבים בשולחן (לא לפי game_id!)
+      // 1) Load all seated players on this table (not by game_id)
       const { data: tablePlayers } = await supabase
         .from('casino_players')
         .select('*')
         .eq('table_id', currentTableId)
         .order('seat_index');
 
-      // משחקים רק מי שיש להם צ'יפים
-      const participants = (tablePlayers || []).filter(p => (p.chips || 0) > 0);
+      // Only players with chips can play this hand
+      const participants = (tablePlayers || [])
+        .filter(p => (p.chips || 0) > 0)
+        .slice(0, HARD_MAX_PLAYERS);
       if (participants.length < 2) {
         await supabase.from('casino_games').update({
           status: GAME_STATUS.WAITING,
@@ -1821,23 +1971,23 @@ export default function TexasHoldemCasinoPage() {
         return;
       }
 
-      // 2) כל המשתתפים מקבלים game_id של היד הנוכחית
+      // 2) Attach current game_id to all participants for this hand
       await supabase.from('casino_players')
         .update({ game_id: currentGameId })
         .in('id', participants.map(p => p.id));
 
-      // 3) בחר כיסא דילר חדש:
-      //    game.dealer_index מחזיק את "כיסא הדילר" של היד הקודמת (seat_index),
-      //    אם לא קיים – קח את הכיסא הנמוך ביותר.
+      // 3) Choose the next dealer seat:
+      //    game.dealer_index holds the dealer seat_index from the previous hand.
+      //    If missing, choose the lowest seat_index.
       const prevDealerSeat = typeof game?.dealer_index === 'number'
         ? game.dealer_index : (participants[0]?.seat_index || 0);
       const dealerSeat = nextSeat(seatRing(participants), prevDealerSeat);
 
-      // 4) סדר לפי seat_index, חשב עמדות
+      // 4) Sort by seat_index and compute preflop positions
       const playersSorted = [...participants].sort((a,b)=>a.seat_index - b.seat_index);
       const pos = computePreflopPositions(playersSorted, dealerSeat);
 
-      // 5) חלק קלפים ואפס סטטוסים/השקעה
+      // 5) Deal hole cards and reset statuses/investment for the hand
       const updated = playersSorted.map((p, idx) => ({
         ...p,
         hole_cards: [deck[idx*2], deck[idx*2+1]],
@@ -1847,7 +1997,7 @@ export default function TexasHoldemCasinoPage() {
         hand_invested: 0,
       }));
 
-      // 6) פוסט בליינדים
+      // 6) Post blinds
       const sb = updated[pos.smallBlindIdx];
       const bb = updated[pos.bigBlindIdx];
 
@@ -1859,7 +2009,7 @@ export default function TexasHoldemCasinoPage() {
       bb.chips      -= bb.current_bet;
       bb.hand_invested = bb.current_bet;
 
-      // כתיבה ל־DB
+      // Persist players
       for (const p of updated) {
         await supabase.from('casino_players').update({
           game_id: currentGameId,
@@ -1875,17 +2025,17 @@ export default function TexasHoldemCasinoPage() {
       const pot = updated.reduce((s, p) => s + (p.current_bet || 0), 0);
       const currentBet = Math.max(...updated.map(p => p.current_bet || 0), 0);
 
-      // NB: dealer_index ישמור את *seat_index* של הדילר, לא אינדקס מערך
+      // NB: dealer_index stores the dealer's *seat_index*, not array index
       await supabase.from('casino_games').update({
         status: GAME_STATUS.PLAYING,
         deck,
         pot,
         current_bet: currentBet,
-        last_raise_to: currentBet,
+        last_raise_to: currentBet,               // הימור ה-BB כנקודת ייחוס לרייז מינימלי
         round: 'preflop',
         community_cards: [],
         community_visible: 0,
-        dealer_index: dealerSeat,                    // ⬅️ seat_index
+        dealer_index: dealerSeat,                    // seat_index
         last_raiser_seat: playersSorted[pos.bigBlindIdx].seat_index,
         current_player_seat: playersSorted[pos.firstToActIdx].seat_index,
         turn_deadline: new Date(Date.now() + BETTING_TIME_LIMIT).toISOString()
@@ -2025,7 +2175,8 @@ export default function TexasHoldemCasinoPage() {
                 {TIERS.map(t => {
                   const list = groupedByMin.get(t.min_buyin) || [];
                   const players = list.reduce((acc, r) => acc + (r.current_players || 0), 0);
-                  const seats   = list.reduce((acc, r) => acc + (r.max_players || 6), 0);
+                  // סך המושבים – מוגבל ל-6 לשולחן אחד
+                  const seats   = list.reduce((acc, r) => acc + Math.min(HARD_MAX_PLAYERS, r.max_players || HARD_MAX_PLAYERS), 0);
                   return (
                     <button
                       key={t.min_buyin}
@@ -2083,25 +2234,31 @@ export default function TexasHoldemCasinoPage() {
                         </div>
 
                         <div className="flex items-center gap-1 flex-wrap pt-1">
-                          {Array.from({ length: table.max_players }).map((_, i) => (
+                          {Array.from({ length: Math.min(HARD_MAX_PLAYERS, table.max_players || HARD_MAX_PLAYERS) }).map((_, i) => (
                             <span
                               key={i}
                               className={`block rounded-full ${i < table.current_players ? 'bg-emerald-400' : 'bg-white/15'} w-2 h-2 md:w-2.5 md:h-2.5`}
                             />
                           ))}
-                          <span className="ml-auto text-white/50 text-[10px]">{table.current_players}/{table.max_players}</span>
+                          <span className="ml-auto text-white/50 text-[10px]">
+                            {table.current_players}/{Math.min(HARD_MAX_PLAYERS, table.max_players || HARD_MAX_PLAYERS)}
+                          </span>
                         </div>
 
                         <button
                           onClick={() => handleJoinTable(table)}
-                          disabled={table.current_players >= table.max_players || vaultAmount < table.min_buyin}
+                          disabled={
+                            table.current_players >= Math.min(HARD_MAX_PLAYERS, table.max_players || HARD_MAX_PLAYERS)
+                            || vaultAmount < table.min_buyin
+                          }
                           className={`w-full px-2 py-1.5 md:px-3 md:py-1.5 rounded-lg font-bold text-xs md:text-sm transition-all ${
-                            table.current_players >= table.max_players || vaultAmount < table.min_buyin
+                            table.current_players >= Math.min(HARD_MAX_PLAYERS, table.max_players || HARD_MAX_PLAYERS)
+                            || vaultAmount < table.min_buyin
                               ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                               : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:shadow-lg hover:scale-105'
                           }`}
                         >
-                          {table.current_players >= table.max_players ? 'FULL' : 'JOIN TABLE'}
+                          {table.current_players >= Math.min(HARD_MAX_PLAYERS, table.max_players || HARD_MAX_PLAYERS) ? 'FULL' : 'JOIN TABLE'}
                         </button>
                       </div>
                     </div>
@@ -2516,7 +2673,7 @@ export default function TexasHoldemCasinoPage() {
                     <div className="flex flex-col md:flex-row items-center justify-center gap-1.5 md:gap-2">
                       {/* Timer */}
                       <div className="px-2 py-1 rounded-md bg-white/10 text-white/80 text-[10px] md:text-sm">
-                        {timeLeft > 0 ? `Your Turn (${timeLeft}s)` : 'Your Turn'}
+                        {timeLeft > 0 ? `Your turn (${timeLeft}s)` : 'Your turn'}
                       </div>
 
                       {/* Raise group */}
@@ -2529,6 +2686,19 @@ export default function TexasHoldemCasinoPage() {
                       {/* Raise button moved to Row 1 */}
                     </div>
                   </div>
+
+                  {/* Rebuy CTA (also available during game when you're short/busted and not in-action) */}
+                  {myPlayer && vaultAmount >= (selectedTable?.min_buyin || 0) &&
+                   (myPlayer.chips < (selectedTable?.min_buyin || 0)) && (
+                    <div className="mt-2 flex justify-center">
+                      <button
+                        onClick={() => { handleRebuy(selectedTable.min_buyin); setShowRebuyPrompt(false); }}
+                        className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm"
+                      >
+                        Rebuy {fmt(selectedTable.min_buyin)}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2545,6 +2715,33 @@ export default function TexasHoldemCasinoPage() {
                   </div>
                 </div>
               )}
+
+              {/* BONUS UX: Rebuy prompt modal */}
+              {showRebuyPrompt && (
+                <div className="fixed inset-0 z-[12000] bg-black/70 flex items-center justify-center p-4">
+                  <div className="bg-zinc-900 text-white w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center">
+                    <div className="text-xl font-extrabold mb-2">💰 Rebuy now?</div>
+                    <div className="text-white/80 text-sm">
+                      You have enough in your Vault to rebuy and join the next hand.
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => { handleRebuy(selectedTable.min_buyin); setShowRebuyPrompt(false); }}
+                        className="py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                      >
+                        Rebuy {fmt(selectedTable?.min_buyin || 0)}
+                      </button>
+                      <button
+                        onClick={() => setShowRebuyPrompt(false)}
+                        className="py-2 rounded-lg bg-white/10 hover:bg-white/20 font-bold"
+                      >
+                        Not now
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
 
               {game?.status === 'finished' && (
                 <div className="text-center text-white/70">
