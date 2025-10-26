@@ -54,64 +54,27 @@ function handValue(hand){
 const suitIcon = (s)=> s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
 const suitClass = (s)=> (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
 
+function Card({ code, size = "normal", hidden = false, isDealing = false }) {
+  if (!code && !hidden) return null;
+  
+  // Dynamic sizing based on game state
+  const sizeClasses = size === "small" ? 
+    (isDealing ? "w-10 h-14 text-sm" : "w-6 h-8 text-xs") : 
+    (isDealing ? "w-12 h-16 text-base" : "w-8 h-10 text-sm");
 
-// === UI Skin Components ===
-// === Card (SVG skin) ===
-
-// === ChipsBar ===
-function ChipsBar({ onAdd, onClear }){
-  const CHIPS = [1000, 5000, 10000, 50000, 100000, 1000000];
-  const fmt = v => v>=1e6? (v/1e6)+'M' : v>=1e3? (v/1e3)+'K' : String(v);
-  return (
-    <div className="flex gap-2 items-center flex-wrap">
-      {CHIPS.map(v => (
-        <button key={v} onClick={()=>onAdd?.(v)}
-          className="relative w-12 h-12 rounded-full border-[5px] border-white/80 bg-gradient-to-b from-red-500 to-red-600
-                     shadow-[0_4px_12px_rgba(0,0,0,.5)] hover:scale-105 active:scale-95 transition">
-          <span className="absolute inset-0 grid place-items-center text-white text-[10px] font-extrabold drop-shadow-[0_1px_1px_rgba(0,0,0,.7)]">
-            {fmt(v)}
-          </span>
-        </button>
-      ))}
-      <button onClick={()=>onClear?.()} className="ml-1 px-3 py-2 text-xs rounded bg-gray-800/90 text-white hover:bg-gray-700">CLEAR</button>
-    </div>
-  );
-}
-
-function Card({ code, hidden=false, size="md", className="" }){
-  function mapToFile(code){
-    const SUIT_MAP = { "♥":"hearts","♦":"diamonds","♣":"clubs","♠":"spades","h":"hearts","d":"diamonds","c":"clubs","s":"spades" };
-    const RANKS = { "A":"A","K":"K","Q":"Q","J":"J","10":"10","9":"9","8":"8","7":"7","6":"6","5":"5","4":"4","3":"3","2":"2" };
-    let rank="", suit="";
-    if (typeof code === "string") {
-      const m = code.trim().match(/^(10|[2-9AJQK])\s*([♥♦♣♠hdcs])$/i);
-      if (m) { rank = RANKS[m[1].toUpperCase()]; suit = (SUIT_MAP[m[2]] || SUIT_MAP[m[2].toLowerCase()] || "hearts"); }
-    }
-    return { rank: rank || "A", suit: suit || "spades" };
-  }
-  const sizeCls = size==="sm" ? "w-12 h-16" : size==="lg" ? "w-24 h-32" : "w-16 h-24";
-  if (hidden){
+  if (hidden) {
     return (
-      <div className={`${sizeCls} rounded-xl card-shadow select-none bg-gray-800 relative overflow-hidden`}>
-        <div className="absolute inset-2 rounded-lg bg-gray-700" />
-        <div className="absolute inset-4 rounded-md bg-[radial-gradient(circle_at_20%_30%,rgba(255,255,255,.25)_2px,transparent_2px)]" />
-        <div className="absolute inset-0 grid place-items-center text-gray-200 font-black">MLEO</div>
+      <div className={`inline-flex items-center justify-center border border-white/30 rounded ${sizeClasses} font-bold bg-white/10`}>
+        <span className="leading-none">🂠</span>
       </div>
     );
   }
-  const { rank, suit } = mapToFile(code);
-  const red = (suit==="hearts"||suit==="diamonds");
-  const glyph = suit==="hearts"?"♥":suit==="diamonds"?"♦":suit==="clubs"?"♣":"♠";
-  const midColor = red ? "#e11d48" : "#111827";
+
+  const r = code.slice(0,-1), s = code.slice(-1);
+  
   return (
-    <div className={`${sizeCls} rounded-xl card-shadow select-none bg-white relative overflow-hidden`}>
-      <div className="absolute top-1 left-1 text-xs font-extrabold" style={{color: red? "#e11d48" : "#111827"}}>{rank}</div>
-      <div className="absolute top-5 left-1 text-xs" style={{color: red? "#e11d48" : "#111827"}}>{glyph}</div>
-      <div className="absolute bottom-1 right-1 rotate-180 text-xs font-extrabold" style={{color: red? "#e11d48" : "#111827"}}>{rank}</div>
-      <div className="absolute bottom-5 right-1 rotate-180 text-xs" style={{color: red? "#e11d48" : "#111827"}}>{glyph}</div>
-      <div className="absolute inset-0 grid place-items-center" style={{color: midColor, textShadow: "0 3px 6px rgba(0,0,0,.35)"}}>
-        <span className="text-6xl md:text-7xl">{glyph}</span>
-      </div>
+    <div className={`inline-flex items-center justify-center border border-white/30 rounded ${sizeClasses} font-bold bg-gradient-to-b from-white/10 to-white/5 shadow ${suitClass(s)}`}>
+      <span className="leading-none">{r}{suitIcon(s)}</span>
     </div>
   );
 }
@@ -1381,8 +1344,9 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
               }}
               className="w-20 bg-black/40 text-white text-xs rounded px-1 py-1 border border-white/20 focus:border-emerald-400 focus:outline-none placeholder-white/50" 
             />
-            <ChipsBar onAdd={(v)=>{ setBet(b=>Math.min(b+v, vault)); setDisplayValue(""); }} onClear={()=>{ setBet(0); setDisplayValue(""); }} />
-\1
+            <button onClick={placeBet} disabled={!canPlaceBet} className="w-12 px-2 py-1 rounded bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+              PLACE
+            </button>
             <button onClick={()=>{setBet(1000); setDisplayValue('1K');}} className="w-12 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
               1K
             </button>

@@ -64,15 +64,18 @@ function drawCard() {
 }
 
 function PlayingCard({ card }) {
-  const isRed = card.suit === "♥️" || card.suit === "♦️";
-  const color = isRed ? "text-red-600" : "text-black";
+  // Force all cards to display in red
+  const color = "text-red-600";
+  
+  // Custom card background - set to your image path
+  const cardBg = "bg-[url('/card-backs/hi-lo.jpg')] bg-cover bg-center bg-no-repeat";
   
   return (
-    <div className="w-24 h-36 rounded-lg bg-white border-2 border-gray-400 shadow-lg p-2 relative flex items-center justify-center">
-      <div className={`text-3xl font-bold ${color} absolute top-2 left-3 leading-tight`}>
+    <div className={`w-28 h-40 rounded-lg ${cardBg} border-2 border-gray-400 shadow-lg p-2 relative flex items-center justify-center`}>
+      <div className={`text-4xl font-bold ${color} absolute top-2 left-3 leading-tight drop-shadow-lg`}>
         {card.rank}
       </div>
-      <div className={`text-6xl ${color}`}>
+      <div className={`text-5xl ${color} drop-shadow-lg`}>
         {card.suit}
       </div>
     </div>
