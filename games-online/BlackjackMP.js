@@ -162,9 +162,9 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     };
   }
 
-  // נקה snapshot רק כשנכנסים לסיבוב חדש (betting / lobby / dealing)
+  // נקה snapshot רק כשמתחילים לחלק קלפים חדשים (dealing בלבד)
   useEffect(() => {
-    if (session?.state === 'betting' || session?.state === 'lobby' || session?.state === 'dealing') {
+    if (session?.state === 'dealing') {
       setEndedSnapshot(null);
     }
   }, [session?.state]);
@@ -1089,6 +1089,21 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       return; // מסיים פה
     }
 
+    // יצירת snapshot לפני עדכון התוצאות (כדי לשמור על ההימורים)
+    const snapshotPlayers = participants.map(p => ({
+      seat: p.seat,
+      player_name: p.player_name,
+      hand: Array.isArray(p.hand) ? [...p.hand] : [],
+      total: handValue(Array.isArray(p.hand) ? p.hand : []),
+      bet: p.bet ?? 0,
+      result: null // התוצאה תתעדכן בהמשך
+    }));
+    setEndedSnapshot({
+      dealer: [...dealer],
+      players: snapshotPlayers,
+      takenAt: new Date().toISOString()
+    });
+
     const lines = [];
     let myResult = null; // רק לשחקן המקומי
     for (const p of participants) {
@@ -1127,8 +1142,10 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         myResult = { result, delta, dealerBust, dealerScore, originalBet: p.bet, insuranceWin: p.insurance_bet > 0 && dealerBlackjack ? p.insurance_bet * 2 : 0 };
       }
 
+      // עדכן תוצאות ללא איפוס bet/hand (נישמר עבור snapshot)
       await supabase.from('bj_players').update({
-        result, status:'settled', bet:0, insurance_bet:0
+        result, status:'settled', insurance_bet:0
+        // לא מאפסים bet ו-hand עדיין
       }).eq('id', p.id);
 
       const tag = result==='win' ? '+'
@@ -1137,21 +1154,6 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
                : '-';
       lines.push(`Seat ${p.seat+1} • ${p.player_name} — ${result.toUpperCase()} (${tag}${fmt(Math.abs(delta))})`);
     }
-
-    // יצירת snapshot לפני המעבר ל-ENDED
-    const snapshotPlayers = participants.map(p => ({
-      seat: p.seat,
-      player_name: p.player_name,
-      hand: Array.isArray(p.hand) ? [...p.hand] : [],
-      total: handValue(Array.isArray(p.hand) ? p.hand : []),
-      bet: p.bet ?? 0,
-      result: p.result ?? null
-    }));
-    setEndedSnapshot({
-      dealer: [...dealer],
-      players: snapshotPlayers,
-      takenAt: new Date().toISOString()
-    });
 
     // הצג את התוצאות למשך 3 שניות לפני סיום המשחק
     await new Promise(resolve => setTimeout(resolve, 3000));
@@ -1213,7 +1215,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
             )}
             <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-0.5 gap-0.5">
               {(() => {
-                const showDealerFromSnap = (session?.state === 'settling' || session?.state === 'ended') && endedSnapshot;
+                const showDealerFromSnap = session?.state === 'ended' && endedSnapshot; // רק ב-ended, לא ב-settling
                 const dealerCards = showDealerFromSnap ? (endedSnapshot?.dealer || []) : (session?.dealer_hand || []);
                 return dealerCards.map((c,i)=>(
                   <Card key={i} code={c} hidden={session?.dealer_hidden && i===1 && !showDealerFromSnap} isDealing={session?.state === 'dealing' || session?.state === 'acting'} />
@@ -1223,7 +1225,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
             {!(session?.state === 'dealing' || session?.state === 'acting') && (
               <div className="text-white/80 text-xs mt-0.5">
                 {(() => {
-                  const showDealerFromSnap = (session?.state === 'settling' || session?.state === 'ended') && endedSnapshot;
+                  const showDealerFromSnap = session?.state === 'ended' && endedSnapshot; // רק ב-ended, לא ב-settling
                   const dealerCards = showDealerFromSnap ? (endedSnapshot?.dealer || []) : (session?.dealer_hand || []);
                   return `Total: ${session?.dealer_hidden && !showDealerFromSnap ? "—" : (handValue(dealerCards) || "—")}`;
                 })()}
@@ -1264,20 +1266,16 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
             let betToShow = occupant?.bet || 0;
             let handToShow = occupant?.hand;
 
-            const useSnap = (session?.state === 'settling' || session?.state === 'ended') && endedSnapshot;
+            const useSnap = session?.state === 'ended' && endedSnapshot; // רק ב-ended, לא ב-settling
             if (useSnap) {
               const snap = endedSnapshot?.players?.find(sp => sp.seat === i);
               if (snap) {
-                // בזמן settling/ended – תמיד snapshot!
+                // בזמן ended עם snapshot – השתמש ב-snapshot
                 nameToShow = snap.player_name;
                 betToShow = snap.bet || 0;
                 handToShow = snap.hand;
-              } else {
-                // אין snapshot (למשל כיסא ריק) – הצג ריק
-                nameToShow = null;
-                handToShow = [];
-                betToShow = 0;
               }
+              // אם אין snapshot לכיסא הזה, השאר את הנתונים הרגילים
             }
 
             const hv = Array.isArray(handToShow) ? handValue(handToShow) : null;
