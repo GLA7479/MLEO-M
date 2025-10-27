@@ -53,7 +53,7 @@ const MIN_BET = 1000;
 
 // EXTREME Plinko - 0 center and corners (Custom Probabilities!)
 // High multipliers at edges for big wins, but low probability!
-const MULTIPLIERS = [0, 40, 2, 18, 1.5, 5, 1, 0.5, 0, 0.5, 1, 5, 1.5, 18, 2, 40, 0];
+const MULTIPLIERS = [0, 40, 18, 5, 2, 1.5, 1, 0.5, 0, 0.5, 1, 1.5, 2, 5, 18, 40, 0];
 
 // Adjusted probabilities for RTP ~99%
 const CUSTOM_PROBABILITIES = [
@@ -422,6 +422,12 @@ export default function Plinko2Page() {
         // Update position
         ball.x += ball.vx * dt;
         ball.y += ball.vy * dt;
+        
+        // Gentle center bias - barely noticeable but keeps RTP balanced
+        const centerX = canvas.width / 2;
+        const centerBias = 0.05; // Very light - keeps balls more to center
+        const biasForce = (centerX - ball.x) * centerBias * dt * 60;
+        ball.vx += biasForce;
 
         // Wall collision - REMOVE ball if hits walls (0x multiplier)
         if (ball.x - ball.r < 0 || ball.x + ball.r > canvas.width) {
@@ -449,20 +455,21 @@ export default function Plinko2Page() {
           }
         });
 
-        // Bucket collision
+        // Bucket collision - only check if ball reached buckets area
         let landed = false;
-        bucketsRef.current.forEach((bucket) => {
-          if (
-            ball.y + ball.r >= bucket.y &&
-            ball.x >= bucket.x &&
-            ball.x <= bucket.x + bucket.w &&
-            ball.vy > 0
-          ) {
+        if (ball.y >= canvas.height - 80 && ball.vy > 0) {
+          // Find which bucket the ball landed in based on x position
+          const bucketWidth = canvas.width / MULTIPLIERS.length;
+          let bucketIndex = Math.floor(ball.x / bucketWidth);
+          bucketIndex = Math.max(0, Math.min(bucketIndex, bucketsRef.current.length - 1));
+          
+          const bucket = bucketsRef.current[bucketIndex];
+          if (bucket && ball.y + ball.r >= bucket.y && ball.x >= bucket.x - 10 && ball.x <= bucket.x + bucket.w + 10) {
             landed = true;
             landInBucket(ball, bucket);
             balls.splice(i, 1);
           }
-        });
+        }
 
         // Draw ball - smaller for better physics
         if (!landed) {
@@ -488,20 +495,9 @@ export default function Plinko2Page() {
   const landInBucket = (ball, bucket) => {
     const bet = ball.bet;
     
-    // Use custom probabilities instead of physical bucket position
-    const random = Math.random();
-    let cumulativeProbability = 0;
-    let selectedBucketIndex = 0;
-    
-    for (let i = 0; i < CUSTOM_PROBABILITIES.length; i++) {
-      cumulativeProbability += CUSTOM_PROBABILITIES[i];
-      if (random <= cumulativeProbability) {
-        selectedBucketIndex = i;
-        break;
-      }
-    }
-    
-    const multiplier = MULTIPLIERS[selectedBucketIndex];
+    // Use the ACTUAL physical bucket the ball landed in!
+    const bucketIndex = bucket.index;
+    const multiplier = MULTIPLIERS[bucketIndex];
     const prize = Math.floor(bet * multiplier);
     const win = prize > 0;
 
@@ -517,7 +513,7 @@ export default function Plinko2Page() {
       multiplier,
       prize,
       profit: win ? prize - bet : -bet,
-      bucketIndex: selectedBucketIndex,
+      bucketIndex: bucketIndex,
     };
 
     setLastResult(result);
