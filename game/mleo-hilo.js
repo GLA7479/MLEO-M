@@ -75,7 +75,7 @@ function PlayingCard({ card }) {
     // Mobile: w-32 h-44, Desktop: w-40 h-56
     <div className={`w-32 h-44 md:w-40 md:h-56 rounded-lg ${cardBg} border-2 border-gray-400 shadow-lg p-2 relative flex items-center justify-center`}>
       {/* Top-left corner: Number and Suit stacked vertically */}
-      <div className={`absolute top-2 left-3 flex flex-col items-start leading-none drop-shadow-lg`}>
+      <div className={`absolute top-2 left-3 flex flex-col items-start leading-none drop-shadow-lg -space-y-2`}>
         <div className={`text-3xl md:text-4xl font-serif font-bold ${color}`}>
           {card.rank}
         </div>
@@ -85,7 +85,7 @@ function PlayingCard({ card }) {
       </div>
       
       {/* Bottom-right corner (upside down): Number and Suit stacked */}
-      <div className={`absolute bottom-2 right-3 flex flex-col items-start leading-none drop-shadow-lg rotate-180`}>
+      <div className={`absolute bottom-2 right-3 flex flex-col items-start leading-none drop-shadow-lg rotate-180 -space-y-2`}>
         <div className={`text-3xl md:text-4xl font-serif font-bold ${color}`}>
           {card.rank}
         </div>
