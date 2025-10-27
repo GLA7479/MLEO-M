@@ -1058,26 +1058,34 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
             </div>
           </div>
 
-          {/* Timer badge - Top Right */}
-          {ses?.turn_deadline && (
-            <div className="absolute top-2 right-2 z-30 bg-red-600 text-white px-3 py-1 rounded-full font-bold text-xs shadow-lg animate-pulse">
-              <TurnCountdown deadline={ses.turn_deadline} />
-            </div>
-          )}
 
-          {/* Players - Circular positioning */}
+          {/* Players - 3 top, 3 bottom rows */}
           <div className="absolute inset-0 overflow-visible">
             {Array.from({length: seats}).map((_,i)=>{
               const p = seatMapMemo.get(i);
               const isTurn = ses?.current_turn===i && ["preflop","flop","turn","river"].includes(ses?.stage);
               const isMe = p?.client_id === clientId;
               
-              // Calculate angle for circular positioning
-              const angle = (i * 360) / seats - 90; // Start from top
-              const angleRad = angle * Math.PI / 180;
-              const radius = 38; // Closer to center
-              const x = 50 + radius * Math.cos(angleRad);
-              const y = 50 + radius * Math.sin(angleRad);
+              // Position calculation: Player 5 (you) always in center
+              let x = 0, y = 0;
+              if (i === 5) {
+                // You - center bottom
+                x = 50; // Center
+                y = 85; // Bottom
+              } else if (i < 3) {
+                // Top row (seats 0, 1, 2)
+                x = 50 + ((i - 1) * 15); // 35%, 50%, 65%
+                y = 15; // Top
+              } else {
+                // Bottom row (seats 3, 4) around seat 5
+                if (i === 3) {
+                  x = 25; // Left of center
+                  y = 85;
+                } else if (i === 4) {
+                  x = 75; // Right of center
+                  y = 85;
+                }
+              }
               
               // Scale for responsive sizing
               const scale = isMe ? 1.0 : 0.7;
@@ -1244,6 +1252,11 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
                   className="px-2 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
                   RAISE
                 </button>
+                {ses?.turn_deadline && (
+                  <div className="bg-red-600 text-white px-3 py-1 rounded-full font-bold text-xs shadow-lg animate-pulse">
+                    <TurnCountdown deadline={ses.turn_deadline} />
+                  </div>
+                )}
               </div>
             </div>
             
