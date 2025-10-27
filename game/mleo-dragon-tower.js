@@ -180,8 +180,8 @@ export default function DragonTowerPage() {
 
   const endGame = (win, finalFloor) => {
     const bet = Number(betAmount);
-    // Fun arcade multipliers!
-    const multipliers = [1.7, 2.4, 3.3, 4.8, 7.2, 10.5, 16, 26];
+    // Adjusted for RTP ~99% - Still high multipliers but slightly reduced
+    const multipliers = [1.65, 2.3, 3.1, 4.5, 6.7, 9.5, 14, 22];
     const multiplier = multipliers[Math.min(finalFloor - 1, multipliers.length - 1)] || 1;
     const prize = win ? Math.floor(bet * multiplier) : 0;
 
@@ -210,7 +210,7 @@ export default function DragonTowerPage() {
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-red-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
 
-  const multipliers = [1.7, 2.4, 3.3, 4.8, 7.2, 10.5, 16, 26];
+  const multipliers = [1.65, 2.3, 3.1, 4.5, 6.7, 9.5, 14, 22];
   const currentMultiplier = gameActive && floor > 0 ? multipliers[floor - 1] : (floor + 1 <= multipliers.length ? multipliers[floor] : 1);
   const currentPrize = gameActive && floor > 0 ? Math.floor(Number(betAmount) * multipliers[floor - 1]) : 0;
   const potentialWin = Math.floor(Number(betAmount) * currentMultiplier);

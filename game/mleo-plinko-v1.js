@@ -17,7 +17,8 @@ const LS_KEY = "mleo_plinko_v2_physics";
 const MIN_BET = 1000; // Minimum bet amount
 
 // 15 buckets (13 original + 2 zero buckets at edges)
-const MULTIPLIERS = [0, 2.2, 1.2, 1.5, 1.3, 1.1, 0.9, 0, 0.9, 1.1, 1.3, 1.5, 1.2, 2.2, 0];
+// Adjusted for RTP ~99% - High multipliers at edges for big wins!
+const MULTIPLIERS = [0, 2.0, 1.1, 1.4, 1.2, 1.0, 0.8, 0, 0.8, 1.0, 1.2, 1.4, 1.1, 2.0, 0];
 const BUCKET_COLORS = [
   "from-gray-700 to-gray-800",       // 0x (edge)
   "from-yellow-400 to-amber-500",    // 2.2x
@@ -1018,31 +1019,31 @@ function buildBoardGeometry(w, h) {
               <li>• <strong>Instant payout:</strong> Prize is awarded upon bucket capture</li>
             </ul>
             <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <p className="text-yellow-300 font-semibold mb-2">Prize Distribution (109% RTP!):</p>
+              <p className="text-yellow-300 font-semibold mb-2">Prize Distribution (RTP ~99%):</p>
               <div className="grid grid-cols-3 gap-1 text-xs">
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded bg-yellow-400"></div>
-                  <span className="text-white/70">×2.2</span>
+                  <span className="text-white/70">×2.0</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded bg-orange-500"></div>
-                  <span className="text-white/70">×1.2</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded bg-green-500"></div>
-                  <span className="text-white/70">×1.5</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded bg-blue-500"></div>
-                  <span className="text-white/70">×1.3</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded bg-purple-500"></div>
                   <span className="text-white/70">×1.1</span>
                 </div>
                 <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-green-500"></div>
+                  <span className="text-white/70">×1.4</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-blue-500"></div>
+                  <span className="text-white/70">×1.2</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-purple-500"></div>
+                  <span className="text-white/70">×1.0</span>
+                </div>
+                <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded bg-red-500"></div>
-                  <span className="text-white/70">×0.9</span>
+                  <span className="text-white/70">×0.8</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded bg-gray-600"></div>

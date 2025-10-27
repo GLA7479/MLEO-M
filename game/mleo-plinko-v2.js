@@ -52,27 +52,28 @@ const LS_KEY = "mleo_plinko2_v1";
 const MIN_BET = 1000;
 
 // EXTREME Plinko - 0 center and corners (Custom Probabilities!)
+// High multipliers at edges for big wins, but low probability!
 const MULTIPLIERS = [0, 40, 2, 18, 1.5, 5, 1, 0.5, 0, 0.5, 1, 5, 1.5, 18, 2, 40, 0];
 
-// Custom probabilities (not binomial) - like real casinos!
+// Adjusted probabilities for RTP ~99%
 const CUSTOM_PROBABILITIES = [
-  0.00005,  // 0.005% - corner ×0
-  0.0005,   // 0.05% - ×40
-  0.001,    // 0.1% - ×2
-  0.005,    // 0.5% - ×18
-  0.02,     // 2% - ×1.5
-  0.06,     // 6% - ×5
-  0.12,     // 12% - ×1
-  0.18,     // 18% - ×0.5
-  0.4,      // 40% - center ×0
-  0.18,     // 18% - ×0.5
-  0.12,     // 12% - ×1
-  0.06,     // 6% - ×5
-  0.02,     // 2% - ×1.5
-  0.005,    // 0.5% - ×18
-  0.001,    // 0.1% - ×2
-  0.0005,   // 0.05% - ×40
-  0.00005   // 0.005% - corner ×0
+  0.0002,   // 0.02% - corner ×0
+  0.0001,   // 0.01% - ×40 (big win but rare!)
+  0.003,    // 0.3% - ×2
+  0.0015,   // 0.15% - ×18
+  0.015,    // 1.5% - ×1.5
+  0.04,     // 4% - ×5
+  0.09,     // 9% - ×1
+  0.12,     // 12% - ×0.5
+  0.5,      // 50% - center ×0 (most common)
+  0.12,     // 12% - ×0.5
+  0.09,     // 9% - ×1
+  0.04,     // 4% - ×5
+  0.015,    // 1.5% - ×1.5
+  0.0015,   // 0.15% - ×18
+  0.003,    // 0.3% - ×2
+  0.0001,   // 0.01% - ×40 (big win but rare!)
+  0.0002    // 0.02% - corner ×0
 ];
 const BUCKET_COLORS = ["from-black to-gray-900", "from-yellow-300 to-yellow-500", "from-orange-400 to-orange-600", "from-green-500 to-emerald-500", "from-blue-500 to-cyan-500", "from-purple-500 to-purple-600", "from-gray-600 to-gray-700", "from-red-600 to-red-700", "from-black to-gray-900", "from-red-600 to-red-700", "from-gray-600 to-gray-700", "from-purple-500 to-purple-600", "from-blue-500 to-cyan-500", "from-green-500 to-emerald-500", "from-orange-400 to-orange-600", "from-yellow-300 to-yellow-500", "from-black to-gray-900"];
 

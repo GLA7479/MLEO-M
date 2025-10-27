@@ -220,7 +220,7 @@ export default function HiLoPage() {
     const win = (choice === "higher" && next.value > currentCard.value) || (choice === "lower" && next.value < currentCard.value);
     if (win) {
       const newStreak = streak + 1;
-      const multiplier = 1 + (newStreak * 0.2);
+      const multiplier = 1 + (newStreak * 0.18); // Reduced from 0.2 to 0.18 for RTP ~99%
       const roundPrize = Math.floor(Number(betAmount) * multiplier);
       setStreak(newStreak);
       setTotalPrize(roundPrize);

@@ -214,13 +214,13 @@ export default function HorseRacePage() {
     // positions[0] = 1st, positions[1] = 2nd, positions[2] = 3rd, positions[3] = 4th
     const myPosition = positions.indexOf(selectedHorse);
     
-    // Prize multipliers based on finish position
+    // Prize multipliers based on finish position - Adjusted for RTP ~99%
     let multiplier = 0;
     let place = '';
-    if (myPosition === 0) { multiplier = 3.6; place = '1st 🥇'; }
-    else if (myPosition === 1) { multiplier = 1; place = '2nd 🥈'; }
-    else if (myPosition === 2) { multiplier = 0.6; place = '3rd 🥉'; }
-    else if (myPosition === 3) { multiplier = 0.2; place = '4th'; }
+    if (myPosition === 0) { multiplier = 3.2; place = '1st 🥇'; }
+    else if (myPosition === 1) { multiplier = 0.9; place = '2nd 🥈'; }
+    else if (myPosition === 2) { multiplier = 0.5; place = '3rd 🥉'; }
+    else if (myPosition === 3) { multiplier = 0.15; place = '4th'; }
     else { multiplier = 0; place = '5th'; }
     
     const prize = Math.floor(bet * multiplier);

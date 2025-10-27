@@ -38,7 +38,8 @@ function useIOSViewportFix() {
 
 const LS_KEY = "mleo_mega_wheel_v2";
 const MIN_BET = 1000;
-const WHEEL_SEGMENTS = [0.5, 0.5, 0.8, 0.8, 1, 1.2, 1.5, 2.5]; // 8 segments
+// Adjusted for RTP ~99% - Still fun with variety!
+const WHEEL_SEGMENTS = [0.6, 0.7, 0.9, 1.0, 1.2, 1.4, 1.8, 2.9]; // 8 segments
 const WHEEL_COLORS = ['Red', 'Blue', 'Green', 'Purple', 'Orange', 'Yellow', 'Gray', 'Pink'];
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();

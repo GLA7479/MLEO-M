@@ -191,8 +191,8 @@ export default function BombPage() {
 
   const endGame = (win, finalLevel) => {
     const bet = Number(betAmount);
-    // Fun arcade multipliers!
-    const multipliers = [2.65, 4.2, 6.4, 10.5, 20];
+    // Adjusted for RTP ~99% - High risk = high reward!
+    const multipliers = [2.5, 3.9, 5.8, 9.2, 17];
     const multiplier = multipliers[Math.min(finalLevel - 1, multipliers.length - 1)] || 1;
     const prize = win ? Math.floor(bet * multiplier) : 0;
 
@@ -215,7 +215,7 @@ export default function BombPage() {
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-red-900 via-black to-orange-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
 
-  const multipliers = [2.65, 4.2, 6.4, 10.5, 20];
+  const multipliers = [2.5, 3.9, 5.8, 9.2, 17];
   const currentMultiplier = gameActive && level > 0 ? multipliers[level - 1] : (level + 1 <= multipliers.length ? multipliers[level] : 1);
   const currentPrize = gameActive && level > 0 ? Math.floor(Number(betAmount) * multipliers[level - 1]) : 0;
   const potentialWin = Math.floor(Number(betAmount) * currentMultiplier);

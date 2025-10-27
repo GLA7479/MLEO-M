@@ -51,8 +51,8 @@ const MIN_BET = 1000;
 const TOTAL_BOXES = 10;
 
 // Prize distribution in boxes (multipliers)
-// Fun arcade bonus!
-const PRIZES = [0, 0, 0, 0, 0.5, 1, 1, 1.5, 3, 4];
+// Adjusted for RTP ~99% - Big prizes at high boxes!
+const PRIZES = [0, 0, 0, 0, 0.45, 0.9, 0.9, 1.35, 2.7, 3.6];
 
 // On-chain Claim Config
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);

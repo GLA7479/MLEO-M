@@ -3,7 +3,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 import {
   maxStreetBet, minRaiseAmount,
-  startHand as engineStartHand, advanceStreet as engineAdvanceStreet
+  startHand as engineStartHand, 
+  advanceStreet as engineAdvanceStreet,
+  settlePots,
+  determineWinnersAuto
 } from "../lib/pokerEngine";
 
 const TURN_SECONDS = Number(process.env.NEXT_PUBLIC_POKER_TURN_SECONDS||20);
@@ -297,7 +300,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   const DEFAULT_REBUY = 1000;   // Default for quick button
 
   async function doRebuy(amount) {
-    if (!ses?.stage === 'lobby' || !myRow?.id) return;
+    if (ses?.stage !== 'lobby' || !myRow?.id) return;
     const vault = readVault();
     const amt = Math.min(Math.max(MIN_REBUY, Math.floor(Number(amount||0))), vault);
     if (amt <= 0) return;
@@ -665,9 +668,14 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     }).eq('id', sessionId);
 
     // בשואודאון: הצגת קלפים לשחקנים שלא קיפלו נעשית כבר ב־UI (לפי ses.stage==='showdown' && !folded)
-    // ואם יש לך פונקציית settlePots – קרא אותה:
-    if (typeof settlePots === 'function') {
-      await settlePots(sessionId);
+    // שקרא ל-settlePots עם כל הפרמטרים הנדרשים
+    const { data: allPlayers } = await supabase
+      .from('poker_players')
+      .select('*')
+      .eq('session_id', sessionId);
+    
+    if (allPlayers && board.length === 5) {
+      await settlePots(sessionId, board, allPlayers);
     }
   }
 

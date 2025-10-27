@@ -52,13 +52,14 @@ function useIOSViewportFix() {
 const LS_KEY = "mleo_goldrush_v2";
 const MIN_BET = 1000;
 const GRID_SIZE = 25;
+// Adjusted for RTP ~99%
 const PRIZES = {
-  small_gem: { emoji: '💎', multiplier: 0.5, count: 8 },
-  medium_gem: { emoji: '💍', multiplier: 0.8, count: 6 },
-  large_treasure: { emoji: '👑', multiplier: 1.2, count: 3 },
-  jackpot: { emoji: '🌟', multiplier: 2, count: 2 },
+  small_gem: { emoji: '💎', multiplier: 0.65, count: 8 },
+  medium_gem: { emoji: '💍', multiplier: 1.0, count: 6 },
+  large_treasure: { emoji: '👑', multiplier: 1.5, count: 3 },
+  jackpot: { emoji: '🌟', multiplier: 2.5, count: 2 },
   skull: { emoji: '💀', multiplier: -1, count: 6 }
-}; // Fun arcade!
+};
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
