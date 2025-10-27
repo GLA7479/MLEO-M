@@ -125,11 +125,12 @@ function TurnCountdown({ deadline }) {
   const [left, setLeft] = useState(Math.max(0, Math.floor((new Date(deadline).getTime() - Date.now())/1000)));
   useEffect(() => {
     const t = setInterval(() => {
-      setLeft(Math.max(0, Math.floor((new Date(deadline).getTime() - Date.now())/1000)));
-    }, 100);
+      const remaining = Math.max(0, Math.floor((new Date(deadline).getTime() - Date.now())/1000));
+      setLeft(remaining);
+    }, 1000); // Update every second
     return () => clearInterval(t);
   }, [deadline]);
-  return <div className="text-xs text-emerald-300 font-bold">⏱️ {left}s</div>;
+  return <span className="text-xs text-white font-bold">⏰ {left}s</span>;
 }
 
 export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierCode = '10K' }) {
@@ -1041,7 +1042,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
         </div>
 
         {/* Game Area - Center table */}
-        <div className="flex-1 relative overflow-hidden" style={{ minHeight: '40vh', maxHeight: '45vh' }}>
+        <div className="flex-1 relative overflow-hidden" style={{ minHeight: '50vh', maxHeight: '55vh' }}>
           
           {/* Community Cards - Center of table - NO FRAME */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-full px-4">
@@ -1057,10 +1058,10 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
             </div>
           </div>
 
-          {/* Timer badge - Floating */}
+          {/* Timer badge - Top Right */}
           {ses?.turn_deadline && (
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 bg-red-600 text-white px-3 py-1 rounded-full font-bold text-xs shadow-lg animate-pulse">
-              ⏰ {Math.max(0, Math.ceil((new Date(ses.turn_deadline).getTime() - Date.now())/1000))}s
+            <div className="absolute top-2 right-2 z-30 bg-red-600 text-white px-3 py-1 rounded-full font-bold text-xs shadow-lg animate-pulse">
+              <TurnCountdown deadline={ses.turn_deadline} />
             </div>
           )}
 
@@ -1156,36 +1157,99 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
           </div>
         </div>
 
-        {/* Controls - Bottom fixed */}
+        {/* Controls - Single Panel */}
         <div className="flex-shrink-0 bg-black/50 backdrop-blur-sm border-t border-white/20 p-2 md:p-3">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="bg-black/50 rounded-lg p-2 border border-white/20">
+            <div className="text-white font-bold text-xs mb-2">Your Actions</div>
             
-            {/* Left: Game control */}
-            <div className="bg-black/50 rounded-lg p-2 border border-white/20">
-              <div className="text-white font-bold text-xs mb-2">Game Control</div>
-              <div className="flex gap-1 flex-wrap mb-2">
+            {/* Player Actions */}
+            <div className="space-y-1.5 mb-2">
+              <div className="flex gap-1">
+                <button onClick={actFold} disabled={!canActNow} 
+                  className="flex-1 px-2 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
+                  FOLD
+                </button>
+                <button onClick={actCheck} disabled={!canActNow || !canCheck}
+                  className="flex-1 px-2 py-1.5 rounded-lg bg-gray-600 hover:bg-gray-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
+                  CHECK
+                </button>
+                <button onClick={actCall} disabled={!canActNow || !canCall}
+                  className="flex-1 px-2 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
+                  CALL
+                </button>
+                <button onClick={actAllIn} disabled={!canActNow}
+                  className="flex-1 px-2 py-1.5 rounded-lg bg-yellow-600 hover:bg-yellow-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
+                  ALL-IN
+                </button>
+              </div>
+              
+              <div className="flex gap-1 flex-wrap">
                 <button 
                   onClick={startHand}
-                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-all shadow-lg"
+                  className="px-2 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-all shadow-lg"
                 >
                   ▶ Start
                 </button>
                 <button 
                   onClick={leaveSeat}
-                  className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all shadow-lg"
+                  className="px-2 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all shadow-lg"
                 >
                   Leave
                 </button>
-                {["preflop","flop","turn","river"].includes(ses?.stage) && (
+                <button 
+                  onClick={()=>engineAdvanceStreet(ses.id)}
+                  disabled={!["preflop","flop","turn","river"].includes(ses?.stage)}
+                  className="px-2 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ⏩ Advance
+                </button>
+                <div className="flex items-center gap-0.5">
                   <button 
-                    onClick={()=>engineAdvanceStreet(ses.id)}
-                    className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-all shadow-lg"
+                    onClick={()=>setBetInput(prev=>Math.max(0, prev - 10))}
+                    className="px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 font-bold text-xs"
                   >
-                    ⏩
+                    ↓
                   </button>
-                )}
+                  <input
+                    type="number" min="0" step="10" value={betInput}
+                    onChange={e=>setBetInput(Number(e.target.value||0))}
+                    className="w-20 bg-black/60 text-white text-xs rounded-lg px-2 py-1 border border-white/20 focus:border-emerald-400 focus:outline-none placeholder-white/50"
+                    placeholder="Amount"
+                    disabled={!myTurn}
+                  />
+                  <button 
+                    onClick={()=>setBetInput(prev=>Math.max(0, prev + 10))}
+                    className="px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 font-bold text-xs"
+                  >
+                    ↑
+                  </button>
+                </div>
+                <button onClick={()=>setBetInput(ses?.min_bet||20)} className="px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 font-bold text-xs">
+                  BB
+                </button>
+                <button onClick={()=>setBetInput(Math.floor(pot/2))} className="px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 font-bold text-xs">
+                  ½ Pot
+                </button>
+                <button onClick={()=>setBetInput(pot)} className="px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 font-bold text-xs">
+                  Pot
+                </button>
+                <button onClick={()=>setBetInput(pot * 2)} className="px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 font-bold text-xs">
+                  2× Pot
+                </button>
+                <button onClick={()=>actBet(betInput)} disabled={!canActNow || canCall || betInput<=0} 
+                  className="px-2 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
+                  BET
+                </button>
+                <button onClick={()=>actRaise(betInput)} disabled={!canActNow || !canCall || betInput<=0}
+                  className="px-2 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
+                  RAISE
+                </button>
               </div>
-              <div className="text-white/80 text-xs">Vault: {fmt(getVaultFromProps(vault))}</div>
+            </div>
+            
+            {/* Info Section */}
+            <div className="text-white/80 text-xs border-t border-white/20 pt-2">
+              <div>Vault: {fmt(getVaultFromProps(vault))}</div>
               {/* Waiting Players Info */}
               {roomMembers.length > players.length && (
                 <div className="mt-1">
@@ -1210,63 +1274,6 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Right: Actions */}
-            <div className="bg-black/50 rounded-lg p-2 border border-white/20">
-              <div className="text-white font-bold text-xs mb-2">Your Actions</div>
-              <div className="space-y-1.5">
-                <div className="flex gap-1">
-                  <button onClick={actFold} disabled={!canActNow} 
-                    className="flex-1 px-2 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
-                    FOLD
-                  </button>
-                  <button onClick={actCheck} disabled={!canActNow || !canCheck}
-                    className="flex-1 px-2 py-1.5 rounded-lg bg-gray-600 hover:bg-gray-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
-                    CHECK
-                  </button>
-                </div>
-                <div className="flex gap-1">
-                  <button onClick={actCall} disabled={!canActNow || !canCall}
-                    className="flex-1 px-2 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
-                    CALL
-                  </button>
-                  <button onClick={actAllIn} disabled={!canActNow}
-                    className="flex-1 px-2 py-1.5 rounded-lg bg-yellow-600 hover:bg-yellow-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
-                    ALL-IN
-                  </button>
-                </div>
-                
-                <div className="flex gap-1">
-                  <input
-                    type="number" min="0" step="10" value={betInput}
-                    onChange={e=>setBetInput(Number(e.target.value||0))}
-                    className="flex-1 bg-black/60 text-white text-xs rounded-lg px-2 py-1 border border-white/20 focus:border-emerald-400 focus:outline-none placeholder-white/50"
-                    placeholder="Amount"
-                    disabled={!myTurn}
-                  />
-                  <button onClick={()=>actBet(betInput)} disabled={!canActNow || canCall || betInput<=0} 
-                    className="px-2 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
-                    BET
-                  </button>
-                  <button onClick={()=>actRaise(betInput)} disabled={!canActNow || !canCall || betInput<=0}
-                    className="px-2 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
-                    RAISE
-                  </button>
-                </div>
-
-                <div className="flex gap-1 text-xs">
-                  <button onClick={()=>setBetInput(ses?.min_bet||20)} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
-                    BB
-                  </button>
-                  <button onClick={()=>setBetInput(Math.floor(pot/2))} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
-                    ½ Pot
-                  </button>
-                  <button onClick={()=>setBetInput(pot)} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
-                    Pot
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>
