@@ -68,46 +68,22 @@ function Card({ code, hidden = false, isDealing = false }) {
   
   const r = code.slice(0,-1), s = code.slice(-1);
   const suitIcon = s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
-  const color = (s==="h"||s==="d") ? "text-red-600" : "text-black";
+  const suitClass = (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
   
-  const cardSize = isDealing ? "w-20 h-32 md:w-24 md:h-40" : "w-10 h-14 md:w-12 md:h-18";
+  // Dynamic sizing based on game state
+  const cardSize = isDealing ? "w-12 h-16 mx-1 text-sm" : "w-10 h-14 mx-1 text-xs";
   
   if (hidden) {
     return (
-      <div className={`relative ${cardSize} rounded-md shadow-lg transition-all`}>
-        {/* Realistic card back pattern */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-700 via-blue-800 to-blue-900 rounded-md border-2 border-blue-500/50">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,.15)_1px,transparent_1px)] bg-[length:6px_6px]"></div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-lg md:text-xl font-black text-white drop-shadow-lg">MLEO</span>
-          </div>
-        </div>
+      <div className={`inline-flex items-center justify-center border-2 border-white/30 rounded-lg ${cardSize} font-bold bg-gradient-to-b from-gray-600 to-gray-800 text-white`}>
+        <span className="leading-none">?</span>
       </div>
     );
   }
   
-  const isLarge = isDealing; // Large cards for community cards
-  
   return (
-    <div className={`${cardSize} rounded-md bg-white border-2 border-gray-300 shadow-xl hover:scale-105 transition-all relative overflow-hidden`}>
-      {/* Top left corner rank */}
-      <div className={`absolute top-1 left-2 text-base md:text-lg font-black ${color} leading-none`}>
-        {r}
-      </div>
-      {/* Top left corner suit */}
-      <div className={`absolute top-4 left-2 text-base ${color}`}>
-        {suitIcon}
-      </div>
-      
-      {/* Center large suit icon */}
-      <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${isLarge ? 'text-6xl md:text-8xl' : 'text-2xl md:text-4xl'} ${color} opacity-20`}>
-        {suitIcon}
-      </div>
-      
-      {/* Bottom right corner (rotated) */}
-      <div className={`absolute bottom-1 right-2 text-base md:text-lg font-black ${color} leading-none rotate-180`}>
-        {r}
-      </div>
+    <div className={`inline-flex items-center justify-center border-2 border-white/30 rounded-lg ${cardSize} font-bold bg-gradient-to-b from-white/10 to-white/5 shadow-lg ${suitClass}`}>
+      <span className="leading-none">{r}{suitIcon}</span>
     </div>
   );
 }
@@ -1011,270 +987,220 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   if (!roomId) return <div className="w-full h-full flex items-center justify-center text-white/70">Select or create a room to start.</div>;
 
   return (
-    <div className="w-full h-full flex flex-col relative overflow-hidden" style={{ height: '100svh' }}>
-      {/* Poker Table Felt Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-green-900 to-emerald-800">
-        {/* Felt texture overlay */}
-        <div className="absolute inset-0 opacity-30" style={{
-          backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.03) 10px, rgba(0,0,0,0.03) 20px)',
-        }}></div>
-        {/* Dot pattern for realistic felt */}
-        <div className="absolute inset-0" style={{
-          backgroundImage: 'radial-gradient(circle, rgba(0,0,0,0.1) 1px, transparent 1px)',
-          backgroundSize: '20px 20px'
-        }}></div>
+    <div className="w-full h-full flex flex-col p-1 md:p-2 gap-1 md:gap-2 -mt-1">
+      {/* Header */}
+      <div className="flex items-center justify-between bg-white/5 rounded-xl p-1 md:p-2 border border-white/10">
+        <div className="text-white font-bold text-sm md:text-lg">MLEO Online</div>
+        <div className="flex items-center gap-1 md:gap-2 text-white/80 text-xs">
+          <span>Hand #{ses?.hand_no||"-"}</span>
+          <span>Stage: {ses?.stage||"lobby"}</span>
+          <span>Pot: {fmt(pot)}</span>
+        </div>
       </div>
 
-      {/* Content Container */}
-      <div className="relative z-10 flex flex-col h-full overflow-hidden">
-        
-        {/* Header Bar */}
-        <div className="flex-shrink-0 bg-black/40 backdrop-blur-sm px-2 py-2 md:px-4 md:py-3 border-b border-white/10">
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-white font-bold text-xs md:text-base">🃏 MLEO Poker</div>
-            <div className="flex items-center gap-1 md:gap-2 text-white/90 text-[10px] md:text-xs">
-              <span className="bg-green-800/50 px-2 py-0.5 rounded">Hand #{ses?.hand_no||"-"}</span>
-              <span className="bg-green-800/50 px-2 py-0.5 rounded capitalize">{ses?.stage||"lobby"}</span>
-              <span className="bg-amber-600/50 px-2 py-0.5 rounded font-bold">💰 {fmt(pot)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Game Area - Center table */}
-        <div className="flex-1 relative overflow-hidden" style={{ minHeight: '40vh', maxHeight: '45vh' }}>
-          
-          {/* Community Cards - Center of table - NO FRAME */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-full px-4">
-            <div className="flex justify-center gap-3 md:gap-4">
-              {board.map((card, idx) => (
-                <Card key={idx} code={card} isDealing={true} />
-              ))}
-              {Array.from({ length: 5 - board.length }).map((_, idx) => (
-                <div key={idx} className="w-20 h-32 md:w-24 md:h-40 rounded-md bg-white/10 border-2 border-white/40 flex items-center justify-center text-white/80 text-3xl font-bold shadow-lg">
-                  ?
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Timer badge - Floating */}
-          {ses?.turn_deadline && (
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 bg-red-600 text-white px-3 py-1 rounded-full font-bold text-xs shadow-lg animate-pulse">
-              ⏰ {Math.max(0, Math.ceil((new Date(ses.turn_deadline).getTime() - Date.now())/1000))}s
+      {/* Board - Fixed Height */}
+      <div className="bg-gradient-to-r from-green-900/20 to-green-800/20 rounded-xl p-2 md:p-3 border border-green-400/30 h-32 sm:h-40 relative">
+        <div className="text-center h-full flex flex-col justify-center">
+          {/* Hide text during active game for more card space */}
+          {!(ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river') && (
+            <div className="text-white font-bold text-xs mb-0.5">Community Cards</div>
+          )}
+          <HandView hand={board} isDealing={ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river'}/>
+          {!(ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river') && (
+            <div className="text-white/80 text-xs mt-0.5">
+              {board.length === 0 ? "No cards yet" : 
+               board.length === 3 ? "Flop" :
+               board.length === 4 ? "Turn" : 
+               board.length === 5 ? "River" : ""}
             </div>
           )}
-
-          {/* Players - Circular positioning */}
-          <div className="absolute inset-0 overflow-visible">
-            {Array.from({length: seats}).map((_,i)=>{
-              const p = seatMapMemo.get(i);
-              const isTurn = ses?.current_turn===i && ["preflop","flop","turn","river"].includes(ses?.stage);
-              const isMe = p?.client_id === clientId;
-              
-              // Calculate angle for circular positioning
-              const angle = (i * 360) / seats - 90; // Start from top
-              const angleRad = angle * Math.PI / 180;
-              const radius = 38; // Closer to center
-              const x = 50 + radius * Math.cos(angleRad);
-              const y = 50 + radius * Math.sin(angleRad);
-              
-              // Scale for responsive sizing
-              const scale = isMe ? 1.0 : 0.7;
-              
-              return (
-                <div
-                  key={i}
-                  className={`absolute rounded-md border-2 shadow-lg transition-all ${
-                    isTurn ? 'border-yellow-400 bg-yellow-400/20 ring-2 ring-yellow-400/30' :
-                    isMe ? 'border-purple-400 bg-purple-400/15' :
-                    'border-white/20 bg-white/10'
-                  }`}
-                  style={{
-                    left: `${x}%`,
-                    top: `${y}%`,
-                    transform: `translate(-50%, -50%) scale(${scale})`,
-                    minWidth: '80px',
-                    minHeight: isMe ? '90px' : '80px',
-                    maxWidth: '90px',
-                    fontSize: '10px'
-                  }}
-                >
-                  {p ? (
-                    <div className="p-2 md:p-3 text-center space-y-1">
-                      {/* Player name */}
-                      <div className={`text-white font-bold text-[10px] md:text-xs truncate ${
-                        isMe ? 'text-purple-300' : ''
-                      }`}>
-                        {p.player_name}{isMe && ' (You)'}
-                      </div>
-                      
-                      {/* Chips count */}
-                      <div className="text-cyan-300 text-[11px] md:text-sm font-semibold">
-                        {fmt(p.stack_live)} 💰
-                      </div>
-                      
-                      {/* Current bet */}
-                      {p.bet_street > 0 && (
-                        <div className="text-amber-300 text-[9px] md:text-xs">
-                          Bet: {fmt(p.bet_street)}
-                        </div>
-                      )}
-                      
-                      {/* Cards */}
-                      <div className="flex justify-center gap-0.5 mt-1">
-                        {p.hole_cards?.map((card, idx) => (
-                          <Card 
-                            key={idx} 
-                            code={card} 
-                            hidden={!(isMe || (ses?.stage === 'showdown' && ses.board?.length === 5 && !p?.folded))}
-                            isDealing={false}
-                          />
-                        ))}
-                      </div>
-                      
-                      {/* Status badges */}
-                      <div className="flex flex-col items-center gap-1 mt-1">
-                        {p.folded && <div className="bg-red-900/50 text-red-300 text-[9px] px-2 py-0.5 rounded">FOLDED</div>}
-                        {p.all_in && <div className="bg-orange-900/50 text-orange-300 text-[9px] px-2 py-0.5 rounded">ALL-IN</div>}
-                        {isTurn && <div className="bg-green-600 text-white text-[9px] px-2 py-0.5 rounded">YOUR TURN</div>}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-4 flex flex-col items-center justify-center h-full">
-                      <div className="text-white/40 text-[10px] mb-2">Seat {i+1}</div>
-                      <button 
-                        onClick={() => takeSeat(i)}
-                        className="px-3 py-1.5 bg-green-700 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition-all shadow-lg"
-                      >
-                        JOIN
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
         </div>
+        {/* Timer in bottom-left corner */}
+        {ses?.turn_deadline && (
+          <div className="absolute bottom-2 left-2 text-sm">
+            <div className="text-amber-300 font-bold text-lg">
+              ⏰ {Math.max(0, Math.ceil((new Date(ses.turn_deadline).getTime() - Date.now())/1000))}s
+            </div>
+          </div>
+        )}
+      </div>
 
-        {/* Controls - Bottom fixed */}
-        <div className="flex-shrink-0 bg-black/50 backdrop-blur-sm border-t border-white/20 p-2 md:p-3">
-          <div className="grid grid-cols-2 gap-2">
-            
-            {/* Left: Game control */}
-            <div className="bg-black/50 rounded-lg p-2 border border-white/20">
-              <div className="text-white font-bold text-xs mb-2">Game Control</div>
-              <div className="flex gap-1 flex-wrap mb-2">
-                <button 
-                  onClick={startHand}
-                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-all shadow-lg"
-                >
-                  ▶ Start
-                </button>
-                <button 
-                  onClick={leaveSeat}
-                  className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all shadow-lg"
-                >
-                  Leave
-                </button>
-                {["preflop","flop","turn","river"].includes(ses?.stage) && (
-                  <button 
-                    onClick={()=>engineAdvanceStreet(ses.id)}
-                    className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-all shadow-lg"
-                  >
-                    ⏩
-                  </button>
+      {/* Players Grid */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1 md:gap-2">
+        {Array.from({length: seats}).map((_,i)=>{
+          const p = seatMapMemo.get(i);
+          const isTurn = ses?.current_turn===i && ["preflop","flop","turn","river"].includes(ses?.stage);
+          const isMe = p?.client_id === clientId;
+          return (
+            <div key={i} className={`rounded-xl border-2 ${isTurn?'border-emerald-400 bg-emerald-900/20':isMe?'border-blue-400 bg-blue-900/20':'border-white/20 bg-white/5'} p-1 md:p-2 min-h-[120px] md:min-h-[150px] transition-all hover:bg-white/10 relative`}>
+              {/* Turn indicator button - top right corner */}
+              {p && (
+                <div className={`absolute top-1 right-1 w-3 h-3 rounded-full ${isTurn ? 'bg-green-500' : 'bg-red-500'} ${isTurn ? 'animate-pulse' : ''}`}></div>
+              )}
+              <div className="text-center">
+                {p ? (
+                  <div className="space-y-1 md:space-y-2">
+                    <div className="text-white font-bold text-xs md:text-sm truncate">{p.player_name}</div>
+                    <div className="text-emerald-300 text-xs font-semibold">Stack: {fmt(p.stack_live)}</div>
+                    <div className="text-cyan-300 text-xs">Bet: {fmt(p.bet_street||0)}</div>
+                    <div className="text-yellow-300 text-sm">Total: {fmt(p.total_bet||0)}</div>
+                    <HandView 
+                      hand={p.hole_cards} 
+                      hidden={!(isMe || (ses?.stage === 'showdown' && Array.isArray(ses?.board) && ses.board.length === 5 && !p?.folded))} 
+                      isDealing={ses?.stage === 'preflop' || ses?.stage === 'flop' || ses?.stage === 'turn' || ses?.stage === 'river'}
+                    />
+                    {p.folded && <div className="text-red-400 text-sm font-bold">FOLDED</div>}
+                    {p.all_in && <div className="text-yellow-400 text-sm font-bold">ALL-IN</div>}
+                    {isTurn && <div className="text-emerald-400 text-sm font-bold">YOUR TURN</div>}
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <div className="text-white/50 text-sm mb-2">Empty Seat</div>
+                    <button 
+                      onClick={() => takeSeat(i)}
+                      className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-all"
+                    >
+                      TAKE SEAT
+                    </button>
+                  </div>
                 )}
               </div>
-              <div className="text-white/80 text-xs">Vault: {fmt(getVaultFromProps(vault))}</div>
-              {/* Waiting Players Info */}
-              {roomMembers.length > players.length && (
-                <div className="mt-1">
-                  <div className="text-[9px] text-blue-400 font-semibold mb-1">
-                    👥 Waiting ({roomMembers.length - players.length})
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {roomMembers
-                      .filter(member => !players.some(p => p.player_name === member.player_name))
-                      .slice(0, 3)
-                      .map((member, idx) => (
-                        <div key={idx} className="px-1 py-0.5 bg-white/10 rounded text-[8px] text-white/80 border border-white/20">
-                          {member.player_name}
-                        </div>
-                      ))
-                    }
-                    {roomMembers.filter(member => !players.some(p => p.player_name === member.player_name)).length > 3 && (
-                      <div className="px-1 py-0.5 bg-white/10 rounded text-[8px] text-white/80 border border-white/20">
-                        +{roomMembers.filter(member => !players.some(p => p.player_name === member.player_name)).length - 3}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
+          );
+        })}
+      </div>
 
-            {/* Right: Actions */}
-            <div className="bg-black/50 rounded-lg p-2 border border-white/20">
-              <div className="text-white font-bold text-xs mb-2">Your Actions</div>
-              <div className="space-y-1.5">
-                <div className="flex gap-1">
-                  <button onClick={actFold} disabled={!canActNow} 
-                    className="flex-1 px-2 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
-                    FOLD
-                  </button>
-                  <button onClick={actCheck} disabled={!canActNow || !canCheck}
-                    className="flex-1 px-2 py-1.5 rounded-lg bg-gray-600 hover:bg-gray-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
-                    CHECK
-                  </button>
-                </div>
-                <div className="flex gap-1">
-                  <button onClick={actCall} disabled={!canActNow || !canCall}
-                    className="flex-1 px-2 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
-                    CALL
-                  </button>
-                  <button onClick={actAllIn} disabled={!canActNow}
-                    className="flex-1 px-2 py-1.5 rounded-lg bg-yellow-600 hover:bg-yellow-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
-                    ALL-IN
-                  </button>
-                </div>
-                
-                <div className="flex gap-1">
-                  <input
-                    type="number" min="0" step="10" value={betInput}
-                    onChange={e=>setBetInput(Number(e.target.value||0))}
-                    className="flex-1 bg-black/60 text-white text-xs rounded-lg px-2 py-1 border border-white/20 focus:border-emerald-400 focus:outline-none placeholder-white/50"
-                    placeholder="Amount"
-                    disabled={!myTurn}
-                  />
-                  <button onClick={()=>actBet(betInput)} disabled={!canActNow || canCall || betInput<=0} 
-                    className="px-2 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
-                    BET
-                  </button>
-                  <button onClick={()=>actRaise(betInput)} disabled={!canActNow || !canCall || betInput<=0}
-                    className="px-2 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
-                    RAISE
-                  </button>
-                </div>
 
-                <div className="flex gap-1 text-xs">
-                  <button onClick={()=>setBetInput(ses?.min_bet||20)} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
-                    BB
-                  </button>
-                  <button onClick={()=>setBetInput(Math.floor(pot/2))} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
-                    ½ Pot
-                  </button>
-                  <button onClick={()=>setBetInput(pot)} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
-                    Pot
-                  </button>
-                </div>
+      {/* Controls - Fixed Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:gap-2 h-40 md:h-44">
+        <div className="bg-white/5 rounded-xl p-1 md:p-2 border border-white/10 h-full">
+          <div className="text-white/80 text-xs mb-1 font-semibold">Game Control</div>
+          <div className="flex gap-1 flex-wrap mb-2">
+            <button 
+              onClick={startHand}
+              className="px-2 py-1 md:px-3 md:py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-xs transition-all shadow-lg"
+            >
+              Start / Next Hand
+            </button>
+            <button 
+              onClick={leaveSeat}
+              className="px-2 py-1 md:px-3 md:py-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all shadow-lg"
+            >
+              Leave Seat
+            </button>
+            {["preflop","flop","turn","river"].includes(ses?.stage) && (
+              <button 
+                onClick={()=>engineAdvanceStreet(ses.id)}
+                className="px-2 py-1 md:px-3 md:py-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold text-xs transition-all shadow-lg"
+              >
+                Force Advance
+              </button>
+            )}
+          </div>
+          <div className="text-white/60 text-xs mb-2">Vault: {fmt(getVaultFromProps(vault))} MLEO</div>
+          {/* Waiting Players Info */}
+          {roomMembers.length > players.length && (
+            <div>
+              <div className="text-xs text-blue-400 font-semibold mb-1">
+                👥 Waiting ({roomMembers.length - players.length})
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {roomMembers
+                  .filter(member => !players.some(p => p.player_name === member.player_name))
+                  .slice(0, 3)
+                  .map((member, idx) => (
+                    <div key={idx} className="px-1 py-0.5 bg-white/10 rounded text-xs text-white/80 border border-white/20">
+                      {member.player_name}
+                    </div>
+                  ))
+                }
+                {roomMembers.filter(member => !players.some(p => p.player_name === member.player_name)).length > 3 && (
+                  <div className="px-1 py-0.5 bg-white/10 rounded text-xs text-white/80 border border-white/20">
+                    +{roomMembers.filter(member => !players.some(p => p.player_name === member.player_name)).length - 3}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Messages - Floating */}
+        <div className="bg-white/5 rounded-xl p-1 md:p-2 border border-white/10 h-full">
+          <div className="text-white/80 text-xs mb-1 font-semibold">Player Actions</div>
+          <div className="space-y-1">
+            <div className="flex gap-1 flex-wrap">
+              <button onClick={actFold} disabled={!canActNow} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                FOLD
+              </button>
+              <button onClick={actCheck} disabled={!canActNow || !canCheck} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                CHECK
+              </button>
+              <button onClick={actCall} disabled={!canActNow || !canCall} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                CALL
+              </button>
+              <button onClick={actAllIn} disabled={!canActNow} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                ALL-IN
+              </button>
+            </div>
+            
+            <div className="flex gap-1 items-center">
+              <input
+                type="number" min="0" step="10" value={betInput}
+                onChange={e=>setBetInput(Number(e.target.value||0))}
+                className="flex-1 bg-black/40 text-white text-xs rounded-lg px-1 py-0.5 md:px-2 md:py-1 border border-white/20 focus:border-emerald-400 focus:outline-none"
+                placeholder="Amount"
+              disabled={!myTurn}
+              />
+              <button onClick={()=>actBet(betInput)} disabled={!canActNow || canCall || betInput<=0} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                BET
+              </button>
+              <button onClick={()=>actRaise(betInput)} disabled={!canActNow || !canCall || betInput<=0} className="px-1 py-0.5 md:px-2 md:py-1 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                RAISE
+              </button>
+            </div>
+
+            <div className="flex gap-1 text-xs">
+              <button onClick={()=>setBetInput(ses?.min_bet||20)} className="px-1 py-0.5 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
+                1×BB
+              </button>
+              <button onClick={()=>setBetInput(Math.floor(pot/2))} className="px-1 py-0.5 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
+                ½ Pot
+              </button>
+              <button onClick={()=>setBetInput(pot)} className="px-1 py-0.5 rounded bg-white/10 border border-white/20 text-white/80 hover:bg-white/20">
+                Pot
+              </button>
+            </div>
+
+            {/* Vault and Re-buy Messages */}
+            {!canActNow && !inLobby && myStack<=0 && (
+              <div className="text-xs text-red-400 mt-2">Busted from table • Add coins to Vault to continue</div>
+            )}
+            {inLobby && myVault > 0 && (
+              <button 
+                className="px-3 py-2 rounded-md bg-indigo-600 text-white ml-2 text-xs"
+                onClick={()=>{ setRebuyAmt(Math.min(DEFAULT_REBUY, readVault())); setShowRebuy(true); }}
+                title={`Vault: ${myVault.toLocaleString()} MLEO`}
+              >
+                Load from Vault
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Fixed Timer Position */}
+      <div className="h-16 flex items-center justify-center">
+        {ses?.current_turn!=null && ses?.turn_deadline && (
+          <div className="bg-white/5 rounded-xl p-4 border border-white/10 text-center">
+            <TurnCountdown deadline={ses.turn_deadline} />
+          </div>
+        )}
+      </div>
+
+      {/* Fixed Status Message Position */}
+      <div className="h-16 flex items-center justify-center">
         {msg && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-emerald-900/40 backdrop-blur-sm rounded-lg p-3 border border-emerald-400/40 shadow-lg max-w-md mx-auto z-50">
-            <div className="text-emerald-300 text-xs md:text-sm text-center">{msg}</div>
+          <div className="bg-emerald-900/20 rounded-xl p-4 border border-emerald-400/30 text-center max-w-md mx-auto">
+            <div className="text-emerald-300 text-sm">{msg}</div>
           </div>
         )}
       </div>

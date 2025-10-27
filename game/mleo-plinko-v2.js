@@ -77,7 +77,7 @@ const CUSTOM_PROBABILITIES = [
 ];
 const BUCKET_COLORS = ["from-black to-gray-900", "from-yellow-300 to-yellow-500", "from-orange-400 to-orange-600", "from-green-500 to-emerald-500", "from-blue-500 to-cyan-500", "from-purple-500 to-purple-600", "from-gray-600 to-gray-700", "from-red-600 to-red-700", "from-black to-gray-900", "from-red-600 to-red-700", "from-gray-600 to-gray-700", "from-purple-500 to-purple-600", "from-blue-500 to-cyan-500", "from-green-500 to-emerald-500", "from-orange-400 to-orange-600", "from-yellow-300 to-yellow-500", "from-black to-gray-900"];
 
-const ROWS = 16;
+const ROWS = 18;
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -319,7 +319,7 @@ export default function Plinko2Page() {
       for (let i = 0; i < bucketCount; i++) {
         buckets.push({
           x: 20 + i * bucketWidth,
-          y: h - 30,
+          y: h - 50,
           w: bucketWidth,
           h: 20,
           multiplier: MULTIPLIERS[i],
