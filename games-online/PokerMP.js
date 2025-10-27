@@ -1073,16 +1073,16 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
                 x = 50; // Center
                 y = 85; // Bottom
               } else if (i < 3) {
-                // Top row (seats 0, 1, 2)
-                x = 50 + ((i - 1) * 15); // 35%, 50%, 65%
+                // Top row (seats 0, 1, 2) - wider spacing
+                x = 50 + ((i - 1) * 25); // 25%, 50%, 75%
                 y = 15; // Top
               } else {
-                // Bottom row (seats 3, 4) around seat 5
+                // Bottom row (seats 3, 4) around seat 5 - wider spacing
                 if (i === 3) {
-                  x = 25; // Left of center
+                  x = 15; // Left of center
                   y = 85;
                 } else if (i === 4) {
-                  x = 75; // Right of center
+                  x = 85; // Right of center
                   y = 85;
                 }
               }
