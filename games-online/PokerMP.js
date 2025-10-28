@@ -100,7 +100,7 @@ function Card({ code, hidden = false, isDealing = false }) {
       </div>
       
       {/* Center large suit icon */}
-      <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${isLarge ? 'text-6xl md:text-8xl' : 'text-2xl md:text-4xl'} ${color} opacity-20`}>
+      <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${isLarge ? 'text-4xl md:text-5xl' : 'text-2xl md:text-4xl'} ${color} opacity-20`}>
         {suitIcon}
       </div>
       
@@ -1108,9 +1108,9 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
                     left: `${x}%`,
                     top: `${y}%`,
                     transform: `translate(-50%, -50%) scale(${scale})`,
-                    minWidth: '80px',
-                    minHeight: isMe ? '90px' : '80px',
-                    maxWidth: '90px',
+                    minWidth: '100px',
+                    minHeight: isMe ? '110px' : '100px',
+                    maxWidth: '110px',
                     fontSize: '10px'
                   }}
                 >
