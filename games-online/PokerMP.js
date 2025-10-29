@@ -1085,9 +1085,9 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
               // Position calculation: השחקן הנוכחי תמיד במושב 5 (מרכז תחתון)
               let x = 0, y = 0;
               if (virtualSeat === 5) {
-                // השחקן הנוכחי - מרכז תחתון
+                // השחקן הנוכחי - מרכז תחתון (מורם מעט כדי לא להיחתך)
                 x = 50; // Center
-                y = 85; // Bottom
+                y = isMe ? 80 : 85; // Bottom - מורם עבור השחקן הנוכחי
               } else if (virtualSeat < 3) {
                 // Top row (seats 0, 1, 2)
                 if (virtualSeat === 0) {
