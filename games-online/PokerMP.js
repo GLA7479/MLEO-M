@@ -74,14 +74,13 @@ function Card({ code, hidden = false, isDealing = false }) {
   
   if (hidden) {
     return (
-      <div className={`relative ${cardSize} rounded-md shadow-lg transition-all`}>
-        {/* Realistic card back pattern */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-700 via-blue-800 to-blue-900 rounded-md border-2 border-blue-500/50">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,.15)_1px,transparent_1px)] bg-[length:6px_6px]"></div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-lg md:text-xl font-black text-white drop-shadow-lg">MLEO</span>
-          </div>
-        </div>
+      <div className={`relative ${cardSize} rounded-md shadow-lg transition-all overflow-hidden`}>
+        {/* Card back image */}
+        <img 
+          src="/card-backs/poker-back.jpg" 
+          alt="Card back"
+          className="w-full h-full object-cover"
+        />
       </div>
     );
   }
@@ -89,23 +88,30 @@ function Card({ code, hidden = false, isDealing = false }) {
   const isLarge = isDealing; // Large cards for community cards
   
   return (
-    <div className={`${cardSize} rounded-md bg-white border-2 border-gray-300 shadow-xl hover:scale-105 transition-all relative overflow-hidden`}>
+    <div className={`${cardSize} rounded-md shadow-xl hover:scale-105 transition-all relative overflow-hidden`}>
+      {/* Card front image */}
+      <img 
+        src="/card-backs/poker-front.jpg" 
+        alt="Card front"
+        className="absolute inset-0 w-full h-full object-cover opacity-30"
+      />
+      
       {/* Top left corner rank */}
-      <div className={`absolute top-1 left-2 text-base md:text-lg font-black ${color} leading-none`}>
+      <div className={`absolute top-1 left-2 text-base md:text-lg font-black ${color} leading-none z-10`}>
         {r}
       </div>
       {/* Top left corner suit */}
-      <div className={`absolute top-4 left-2 text-base ${color}`}>
+      <div className={`absolute top-4 left-2 text-base ${color} z-10`}>
         {suitIcon}
       </div>
       
       {/* Center large suit icon */}
-      <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${isLarge ? 'text-4xl md:text-5xl' : 'text-2xl md:text-4xl'} ${color} opacity-20`}>
+      <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${isLarge ? 'text-4xl md:text-5xl' : 'text-2xl md:text-4xl'} ${color} opacity-20 z-10`}>
         {suitIcon}
       </div>
       
       {/* Bottom right corner (rotated) */}
-      <div className={`absolute bottom-1 right-2 text-base md:text-lg font-black ${color} leading-none rotate-180`}>
+      <div className={`absolute bottom-1 right-2 text-base md:text-lg font-black ${color} leading-none rotate-180 z-10`}>
         {r}
       </div>
     </div>
@@ -1051,8 +1057,12 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
                 <Card key={idx} code={card} isDealing={true} />
               ))}
               {Array.from({ length: 5 - board.length }).map((_, idx) => (
-                <div key={idx} className="w-20 h-32 md:w-24 md:h-40 rounded-md bg-white/10 border-2 border-white/40 flex items-center justify-center text-white/80 text-3xl font-bold shadow-lg">
-                  ?
+                <div key={idx} className="w-20 h-32 md:w-24 md:h-40 rounded-md shadow-lg overflow-hidden">
+                  <img 
+                    src="/card-backs/poker-back.jpg" 
+                    alt="Card back"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
               ))}
             </div>

@@ -54,64 +54,27 @@ function handValue(hand){
 const suitIcon = (s)=> s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
 const suitClass = (s)=> (s==="h"||s==="d") ? "text-red-400" : "text-blue-300";
 
+function Card({ code, size = "normal", hidden = false, isDealing = false }) {
+  if (!code && !hidden) return null;
+  
+  // Dynamic sizing based on game state
+  const sizeClasses = size === "small" ? 
+    (isDealing ? "w-10 h-14 text-sm" : "w-6 h-8 text-xs") : 
+    (isDealing ? "w-12 h-16 text-base" : "w-8 h-10 text-sm");
 
-// === UI Skin Components ===
-// === Card (SVG skin) ===
-
-// === ChipsBar ===
-function ChipsBar({ onAdd, onClear }){
-  const CHIPS = [1000, 5000, 10000, 50000, 100000, 1000000];
-  const fmt = v => v>=1e6? (v/1e6)+'M' : v>=1e3? (v/1e3)+'K' : String(v);
-  return (
-    <div className="flex gap-2 items-center flex-wrap">
-      {CHIPS.map(v => (
-        <button key={v} onClick={()=>onAdd?.(v)}
-          className="relative w-12 h-12 rounded-full border-[5px] border-white/80 bg-gradient-to-b from-red-500 to-red-600
-                     shadow-[0_4px_12px_rgba(0,0,0,.5)] hover:scale-105 active:scale-95 transition">
-          <span className="absolute inset-0 grid place-items-center text-white text-[10px] font-extrabold drop-shadow-[0_1px_1px_rgba(0,0,0,.7)]">
-            {fmt(v)}
-          </span>
-        </button>
-      ))}
-      <button onClick={()=>onClear?.()} className="ml-1 px-3 py-2 text-xs rounded bg-gray-800/90 text-white hover:bg-gray-700">CLEAR</button>
-    </div>
-  );
-}
-
-function Card({ code, hidden=false, size="md", className="" }){
-  function mapToFile(code){
-    const SUIT_MAP = { "♥":"hearts","♦":"diamonds","♣":"clubs","♠":"spades","h":"hearts","d":"diamonds","c":"clubs","s":"spades" };
-    const RANKS = { "A":"A","K":"K","Q":"Q","J":"J","10":"10","9":"9","8":"8","7":"7","6":"6","5":"5","4":"4","3":"3","2":"2" };
-    let rank="", suit="";
-    if (typeof code === "string") {
-      const m = code.trim().match(/^(10|[2-9AJQK])\s*([♥♦♣♠hdcs])$/i);
-      if (m) { rank = RANKS[m[1].toUpperCase()]; suit = (SUIT_MAP[m[2]] || SUIT_MAP[m[2].toLowerCase()] || "hearts"); }
-    }
-    return { rank: rank || "A", suit: suit || "spades" };
-  }
-  const sizeCls = size==="sm" ? "w-12 h-16" : size==="lg" ? "w-24 h-32" : "w-16 h-24";
-  if (hidden){
+  if (hidden) {
     return (
-      <div className={`${sizeCls} rounded-xl card-shadow select-none bg-gray-800 relative overflow-hidden`}>
-        <div className="absolute inset-2 rounded-lg bg-gray-700" />
-        <div className="absolute inset-4 rounded-md bg-[radial-gradient(circle_at_20%_30%,rgba(255,255,255,.25)_2px,transparent_2px)]" />
-        <div className="absolute inset-0 grid place-items-center text-gray-200 font-black">MLEO</div>
+      <div className={`inline-flex items-center justify-center border border-white/30 rounded ${sizeClasses} font-bold bg-white/10`}>
+        <span className="leading-none">🂠</span>
       </div>
     );
   }
-  const { rank, suit } = mapToFile(code);
-  const red = (suit==="hearts"||suit==="diamonds");
-  const glyph = suit==="hearts"?"♥":suit==="diamonds"?"♦":suit==="clubs"?"♣":"♠";
-  const midColor = red ? "#e11d48" : "#111827";
+
+  const r = code.slice(0,-1), s = code.slice(-1);
+  
   return (
-    <div className={`${sizeCls} rounded-xl card-shadow select-none bg-white relative overflow-hidden`}>
-      <div className="absolute top-1 left-1 text-xs font-extrabold" style={{color: red? "#e11d48" : "#111827"}}>{rank}</div>
-      <div className="absolute top-5 left-1 text-xs" style={{color: red? "#e11d48" : "#111827"}}>{glyph}</div>
-      <div className="absolute bottom-1 right-1 rotate-180 text-xs font-extrabold" style={{color: red? "#e11d48" : "#111827"}}>{rank}</div>
-      <div className="absolute bottom-5 right-1 rotate-180 text-xs" style={{color: red? "#e11d48" : "#111827"}}>{glyph}</div>
-      <div className="absolute inset-0 grid place-items-center" style={{color: midColor, textShadow: "0 3px 6px rgba(0,0,0,.35)"}}>
-        <span className="text-6xl md:text-7xl">{glyph}</span>
-      </div>
+    <div className={`inline-flex items-center justify-center border border-white/30 rounded ${sizeClasses} font-bold bg-gradient-to-b from-white/10 to-white/5 shadow ${suitClass(s)}`}>
+      <span className="leading-none">{r}{suitIcon(s)}</span>
     </div>
   );
 }
@@ -169,9 +132,9 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     }
   }, []);
   
-  // בדיקת client_id
+  // בדיקת client_id - רק עבור debug
   useEffect(() => {
-    console.log('🔍 Client ID check:', { clientId });
+    // console.log('🔍 Client ID check:', { clientId });
   }, []);
   
   const [endedSnapshot, setEndedSnapshot] = useState(null); // MUST be before any useEffect using it
@@ -199,19 +162,19 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     };
   }
 
-  // נקה snapshot רק כשנכנסים לסיבוב חדש (betting / lobby / dealing)
+  // נקה snapshot רק כשמתחילים לחלק קלפים חדשים (dealing בלבד)
   useEffect(() => {
-    if (session?.state === 'betting' || session?.state === 'lobby' || session?.state === 'dealing') {
+    if (session?.state === 'dealing') {
       setEndedSnapshot(null);
     }
   }, [session?.state]);
 
-  // לוגים לבדיקות
+  // לוגים לבדיקות - מבוטלים לשיפור ביצועים
   useEffect(() => {
-    if (endedSnapshot) console.log('[BJ] snapshot set at', endedSnapshot.takenAt);
+    // if (endedSnapshot) console.log('[BJ] snapshot set at', endedSnapshot.takenAt);
   }, [endedSnapshot]);
   useEffect(() => {
-    console.log('[BJ] state=', session?.state);
+    // console.log('[BJ] state=', session?.state);
   }, [session?.state]);
 
   // 1) מחשבים קודם את myRow
@@ -505,9 +468,11 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     .maybeSingle();
 
     if (up.error) {
-      console.error("Failed to join seat:", up.error);
-      setMsg("Failed to join seat");
+      console.warn("Failed to join seat:", up.error); // שונה מerror לwarn
+      setMsg("Failed to join seat - try again");
       return null;
+    } else {
+      setMsg(""); // נקה הודעות אם הכל בסדר
     }
     return up.data;   // עכשיו חוזר עם id
   }
@@ -545,7 +510,11 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       setMsg("Failed to place bet");
       // החזר כסף ל-vault אם ההימור נכשל
       setVault(currentVault);
+      if (setVaultBoth) {
+        setVaultBoth(currentVault);
+      }
     } else {
+      setMsg(""); // נקה הודעות שגיאה אם הכל בסדר
       setDisplayValue(''); // נקה את התצוגה אחרי הימור מוצלח
     }
   }
@@ -672,13 +641,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
     // 1) LOBBY / ENDED -> BETTING (אוטומטי)
     if (s.state === 'lobby' || (s.state === 'ended' && s.next_round_at && new Date() > new Date(s.next_round_at))) {
-      // אפס לכולם את היד הקודמת אם צריך (ב-ENDED)
-      if (s.state === 'ended') {
-        await supabase.from('bj_players').update({
-          hand: [], bet: 0, result: null, acted: false
-          // השאר את status ו-name כדי לא לאבד נראות
-        }).eq('session_id', s.id);
-      }
+      // לא צריך לאפס כאן - כבר התבצע ב-dealerAndSettle
 
       // פתח חלון הימורים חדש ל־15 שניות
       const deadline = new Date(Date.now() + 15000).toISOString();
@@ -786,14 +749,21 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   async function hit() {
     if (!session || !myRow || myRow.status !== 'acting') return;
     
-    let shoe = [...(session.shoe||[])];
-    const card = shoe.pop();
-    const hand = [...(myRow.hand||[]), card];
-    const v = handValue(hand);
-    const status = (v > 21) ? 'busted' : (v === 21 ? 'stood' : 'acting');
+    let status;
+    try {
+      let shoe = [...(session.shoe||[])];
+      const card = shoe.pop();
+      const hand = [...(myRow.hand||[]), card];
+      const v = handValue(hand);
+      status = (v > 21) ? 'busted' : (v === 21 ? 'stood' : 'acting');
 
-    await supabase.from("bj_players").update({ hand, status }).eq("id", myRow.id);
-    await supabase.from("bj_sessions").update({ shoe }).eq("id", session.id);
+      await supabase.from("bj_players").update({ hand, status }).eq("id", myRow.id);
+      await supabase.from("bj_sessions").update({ shoe }).eq("id", session.id);
+    } catch (error) {
+      console.warn('[hit] error:', error);
+      setMsg("Action failed - please try again");
+      return;
+    }
 
     if (status === 'acting') {
       // נשאר אותו שחקן בתור – רק לרענן דדליין ולהבטיח שה-ID נשאר עליו
@@ -815,11 +785,16 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
   async function stand() {
     if (!myRow || myRow.status !== 'acting') return;
-    await supabase.from("bj_players").update({
-      status: 'stood',
-      acted: true
-    }).eq("id", myRow.id);
-    await afterMyMove();
+    try {
+      await supabase.from("bj_players").update({
+        status: 'stood',
+        acted: true
+      }).eq("id", myRow.id);
+      await afterMyMove();
+    } catch (error) {
+      console.warn('[stand] error:', error);
+      setMsg("Action failed - please try again");
+    }
   }
 
   async function double() {
@@ -1084,11 +1059,16 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       const newCard = shoe.pop();
       dealer.push(newCard);
       
-      // עדכון מיידי של היד במסד הנתונים
-      await supabase.from('bj_sessions').update({
-        dealer_hand: dealer,
-        shoe: shoe
-      }).eq('id', session.id);
+      // עדכון מיידי של היד במסד הנתונים (עם error handling)
+      try {
+        await supabase.from('bj_sessions').update({
+          dealer_hand: dealer,
+          shoe: shoe
+        }).eq('id', session.id);
+      } catch (error) {
+        console.warn('[dealerAndSettle] update error:', error);
+        // המשך בלי לעצור את המשחק
+      }
       
       // השהיה של 1.5 שניות בין קלפים
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -1125,6 +1105,21 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
       return; // מסיים פה
     }
+
+    // יצירת snapshot לפני עדכון התוצאות (כדי לשמור על ההימורים)
+    const snapshotPlayers = participants.map(p => ({
+      seat: p.seat,
+      player_name: p.player_name,
+      hand: Array.isArray(p.hand) ? [...p.hand] : [],
+      total: handValue(Array.isArray(p.hand) ? p.hand : []),
+      bet: p.bet ?? 0,
+      result: null // התוצאה תתעדכן בהמשך
+    }));
+    setEndedSnapshot({
+      dealer: [...dealer],
+      players: snapshotPlayers,
+      takenAt: new Date().toISOString()
+    });
 
     const lines = [];
     let myResult = null; // רק לשחקן המקומי
@@ -1164,8 +1159,10 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
         myResult = { result, delta, dealerBust, dealerScore, originalBet: p.bet, insuranceWin: p.insurance_bet > 0 && dealerBlackjack ? p.insurance_bet * 2 : 0 };
       }
 
+      // עדכן תוצאות ללא איפוס bet/hand (נישמר עבור snapshot)
       await supabase.from('bj_players').update({
-        result, status:'settled', bet:0, insurance_bet:0
+        result, status:'settled', insurance_bet:0
+        // לא מאפסים bet ו-hand עדיין
       }).eq('id', p.id);
 
       const tag = result==='win' ? '+'
@@ -1175,21 +1172,6 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       lines.push(`Seat ${p.seat+1} • ${p.player_name} — ${result.toUpperCase()} (${tag}${fmt(Math.abs(delta))})`);
     }
 
-    // יצירת snapshot לפני המעבר ל-ENDED
-    const snapshotPlayers = participants.map(p => ({
-      seat: p.seat,
-      player_name: p.player_name,
-      hand: Array.isArray(p.hand) ? [...p.hand] : [],
-      total: handValue(Array.isArray(p.hand) ? p.hand : []),
-      bet: p.bet ?? 0,
-      result: p.result ?? null
-    }));
-    setEndedSnapshot({
-      dealer: [...dealer],
-      players: snapshotPlayers,
-      takenAt: new Date().toISOString()
-    });
-
     // הצג את התוצאות למשך 3 שניות לפני סיום המשחק
     await new Promise(resolve => setTimeout(resolve, 3000));
 
@@ -1197,6 +1179,17 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
       state:'ended',
       next_round_at: new Date(Date.now() + 5000).toISOString() // 5 שניות לסיבוב הבא
     }).eq('id', session.id);
+
+    // אפס bet ו-hand אחרי יצירת snapshot (למנוע קונפליקט עם אוטופיילוט)
+    setTimeout(async () => {
+      try {
+        await supabase.from('bj_players').update({
+          hand: [], bet: 0
+        }).eq('session_id', session.id);
+      } catch (error) {
+        // שגיאה שקטה - לא קריטית
+      }
+    }, 100);
 
     // הצג הודעות אישיות לכל שחקן
     if (myResult) {
@@ -1250,7 +1243,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
             )}
             <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-0.5 gap-0.5">
               {(() => {
-                const showDealerFromSnap = (session?.state === 'settling' || session?.state === 'ended') && endedSnapshot;
+                const showDealerFromSnap = session?.state === 'ended' && endedSnapshot; // רק ב-ended, לא ב-settling
                 const dealerCards = showDealerFromSnap ? (endedSnapshot?.dealer || []) : (session?.dealer_hand || []);
                 return dealerCards.map((c,i)=>(
                   <Card key={i} code={c} hidden={session?.dealer_hidden && i===1 && !showDealerFromSnap} isDealing={session?.state === 'dealing' || session?.state === 'acting'} />
@@ -1260,7 +1253,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
             {!(session?.state === 'dealing' || session?.state === 'acting') && (
               <div className="text-white/80 text-xs mt-0.5">
                 {(() => {
-                  const showDealerFromSnap = (session?.state === 'settling' || session?.state === 'ended') && endedSnapshot;
+                  const showDealerFromSnap = session?.state === 'ended' && endedSnapshot; // רק ב-ended, לא ב-settling
                   const dealerCards = showDealerFromSnap ? (endedSnapshot?.dealer || []) : (session?.dealer_hand || []);
                   return `Total: ${session?.dealer_hidden && !showDealerFromSnap ? "—" : (handValue(dealerCards) || "—")}`;
                 })()}
@@ -1301,20 +1294,16 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
             let betToShow = occupant?.bet || 0;
             let handToShow = occupant?.hand;
 
-            const useSnap = (session?.state === 'settling' || session?.state === 'ended') && endedSnapshot;
+            const useSnap = session?.state === 'ended' && endedSnapshot; // רק ב-ended, לא ב-settling
             if (useSnap) {
               const snap = endedSnapshot?.players?.find(sp => sp.seat === i);
               if (snap) {
-                // בזמן settling/ended – תמיד snapshot!
+                // בזמן ended עם snapshot – השתמש ב-snapshot
                 nameToShow = snap.player_name;
                 betToShow = snap.bet || 0;
                 handToShow = snap.hand;
-              } else {
-                // אין snapshot (למשל כיסא ריק) – הצג ריק
-                nameToShow = null;
-                handToShow = [];
-                betToShow = 0;
               }
+              // אם אין snapshot לכיסא הזה, השאר את הנתונים הרגילים
             }
 
             const hv = Array.isArray(handToShow) ? handValue(handToShow) : null;
@@ -1381,8 +1370,9 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
               }}
               className="w-20 bg-black/40 text-white text-xs rounded px-1 py-1 border border-white/20 focus:border-emerald-400 focus:outline-none placeholder-white/50" 
             />
-            <ChipsBar onAdd={(v)=>{ setBet(b=>Math.min(b+v, vault)); setDisplayValue(""); }} onClear={()=>{ setBet(0); setDisplayValue(""); }} />
-\1
+            <button onClick={placeBet} disabled={!canPlaceBet} className="w-12 px-2 py-1 rounded bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+              PLACE
+            </button>
             <button onClick={()=>{setBet(1000); setDisplayValue('1K');}} className="w-12 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-all">
               1K
             </button>
