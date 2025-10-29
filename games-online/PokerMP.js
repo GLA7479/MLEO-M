@@ -1124,9 +1124,9 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
                     left: `${x}%`,
                     top: `${y}%`,
                     transform: `translate(-50%, -50%) scale(${scale})`,
-                    minWidth: '80px',
-                    minHeight: isMe ? '90px' : '80px',
-                    maxWidth: '90px',
+                    minWidth: isMe ? '120px' : '80px',
+                    minHeight: isMe ? '140px' : '80px',
+                    maxWidth: isMe ? '140px' : '90px',
                     fontSize: '10px'
                   }}
                 >
