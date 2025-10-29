@@ -64,55 +64,59 @@ function canCheckNow(ses, pls, seatIndex){
 }
 
 function Card({ code, hidden = false, isDealing = false }) {
-  if (!code) return null;
+  if (!code && !hidden) return null;
   
-  const r = code.slice(0,-1), s = code.slice(-1);
-  const suitIcon = s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
-  const color = (s==="h"||s==="d") ? "text-red-600" : "text-black";
-  
-  const cardSize = isDealing ? "w-20 h-32 md:w-24 md:h-40" : "w-10 h-14 md:w-12 md:h-18";
+  // קלפי קהילה גדולים יותר, קלפי שחקן קטנים יותר
+  const cardSize = isDealing ? "w-14 h-20 md:w-16 md:h-24" : "w-[36px] h-[52px] md:w-[44px] md:h-[64px]";
   
   if (hidden) {
     return (
       <div className={`relative ${cardSize} rounded-md shadow-lg transition-all overflow-hidden`}>
-        {/* Card back image */}
         <img 
           src="/card-backs/poker-back.jpg" 
           alt="Card back"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover rounded-md"
         />
       </div>
     );
   }
   
-  const isLarge = isDealing; // Large cards for community cards
+  // המרת קוד קלף לפורמט deckofcardsapi או תמונה מקומית
+  // פורמט: "A♠" -> "AS" (deckofcardsapi) או "/cards/AS.png" (מקומי)
+  const r = code.slice(0,-1);
+  const s = code.slice(-1);
+  
+  // המרת לפורמט deckofcardsapi (T = 10 = 0 בשרות)
+  const rankMap = {
+    'A': 'A', 'K': 'K', 'Q': 'Q', 'J': 'J', 'T': '0',
+    '9': '9', '8': '8', '7': '7', '6': '6', '5': '5', '4': '4', '3': '3', '2': '2'
+  };
+  const suitMap = { 'h': 'H', 'd': 'D', 'c': 'C', 's': 'S' };
+  const cardCode = `${rankMap[r] || r}${suitMap[s] || s.toUpperCase()}`;
+  
+  // שימוש בתמונות קלפים אמיתיות מ-deckofcardsapi.com
+  const cardImageUrl = `https://deckofcardsapi.com/static/img/${cardCode}.png`;
+  const suitIcon = s==="h"?"♥":s==="d"?"♦":s==="c"?"♣":"♠";
+  const color = (s==="h"||s==="d") ? "text-red-600" : "text-black";
   
   return (
-    <div className={`${cardSize} rounded-md shadow-xl hover:scale-105 transition-all relative overflow-hidden`}>
-      {/* Card front image */}
+    <div className={`relative ${cardSize} rounded-md shadow-xl hover:scale-105 transition-all overflow-hidden bg-white`}>
       <img 
-        src="/card-backs/poker-front.jpg" 
-        alt="Card front"
-        className="absolute inset-0 w-full h-full object-cover opacity-30"
+        src={cardImageUrl}
+        alt={`${r}${suitIcon}`}
+        className="w-full h-full object-cover rounded-md"
+        onError={(e) => {
+          // Fallback - מציג קלף פשוט אם תמונה לא נטענה
+          e.target.style.display = 'none';
+          const fallback = e.target.parentElement.querySelector('.card-fallback');
+          if (fallback) fallback.style.display = 'flex';
+        }}
       />
-      
-      {/* Top left corner rank */}
-      <div className={`absolute top-1 left-2 text-base md:text-lg font-black ${color} leading-none z-10`}>
-        {r}
-      </div>
-      {/* Top left corner suit */}
-      <div className={`absolute top-4 left-2 text-base ${color} z-10`}>
-        {suitIcon}
-      </div>
-      
-      {/* Center large suit icon */}
-      <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${isLarge ? 'text-4xl md:text-5xl' : 'text-2xl md:text-4xl'} ${color} opacity-20 z-10`}>
-        {suitIcon}
-      </div>
-      
-      {/* Bottom right corner (rotated) */}
-      <div className={`absolute bottom-1 right-2 text-base md:text-lg font-black ${color} leading-none rotate-180 z-10`}>
-        {r}
+      {/* Fallback קלף פשוט */}
+      <div className="card-fallback hidden absolute inset-0 w-full h-full bg-white border-2 border-gray-300 rounded-md items-center justify-center">
+        <div className={`text-xl md:text-2xl font-bold ${color}`}>
+          {r}{suitIcon}
+        </div>
       </div>
     </div>
   );
@@ -1050,21 +1054,19 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
         {/* Game Area - Center table */}
         <div className="flex-1 relative overflow-hidden" style={{ minHeight: '50vh', maxHeight: '55vh' }}>
           
-          {/* Community Cards - Center of table - NO FRAME */}
+          {/* Community Cards - Center of table - מוצגים רק לפי הרחוב */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-full px-4">
             <div className="flex justify-center gap-3 md:gap-4">
-              {board.map((card, idx) => (
-                <Card key={idx} code={card} isDealing={true} />
-              ))}
-              {Array.from({ length: 5 - board.length }).map((_, idx) => (
-                <div key={idx} className="w-20 h-32 md:w-24 md:h-40 rounded-md shadow-lg overflow-hidden">
-                  <img 
-                    src="/card-backs/poker-back.jpg" 
-                    alt="Card back"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ))}
+              {/* מציגים רק את הקלפים לפי הרחוב - ללא מקומות ריקים */}
+              {ses?.stage === 'preflop' ? null : (
+                board.slice(0, 
+                  ses?.stage === 'flop' ? 3 : 
+                  ses?.stage === 'turn' ? 4 : 
+                  ses?.stage === 'river' || ses?.stage === 'showdown' ? 5 : 0
+                ).map((card, idx) => (
+                  <Card key={idx} code={card} isDealing={true} />
+                ))
+              )}
             </div>
           </div>
 
@@ -1118,9 +1120,9 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
                     left: `${x}%`,
                     top: `${y}%`,
                     transform: `translate(-50%, -50%) scale(${scale})`,
-                    minWidth: '100px',
-                    minHeight: isMe ? '110px' : '100px',
-                    maxWidth: '110px',
+                    minWidth: '80px',
+                    minHeight: isMe ? '90px' : '80px',
+                    maxWidth: '90px',
                     fontSize: '10px'
                   }}
                 >
