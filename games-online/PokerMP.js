@@ -1078,28 +1078,32 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
               const isTurn = ses?.current_turn===i && ["preflop","flop","turn","river"].includes(ses?.stage);
               const isMe = p?.client_id === clientId;
               
-              // Position calculation: Player 5 (you) always in center
+              // חישוב מושב וירטואלי: תמיד מציגים את השחקן הנוכחי במרכז (מושב 5)
+              const mySeat = myRow?.seat_index ?? null;
+              const virtualSeat = mySeat !== null ? (i - mySeat + 5 + 6) % 6 : i;
+              
+              // Position calculation: השחקן הנוכחי תמיד במושב 5 (מרכז תחתון)
               let x = 0, y = 0;
-              if (i === 5) {
-                // You - center bottom
+              if (virtualSeat === 5) {
+                // השחקן הנוכחי - מרכז תחתון
                 x = 50; // Center
                 y = 85; // Bottom
-              } else if (i < 3) {
-                // Top row (seats 0, 1, 2) - same as bottom row
-                if (i === 0) {
+              } else if (virtualSeat < 3) {
+                // Top row (seats 0, 1, 2)
+                if (virtualSeat === 0) {
                   x = 15; // Left
-                } else if (i === 1) {
+                } else if (virtualSeat === 1) {
                   x = 50; // Center
-                } else if (i === 2) {
+                } else if (virtualSeat === 2) {
                   x = 85; // Right
                 }
                 y = 15; // Top
               } else {
-                // Bottom row (seats 3, 4) around seat 5 - wider spacing
-                if (i === 3) {
+                // Bottom row (seats 3, 4) מסביב למושב 5
+                if (virtualSeat === 3) {
                   x = 15; // Left of center
                   y = 85;
-                } else if (i === 4) {
+                } else if (virtualSeat === 4) {
                   x = 85; // Right of center
                   y = 85;
                 }
