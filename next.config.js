@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
-    esmExternals: 'loose'
+    esmExternals: 'loose',
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {
@@ -13,7 +13,7 @@ const nextConfig = {
         tls: false,
       };
     }
-    
+
     // Fix for MetaMask SDK chunk loading issues
     config.optimization = {
       ...config.optimization,
@@ -30,13 +30,23 @@ const nextConfig = {
         },
       },
     };
-    
+
     return config;
   },
-  // Ensure proper build output
-  generateBuildId: async () => {
-    return 'build-' + Date.now();
-  }
+  // אופציונלי: למנוע קאש אגרסיבי של דפי HTML ישנים
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=0, must-revalidate',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
