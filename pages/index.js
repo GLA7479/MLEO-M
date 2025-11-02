@@ -870,6 +870,7 @@ const [showGate, setShowGate] = useState(false);
         <meta name="description" content="MLEO is a playful crypto-mining experience." />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0b0b0d" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="MLEO" />
