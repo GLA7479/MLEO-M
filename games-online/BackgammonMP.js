@@ -76,18 +76,27 @@ function Checker({ owner, count, index }) {
 }
 
 function Triangle({ up, isAlt }) {
-  const bgColor = isAlt ? "from-amber-700/95 to-amber-600/75" : "from-amber-800/95 to-amber-700/75";
+  // Realistic backgammon board colors - alternating light cream and dark brown
+  // isAlt = true means light color, false means dark color
+  const lightColor = '#E8D5B7';  // Light cream/tan (ivory/beige)
+  const darkColor = '#6B4423';   // Dark brown
+  
+  const bgColor = isAlt ? lightColor : darkColor;
+  const borderColor = '#4A3420';
+  
   return (
     <div className="relative w-full h-full overflow-visible">
       <div 
-        className={`absolute inset-0 ${
-          up 
-            ? `bg-gradient-to-t ${bgColor} border-t-amber-900/60` 
-            : `bg-gradient-to-b ${bgColor} border-b-amber-900/60`
-        } border-l-amber-900/40 border-r-amber-900/40`}
+        className="absolute inset-0"
         style={{
           clipPath: up ? 'polygon(0% 0%, 50% 100%, 100% 0%)' : 'polygon(0% 100%, 50% 0%, 100% 100%)',
-          WebkitClipPath: up ? 'polygon(0% 0%, 50% 100%, 100% 0%)' : 'polygon(0% 100%, 50% 0%, 100% 100%)'
+          WebkitClipPath: up ? 'polygon(0% 0%, 50% 100%, 100% 0%)' : 'polygon(0% 100%, 50% 0%, 100% 100%)',
+          backgroundColor: bgColor,
+          borderLeft: `1px solid ${borderColor}`,
+          borderRight: `1px solid ${borderColor}`,
+          borderTop: up ? `1px solid ${borderColor}` : 'none',
+          borderBottom: up ? 'none' : `1px solid ${borderColor}`,
+          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)'
         }}
       />
     </div>
@@ -575,11 +584,39 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
               )}
             </div>
 
-                         {/* Board - Fixed Height */}
-             <div className="bg-gradient-to-r from-amber-950/40 via-amber-900/35 to-amber-950/40 rounded-lg p-2 md:p-3 border-2 border-amber-700/50 h-64 sm:h-80 md:h-96 relative overflow-hidden shadow-2xl">
-              <div className="flex flex-col gap-0.5 h-full">
+                                                   {/* Board - Fixed Height - Realistic Wooden Backgammon Board */}
+              <div 
+                className="rounded-xl p-1 md:p-2 border-4 h-64 sm:h-80 md:h-96 relative overflow-hidden shadow-2xl" 
+                style={{ 
+                  backgroundColor: '#8B6F47',
+                  borderColor: '#5A4530',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 0 20px rgba(0,0,0,0.2)'
+                }}
+              >
+                {/* 30-point division markers */}
+                {/* Vertical divider - separates left 15 points from right 15 points */}
+                <div 
+                  className="absolute left-1/2 top-0 bottom-0 z-0" 
+                  style={{ 
+                    width: '2px',
+                    backgroundColor: '#4A3420',
+                    transform: 'translateX(-50%)',
+                    boxShadow: '0 0 4px rgba(0,0,0,0.5)'
+                  }}
+                ></div>
+                {/* Horizontal divider between top and bottom halves */}
+                <div 
+                  className="absolute left-0 right-0 top-1/2 z-0" 
+                  style={{ 
+                    height: '2px',
+                    backgroundColor: '#4A3420',
+                    transform: 'translateY(-50%)',
+                    boxShadow: '0 0 4px rgba(0,0,0,0.5)'
+                  }}
+                ></div>
+              <div className="flex flex-col gap-0 h-full relative">
                 {/* Top Row (B's side) - 12 points + BAR = 13 columns */}
-                <div className="flex gap-0.5 flex-1" style={{ minHeight: '0' }}>
+                <div className="flex gap-0 flex-1 relative" style={{ minHeight: '0' }}>
                   {/* First 6 points (right side) */}
                   {pointIndices[0].slice(0, 6).map((pointIdx, colIdx) => {
                     const pt = b?.points?.[pointIdx] || {owner:null,count:0};
@@ -606,30 +643,34 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                                 +{pt.count - 3}
                               </div>
                             )}
-                          </div>
-                          <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white/60 z-10">
-                            {pointIdx}
+                                                    </div>
+                          <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[9px] md:text-[10px] font-bold text-white/70 drop-shadow z-10">
+                            {pointIdx + 1}
                           </div>
                         </div>
                       </div>
                     );
                   })}
                   
-                                     {/* BAR - spans full height, shared by both rows */}
-                   <div className="w-8 md:w-12 flex items-center justify-center h-full">
-                     <div 
-                       className={`w-full h-full bg-gradient-to-b from-amber-950/90 to-amber-900/80 rounded flex flex-col items-center justify-center border-2 ${
-                         selectedPoint === "bar" && (b.bar?.B > 0 || b.bar?.A > 0) && isMyTurn ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-amber-800/60'
-                       } cursor-pointer transition-all shadow-inner`}
-                       onClick={() => isMyTurn && (b.bar?.B > 0 || b.bar?.A > 0) && onPointClick("bar")}
-                     >
-                       <div className="text-white/90 text-[8px] md:text-xs font-bold mb-1">BAR</div>
-                       <div className="text-white text-xs md:text-sm font-bold mb-1">{(b?.bar?.B || 0) + (b?.bar?.A || 0)}</div>
+                                                                             {/* BAR - spans full height from edge to edge, centered */}
+                    <div className="absolute left-1/2 top-0 bottom-0 w-10 md:w-16 transform -translate-x-1/2 z-20">
+                      <div 
+                        className={`w-full h-full flex flex-col items-center justify-center border-l-2 border-r-2 ${
+                          selectedPoint === "bar" && (b.bar?.B > 0 || b.bar?.A > 0) && isMyTurn ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-[#4A3420]'
+                        } cursor-pointer transition-all shadow-inner`}
+                        style={{ 
+                          backgroundColor: '#5A4530',
+                          boxShadow: 'inset 0 0 10px rgba(0,0,0,0.5)' 
+                        }}
+                        onClick={() => isMyTurn && (b.bar?.B > 0 || b.bar?.A > 0) && onPointClick("bar")}
+                      >
+                       <div className="text-white/95 text-[9px] md:text-xs font-bold mb-1 drop-shadow-lg">BAR</div>
+                       <div className="text-white text-xs md:text-sm font-bold mb-1 drop-shadow">{(b?.bar?.B || 0) + (b?.bar?.A || 0)}</div>
                        <div className="flex flex-col gap-0.5 items-center">
-                         {b?.bar?.B > 0 && Array.from({length: Math.min(b.bar.B, 3)}).map((_,i) => (
+                         {b?.bar?.B > 0 && Array.from({length: Math.min(b.bar.B, 4)}).map((_,i) => (
                            <Checker key={`b-${i}`} owner="B" count={b.bar.B} index={i} />
                          ))}
-                         {b?.bar?.A > 0 && Array.from({length: Math.min(b.bar.A, 3)}).map((_,i) => (
+                         {b?.bar?.A > 0 && Array.from({length: Math.min(b.bar.A, 4)}).map((_,i) => (
                            <Checker key={`a-${i}`} owner="A" count={b.bar.A} index={i} />
                          ))}
                        </div>
@@ -663,8 +704,8 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                               </div>
                             )}
                           </div>
-                          <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white/60 z-10">
-                            {pointIdx}
+                          <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[9px] md:text-[10px] font-bold text-white/70 drop-shadow z-10">
+                            {pointIdx + 1}
                           </div>
                         </div>
                       </div>
@@ -673,7 +714,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                 </div>
 
                 {/* Bottom Row (A's side) - 12 points */}
-                <div className="flex gap-0.5 flex-1" style={{ minHeight: '0' }}>
+                <div className="flex gap-0 flex-1 relative" style={{ minHeight: '0' }}>
                   {/* First 6 points (left side) */}
                   {pointIndices[1].slice(0, 6).map((pointIdx, colIdx) => {
                     const pt = b?.points?.[pointIdx] || {owner:null,count:0};
@@ -700,17 +741,17 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                                 +{pt.count - 3}
                               </div>
                             )}
-                          </div>
-                          <div className="absolute top-0.5 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white/60 z-10">
-                            {pointIdx}
+                                                    </div>
+                          <div className="absolute top-0.5 left-1/2 -translate-x-1/2 text-[9px] md:text-[10px] font-bold text-white/70 drop-shadow z-10">
+                            {pointIdx + 1}
                           </div>
                         </div>
                       </div>
                     );
                   })}
                   
-                  {/* Empty space for BAR (already rendered above) */}
-                  <div className="w-8 md:w-12"></div>
+                                      {/* Empty space for BAR (already rendered above as absolute) */}
+                   <div className="w-10 md:w-16"></div>
                   
                   {/* Last 6 points (right side) */}
                   {pointIndices[1].slice(6).map((pointIdx, colIdx) => {
@@ -739,8 +780,8 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                               </div>
                             )}
                           </div>
-                          <div className="absolute top-0.5 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white/60 z-10">
-                            {pointIdx}
+                          <div className="absolute top-0.5 left-1/2 -translate-x-1/2 text-[9px] md:text-[10px] font-bold text-white/70 drop-shadow z-10">
+                            {pointIdx + 1}
                           </div>
                         </div>
                       </div>
