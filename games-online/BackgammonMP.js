@@ -57,17 +57,17 @@ function Checker({ owner, count, index }) {
   
   return (
     <div 
-      className={`w-5 h-5 md:w-6 md:h-6 rounded-full border shadow flex items-center justify-center ${
+      className={`w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 rounded-full border-2 shadow-lg flex items-center justify-center ${
         owner === "A" 
           ? "bg-white border-gray-400 text-black" 
           : owner === "B"
           ? "bg-black border-gray-600 text-white"
           : "bg-gray-500 border-gray-400"
-      } ${isStack && index === 0 ? 'ring-1 ring-yellow-400' : ''}`}
+      } ${isStack && index === 0 ? 'ring-2 ring-yellow-400' : ''}`}
       style={{ zIndex: isStack ? (count - index) : 1 }}
     >
       {isStack && index === 0 && (
-        <span className={`text-[8px] md:text-xs font-bold ${owner === "A" ? "text-black" : "text-white"}`}>
+        <span className={`text-[11px] md:text-sm lg:text-base font-bold ${owner === "A" ? "text-black" : "text-white"}`}>
           {count}
         </span>
       )}
@@ -85,7 +85,7 @@ function Triangle({ up, isAlt }) {
   const borderColor = '#4A3420';
   
   return (
-    <div className="relative w-full h-full overflow-visible">
+    <div className="relative w-full h-full" style={{ overflow: 'hidden' }}>
       <div 
         className="absolute inset-0"
         style={{
@@ -604,7 +604,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                     boxShadow: '0 0 4px rgba(0,0,0,0.5)'
                   }}
                 ></div>
-                {/* Horizontal divider between top and bottom halves */}
+                                {/* Horizontal divider between top and bottom halves */}
                 <div 
                   className="absolute left-0 right-0 top-1/2 z-0" 
                   style={{ 
@@ -614,8 +614,44 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                     boxShadow: '0 0 4px rgba(0,0,0,0.5)'
                   }}
                 ></div>
+                
+                {/* BAR - spans full height from edge to edge, centered in board */}
+                <div 
+                  className="absolute left-1/2 top-0 bottom-0 z-30"
+                  style={{ 
+                    width: '48px',
+                    transform: 'translateX(-50%)'
+                  }}
+                >
+                  <div 
+                    className={`w-full h-full flex flex-col items-center justify-center border-l-2 border-r-2 ${
+                      selectedPoint === "bar" && (b.bar?.B > 0 || b.bar?.A > 0) && isMyTurn 
+                        ? 'border-yellow-400 ring-2 ring-yellow-300' 
+                        : 'border-[#4A3420]'
+                    } cursor-pointer transition-all shadow-inner`}
+                    style={{ 
+                      backgroundColor: '#5A4530',
+                      boxShadow: 'inset 0 0 10px rgba(0,0,0,0.5)' 
+                    }}
+                    onClick={() => isMyTurn && (b.bar?.B > 0 || b.bar?.A > 0) && onPointClick("bar")}
+                  >
+                    <div className="text-white/95 text-[10px] md:text-xs font-bold mb-1 drop-shadow-lg">BAR</div>
+                    <div className="text-white text-xs md:text-sm font-bold mb-1 drop-shadow">
+                      {(b?.bar?.B || 0) + (b?.bar?.A || 0)}
+                    </div>
+                    <div className="flex flex-col gap-1 items-center">
+                      {b?.bar?.B > 0 && Array.from({length: Math.min(b.bar.B, 4)}).map((_,i) => (
+                        <Checker key={`b-${i}`} owner="B" count={b.bar.B} index={i} />
+                      ))}
+                      {b?.bar?.A > 0 && Array.from({length: Math.min(b.bar.A, 4)}).map((_,i) => (
+                        <Checker key={`a-${i}`} owner="A" count={b.bar.A} index={i} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                
               <div className="flex flex-col gap-0 h-full relative">
-                {/* Top Row (B's side) - 12 points + BAR = 13 columns */}
+                {/* Top Row (B's side) - 12 points (6 on each side of BAR) */}
                 <div className="flex gap-0 flex-1 relative" style={{ minHeight: '0' }}>
                   {/* First 6 points (right side) */}
                   {pointIndices[0].slice(0, 6).map((pointIdx, colIdx) => {
@@ -634,48 +670,23 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                           <div className="absolute inset-0 overflow-hidden rounded-t-lg">
                             <Triangle up={true} isAlt={(colIdx % 2) === 0} />
                           </div>
-                          <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col gap-0.5 items-center z-10 pt-0.5">
-                            {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
-                              <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
-                            ))}
-                            {pt.count > 3 && (
-                              <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
-                                +{pt.count - 3}
-                              </div>
-                            )}
-                                                    </div>
-                          <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[9px] md:text-[10px] font-bold text-white/70 drop-shadow z-10">
-                            {pointIdx + 1}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  
-                                                                             {/* BAR - spans full height from edge to edge, centered */}
-                    <div className="absolute left-1/2 top-0 bottom-0 w-10 md:w-16 transform -translate-x-1/2 z-20">
-                      <div 
-                        className={`w-full h-full flex flex-col items-center justify-center border-l-2 border-r-2 ${
-                          selectedPoint === "bar" && (b.bar?.B > 0 || b.bar?.A > 0) && isMyTurn ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-[#4A3420]'
-                        } cursor-pointer transition-all shadow-inner`}
-                        style={{ 
-                          backgroundColor: '#5A4530',
-                          boxShadow: 'inset 0 0 10px rgba(0,0,0,0.5)' 
-                        }}
-                        onClick={() => isMyTurn && (b.bar?.B > 0 || b.bar?.A > 0) && onPointClick("bar")}
-                      >
-                       <div className="text-white/95 text-[9px] md:text-xs font-bold mb-1 drop-shadow-lg">BAR</div>
-                       <div className="text-white text-xs md:text-sm font-bold mb-1 drop-shadow">{(b?.bar?.B || 0) + (b?.bar?.A || 0)}</div>
-                       <div className="flex flex-col gap-0.5 items-center">
-                         {b?.bar?.B > 0 && Array.from({length: Math.min(b.bar.B, 4)}).map((_,i) => (
-                           <Checker key={`b-${i}`} owner="B" count={b.bar.B} index={i} />
-                         ))}
-                         {b?.bar?.A > 0 && Array.from({length: Math.min(b.bar.A, 4)}).map((_,i) => (
-                           <Checker key={`a-${i}`} owner="A" count={b.bar.A} index={i} />
-                         ))}
+                                                     <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col gap-1 items-center z-10 pt-1">
+                             {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
+                               <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
+                             ))}
+                             {pt.count > 3 && (
+                               <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
+                                 +{pt.count - 3}
+                               </div>
+                             )}
+                           </div>
+                         </div>
                        </div>
-                     </div>
-                   </div>
+                     );
+                   })}
+                   
+                   {/* Space for BAR (48px) */}
+                  <div className="w-12"></div>
                   
                   {/* Last 6 points (left side) */}
                   {pointIndices[0].slice(6).map((pointIdx, colIdx) => {
@@ -692,104 +703,96 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                           onClick={() => canClick && onPointClick(pointIdx)}
                         >
                           <div className="absolute inset-0 overflow-hidden rounded-t-lg">
-                            <Triangle up={true} isAlt={((colIdx+6) % 2) === 0} />
+                            <Triangle up={true} isAlt={(colIdx % 2) === 0} />
                           </div>
-                          <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col gap-0.5 items-center z-10 pt-0.5">
-                            {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
-                              <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
-                            ))}
-                            {pt.count > 3 && (
-                              <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
-                                +{pt.count - 3}
-                              </div>
-                            )}
-                          </div>
-                          <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[9px] md:text-[10px] font-bold text-white/70 drop-shadow z-10">
-                            {pointIdx + 1}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Bottom Row (A's side) - 12 points */}
-                <div className="flex gap-0 flex-1 relative" style={{ minHeight: '0' }}>
-                  {/* First 6 points (left side) */}
-                  {pointIndices[1].slice(0, 6).map((pointIdx, colIdx) => {
-                    const pt = b?.points?.[pointIdx] || {owner:null,count:0};
-                    const canClick = isMyTurn && ((selectedPoint === null && pt.owner === b.turn) || selectedPoint !== null);
-                    const isSelected = selectedPoint === pointIdx;
-                    return (
-                      <div 
-                        key={`bot-${pointIdx}`} 
-                        className="flex-1 relative select-none transition-all h-full"
-                      >
+                                                     <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col gap-1 items-center z-10 pt-1">
+                             {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
+                               <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
+                             ))}
+                             {pt.count > 3 && (
+                               <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
+                                 +{pt.count - 3}
+                               </div>
+                             )}
+                           </div>
+                         </div>
+                       </div>
+                     );
+                   })}
+                   
+                                    </div>
+ 
+                                   {/* Bottom Row (A's side) - 12 points (6 on each side of BAR) */}
+                  <div className="flex gap-0 flex-1 relative" style={{ minHeight: '0' }}>
+                    {/* First 6 points (left side) */}
+                    {pointIndices[1].slice(0, 6).map((pointIdx, colIdx) => {
+                      const pt = b?.points?.[pointIdx] || {owner:null,count:0};
+                      const canClick = isMyTurn && ((selectedPoint === null && pt.owner === b.turn) || selectedPoint !== null);
+                      const isSelected = selectedPoint === pointIdx;
+                      return (
                         <div 
-                          className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""}`}
-                          onClick={() => canClick && onPointClick(pointIdx)}
+                          key={`bot-${pointIdx}`} 
+                          className="flex-1 relative select-none transition-all h-full"
                         >
-                          <div className="absolute inset-0 overflow-hidden rounded-b-lg">
-                            <Triangle up={false} isAlt={(colIdx % 2) === 0} />
-                          </div>
-                          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 flex flex-col-reverse gap-0.5 items-center z-10 pb-0.5">
-                            {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
-                              <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
-                            ))}
-                            {pt.count > 3 && (
-                              <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
-                                +{pt.count - 3}
-                              </div>
-                            )}
-                                                    </div>
-                          <div className="absolute top-0.5 left-1/2 -translate-x-1/2 text-[9px] md:text-[10px] font-bold text-white/70 drop-shadow z-10">
-                            {pointIdx + 1}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  
-                                      {/* Empty space for BAR (already rendered above as absolute) */}
-                   <div className="w-10 md:w-16"></div>
-                  
-                  {/* Last 6 points (right side) */}
-                  {pointIndices[1].slice(6).map((pointIdx, colIdx) => {
-                    const pt = b?.points?.[pointIdx] || {owner:null,count:0};
-                    const canClick = isMyTurn && ((selectedPoint === null && pt.owner === b.turn) || selectedPoint !== null);
-                    const isSelected = selectedPoint === pointIdx;
-                    return (
-                      <div 
-                        key={`bot-${pointIdx}`} 
-                        className="flex-1 relative select-none transition-all h-full"
-                      >
+                          <div 
+                            className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""}`}
+                            onClick={() => canClick && onPointClick(pointIdx)}
+                          >
+                            <div className="absolute inset-0 overflow-hidden rounded-b-lg">
+                              <Triangle up={false} isAlt={(colIdx % 2) === 0} />
+                            </div>
+                                                         <div className="absolute left-1/2 -translate-x-1/2 bottom-0 flex flex-col-reverse gap-1 items-center z-10 pb-1">
+                               {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
+                                 <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
+                               ))}
+                               {pt.count > 3 && (
+                                 <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
+                                   +{pt.count - 3}
+                                 </div>
+                               )}
+                             </div>
+                           </div>
+                         </div>
+                       );
+                     })}
+                     
+                     {/* Space for BAR (48px) */}
+                    <div className="w-12"></div>
+                    
+                                        {/* Last 6 points (right side) */}
+                    {pointIndices[1].slice(6).map((pointIdx, colIdx) => {
+                      const pt = b?.points?.[pointIdx] || {owner:null,count:0};
+                      const canClick = isMyTurn && ((selectedPoint === null && pt.owner === b.turn) || selectedPoint !== null);
+                      const isSelected = selectedPoint === pointIdx;
+                      return (
                         <div 
-                          className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""}`}
-                          onClick={() => canClick && onPointClick(pointIdx)}
+                          key={`bot-${pointIdx}`} 
+                          className="flex-1 relative select-none transition-all h-full"
                         >
-                          <div className="absolute inset-0 overflow-hidden rounded-b-lg">
-                            <Triangle up={false} isAlt={((colIdx+6) % 2) === 0} />
-                          </div>
-                          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 flex flex-col-reverse gap-0.5 items-center z-10 pb-0.5">
-                            {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
-                              <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
-                            ))}
-                            {pt.count > 3 && (
-                              <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
-                                +{pt.count - 3}
-                              </div>
-                            )}
-                          </div>
-                          <div className="absolute top-0.5 left-1/2 -translate-x-1/2 text-[9px] md:text-[10px] font-bold text-white/70 drop-shadow z-10">
-                            {pointIdx + 1}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+                          <div 
+                            className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""}`}
+                            onClick={() => canClick && onPointClick(pointIdx)}
+                          >
+                            <div className="absolute inset-0 overflow-hidden rounded-b-lg">
+                              <Triangle up={false} isAlt={((colIdx) % 2) === 0} />
+                            </div>
+                                                         <div className="absolute left-1/2 -translate-x-1/2 bottom-0 flex flex-col-reverse gap-1 items-center z-10 pb-1">
+                               {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
+                                 <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
+                               ))}
+                               {pt.count > 3 && (
+                                 <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
+                                   +{pt.count - 3}
+                                 </div>
+                               )}
+                             </div>
+                           </div>
+                         </div>
+                       );
+                     })}
+                   </div>
+               </div>
+             </div>
 
             {/* Controls */}
             <div className="flex flex-col sm:flex-row gap-1 md:gap-2 items-center">
