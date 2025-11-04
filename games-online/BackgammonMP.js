@@ -76,16 +76,15 @@ function Checker({ owner, count, index }) {
 }
 
 function Triangle({ up, isAlt }) {
-  // Using border triangles instead of clipPath for better browser support
-  const bgColor = isAlt ? "from-amber-600/80 to-amber-500/50" : "from-amber-700/80 to-amber-600/40";
+  const bgColor = isAlt ? "from-amber-700/95 to-amber-600/75" : "from-amber-800/95 to-amber-700/75";
   return (
-    <div className="relative w-full h-full overflow-hidden">
+    <div className="relative w-full h-full overflow-visible">
       <div 
         className={`absolute inset-0 ${
           up 
-            ? `bg-gradient-to-t ${bgColor}` 
-            : `bg-gradient-to-b ${bgColor}`
-        }`}
+            ? `bg-gradient-to-t ${bgColor} border-t-amber-900/60` 
+            : `bg-gradient-to-b ${bgColor} border-b-amber-900/60`
+        } border-l-amber-900/40 border-r-amber-900/40`}
         style={{
           clipPath: up ? 'polygon(0% 0%, 50% 100%, 100% 0%)' : 'polygon(0% 100%, 50% 0%, 100% 100%)',
           WebkitClipPath: up ? 'polygon(0% 0%, 50% 100%, 100% 0%)' : 'polygon(0% 100%, 50% 0%, 100% 100%)'
@@ -576,8 +575,8 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
               )}
             </div>
 
-            {/* Board - Fixed Height */}
-            <div className="bg-gradient-to-r from-amber-900/20 to-amber-800/20 rounded-lg p-1 md:p-2 border border-amber-400/30 h-64 sm:h-80 md:h-96 relative overflow-hidden">
+                         {/* Board - Fixed Height */}
+             <div className="bg-gradient-to-r from-amber-950/40 via-amber-900/35 to-amber-950/40 rounded-lg p-2 md:p-3 border-2 border-amber-700/50 h-64 sm:h-80 md:h-96 relative overflow-hidden shadow-2xl">
               <div className="flex flex-col gap-0.5 h-full">
                 {/* Top Row (B's side) - 12 points + BAR = 13 columns */}
                 <div className="flex gap-0.5 flex-1" style={{ minHeight: '0' }}>
@@ -598,7 +597,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                           <div className="absolute inset-0 overflow-hidden rounded-t-lg">
                             <Triangle up={true} isAlt={(colIdx % 2) === 0} />
                           </div>
-                          <div className="absolute left-1/2 -translate-x-1/2 top-1 flex flex-col gap-0.5 items-center z-10">
+                          <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col gap-0.5 items-center z-10 pt-0.5">
                             {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
                               <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
                             ))}
@@ -616,24 +615,26 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                     );
                   })}
                   
-                  {/* BAR - spans full height, shared by both rows */}
-                  <div className="w-8 md:w-12 flex items-center justify-center h-full">
-                    <div 
-                      className={`w-full h-full bg-black/60 rounded flex flex-col items-center justify-center border ${
-                        selectedPoint === "bar" && (b.bar?.B > 0 || b.bar?.A > 0) && isMyTurn ? 'border-yellow-400 ring-1 ring-yellow-300' : 'border-gray-600'
-                      } cursor-pointer transition-all`}
-                      onClick={() => isMyTurn && (b.bar?.B > 0 || b.bar?.A > 0) && onPointClick("bar")}
-                    >
-                      <div className="text-white text-[8px] md:text-xs font-bold mb-0.5">BAR</div>
-                      <div className="text-white text-xs md:text-sm font-bold">{(b?.bar?.B || 0) + (b?.bar?.A || 0)}</div>
-                      {b?.bar?.B > 0 && Array.from({length: Math.min(b.bar.B, 2)}).map((_,i) => (
-                        <Checker key={`b-${i}`} owner="B" count={b.bar.B} index={i} />
-                      ))}
-                      {b?.bar?.A > 0 && Array.from({length: Math.min(b.bar.A, 2)}).map((_,i) => (
-                        <Checker key={`a-${i}`} owner="A" count={b.bar.A} index={i} />
-                      ))}
-                    </div>
-                  </div>
+                                     {/* BAR - spans full height, shared by both rows */}
+                   <div className="w-8 md:w-12 flex items-center justify-center h-full">
+                     <div 
+                       className={`w-full h-full bg-gradient-to-b from-amber-950/90 to-amber-900/80 rounded flex flex-col items-center justify-center border-2 ${
+                         selectedPoint === "bar" && (b.bar?.B > 0 || b.bar?.A > 0) && isMyTurn ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-amber-800/60'
+                       } cursor-pointer transition-all shadow-inner`}
+                       onClick={() => isMyTurn && (b.bar?.B > 0 || b.bar?.A > 0) && onPointClick("bar")}
+                     >
+                       <div className="text-white/90 text-[8px] md:text-xs font-bold mb-1">BAR</div>
+                       <div className="text-white text-xs md:text-sm font-bold mb-1">{(b?.bar?.B || 0) + (b?.bar?.A || 0)}</div>
+                       <div className="flex flex-col gap-0.5 items-center">
+                         {b?.bar?.B > 0 && Array.from({length: Math.min(b.bar.B, 3)}).map((_,i) => (
+                           <Checker key={`b-${i}`} owner="B" count={b.bar.B} index={i} />
+                         ))}
+                         {b?.bar?.A > 0 && Array.from({length: Math.min(b.bar.A, 3)}).map((_,i) => (
+                           <Checker key={`a-${i}`} owner="A" count={b.bar.A} index={i} />
+                         ))}
+                       </div>
+                     </div>
+                   </div>
                   
                   {/* Last 6 points (left side) */}
                   {pointIndices[0].slice(6).map((pointIdx, colIdx) => {
@@ -652,7 +653,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                           <div className="absolute inset-0 overflow-hidden rounded-t-lg">
                             <Triangle up={true} isAlt={((colIdx+6) % 2) === 0} />
                           </div>
-                          <div className="absolute left-1/2 -translate-x-1/2 top-1 flex flex-col gap-0.5 items-center z-10">
+                          <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col gap-0.5 items-center z-10 pt-0.5">
                             {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
                               <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
                             ))}
@@ -690,7 +691,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                           <div className="absolute inset-0 overflow-hidden rounded-b-lg">
                             <Triangle up={false} isAlt={(colIdx % 2) === 0} />
                           </div>
-                          <div className="absolute left-1/2 -translate-x-1/2 bottom-1 flex flex-col-reverse gap-0.5 items-center z-10">
+                          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 flex flex-col-reverse gap-0.5 items-center z-10 pb-0.5">
                             {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
                               <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
                             ))}
@@ -728,7 +729,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                           <div className="absolute inset-0 overflow-hidden rounded-b-lg">
                             <Triangle up={false} isAlt={((colIdx+6) % 2) === 0} />
                           </div>
-                          <div className="absolute left-1/2 -translate-x-1/2 bottom-1 flex flex-col-reverse gap-0.5 items-center z-10">
+                          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 flex flex-col-reverse gap-0.5 items-center z-10 pb-0.5">
                             {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
                               <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
                             ))}
