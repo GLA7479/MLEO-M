@@ -57,7 +57,7 @@ function Checker({ owner, count, index }) {
   
   return (
     <div 
-      className={`w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 rounded-full border-2 shadow-lg flex items-center justify-center ${
+      className={`w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 xl:w-12 xl:h-12 rounded-full border-2 shadow-lg flex items-center justify-center ${
         owner === "A" 
           ? "bg-white border-gray-400 text-black" 
           : owner === "B"
@@ -67,7 +67,7 @@ function Checker({ owner, count, index }) {
       style={{ zIndex: isStack ? (count - index) : 1 }}
     >
       {isStack && index === 0 && (
-        <span className={`text-[11px] md:text-sm lg:text-base font-bold ${owner === "A" ? "text-black" : "text-white"}`}>
+        <span className={`text-[8px] sm:text-[9px] md:text-[11px] lg:text-sm font-bold ${owner === "A" ? "text-black" : "text-white"}`}>
           {count}
         </span>
       )}
@@ -556,43 +556,21 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
               )}
             </div>
           </div>
-        ) : (
+                ) : (
           <div className="flex-1 flex flex-col gap-1 md:gap-2">
-            {/* Players Info */}
-            <div className="flex items-center justify-between bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
-              <div className="flex items-center gap-4">
-                {players.map((p, idx) => (
-                  <div key={idx} className={`px-4 py-2 rounded-lg ${
-                    p.seat_index === turnSeat && isPlaying ? 'bg-emerald-700/60 ring-2 ring-emerald-400' : 'bg-white/10'
-                  }`}>
-                    <div className="text-white text-sm font-semibold">
-                      {p.player_name} {p.seat_index === mySeat ? "(You)" : ""}
-                    </div>
-                    <div className="text-white/70 text-xs">
-                      Seat {p.seat_index === 0 ? "A" : "B"} • {p.wins || 0} wins
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {isLeader && ses?.stage === "lobby" && seatedCount >= MIN_PLAYERS_TO_START && (
-                <button 
-                  onClick={startMatch}
-                  className="px-5 py-2 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold shadow-lg hover:from-green-700 hover:to-emerald-700 transition-all"
-                >
-                  ▶ Start Game
-                </button>
-              )}
-            </div>
-
-                                                   {/* Board - Fixed Height - Realistic Wooden Backgammon Board */}
-              <div 
-                className="rounded-xl p-1 md:p-2 border-4 h-64 sm:h-80 md:h-96 relative overflow-hidden shadow-2xl" 
-                style={{ 
-                  backgroundColor: '#8B6F47',
-                  borderColor: '#5A4530',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 0 20px rgba(0,0,0,0.2)'
-                }}
-              >
+                                                                                                        {/* Board - Fixed Height - Realistic Wooden Backgammon Board */}
+               <div 
+                 className="rounded-xl p-1 md:p-2 border-4 relative overflow-hidden shadow-2xl" 
+                 style={{ 
+                   aspectRatio: '16 / 10',
+                   minHeight: '320px',
+                   maxHeight: '500px',
+                   width: '100%',
+                   backgroundColor: '#8B6F47',
+                   borderColor: '#5A4530',
+                   boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 0 20px rgba(0,0,0,0.2)'
+                 }}
+               >
                 {/* 30-point division markers */}
                 {/* Vertical divider - separates left 15 points from right 15 points */}
                 <div 
@@ -640,10 +618,10 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                       {(b?.bar?.B || 0) + (b?.bar?.A || 0)}
                     </div>
                     <div className="flex flex-col gap-1 items-center">
-                      {b?.bar?.B > 0 && Array.from({length: Math.min(b.bar.B, 4)}).map((_,i) => (
+                      {b?.bar?.B > 0 && Array.from({length: Math.min(b.bar.B, 5)}).map((_,i) => (
                         <Checker key={`b-${i}`} owner="B" count={b.bar.B} index={i} />
                       ))}
-                      {b?.bar?.A > 0 && Array.from({length: Math.min(b.bar.A, 4)}).map((_,i) => (
+                      {b?.bar?.A > 0 && Array.from({length: Math.min(b.bar.A, 5)}).map((_,i) => (
                         <Checker key={`a-${i}`} owner="A" count={b.bar.A} index={i} />
                       ))}
                     </div>
@@ -671,12 +649,12 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                             <Triangle up={true} isAlt={(colIdx % 2) === 0} />
                           </div>
                                                      <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col gap-1 items-center z-10 pt-1">
-                             {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
+                             {pt.count > 0 && Array.from({length: Math.min(pt.count, 5)}).map((_,k) => (
                                <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
                              ))}
-                             {pt.count > 3 && (
+                             {pt.count > 5 && (
                                <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
-                                 +{pt.count - 3}
+                                 +{pt.count - 5}
                                </div>
                              )}
                            </div>
@@ -706,12 +684,12 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                             <Triangle up={true} isAlt={(colIdx % 2) === 0} />
                           </div>
                                                      <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col gap-1 items-center z-10 pt-1">
-                             {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
+                             {pt.count > 0 && Array.from({length: Math.min(pt.count, 5)}).map((_,k) => (
                                <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
                              ))}
-                             {pt.count > 3 && (
+                             {pt.count > 5 && (
                                <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
-                                 +{pt.count - 3}
+                                 +{pt.count - 5}
                                </div>
                              )}
                            </div>
@@ -742,12 +720,12 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                               <Triangle up={false} isAlt={(colIdx % 2) === 0} />
                             </div>
                                                          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 flex flex-col-reverse gap-1 items-center z-10 pb-1">
-                               {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
+                               {pt.count > 0 && Array.from({length: Math.min(pt.count, 5)}).map((_,k) => (
                                  <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
                                ))}
-                               {pt.count > 3 && (
+                               {pt.count > 5 && (
                                  <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
-                                   +{pt.count - 3}
+                                   +{pt.count - 5}
                                  </div>
                                )}
                              </div>
@@ -777,12 +755,12 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                               <Triangle up={false} isAlt={((colIdx) % 2) === 0} />
                             </div>
                                                          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 flex flex-col-reverse gap-1 items-center z-10 pb-1">
-                               {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
+                               {pt.count > 0 && Array.from({length: Math.min(pt.count, 5)}).map((_,k) => (
                                  <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
                                ))}
-                               {pt.count > 3 && (
+                               {pt.count > 5 && (
                                  <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
-                                   +{pt.count - 3}
+                                   +{pt.count - 5}
                                  </div>
                                )}
                              </div>
