@@ -45,7 +45,7 @@ function TurnCountdown({ deadline }) {
 
 function Dice({ value }) {
   return (
-    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-white to-gray-100 text-black shadow-lg flex items-center justify-center text-xl font-bold border-2 border-gray-300">
+    <div className="w-8 h-8 md:w-10 md:h-10 rounded bg-white text-black shadow flex items-center justify-center text-sm md:text-xl font-bold border border-gray-300">
       {value != null ? String(value) : "?"}
     </div>
   );
@@ -53,16 +53,24 @@ function Dice({ value }) {
 
 function Checker({ owner, count, index }) {
   const isStack = count > 1;
+  if (!owner) return null; // Don't render if no owner
+  
   return (
     <div 
-      className={`w-8 h-8 rounded-full border-2 shadow-lg flex items-center justify-center ${
+      className={`w-5 h-5 md:w-6 md:h-6 rounded-full border shadow flex items-center justify-center ${
         owner === "A" 
-          ? "bg-gradient-to-br from-white to-gray-200 border-gray-400" 
-          : "bg-gradient-to-br from-gray-800 to-black border-gray-600"
-      } ${isStack && index === 0 ? 'ring-2 ring-yellow-400' : ''}`}
+          ? "bg-white border-gray-400 text-black" 
+          : owner === "B"
+          ? "bg-black border-gray-600 text-white"
+          : "bg-gray-500 border-gray-400"
+      } ${isStack && index === 0 ? 'ring-1 ring-yellow-400' : ''}`}
       style={{ zIndex: isStack ? (count - index) : 1 }}
     >
-      {isStack && index === 0 && <span className="text-xs font-bold">{count}</span>}
+      {isStack && index === 0 && (
+        <span className={`text-[8px] md:text-xs font-bold ${owner === "A" ? "text-black" : "text-white"}`}>
+          {count}
+        </span>
+      )}
     </div>
   );
 }
@@ -234,17 +242,20 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
       writeVault(v - BUYIN_PER_MATCH);
     }
     
-    const { error } = await supabase.from("bg_sessions").update({
+    const { data, error } = await supabase.from("bg_sessions").update({
       stage: "playing",
       board_state: board,
       to_move: board.turn,
       current_turn: board.turn==="A" ? 0 : 1,
       turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
-    }).eq("id", ses.id);
+    }).eq("id", ses.id).select().single();
     
     if (error) {
       setMsg(error.message || "Failed to start game");
     } else {
+      if (data) {
+        setSes(data); // Update local state immediately
+      }
       setMsg("");
     }
   }
@@ -287,7 +298,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
   // ===== roll =====
   async function doRoll(){
     const s = await fetchSession(); if (!s || s.stage!=="playing") return;
-    const b = { ...(s.board_state) };
+    const b = JSON.parse(JSON.stringify(s.board_state)); // Deep clone
     const seatTurn = b.turn==="A" ? 0 : 1;
     if (mySeat !== seatTurn) return;
 
@@ -296,10 +307,15 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
     const d1 = 1 + Math.floor(Math.random()*6);
     const d2 = 1 + Math.floor(Math.random()*6);
     applyRoll(b, d1, d2);
-    await supabase.from("bg_sessions").update({
+    
+    const { data, error } = await supabase.from("bg_sessions").update({
       board_state: b,
       turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
-    }).eq("id", ses.id);
+    }).eq("id", ses.id).select().single();
+    
+    if (!error && data) {
+      setSes(data); // Update local state immediately
+    }
   }
 
   // ===== movement =====
@@ -349,7 +365,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
 
   async function moveTo(to){
     const s = await fetchSession(); if (!s || s.stage!=="playing") return;
-    const b = { ...(s.board_state) };
+    const b = JSON.parse(JSON.stringify(s.board_state)); // Deep clone
     const turnSeat = b.turn==="A" ? 0 : 1;
     if (mySeat !== turnSeat) return;
 
@@ -380,10 +396,14 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
     // consume a step
     if (b.roll.moves_left>0) b.roll.moves_left -= 1;
 
-    await supabase.from("bg_sessions").update({
+    const { data, error } = await supabase.from("bg_sessions").update({
       board_state: b,
       turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
-    }).eq("id", ses.id);
+    }).eq("id", ses.id).select().single();
+
+    if (!error && data) {
+      setSes(data); // Update local state immediately
+    }
 
     setSelectedPoint(null);
     setPendingStepTo(null);
@@ -406,23 +426,31 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
         writeVault(cur + add);
       }
 
-      await supabase.from("bg_sessions").update({
+      const { data, error } = await supabase.from("bg_sessions").update({
         stage: "finished",
         board_state: b,
         current_turn: null,
         turn_deadline: null
-      }).eq("id", ses.id);
+      }).eq("id", ses.id).select().single();
+      
+      if (!error && data) {
+        setSes(data); // Update local state immediately
+      }
       return;
     }
 
     // next
     nextTurn(b);
-    await supabase.from("bg_sessions").update({
+    const { data, error } = await supabase.from("bg_sessions").update({
       board_state: b,
       to_move: b.turn,
       current_turn: b.turn==="A" ? 0 : 1,
       turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
-    }).eq("id", ses.id);
+    }).eq("id", ses.id).select().single();
+    
+    if (!error && data) {
+      setSes(data); // Update local state immediately
+    }
   }
 
   // ===== Doubling cube (optional, Phase 2) =====
@@ -471,38 +499,25 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
   ];
 
   return (
-    <div className="w-full h-full flex flex-col bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950" style={{ height: "100svh" }}>
+    <div className="w-full h-full flex flex-col p-1 md:p-2 gap-1 md:gap-2 -mt-1">
       {/* Header */}
-      <div className="flex-shrink-0 bg-gradient-to-r from-amber-900/80 to-amber-800/80 backdrop-blur-sm px-4 py-3 border-b-2 border-amber-600/50 shadow-lg">
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-white font-bold text-lg flex items-center gap-2">
-            <span className="text-2xl">🎲</span>
-            <span>Backgammon</span>
-          </div>
-          <div className="flex items-center gap-3 text-white/90 text-sm">
-            <span className={`px-3 py-1 rounded-lg font-semibold ${
-              ses?.stage==="playing" ? "bg-emerald-700/60" : 
-              ses?.stage==="finished" ? "bg-red-700/60" : 
-              "bg-blue-700/60"
-            }`}>
-              {ses?.stage || "lobby"}
-            </span>
-            {isMyTurn && ses?.turn_deadline && (
-              <TurnCountdown deadline={ses.turn_deadline} />
-            )}
-            <span className="bg-purple-700/60 px-3 py-1 rounded-lg font-semibold">
-              💰 {fmt(readVault())}
-            </span>
-          </div>
+      <div className="flex items-center justify-between bg-white/5 rounded-xl p-1 md:p-2 border border-white/10">
+        <div className="text-white font-bold text-sm md:text-lg">Backgammon</div>
+        <div className="flex items-center gap-1 md:gap-2 text-white/80 text-xs">
+          <span>Stage: {ses?.stage || "lobby"}</span>
+          {isMyTurn && ses?.turn_deadline && (
+            <TurnCountdown deadline={ses.turn_deadline} />
+          )}
+          <span>💰 {fmt(readVault())}</span>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-3 overflow-auto">
+      <div className="flex-1 flex flex-col gap-1 md:gap-2 overflow-auto">
         {(!myRow || myRow.seat_index===null) ? (
-          <div className="h-full grid place-items-center">
+          <div className="flex-1 grid place-items-center">
             <div className="text-center max-w-md">
-              <div className="text-white/90 mb-4 text-xl font-semibold">Choose your seat</div>
+              <div className="text-white/90 mb-2 md:mb-4 text-sm md:text-xl font-semibold">Choose your seat</div>
               <div className="flex items-center justify-center gap-6 mb-4">
                 <button 
                   onClick={()=>takeSeat(0)} 
@@ -534,9 +549,9 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
             </div>
           </div>
         ) : (
-          <div className="max-w-6xl mx-auto">
+          <div className="flex-1 flex flex-col gap-1 md:gap-2">
             {/* Players Info */}
-            <div className="mb-4 flex items-center justify-between bg-black/30 rounded-xl p-3 border border-white/20">
+            <div className="flex items-center justify-between bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
               <div className="flex items-center gap-4">
                 {players.map((p, idx) => (
                   <div key={idx} className={`px-4 py-2 rounded-lg ${
@@ -561,11 +576,11 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
               )}
             </div>
 
-            {/* Board */}
-            <div className="bg-gradient-to-br from-amber-800/40 to-amber-900/40 rounded-3xl shadow-2xl p-4 border-4 border-amber-600/50">
-              <div className="flex flex-col gap-1" style={{ minHeight: '400px' }}>
+            {/* Board - Fixed Height */}
+            <div className="bg-gradient-to-r from-amber-900/20 to-amber-800/20 rounded-lg p-1 md:p-2 border border-amber-400/30 h-64 sm:h-80 md:h-96 relative overflow-hidden">
+              <div className="flex flex-col gap-0.5 h-full">
                 {/* Top Row (B's side) - 12 points + BAR = 13 columns */}
-                <div className="flex gap-1" style={{ height: '50%', minHeight: '180px' }}>
+                <div className="flex gap-0.5 flex-1" style={{ minHeight: '0' }}>
                   {/* First 6 points (right side) */}
                   {pointIndices[0].slice(0, 6).map((pointIdx, colIdx) => {
                     const pt = b?.points?.[pointIdx] || {owner:null,count:0};
@@ -574,8 +589,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                     return (
                       <div 
                         key={`top-${pointIdx}`} 
-                        className="flex-1 relative select-none transition-all"
-                        style={{ minHeight: '180px' }}
+                        className="flex-1 relative select-none transition-all h-full"
                       >
                         <div 
                           className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""}`}
@@ -584,17 +598,17 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                           <div className="absolute inset-0 overflow-hidden rounded-t-lg">
                             <Triangle up={true} isAlt={(colIdx % 2) === 0} />
                           </div>
-                          <div className="absolute left-1/2 -translate-x-1/2 top-2 flex flex-col gap-1 items-center z-10">
-                            {pt.count > 0 && Array.from({length: Math.min(pt.count, 5)}).map((_,k) => (
+                          <div className="absolute left-1/2 -translate-x-1/2 top-1 flex flex-col gap-0.5 items-center z-10">
+                            {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
                               <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
                             ))}
-                            {pt.count > 5 && (
-                              <div className="text-xs font-bold text-white bg-black/50 px-1 rounded">
-                                +{pt.count - 5}
+                            {pt.count > 3 && (
+                              <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
+                                +{pt.count - 3}
                               </div>
                             )}
                           </div>
-                          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-xs font-bold text-white/80 z-10">
+                          <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white/60 z-10">
                             {pointIdx}
                           </div>
                         </div>
@@ -603,20 +617,19 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                   })}
                   
                   {/* BAR - spans full height, shared by both rows */}
-                  <div className="w-20 flex items-center justify-center" style={{ minHeight: '180px' }}>
+                  <div className="w-8 md:w-12 flex items-center justify-center h-full">
                     <div 
-                      className={`w-16 h-full bg-black/60 rounded-lg flex flex-col items-center justify-center border-2 ${
-                        selectedPoint === "bar" && (b.bar?.B > 0 || b.bar?.A > 0) && isMyTurn ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-gray-600'
+                      className={`w-full h-full bg-black/60 rounded flex flex-col items-center justify-center border ${
+                        selectedPoint === "bar" && (b.bar?.B > 0 || b.bar?.A > 0) && isMyTurn ? 'border-yellow-400 ring-1 ring-yellow-300' : 'border-gray-600'
                       } cursor-pointer transition-all`}
                       onClick={() => isMyTurn && (b.bar?.B > 0 || b.bar?.A > 0) && onPointClick("bar")}
-                      style={{ minHeight: '360px' }}
                     >
-                      <div className="text-white text-xs font-bold mb-1">BAR</div>
-                      <div className="text-white text-lg font-bold">{(b?.bar?.B || 0) + (b?.bar?.A || 0)}</div>
-                      {b?.bar?.B > 0 && Array.from({length: Math.min(b.bar.B, 3)}).map((_,i) => (
+                      <div className="text-white text-[8px] md:text-xs font-bold mb-0.5">BAR</div>
+                      <div className="text-white text-xs md:text-sm font-bold">{(b?.bar?.B || 0) + (b?.bar?.A || 0)}</div>
+                      {b?.bar?.B > 0 && Array.from({length: Math.min(b.bar.B, 2)}).map((_,i) => (
                         <Checker key={`b-${i}`} owner="B" count={b.bar.B} index={i} />
                       ))}
-                      {b?.bar?.A > 0 && Array.from({length: Math.min(b.bar.A, 3)}).map((_,i) => (
+                      {b?.bar?.A > 0 && Array.from({length: Math.min(b.bar.A, 2)}).map((_,i) => (
                         <Checker key={`a-${i}`} owner="A" count={b.bar.A} index={i} />
                       ))}
                     </div>
@@ -630,8 +643,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                     return (
                       <div 
                         key={`top-${pointIdx}`} 
-                        className="flex-1 relative select-none transition-all"
-                        style={{ minHeight: '180px' }}
+                        className="flex-1 relative select-none transition-all h-full"
                       >
                         <div 
                           className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""}`}
@@ -640,17 +652,17 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                           <div className="absolute inset-0 overflow-hidden rounded-t-lg">
                             <Triangle up={true} isAlt={((colIdx+6) % 2) === 0} />
                           </div>
-                          <div className="absolute left-1/2 -translate-x-1/2 top-2 flex flex-col gap-1 items-center z-10">
-                            {pt.count > 0 && Array.from({length: Math.min(pt.count, 5)}).map((_,k) => (
+                          <div className="absolute left-1/2 -translate-x-1/2 top-1 flex flex-col gap-0.5 items-center z-10">
+                            {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
                               <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
                             ))}
-                            {pt.count > 5 && (
-                              <div className="text-xs font-bold text-white bg-black/50 px-1 rounded">
-                                +{pt.count - 5}
+                            {pt.count > 3 && (
+                              <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
+                                +{pt.count - 3}
                               </div>
                             )}
                           </div>
-                          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-xs font-bold text-white/80 z-10">
+                          <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white/60 z-10">
                             {pointIdx}
                           </div>
                         </div>
@@ -660,7 +672,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                 </div>
 
                 {/* Bottom Row (A's side) - 12 points */}
-                <div className="flex gap-1" style={{ height: '50%', minHeight: '180px' }}>
+                <div className="flex gap-0.5 flex-1" style={{ minHeight: '0' }}>
                   {/* First 6 points (left side) */}
                   {pointIndices[1].slice(0, 6).map((pointIdx, colIdx) => {
                     const pt = b?.points?.[pointIdx] || {owner:null,count:0};
@@ -669,8 +681,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                     return (
                       <div 
                         key={`bot-${pointIdx}`} 
-                        className="flex-1 relative select-none transition-all"
-                        style={{ minHeight: '180px' }}
+                        className="flex-1 relative select-none transition-all h-full"
                       >
                         <div 
                           className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""}`}
@@ -679,17 +690,17 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                           <div className="absolute inset-0 overflow-hidden rounded-b-lg">
                             <Triangle up={false} isAlt={(colIdx % 2) === 0} />
                           </div>
-                          <div className="absolute left-1/2 -translate-x-1/2 bottom-2 flex flex-col-reverse gap-1 items-center z-10">
-                            {pt.count > 0 && Array.from({length: Math.min(pt.count, 5)}).map((_,k) => (
+                          <div className="absolute left-1/2 -translate-x-1/2 bottom-1 flex flex-col-reverse gap-0.5 items-center z-10">
+                            {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
                               <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
                             ))}
-                            {pt.count > 5 && (
-                              <div className="text-xs font-bold text-white bg-black/50 px-1 rounded">
-                                +{pt.count - 5}
+                            {pt.count > 3 && (
+                              <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
+                                +{pt.count - 3}
                               </div>
                             )}
                           </div>
-                          <div className="absolute top-1 left-1/2 -translate-x-1/2 text-xs font-bold text-white/80 z-10">
+                          <div className="absolute top-0.5 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white/60 z-10">
                             {pointIdx}
                           </div>
                         </div>
@@ -698,7 +709,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                   })}
                   
                   {/* Empty space for BAR (already rendered above) */}
-                  <div className="w-20"></div>
+                  <div className="w-8 md:w-12"></div>
                   
                   {/* Last 6 points (right side) */}
                   {pointIndices[1].slice(6).map((pointIdx, colIdx) => {
@@ -708,8 +719,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                     return (
                       <div 
                         key={`bot-${pointIdx}`} 
-                        className="flex-1 relative select-none transition-all"
-                        style={{ minHeight: '180px' }}
+                        className="flex-1 relative select-none transition-all h-full"
                       >
                         <div 
                           className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""}`}
@@ -718,17 +728,17 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                           <div className="absolute inset-0 overflow-hidden rounded-b-lg">
                             <Triangle up={false} isAlt={((colIdx+6) % 2) === 0} />
                           </div>
-                          <div className="absolute left-1/2 -translate-x-1/2 bottom-2 flex flex-col-reverse gap-1 items-center z-10">
-                            {pt.count > 0 && Array.from({length: Math.min(pt.count, 5)}).map((_,k) => (
+                          <div className="absolute left-1/2 -translate-x-1/2 bottom-1 flex flex-col-reverse gap-0.5 items-center z-10">
+                            {pt.count > 0 && Array.from({length: Math.min(pt.count, 3)}).map((_,k) => (
                               <Checker key={k} owner={pt.owner} count={pt.count} index={k} />
                             ))}
-                            {pt.count > 5 && (
-                              <div className="text-xs font-bold text-white bg-black/50 px-1 rounded">
-                                +{pt.count - 5}
+                            {pt.count > 3 && (
+                              <div className="text-[10px] font-bold text-white bg-black/70 px-0.5 rounded">
+                                +{pt.count - 3}
                               </div>
                             )}
                           </div>
-                          <div className="absolute top-1 left-1/2 -translate-x-1/2 text-xs font-bold text-white/80 z-10">
+                          <div className="absolute top-0.5 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white/60 z-10">
                             {pointIdx}
                           </div>
                         </div>
@@ -740,8 +750,8 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
             </div>
 
             {/* Controls */}
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-              <div className="flex items-center gap-3 bg-black/30 rounded-xl p-3 border border-white/20">
+            <div className="flex flex-col sm:flex-row gap-1 md:gap-2 items-center">
+              <div className="flex items-center gap-1 md:gap-2 bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
                 <Dice value={b?.roll?.d1} />
                 <Dice value={b?.roll?.d2} />
                 <button 
@@ -753,15 +763,15 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                 </button>
               </div>
               
-              <div className="text-center bg-black/30 rounded-xl p-3 border border-white/20">
-                <div className="text-white/80 text-sm mb-1">Current Turn</div>
-                <div className="text-white font-bold text-lg">
-                  {b?.turn === "A" ? "⚪ White (A)" : "⚫ Black (B)"}
+              <div className="text-center bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
+                <div className="text-white/80 text-xs mb-0.5">Turn</div>
+                <div className="text-white font-bold text-sm">
+                  {b?.turn === "A" ? "⚪ A" : "⚫ B"}
                 </div>
-                {isMyTurn && <div className="text-emerald-400 text-xs mt-1">Your turn!</div>}
+                {isMyTurn && <div className="text-emerald-400 text-[10px] mt-0.5">Your turn!</div>}
               </div>
               
-              <div className="flex items-center justify-center gap-2 bg-black/30 rounded-xl p-3 border border-white/20">
+              <div className="flex items-center justify-center gap-1 md:gap-2 bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
                 {ses?.stage==="lobby" ? (
                   <button 
                     onClick={startMatch} 
@@ -851,17 +861,17 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
       </div>
 
       {/* Footer */}
-      <div className="flex-shrink-0 bg-gradient-to-r from-amber-900/80 to-amber-800/80 backdrop-blur-sm px-4 py-2 border-t-2 border-amber-600/50 flex items-center justify-between">
-        <div className="text-white/80 text-sm">
+      <div className="flex items-center justify-between bg-white/5 rounded-lg p-1 md:p-2 border border-white/10">
+        <div className="text-white/80 text-xs">
           Player: <span className="font-bold text-white">{playerName||"Guest"}</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2">
           {(!myRow || myRow.seat_index===null) ? null : (
             <button 
               onClick={leaveSeat} 
-              className="px-4 py-1.5 rounded-lg bg-red-600/80 hover:bg-red-700 text-white text-sm font-semibold shadow-lg transition-all"
+              className="px-2 md:px-4 py-0.5 md:py-1.5 rounded bg-red-600/80 hover:bg-red-700 text-white text-xs font-semibold transition-all"
             >
-              LEAVE SEAT
+              LEAVE
             </button>
           )}
         </div>
