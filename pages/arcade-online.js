@@ -73,13 +73,13 @@ function fmt(n) {
 // Game Registry with lazy loading
 const GAME_REGISTRY = [
   {
-    id: "dice",
-    title: "Dice",
+    id: "backgammon",
+    title: "Backgammon",
     emoji: "🎲",
-    description: "Roll the dice! Choose high or low and win big!",
-    color: "#3B82F6",
-    isMultiplayer: false,
-    loader: () => import("../games-online/DiceGame").then(m => m.default)
+    description: "Classic two-player backgammon with timers.",
+    color: "#F59E0B",
+    isMultiplayer: true,
+    loader: () => import("../games-online/BackgammonMP").then(m => m.default)
   },
   {
     id: "blackjack",
@@ -476,7 +476,7 @@ export default function ArcadeOnline() {
                 vault={vaultAmt}
                 setVaultBoth={setVaultBoth}
                 playerName={playerName}
-                roomId={selectedGame === 'dice' ? null : selectedRoomId}
+                roomId={selectedRoomId}
                 tierCode={selectedGame === 'poker' ? selectedTier : undefined}
               />
             </div>
