@@ -636,6 +636,12 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                     const pt = b?.points?.[pointIdx] || {owner:null,count:0};
                     const canClick = isMyTurn && ((selectedPoint === null && pt.owner === b.turn) || selectedPoint !== null);
                     const isSelected = selectedPoint === pointIdx;
+                    // Top row: to ensure opposite of bottom, use ((23-pointIdx) % 2) === 0
+                    // Bottom pointIdx 0 -> opposite is 23 -> (23-23) % 2 = 0 -> should be opposite of bottom's 0
+                    // Bottom uses (pointIdx % 2) === 0 for light, so opposite should be dark
+                    // So top: ((23-pointIdx) % 2) === 1 for light
+                    const oppositeIdx = 23 - pointIdx;
+                    const isAlt = (oppositeIdx % 2) === 1;
                     return (
                       <div 
                         key={`top-${pointIdx}`} 
@@ -646,7 +652,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                           onClick={() => canClick && onPointClick(pointIdx)}
                         >
                           <div className="absolute inset-0 overflow-hidden rounded-t-lg">
-                            <Triangle up={true} isAlt={(colIdx % 2) === 0} />
+                            <Triangle up={true} isAlt={isAlt} />
                           </div>
                                                      <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col gap-1 items-center z-10 pt-1">
                              {pt.count > 0 && Array.from({length: Math.min(pt.count, 5)}).map((_,k) => (
@@ -671,6 +677,9 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                     const pt = b?.points?.[pointIdx] || {owner:null,count:0};
                     const canClick = isMyTurn && ((selectedPoint === null && pt.owner === b.turn) || selectedPoint !== null);
                     const isSelected = selectedPoint === pointIdx;
+                    // Top row: use opposite index calculation for opposite color
+                    const oppositeIdx = 23 - pointIdx;
+                    const isAlt = (oppositeIdx % 2) === 1;
                     return (
                       <div 
                         key={`top-${pointIdx}`} 
@@ -681,7 +690,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                           onClick={() => canClick && onPointClick(pointIdx)}
                         >
                           <div className="absolute inset-0 overflow-hidden rounded-t-lg">
-                            <Triangle up={true} isAlt={(colIdx % 2) === 0} />
+                            <Triangle up={true} isAlt={isAlt} />
                           </div>
                                                      <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col gap-1 items-center z-10 pt-1">
                              {pt.count > 0 && Array.from({length: Math.min(pt.count, 5)}).map((_,k) => (
@@ -707,6 +716,8 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                       const pt = b?.points?.[pointIdx] || {owner:null,count:0};
                       const canClick = isMyTurn && ((selectedPoint === null && pt.owner === b.turn) || selectedPoint !== null);
                       const isSelected = selectedPoint === pointIdx;
+                      // Bottom row: even pointIdx = light (isAlt=true), odd = dark (isAlt=false)
+                      const isAlt = (pointIdx % 2) === 0;
                       return (
                         <div 
                           key={`bot-${pointIdx}`} 
@@ -717,7 +728,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                             onClick={() => canClick && onPointClick(pointIdx)}
                           >
                             <div className="absolute inset-0 overflow-hidden rounded-b-lg">
-                              <Triangle up={false} isAlt={(colIdx % 2) === 0} />
+                              <Triangle up={false} isAlt={isAlt} />
                             </div>
                                                          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 flex flex-col-reverse gap-1 items-center z-10 pb-1">
                                {pt.count > 0 && Array.from({length: Math.min(pt.count, 5)}).map((_,k) => (
@@ -742,6 +753,8 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                       const pt = b?.points?.[pointIdx] || {owner:null,count:0};
                       const canClick = isMyTurn && ((selectedPoint === null && pt.owner === b.turn) || selectedPoint !== null);
                       const isSelected = selectedPoint === pointIdx;
+                      // Bottom row: even pointIdx = light (isAlt=true), odd = dark (isAlt=false)
+                      const isAlt = (pointIdx % 2) === 0;
                       return (
                         <div 
                           key={`bot-${pointIdx}`} 
@@ -752,7 +765,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                             onClick={() => canClick && onPointClick(pointIdx)}
                           >
                             <div className="absolute inset-0 overflow-hidden rounded-b-lg">
-                              <Triangle up={false} isAlt={((colIdx) % 2) === 0} />
+                              <Triangle up={false} isAlt={isAlt} />
                             </div>
                                                          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 flex flex-col-reverse gap-1 items-center z-10 pb-1">
                                {pt.count > 0 && Array.from({length: Math.min(pt.count, 5)}).map((_,k) => (
