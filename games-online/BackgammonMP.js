@@ -398,11 +398,77 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
     }
     if (!legal.includes(to)) { setPendingStepTo(null); return; }
 
+    // Calculate the distance traveled to determine which step was used
+    let distanceUsed = 0;
+    const dir = dirFor(b.turn);
+    
+    if (from === "bar") {
+      // Entry from bar - calculate distance to entry point
+      if (to === "off") {
+        // Bear off from bar shouldn't normally be possible, but handle edge case
+        // Use the step that allows bearing off
+        distanceUsed = b.roll.steps && b.roll.steps.length > 0 ? b.roll.steps[0] : (b.turn === "A" ? 24 : 1);
+      } else {
+        // Calculate entry distance: for A, point 0 = step 1, point 1 = step 2, etc.
+        // For B, point 23 = step 1, point 22 = step 2, etc.
+        if (b.turn === "A") {
+          distanceUsed = to + 1; // Point 0 needs step 1, point 1 needs step 2, etc.
+        } else {
+          distanceUsed = 24 - to; // Point 23 needs step 1, point 22 needs step 2, etc.
+        }
+      }
+    } else if (to === "off") {
+      // Bear off - must use exact step needed to reach edge
+      // Find which step from available steps was used for this bear-off
+      const [homeLo, homeHi] = b.turn === "A" ? [18, 23] : [0, 5];
+      if (b.turn === "A") {
+        // For A: need to move from point to edge (point 24 is off)
+        const distanceToEdge = 24 - from;
+        // The step used is the one that matches this distance (or the minimum if over)
+        distanceUsed = distanceToEdge;
+      } else {
+        // For B: need to move from point to edge (point -1 is off)
+        const distanceToEdge = from + 1;
+        distanceUsed = distanceToEdge;
+      }
+      // Verify the step exists in available steps
+      if (b.roll.steps && b.roll.steps.length > 0) {
+        const availableSteps = b.roll.steps;
+        // If exact step exists, use it; otherwise use the minimum that's >= distanceToEdge
+        const exactMatch = availableSteps.find(s => s === distanceUsed);
+        if (!exactMatch && availableSteps.length > 0) {
+          // Use the minimum step that allows bearing off (when bearing off, you can use a larger step)
+          distanceUsed = Math.min(...availableSteps.filter(s => s >= distanceUsed));
+          if (isNaN(distanceUsed)) {
+            // Fallback to first available step
+            distanceUsed = availableSteps[0];
+          }
+        }
+      }
+    } else {
+      // Regular move - absolute distance in the direction of movement
+      distanceUsed = Math.abs(to - from);
+    }
+
     const res = applyStep(b, b.turn, from, to);
     if (!res.ok) { setPendingStepTo(null); return; }
 
-    // consume a step
-    if (b.roll.moves_left>0) b.roll.moves_left -= 1;
+    // Remove the used step from steps array
+    if (b.roll.steps && Array.isArray(b.roll.steps) && b.roll.steps.length > 0) {
+      // Find and remove the first step that matches the distance used
+      const stepIndex = b.roll.steps.findIndex(step => step === distanceUsed);
+      if (stepIndex >= 0) {
+        b.roll.steps.splice(stepIndex, 1);
+        // Update moves_left based on remaining steps
+        b.roll.moves_left = b.roll.steps.length;
+      } else {
+        // Fallback: if step not found (shouldn't happen), just decrement
+        if (b.roll.moves_left > 0) b.roll.moves_left -= 1;
+      }
+    } else {
+      // Fallback: if steps array is missing, just decrement moves_left
+      if (b.roll.moves_left > 0) b.roll.moves_left -= 1;
+    }
 
     const { data, error } = await supabase.from("bg_sessions").update({
       board_state: b,
@@ -416,7 +482,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
     setSelectedPoint(null);
     setPendingStepTo(null);
 
-    if (b.roll.moves_left<=0) {
+    if (b.roll.moves_left <= 0) {
       await endTurn(b, []); // record steps if you log, here we pass []
     }
   }
@@ -507,8 +573,16 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
   ];
 
   // Calculate legal destinations when a point is selected
+  // Use remaining steps from roll.steps instead of recalculating from d1/d2
   const legalDestinationsSet = useMemo(() => {
     if (!isPlaying || !isMyTurn || !b.roll?.d1 || !b.roll?.d2) return new Set();
+    
+    // Get remaining steps (use roll.steps if available, otherwise calculate from d1/d2)
+    const availableSteps = (b.roll.steps && Array.isArray(b.roll.steps) && b.roll.steps.length > 0) 
+      ? [...b.roll.steps] 
+      : stepList(b.roll);
+    
+    if (availableSteps.length === 0) return new Set();
     
     let from = selectedPoint;
     if (from === null) {
@@ -520,19 +594,38 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
       }
     }
     
+    // Create a temporary roll object with only remaining steps for legalDestinations calculation
+    // We need to call legalDestinations but with modified roll that only has remaining steps
+    // Since legalDestinations uses stepList internally, we need to modify the roll temporarily
+    const dir = dirFor(b.turn);
+    const res = new Set();
+    
     if (from === "bar") {
       // Virtual index for bar entry
       const virtualFrom = b.turn === "A" ? -1 : 24;
-      const legals = legalDestinations(b, b.turn, virtualFrom);
-      return new Set(legals);
-    } else if (typeof from === 'number') {
-      const legals = legalDestinations(b, b.turn, from);
-      const result = new Set(legals);
-      // If bear-off is legal, mark it as a special case (we'll show it via button)
-      if (legals.includes("off")) {
-        result.add("off");
+      for (const step of availableSteps) {
+        const dest = virtualFrom + step * dir;
+        if (dest < 0 || dest > 23) {
+          if (canBearOff(b, b.turn)) res.add("off");
+          continue;
+        }
+        const pt = b.points[dest];
+        if (pt.owner && pt.owner !== b.turn && pt.count >= 2) continue; // blocked
+        res.add(dest);
       }
-      return result;
+      return res;
+    } else if (typeof from === 'number') {
+      for (const step of availableSteps) {
+        const dest = from + step * dir;
+        if (dest < 0 || dest > 23) {
+          if (canBearOff(b, b.turn)) res.add("off");
+          continue;
+        }
+        const pt = b.points[dest];
+        if (pt.owner && pt.owner !== b.turn && pt.count >= 2) continue; // blocked
+        res.add(dest);
+      }
+      return res;
     }
     
     return new Set();
