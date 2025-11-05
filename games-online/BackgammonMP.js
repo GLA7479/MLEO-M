@@ -387,20 +387,47 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
       return; // need to select source first
     }
 
-    // compute legality
-    let legal = [];
-    if (from==="bar") {
+    // Get remaining steps (use roll.steps if available, otherwise calculate from d1/d2)
+    const availableSteps = (b.roll.steps && Array.isArray(b.roll.steps) && b.roll.steps.length > 0) 
+      ? [...b.roll.steps] 
+      : stepList(b.roll);
+    
+    if (availableSteps.length === 0) { setPendingStepTo(null); return; }
+
+    // compute legality using only remaining steps
+    const dir = dirFor(b.turn);
+    const legal = new Set();
+    
+    if (from === "bar") {
       // treat virtual index for legality
-      const virtualFrom = b.turn==="A" ? -1 : 24;
-      legal = legalDestinations(b, b.turn, virtualFrom);
+      const virtualFrom = b.turn === "A" ? -1 : 24;
+      for (const step of availableSteps) {
+        const dest = virtualFrom + step * dir;
+        if (dest < 0 || dest > 23) {
+          if (canBearOff(b, b.turn)) legal.add("off");
+          continue;
+        }
+        const pt = b.points[dest];
+        if (pt.owner && pt.owner !== b.turn && pt.count >= 2) continue; // blocked
+        legal.add(dest);
+      }
     } else {
-      legal = legalDestinations(b, b.turn, from);
+      for (const step of availableSteps) {
+        const dest = from + step * dir;
+        if (dest < 0 || dest > 23) {
+          if (canBearOff(b, b.turn)) legal.add("off");
+          continue;
+        }
+        const pt = b.points[dest];
+        if (pt.owner && pt.owner !== b.turn && pt.count >= 2) continue; // blocked
+        legal.add(dest);
+      }
     }
-    if (!legal.includes(to)) { setPendingStepTo(null); return; }
+    
+    if (!legal.has(to)) { setPendingStepTo(null); return; }
 
     // Calculate the distance traveled to determine which step was used
     let distanceUsed = 0;
-    const dir = dirFor(b.turn);
     
     if (from === "bar") {
       // Entry from bar - calculate distance to entry point
