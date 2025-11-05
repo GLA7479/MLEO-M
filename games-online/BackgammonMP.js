@@ -506,6 +506,38 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
     [0,1,2,3,4,5, 6,7,8,9,10,11]
   ];
 
+  // Calculate legal destinations when a point is selected
+  const legalDestinationsSet = useMemo(() => {
+    if (!isPlaying || !isMyTurn || !b.roll?.d1 || !b.roll?.d2) return new Set();
+    
+    let from = selectedPoint;
+    if (from === null) {
+      // If no selection but has pieces on bar, check bar destinations
+      if (b.bar?.[b.turn] > 0) {
+        from = "bar";
+      } else {
+        return new Set();
+      }
+    }
+    
+    if (from === "bar") {
+      // Virtual index for bar entry
+      const virtualFrom = b.turn === "A" ? -1 : 24;
+      const legals = legalDestinations(b, b.turn, virtualFrom);
+      return new Set(legals);
+    } else if (typeof from === 'number') {
+      const legals = legalDestinations(b, b.turn, from);
+      const result = new Set(legals);
+      // If bear-off is legal, mark it as a special case (we'll show it via button)
+      if (legals.includes("off")) {
+        result.add("off");
+      }
+      return result;
+    }
+    
+    return new Set();
+  }, [isPlaying, isMyTurn, b, selectedPoint]);
+
   return (
     <div className="w-full h-full flex flex-col p-1 md:p-2 gap-1 md:gap-2 -mt-1">
       {/* Header */}
@@ -613,7 +645,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                     }}
                     onClick={() => isMyTurn && (b.bar?.B > 0 || b.bar?.A > 0) && onPointClick("bar")}
                   >
-                    <div className="text-white/95 text-[10px] md:text-xs font-bold mb-1 drop-shadow-lg">BAR</div>
+                    <div className={`text-white/95 text-[10px] md:text-xs font-bold mb-1 drop-shadow-lg ${selectedPoint === "bar" ? "text-yellow-300" : ""}`}>BAR</div>
                     <div className="text-white text-xs md:text-sm font-bold mb-1 drop-shadow">
                       {(b?.bar?.B || 0) + (b?.bar?.A || 0)}
                     </div>
@@ -636,6 +668,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                     const pt = b?.points?.[pointIdx] || {owner:null,count:0};
                     const canClick = isMyTurn && ((selectedPoint === null && pt.owner === b.turn) || selectedPoint !== null);
                     const isSelected = selectedPoint === pointIdx;
+                    const isLegalDestination = legalDestinationsSet.has(pointIdx);
                     // Top row: to ensure opposite of bottom, use ((23-pointIdx) % 2) === 0
                     // Bottom pointIdx 0 -> opposite is 23 -> (23-23) % 2 = 0 -> should be opposite of bottom's 0
                     // Bottom uses (pointIdx % 2) === 0 for light, so opposite should be dark
@@ -648,7 +681,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                         className="flex-1 relative select-none transition-all h-full"
                       >
                         <div 
-                          className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""}`}
+                          className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""} ${isLegalDestination && !isSelected ? "ring-2 ring-green-400 shadow-md z-5" : ""}`}
                           onClick={() => canClick && onPointClick(pointIdx)}
                         >
                           <div className="absolute inset-0 overflow-hidden rounded-t-lg">
@@ -677,6 +710,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                     const pt = b?.points?.[pointIdx] || {owner:null,count:0};
                     const canClick = isMyTurn && ((selectedPoint === null && pt.owner === b.turn) || selectedPoint !== null);
                     const isSelected = selectedPoint === pointIdx;
+                    const isLegalDestination = legalDestinationsSet.has(pointIdx);
                     // Top row: use opposite index calculation for opposite color
                     const oppositeIdx = 23 - pointIdx;
                     const isAlt = (oppositeIdx % 2) === 1;
@@ -686,7 +720,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                         className="flex-1 relative select-none transition-all h-full"
                       >
                         <div 
-                          className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""}`}
+                          className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""} ${isLegalDestination && !isSelected ? "ring-2 ring-green-400 shadow-md z-5" : ""}`}
                           onClick={() => canClick && onPointClick(pointIdx)}
                         >
                           <div className="absolute inset-0 overflow-hidden rounded-t-lg">
@@ -716,6 +750,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                       const pt = b?.points?.[pointIdx] || {owner:null,count:0};
                       const canClick = isMyTurn && ((selectedPoint === null && pt.owner === b.turn) || selectedPoint !== null);
                       const isSelected = selectedPoint === pointIdx;
+                      const isLegalDestination = legalDestinationsSet.has(pointIdx);
                       // Bottom row: even pointIdx = light (isAlt=true), odd = dark (isAlt=false)
                       const isAlt = (pointIdx % 2) === 0;
                       return (
@@ -724,7 +759,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                           className="flex-1 relative select-none transition-all h-full"
                         >
                           <div 
-                            className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""}`}
+                            className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""} ${isLegalDestination && !isSelected ? "ring-2 ring-green-400 shadow-md z-5" : ""}`}
                             onClick={() => canClick && onPointClick(pointIdx)}
                           >
                             <div className="absolute inset-0 overflow-hidden rounded-b-lg">
@@ -753,6 +788,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                       const pt = b?.points?.[pointIdx] || {owner:null,count:0};
                       const canClick = isMyTurn && ((selectedPoint === null && pt.owner === b.turn) || selectedPoint !== null);
                       const isSelected = selectedPoint === pointIdx;
+                      const isLegalDestination = legalDestinationsSet.has(pointIdx);
                       // Bottom row: even pointIdx = light (isAlt=true), odd = dark (isAlt=false)
                       const isAlt = (pointIdx % 2) === 0;
                       return (
@@ -761,7 +797,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                           className="flex-1 relative select-none transition-all h-full"
                         >
                           <div 
-                            className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""}`}
+                            className={`absolute inset-0 ${canClick ? "cursor-pointer hover:brightness-110" : ""} ${isSelected ? "ring-4 ring-yellow-400 shadow-lg z-10" : ""} ${isLegalDestination && !isSelected ? "ring-2 ring-green-400 shadow-md z-5" : ""}`}
                             onClick={() => canClick && onPointClick(pointIdx)}
                           >
                             <div className="absolute inset-0 overflow-hidden rounded-b-lg">
@@ -827,8 +863,12 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
                     </button>
                     <button 
                       onClick={()=>moveTo("off")} 
-                      disabled={!isMyTurn || !canBearOff(b, b.turn)} 
-                      className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      disabled={!isMyTurn || !canBearOff(b, b.turn) || !legalDestinationsSet.has("off")} 
+                      className={`px-3 py-2 rounded-lg text-white text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                        legalDestinationsSet.has("off") && isMyTurn 
+                          ? "bg-green-600/80 hover:bg-green-700 ring-2 ring-green-400" 
+                          : "bg-white/10 hover:bg-white/20"
+                      }`}
                     >
                       Bear Off
                     </button>
