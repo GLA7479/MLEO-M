@@ -1158,84 +1158,84 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                   <button
                     onClick={() => placeBet('red', 'red')}
                     disabled={!canBet}
-                    className="px-4 py-2 rounded bg-red-600/80 hover:bg-red-600 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     RED (2x)
                   </button>
                   <button
                     onClick={() => placeBet('black', 'black')}
                     disabled={!canBet}
-                    className="px-4 py-2 rounded bg-gray-800 hover:bg-gray-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 rounded bg-gray-900 hover:bg-gray-800 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     BLACK (2x)
                   </button>
                   <button
                     onClick={() => placeBet('even', 'even')}
                     disabled={!canBet}
-                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     EVEN (2x)
                   </button>
                   <button
                     onClick={() => placeBet('odd', 'odd')}
                     disabled={!canBet}
-                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 rounded bg-purple-600 hover:bg-purple-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     ODD (2x)
                   </button>
                   <button
                     onClick={() => placeBet('low', 'low')}
                     disabled={!canBet}
-                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     1-18 (2x)
                   </button>
                   <button
                     onClick={() => placeBet('high', 'high')}
                     disabled={!canBet}
-                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 rounded bg-yellow-600 hover:bg-yellow-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     19-36 (2x)
                   </button>
                   <button
                     onClick={() => placeBet('dozen1', '1')}
                     disabled={!canBet}
-                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 rounded bg-orange-600 hover:bg-orange-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     1st 12 (3x)
                   </button>
                   <button
                     onClick={() => placeBet('dozen2', '2')}
                     disabled={!canBet}
-                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 rounded bg-pink-600 hover:bg-pink-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     2nd 12 (3x)
                   </button>
                   <button
                     onClick={() => placeBet('dozen3', '3')}
                     disabled={!canBet}
-                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 rounded bg-cyan-600 hover:bg-cyan-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     3rd 12 (3x)
                   </button>
                   <button
                     onClick={() => placeBet('column1', '1')}
                     disabled={!canBet}
-                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     Col 1 (3x)
                   </button>
                   <button
                     onClick={() => placeBet('column2', '2')}
                     disabled={!canBet}
-                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 rounded bg-teal-600 hover:bg-teal-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     Col 2 (3x)
                   </button>
                   <button
                     onClick={() => placeBet('column3', '3')}
                     disabled={!canBet}
-                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     Col 3 (3x)
                   </button>
@@ -1252,10 +1252,10 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                         disabled={!canBet}
                         className={`px-2 py-2 rounded text-xs font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                           color === 'red'
-                            ? 'bg-red-600/80 hover:bg-red-600'
+                            ? 'bg-red-600 hover:bg-red-700'
                             : color === 'black'
-                            ? 'bg-gray-800 hover:bg-gray-700'
-                            : 'bg-green-600/80 hover:bg-green-600'
+                            ? 'bg-gray-900 hover:bg-gray-800'
+                            : 'bg-green-600 hover:bg-green-700'
                         }`}
                       >
                         {num}
