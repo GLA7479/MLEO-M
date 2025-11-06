@@ -367,9 +367,6 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
       .update({ total_bet: 0, total_won: 0 })
       .eq("session_id", session.id);
 
-    // Clear old resolved bets (optional - for cleanup)
-    // await supabase.from("roulette_bets").delete().eq("session_id", session.id).not("is_winner", "is", null);
-
     const { data, error } = await supabase
       .from("roulette_sessions")
       .update({
@@ -390,6 +387,44 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
       setBets([]); // Clear bets list
     }
   }
+
+  // ===== Auto-start first round =====
+  useEffect(() => {
+    if (!session?.id || !isLeader) return;
+    if (session.stage === "lobby" && (session.spin_number || 0) === 0) {
+      // Auto-start first round when in lobby and no spins yet
+      const timer = setTimeout(async () => {
+        const deadline = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
+
+        // Reset player bets first
+        await supabase
+          .from("roulette_players")
+          .update({ total_bet: 0, total_won: 0 })
+          .eq("session_id", session.id);
+
+        const { data, error } = await supabase
+          .from("roulette_sessions")
+          .update({
+            stage: "betting",
+            betting_deadline: deadline,
+            spin_result: null,
+            spin_color: null,
+            spin_number: 1,
+            total_bets: 0,
+            total_payouts: 0,
+          })
+          .eq("id", session.id)
+          .select()
+          .single();
+
+        if (!error && data) {
+          setSession(data);
+          setBets([]);
+        }
+      }, 1000); // Small delay to ensure session is loaded
+      return () => clearTimeout(timer);
+    }
+  }, [session?.id, session?.stage, session?.spin_number, isLeader]);
 
   // ===== Place bet =====
   async function placeBet(betType, betValue) {
@@ -693,7 +728,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
         const now = new Date().getTime();
         const deadline = new Date(session.betting_deadline).getTime();
         if (now >= deadline) {
-          // Auto-spin if leader
+          // Auto-spin if leader (automatic)
           if (isLeader) {
             spinWheel();
           }
@@ -827,22 +862,6 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
 
               {/* Controls */}
               <div className="flex items-center justify-center gap-2">
-                {session?.stage === "lobby" && isLeader && (
-                  <button
-                    onClick={startRound}
-                    className="px-6 py-3 rounded-lg bg-emerald-600/80 hover:bg-emerald-600 text-white font-bold"
-                  >
-                    START ROUND
-                  </button>
-                )}
-                {isBetting && isLeader && (
-                  <button
-                    onClick={spinWheel}
-                    className="px-6 py-3 rounded-lg bg-yellow-600/80 hover:bg-yellow-600 text-white font-bold"
-                  >
-                    SPIN WHEEL
-                  </button>
-                )}
                 {isBetting && (
                   <button
                     onClick={() => setShowBetPanel(!showBetPanel)}
