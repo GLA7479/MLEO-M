@@ -163,11 +163,28 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
   const myRow = players.find(p => p.client_id === clientId) || null;
   
   // My bets - sorted and memoized
+  // Show bets from current spin, or keep previous spin bets until new betting starts
   const myBets = useMemo(() => {
-    const arr = bets.filter(b => b.player_id === myRow?.id) || [];
-    arr.sort((a, b) => (a.bet_type + a.bet_value).localeCompare(b.bet_type + b.bet_value));
-    return arr;
-  }, [bets, myRow?.id]);
+    if (!myRow?.id) return [];
+    
+    // Get bets for current player
+    const arr = bets.filter(b => b.player_id === myRow.id) || [];
+    
+    // If in betting stage, only show unresolved bets (active bets)
+    // Otherwise, show all bets (to show results from previous spin)
+    const filteredBets = session?.stage === "betting" 
+      ? arr.filter(b => b.is_winner === null)
+      : arr; // Keep all bets during results/spinning/lobby to show winners/losers
+    
+    filteredBets.sort((a, b) => {
+      // Sort by: unresolved first, then by type
+      if (a.is_winner === null && b.is_winner !== null) return -1;
+      if (a.is_winner !== null && b.is_winner === null) return 1;
+      return (a.bet_type + a.bet_value).localeCompare(b.bet_type + b.bet_value);
+    });
+    
+    return filteredBets;
+  }, [bets, myRow?.id, session?.stage]);
 
   // ===== Channel: Sessions per room =====
   useEffect(() => {
@@ -254,11 +271,13 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
         table: "roulette_bets",
         filter: `session_id=eq.${session.id}`,
       }, async () => {
+        // Get bets for current spin only (same spin_number as session)
+        // Keep bets from previous spin until new betting starts
         const { data } = await supabase
           .from("roulette_bets")
           .select("*")
           .eq("session_id", session.id)
-          .is("is_winner", null); // Only active bets
+          .order("created_at", { ascending: false });
         setBets(data || []);
       })
       .subscribe(async (st) => {
@@ -267,7 +286,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
             .from("roulette_bets")
             .select("*")
             .eq("session_id", session.id)
-            .is("is_winner", null);
+            .order("created_at", { ascending: false });
           setBets(data || []);
         }
       });
@@ -361,6 +380,13 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
 
     const deadline = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
 
+    // Clear old resolved bets before starting new round
+    await supabase
+      .from("roulette_bets")
+      .delete()
+      .eq("session_id", session.id)
+      .not("is_winner", "is", null);
+
     // Reset player bets first
     await supabase
       .from("roulette_players")
@@ -384,7 +410,6 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
 
     if (!error && data) {
       setSession(data);
-      setBets([]); // Clear bets list
     }
   }
 
@@ -395,6 +420,13 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
       // Auto-start first round when in lobby and no spins yet
       const timer = setTimeout(async () => {
         const deadline = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
+
+        // Clear any old resolved bets before starting
+        await supabase
+          .from("roulette_bets")
+          .delete()
+          .eq("session_id", session.id)
+          .not("is_winner", "is", null);
 
         // Reset player bets first
         await supabase
@@ -419,7 +451,6 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
 
         if (!error && data) {
           setSession(data);
-          setBets([]);
         }
       }, 1000); // Small delay to ensure session is loaded
       return () => clearTimeout(timer);
@@ -587,6 +618,13 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
         if (isLeader) {
           const deadline = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
           
+          // Clear old resolved bets before starting new round (keep bets visible during results)
+          await supabase
+            .from("roulette_bets")
+            .delete()
+            .eq("session_id", updatedSession.id)
+            .not("is_winner", "is", null); // Delete only resolved bets
+          
           // Reset player bets
           await supabase
             .from("roulette_players")
@@ -611,10 +649,10 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
           
           if (newSession) {
             setSession(newSession);
-            setBets([]); // Clear bets list
+            // Don't clear bets list - let the channel refresh it
           }
         } else {
-          // For non-leaders, just clear results
+          // For non-leaders, just update stage (bets will be cleared when leader starts new round)
           await supabase
             .from("roulette_sessions")
             .update({ stage: "betting", spin_result: null, spin_color: null })
@@ -698,12 +736,12 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
       setSession(updatedSession);
     }
 
-    // Refresh bets list (will be empty now since all are resolved)
+    // Refresh bets list - keep all bets (including resolved) to show results
     const { data: refreshedBets } = await supabase
       .from("roulette_bets")
       .select("*")
       .eq("session_id", sessionId)
-      .is("is_winner", null);
+      .order("created_at", { ascending: false });
     setBets(refreshedBets || []);
 
     // Refresh players to get updated balances
@@ -924,30 +962,55 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                 <div className="text-white font-bold text-sm mb-2 text-center">My Bets</div>
                 {myBets.length > 0 ? (
                   <div className="flex flex-wrap gap-2 justify-center">
-                    {myBets.map((bet) => (
-                      <div
-                        key={bet.id}
-                        className="px-3 py-1.5 rounded bg-white/10 text-white text-xs sm:text-sm border border-white/20"
-                      >
-                        <span className="font-semibold">
-                          {bet.bet_type === 'number' ? `#${bet.bet_value}` : 
-                           bet.bet_type === 'red' ? 'RED' :
-                           bet.bet_type === 'black' ? 'BLACK' :
-                           bet.bet_type === 'even' ? 'EVEN' :
-                           bet.bet_type === 'odd' ? 'ODD' :
-                           bet.bet_type === 'low' ? '1-18' :
-                           bet.bet_type === 'high' ? '19-36' :
-                           bet.bet_type === 'dozen1' ? '1st 12' :
-                           bet.bet_type === 'dozen2' ? '2nd 12' :
-                           bet.bet_type === 'dozen3' ? '3rd 12' :
-                           bet.bet_type === 'column1' ? 'Col 1' :
-                           bet.bet_type === 'column2' ? 'Col 2' :
-                           bet.bet_type === 'column3' ? 'Col 3' :
-                           bet.bet_type}
-                        </span>
-                        <span className="ml-1 text-yellow-400">{fmt(bet.amount)}</span>
-                      </div>
-                    ))}
+                    {myBets.map((bet) => {
+                      // Determine if bet is winner, loser, or pending
+                      const isWinner = bet.is_winner === true;
+                      const isLoser = bet.is_winner === false;
+                      const isPending = bet.is_winner === null;
+                      
+                      // Color based on result
+                      const bgColor = isWinner 
+                        ? 'bg-green-600/80 border-green-400' 
+                        : isLoser 
+                        ? 'bg-red-600/80 border-red-400' 
+                        : 'bg-white/10 border-white/20';
+                      
+                      const textColor = isWinner 
+                        ? 'text-green-100' 
+                        : isLoser 
+                        ? 'text-red-100' 
+                        : 'text-white';
+                      
+                      return (
+                        <div
+                          key={bet.id}
+                          className={`px-3 py-1.5 rounded ${bgColor} ${textColor} text-xs sm:text-sm border`}
+                        >
+                          <span className="font-semibold">
+                            {bet.bet_type === 'number' ? `#${bet.bet_value}` : 
+                             bet.bet_type === 'red' ? 'RED' :
+                             bet.bet_type === 'black' ? 'BLACK' :
+                             bet.bet_type === 'even' ? 'EVEN' :
+                             bet.bet_type === 'odd' ? 'ODD' :
+                             bet.bet_type === 'low' ? '1-18' :
+                             bet.bet_type === 'high' ? '19-36' :
+                             bet.bet_type === 'dozen1' ? '1st 12' :
+                             bet.bet_type === 'dozen2' ? '2nd 12' :
+                             bet.bet_type === 'dozen3' ? '3rd 12' :
+                             bet.bet_type === 'column1' ? 'Col 1' :
+                             bet.bet_type === 'column2' ? 'Col 2' :
+                             bet.bet_type === 'column3' ? 'Col 3' :
+                             bet.bet_type}
+                          </span>
+                          <span className={`ml-1 ${isPending ? 'text-yellow-400' : isWinner ? 'text-green-100' : 'text-red-100'}`}>
+                            {fmt(bet.amount)}
+                          </span>
+                          {isWinner && bet.payout_amount > 0 && (
+                            <span className="ml-1 text-green-200">+{fmt(bet.payout_amount)}</span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-white/40 text-xs text-center py-2">No bets placed</div>
