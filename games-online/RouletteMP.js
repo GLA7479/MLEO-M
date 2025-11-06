@@ -186,6 +186,18 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
     return filteredBets;
   }, [bets, myRow?.id, session?.stage]);
 
+  // Auto-open bet panel when betting stage starts
+  useEffect(() => {
+    if (session?.stage === "betting") {
+      setShowBetPanel(true);
+    } else if (session?.stage !== "betting") {
+      // Keep panel open during spinning/results, close only when in lobby
+      if (session?.stage === "lobby") {
+        setShowBetPanel(false);
+      }
+    }
+  }, [session?.stage]);
+
   // ===== Channel: Sessions per room =====
   useEffect(() => {
     if (!roomId) return;
