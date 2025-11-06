@@ -1050,9 +1050,11 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
           
           {/* Bet Panel */}
           <div
-            className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-900 via-zinc-800 to-zinc-900 border-t-2 border-white/20 rounded-t-2xl shadow-2xl z-50 transition-transform duration-300"
+            className="fixed bottom-0 left-1/2 -translate-x-1/2 bg-gradient-to-t from-zinc-900 via-zinc-800 to-zinc-900 border-t-2 border-white/20 rounded-t-2xl shadow-2xl z-50 transition-transform duration-300"
             style={{
               maxHeight: '80vh',
+              maxWidth: '70vw',
+              width: '100%',
               boxShadow: '0 -10px 40px rgba(0,0,0,0.8)'
             }}
           >
