@@ -100,6 +100,15 @@ const GAME_REGISTRY = [
     loader: () => import("../games-online/PokerMP").then(m => m.default)
   },
   {
+    id: "roulette",
+    title: "Roulette",
+    emoji: "🎰",
+    description: "European Roulette! Spin the wheel and win big!",
+    color: "#EF4444",
+    isMultiplayer: true,
+    loader: () => import("../games-online/RouletteMP").then(m => m.default)
+  },
+  {
     id: "poker-tables",
     title: "Poker Tables",
     emoji: "🎰",

@@ -557,29 +557,54 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
   // ===== Doubling cube (optional, Phase 2) =====
   async function offerDouble(){
     const s = await fetchSession(); if (!s || s.stage!=="playing") return;
-    const b = { ...(s.board_state) };
+    const b = JSON.parse(JSON.stringify(s.board_state)); // Deep clone
     const seatTurn = b.turn==="A" ? 0 : 1;
     if (mySeat !== seatTurn) return;
     if (!canOfferDouble(b, b.turn)) return;
-    // In MVP: store intent flag on session; in production you'd add bg_actions table or modal handshake
-    await supabase.from("bg_sessions").update({
-      doubling_proposed_by: b.turn,
+    
+    // Store doubling_proposed_by in board_state so UI can see it
+    b.doubling_proposed_by = b.turn;
+    
+    const { data, error } = await supabase.from("bg_sessions").update({
+      board_state: b,
+      doubling_proposed_by: b.turn, // Also store in session for query convenience
       turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
-    }).eq("id", ses.id);
+    }).eq("id", ses.id).select().single();
+    
+    if (!error && data) {
+      setSes(data); // Update local state immediately
+    }
   }
   async function acceptDouble(){
     const s = await fetchSession(); if (!s || s.stage!=="playing") return;
-    const b = { ...(s.board_state) };
+    const b = JSON.parse(JSON.stringify(s.board_state)); // Deep clone
     if (!b.doubling_proposed_by) return;
     const acceptor = oppOf(b.doubling_proposed_by);
     onAcceptDouble(b, acceptor);
     b.doubling_proposed_by = null;
-    await supabase.from("bg_sessions").update({ board_state: b }).eq("id", ses.id);
+    
+    const { data, error } = await supabase.from("bg_sessions").update({
+      board_state: b,
+      doubling_proposed_by: null, // Clear from session
+      turn_deadline: new Date(Date.now()+TURN_SECONDS*1000).toISOString()
+    }).eq("id", ses.id).select().single();
+    
+    if (!error && data) {
+      setSes(data); // Update local state immediately
+    }
   }
   async function declineDouble(){
     const s = await fetchSession(); if (!s || s.stage!=="playing") return;
     // loser resigns immediately (pays current value)
-    await supabase.from("bg_sessions").update({ stage: "finished", turn_deadline: null }).eq("id", ses.id);
+    const { data, error } = await supabase.from("bg_sessions").update({
+      stage: "finished",
+      turn_deadline: null,
+      doubling_proposed_by: null
+    }).eq("id", ses.id).select().single();
+    
+    if (!error && data) {
+      setSes(data); // Update local state immediately
+    }
   }
 
   // ===== UI =====
