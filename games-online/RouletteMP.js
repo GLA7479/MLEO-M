@@ -151,6 +151,17 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
   const [showBetPanel, setShowBetPanel] = useState(false);
   const [bettingTimeLeft, setBettingTimeLeft] = useState(0);
   const timerRef = useRef(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Leader detection
   const isLeader = useMemo(() => {
@@ -1050,9 +1061,20 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
           
           {/* Bet Panel */}
           <div
-            className="fixed bottom-0 left-0 right-0 md:left-1/2 md:-translate-x-1/2 md:max-w-[65vw] bg-gradient-to-t from-zinc-900 via-zinc-800 to-zinc-900 border-t-2 border-white/20 rounded-t-2xl shadow-2xl z-50 transition-transform duration-300 w-full md:w-auto"
+            className="fixed bottom-0 bg-gradient-to-t from-zinc-900 via-zinc-800 to-zinc-900 border-t-2 border-white/20 rounded-t-2xl shadow-2xl z-50 transition-transform duration-300"
             style={{
               maxHeight: '80vh',
+              ...(isMobile ? {
+                left: 0,
+                right: 0,
+                width: '100%',
+                maxWidth: '100%'
+              } : {
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '45vw',
+                maxWidth: '45vw'
+              }),
               boxShadow: '0 -10px 40px rgba(0,0,0,0.8)'
             }}
           >
