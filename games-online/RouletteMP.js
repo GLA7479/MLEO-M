@@ -153,7 +153,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
   // Leader detection
   const isLeader = useMemo(() => {
     if (!roomMembers.length || !name) return false;
-    const sorted = [...roomMembers].sort((a, b) => a.player_name.localeCompare(b.player_name));
+    const sorted = [...roomMembers].sort((a, b) => (a.player_name || '').localeCompare(b.player_name || ''));
     return sorted[0]?.player_name === name;
   }, [roomMembers, name]);
 
@@ -377,12 +377,41 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
 
   // ===== Place bet =====
   async function placeBet(betType, betValue) {
-    if (!myRow) {
+    // Ensure session exists
+    let sess = session;
+    if (!sess || !sess.id) {
+      sess = await ensureRouletteSession(roomId);
+      setSession(sess);
+    }
+    
+    let currentPlayer = myRow;
+    
+    // Auto-join if needed
+    if (!currentPlayer) {
+      await joinGame();
+      // Wait a bit and refresh players list
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const { data: refreshedPlayers } = await supabase
+        .from("roulette_players")
+        .select("*")
+        .eq("session_id", sess.id);
+      if (refreshedPlayers) {
+        setPlayers(refreshedPlayers);
+        currentPlayer = refreshedPlayers.find(p => p.client_id === clientId);
+      }
+      if (!currentPlayer) {
+        setMsg("Join failed. Try again.");
+        return;
+      }
+    }
+
+    // Double-check we have a player
+    if (!currentPlayer) {
       setMsg("Join the game first");
       return;
     }
 
-    if (session?.stage !== "betting") {
+    if (sess.stage !== "betting") {
       setMsg("Betting is closed");
       return;
     }
@@ -393,16 +422,18 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
       return;
     }
 
-    if (myRow.balance + amount > readVault()) {
+    if (amount > readVault()) {
       setMsg("Insufficient vault balance");
       return;
     }
 
     const multiplier = getPayoutMultiplier(betType);
 
+    const currentPlayerId = currentPlayer.id;
+
     const { error } = await supabase.from("roulette_bets").insert({
-      session_id: session.id,
-      player_id: myRow.id,
+      session_id: sess.id,
+      player_id: currentPlayerId,
       bet_type: betType,
       bet_value: String(betValue),
       amount: amount,
@@ -419,16 +450,16 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
     // Update player balance
     const { data: updatedPlayer } = await supabase
       .from("roulette_players")
-      .update({ total_bet: (myRow.total_bet || 0) + amount })
-      .eq("id", myRow.id)
+      .update({ total_bet: (currentPlayer.total_bet || 0) + amount })
+      .eq("id", currentPlayerId)
       .select()
       .single();
 
     // Update session total bets
     await supabase
       .from("roulette_sessions")
-      .update({ total_bets: (session.total_bets || 0) + amount })
-      .eq("id", session.id);
+      .update({ total_bets: (sess.total_bets || 0) + amount })
+      .eq("id", sess.id);
 
     // Deduct from vault
     const v = readVault();
@@ -634,23 +665,8 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
 
       {/* Content */}
       <div className="flex-1 flex flex-col gap-2 overflow-auto">
-        {!myRow ? (
-          <div className="flex-1 grid place-items-center">
-            <div className="text-center max-w-md">
-              <div className="text-white/90 mb-4 text-xl font-semibold">Join the game</div>
-              <button
-                onClick={joinGame}
-                className="px-6 py-3 rounded-lg bg-emerald-600/80 hover:bg-emerald-600 text-white font-bold"
-              >
-                JOIN
-              </button>
-              {msg && <div className="text-amber-300 mt-3 text-sm">{msg}</div>}
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Game Board */}
-            <div className="flex-1 flex flex-col gap-2">
+        {/* Game Board */}
+        <div className="flex-1 flex flex-col gap-2">
               {/* Roulette Wheel */}
               <div className="bg-white/5 rounded-xl p-4 border border-white/10">
                 <div className="flex items-center justify-center gap-4">
@@ -732,131 +748,187 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                 </div>
               </div>
 
-              {/* Betting Table */}
-              {canBet && (
-                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <div className="text-white font-bold mb-2">Place Your Bet</div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <input
-                      type="number"
-                      min={MIN_BET}
-                      value={betAmount}
-                      onChange={(e) => setBetAmount(Math.max(MIN_BET, parseInt(e.target.value) || MIN_BET))}
-                      className="px-3 py-2 rounded bg-white/10 text-white border border-white/20"
-                    />
-                    <button
-                      onClick={() => setBetAmount(MIN_BET)}
-                      className="px-3 py-2 rounded bg-white/10 text-white text-sm"
+              {/* Betting Table - Always visible */}
+              <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                <div className="text-white font-bold mb-2">Place Your Bet</div>
+                {!canBet && (
+                  <div className="text-white/60 text-sm mb-2">
+                    {!myRow ? "Join the game to bet." :
+                      session?.stage !== "betting" ? "Waiting for betting stage..." :
+                      "Betting closed."}
+                  </div>
+                )}
+                
+                <div className="flex items-center gap-2 mb-4 flex-wrap">
+                  <button
+                    onClick={() => setBetAmount(a => Math.max(MIN_BET, Math.floor((a || MIN_BET) - MIN_BET)))}
+                    disabled={!canBet}
+                    className="px-3 py-2 rounded bg-white/10 text-white text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    −
+                  </button>
+                  
+                  <input
+                    type="number"
+                    min={MIN_BET}
+                    step={MIN_BET}
+                    value={betAmount}
+                    onChange={(e) => setBetAmount(Math.max(MIN_BET, parseInt(e.target.value) || MIN_BET))}
+                    disabled={!canBet}
+                    className="w-24 px-3 py-2 rounded bg-white/10 text-white border border-white/20 text-center disabled:opacity-40 disabled:cursor-not-allowed"
+                  />
+                  
+                  <button
+                    onClick={() => setBetAmount(a => Math.max(MIN_BET, Math.floor((a || MIN_BET) + MIN_BET)))}
+                    disabled={!canBet}
+                    className="px-3 py-2 rounded bg-white/10 text-white text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    +
+                  </button>
+                  
+                  <div className="flex items-center gap-2 ml-2 flex-wrap">
+                    <button 
+                      onClick={() => setBetAmount(MIN_BET)} 
+                      disabled={!canBet}
+                      className="px-3 py-2 rounded bg-white/10 text-white text-xs border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       Min
                     </button>
-                    <button
-                      onClick={() => setBetAmount(Math.floor(readVault() / 10))}
-                      className="px-3 py-2 rounded bg-white/10 text-white text-sm"
+                    <button 
+                      onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 20)))} 
+                      disabled={!canBet}
+                      className="px-3 py-2 rounded bg-white/10 text-white text-xs border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      5%
+                    </button>
+                    <button 
+                      onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 10)))} 
+                      disabled={!canBet}
+                      className="px-3 py-2 rounded bg-white/10 text-white text-xs border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       10%
                     </button>
-                  </div>
-
-                  {/* Outside Bets */}
-                  <div className="grid grid-cols-4 gap-2 mb-4">
-                    <button
-                      onClick={() => placeBet('red', 'red')}
-                      className="px-4 py-2 rounded bg-red-600/80 hover:bg-red-600 text-white font-bold"
+                    <button 
+                      onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 4)))} 
+                      disabled={!canBet}
+                      className="px-3 py-2 rounded bg-white/10 text-white text-xs border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      RED (2x)
+                      25%
                     </button>
-                    <button
-                      onClick={() => placeBet('black', 'black')}
-                      className="px-4 py-2 rounded bg-gray-800 hover:bg-gray-700 text-white font-bold"
-                    >
-                      BLACK (2x)
-                    </button>
-                    <button
-                      onClick={() => placeBet('even', 'even')}
-                      className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold"
-                    >
-                      EVEN (2x)
-                    </button>
-                    <button
-                      onClick={() => placeBet('odd', 'odd')}
-                      className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold"
-                    >
-                      ODD (2x)
-                    </button>
-                    <button
-                      onClick={() => placeBet('low', 'low')}
-                      className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold"
-                    >
-                      1-18 (2x)
-                    </button>
-                    <button
-                      onClick={() => placeBet('high', 'high')}
-                      className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold"
-                    >
-                      19-36 (2x)
-                    </button>
-                    <button
-                      onClick={() => placeBet('dozen1', '1')}
-                      className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold"
-                    >
-                      1st 12 (3x)
-                    </button>
-                    <button
-                      onClick={() => placeBet('dozen2', '2')}
-                      className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold"
-                    >
-                      2nd 12 (3x)
-                    </button>
-                    <button
-                      onClick={() => placeBet('dozen3', '3')}
-                      className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold"
-                    >
-                      3rd 12 (3x)
-                    </button>
-                    <button
-                      onClick={() => placeBet('column1', '1')}
-                      className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold"
-                    >
-                      Col 1 (3x)
-                    </button>
-                    <button
-                      onClick={() => placeBet('column2', '2')}
-                      className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold"
-                    >
-                      Col 2 (3x)
-                    </button>
-                    <button
-                      onClick={() => placeBet('column3', '3')}
-                      className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold"
-                    >
-                      Col 3 (3x)
-                    </button>
-                  </div>
-
-                  {/* Number Grid */}
-                  <div className="grid grid-cols-6 gap-1">
-                    {[0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26].map((num) => {
-                      const color = getColor(num);
-                      return (
-                        <button
-                          key={num}
-                          onClick={() => placeBet('number', num)}
-                          className={`px-2 py-2 rounded text-xs font-bold text-white ${
-                            color === 'red'
-                              ? 'bg-red-600/80 hover:bg-red-600'
-                              : color === 'black'
-                              ? 'bg-gray-800 hover:bg-gray-700'
-                              : 'bg-green-600/80 hover:bg-green-600'
-                          }`}
-                        >
-                          {num}
-                        </button>
-                      );
-                    })}
                   </div>
                 </div>
-              )}
+
+                {/* Outside Bets */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mb-4">
+                  <button
+                    onClick={() => placeBet('red', 'red')}
+                    disabled={!canBet}
+                    className="px-4 py-2 rounded bg-red-600/80 hover:bg-red-600 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    RED (2x)
+                  </button>
+                  <button
+                    onClick={() => placeBet('black', 'black')}
+                    disabled={!canBet}
+                    className="px-4 py-2 rounded bg-gray-800 hover:bg-gray-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    BLACK (2x)
+                  </button>
+                  <button
+                    onClick={() => placeBet('even', 'even')}
+                    disabled={!canBet}
+                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    EVEN (2x)
+                  </button>
+                  <button
+                    onClick={() => placeBet('odd', 'odd')}
+                    disabled={!canBet}
+                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    ODD (2x)
+                  </button>
+                  <button
+                    onClick={() => placeBet('low', 'low')}
+                    disabled={!canBet}
+                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    1-18 (2x)
+                  </button>
+                  <button
+                    onClick={() => placeBet('high', 'high')}
+                    disabled={!canBet}
+                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    19-36 (2x)
+                  </button>
+                  <button
+                    onClick={() => placeBet('dozen1', '1')}
+                    disabled={!canBet}
+                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    1st 12 (3x)
+                  </button>
+                  <button
+                    onClick={() => placeBet('dozen2', '2')}
+                    disabled={!canBet}
+                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    2nd 12 (3x)
+                  </button>
+                  <button
+                    onClick={() => placeBet('dozen3', '3')}
+                    disabled={!canBet}
+                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    3rd 12 (3x)
+                  </button>
+                  <button
+                    onClick={() => placeBet('column1', '1')}
+                    disabled={!canBet}
+                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    Col 1 (3x)
+                  </button>
+                  <button
+                    onClick={() => placeBet('column2', '2')}
+                    disabled={!canBet}
+                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    Col 2 (3x)
+                  </button>
+                  <button
+                    onClick={() => placeBet('column3', '3')}
+                    disabled={!canBet}
+                    className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    Col 3 (3x)
+                  </button>
+                </div>
+
+                {/* Number Grid */}
+                <div className="grid grid-cols-5 xs:grid-cols-6 sm:grid-cols-7 md:grid-cols-9 lg:grid-cols-10 gap-1">
+                  {[0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26].map((num) => {
+                    const color = getColor(num);
+                    return (
+                      <button
+                        key={num}
+                        onClick={() => placeBet('number', num)}
+                        disabled={!canBet}
+                        className={`px-2 py-2 rounded text-xs font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                          color === 'red'
+                            ? 'bg-red-600/80 hover:bg-red-600'
+                            : color === 'black'
+                            ? 'bg-gray-800 hover:bg-gray-700'
+                            : 'bg-green-600/80 hover:bg-green-600'
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               {/* My Bets */}
               {myBets.length > 0 && (
@@ -893,7 +965,14 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                     SPIN WHEEL
                   </button>
                 )}
-                {myRow && (
+                {!myRow ? (
+                  <button
+                    onClick={joinGame}
+                    className="px-4 py-2 rounded-lg bg-emerald-600/80 hover:bg-emerald-600 text-white font-semibold"
+                  >
+                    JOIN
+                  </button>
+                ) : (
                   <button
                     onClick={leaveGame}
                     className="px-4 py-2 rounded-lg bg-red-600/80 hover:bg-red-700 text-white font-semibold"
@@ -903,7 +982,13 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                 )}
               </div>
             </div>
-          </>
+        
+        {msg && (
+          <div className="text-center">
+            <div className="inline-block bg-amber-900/60 border border-amber-500/50 text-amber-200 px-4 py-2 rounded-lg text-sm">
+              {msg}
+            </div>
+          </div>
         )}
       </div>
     </div>
