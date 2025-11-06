@@ -152,6 +152,13 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
   const [bettingTimeLeft, setBettingTimeLeft] = useState(0);
   const timerRef = useRef(null);
   const [isMobile, setIsMobile] = useState(false);
+  const lastSpinAngleRef = useRef(0);
+  const currentSpinAngleRef = useRef(0);
+  const [isSlowingDown, setIsSlowingDown] = useState(false);
+  const slowingDownStartRef = useRef(null);
+  const bettingStartTimeRef = useRef(null);
+  const bettingStartAngleRef = useRef(null); // Store the initial angle when betting phase starts
+  const animationRunningRef = useRef(false); // Prevent multiple animations
 
   // Detect mobile
   useEffect(() => {
@@ -162,6 +169,208 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Sync spinAngle with ref when it changes externally (but not during betting animation)
+  useEffect(() => {
+    if (session?.stage !== "betting") {
+      currentSpinAngleRef.current = spinAngle;
+    }
+  }, [spinAngle, session?.stage]);
+
+  // Helper function to calculate current velocity at a given time in betting phase
+  // During 30 seconds: starts fast and gradually slows down
+  const calculateCurrentVelocity = (elapsed, totalDuration) => {
+    const initialVelocity = 360 / 0.5; // degrees per second - very fast at start (full rotation every 0.5 seconds)
+    const finalVelocity = 360 / 3; // degrees per second - slower at end (full rotation every 3 seconds)
+    const timeProgress = Math.min(elapsed / totalDuration, 1);
+    // Smooth ease-out deceleration
+    const easeOutFactor = 1 - Math.pow(1 - timeProgress, 2); // ease-out quadratic for smoother transition
+    return initialVelocity + (finalVelocity - initialVelocity) * easeOutFactor;
+  };
+
+  // Helper function to calculate winning number from angle
+  const calculateWinningNumberFromAngle = (angle) => {
+    // Normalize angle to 0-360
+    const normalizedAngle = ((angle % 360) + 360) % 360;
+    
+    // Each number occupies 360/37 degrees
+    // The wheel starts at 0 degrees with number 0 at the top
+    // We need to find which segment the angle falls into
+    const segmentSize = 360 / 37;
+    
+    // Calculate which segment (0-36)
+    // Adjust for the wheel starting position (0 is at top, which is -90 degrees in our coordinate system)
+    const adjustedAngle = (normalizedAngle + 90) % 360;
+    let segmentIndex = Math.floor(adjustedAngle / segmentSize);
+    
+    // Map segment index to actual roulette number (based on ROULETTE_NUMBERS array order)
+    if (segmentIndex >= 0 && segmentIndex < ROULETTE_NUMBERS.length) {
+      return ROULETTE_NUMBERS[segmentIndex].num;
+    }
+    return 0;
+  };
+
+  // Continuous spin animation during betting stage (30 seconds) + 5 seconds slowdown
+  useEffect(() => {
+    let animationFrameId = null;
+    const BETTING_DURATION = BETTING_SECONDS;
+    const FINAL_SLOWDOWN_DURATION = 5; // seconds
+    
+    // Initialize betting start time when betting stage starts
+    if (session?.stage === "betting" && bettingTimeLeft > 0) {
+      if (!bettingStartTimeRef.current) {
+        // Calculate when betting actually started based on deadline
+        if (session?.betting_deadline) {
+          const deadline = new Date(session.betting_deadline).getTime();
+          bettingStartTimeRef.current = deadline - (BETTING_SECONDS * 1000);
+        } else {
+          bettingStartTimeRef.current = Date.now();
+        }
+        // Store the initial angle when betting phase starts - this stays constant for the entire animation
+        bettingStartAngleRef.current = currentSpinAngleRef.current || lastSpinAngleRef.current || 0;
+        currentSpinAngleRef.current = bettingStartAngleRef.current;
+        setSpinAngle(bettingStartAngleRef.current);
+      }
+    }
+    
+    // Start final slowdown when betting time reaches 0
+    // Ensure smooth transition - use the exact final velocity from 30-second phase
+    if (session?.stage === "betting" && bettingTimeLeft === 0 && !isSlowingDown && currentSpinAngleRef.current !== null && bettingStartTimeRef.current) {
+      // Use the final velocity that matches the end of the 30-second phase
+      // This ensures perfect continuity - no jumps
+      const finalVelocityAt30s = 360 / 3; // degrees per second - matches finalVelocity in betting phase
+      
+      // Get the current angle - preserve it for smooth transition
+      const currentAngle = currentSpinAngleRef.current || 0;
+      
+      setIsSlowingDown(true);
+      slowingDownStartRef.current = {
+        angle: currentAngle,
+        time: Date.now(),
+        velocity: finalVelocityAt30s // Use exact final velocity for smooth transition
+      };
+    }
+    
+    if (session?.stage === "betting" && bettingTimeLeft > 0 && bettingStartTimeRef.current && bettingStartAngleRef.current !== null && !animationRunningRef.current) {
+      // Reset slowing down state if betting restarted
+      if (isSlowingDown) {
+        setIsSlowingDown(false);
+        slowingDownStartRef.current = null;
+      }
+      
+      // Mark animation as running to prevent multiple instances
+      animationRunningRef.current = true;
+      
+      // Gradual slowdown during 30 seconds of betting - starts fast, ends slower
+      const startTime = bettingStartTimeRef.current;
+      const startAngle = bettingStartAngleRef.current; // Use the fixed start angle - never changes during animation
+      const initialVelocity = 360 / 0.5; // degrees per second - very fast at start
+      const finalVelocity = 360 / 3; // degrees per second - slower at end (matches slowdown phase)
+      
+      // Use requestAnimationFrame for smooth animation
+      const animate = () => {
+        // Check if we should continue animating
+        if (session?.stage !== "betting" || bettingTimeLeft <= 0 || !bettingStartTimeRef.current || bettingStartAngleRef.current === null) {
+          animationRunningRef.current = false;
+          return;
+        }
+        
+        const elapsed = (Date.now() - startTime) / 1000; // seconds since betting started
+        const timeProgress = Math.min(elapsed / BETTING_DURATION, 1); // 0 to 1
+        
+        // Calculate distance using integration of velocity curve
+        // For ease-out quadratic: v(t) = initial + (final - initial) * (1 - (1-t)^2)
+        // Distance = ∫v(t)dt from 0 to elapsed
+        // We integrate: ∫[final - (final - initial) * (1-t)^2]dt
+        // = final*t - (final - initial) * ∫(1-t)^2 dt
+        // = final*t - (final - initial) * [-(1-t)^3/3]
+        // = final*t + (final - initial) * [(1-t)^3 - 1]/3 * DURATION
+        const distance = finalVelocity * elapsed + (finalVelocity - initialVelocity) * BETTING_DURATION * (Math.pow(1 - timeProgress, 3) - 1) / 3;
+        
+        // Calculate new angle from fixed start angle - this ensures smooth, continuous rotation
+        // startAngle never changes, only distance accumulates
+        const newAngle = startAngle + distance;
+        
+        // Store the full angle in ref for continuity
+        currentSpinAngleRef.current = newAngle;
+        // Update display - CSS handles large values correctly (720deg = 360deg visually)
+        setSpinAngle(newAngle);
+        
+        // Continue animation
+        animationFrameId = requestAnimationFrame(animate);
+      };
+      
+      animationFrameId = requestAnimationFrame(animate);
+      
+    } else if (session?.stage === "betting" && isSlowingDown && slowingDownStartRef.current) {
+      // Final slowdown phase - 5 seconds of gradual slowdown to complete stop
+      // This continues smoothly from where the 30-second phase ended
+      const startData = slowingDownStartRef.current;
+      const startTime = startData.time;
+      const startAngle = startData.angle;
+      const initialVelocity = startData.velocity; // degrees per second at start of final slowdown (should match finalVelocity from betting phase)
+      
+      // Use requestAnimationFrame for smooth slowdown animation
+      const animate = () => {
+        const elapsed = (Date.now() - startTime) / 1000; // seconds since slowdown started
+        
+        if (elapsed >= FINAL_SLOWDOWN_DURATION) {
+          // Stop completely - calculate final angle using smooth ease-out
+          // For ease-out cubic: when t=1, distance = initialVelocity * FINAL_SLOWDOWN_DURATION * (1 - 1/4) = 0.75
+          // This ensures smooth deceleration - velocity reaches 0 gradually
+          const totalDistance = initialVelocity * FINAL_SLOWDOWN_DURATION * 0.75;
+          const finalAngle = startAngle + totalDistance;
+          currentSpinAngleRef.current = finalAngle;
+          setSpinAngle(finalAngle);
+          setIsSlowingDown(false);
+          slowingDownStartRef.current = null;
+          
+          // Calculate winning number from final angle and declare winner immediately
+          const winningNumber = calculateWinningNumberFromAngle(finalAngle);
+          // Use setTimeout to ensure state updates are complete
+          setTimeout(() => {
+            declareWinner(winningNumber);
+          }, 50);
+          return;
+        }
+        
+        // Smooth ease-out function: velocity decreases gradually from initialVelocity to 0
+        // Using ease-out cubic for very smooth deceleration without sudden stops
+        const t = elapsed / FINAL_SLOWDOWN_DURATION;
+        // Ease-out cubic: v(t) = initialVelocity * (1 - t^3) for very smooth deceleration
+        // Distance = ∫v(t)dt = initialVelocity * FINAL_SLOWDOWN_DURATION * ∫(1 - t^3)dt
+        // = initialVelocity * FINAL_SLOWDOWN_DURATION * (t - t^4/4)
+        // This ensures velocity approaches 0 smoothly, no sudden stop
+        const distance = initialVelocity * FINAL_SLOWDOWN_DURATION * (t - (t * t * t * t) / 4);
+        // Keep angle continuous for smooth rotation
+        const newAngle = startAngle + distance;
+        currentSpinAngleRef.current = newAngle;
+        // Store full angle - CSS handles modulo correctly for smooth rotation
+        setSpinAngle(newAngle);
+        animationFrameId = requestAnimationFrame(animate);
+      };
+      
+      animationFrameId = requestAnimationFrame(animate);
+      
+    } else if (session?.stage !== "betting") {
+      // Reset when stage changes
+      animationRunningRef.current = false;
+      if (isSlowingDown) {
+        setIsSlowingDown(false);
+        slowingDownStartRef.current = null;
+      }
+      bettingStartTimeRef.current = null;
+      bettingStartAngleRef.current = null;
+    }
+    
+    // Cleanup function
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      animationRunningRef.current = false;
+    };
+  }, [session?.stage, bettingTimeLeft, isSlowingDown]);
 
   // Leader detection
   const isLeader = useMemo(() => {
@@ -575,9 +784,103 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
     setMsg("");
   }
 
-  // ===== Spin wheel =====
+  // ===== Declare winner (replaces spinWheel) =====
   const spinningRef = useRef(false);
   
+  async function declareWinner(winningNumber) {
+    if (!isLeader) return;
+    if (session?.stage !== "betting") return;
+    
+    // Guard against concurrent declarations
+    if (spinningRef.current) return;
+    spinningRef.current = true;
+    
+    try {
+      const color = getColor(winningNumber);
+      
+      // Update session with result immediately
+      const { data: updatedSession, error: sessionError } = await supabase
+        .from("roulette_sessions")
+        .update({
+          stage: "results",
+          spin_result: winningNumber,
+          spin_color: color,
+          betting_deadline: null
+        })
+        .eq("id", session.id)
+        .select()
+        .single();
+
+      if (sessionError) {
+        spinningRef.current = false;
+        return;
+      }
+
+      setSession(updatedSession);
+
+      // Calculate payouts
+      await calculatePayouts(winningNumber, color, updatedSession.id);
+
+      // Save spin to history
+      await supabase.from("roulette_spins").insert({
+        session_id: updatedSession.id,
+        spin_number: (updatedSession.spin_number || 0) + 1,
+        result: winningNumber,
+        color: color,
+        total_bets: updatedSession.total_bets || 0,
+        total_payouts: updatedSession.total_payouts || 0,
+      });
+
+      // After results display, immediately start next betting round
+      setTimeout(async () => {
+        if (isLeader) {
+          const deadline = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
+          
+          // Clear old resolved bets before starting new round
+          await supabase
+            .from("roulette_bets")
+            .delete()
+            .eq("session_id", updatedSession.id)
+            .not("is_winner", "is", null);
+          
+          // Reset player bets
+          await supabase
+            .from("roulette_players")
+            .update({ total_bet: 0, total_won: 0 })
+            .eq("session_id", updatedSession.id);
+          
+          // Start betting stage immediately
+          const { data: newSession } = await supabase
+            .from("roulette_sessions")
+            .update({
+              stage: "betting",
+              betting_deadline: deadline,
+              spin_result: null,
+              spin_color: null,
+              spin_number: (updatedSession.spin_number || 0) + 1,
+              total_bets: 0,
+              total_payouts: 0,
+            })
+            .eq("id", updatedSession.id)
+            .select()
+            .single();
+          
+          if (newSession) {
+            setSession(newSession);
+            // Reset betting start time for new round
+            bettingStartTimeRef.current = null;
+          }
+        }
+      }, RESULTS_SECONDS * 1000);
+      
+      spinningRef.current = false;
+    } catch (error) {
+      console.error("Error declaring winner:", error);
+      spinningRef.current = false;
+    }
+  }
+  
+  // Legacy function - no longer used but kept for compatibility
   async function spinWheel() {
     if (!isLeader) return;
     if (session?.stage !== "betting") return;
@@ -597,11 +900,16 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
     const result = Math.floor(Math.random() * 37);
     const color = getColor(result);
 
-    // Animate spin
+    // Animate spin - reset slowing down state
+    setIsSlowingDown(false);
+    slowingDownStartRef.current = null;
     setIsSpinning(true);
     const spins = 5 + Math.random() * 5; // 5-10 full rotations
-    const finalAngle = spins * 360 + (result * (360 / 37));
+    const currentAngle = currentSpinAngleRef.current % 360; // Get current position from ref
+    const finalAngle = currentAngle + (spins * 360) + (result * (360 / 37));
     setSpinAngle(finalAngle);
+    currentSpinAngleRef.current = finalAngle;
+    lastSpinAngleRef.current = finalAngle;
 
     setTimeout(async () => {
       setIsSpinning(false);
@@ -788,10 +1096,8 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
         setBettingTimeLeft(timeLeft);
         
         if (timeLeft <= 0) {
-          // Auto-spin if leader (automatic)
-          if (isLeader) {
-            spinWheel();
-          }
+          // Don't auto-spin immediately - let the 5 second slowdown happen first
+          // spinWheel will be called after slowdown completes
           clearInterval(timerRef.current);
         }
       };
@@ -857,8 +1163,12 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                             const a1 = ((i + 1) / ROULETTE_NUMBERS.length) * 360;
                             return `${c} ${a0}deg ${a1}deg`;
                           }).join(", ") + ")",
-                        transform: `rotate(${spinAngle}deg)`,
-                        transition: isSpinning ? "transform 5s cubic-bezier(0.25,0.1,0.25,1)" : "none",
+                        transform: `rotate3d(0, 0, 1, ${spinAngle}deg)`,
+                        transformStyle: 'preserve-3d',
+                        willChange: 'transform',
+                        backfaceVisibility: 'hidden',
+                        WebkitBackfaceVisibility: 'hidden',
+                        WebkitTransform: `rotate3d(0, 0, 1, ${spinAngle}deg)`,
                       }}
                     />
                     
@@ -866,8 +1176,12 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                     <div 
                       className="absolute inset-0 pointer-events-none"
                       style={{
-                        transform: `rotate(${spinAngle}deg)`,
-                        transition: isSpinning ? "transform 5s cubic-bezier(0.25,0.1,0.25,1)" : "none",
+                        transform: `rotate3d(0, 0, 1, ${spinAngle}deg)`,
+                        transformStyle: 'preserve-3d',
+                        willChange: 'transform',
+                        backfaceVisibility: 'hidden',
+                        WebkitBackfaceVisibility: 'hidden',
+                        WebkitTransform: `rotate3d(0, 0, 1, ${spinAngle}deg)`,
                       }}
                     >
                       {ROULETTE_NUMBERS.map((n, i) => {
@@ -881,10 +1195,15 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                         
                         // Position at outer edge
                         const radiusPx = 120;
-                        const centerPx = 128; // Half of 256px
+                        const centerPx = 128; // Half of 256px (w-64 h-64 = 256px)
                         
                         const x = centerPx + radiusPx * Math.cos(angleRad);
                         const y = centerPx + radiusPx * Math.sin(angleRad);
+                        
+                        // Counter-rotate to keep numbers upright
+                        // Use negative of spinAngle directly - CSS handles large values correctly
+                        // No modulo needed - CSS will handle rotation smoothly even for values > 360
+                        const counterRotation = -spinAngle;
                         
                         return (
                           <div
@@ -893,8 +1212,12 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                             style={{
                               left: `${x}px`,
                               top: `${y}px`,
-                              transform: `translate(-50%, -50%) rotate(-${spinAngle}deg)`,
-                              transition: isSpinning ? "transform 5s cubic-bezier(0.25,0.1,0.25,1)" : "none",
+                              transform: `translate3d(-50%, -50%, 0) rotate(${counterRotation}deg)`,
+                              transformStyle: 'preserve-3d',
+                              willChange: 'transform',
+                              backfaceVisibility: 'hidden',
+                              WebkitBackfaceVisibility: 'hidden',
+                              WebkitTransform: `translate3d(-50%, -50%, 0) rotate(${counterRotation}deg)`,
                               color: n.color === 'red' ? '#ffcccc' : n.color === 'black' ? '#ffffff' : '#90ee90',
                               textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
                               zIndex: 20,
