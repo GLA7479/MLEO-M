@@ -148,6 +148,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
   const [betAmount, setBetAmount] = useState(MIN_BET);
   const [spinAngle, setSpinAngle] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
+  const [showBetPanel, setShowBetPanel] = useState(false);
   const timerRef = useRef(null);
 
   // Leader detection
@@ -159,7 +160,13 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
 
   // My player row
   const myRow = players.find(p => p.client_id === clientId) || null;
-  const myBets = bets.filter(b => b.player_id === myRow?.id) || [];
+  
+  // My bets - sorted and memoized
+  const myBets = useMemo(() => {
+    const arr = bets.filter(b => b.player_id === myRow?.id) || [];
+    arr.sort((a, b) => (a.bet_type + a.bet_value).localeCompare(b.bet_type + b.bet_value));
+    return arr;
+  }, [bets, myRow?.id]);
 
   // ===== Channel: Sessions per room =====
   useEffect(() => {
@@ -274,8 +281,8 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
       .select("*")
       .eq("room_id", roomId)
       .order("created_at", { ascending: false })
-      .limit(1);
-    if (existing && existing.length) return existing[0];
+      .maybeSingle();
+    if (existing) return existing;
 
     const { data: created, error } = await supabase
       .from("roulette_sessions")
@@ -297,40 +304,48 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
   }
 
   // ===== Join/Leave =====
+  const joinGameBusyRef = useRef(false);
+  
   async function joinGame() {
-    if (!clientId) {
-      setMsg("Client not recognized");
-      return;
-    }
+    // Guard against concurrent calls
+    if (joinGameBusyRef.current) return;
+    joinGameBusyRef.current = true;
+    
+    try {
+      if (!clientId) {
+        setMsg("Client not recognized");
+        return;
+      }
 
-    let sess = session;
-    if (!sess || !sess.id) {
-      sess = await ensureRouletteSession(roomId);
-      setSession(sess);
-    }
+      let sess = session;
+      if (!sess || !sess.id) {
+        sess = await ensureRouletteSession(roomId);
+        setSession(sess);
+      }
 
-    const { data: mine } = await supabase
-      .from("roulette_players")
-      .select("id,client_id")
-      .eq("session_id", sess.id)
-      .eq("client_id", clientId)
-      .maybeSingle();
+      // Use upsert to handle conflicts gracefully
+      const { error } = await supabase
+        .from("roulette_players")
+        .upsert(
+          {
+            session_id: sess.id,
+            player_name: name,
+            client_id: clientId,
+            balance: 0,
+            total_bet: 0,
+            total_won: 0,
+          },
+          { onConflict: "session_id,client_id", ignoreDuplicates: false }
+        );
 
-    if (!mine) {
-      const { error } = await supabase.from("roulette_players").insert({
-        session_id: sess.id,
-        player_name: name,
-        client_id: clientId,
-        balance: 0,
-        total_bet: 0,
-        total_won: 0,
-      });
       if (error) {
         setMsg(error.message);
         return;
       }
+      setMsg("");
+    } finally {
+      joinGameBusyRef.current = false;
     }
-    setMsg("");
   }
 
   async function leaveGame() {
@@ -455,11 +470,13 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
       .select()
       .single();
 
-    // Update session total bets
+    // Update session total bets (with select to ensure return representation)
     await supabase
       .from("roulette_sessions")
       .update({ total_bets: (sess.total_bets || 0) + amount })
-      .eq("id", sess.id);
+      .eq("id", sess.id)
+      .select()
+      .single();
 
     // Deduct from vault
     const v = readVault();
@@ -469,15 +486,22 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
   }
 
   // ===== Spin wheel =====
+  const spinningRef = useRef(false);
+  
   async function spinWheel() {
     if (!isLeader) return;
     if (session?.stage !== "betting") return;
-
-    // Close betting
-    await supabase
-      .from("roulette_sessions")
-      .update({ stage: "spinning", betting_deadline: null })
-      .eq("id", session.id);
+    
+    // Guard against concurrent spins
+    if (spinningRef.current) return;
+    spinningRef.current = true;
+    
+    try {
+      // Close betting
+      await supabase
+        .from("roulette_sessions")
+        .update({ stage: "spinning", betting_deadline: null })
+        .eq("id", session.id);
 
     // Generate random number (0-36)
     const result = Math.floor(Math.random() * 37);
@@ -527,8 +551,15 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
           .from("roulette_sessions")
           .update({ stage: "lobby" })
           .eq("id", updatedSession.id);
+        // Reset spinning flag after all animations complete
+        spinningRef.current = false;
       }, RESULTS_SECONDS * 1000);
     }, SPINNING_SECONDS * 1000);
+    } catch (error) {
+      // On error, reset immediately
+      spinningRef.current = false;
+      console.error("Spin error:", error);
+    }
   }
 
   // ===== Calculate payouts =====
@@ -748,78 +779,177 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                 </div>
               </div>
 
-              {/* Betting Table - Always visible */}
-              <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                <div className="text-white font-bold mb-2">Place Your Bet</div>
-                {!canBet && (
-                  <div className="text-white/60 text-sm mb-2">
-                    {!myRow ? "Join the game to bet." :
-                      session?.stage !== "betting" ? "Waiting for betting stage..." :
-                      "Betting closed."}
-                  </div>
+              {/* Controls */}
+              <div className="flex items-center justify-center gap-2">
+                {session?.stage === "lobby" && isLeader && (
+                  <button
+                    onClick={startRound}
+                    className="px-6 py-3 rounded-lg bg-emerald-600/80 hover:bg-emerald-600 text-white font-bold"
+                  >
+                    START ROUND
+                  </button>
                 )}
-                
-                <div className="flex items-center gap-2 mb-4 flex-wrap">
+                {isBetting && isLeader && (
                   <button
-                    onClick={() => setBetAmount(a => Math.max(MIN_BET, Math.floor((a || MIN_BET) - MIN_BET)))}
-                    disabled={!canBet}
-                    className="px-3 py-2 rounded bg-white/10 text-white text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                    onClick={spinWheel}
+                    className="px-6 py-3 rounded-lg bg-yellow-600/80 hover:bg-yellow-600 text-white font-bold"
                   >
-                    −
+                    SPIN WHEEL
                   </button>
-                  
-                  <input
-                    type="number"
-                    min={MIN_BET}
-                    step={MIN_BET}
-                    value={betAmount}
-                    onChange={(e) => setBetAmount(Math.max(MIN_BET, parseInt(e.target.value) || MIN_BET))}
-                    disabled={!canBet}
-                    className="w-24 px-3 py-2 rounded bg-white/10 text-white border border-white/20 text-center disabled:opacity-40 disabled:cursor-not-allowed"
-                  />
-                  
+                )}
+                {isBetting && (
                   <button
-                    onClick={() => setBetAmount(a => Math.max(MIN_BET, Math.floor((a || MIN_BET) + MIN_BET)))}
-                    disabled={!canBet}
-                    className="px-3 py-2 rounded bg-white/10 text-white text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                    onClick={() => setShowBetPanel(!showBetPanel)}
+                    className={`px-6 py-3 rounded-lg text-white font-bold transition-all ${
+                      showBetPanel
+                        ? 'bg-purple-600/80 hover:bg-purple-600'
+                        : 'bg-blue-600/80 hover:bg-blue-600'
+                    }`}
                   >
-                    +
+                    {showBetPanel ? 'HIDE BETS' : 'SHOW BETS'}
                   </button>
-                  
-                  <div className="flex items-center gap-2 ml-2 flex-wrap">
-                    <button 
-                      onClick={() => setBetAmount(MIN_BET)} 
-                      disabled={!canBet}
-                      className="px-3 py-2 rounded bg-white/10 text-white text-xs border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      Min
-                    </button>
-                    <button 
-                      onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 20)))} 
-                      disabled={!canBet}
-                      className="px-3 py-2 rounded bg-white/10 text-white text-xs border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      5%
-                    </button>
-                    <button 
-                      onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 10)))} 
-                      disabled={!canBet}
-                      className="px-3 py-2 rounded bg-white/10 text-white text-xs border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      10%
-                    </button>
-                    <button 
-                      onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 4)))} 
-                      disabled={!canBet}
-                      className="px-3 py-2 rounded bg-white/10 text-white text-xs border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      25%
-                    </button>
-                  </div>
-                </div>
+                )}
+                {!myRow ? (
+                  <button
+                    onClick={joinGame}
+                    className="px-4 py-2 rounded-lg bg-emerald-600/80 hover:bg-emerald-600 text-white font-semibold"
+                  >
+                    JOIN
+                  </button>
+                ) : (
+                  <button
+                    onClick={leaveGame}
+                    className="px-4 py-2 rounded-lg bg-red-600/80 hover:bg-red-700 text-white font-semibold"
+                  >
+                    LEAVE
+                  </button>
+                )}
+              </div>
+            </div>
+        
+        {msg && (
+          <div className="text-center">
+            <div className="inline-block bg-amber-900/60 border border-amber-500/50 text-amber-200 px-4 py-2 rounded-lg text-sm">
+              {msg}
+            </div>
+          </div>
+        )}
+      </div>
 
-                {/* Outside Bets */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mb-4">
+      {/* Floating Bet Panel - Bottom Sheet */}
+      {showBetPanel && (
+        <>
+          {/* Backdrop - Only on mobile */}
+          <div
+            className="fixed inset-0 bg-black/60 z-40 md:hidden"
+            onClick={() => setShowBetPanel(false)}
+          />
+          
+          {/* Bet Panel */}
+          <div
+            className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-900 via-zinc-800 to-zinc-900 border-t-2 border-white/20 rounded-t-2xl shadow-2xl z-50 transition-transform duration-300"
+            style={{
+              maxHeight: '80vh',
+              boxShadow: '0 -10px 40px rgba(0,0,0,0.8)'
+            }}
+          >
+            {/* Drag Handle */}
+            <div className="flex justify-center pt-2 pb-1">
+              <div
+                className="w-12 h-1 bg-white/30 rounded-full cursor-pointer"
+                onClick={() => setShowBetPanel(false)}
+              />
+            </div>
+
+            {/* Panel Header */}
+            <div className="flex items-center justify-between p-3 border-b border-white/10">
+              <div className="text-white font-bold text-lg">Place Your Bet</div>
+              {isBetting && (
+                <div className="flex items-center gap-2">
+                  <div className="text-white/60 text-sm">Time:</div>
+                  <div className="text-yellow-400 font-bold text-lg">{bettingTimeLeft}s</div>
+                </div>
+              )}
+              <button
+                onClick={() => setShowBetPanel(false)}
+                className="text-white/60 hover:text-white text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Panel Content - Scrollable */}
+            <div className="overflow-y-auto p-3 md:p-4" style={{ maxHeight: 'calc(80vh - 80px)' }}>
+              {/* Bet Amount Controls */}
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
+                <button
+                  onClick={() => setBetAmount(a => Math.max(MIN_BET, Math.floor((a || MIN_BET) - MIN_BET)))}
+                  disabled={!canBet}
+                  className="px-3 py-2 rounded bg-white/10 text-white text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  −
+                </button>
+                
+                <input
+                  type="number"
+                  min={MIN_BET}
+                  step={MIN_BET}
+                  value={betAmount}
+                  onChange={(e) => setBetAmount(Math.max(MIN_BET, parseInt(e.target.value) || MIN_BET))}
+                  disabled={!canBet}
+                  className="flex-1 min-w-[80px] max-w-[120px] px-3 py-2 rounded bg-white/10 text-white border border-white/20 text-center disabled:opacity-40 disabled:cursor-not-allowed"
+                />
+                
+                <button
+                  onClick={() => setBetAmount(a => Math.max(MIN_BET, Math.floor((a || MIN_BET) + MIN_BET)))}
+                  disabled={!canBet}
+                  className="px-3 py-2 rounded bg-white/10 text-white text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  +
+                </button>
+                
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button 
+                    onClick={() => setBetAmount(MIN_BET)} 
+                    disabled={!canBet}
+                    className="px-2 py-1.5 rounded bg-white/10 text-white text-xs border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Min
+                  </button>
+                  <button 
+                    onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 20)))} 
+                    disabled={!canBet}
+                    className="px-2 py-1.5 rounded bg-white/10 text-white text-xs border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    5%
+                  </button>
+                  <button 
+                    onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 10)))} 
+                    disabled={!canBet}
+                    className="px-2 py-1.5 rounded bg-white/10 text-white text-xs border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    10%
+                  </button>
+                  <button 
+                    onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 4)))} 
+                    disabled={!canBet}
+                    className="px-2 py-1.5 rounded bg-white/10 text-white text-xs border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    25%
+                  </button>
+                </div>
+              </div>
+
+              {!canBet && (
+                <div className="text-white/60 text-sm mb-3 text-center">
+                  {!myRow ? "Join the game to bet." :
+                    session?.stage !== "betting" ? "Waiting for betting stage..." :
+                    "Betting closed."}
+                </div>
+              )}
+
+              {/* Outside Bets */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mb-4">
                   <button
                     onClick={() => placeBet('red', 'red')}
                     disabled={!canBet}
@@ -928,69 +1058,36 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                     );
                   })}
                 </div>
-              </div>
 
-              {/* My Bets */}
-              {myBets.length > 0 && (
-                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <div className="text-white font-bold mb-2">My Bets</div>
-                  <div className="flex flex-wrap gap-2">
-                    {myBets.map((bet) => (
-                      <div
-                        key={bet.id}
-                        className="px-3 py-1 rounded bg-white/10 text-white text-sm"
-                      >
-                        {bet.bet_type === 'number' ? bet.bet_value : bet.bet_type}: {fmt(bet.amount)}
-                      </div>
-                    ))}
+                {/* My Bets - In Panel */}
+                {myBets.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-white/10">
+                    <div className="text-white font-bold mb-2 text-sm">My Bets</div>
+                    <div className="flex flex-wrap gap-2">
+                      {myBets.map((bet) => (
+                        <div
+                          key={bet.id}
+                          className="px-3 py-1 rounded bg-white/10 text-white text-xs sm:text-sm"
+                        >
+                          {bet.bet_type === 'number' ? bet.bet_value : bet.bet_type}: {fmt(bet.amount)}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {/* Controls */}
-              <div className="flex items-center justify-center gap-2">
-                {session?.stage === "lobby" && isLeader && (
-                  <button
-                    onClick={startRound}
-                    className="px-6 py-3 rounded-lg bg-emerald-600/80 hover:bg-emerald-600 text-white font-bold"
-                  >
-                    START ROUND
-                  </button>
-                )}
-                {isBetting && isLeader && (
-                  <button
-                    onClick={spinWheel}
-                    className="px-6 py-3 rounded-lg bg-yellow-600/80 hover:bg-yellow-600 text-white font-bold"
-                  >
-                    SPIN WHEEL
-                  </button>
-                )}
-                {!myRow ? (
-                  <button
-                    onClick={joinGame}
-                    className="px-4 py-2 rounded-lg bg-emerald-600/80 hover:bg-emerald-600 text-white font-semibold"
-                  >
-                    JOIN
-                  </button>
-                ) : (
-                  <button
-                    onClick={leaveGame}
-                    className="px-4 py-2 rounded-lg bg-red-600/80 hover:bg-red-700 text-white font-semibold"
-                  >
-                    LEAVE
-                  </button>
                 )}
               </div>
             </div>
-        
-        {msg && (
-          <div className="text-center">
-            <div className="inline-block bg-amber-900/60 border border-amber-500/50 text-amber-200 px-4 py-2 rounded-lg text-sm">
-              {msg}
-            </div>
-          </div>
+          </>
         )}
-      </div>
+
+      {/* Message */}
+      {msg && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-30">
+          <div className="inline-block bg-amber-900/60 border border-amber-500/50 text-amber-200 px-4 py-2 rounded-lg text-sm shadow-lg">
+            {msg}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
