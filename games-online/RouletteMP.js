@@ -920,9 +920,9 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
               </div>
 
               {/* My Bets - Always visible */}
-              {myBets.length > 0 && (
-                <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                  <div className="text-white font-bold text-sm mb-2 text-center">My Bets</div>
+              <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                <div className="text-white font-bold text-sm mb-2 text-center">My Bets</div>
+                {myBets.length > 0 ? (
                   <div className="flex flex-wrap gap-2 justify-center">
                     {myBets.map((bet) => (
                       <div
@@ -949,8 +949,10 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-white/40 text-xs text-center py-2">No bets placed</div>
+                )}
+              </div>
             </div>
         
         {msg && (
