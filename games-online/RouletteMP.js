@@ -7,8 +7,7 @@ import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 // ===== Config =====
 const BETTING_SECONDS = Number(process.env.NEXT_PUBLIC_ROULETTE_BETTING_SECONDS || 30);
 const SPINNING_SECONDS = 5;
-const RESULTS_SECONDS = 10;
-const AUTO_START_DELAY = 5; // seconds after results to auto-start next round
+const RESULTS_SECONDS = 5; // Show result for 5 seconds
 const MIN_BET = 100;
 
 // European Roulette numbers (0-36)
@@ -150,6 +149,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
   const [spinAngle, setSpinAngle] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [showBetPanel, setShowBetPanel] = useState(false);
+  const [bettingTimeLeft, setBettingTimeLeft] = useState(0);
   const timerRef = useRef(null);
 
   // Leader detection
@@ -581,53 +581,48 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
         total_payouts: updatedSession.total_payouts || 0,
       });
 
-      // Move to results stage, then after delay auto-start next round
+      // Move to results stage, then immediately start countdown for next round
       setTimeout(async () => {
-        // After results display, move to lobby and auto-start next round
-        const { data: lobbySession } = await supabase
-          .from("roulette_sessions")
-          .update({ stage: "lobby" })
-          .eq("id", updatedSession.id)
-          .select()
-          .single();
+        // After results display, immediately start next betting round
+        if (isLeader) {
+          const deadline = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
+          
+          // Reset player bets
+          await supabase
+            .from("roulette_players")
+            .update({ total_bet: 0, total_won: 0 })
+            .eq("session_id", updatedSession.id);
+          
+          // Start betting stage immediately (with 30 second countdown)
+          const { data: newSession } = await supabase
+            .from("roulette_sessions")
+            .update({
+              stage: "betting",
+              betting_deadline: deadline,
+              spin_result: null,
+              spin_color: null,
+              spin_number: (updatedSession.spin_number || 0) + 1,
+              total_bets: 0,
+              total_payouts: 0,
+            })
+            .eq("id", updatedSession.id)
+            .select()
+            .single();
+          
+          if (newSession) {
+            setSession(newSession);
+            setBets([]); // Clear bets list
+          }
+        } else {
+          // For non-leaders, just clear results
+          await supabase
+            .from("roulette_sessions")
+            .update({ stage: "betting", spin_result: null, spin_color: null })
+            .eq("id", updatedSession.id);
+        }
         
         // Reset spinning flag
         spinningRef.current = false;
-        
-        // Auto-start next round after AUTO_START_DELAY seconds
-        if (lobbySession && isLeader) {
-          setTimeout(async () => {
-            // Start next round automatically
-            const deadline = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
-            
-            // Reset player bets
-            await supabase
-              .from("roulette_players")
-              .update({ total_bet: 0, total_won: 0 })
-              .eq("session_id", lobbySession.id);
-            
-            // Start betting stage
-            const { data: newSession } = await supabase
-              .from("roulette_sessions")
-              .update({
-                stage: "betting",
-                betting_deadline: deadline,
-                spin_result: null,
-                spin_color: null,
-                spin_number: (lobbySession.spin_number || 0) + 1,
-                total_bets: 0,
-                total_payouts: 0,
-              })
-              .eq("id", lobbySession.id)
-              .select()
-              .single();
-            
-            if (newSession) {
-              setSession(newSession);
-              setBets([]); // Clear bets list
-            }
-          }, AUTO_START_DELAY * 1000);
-        }
       }, RESULTS_SECONDS * 1000);
     }, SPINNING_SECONDS * 1000);
     } catch (error) {
@@ -719,21 +714,37 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
     setPlayers(refreshedPlayers || []);
   }
 
-  // ===== Timer =====
+  // ===== Timer - Smooth countdown =====
   useEffect(() => {
     if (timerRef.current) clearInterval(timerRef.current);
-
+    
+    // Update timer immediately
     if (session?.betting_deadline && session.stage === "betting") {
-      timerRef.current = setInterval(() => {
-        const now = new Date().getTime();
+      const updateTimer = () => {
+        const now = Date.now();
         const deadline = new Date(session.betting_deadline).getTime();
-        if (now >= deadline) {
+        const timeLeft = Math.max(0, Math.floor((deadline - now) / 1000));
+        setBettingTimeLeft(timeLeft);
+        
+        if (timeLeft <= 0) {
           // Auto-spin if leader (automatic)
           if (isLeader) {
             spinWheel();
           }
+          clearInterval(timerRef.current);
         }
-      }, 1000);
+      };
+      
+      // Update immediately
+      updateTimer();
+      
+      // Then update every second
+      timerRef.current = setInterval(updateTimer, 1000);
+    } else if (session?.stage === "results") {
+      // Clear timer during results
+      setBettingTimeLeft(0);
+    } else {
+      setBettingTimeLeft(0);
     }
 
     return () => {
@@ -752,11 +763,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
   const isBetting = session?.stage === "betting";
   const isSpinningStage = session?.stage === "spinning";
   const isResults = session?.stage === "results";
-  const canBet = isBetting && myRow && Date.now() < new Date(session?.betting_deadline || 0).getTime();
-
-  const bettingTimeLeft = session?.betting_deadline
-    ? Math.max(0, Math.floor((new Date(session.betting_deadline).getTime() - Date.now()) / 1000))
-    : 0;
+  const canBet = isBetting && myRow && bettingTimeLeft > 0;
 
   return (
     <div className="w-full h-full flex flex-col p-2 gap-2">
@@ -843,10 +850,10 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                           </>
                         ) : isSpinningStage ? (
                           <div className="text-yellow-400 text-3xl animate-pulse">🎰</div>
-                        ) : isBetting ? (
+                        ) : isBetting && bettingTimeLeft > 0 ? (
                           <>
                             <div className="text-white/60 text-xs mb-1">Time Left</div>
-                            <div className="text-2xl font-bold text-white">{bettingTimeLeft}s</div>
+                            <div className="text-3xl font-bold text-white tabular-nums">{bettingTimeLeft}</div>
                           </>
                         ) : (
                           <div className="text-white/40 text-sm">Ready</div>
@@ -929,10 +936,10 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
             {/* Panel Header */}
             <div className="flex items-center justify-between p-3 border-b border-white/10">
               <div className="text-white font-bold text-lg">Place Your Bet</div>
-              {isBetting && (
+              {isBetting && bettingTimeLeft > 0 && (
                 <div className="flex items-center gap-2">
                   <div className="text-white/60 text-sm">Time:</div>
-                  <div className="text-yellow-400 font-bold text-lg">{bettingTimeLeft}s</div>
+                  <div className="text-yellow-400 font-bold text-lg tabular-nums">{bettingTimeLeft}</div>
                 </div>
               )}
               <button
