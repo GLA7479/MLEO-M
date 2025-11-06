@@ -741,40 +741,46 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                         );
                       })}
                     </div>
+                    
+                    {/* Center Display - Result in center of wheel */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="w-32 h-32 rounded-full bg-black/80 border-4 border-white/30 flex flex-col items-center justify-center shadow-2xl">
+                        {isResults && session?.spin_result !== null ? (
+                          <>
+                            <div className="text-5xl font-bold mb-1" style={{
+                              color: session.spin_color === 'red' ? '#dc2626' : 
+                                     session.spin_color === 'black' ? '#ffffff' : 
+                                     '#059669'
+                            }}>
+                              {session.spin_result}
+                            </div>
+                            <div 
+                              className="text-xs font-semibold px-3 py-1 rounded-full"
+                              style={{
+                                backgroundColor: session.spin_color === 'red' ? '#dc2626' : 
+                                                session.spin_color === 'black' ? '#1f2937' : 
+                                                '#059669',
+                                color: '#ffffff'
+                              }}
+                            >
+                              {session.spin_color?.toUpperCase() || ''}
+                            </div>
+                          </>
+                        ) : isSpinningStage ? (
+                          <div className="text-yellow-400 text-3xl animate-pulse">🎰</div>
+                        ) : isBetting ? (
+                          <>
+                            <div className="text-white/60 text-xs mb-1">Time Left</div>
+                            <div className="text-2xl font-bold text-white">{bettingTimeLeft}s</div>
+                          </>
+                        ) : (
+                          <div className="text-white/40 text-sm">Ready</div>
+                        )}
+                      </div>
+                    </div>
+                    
                     {/* Pointer */}
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[20px] border-transparent border-t-yellow-400"></div>
-                  </div>
-
-                  {/* Result Display */}
-                  <div className="flex flex-col gap-2">
-                    {isResults && session?.spin_result !== null && (
-                      <div className="bg-white/10 rounded-lg p-4 text-center">
-                        <div className="text-white/60 text-sm mb-1">Result</div>
-                        <div
-                          className={`text-4xl font-bold ${
-                            session.spin_color === 'red'
-                              ? 'text-red-400'
-                              : session.spin_color === 'black'
-                              ? 'text-black'
-                              : 'text-green-400'
-                          }`}
-                        >
-                          {session.spin_result}
-                        </div>
-                      </div>
-                    )}
-                    {isBetting && (
-                      <div className="bg-white/10 rounded-lg p-4 text-center">
-                        <div className="text-white/60 text-sm mb-1">Time Left</div>
-                        <div className="text-2xl font-bold text-white">{bettingTimeLeft}s</div>
-                      </div>
-                    )}
-                    {isSpinningStage && (
-                      <div className="bg-white/10 rounded-lg p-4 text-center">
-                        <div className="text-white/60 text-sm mb-1">Spinning...</div>
-                        <div className="text-2xl font-bold text-yellow-400">🎰</div>
-                      </div>
-                    )}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[20px] border-transparent border-t-yellow-400 z-10"></div>
                   </div>
                 </div>
               </div>
