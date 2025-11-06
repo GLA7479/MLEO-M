@@ -5,9 +5,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 
 // ===== Config =====
-const BETTING_SECONDS = Number(process.env.NEXT_PUBLIC_ROULETTE_BETTING_SECONDS || 20);
+const BETTING_SECONDS = Number(process.env.NEXT_PUBLIC_ROULETTE_BETTING_SECONDS || 30);
 const SPINNING_SECONDS = 5;
 const RESULTS_SECONDS = 10;
+const AUTO_START_DELAY = 5; // seconds after results to auto-start next round
 const MIN_BET = 100;
 
 // European Roulette numbers (0-36)
@@ -545,14 +546,53 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
         total_payouts: updatedSession.total_payouts || 0,
       });
 
-      // Move to results stage and then back to lobby
+      // Move to results stage, then after delay auto-start next round
       setTimeout(async () => {
-        await supabase
+        // After results display, move to lobby and auto-start next round
+        const { data: lobbySession } = await supabase
           .from("roulette_sessions")
           .update({ stage: "lobby" })
-          .eq("id", updatedSession.id);
-        // Reset spinning flag after all animations complete
+          .eq("id", updatedSession.id)
+          .select()
+          .single();
+        
+        // Reset spinning flag
         spinningRef.current = false;
+        
+        // Auto-start next round after AUTO_START_DELAY seconds
+        if (lobbySession && isLeader) {
+          setTimeout(async () => {
+            // Start next round automatically
+            const deadline = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
+            
+            // Reset player bets
+            await supabase
+              .from("roulette_players")
+              .update({ total_bet: 0, total_won: 0 })
+              .eq("session_id", lobbySession.id);
+            
+            // Start betting stage
+            const { data: newSession } = await supabase
+              .from("roulette_sessions")
+              .update({
+                stage: "betting",
+                betting_deadline: deadline,
+                spin_result: null,
+                spin_color: null,
+                spin_number: (lobbySession.spin_number || 0) + 1,
+                total_bets: 0,
+                total_payouts: 0,
+              })
+              .eq("id", lobbySession.id)
+              .select()
+              .single();
+            
+            if (newSession) {
+              setSession(newSession);
+              setBets([]); // Clear bets list
+            }
+          }, AUTO_START_DELAY * 1000);
+        }
       }, RESULTS_SECONDS * 1000);
     }, SPINNING_SECONDS * 1000);
     } catch (error) {
