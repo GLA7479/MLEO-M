@@ -918,6 +918,39 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                   </button>
                 )}
               </div>
+
+              {/* My Bets - Always visible */}
+              {myBets.length > 0 && (
+                <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                  <div className="text-white font-bold text-sm mb-2 text-center">My Bets</div>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {myBets.map((bet) => (
+                      <div
+                        key={bet.id}
+                        className="px-3 py-1.5 rounded bg-white/10 text-white text-xs sm:text-sm border border-white/20"
+                      >
+                        <span className="font-semibold">
+                          {bet.bet_type === 'number' ? `#${bet.bet_value}` : 
+                           bet.bet_type === 'red' ? 'RED' :
+                           bet.bet_type === 'black' ? 'BLACK' :
+                           bet.bet_type === 'even' ? 'EVEN' :
+                           bet.bet_type === 'odd' ? 'ODD' :
+                           bet.bet_type === 'low' ? '1-18' :
+                           bet.bet_type === 'high' ? '19-36' :
+                           bet.bet_type === 'dozen1' ? '1st 12' :
+                           bet.bet_type === 'dozen2' ? '2nd 12' :
+                           bet.bet_type === 'dozen3' ? '3rd 12' :
+                           bet.bet_type === 'column1' ? 'Col 1' :
+                           bet.bet_type === 'column2' ? 'Col 2' :
+                           bet.bet_type === 'column3' ? 'Col 3' :
+                           bet.bet_type}
+                        </span>
+                        <span className="ml-1 text-yellow-400">{fmt(bet.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
         
         {msg && (
