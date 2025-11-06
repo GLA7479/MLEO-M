@@ -1106,11 +1106,11 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
             {/* Panel Content - Scrollable */}
             <div className="overflow-y-auto p-3 md:p-4" style={{ maxHeight: 'calc(80vh - 80px)' }}>
               {/* Bet Amount Controls */}
-              <div className="flex items-center gap-2 mb-4 flex-wrap" style={{ width: '50%', marginLeft: 'auto', marginRight: 'auto' }}>
+              <div className="flex items-center gap-1 md:gap-2 mb-4 flex-nowrap overflow-x-auto" style={{ width: '100%' }}>
                 <button
                   onClick={() => setBetAmount(a => Math.max(MIN_BET, Math.floor((a || MIN_BET) - MIN_BET)))}
                   disabled={!canBet}
-                  className="px-3 py-2 rounded bg-white/10 text-white text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
                   −
                 </button>
@@ -1122,47 +1122,45 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                   value={betAmount}
                   onChange={(e) => setBetAmount(Math.max(MIN_BET, parseInt(e.target.value) || MIN_BET))}
                   disabled={!canBet}
-                  className="flex-1 min-w-[80px] max-w-[120px] px-3 py-2 rounded bg-white/10 text-white border border-white/20 text-center disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex-1 min-w-[60px] md:min-w-[80px] max-w-[100px] md:max-w-[120px] px-2 md:px-3 py-2 rounded bg-white/10 text-white border border-white/20 text-center text-xs md:text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 />
                 
                 <button
                   onClick={() => setBetAmount(a => Math.max(MIN_BET, Math.floor((a || MIN_BET) + MIN_BET)))}
                   disabled={!canBet}
-                  className="px-3 py-2 rounded bg-white/10 text-white text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
                   +
                 </button>
                 
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button 
-                    onClick={() => setBetAmount(MIN_BET)} 
-                    disabled={!canBet}
-                    className="px-3 py-2 rounded bg-white/10 text-white text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    Min
-                  </button>
-                  <button 
-                    onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 20)))} 
-                    disabled={!canBet}
-                    className="px-3 py-2 rounded bg-white/10 text-white text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    5%
-                  </button>
-                  <button 
-                    onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 10)))} 
-                    disabled={!canBet}
-                    className="px-3 py-2 rounded bg-white/10 text-white text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    10%
-                  </button>
-                  <button 
-                    onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 4)))} 
-                    disabled={!canBet}
-                    className="px-3 py-2 rounded bg-white/10 text-white text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    25%
-                  </button>
-                </div>
+                <button 
+                  onClick={() => setBetAmount(MIN_BET)} 
+                  disabled={!canBet}
+                  className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                >
+                  Min
+                </button>
+                <button 
+                  onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 20)))} 
+                  disabled={!canBet}
+                  className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                >
+                  5%
+                </button>
+                <button 
+                  onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 10)))} 
+                  disabled={!canBet}
+                  className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                >
+                  10%
+                </button>
+                <button 
+                  onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 4)))} 
+                  disabled={!canBet}
+                  className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                >
+                  25%
+                </button>
               </div>
 
               {!canBet && (
