@@ -785,40 +785,61 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                 <div className="flex items-center justify-center gap-4">
                   {/* Wheel */}
                   <div className="relative w-64 h-64">
+                    {/* Wheel background with gradient */}
                     <div
-                      className="w-full h-full rounded-full border-4 border-white/20 relative overflow-hidden"
+                      className="absolute inset-0 rounded-full border-4 border-white/20"
                       style={{
                         background: "conic-gradient(" +
                           ROULETTE_NUMBERS.map((n, i) => {
-                            const color = n.color === 'red' ? '#dc2626' : n.color === 'black' ? '#1f2937' : '#059669';
-                            const start = (i / ROULETTE_NUMBERS.length) * 360;
-                            const end = ((i + 1) / ROULETTE_NUMBERS.length) * 360;
-                            return `${color} ${start}deg ${end}deg`;
-                          }).join(', ') + ")",
+                            const c = n.color === 'red' ? '#dc2626' : n.color === 'black' ? '#1f2937' : '#059669';
+                            const a0 = (i / ROULETTE_NUMBERS.length) * 360;
+                            const a1 = ((i + 1) / ROULETTE_NUMBERS.length) * 360;
+                            return `${c} ${a0}deg ${a1}deg`;
+                          }).join(", ") + ")",
                         transform: `rotate(${spinAngle}deg)`,
-                        transition: isSpinning ? 'transform 5s cubic-bezier(0.25, 0.1, 0.25, 1)' : 'none'
+                        transition: isSpinning ? "transform 5s cubic-bezier(0.25,0.1,0.25,1)" : "none",
+                      }}
+                    />
+                    
+                    {/* Numbers overlay - positioned on outer edge, counter-rotate to stay upright */}
+                    <div 
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        transform: `rotate(${spinAngle}deg)`,
+                        transition: isSpinning ? "transform 5s cubic-bezier(0.25,0.1,0.25,1)" : "none",
                       }}
                     >
-                      {/* Numbers overlay */}
                       {ROULETTE_NUMBERS.map((n, i) => {
-                        const angle = (i / ROULETTE_NUMBERS.length) * 360;
+                        // Calculate angle for this number slot (center of segment)
+                        const segmentSize = 360 / ROULETTE_NUMBERS.length;
+                        const segmentAngle = i * segmentSize;
+                        const centerAngle = segmentAngle + (segmentSize / 2);
+                        
+                        // Convert to radians, adjust for starting at top (-90 degrees)
+                        const angleRad = (centerAngle - 90) * (Math.PI / 180);
+                        
+                        // Position at outer edge
+                        const radiusPx = 120;
+                        const centerPx = 128; // Half of 256px
+                        
+                        const x = centerPx + radiusPx * Math.cos(angleRad);
+                        const y = centerPx + radiusPx * Math.sin(angleRad);
+                        
                         return (
                           <div
-                            key={i}
-                            className="absolute inset-0 flex items-center justify-center"
+                            key={`num-${n.num}-${i}`}
+                            className="absolute flex items-center justify-center text-white text-[9px] font-bold"
                             style={{
-                              transform: `rotate(${angle}deg)`,
+                              left: `${x}px`,
+                              top: `${y}px`,
+                              transform: `translate(-50%, -50%) rotate(-${spinAngle}deg)`,
+                              transition: isSpinning ? "transform 5s cubic-bezier(0.25,0.1,0.25,1)" : "none",
+                              color: n.color === 'red' ? '#ffcccc' : n.color === 'black' ? '#ffffff' : '#90ee90',
+                              textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                              zIndex: 20,
                             }}
                           >
-                            <div
-                              className="absolute w-8 h-8 flex items-center justify-center text-white text-xs font-bold rounded-full"
-                              style={{
-                                transform: `rotate(-${angle}deg) translateY(-120px)`,
-                                backgroundColor: n.color === 'red' ? '#dc2626' : n.color === 'black' ? '#1f2937' : '#059669',
-                              }}
-                            >
-                              {n.num}
-                            </div>
+                            {n.num}
                           </div>
                         );
                       })}
