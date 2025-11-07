@@ -7,6 +7,15 @@ import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 const MIN_BET = 1000;
 const SEATS = 6;
 
+const MIN_BUYIN_OPTIONS = {
+  '1K': 1_000,
+  '10K': 10_000,
+  '100K': 100_000,
+  '1M': 1_000_000,
+  '10M': 10_000_000,
+  '100M': 100_000_000,
+};
+
 // ---------- Utils ----------
 function safeRead(key, fallback){ try { const raw = localStorage.getItem(key); return raw? JSON.parse(raw) : fallback; } catch { return fallback; } }
 function safeWrite(key, val){ try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
@@ -88,7 +97,7 @@ function HandView({ hand, size = "normal", isDealing = false }) {
 }
 
 // ---------- Component ----------
-export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth }) {
+export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, tierCode = '10K' }) {
   // Use same vault functions as existing games
   function getVault() {
     const rushData = JSON.parse(localStorage.getItem("mleo_rush_core_v4") || "{}");
@@ -101,6 +110,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
     localStorage.setItem("mleo_rush_core_v4", JSON.stringify(rushData));
   }
   const name = playerName || "Guest";
+  const minRequired = MIN_BUYIN_OPTIONS[tierCode] ?? 0;
 
   // בדיקת חיבור מיידית
   useEffect(() => {
@@ -425,6 +435,10 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
   async function ensureSeated() {
     if (!session?.id || !name) return null;
+    if (getVault() < minRequired) {
+      setMsg(`Minimum buy-in is ${fmt(minRequired)}`);
+      return null;
+    }
     const client_id = clientId;
 
     // יש כבר שורה שלי?
@@ -1199,8 +1213,18 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
   if (!roomId) return <div className="w-full h-full flex items-center justify-center text-white/70 text-sm">Select or create a room to start.</div>;
   const dealerV = handValue(session?.dealer_hand || []);
 
+  const currentVault = getVault();
+
   return (
     <div className="w-full h-full flex flex-col p-1 md:p-2 gap-1 md:gap-2 -mt-1">
+
+      <div className="flex items-center justify-between bg-white/5 rounded-lg p-2 border border-white/10">
+        <div className="text-white font-bold text-base md:text-lg">Blackjack</div>
+        <div className="flex items-center gap-2 text-white/70 text-xs md:text-sm">
+          <span>Min: {fmt(minRequired)}</span>
+          <span>💰 {fmt(currentVault)}</span>
+        </div>
+      </div>
 
       {/* Main Game Area */}
       <div className="flex-1 flex flex-col gap-1 md:gap-2">

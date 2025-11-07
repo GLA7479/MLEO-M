@@ -10,6 +10,15 @@ const SPINNING_SECONDS = 5;
 const RESULTS_SECONDS = 5; // Show result for 5 seconds
 const MIN_BET = 100;
 
+const MIN_BUYIN_OPTIONS = {
+  '1K': 1_000,
+  '10K': 10_000,
+  '100K': 100_000,
+  '1M': 1_000_000,
+  '10M': 10_000_000,
+  '100M': 100_000_000,
+};
+
 // European Roulette numbers (0-36)
 const ROULETTE_NUMBERS = [
   { num: 0, color: 'green', row: 0 },
@@ -145,7 +154,7 @@ case 'column':
   }
 }
 
-export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) {
+export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, tierCode = '10K' }) {
   useEffect(() => {
     window.updateVaultCallback = setVaultBoth;
     return () => {
@@ -155,6 +164,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
 
   const name = playerName || "Guest";
   const clientId = useMemo(() => getClientId(), []);
+  const minRequired = MIN_BUYIN_OPTIONS[tierCode] ?? 0;
   const [session, setSession] = useState(null);
   const [players, setPlayers] = useState([]);
   const [bets, setBets] = useState([]);
@@ -562,6 +572,11 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
         return;
       }
 
+      if (readVault() < minRequired) {
+        setMsg(`Minimum buy-in is ${fmt(minRequired)}`);
+        return;
+      }
+
       let sess = session;
       if (!sess || !sess.id) {
         sess = await ensureRouletteSession(roomId);
@@ -720,6 +735,11 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
 
     if (sess.stage !== "betting") {
       setMsg("Betting is closed");
+      return;
+    }
+
+    if (readVault() < minRequired) {
+      setMsg(`Minimum buy-in is ${fmt(minRequired)}`);
       return;
     }
 
@@ -1139,6 +1159,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
       <div className="flex items-center justify-between bg-white/5 rounded-xl p-2 border border-white/10">
         <div className="text-white font-bold text-lg">🎰 Roulette</div>
         <div className="flex items-center gap-2 text-white/80 text-sm">
+          <span>Min: {fmt(minRequired)}</span>
           <span>💰 {fmt(readVault())}</span>
           {myRow && <span>Balance: {fmt(myRow.balance || 0)}</span>}
         </div>

@@ -337,7 +337,7 @@ export default function ArcadeOnline() {
     setSelectedTier(tierCode || '10K');
     setShowRoomBrowser(false);
     const query = { ...router.query, game: selectedGame, room: roomId };
-    if (selectedGame === 'poker' && tierCode) query.tier = tierCode;
+    if (tierCode) query.tier = tierCode;
     router.push({ pathname: router.pathname, query }, undefined, { shallow: true });
   }
 

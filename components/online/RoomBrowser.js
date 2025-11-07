@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabaseMP as supabase, getClientId } from "../../lib/supabaseClients";
 
 const TIER_OPTIONS = ['1K','10K','100K','1M','10M','100M'];
+const TIERED_GAMES = ['poker', 'backgammon', 'roulette', 'blackjack'];
 
 export default function RoomBrowser({ gameId, playerName, onJoinRoom }) {
   const [rooms, setRooms] = useState([]);
@@ -50,7 +51,7 @@ export default function RoomBrowser({ gameId, playerName, onJoinRoom }) {
   async function createRoom() {
     if (!title.trim()) return;
     setCreating(true);
-    const payload = (gameId === 'poker')
+    const payload = TIERED_GAMES.includes(gameId)
       ? { game_id: gameId, title, is_locked: !!usePasscode, passcode: usePasscode ? passcode.trim() || null : null, meta: { tier_code: tier } }
       : { game_id: gameId, title, is_locked: !!usePasscode, passcode: usePasscode ? passcode.trim() || null : null };
     await supabase.from("arcade_rooms").insert(payload);
@@ -86,7 +87,7 @@ export default function RoomBrowser({ gameId, playerName, onJoinRoom }) {
         joined_at: new Date().toISOString() 
       }, { onConflict: "room_id,client_id" });
     const tierCode = room?.meta?.tier_code || '10K';
-    onJoinRoom?.(room.id, gameId === 'poker' ? tierCode : undefined);
+    onJoinRoom?.(room.id, TIERED_GAMES.includes(gameId) ? tierCode : undefined);
   }
 
   return (
@@ -101,7 +102,7 @@ export default function RoomBrowser({ gameId, playerName, onJoinRoom }) {
           return (
             <div key={r.id} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-2">
               <div className="flex-1">
-                <div className="text-white font-semibold text-sm truncate">{r.title} {gameId === 'poker' && (<span className="text-white/50 text-[11px]">• {tierCode}</span>)}</div>
+                <div className="text-white font-semibold text-sm truncate">{r.title} {TIERED_GAMES.includes(gameId) && (<span className="text-white/50 text-[11px]">• {tierCode}</span>)}</div>
                 <div className="flex items-center gap-2 text-white/50 text-[11px]">
                   <span>{new Date(r.created_at).toLocaleString()}</span>
                   <span className="text-emerald-400">•</span>
@@ -125,7 +126,7 @@ export default function RoomBrowser({ gameId, playerName, onJoinRoom }) {
         {usePasscode && (
           <input value={passcode} onChange={e=>setPasscode(e.target.value)} placeholder="Passcode" className="w-full px-2 py-1.5 text-xs rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400" />
         )}
-        {gameId === 'poker' && (
+        {TIERED_GAMES.includes(gameId) && (
           <div className="flex items-center gap-2">
             <label className="text-white/70 text-xs">Tier</label>
             <select

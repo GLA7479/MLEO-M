@@ -14,6 +14,15 @@ const TURN_SECONDS = Number(process.env.NEXT_PUBLIC_BG_TURN_SECONDS || 35);
 const MIN_PLAYERS_TO_START = 2;
 const BUYIN_PER_MATCH = Number(process.env.NEXT_PUBLIC_BG_BUYIN || 1000); // Vault points per match (optional)
 
+const MIN_BUYIN_OPTIONS = {
+  '1K': 1_000,
+  '10K': 10_000,
+  '100K': 100_000,
+  '1M': 1_000_000,
+  '10M': 10_000_000,
+  '100M': 100_000_000,
+};
+
 // ===== Vault helpers (same spirit as PokerMP) =====
 function safeRead(k, d){ try{ const r=localStorage.getItem(k); return r? JSON.parse(r):d }catch{ return d } }
 function safeWrite(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)) }catch{} }
@@ -108,6 +117,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
 
   const name = playerName || "Guest";
   const clientId = useMemo(()=>getClientId(), []);
+  const minRequired = MIN_BUYIN_OPTIONS[tierCode] ?? 0;
   const [ses, setSes] = useState(null);
   const [players, setPlayers] = useState([]);
   const [roomMembers, setRoomMembers] = useState([]);
@@ -196,6 +206,10 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
 
   async function takeSeat(seatIndex){
     if (!clientId) { setMsg("Client not recognized"); return; }
+    if (readVault() < minRequired) {
+      setMsg(`Minimum buy-in is ${fmt(minRequired)}`);
+      return;
+    }
     let session = ses;
     if (!session || !session.id) {
       session = await ensureBgSession(roomId);
@@ -690,6 +704,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
         <div className="text-white font-bold text-sm md:text-lg">Backgammon</div>
         <div className="flex items-center gap-1 md:gap-2 text-white/80 text-xs">
           <span>Stage: {ses?.stage || "lobby"}</span>
+          <span>Min: {fmt(minRequired)}</span>
           {isMyTurn && ses?.turn_deadline && (
             <TurnCountdown deadline={ses.turn_deadline} />
           )}
