@@ -1236,7 +1236,27 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
         {/* Game Board */}
         <div className="flex-1 flex flex-col gap-2">
               {/* Roulette Wheel */}
-              <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+              <div className="bg-white/5 rounded-xl p-4 border border-white/10 relative">
+                {myRow && (
+                  <button
+                    onClick={leaveGame}
+                    className="absolute top-3 left-3 px-3 py-1.5 rounded-lg bg-red-600/80 hover:bg-red-700 text-white font-semibold text-xs sm:text-sm shadow-md"
+                  >
+                    LEAVE
+                  </button>
+                )}
+                {isBetting && (
+                  <button
+                    onClick={handleToggleBetPanel}
+                    className={`absolute top-3 right-3 px-3 py-1.5 rounded-lg text-white font-bold text-xs sm:text-sm shadow-md ${
+                      showBetPanel
+                        ? 'bg-purple-600/80 hover:bg-purple-600'
+                        : 'bg-blue-600/80 hover:bg-blue-600'
+                    }`}
+                  >
+                    {showBetPanel ? 'HIDE BETS' : 'SHOW BETS'}
+                  </button>
+                )}
                 <div className="flex items-center justify-center gap-4">
                   {/* Wheel */}
                   <div className="relative w-64 h-64">
@@ -1362,18 +1382,6 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
 
               {/* Controls */}
               <div className="flex items-center justify-center gap-2">
-                {isBetting && (
-                  <button
-                    onClick={handleToggleBetPanel}
-                    className={`px-6 py-3 rounded-lg text-white font-bold transition-all ${
-                      showBetPanel
-                        ? 'bg-purple-600/80 hover:bg-purple-600'
-                        : 'bg-blue-600/80 hover:bg-blue-600'
-                    }`}
-                  >
-                    {showBetPanel ? 'HIDE BETS' : 'SHOW BETS'}
-                  </button>
-                )}
                 {!myRow ? (
                   <button
                     onClick={joinGame}
@@ -1381,14 +1389,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                   >
                     JOIN
                   </button>
-                ) : (
-                  <button
-                    onClick={leaveGame}
-                    className="px-4 py-2 rounded-lg bg-red-600/80 hover:bg-red-700 text-white font-semibold"
-                  >
-                    LEAVE
-                  </button>
-                )}
+                ) : null}
               </div>
 
               {/* My Bets - Always visible */}
