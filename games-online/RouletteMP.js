@@ -27,6 +27,25 @@ const ROULETTE_NUMBERS = [
   { num: 35, color: 'black', row: 0 }, { num: 3, color: 'red', row: 0 }, { num: 26, color: 'black', row: 0 }
 ];
 
+const SEGMENT_SIZE = 360 / ROULETTE_NUMBERS.length;
+
+function normalizeAngle(angle) {
+  return ((angle % 360) + 360) % 360;
+}
+
+function angleToIndex(angle) {
+  const normalized = normalizeAngle(angle);
+  return Math.min(
+    ROULETTE_NUMBERS.length - 1,
+    Math.floor(normalized / SEGMENT_SIZE)
+  );
+}
+
+function indexToCenterAngle(idx) {
+  return idx * SEGMENT_SIZE + SEGMENT_SIZE / 2;
+}
+
+
 // Helper functions
 function safeRead(key, fallback) {
   try {
@@ -190,24 +209,8 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
 
   // Helper function to calculate winning number from angle
   const calculateWinningNumberFromAngle = (angle) => {
-    // Normalize angle to 0-360
-    const normalizedAngle = ((angle % 360) + 360) % 360;
-    
-    // Each number occupies 360/37 degrees
-    // The wheel starts at 0 degrees with number 0 at the top
-    // We need to find which segment the angle falls into
-    const segmentSize = 360 / 37;
-    
-    // Calculate which segment (0-36)
-    // Adjust for the wheel starting position (0 is at top, which is -90 degrees in our coordinate system)
-    const adjustedAngle = (normalizedAngle + 90) % 360;
-    let segmentIndex = Math.floor(adjustedAngle / segmentSize);
-    
-    // Map segment index to actual roulette number (based on ROULETTE_NUMBERS array order)
-    if (segmentIndex >= 0 && segmentIndex < ROULETTE_NUMBERS.length) {
-      return ROULETTE_NUMBERS[segmentIndex].num;
-    }
-    return 0;
+    const idx = angleToIndex(angle);
+    return ROULETTE_NUMBERS[idx]?.num ?? 0;
   };
 
   // Continuous spin animation during betting stage (30 seconds) + 5 seconds slowdown
@@ -313,40 +316,33 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
       // Use requestAnimationFrame for smooth slowdown animation
       const animate = () => {
         const elapsed = (Date.now() - startTime) / 1000; // seconds since slowdown started
-        
+        const clampedElapsed = Math.min(elapsed, FINAL_SLOWDOWN_DURATION);
+        const t = clampedElapsed / FINAL_SLOWDOWN_DURATION;
+
+        // Ease-out cubic: v(t) = initialVelocity * (1 - t^3)
+        // Distance = initialVelocity * FINAL_SLOWDOWN_DURATION * (t - t^4/4)
+        const distance = initialVelocity * FINAL_SLOWDOWN_DURATION * (t - (t * t * t * t) / 4);
+        const candidateAngle = startAngle + distance;
+
         if (elapsed >= FINAL_SLOWDOWN_DURATION) {
-          // Stop completely - calculate final angle using smooth ease-out
-          // For ease-out cubic: when t=1, distance = initialVelocity * FINAL_SLOWDOWN_DURATION * (1 - 1/4) = 0.75
-          // This ensures smooth deceleration - velocity reaches 0 gradually
-          const totalDistance = initialVelocity * FINAL_SLOWDOWN_DURATION * 0.75;
-          const finalAngle = startAngle + totalDistance;
-          currentSpinAngleRef.current = finalAngle;
-          setSpinAngle(finalAngle);
+          const snappedIndex = angleToIndex(candidateAngle);
+          const snappedAngle = indexToCenterAngle(snappedIndex);
+
+          currentSpinAngleRef.current = snappedAngle;
+          setSpinAngle(snappedAngle);
           setIsSlowingDown(false);
           slowingDownStartRef.current = null;
-          
-          // Calculate winning number from final angle and declare winner immediately
-          const winningNumber = calculateWinningNumberFromAngle(finalAngle);
-          // Use setTimeout to ensure state updates are complete
+          animationRunningRef.current = false;
+
+          const winningNumber = ROULETTE_NUMBERS[snappedIndex].num;
           setTimeout(() => {
             declareWinner(winningNumber);
           }, 50);
           return;
         }
-        
-        // Smooth ease-out function: velocity decreases gradually from initialVelocity to 0
-        // Using ease-out cubic for very smooth deceleration without sudden stops
-        const t = elapsed / FINAL_SLOWDOWN_DURATION;
-        // Ease-out cubic: v(t) = initialVelocity * (1 - t^3) for very smooth deceleration
-        // Distance = ∫v(t)dt = initialVelocity * FINAL_SLOWDOWN_DURATION * ∫(1 - t^3)dt
-        // = initialVelocity * FINAL_SLOWDOWN_DURATION * (t - t^4/4)
-        // This ensures velocity approaches 0 smoothly, no sudden stop
-        const distance = initialVelocity * FINAL_SLOWDOWN_DURATION * (t - (t * t * t * t) / 4);
-        // Keep angle continuous for smooth rotation
-        const newAngle = startAngle + distance;
-        currentSpinAngleRef.current = newAngle;
-        // Store full angle - CSS handles modulo correctly for smooth rotation
-        setSpinAngle(newAngle);
+
+        currentSpinAngleRef.current = candidateAngle;
+        setSpinAngle(candidateAngle);
         animationFrameId = requestAnimationFrame(animate);
       };
       
@@ -789,7 +785,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
   
   async function declareWinner(winningNumber) {
     if (!isLeader) return;
-    if (session?.stage !== "betting") return;
+    if (session && !["betting", "spinning"].includes(session.stage)) return;
     
     // Guard against concurrent declarations
     if (spinningRef.current) return;
@@ -824,7 +820,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
       // Save spin to history
       await supabase.from("roulette_spins").insert({
         session_id: updatedSession.id,
-        spin_number: (updatedSession.spin_number || 0) + 1,
+        spin_number: updatedSession.spin_number,
         result: winningNumber,
         color: color,
         total_bets: updatedSession.total_bets || 0,
@@ -1055,10 +1051,18 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
       }
     }
 
-    // Update session totals
+    // Update session totals (aggregate with existing value)
+    const { data: currentSessionTotals } = await supabase
+      .from("roulette_sessions")
+      .select("total_payouts")
+      .eq("id", sessionId)
+      .maybeSingle();
+    
+    const aggregatedPayouts = (currentSessionTotals?.total_payouts || 0) + totalPayouts;
+    
     const { data: updatedSession } = await supabase
       .from("roulette_sessions")
-      .update({ total_payouts: totalPayouts })
+      .update({ total_payouts: aggregatedPayouts })
       .eq("id", sessionId)
       .select()
       .single();
@@ -1089,7 +1093,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
     
     // Update timer immediately
     if (session?.betting_deadline && session.stage === "betting") {
-      const updateTimer = () => {
+      const updateTimer = async () => {
         const now = Date.now();
         const deadline = new Date(session.betting_deadline).getTime();
         const timeLeft = Math.max(0, Math.floor((deadline - now) / 1000));
@@ -1097,7 +1101,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
         
         if (timeLeft <= 0) {
           // Don't auto-spin immediately - let the 5 second slowdown happen first
-          // spinWheel will be called after slowdown completes
+          // spinWheel (declareWinner) will be called after slowdown completes
           clearInterval(timerRef.current);
         }
       };
@@ -1584,7 +1588,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
 
                 {/* Number Grid */}
                 <div className="grid grid-cols-5 xs:grid-cols-6 sm:grid-cols-7 md:grid-cols-9 lg:grid-cols-10 gap-1">
-                  {[0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26].map((num) => {
+                  {Array.from({ length: 37 }, (_, num) => num).map((num) => {
                     const color = getColor(num);
                     return (
                       <button
