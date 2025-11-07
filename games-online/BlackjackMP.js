@@ -467,7 +467,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       client_id,
       player_name: name,
       seat: free,
-      stack: Math.min(getVault(), 10000),
+      stack: Math.min(getVault(), Math.max(10000, minRequired)),
       bet: 0,
       hand: [],
       status: "seated",
@@ -492,7 +492,12 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
   async function placeBet() {
     let row = myRow;
     if (!row) row = await ensureSeated();
-    if (!row || !row.id || bet < MIN_BET) return;
+    const effectiveMinBet = Math.max(MIN_BET, minRequired);
+    if (!row || !row.id) return;
+    if (bet < effectiveMinBet) {
+      setMsg(`Minimum bet is ${fmt(effectiveMinBet)}`);
+      return;
+    }
 
     // בדוק שיש מספיק כסף ב-vault
     const currentVault = getVault();

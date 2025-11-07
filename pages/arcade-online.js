@@ -70,6 +70,8 @@ function fmt(n) {
   return String(n);
 }
 
+const TIERED_GAMES = ['poker', 'backgammon', 'roulette', 'blackjack'];
+
 // Game Registry with lazy loading
 const GAME_REGISTRY = [
   {
@@ -375,6 +377,7 @@ export default function ArcadeOnline() {
     // Reset state and go back to games
     setSelectedGame(null);
     setSelectedRoomId(null);
+    setSelectedTier(null);
     setShowRoomBrowser(false);
     router.push('/arcade-online', undefined, { shallow: true });
   }
@@ -383,9 +386,11 @@ export default function ArcadeOnline() {
     if (showRoomBrowser) {
       setShowRoomBrowser(false);
       setSelectedGame(null);
+      setSelectedTier(null);
     } else if (selectedGame) {
       setSelectedGame(null);
       setSelectedRoomId(null);
+      setSelectedTier(null);
       router.push('/arcade-online', undefined, { shallow: true });
     } else {
       router.push('/mining');
@@ -486,7 +491,7 @@ export default function ArcadeOnline() {
                 setVaultBoth={setVaultBoth}
                 playerName={playerName}
                 roomId={selectedRoomId}
-                tierCode={selectedGame === 'poker' ? selectedTier : undefined}
+                tierCode={TIERED_GAMES.includes(selectedGame) ? (selectedTier || '10K') : undefined}
               />
             </div>
           </div>

@@ -8,7 +8,6 @@ import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 const BETTING_SECONDS = Number(process.env.NEXT_PUBLIC_ROULETTE_BETTING_SECONDS || 30);
 const SPINNING_SECONDS = 5;
 const RESULTS_SECONDS = 5; // Show result for 5 seconds
-const MIN_BET = 100;
 
 const MIN_BUYIN_OPTIONS = {
   '1K': 1_000,
@@ -171,7 +170,11 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
   const [roomMembers, setRoomMembers] = useState([]);
   const [msg, setMsg] = useState("");
   const [selectedBet, setSelectedBet] = useState(null);
-  const [betAmount, setBetAmount] = useState(MIN_BET);
+  const [betAmount, setBetAmount] = useState(minRequired);
+
+  useEffect(() => {
+    setBetAmount(minRequired);
+  }, [minRequired]);
   const [spinAngle, setSpinAngle] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [showBetPanel, setShowBetPanel] = useState(false);
@@ -744,8 +747,8 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     }
 
     const amount = Math.floor(Number(betAmount));
-    if (amount < MIN_BET) {
-      setMsg(`Minimum bet is ${MIN_BET}`);
+    if (amount < minRequired) {
+      setMsg(`Minimum bet is ${fmt(minRequired)}`);
       return;
     }
 
@@ -792,7 +795,9 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
 
     // Deduct from vault
     const v = readVault();
-    writeVault(v - amount);
+    const newVault = v - amount;
+    writeVault(newVault);
+    setVaultBoth?.(newVault);
 
     setMsg("");
   }
@@ -1453,7 +1458,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
               {/* Bet Amount Controls */}
               <div className="flex items-center gap-1 md:gap-2 mb-4 flex-nowrap overflow-x-auto" style={{ width: '100%' }}>
                 <button
-                  onClick={() => setBetAmount(a => Math.max(MIN_BET, Math.floor((a || MIN_BET) - MIN_BET)))}
+                  onClick={() => setBetAmount(a => Math.max(minRequired, Math.floor((a || minRequired) - minRequired)))}
                   disabled={!canBet}
                   className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
@@ -1462,16 +1467,16 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                 
                 <input
                   type="number"
-                  min={MIN_BET}
-                  step={MIN_BET}
+                  min={minRequired}
+                  step={minRequired}
                   value={betAmount}
-                  onChange={(e) => setBetAmount(Math.max(MIN_BET, parseInt(e.target.value) || MIN_BET))}
+                  onChange={(e) => setBetAmount(Math.max(minRequired, parseInt(e.target.value) || minRequired))}
                   disabled={!canBet}
                   className="flex-1 min-w-[60px] md:min-w-[80px] max-w-[100px] md:max-w-[120px] px-2 md:px-3 py-2 rounded bg-white/10 text-white border border-white/20 text-center text-xs md:text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 />
                 
                 <button
-                  onClick={() => setBetAmount(a => Math.max(MIN_BET, Math.floor((a || MIN_BET) + MIN_BET)))}
+                  onClick={() => setBetAmount(a => Math.max(minRequired, Math.floor((a || minRequired) + minRequired)))}
                   disabled={!canBet}
                   className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
@@ -1479,28 +1484,28 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                 </button>
                 
                 <button 
-                  onClick={() => setBetAmount(MIN_BET)} 
+                  onClick={() => setBetAmount(minRequired)} 
                   disabled={!canBet}
                   className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
                   Min
                 </button>
                 <button 
-                  onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 20)))} 
+                  onClick={() => setBetAmount(Math.max(minRequired, Math.floor(readVault() / 20)))} 
                   disabled={!canBet}
                   className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
                   5%
                 </button>
                 <button 
-                  onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 10)))} 
+                  onClick={() => setBetAmount(Math.max(minRequired, Math.floor(readVault() / 10)))} 
                   disabled={!canBet}
                   className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
                   10%
                 </button>
                 <button 
-                  onClick={() => setBetAmount(Math.max(MIN_BET, Math.floor(readVault() / 4)))} 
+                  onClick={() => setBetAmount(Math.max(minRequired, Math.floor(readVault() / 4)))} 
                   disabled={!canBet}
                   className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
