@@ -91,10 +91,11 @@ function getColor(num) {
 // Check if bet wins
 function checkBetWin(betType, betValue, result) {
   const resultColor = getColor(result);
-  
+  const value = parseInt(betValue, 10);
+
   switch (betType) {
     case 'number':
-      return parseInt(betValue) === result;
+      return parseInt(betValue, 10) === result;
     case 'red':
       return resultColor === 'red';
     case 'black':
@@ -107,18 +108,18 @@ function checkBetWin(betType, betValue, result) {
       return result >= 1 && result <= 18;
     case 'high':
       return result >= 19 && result <= 36;
-    case 'dozen1':
-      return result >= 1 && result <= 12;
-    case 'dozen2':
-      return result >= 13 && result <= 24;
-    case 'dozen3':
-      return result >= 25 && result <= 36;
-    case 'column1':
-      return [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34].includes(result);
-    case 'column2':
-      return [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35].includes(result);
-    case 'column3':
-      return [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36].includes(result);
+    case 'dozen': {
+      if (value === 1) return result >= 1 && result <= 12;
+      if (value === 2) return result >= 13 && result <= 24;
+      if (value === 3) return result >= 25 && result <= 36;
+      return false;
+    }
+    case 'column': {
+      if (value === 1) return [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34].includes(result);
+      if (value === 2) return [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35].includes(result);
+      if (value === 3) return [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36].includes(result);
+      return false;
+    }
     default:
       return false;
   }
@@ -136,12 +137,8 @@ function getPayoutMultiplier(betType) {
     case 'low':
     case 'high':
       return 2;
-    case 'dozen1':
-    case 'dozen2':
-    case 'dozen3':
-    case 'column1':
-    case 'column2':
-    case 'column3':
+case 'dozen':
+case 'column':
       return 3;
     default:
       return 1;
@@ -1344,12 +1341,12 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                              bet.bet_type === 'odd' ? 'ODD' :
                              bet.bet_type === 'low' ? '1-18' :
                              bet.bet_type === 'high' ? '19-36' :
-                             bet.bet_type === 'dozen1' ? '1st 12' :
-                             bet.bet_type === 'dozen2' ? '2nd 12' :
-                             bet.bet_type === 'dozen3' ? '3rd 12' :
-                             bet.bet_type === 'column1' ? 'Col 1' :
-                             bet.bet_type === 'column2' ? 'Col 2' :
-                             bet.bet_type === 'column3' ? 'Col 3' :
+                             (bet.bet_type === 'dozen' && bet.bet_value === '1') ? '1st 12' :
+                             (bet.bet_type === 'dozen' && bet.bet_value === '2') ? '2nd 12' :
+                             (bet.bet_type === 'dozen' && bet.bet_value === '3') ? '3rd 12' :
+                             (bet.bet_type === 'column' && bet.bet_value === '1') ? 'Col 1' :
+                             (bet.bet_type === 'column' && bet.bet_value === '2') ? 'Col 2' :
+                             (bet.bet_type === 'column' && bet.bet_value === '3') ? 'Col 3' :
                              bet.bet_type}
                           </span>
                           <span className={`ml-1 ${isPending ? 'text-yellow-400' : isWinner ? 'text-green-100' : 'text-red-100'}`}>
@@ -1543,42 +1540,42 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                     19-36 (2x)
                   </button>
                   <button
-                    onClick={() => placeBet('dozen1', '1')}
+                    onClick={() => placeBet('dozen', '1')}
                     disabled={!canBet}
                     className="px-4 py-2 rounded bg-orange-600 hover:bg-orange-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     1st 12 (3x)
                   </button>
                   <button
-                    onClick={() => placeBet('dozen2', '2')}
+                    onClick={() => placeBet('dozen', '2')}
                     disabled={!canBet}
                     className="px-4 py-2 rounded bg-pink-600 hover:bg-pink-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     2nd 12 (3x)
                   </button>
                   <button
-                    onClick={() => placeBet('dozen3', '3')}
+                    onClick={() => placeBet('dozen', '3')}
                     disabled={!canBet}
                     className="px-4 py-2 rounded bg-cyan-600 hover:bg-cyan-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     3rd 12 (3x)
                   </button>
                   <button
-                    onClick={() => placeBet('column1', '1')}
+                    onClick={() => placeBet('column', '1')}
                     disabled={!canBet}
                     className="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     Col 1 (3x)
                   </button>
                   <button
-                    onClick={() => placeBet('column2', '2')}
+                    onClick={() => placeBet('column', '2')}
                     disabled={!canBet}
                     className="px-4 py-2 rounded bg-teal-600 hover:bg-teal-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     Col 2 (3x)
                   </button>
                   <button
-                    onClick={() => placeBet('column3', '3')}
+                    onClick={() => placeBet('column', '3')}
                     disabled={!canBet}
                     className="px-4 py-2 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
