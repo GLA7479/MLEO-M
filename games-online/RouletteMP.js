@@ -167,6 +167,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
   const [session, setSession] = useState(null);
   const [players, setPlayers] = useState([]);
   const [bets, setBets] = useState([]);
+  const [spinHistory, setSpinHistory] = useState([]);
   const [roomMembers, setRoomMembers] = useState([]);
   const [msg, setMsg] = useState("");
   const [selectedBet, setSelectedBet] = useState(null);
@@ -549,6 +550,43 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
           setBets(data || []);
         }
       });
+
+    return () => ch.unsubscribe();
+  }, [session?.id]);
+
+  // ===== Channel: Spin history =====
+  useEffect(() => {
+    if (!session?.id) {
+      setSpinHistory([]);
+      return;
+    }
+
+    const fetchHistory = async () => {
+      const { data } = await supabase
+        .from("roulette_spins")
+        .select("*")
+        .eq("session_id", session.id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      setSpinHistory(data || []);
+    };
+
+    const ch = supabase
+      .channel("roulette_spins:" + session.id)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "roulette_spins",
+        filter: `session_id=eq.${session.id}`,
+      }, fetchHistory)
+      .subscribe(async (st) => {
+        if (st === "SUBSCRIBED") {
+          await fetchHistory();
+        }
+      });
+
+    // Initial fetch in case subscription misses early data
+    fetchHistory();
 
     return () => ch.unsubscribe();
   }, [session?.id]);
@@ -1410,6 +1448,38 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                   <div className="text-white/40 text-xs text-center py-2">No bets placed</div>
                 )}
               </div>
+
+          {/* Recent Results */}
+          <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+            <div className="text-white font-bold text-sm mb-2 text-center">Last 10 Results</div>
+            {spinHistory.length > 0 ? (
+              <div className="flex flex-wrap gap-2 justify-center">
+                {spinHistory.map((spin) => {
+                  const chipColor =
+                    spin.color === "red"
+                      ? "bg-red-600/80 border-red-400"
+                      : spin.color === "black"
+                      ? "bg-gray-900/80 border-gray-500"
+                      : "bg-emerald-600/80 border-emerald-400";
+                  const textColor =
+                    spin.color === "black" ? "text-gray-100" : "text-white";
+                  return (
+                    <div
+                      key={spin.id || `${spin.session_id}-${spin.spin_number}`}
+                      className={`px-3 py-1.5 rounded border ${chipColor} ${textColor} text-xs sm:text-sm flex items-center gap-2`}
+                    >
+                      <span className="font-bold text-base">{spin.result}</span>
+                      <span className="uppercase tracking-wide text-[10px] sm:text-xs">
+                        {spin.color}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-white/40 text-xs text-center py-2">No results yet</div>
+            )}
+          </div>
             </div>
         
         {msg && (
