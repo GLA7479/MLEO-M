@@ -1549,7 +1549,10 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                   <button
                     onClick={() => placeBet('dozen', '2')}
                     disabled={!canBet}
-                    className="px-4 py-2 rounded bg-pink-600 hover:bg-pink-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 rounded text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    style={{ backgroundColor: '#db2777' /* pink-600 */, }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#be185d'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#db2777'}
                   >
                     2nd 12 (3x)
                   </button>
@@ -1563,14 +1566,20 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                   <button
                     onClick={() => placeBet('column', '1')}
                     disabled={!canBet}
-                    className="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 rounded text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    style={{ backgroundColor: '#4f46e5' /* indigo-600 */ }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4338ca'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4f46e5'}
                   >
                     Col 1 (3x)
                   </button>
                   <button
                     onClick={() => placeBet('column', '2')}
                     disabled={!canBet}
-                    className="px-4 py-2 rounded bg-teal-600 hover:bg-teal-700 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 rounded text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    style={{ backgroundColor: '#0f766e' /* teal-600 */ }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0d9488'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#0f766e'}
                   >
                     Col 2 (3x)
                   </button>
@@ -1611,14 +1620,33 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth }) 
                   <div className="mt-4 pt-4 border-t border-white/10">
                     <div className="text-white font-bold mb-2 text-sm">My Bets</div>
                     <div className="flex flex-wrap gap-2">
-                      {myBets.map((bet) => (
-                        <div
-                          key={bet.id}
-                          className="px-3 py-1 rounded bg-white/10 text-white text-xs sm:text-sm"
-                        >
-                          {bet.bet_type === 'number' ? bet.bet_value : bet.bet_type}: {fmt(bet.amount)}
-                        </div>
-                      ))}
+                      {myBets.map((bet) => {
+                        let label = bet.bet_type.toUpperCase();
+                        if (bet.bet_type === 'number') label = `#${bet.bet_value}`;
+                        else if (bet.bet_type === 'red') label = 'RED';
+                        else if (bet.bet_type === 'black') label = 'BLACK';
+                        else if (bet.bet_type === 'even') label = 'EVEN';
+                        else if (bet.bet_type === 'odd') label = 'ODD';
+                        else if (bet.bet_type === 'low') label = '1-18';
+                        else if (bet.bet_type === 'high') label = '19-36';
+                        else if (bet.bet_type === 'dozen') {
+                          if (bet.bet_value === '1') label = '1st 12';
+                          else if (bet.bet_value === '2') label = '2nd 12';
+                          else if (bet.bet_value === '3') label = '3rd 12';
+                        } else if (bet.bet_type === 'column') {
+                          if (bet.bet_value === '1') label = 'Col 1';
+                          else if (bet.bet_value === '2') label = 'Col 2';
+                          else if (bet.bet_value === '3') label = 'Col 3';
+                        }
+                        return (
+                          <div
+                            key={bet.id}
+                            className="px-3 py-1 rounded bg-white/10 text-white text-xs sm:text-sm"
+                          >
+                            {label}: {fmt(bet.amount)}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
