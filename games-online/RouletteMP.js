@@ -1455,23 +1455,19 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
             {spinHistory.length > 0 ? (
               <div className="flex flex-wrap gap-2 justify-center">
                 {spinHistory.map((spin) => {
-                  const chipColor =
+                  const colorStyle =
                     spin.color === "red"
-                      ? "bg-red-600/80 border-red-400"
+                      ? { backgroundColor: "#dc2626", borderColor: "#b91c1c", color: "#fff" }
                       : spin.color === "black"
-                      ? "bg-gray-900/80 border-gray-500"
-                      : "bg-emerald-600/80 border-emerald-400";
-                  const textColor =
-                    spin.color === "black" ? "text-gray-100" : "text-white";
+                      ? { backgroundColor: "#111827", borderColor: "#374151", color: "#f3f4f6" }
+                      : { backgroundColor: "#047857", borderColor: "#10b981", color: "#ecfdf5" };
                   return (
                     <div
                       key={spin.id || `${spin.session_id}-${spin.spin_number}`}
-                      className={`px-3 py-1.5 rounded border ${chipColor} ${textColor} text-xs sm:text-sm flex items-center gap-2`}
+                      className="px-3 py-1.5 rounded border text-sm font-bold shadow-sm"
+                      style={colorStyle}
                     >
-                      <span className="font-bold text-base">{spin.result}</span>
-                      <span className="uppercase tracking-wide text-[10px] sm:text-xs">
-                        {spin.color}
-                      </span>
+                      {spin.result}
                     </div>
                   );
                 })}
