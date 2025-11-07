@@ -363,6 +363,8 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
           setIsSlowingDown(false);
           slowingDownStartRef.current = null;
           animationRunningRef.current = false;
+          bettingStartTimeRef.current = null;
+          bettingStartAngleRef.current = null;
 
           const winningNumber = ROULETTE_NUMBERS[snappedIndex].num;
           setTimeout(() => {
