@@ -1,7 +1,7 @@
 // Roulette Multiplayer - European Roulette (0-36)
 // Aligned with PokerMP/BlackjackMP patterns
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 
 // ===== Config =====
@@ -179,6 +179,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
   const [spinAngle, setSpinAngle] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [showBetPanel, setShowBetPanel] = useState(false);
+  const [showAllBetsPanel, setShowAllBetsPanel] = useState(false);
   const [panelDismissed, setPanelDismissed] = useState(false);
   const [bettingTimeLeft, setBettingTimeLeft] = useState(0);
   const timerRef = useRef(null);
@@ -410,6 +411,69 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
   // My player row
   const myRow = players.find(p => p.client_id === clientId) || null;
   
+  const playerNameById = useMemo(() => {
+    const map = new Map();
+    players.forEach((p) => {
+      if (p?.id) map.set(p.id, p.player_name || "Unknown");
+    });
+    return map;
+  }, [players]);
+
+  const describeBet = useCallback((bet) => {
+    if (!bet) return "";
+    switch (bet.bet_type) {
+      case "number":
+        return `#${bet.bet_value}`;
+      case "red":
+        return "RED";
+      case "black":
+        return "BLACK";
+      case "even":
+        return "EVEN";
+      case "odd":
+        return "ODD";
+      case "low":
+        return "1-18";
+      case "high":
+        return "19-36";
+      case "dozen":
+        if (bet.bet_value === "1") return "1st 12";
+        if (bet.bet_value === "2") return "2nd 12";
+        if (bet.bet_value === "3") return "3rd 12";
+        return "Dozen";
+      case "column":
+        if (bet.bet_value === "1") return "Col 1";
+        if (bet.bet_value === "2") return "Col 2";
+        if (bet.bet_value === "3") return "Col 3";
+        return "Column";
+      default:
+        return bet.bet_type;
+    }
+  }, []);
+
+  const allBetsThisRound = useMemo(() => {
+    if (!bets?.length) return [];
+    return bets.map((bet) => {
+      const name = playerNameById.get(bet.player_id) || "Unknown";
+      const label = describeBet(bet);
+      const isWinner = bet.is_winner === true;
+      const isLoser = bet.is_winner === false;
+      return {
+        id: bet.id,
+        player: name,
+        label,
+        amount: fmt(bet.amount),
+        status: bet.is_winner,
+        payout: isWinner && bet.payout_amount ? fmt(bet.payout_amount) : null,
+        className: isWinner
+          ? "bg-green-600/80 border-green-400 text-green-100"
+          : isLoser
+          ? "bg-red-600/80 border-red-400 text-red-100"
+          : "bg-white/10 border-white/20 text-white",
+      };
+    });
+  }, [bets, playerNameById, describeBet]);
+
   // My bets - sorted and memoized
   // Show bets from current spin, or keep previous spin bets until new betting starts
   const myBets = useMemo(() => {
@@ -445,8 +509,9 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     } else {
       if (showBetPanel) setShowBetPanel(false);
       if (panelDismissed) setPanelDismissed(false);
+      if (showAllBetsPanel) setShowAllBetsPanel(false);
     }
-  }, [session?.stage, bettingTimeLeft, panelDismissed, showBetPanel]);
+  }, [session?.stage, bettingTimeLeft, panelDismissed, showBetPanel, showAllBetsPanel]);
 
   // ===== Channel: Sessions per room =====
   useEffect(() => {
@@ -1257,6 +1322,44 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                     {showBetPanel ? 'HIDE BETS' : 'SHOW BETS'}
                   </button>
                 )}
+                <div className="absolute inset-0 pointer-events-none">
+                  <button
+                    onClick={() => setShowAllBetsPanel((prev) => !prev)}
+                    className="pointer-events-auto absolute right-3 bottom-3 px-3 py-1.5 rounded-lg bg-amber-600/80 hover:bg-amber-600 text-white font-semibold text-xs sm:text-sm shadow-md z-30"
+                  >
+                    {showAllBetsPanel ? 'HIDE ALL BETS' : 'ALL BETS'}
+                  </button>
+                  {showAllBetsPanel && (
+                    <div className="pointer-events-auto absolute right-3 bottom-16 w-64 sm:w-72 max-h-64 overflow-y-auto bg-black/85 border border-white/15 rounded-xl shadow-2xl p-3 backdrop-blur-sm z-30">
+                      <div className="text-white font-bold text-sm mb-2 text-center">
+                        All Bets (Current Round)
+                      </div>
+                      {allBetsThisRound.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                          {allBetsThisRound.map((item) => (
+                            <div
+                              key={item.id}
+                              className={`rounded-lg border px-3 py-2 text-xs sm:text-sm ${item.className}`}
+                            >
+                              <div className="flex justify-between items-center">
+                                <span className="font-semibold">{item.player}</span>
+                                <span>{item.amount}</span>
+                              </div>
+                              <div className="flex justify-between items-center mt-1 text-[11px] sm:text-xs">
+                                <span>{item.label}</span>
+                                {item.payout && <span className="text-green-100">+{item.payout}</span>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-white/50 text-xs text-center py-4">
+                          No bets placed yet
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <div className="flex items-center justify-center gap-4">
                   {/* Wheel */}
                   <div className="relative w-64 h-64">
