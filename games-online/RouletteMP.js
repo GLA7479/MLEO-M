@@ -1322,44 +1322,6 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                     {showBetPanel ? 'HIDE BETS' : 'SHOW BETS'}
                   </button>
                 )}
-                <div className="absolute inset-0 pointer-events-none">
-                  <button
-                    onClick={() => setShowAllBetsPanel((prev) => !prev)}
-                    className="pointer-events-auto absolute right-3 bottom-3 px-3 py-1.5 rounded-lg bg-amber-600/80 hover:bg-amber-600 text-white font-semibold text-xs sm:text-sm shadow-md z-30"
-                  >
-                    {showAllBetsPanel ? 'HIDE ALL BETS' : 'ALL BETS'}
-                  </button>
-                  {showAllBetsPanel && (
-                    <div className="pointer-events-auto absolute right-3 bottom-16 w-64 sm:w-72 max-h-64 overflow-y-auto bg-black/85 border border-white/15 rounded-xl shadow-2xl p-3 backdrop-blur-sm z-30">
-                      <div className="text-white font-bold text-sm mb-2 text-center">
-                        All Bets (Current Round)
-                      </div>
-                      {allBetsThisRound.length > 0 ? (
-                        <div className="flex flex-col gap-2">
-                          {allBetsThisRound.map((item) => (
-                            <div
-                              key={item.id}
-                              className={`rounded-lg border px-3 py-2 text-xs sm:text-sm ${item.className}`}
-                            >
-                              <div className="flex justify-between items-center">
-                                <span className="font-semibold">{item.player}</span>
-                                <span>{item.amount}</span>
-                              </div>
-                              <div className="flex justify-between items-center mt-1 text-[11px] sm:text-xs">
-                                <span>{item.label}</span>
-                                {item.payout && <span className="text-green-100">+{item.payout}</span>}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-white/50 text-xs text-center py-4">
-                          No bets placed yet
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
                 <div className="flex items-center justify-center gap-4">
                   {/* Wheel */}
                   <div className="relative w-64 h-64">
@@ -1497,7 +1459,45 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
 
               {/* My Bets - Always visible */}
               <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                <div className="text-white font-bold text-sm mb-2 text-center">My Bets</div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-white font-bold text-sm">My Bets</div>
+                  <button
+                    onClick={() => setShowAllBetsPanel((prev) => !prev)}
+                    className="px-2.5 py-1 rounded-lg bg-amber-600/80 hover:bg-amber-600 text-white font-semibold text-xs shadow"
+                  >
+                    {showAllBetsPanel ? 'Hide All' : 'All Bets'}
+                  </button>
+                </div>
+                {showAllBetsPanel && (
+                  <div className="mb-3 p-3 rounded-lg border border-white/15 bg-black/60 max-h-56 overflow-y-auto">
+                    <div className="text-white/90 font-semibold text-xs sm:text-sm mb-2 text-center">
+                      All Bets (Current Round)
+                    </div>
+                    {allBetsThisRound.length > 0 ? (
+                      <div className="flex flex-col gap-2">
+                        {allBetsThisRound.map((item) => (
+                          <div
+                            key={item.id}
+                            className={`rounded-lg border px-3 py-2 text-xs sm:text-sm ${item.className}`}
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className="font-semibold">{item.player}</span>
+                              <span>{item.amount}</span>
+                            </div>
+                            <div className="flex justify-between items-center mt-1 text-[11px] sm:text-xs">
+                              <span>{item.label}</span>
+                              {item.payout && <span className="text-green-100">+{item.payout}</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-white/40 text-xs text-center py-3">
+                        No bets placed yet
+                      </div>
+                    )}
+                  </div>
+                )}
                 {myBets.length > 0 ? (
                   <div className="flex flex-wrap gap-2 justify-center">
                     {myBets.map((bet) => {
