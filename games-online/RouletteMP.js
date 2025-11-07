@@ -246,7 +246,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
   useEffect(() => {
     let animationFrameId = null;
     const BETTING_DURATION = BETTING_SECONDS;
-    const FINAL_SLOWDOWN_DURATION = 5; // seconds
+    const FINAL_SLOWDOWN_DURATION = 10; // seconds
     
     // Initialize betting start time when betting stage starts
     if (session?.stage === "betting" && bettingTimeLeft > 0) {
@@ -1309,7 +1309,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                             <div className="text-3xl font-bold text-white tabular-nums">{bettingTimeLeft}</div>
                           </>
                         ) : (
-                          <div className="text-white/40 text-sm">Ready</div>
+                          <div className="text-white/40 text-sm uppercase tracking-wide">No More Bet</div>
                         )}
                       </div>
                     </div>
