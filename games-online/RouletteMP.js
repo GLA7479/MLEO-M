@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 
 // ===== Config =====
-const BETTING_SECONDS = Number(process.env.NEXT_PUBLIC_ROULETTE_BETTING_SECONDS || 30);
+const BETTING_SECONDS = Number(process.env.NEXT_PUBLIC_ROULETTE_BETTING_SECONDS || 20);
 const SPINNING_SECONDS = 5;
 const RESULTS_SECONDS = 5; // Show result for 5 seconds
 
@@ -178,6 +178,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
   const [spinAngle, setSpinAngle] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [showBetPanel, setShowBetPanel] = useState(false);
+  const [panelDismissed, setPanelDismissed] = useState(false);
   const [bettingTimeLeft, setBettingTimeLeft] = useState(0);
   const timerRef = useRef(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -188,6 +189,24 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
   const bettingStartTimeRef = useRef(null);
   const bettingStartAngleRef = useRef(null); // Store the initial angle when betting phase starts
   const animationRunningRef = useRef(false); // Prevent multiple animations
+
+  const openBetPanel = () => {
+    setPanelDismissed(false);
+    setShowBetPanel(true);
+  };
+
+  const closeBetPanel = () => {
+    setPanelDismissed(true);
+    setShowBetPanel(false);
+  };
+
+  const handleToggleBetPanel = () => {
+    if (showBetPanel) {
+      closeBetPanel();
+    } else {
+      openBetPanel();
+    }
+  };
 
   // Detect mobile
   useEffect(() => {
@@ -414,15 +433,17 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
 
   // Auto-open bet panel when betting stage starts
   useEffect(() => {
-    if (session?.stage === "betting") {
-      setShowBetPanel(true);
-    } else if (session?.stage !== "betting") {
-      // Keep panel open during spinning/results, close only when in lobby
-      if (session?.stage === "lobby") {
-        setShowBetPanel(false);
+    if (session?.stage === "betting" && bettingTimeLeft > 0) {
+      if (panelDismissed) {
+        if (showBetPanel) setShowBetPanel(false);
+      } else if (!showBetPanel) {
+        setShowBetPanel(true);
       }
+    } else {
+      if (showBetPanel) setShowBetPanel(false);
+      if (panelDismissed) setPanelDismissed(false);
     }
-  }, [session?.stage]);
+  }, [session?.stage, bettingTimeLeft, panelDismissed, showBetPanel]);
 
   // ===== Channel: Sessions per room =====
   useEffect(() => {
@@ -1303,7 +1324,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
               <div className="flex items-center justify-center gap-2">
                 {isBetting && (
                   <button
-                    onClick={() => setShowBetPanel(!showBetPanel)}
+                    onClick={handleToggleBetPanel}
                     className={`px-6 py-3 rounded-lg text-white font-bold transition-all ${
                       showBetPanel
                         ? 'bg-purple-600/80 hover:bg-purple-600'
@@ -1406,7 +1427,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
           {/* Backdrop - Only on mobile */}
           <div
             className="fixed inset-0 bg-black/60 z-40 md:hidden"
-            onClick={() => setShowBetPanel(false)}
+            onClick={closeBetPanel}
           />
           
           {/* Bet Panel */}
@@ -1432,7 +1453,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
             <div className="flex justify-center pt-2 pb-1">
               <div
                 className="w-12 h-1 bg-white/30 rounded-full cursor-pointer"
-                onClick={() => setShowBetPanel(false)}
+                onClick={closeBetPanel}
               />
             </div>
 
@@ -1446,7 +1467,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                 </div>
               )}
               <button
-                onClick={() => setShowBetPanel(false)}
+                onClick={closeBetPanel}
                 className="text-white/60 hover:text-white text-2xl leading-none"
               >
                 ×
