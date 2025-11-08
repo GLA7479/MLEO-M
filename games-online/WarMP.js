@@ -126,16 +126,10 @@ export default function WarMP({
   setVaultBoth,
   tierCode = "10K",
 }) {
-  useEffect(() => {
-    window.updateVaultCallback = setVaultBoth;
-    return () => {
-      delete window.updateVaultCallback;
-    };
-  }, [setVaultBoth]);
-
   const name = playerName || "Guest";
   const clientId = useMemo(() => getClientId(), []);
   const minRequired = MIN_BUYIN_OPTIONS[tierCode] ?? 0;
+  const entryCost = minRequired > 0 ? minRequired : MATCH_BUYIN;
 
   const [ses, setSes] = useState(null);
   const [players, setPlayers] = useState([]);
@@ -143,6 +137,44 @@ export default function WarMP({
   const [msg, setMsg] = useState("");
   const roundRef = useRef(0);
   const [localFlipCountdown, setLocalFlipCountdown] = useState(null);
+  const [vaultBalance, setVaultBalance] = useState(() => readVault());
+  const processedResultRef = useRef(null);
+  const payingRef = useRef(false);
+
+  const syncVault = useCallback(() => {
+    const current = readVault();
+    setVaultBalance(current);
+    if (typeof setVaultBoth === "function") {
+      setVaultBoth(current);
+    }
+    return current;
+  }, [setVaultBoth]);
+
+  useEffect(() => {
+    const handler = (nextValue) => {
+      setVaultBalance(nextValue);
+      if (typeof setVaultBoth === "function") {
+        setVaultBoth(nextValue);
+      }
+    };
+    window.updateVaultCallback = handler;
+    handler(readVault());
+    return () => {
+      if (window.updateVaultCallback === handler) {
+        delete window.updateVaultCallback;
+      }
+    };
+  }, [setVaultBoth]);
+
+  useEffect(() => {
+    const onStorage = (event) => {
+      if (event.key === "mleo_rush_core_v4") {
+        syncVault();
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [setVaultBoth, syncVault]);
 
   const isLeader = useMemo(() => {
     if (!roomMembers.length || !name) return false;
@@ -241,6 +273,50 @@ export default function WarMP({
   const myRow = players.find((p) => p.client_id === clientId) || null;
   const mySeat = myRow?.seat_index ?? null;
 
+  useEffect(() => {
+    if (!ses?.id) return;
+    if (ses.stage !== "dealing") return;
+    if (mySeat === null) return;
+    const paidState = ses.current?.__paid__ || { "0": false, "1": false };
+    const sessionEntry = ses.current?.__entry__ ?? entryCost;
+    const seatKey = String(mySeat);
+    if (paidState[seatKey]) return;
+    if (payingRef.current) return;
+    payingRef.current = true;
+    (async () => {
+      try {
+        const balanceBefore = syncVault();
+        if (balanceBefore < sessionEntry) {
+          setMsg(`Need ${fmt(sessionEntry)} to continue`);
+          payingRef.current = false;
+          return;
+        }
+        const remaining = balanceBefore - sessionEntry;
+        writeVault(remaining);
+        syncVault();
+        const updatedPaid = { ...paidState, [seatKey]: true };
+        const { error } = await supabase
+          .from("war_sessions")
+          .update({
+            current: {
+              ...(ses.current || {}),
+              "__paid__": updatedPaid,
+            },
+          })
+          .eq("id", ses.id);
+        if (error) {
+          writeVault(balanceBefore);
+          syncVault();
+          setMsg(error.message || "Payment failed");
+        } else {
+          processedResultRef.current = null;
+        }
+      } finally {
+        payingRef.current = false;
+      }
+    })();
+  }, [ses?.stage, ses?.current?.__paid__, ses?.current?.__entry__, mySeat, ses?.id, syncVault, entryCost]);
+
   const ensureSession = useCallback(async (room) => {
     const { data: upserted, error } = await supabase
       .from("war_sessions")
@@ -256,6 +332,16 @@ export default function WarMP({
             "1": null,
             "__ready__": { "0": false, "1": false },
             "__deadline__": null,
+            "__stuck__": { "0": 0, "1": 0 },
+            "__double__": {
+              value: 1,
+              proposed_by: null,
+              awaiting: null,
+              owner: null,
+            },
+            "__paid__": { "0": false, "1": false },
+            "__entry__": entryCost,
+            "__result__": null,
           },
           stash: [],
           war_face_down: 1,
@@ -275,7 +361,7 @@ export default function WarMP({
       .eq("room_id", room)
       .single();
     return existing;
-  }, []);
+  }, [entryCost]);
 
   const takeSeat = useCallback(
     async (seatIndex) => {
@@ -283,8 +369,8 @@ export default function WarMP({
         setMsg("Client not recognized");
         return;
       }
-      if (readVault() < minRequired) {
-        setMsg(`Minimum buy-in is ${fmt(minRequired)}`);
+      if (vaultBalance < entryCost) {
+        setMsg(`Minimum buy-in is ${fmt(entryCost)}`);
         return;
       }
       let session = ses;
@@ -335,7 +421,7 @@ export default function WarMP({
       }
       setMsg("");
     },
-    [clientId, ensureSession, minRequired, name, roomId, ses]
+    [clientId, ensureSession, entryCost, name, roomId, ses, vaultBalance]
   );
 
   const leaveSeat = useCallback(async () => {
@@ -374,9 +460,13 @@ export default function WarMP({
       return;
     }
     setMsg("");
-    const vaultBalance = readVault();
-    if (mySeat !== null && vaultBalance >= MATCH_BUYIN) {
-      writeVault(vaultBalance - MATCH_BUYIN);
+    if (mySeat !== null) {
+      if (vaultBalance < entryCost) {
+        setMsg(`Need ${fmt(entryCost)} to start`);
+        return;
+      }
+      writeVault(vaultBalance - entryCost);
+      syncVault();
     }
     const deck = newDeck();
     const { a, b } = splitDeckEven(deck);
@@ -396,6 +486,9 @@ export default function WarMP({
           awaiting: null,
           owner: null,
         },
+        "__paid__": { "0": false, "1": false },
+        "__entry__": entryCost,
+        "__result__": null,
       },
       stash: [],
       round_no: 0,
@@ -403,7 +496,7 @@ export default function WarMP({
     };
     roundRef.current = 0;
     await supabase.from("war_sessions").update(payload).eq("id", ses.id);
-  }, [isLeader, mySeat, players, ses?.id]);
+  }, [entryCost, isLeader, mySeat, players, ses?.id, syncVault, vaultBalance]);
 
   const popTop = (pile) => {
     if (!Array.isArray(pile) || pile.length === 0) return null;
@@ -437,6 +530,7 @@ export default function WarMP({
         awaiting: null,
         owner: null,
       };
+    const paidState = s.current?.__paid__ || { "0": false, "1": false };
     const currentState = {
       "0": pop0?.top ?? null,
       "1": pop1?.top ?? null,
@@ -448,6 +542,8 @@ export default function WarMP({
         proposed_by: null,
         awaiting: null,
       },
+      "__paid__": paidState,
+      "__result__": null,
     };
     const stash = [
       ...(s.stash || []),
@@ -494,6 +590,7 @@ export default function WarMP({
         awaiting: null,
         owner: null,
       };
+    const paidState = s.current?.__paid__ || { "0": false, "1": false };
     const currentState = {
       "0": pop0?.top ?? null,
       "1": pop1?.top ?? null,
@@ -505,6 +602,8 @@ export default function WarMP({
         proposed_by: null,
         awaiting: null,
       },
+      "__paid__": paidState,
+      "__result__": null,
     };
     stash = [
       ...stash,
@@ -526,6 +625,7 @@ export default function WarMP({
     async (winnerSeat) => {
       let multiplier = 1;
       let ownerSeat = ses?.current?.__double__?.owner ?? null;
+      const sessionEntry = ses?.current?.__entry__ ?? entryCost;
       try {
         const latest = await fetchSession();
         multiplier =
@@ -536,18 +636,18 @@ export default function WarMP({
           latest?.current?.__double__?.owner ??
           ses?.current?.__double__?.owner ??
           ownerSeat;
+        if (latest?.current?.__entry__) {
+          const latestEntry = Number(latest.current.__entry__);
+          if (!Number.isNaN(latestEntry) && latestEntry > 0) {
+            ses.current.__entry__ = latestEntry;
+          }
+        }
       } catch {
         multiplier = ses?.current?.__double__?.value ?? 1;
         ownerSeat = ses?.current?.__double__?.owner ?? ownerSeat;
       }
-      try {
-        const vaultBalance = readVault();
-        if (mySeat !== null && mySeat === winnerSeat) {
-          writeVault(vaultBalance + MATCH_BUYIN * 2 * multiplier);
-        }
-      } catch {
-        // ignore
-      }
+      const timestamp = Date.now();
+      const payoutAmount = (ses?.current?.__entry__ ?? sessionEntry) * 2 * multiplier;
       await supabase
         .from("war_sessions")
         .update({
@@ -561,11 +661,17 @@ export default function WarMP({
               awaiting: null,
               owner: ownerSeat,
             },
+            "__result__": {
+              winner: winnerSeat,
+              multiplier,
+              payout: payoutAmount,
+              timestamp,
+            },
           },
         })
         .eq("id", ses.id);
     },
-    [fetchSession, mySeat, ses?.current, ses?.id]
+    [entryCost, fetchSession, ses?.current, ses?.id]
   );
 
   const resolveCompare = useCallback(async () => {
@@ -627,6 +733,8 @@ export default function WarMP({
             proposed_by: null,
             awaiting: null,
           },
+          "__paid__": s.current?.__paid__ || { "0": false, "1": false },
+          "__result__": null,
         },
         stash: [],
         round_no: roundRef.current,
@@ -840,6 +948,21 @@ export default function WarMP({
         : opponentOf(mySeat);
     await finishMatch(winnerSeat);
   }, [finishMatch, mySeat, ses]);
+
+  useEffect(() => {
+    if (!ses?.id) return;
+    const result = ses.current?.__result__;
+    if (!result || !result.timestamp) return;
+    if (processedResultRef.current === result.timestamp) return;
+    processedResultRef.current = result.timestamp;
+    if (mySeat === null) return;
+    if (mySeat !== result.winner) return;
+    const currentBalance = syncVault();
+    const payout =
+      result.payout ?? (ses?.current?.__entry__ ?? entryCost) * 2 * (result.multiplier || 1);
+    writeVault(currentBalance + payout);
+    syncVault();
+  }, [entryCost, ses?.current?.__entry__, ses?.current?.__result__, ses?.id, mySeat, syncVault]);
 
   const triggerFlip = useCallback(
     async (seatIndex) => {
@@ -1146,7 +1269,7 @@ export default function WarMP({
         <div className="font-semibold">War Multiplayer</div>
         <div className="flex items-center gap-3 text-sm text-white/70">
           <span>Stage: {status}</span>
-          <span>Vault: {fmt(readVault())}</span>
+          <span>Vault: {fmt(vaultBalance)}</span>
           <span>Min buy-in: {fmt(minRequired)}</span>
           <span>Stake: x{stakeMultiplier}</span>
           <span>
