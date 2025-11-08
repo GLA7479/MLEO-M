@@ -418,9 +418,8 @@ export default function ArcadeOnline() {
 
   return (
     <Layout address={address} isConnected={isConnected} vaultAmount={vaultAmt}>
-      <div 
-        className="relative w-full overflow-hidden bg-gradient-to-br from-indigo-900 via-black to-purple-900" 
-        style={{ height: 'var(--app-100vh,100svh)' }}
+      <div
+        className="relative w-full min-h-[var(--app-100vh,100svh)] overflow-y-auto bg-gradient-to-br from-indigo-900 via-black to-purple-900"
       >
         {/* Header */}
         <header className="relative px-4 py-6 text-center">
