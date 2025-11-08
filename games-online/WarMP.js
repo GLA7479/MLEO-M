@@ -763,14 +763,6 @@ export default function WarMP({
             </button>
           )}
 
-          {row && (
-            <button
-              onClick={leaveSeat}
-              className="h-10 rounded bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold"
-            >
-              Leave
-            </button>
-          )}
         </div>
       </div>
     );
