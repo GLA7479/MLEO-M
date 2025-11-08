@@ -4,6 +4,7 @@ import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 const TURN_PAUSE_MS = 1200;
 const MATCH_BUYIN = 1000;
 const MAX_ROUNDS_PER_MATCH = 1000;
+const MAX_DOUBLE_VALUE = 1024;
 
 const MIN_BUYIN_OPTIONS = {
   "1K": 1_000,
@@ -73,6 +74,8 @@ function cardValue(code) {
   const idx = RANKS.indexOf(rank);
   return idx < 0 ? -1 : idx;
 }
+
+const opponentOf = (seatIndex) => (seatIndex === 0 ? 1 : 0);
 
 const suitIcon = (suit) =>
   suit === "h" ? "♥" : suit === "d" ? "♦" : suit === "c" ? "♣" : "♠";
@@ -387,6 +390,12 @@ export default function WarMP({
         "__ready__": { "0": false, "1": false },
         "__deadline__": new Date(Date.now() + 5000).toISOString(),
         "__stuck__": { "0": 0, "1": 0 },
+        "__double__": {
+          value: 1,
+          proposed_by: null,
+          awaiting: null,
+          owner: null,
+        },
       },
       stash: [],
       round_no: 0,
@@ -421,12 +430,24 @@ export default function WarMP({
     const pop1 = popTop(piles["1"]);
     const nextPiles = { "0": pop0?.rest ?? [], "1": pop1?.rest ?? [] };
     const penalty = s.current?.__stuck__ || { "0": 0, "1": 0 };
+    const doubleState =
+      s.current?.__double__ || {
+        value: 1,
+        proposed_by: null,
+        awaiting: null,
+        owner: null,
+      };
     const currentState = {
       "0": pop0?.top ?? null,
       "1": pop1?.top ?? null,
       "__ready__": { "0": false, "1": false },
       "__deadline__": null,
       "__stuck__": penalty,
+      "__double__": {
+        ...doubleState,
+        proposed_by: null,
+        awaiting: null,
+      },
     };
     const stash = [
       ...(s.stash || []),
@@ -466,12 +487,24 @@ export default function WarMP({
     if (pop0) nextPiles["0"] = pop0.rest;
     if (pop1) nextPiles["1"] = pop1.rest;
     const penalty = s.current?.__stuck__ || { "0": 0, "1": 0 };
+    const doubleState =
+      s.current?.__double__ || {
+        value: 1,
+        proposed_by: null,
+        awaiting: null,
+        owner: null,
+      };
     const currentState = {
       "0": pop0?.top ?? null,
       "1": pop1?.top ?? null,
       "__ready__": { "0": false, "1": false },
       "__deadline__": null,
       "__stuck__": penalty,
+      "__double__": {
+        ...doubleState,
+        proposed_by: null,
+        awaiting: null,
+      },
     };
     stash = [
       ...stash,
@@ -491,20 +524,48 @@ export default function WarMP({
 
   const finishMatch = useCallback(
     async (winnerSeat) => {
+      let multiplier = 1;
+      let ownerSeat = ses?.current?.__double__?.owner ?? null;
+      try {
+        const latest = await fetchSession();
+        multiplier =
+          latest?.current?.__double__?.value ??
+          ses?.current?.__double__?.value ??
+          1;
+        ownerSeat =
+          latest?.current?.__double__?.owner ??
+          ses?.current?.__double__?.owner ??
+          ownerSeat;
+      } catch {
+        multiplier = ses?.current?.__double__?.value ?? 1;
+        ownerSeat = ses?.current?.__double__?.owner ?? ownerSeat;
+      }
       try {
         const vaultBalance = readVault();
         if (mySeat !== null && mySeat === winnerSeat) {
-          writeVault(vaultBalance + MATCH_BUYIN * 2);
+          writeVault(vaultBalance + MATCH_BUYIN * 2 * multiplier);
         }
       } catch {
         // ignore
       }
       await supabase
         .from("war_sessions")
-        .update({ stage: "ended", next_round_at: null })
+        .update({
+          stage: "ended",
+          next_round_at: null,
+          current: {
+            ...(ses?.current || {}),
+            "__double__": {
+              value: multiplier,
+              proposed_by: null,
+              awaiting: null,
+              owner: ownerSeat,
+            },
+          },
+        })
         .eq("id", ses.id);
     },
-    [mySeat, ses?.id]
+    [fetchSession, mySeat, ses?.current, ses?.id]
   );
 
   const resolveCompare = useCallback(async () => {
@@ -556,6 +617,16 @@ export default function WarMP({
           "__ready__": { "0": false, "1": false },
           "__deadline__": new Date(Date.now() + 5000).toISOString(),
           "__stuck__": s.current?.__stuck__ || { "0": 0, "1": 0 },
+          "__double__": {
+            ...(s.current?.__double__ || {
+              value: 1,
+              proposed_by: null,
+              awaiting: null,
+              owner: null,
+            }),
+            proposed_by: null,
+            awaiting: null,
+          },
         },
         stash: [],
         round_no: roundRef.current,
@@ -572,6 +643,15 @@ export default function WarMP({
       const currentState = session.current || {};
       const ready = currentState.__ready__ || { "0": false, "1": false };
       const penalty = currentState.__stuck__ || { "0": 0, "1": 0 };
+      const doubleState =
+        currentState.__double__ || {
+          value: 1,
+          proposed_by: null,
+          awaiting: null,
+        };
+      if (doubleState.awaiting !== null) {
+        return;
+      }
       const deadlineISO = currentState.__deadline__;
       const now = Date.now();
       if (!deadlineISO) {
@@ -664,11 +744,115 @@ export default function WarMP({
     [doFlip, finishMatch]
   );
 
+  const offerDouble = useCallback(
+    async (seatIndex) => {
+      if (seatIndex !== mySeat) return;
+      if (!ses?.id || ses.stage !== "dealing") return;
+      const currentState = ses.current || {};
+      const readyState = currentState.__ready__ || { "0": false, "1": false };
+      if (readyState[String(seatIndex)]) return;
+      const doubleState =
+        currentState.__double__ || {
+          value: 1,
+          proposed_by: null,
+          awaiting: null,
+          owner: null,
+        };
+      if (doubleState.awaiting !== null) return;
+      if (doubleState.proposed_by === seatIndex) return;
+      if (doubleState.owner !== null && doubleState.owner !== seatIndex) return;
+      if (doubleState.value >= MAX_DOUBLE_VALUE) return;
+      const opponentSeat = opponentOf(seatIndex);
+      const updatedDouble = {
+        value: doubleState.value,
+        proposed_by: seatIndex,
+        awaiting: opponentSeat,
+        owner: doubleState.owner,
+      };
+      const updatedCurrent = {
+        ...currentState,
+        "__double__": updatedDouble,
+        "__deadline__": null,
+      };
+      const { data, error } = await supabase
+        .from("war_sessions")
+        .update({ current: updatedCurrent })
+        .eq("id", ses.id)
+        .select("current")
+        .single();
+      if (!error && data) {
+        setSes((prev) => (prev ? { ...prev, current: data.current } : prev));
+      }
+    },
+    [mySeat, ses, setSes]
+  );
+
+  const acceptDouble = useCallback(async () => {
+    if (mySeat === null) return;
+    if (!ses?.id || ses.stage !== "dealing") return;
+    const currentState = ses.current || {};
+    const doubleState =
+      currentState.__double__ || {
+        value: 1,
+        proposed_by: null,
+        awaiting: null,
+        owner: null,
+      };
+    if (doubleState.awaiting !== mySeat) return;
+    const newValue = Math.min(doubleState.value * 2, MAX_DOUBLE_VALUE);
+    const updatedDouble = {
+      value: newValue,
+      proposed_by: null,
+      awaiting: null,
+      owner: mySeat,
+    };
+    const updatedCurrent = {
+      ...currentState,
+      "__double__": updatedDouble,
+      "__deadline__": new Date(Date.now() + 5000).toISOString(),
+    };
+    const { data, error } = await supabase
+      .from("war_sessions")
+      .update({ current: updatedCurrent })
+      .eq("id", ses.id)
+      .select("current")
+      .single();
+    if (!error && data) {
+      setSes((prev) => (prev ? { ...prev, current: data.current } : prev));
+    }
+  }, [mySeat, ses, setSes]);
+
+  const declineDouble = useCallback(async () => {
+    if (mySeat === null) return;
+    if (!ses?.id || ses.stage !== "dealing") return;
+    const currentState = ses.current || {};
+    const doubleState =
+      currentState.__double__ || {
+        value: 1,
+        proposed_by: null,
+        awaiting: null,
+        owner: null,
+      };
+    if (doubleState.awaiting !== mySeat) return;
+    const winnerSeat =
+      doubleState.proposed_by != null
+        ? doubleState.proposed_by
+        : opponentOf(mySeat);
+    await finishMatch(winnerSeat);
+  }, [finishMatch, mySeat, ses]);
+
   const triggerFlip = useCallback(
     async (seatIndex) => {
       if (!ses?.id) return;
       if (ses?.stage !== "dealing") return;
       const currentState = ses.current || {};
+      const doubleState =
+        currentState.__double__ || {
+          value: 1,
+          proposed_by: null,
+          awaiting: null,
+        };
+      if (doubleState.awaiting !== null) return;
       const ready = currentState.__ready__ || { "0": false, "1": false };
       const penalty = currentState.__stuck__ || { "0": 0, "1": 0 };
       const key = String(seatIndex);
@@ -800,6 +984,27 @@ export default function WarMP({
 
   const piles = ses?.piles || { "0": [], "1": [] };
   const current = ses?.current || { "0": null, "1": null };
+  const currentDouble =
+    ses?.current?.__double__ || {
+      value: 1,
+      proposed_by: null,
+      awaiting: null,
+      owner: null,
+    };
+  const stakeMultiplier = currentDouble.value || 1;
+  const awaitingDoubleSeat = currentDouble.awaiting;
+  const doubleProposerSeat = currentDouble.proposed_by;
+  const seatLabel = (seat) => (seat === 0 ? "Player A" : "Player B");
+  const awaitingName =
+    awaitingDoubleSeat != null
+      ? seatMap.get(awaitingDoubleSeat)?.player_name ||
+        seatLabel(awaitingDoubleSeat)
+      : null;
+  const proposerName =
+    doubleProposerSeat != null
+      ? seatMap.get(doubleProposerSeat)?.player_name ||
+        seatLabel(doubleProposerSeat)
+      : null;
 
   const Seat = ({ index }) => {
     const row = seatMap.get(index);
@@ -811,6 +1016,17 @@ export default function WarMP({
     const currentCard = currentState[String(index)] || null;
     const readyMeta = currentState.__ready__ || { "0": false, "1": false };
     const readyForSeat = readyMeta[String(index)] || false;
+    const doubleState =
+      currentState.__double__ || {
+        value: 1,
+        proposed_by: null,
+        awaiting: null,
+        owner: null,
+      };
+    const awaitingDouble = doubleState.awaiting === index;
+    const pendingFromMe =
+      doubleState.proposed_by === index && doubleState.awaiting !== null;
+    const flipDisabled = readyForSeat || doubleState.awaiting !== null;
     return (
       <div
         className={`flex flex-col h-full min-h-[240px] gap-3 p-4 rounded-xl border border-white/10 bg-white/5 ${
@@ -839,18 +1055,64 @@ export default function WarMP({
         </div>
 
         <div className="mt-auto flex flex-col gap-2">
+          {ses?.stage === "dealing" && awaitingDouble && (
+            mine ? (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={acceptDouble}
+                  className="h-10 rounded bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold"
+                >
+                  Accept x{doubleState.value * 2}
+                </button>
+                <button
+                  onClick={declineDouble}
+                  className="h-10 rounded bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold"
+                >
+                  Concede
+                </button>
+              </div>
+            ) : (
+              <div className="text-sm text-amber-300 text-center">
+                Awaiting decision on x{doubleState.value * 2}
+              </div>
+            )
+          )}
+
+          {ses?.stage === "dealing" && pendingFromMe && (
+            <div className="text-xs text-amber-300 text-center">
+              Waiting for opponent to respond to x
+              {doubleState.value * 2} double…
+            </div>
+          )}
+
+          {mine &&
+            ses?.stage === "dealing" &&
+            doubleState.awaiting === null &&
+            !readyForSeat &&
+            doubleState.value < MAX_DOUBLE_VALUE &&
+            (doubleState.owner === null || doubleState.owner === index) && (
+              <button
+                onClick={() => offerDouble(index)}
+                className="h-10 rounded bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold"
+              >
+                Double (x{doubleState.value * 2})
+              </button>
+            )}
+
           {mine && ses?.stage === "dealing" ? (
             <button
               onClick={() => triggerFlip(index)}
-              disabled={readyForSeat}
+              disabled={flipDisabled}
               className={`h-10 rounded text-white text-sm font-semibold ${
-                readyForSeat
+                flipDisabled
                   ? "bg-white/10 border border-white/20 opacity-70 cursor-not-allowed"
                   : "bg-amber-600 hover:bg-amber-700"
               }`}
             >
-              {readyForSeat ? (
-                <span>Waiting…</span>
+              {flipDisabled ? (
+                <span>
+                  {doubleState.awaiting !== null ? "Resolve double…" : "Waiting…"}
+                </span>
               ) : (
                 <span>
                   Flip Card
@@ -886,8 +1148,23 @@ export default function WarMP({
           <span>Stage: {status}</span>
           <span>Vault: {fmt(readVault())}</span>
           <span>Min buy-in: {fmt(minRequired)}</span>
+          <span>Stake: x{stakeMultiplier}</span>
+          <span>
+            Cube:{" "}
+            {currentDouble.owner == null
+              ? "Center"
+              : seatLabel(currentDouble.owner)}
+          </span>
         </div>
       </div>
+
+      {awaitingDoubleSeat != null && (
+        <div className="text-sm text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+          {proposerName || "Opponent"} proposed double to x
+          {stakeMultiplier * 2}. Waiting for{" "}
+          {awaitingName || "opponent"} to respond.
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-3 auto-rows-fr">
         <Seat index={0} />
@@ -917,7 +1194,18 @@ export default function WarMP({
                     stage: "lobby",
                     deck: newDeck(),
                     piles: { "0": [], "1": [] },
-                    current: { "0": null, "1": null },
+                    current: {
+                      "0": null,
+                      "1": null,
+                      "__ready__": { "0": false, "1": false },
+                      "__deadline__": null,
+                      "__stuck__": { "0": 0, "1": 0 },
+                      "__double__": {
+                        value: 1,
+                        proposed_by: null,
+                        awaiting: null,
+                      },
+                    },
                     stash: [],
                     next_round_at: null,
                     round_no: 0,
@@ -937,5 +1225,6 @@ export default function WarMP({
     </div>
   );
 }
+
 
 
