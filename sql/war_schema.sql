@@ -12,6 +12,8 @@ create table if not exists war_sessions (
   current jsonb not null default '{"0":null,"1":null}',
   stash text[] not null default '{}',
   war_face_down int not null default 1,
+  flip_ready jsonb not null default '{"0":false,"1":false}',
+  flip_deadline timestamptz,
   next_round_at timestamptz,
   round_no int not null default 0,
   created_at timestamptz not null default now()
@@ -34,6 +36,11 @@ alter table war_sessions enable row level security;
 alter table war_players enable row level security;
 
 do $$ begin
+  alter table war_sessions
+    add column if not exists flip_ready jsonb not null default '{"0":false,"1":false}';
+  alter table war_sessions
+    add column if not exists flip_deadline timestamptz;
+
   drop policy if exists war_sessions_select on war_sessions;
   drop policy if exists war_sessions_modify on war_sessions;
   drop policy if exists war_players_select on war_players;

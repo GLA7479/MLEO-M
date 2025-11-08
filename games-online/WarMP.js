@@ -247,7 +247,12 @@ export default function WarMP({
           seat_count: 2,
           deck: newDeck(),
           piles: { "0": [], "1": [] },
-          current: { "0": null, "1": null },
+          current: {
+            "0": null,
+            "1": null,
+            "__ready__": { "0": false, "1": false },
+            "__deadline__": null,
+          },
           stash: [],
           war_face_down: 1,
           round_no: 0,
@@ -375,10 +380,15 @@ export default function WarMP({
       stage: "dealing",
       deck: [],
       piles: { "0": a, "1": b },
-      current: { "0": null, "1": null },
+      current: {
+        "0": null,
+        "1": null,
+        "__ready__": { "0": false, "1": false },
+        "__deadline__": new Date(Date.now() + 5000).toISOString(),
+      },
       stash: [],
       round_no: 0,
-      next_round_at: new Date(Date.now() + TURN_PAUSE_MS).toISOString(),
+      next_round_at: null,
     };
     roundRef.current = 0;
     await supabase.from("war_sessions").update(payload).eq("id", ses.id);
@@ -407,18 +417,23 @@ export default function WarMP({
     const piles = s.piles || { "0": [], "1": [] };
     const pop0 = popTop(piles["0"]);
     const pop1 = popTop(piles["1"]);
-    const current = { "0": pop0?.top ?? null, "1": pop1?.top ?? null };
     const nextPiles = { "0": pop0?.rest ?? [], "1": pop1?.rest ?? [] };
+    const currentState = {
+      "0": pop0?.top ?? null,
+      "1": pop1?.top ?? null,
+      "__ready__": { "0": false, "1": false },
+      "__deadline__": null,
+    };
     const stash = [
       ...(s.stash || []),
-      ...[current["0"], current["1"]].filter(Boolean),
+      ...[currentState["0"], currentState["1"]].filter(Boolean),
     ];
     await supabase
       .from("war_sessions")
       .update({
         stage: "compare",
         piles: nextPiles,
-        current,
+        current: currentState,
         stash,
         next_round_at: new Date(Date.now() + TURN_PAUSE_MS).toISOString(),
       })
@@ -444,19 +459,24 @@ export default function WarMP({
     }
     const pop0 = popTop(nextPiles["0"]);
     const pop1 = popTop(nextPiles["1"]);
-    const current = { "0": pop0?.top ?? null, "1": pop1?.top ?? null };
     if (pop0) nextPiles["0"] = pop0.rest;
     if (pop1) nextPiles["1"] = pop1.rest;
+    const currentState = {
+      "0": pop0?.top ?? null,
+      "1": pop1?.top ?? null,
+      "__ready__": { "0": false, "1": false },
+      "__deadline__": null,
+    };
     stash = [
       ...stash,
-      ...[current["0"], current["1"]].filter(Boolean),
+      ...[currentState["0"], currentState["1"]].filter(Boolean),
     ];
     await supabase
       .from("war_sessions")
       .update({
         stage: "compare",
         piles: nextPiles,
-        current,
+        current: currentState,
         stash,
         next_round_at: new Date(Date.now() + TURN_PAUSE_MS).toISOString(),
       })
@@ -524,15 +544,81 @@ export default function WarMP({
       .update({
         stage: "dealing",
         piles: nextPiles,
-        current: { "0": null, "1": null },
+        current: {
+          "0": null,
+          "1": null,
+          "__ready__": { "0": false, "1": false },
+          "__deadline__": new Date(Date.now() + 5000).toISOString(),
+        },
         stash: [],
         round_no: roundRef.current,
-        next_round_at: new Date(Date.now() + TURN_PAUSE_MS).toISOString(),
+        next_round_at: null,
       })
       .eq("id", s.id);
   }, [fetchSession, finishMatch]);
 
   const autopilotBusy = useRef(false);
+
+  const handleFlipPhase = useCallback(
+    async (session) => {
+      if (!session) return;
+      const currentState = session.current || {};
+      const ready = currentState.__ready__ || { "0": false, "1": false };
+      const deadlineISO = currentState.__deadline__;
+      const now = Date.now();
+      if (!deadlineISO) {
+        const deadline = new Date(now + 5000).toISOString();
+        await supabase
+          .from("war_sessions")
+          .update({
+            current: {
+              ...currentState,
+              "__ready__": ready,
+              "__deadline__": deadline,
+            },
+          })
+          .eq("id", session.id);
+        return;
+      }
+      const deadline = new Date(deadlineISO).getTime();
+      const allReady = ready["0"] && ready["1"];
+      if (!allReady && now < deadline) return;
+      await doFlip();
+    },
+    [doFlip]
+  );
+
+  const triggerFlip = useCallback(
+    async (seatIndex) => {
+      if (!ses?.id) return;
+      if (ses?.stage !== "dealing") return;
+      const currentState = ses.current || {};
+      const ready = currentState.__ready__ || { "0": false, "1": false };
+      const key = String(seatIndex);
+      if (ready[key]) return;
+      const nextReady = { ...ready, [key]: true };
+      const deadline =
+        currentState.__deadline__ ||
+        new Date(Date.now() + 5000).toISOString();
+      const updatedCurrent = {
+        ...currentState,
+        "__ready__": nextReady,
+        "__deadline__": deadline,
+      };
+      const { data, error } = await supabase
+        .from("war_sessions")
+        .update({ current: updatedCurrent })
+        .eq("id", ses.id)
+        .select("current")
+        .single();
+      if (!error && data) {
+        setSes((prev) =>
+          prev ? { ...prev, current: data.current } : prev
+        );
+      }
+    },
+    [ses]
+  );
 
   useEffect(() => {
     if (!isLeader || !ses?.id) return;
@@ -561,7 +647,7 @@ export default function WarMP({
         switch (session.stage) {
           case "dealing":
           case "flip":
-            await doFlip();
+            await handleFlipPhase(session);
             break;
           case "compare":
             await resolveCompare();
@@ -590,6 +676,7 @@ export default function WarMP({
     ses?.stage,
     ses?.next_round_at,
     startMatch,
+    handleFlipPhase,
   ]);
 
   const status = useMemo(() => {
@@ -621,7 +708,10 @@ export default function WarMP({
     const label = index === 0 ? "Player A" : "Player B";
     const pile = piles[String(index)] || [];
     const pileCount = fmt(pile.length);
-    const currentCard = ses?.current?.[String(index)] || null;
+    const currentState = ses?.current || {};
+    const currentCard = currentState[String(index)] || null;
+    const readyMeta = currentState.__ready__ || { "0": false, "1": false };
+    const readyForSeat = readyMeta[String(index)] || false;
     return (
       <div
         className={`flex flex-col gap-3 p-4 rounded-xl border border-white/10 bg-white/5 ${
@@ -649,6 +739,20 @@ export default function WarMP({
         </div>
 
         <div className="text-xs text-white/65">Remaining cards: {pileCount}</div>
+
+        {mine && ses?.stage === "dealing" && (
+          <button
+            onClick={() => triggerFlip(index)}
+            disabled={readyForSeat}
+            className={`px-3 py-1 rounded text-white text-sm ${
+              readyForSeat
+                ? "bg-white/10 border border-white/20 opacity-70 cursor-not-allowed"
+                : "bg-amber-600 hover:bg-amber-700"
+            }`}
+          >
+            {readyForSeat ? "Waiting..." : "Flip Card"}
+          </button>
+        )}
 
         {row ? (
           <button
