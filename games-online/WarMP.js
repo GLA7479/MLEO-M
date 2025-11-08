@@ -1267,6 +1267,11 @@ export default function WarMP({
 
   return (
     <div className="flex flex-col w-full h-full gap-3 px-2 py-3 text-white/90">
+      <div className="grid md:grid-cols-2 gap-3 auto-rows-fr">
+        <Seat index={0} />
+        <Seat index={1} />
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
         <div className="font-semibold">War Multiplayer</div>
         <div className="flex items-center gap-3 text-sm text-white/70">
@@ -1290,11 +1295,6 @@ export default function WarMP({
           {awaitingName || "opponent"} to respond.
         </div>
       )}
-
-      <div className="grid md:grid-cols-2 gap-3 auto-rows-fr">
-        <Seat index={0} />
-        <Seat index={1} />
-      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
         <div className="text-sm text-white/70">
