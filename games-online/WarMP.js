@@ -1183,13 +1183,13 @@ export default function WarMP({
               <div className="flex items-center gap-2">
                 <button
                   onClick={acceptDouble}
-                  className="h-9 px-3 rounded bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold flex-1"
+                  className="h-10 px-4 rounded bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold flex-1"
                 >
                   Accept x{doubleState.value * 2}
                 </button>
                 <button
                   onClick={declineDouble}
-                  className="h-9 px-3 rounded bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex-1"
+                  className="h-10 px-4 rounded bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold flex-1"
                 >
                   Concede
                 </button>
@@ -1217,7 +1217,7 @@ export default function WarMP({
               (doubleState.owner === null || doubleState.owner === index) && (
                 <button
                   onClick={() => offerDouble(index)}
-                  className="h-9 px-3 rounded bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold"
+                  className="h-10 px-4 rounded bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold flex-1"
                 >
                   Double (x{doubleState.value * 2})
                 </button>
@@ -1227,7 +1227,7 @@ export default function WarMP({
               <button
                 onClick={() => triggerFlip(index)}
                 disabled={flipDisabled}
-                className={`h-9 px-3 rounded text-white text-xs font-semibold ${
+                className={`h-10 px-4 rounded text-white text-sm font-semibold flex-1 ${
                   flipDisabled
                     ? "bg-white/10 border border-white/20 opacity-70 cursor-not-allowed"
                     : "bg-amber-600 hover:bg-amber-700"
@@ -1241,7 +1241,7 @@ export default function WarMP({
                   <span>
                     Flip Card
                     {localFlipCountdown != null && localFlipCountdown > 0 && (
-                      <span className="ml-1 text-[10px] text-white/80">
+                      <span className="ml-2 text-xs text-white/80">
                         {localFlipCountdown}s
                       </span>
                     )}
@@ -1249,11 +1249,11 @@ export default function WarMP({
                 )}
               </button>
             ) : row ? (
-              <div className="h-9" aria-hidden="true" />
+              <div className="h-10" aria-hidden="true" />
             ) : (
               <button
                 onClick={() => takeSeat(index)}
-                className="h-9 px-3 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
+                className="h-10 px-4 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold flex-1"
               >
                 Take Seat
               </button>
