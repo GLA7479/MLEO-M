@@ -474,6 +474,21 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     });
   }, [bets, playerNameById, describeBet]);
 
+  const groupedAllBets = useMemo(() => {
+    if (!allBetsThisRound.length) return [];
+    const map = new Map();
+    allBetsThisRound.forEach((bet) => {
+      if (!map.has(bet.player)) {
+        map.set(bet.player, []);
+      }
+      map.get(bet.player).push(bet);
+    });
+    return Array.from(map.entries()).map(([player, bets]) => ({
+      player,
+      bets,
+    }));
+  }, [allBetsThisRound]);
+
   // My bets - sorted and memoized
   // Show bets from current spin, or keep previous spin bets until new betting starts
   const myBets = useMemo(() => {
@@ -509,7 +524,6 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     } else {
       if (showBetPanel) setShowBetPanel(false);
       if (panelDismissed) setPanelDismissed(false);
-      if (showAllBetsPanel) setShowAllBetsPanel(false);
     }
   }, [session?.stage, bettingTimeLeft, panelDismissed, showBetPanel, showAllBetsPanel]);
 
@@ -1469,30 +1483,40 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                   </button>
                 </div>
                 {showAllBetsPanel && (
-                  <div className="mb-3 p-3 rounded-lg border border-white/15 bg-black/60 max-h-56 overflow-y-auto">
-                    <div className="text-white/90 font-semibold text-xs sm:text-sm mb-2 text-center">
+                  <div className="mb-3 p-2 rounded-lg border border-white/15 bg-black/60 max-h-52 overflow-y-auto">
+                    <div className="text-white/70 font-semibold text-[10px] mb-1 text-center uppercase tracking-wide">
                       All Bets (Current Round)
                     </div>
-                    {allBetsThisRound.length > 0 ? (
-                      <div className="flex flex-col gap-2">
-                        {allBetsThisRound.map((item) => (
+                    {groupedAllBets.length > 0 ? (
+                      <div className="flex flex-col gap-1.5">
+                        {groupedAllBets.map((group) => (
                           <div
-                            key={item.id}
-                            className={`rounded-lg border px-3 py-2 text-xs sm:text-sm ${item.className}`}
+                            key={group.player}
+                            className="rounded border border-white/10 bg-white/5 px-2 py-1.5"
                           >
-                            <div className="flex justify-between items-center">
-                              <span className="font-semibold">{item.player}</span>
-                              <span>{item.amount}</span>
+                            <div className="flex items-center justify-between text-[11px] text-white/85 mb-1">
+                              <span className="font-semibold truncate pr-2">{group.player}</span>
+                              <span className="text-white/50 text-[10px]">{group.bets.length} bets</span>
                             </div>
-                            <div className="flex justify-between items-center mt-1 text-[11px] sm:text-xs">
-                              <span>{item.label}</span>
-                              {item.payout && <span className="text-green-100">+{item.payout}</span>}
+                            <div className="flex flex-wrap gap-1">
+                              {group.bets.map((bet) => (
+                                <div
+                                  key={bet.id}
+                                  className={`px-2 py-0.5 rounded-full border text-[10px] leading-tight ${bet.className}`}
+                                >
+                                  <span>{bet.label}</span>
+                                  <span className="ml-1 text-white/85">{bet.amount}</span>
+                                  {bet.payout && (
+                                    <span className="ml-1 text-green-100">+{bet.payout}</span>
+                                  )}
+                                </div>
+                              ))}
                             </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="text-white/40 text-xs text-center py-3">
+                      <div className="text-white/40 text-xs text-center py-2">
                         No bets placed yet
                       </div>
                     )}
