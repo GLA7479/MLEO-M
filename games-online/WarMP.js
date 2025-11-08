@@ -1180,16 +1180,16 @@ export default function WarMP({
         <div className="mt-auto flex flex-col gap-2">
           {ses?.stage === "dealing" && awaitingDouble && (
             mine ? (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={acceptDouble}
-                  className="h-10 rounded bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold"
+                  className="h-9 px-3 rounded bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold flex-1"
                 >
                   Accept x{doubleState.value * 2}
                 </button>
                 <button
                   onClick={declineDouble}
-                  className="h-10 rounded bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold"
+                  className="h-9 px-3 rounded bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex-1"
                 >
                   Concede
                 </button>
@@ -1208,55 +1208,57 @@ export default function WarMP({
             </div>
           )}
 
-          {mine &&
-            ses?.stage === "dealing" &&
-            doubleState.awaiting === null &&
-            !readyForSeat &&
-            doubleState.value < MAX_DOUBLE_VALUE &&
-            (doubleState.owner === null || doubleState.owner === index) && (
+          <div className="flex items-center gap-2">
+            {mine &&
+              ses?.stage === "dealing" &&
+              doubleState.awaiting === null &&
+              !readyForSeat &&
+              doubleState.value < MAX_DOUBLE_VALUE &&
+              (doubleState.owner === null || doubleState.owner === index) && (
+                <button
+                  onClick={() => offerDouble(index)}
+                  className="h-9 px-3 rounded bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold"
+                >
+                  Double (x{doubleState.value * 2})
+                </button>
+              )}
+
+            {mine && ses?.stage === "dealing" ? (
               <button
-                onClick={() => offerDouble(index)}
-                className="h-10 rounded bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold"
+                onClick={() => triggerFlip(index)}
+                disabled={flipDisabled}
+                className={`h-9 px-3 rounded text-white text-xs font-semibold ${
+                  flipDisabled
+                    ? "bg-white/10 border border-white/20 opacity-70 cursor-not-allowed"
+                    : "bg-amber-600 hover:bg-amber-700"
+                }`}
               >
-                Double (x{doubleState.value * 2})
+                {flipDisabled ? (
+                  <span>
+                    {doubleState.awaiting !== null ? "Resolve double…" : "Waiting…"}
+                  </span>
+                ) : (
+                  <span>
+                    Flip Card
+                    {localFlipCountdown != null && localFlipCountdown > 0 && (
+                      <span className="ml-1 text-[10px] text-white/80">
+                        {localFlipCountdown}s
+                      </span>
+                    )}
+                  </span>
+                )}
+              </button>
+            ) : row ? (
+              <div className="h-9" aria-hidden="true" />
+            ) : (
+              <button
+                onClick={() => takeSeat(index)}
+                className="h-9 px-3 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
+              >
+                Take Seat
               </button>
             )}
-
-          {mine && ses?.stage === "dealing" ? (
-            <button
-              onClick={() => triggerFlip(index)}
-              disabled={flipDisabled}
-              className={`h-10 rounded text-white text-sm font-semibold ${
-                flipDisabled
-                  ? "bg-white/10 border border-white/20 opacity-70 cursor-not-allowed"
-                  : "bg-amber-600 hover:bg-amber-700"
-              }`}
-            >
-              {flipDisabled ? (
-                <span>
-                  {doubleState.awaiting !== null ? "Resolve double…" : "Waiting…"}
-                </span>
-              ) : (
-                <span>
-                  Flip Card
-                  {localFlipCountdown != null && localFlipCountdown > 0 && (
-                    <span className="ml-2 text-xs text-white/80">
-                      {localFlipCountdown}s
-                    </span>
-                  )}
-                </span>
-              )}
-            </button>
-          ) : row ? (
-            <div className="h-10" aria-hidden="true" />
-          ) : (
-            <button
-              onClick={() => takeSeat(index)}
-              className="h-10 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold"
-            >
-              Take Seat
-            </button>
-          )}
+          </div>
 
         </div>
       </div>
