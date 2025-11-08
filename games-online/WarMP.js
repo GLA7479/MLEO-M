@@ -714,7 +714,7 @@ export default function WarMP({
     const readyForSeat = readyMeta[String(index)] || false;
     return (
       <div
-        className={`flex flex-col gap-3 p-4 rounded-xl border border-white/10 bg-white/5 ${
+        className={`flex flex-col h-full min-h-[240px] gap-3 p-4 rounded-xl border border-white/10 bg-white/5 ${
           mine ? "ring-2 ring-emerald-400" : ""
         }`}
       >
@@ -731,44 +731,48 @@ export default function WarMP({
           </div>
         </div>
 
-        <div>
+        <div className="flex-1 flex flex-col">
           <div className="text-xs text-white/70 mb-1">Current Card</div>
-          <div className="inline-flex">
+          <div className="inline-flex items-center justify-center h-28">
             <Card code={currentCard} size="lg" hidden={!currentCard} />
           </div>
         </div>
 
         <div className="text-xs text-white/65">Remaining cards: {pileCount}</div>
 
-        {mine && ses?.stage === "dealing" && (
-          <button
-            onClick={() => triggerFlip(index)}
-            disabled={readyForSeat}
-            className={`px-3 py-1 rounded text-white text-sm ${
-              readyForSeat
-                ? "bg-white/10 border border-white/20 opacity-70 cursor-not-allowed"
-                : "bg-amber-600 hover:bg-amber-700"
-            }`}
-          >
-            {readyForSeat ? "Waiting..." : "Flip Card"}
-          </button>
-        )}
+        <div className="mt-auto flex flex-col gap-2">
+          {mine && ses?.stage === "dealing" ? (
+            <button
+              onClick={() => triggerFlip(index)}
+              disabled={readyForSeat}
+              className={`h-10 rounded text-white text-sm font-semibold ${
+                readyForSeat
+                  ? "bg-white/10 border border-white/20 opacity-70 cursor-not-allowed"
+                  : "bg-amber-600 hover:bg-amber-700"
+              }`}
+            >
+              {readyForSeat ? "Waiting..." : "Flip Card"}
+            </button>
+          ) : (
+            <div className="h-10" aria-hidden="true" />
+          )}
 
-        {row ? (
-          <button
-            onClick={leaveSeat}
-            className="px-3 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white text-sm"
-          >
-            Leave
-          </button>
-        ) : (
-          <button
-            onClick={() => takeSeat(index)}
-            className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm"
-          >
-            Take Seat
-          </button>
-        )}
+          {row ? (
+            <button
+              onClick={leaveSeat}
+              className="h-10 rounded bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold"
+            >
+              Leave
+            </button>
+          ) : (
+            <button
+              onClick={() => takeSeat(index)}
+              className="h-10 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold"
+            >
+              Take Seat
+            </button>
+          )}
+        </div>
       </div>
     );
   };
@@ -784,7 +788,7 @@ export default function WarMP({
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-3">
+      <div className="grid md:grid-cols-2 gap-3 auto-rows-fr">
         <Seat index={0} />
         <Seat index={1} />
       </div>
