@@ -237,17 +237,11 @@ export default function WarMP({
   const myRow = players.find((p) => p.client_id === clientId) || null;
   const mySeat = myRow?.seat_index ?? null;
 
-  const ensureSession = useCallback(
-    async (room) => {
-      const { data: existing } = await supabase
-        .from("war_sessions")
-        .select("*")
-        .eq("room_id", room)
-        .maybeSingle();
-      if (existing) return existing;
-      const { data, error } = await supabase
-        .from("war_sessions")
-        .insert({
+  const ensureSession = useCallback(async (room) => {
+    const { data: upserted, error } = await supabase
+      .from("war_sessions")
+      .upsert(
+        {
           room_id: room,
           stage: "lobby",
           seat_count: 2,
@@ -256,14 +250,23 @@ export default function WarMP({
           current: { "0": null, "1": null },
           stash: [],
           war_face_down: 1,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    []
-  );
+          round_no: 0,
+        },
+        { onConflict: "room_id", ignoreDuplicates: false }
+      )
+      .select()
+      .single();
+    if (error && error.code !== "23505") {
+      throw error;
+    }
+    if (upserted) return upserted;
+    const { data: existing } = await supabase
+      .from("war_sessions")
+      .select("*")
+      .eq("room_id", room)
+      .single();
+    return existing;
+  }, []);
 
   const takeSeat = useCallback(
     async (seatIndex) => {
@@ -616,17 +619,37 @@ export default function WarMP({
     const row = seatMap.get(index);
     const mine = row?.client_id === clientId;
     const label = index === 0 ? "Player A" : "Player B";
-    const pileCount = fmt((piles[String(index)] || []).length);
+    const pile = piles[String(index)] || [];
+    const pileCount = fmt(pile.length);
+    const currentCard = ses?.current?.[String(index)] || null;
     return (
       <div
-        className={`flex flex-col items-center gap-2 p-3 rounded-xl border border-white/10 bg-white/5 ${
+        className={`flex flex-col gap-3 p-4 rounded-xl border border-white/10 bg-white/5 ${
           mine ? "ring-2 ring-emerald-400" : ""
         }`}
       >
-        <div className="text-sm text-white/70">{label}</div>
-        <div className="text-lg font-bold text-white/90">
-          {row?.player_name || "—"}
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="text-xs text-white/60">{label}</div>
+            <div className="text-lg font-bold text-white/90">
+              {row?.player_name || "—"}
+            </div>
+          </div>
+          <div className="text-right text-xs text-white/60">
+            <div>Pile: {pileCount}</div>
+            <div>Stage: {status}</div>
+          </div>
         </div>
+
+        <div>
+          <div className="text-xs text-white/70 mb-1">Current Card</div>
+          <div className="inline-flex">
+            <Card code={currentCard} size="lg" hidden={!currentCard} />
+          </div>
+        </div>
+
+        <div className="text-xs text-white/65">Remaining cards: {pileCount}</div>
+
         {row ? (
           <button
             onClick={leaveSeat}
@@ -642,7 +665,6 @@ export default function WarMP({
             Take Seat
           </button>
         )}
-        <div className="text-xs text-white/60">Pile: {pileCount} cards</div>
       </div>
     );
   };
@@ -658,35 +680,20 @@ export default function WarMP({
         </div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-3">
+      <div className="grid md:grid-cols-2 gap-3">
         <Seat index={0} />
-        <div className="flex flex-col items-center gap-4 border border-white/10 rounded-xl bg-white/5 p-4">
-          <div className="text-center">
-            <div className="text-xl font-bold text-white">Battlefield</div>
-            <div className="text-sm text-white/70">
-              Round: {roundRef.current}
-            </div>
-          </div>
-          <div className="flex items-center justify-center gap-6">
-            <div className="flex flex-col items-center gap-2">
-              <div className="text-xs text-white/70">Player A</div>
-              <Card code={current["0"]} size="lg" hidden={!current["0"]} />
-              <div className="text-xs text-white/60">
-                Remaining: {fmt((piles["0"] || []).length)}
-              </div>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <div className="text-xs text-white/70">Player B</div>
-              <Card code={current["1"]} size="lg" hidden={!current["1"]} />
-              <div className="text-xs text-white/60">
-                Remaining: {fmt((piles["1"] || []).length)}
-              </div>
-            </div>
-          </div>
+        <Seat index={1} />
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+        <div className="text-sm text-white/70">
+          Round: <span className="font-semibold text-white">{roundRef.current}</span>
+        </div>
+        <div className="flex items-center gap-2">
           {isLeader && ses?.stage === "lobby" && (
             <button
               onClick={startMatch}
-              className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow"
+              className="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold"
             >
               Start Match
             </button>
@@ -708,57 +715,16 @@ export default function WarMP({
                   })
                   .eq("id", ses.id);
               }}
-              className="px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm"
+              className="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold"
             >
-              Reset to Lobby
+              Reset Lobby
             </button>
           )}
-          {msg && <div className="text-rose-300 text-sm">{msg}</div>}
         </div>
-        <Seat index={1} />
+        {msg && <div className="text-rose-300 text-sm">{msg}</div>}
       </div>
 
-      <div className="border border-white/10 rounded-xl bg-white/5 p-3">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-white font-bold text-sm">My Info</div>
-          <div className="text-xs text-white/60">
-            Stage tips: Higher card wins; tie triggers WAR (each puts{" "}
-            {ses?.war_face_down ?? 1} facedown then flips again).
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs sm:text-sm">
-            <div className="text-white/80 font-semibold mb-1">
-              Player A Pile ({fmt((piles["0"] || []).length)})
-            </div>
-            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-              {(piles["0"] || []).slice(0, 12).map((card, idx) => (
-                <Card key={card + idx} code={card} size="sm" hidden={!card} />
-              ))}
-            </div>
-          </div>
-          <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs sm:text-sm">
-            <div className="text-white/80 font-semibold mb-1">
-              Player B Pile ({fmt((piles["1"] || []).length)})
-            </div>
-            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-              {(piles["1"] || []).slice(0, 12).map((card, idx) => (
-                <Card key={card + idx} code={card} size="sm" hidden={!card} />
-              ))}
-            </div>
-          </div>
-          <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs sm:text-sm flex-1 min-w-[200px]">
-            <div className="text-white/80 font-semibold mb-1">
-              Current Stash ({fmt((ses?.stash || []).length)})
-            </div>
-            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-              {(ses?.stash || []).slice(0, 16).map((card, idx) => (
-                <Card key={card + idx} code={card} size="sm" hidden={!card} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+
     </div>
   );
 }
