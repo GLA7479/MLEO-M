@@ -139,6 +139,7 @@ export default function WarMP({
   const [roomMembers, setRoomMembers] = useState([]);
   const [msg, setMsg] = useState("");
   const roundRef = useRef(0);
+  const [localFlipCountdown, setLocalFlipCountdown] = useState(null);
 
   const isLeader = useMemo(() => {
     if (!roomMembers.length || !name) return false;
@@ -621,6 +622,26 @@ export default function WarMP({
   );
 
   useEffect(() => {
+    if (ses?.stage !== "dealing") {
+      setLocalFlipCountdown(null);
+      return;
+    }
+    const deadlineISO = ses?.current?.__deadline__;
+    if (!deadlineISO) {
+      setLocalFlipCountdown(null);
+      return;
+    }
+    const deadline = new Date(deadlineISO).getTime();
+    const updateCountdown = () => {
+      const diff = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setLocalFlipCountdown(diff);
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 500);
+    return () => clearInterval(interval);
+  }, [ses?.stage, ses?.current?.__deadline__]);
+
+  useEffect(() => {
     if (!isLeader || !ses?.id) return;
     const timer = setInterval(async () => {
       if (autopilotBusy.current) return;
@@ -750,7 +771,18 @@ export default function WarMP({
                   : "bg-amber-600 hover:bg-amber-700"
               }`}
             >
-              {readyForSeat ? "Waiting..." : "Flip Card"}
+              {readyForSeat ? (
+                <span>Waiting…</span>
+              ) : (
+                <span>
+                  Flip Card
+                  {localFlipCountdown != null && localFlipCountdown > 0 && (
+                    <span className="ml-2 text-xs text-white/80">
+                      {localFlipCountdown}s
+                    </span>
+                  )}
+                </span>
+              )}
             </button>
           ) : row ? (
             <div className="h-10" aria-hidden="true" />
