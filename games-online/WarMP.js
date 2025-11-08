@@ -386,6 +386,7 @@ export default function WarMP({
         "1": null,
         "__ready__": { "0": false, "1": false },
         "__deadline__": new Date(Date.now() + 5000).toISOString(),
+        "__stuck__": { "0": 0, "1": 0 },
       },
       stash: [],
       round_no: 0,
@@ -419,11 +420,13 @@ export default function WarMP({
     const pop0 = popTop(piles["0"]);
     const pop1 = popTop(piles["1"]);
     const nextPiles = { "0": pop0?.rest ?? [], "1": pop1?.rest ?? [] };
+    const penalty = s.current?.__stuck__ || { "0": 0, "1": 0 };
     const currentState = {
       "0": pop0?.top ?? null,
       "1": pop1?.top ?? null,
       "__ready__": { "0": false, "1": false },
       "__deadline__": null,
+      "__stuck__": penalty,
     };
     const stash = [
       ...(s.stash || []),
@@ -462,11 +465,13 @@ export default function WarMP({
     const pop1 = popTop(nextPiles["1"]);
     if (pop0) nextPiles["0"] = pop0.rest;
     if (pop1) nextPiles["1"] = pop1.rest;
+    const penalty = s.current?.__stuck__ || { "0": 0, "1": 0 };
     const currentState = {
       "0": pop0?.top ?? null,
       "1": pop1?.top ?? null,
       "__ready__": { "0": false, "1": false },
       "__deadline__": null,
+      "__stuck__": penalty,
     };
     stash = [
       ...stash,
@@ -550,6 +555,7 @@ export default function WarMP({
           "1": null,
           "__ready__": { "0": false, "1": false },
           "__deadline__": new Date(Date.now() + 5000).toISOString(),
+          "__stuck__": s.current?.__stuck__ || { "0": 0, "1": 0 },
         },
         stash: [],
         round_no: roundRef.current,
@@ -565,6 +571,7 @@ export default function WarMP({
       if (!session) return;
       const currentState = session.current || {};
       const ready = currentState.__ready__ || { "0": false, "1": false };
+      const penalty = currentState.__stuck__ || { "0": 0, "1": 0 };
       const deadlineISO = currentState.__deadline__;
       const now = Date.now();
       if (!deadlineISO) {
@@ -576,6 +583,7 @@ export default function WarMP({
               ...currentState,
               "__ready__": ready,
               "__deadline__": deadline,
+              "__stuck__": penalty,
             },
           })
           .eq("id", session.id);
@@ -584,9 +592,76 @@ export default function WarMP({
       const deadline = new Date(deadlineISO).getTime();
       const allReady = ready["0"] && ready["1"];
       if (!allReady && now < deadline) return;
+      const nextPenalty = { ...penalty };
+      const nextReady = { ...ready };
+      let autoTriggered = false;
+      if (!allReady) {
+        ["0", "1"].forEach((seatKey) => {
+          if (!ready[seatKey]) {
+            autoTriggered = true;
+            const strikes = (penalty[seatKey] || 0) + 1;
+            nextPenalty[seatKey] = strikes;
+            nextReady[seatKey] = true;
+          } else {
+            nextPenalty[seatKey] = 0;
+          }
+        });
+      } else {
+        nextPenalty["0"] = 0;
+        nextPenalty["1"] = 0;
+      }
+      const updatedCurrent = {
+        ...currentState,
+        "__stuck__": nextPenalty,
+      };
+      if (autoTriggered) {
+        const strikes0 = nextPenalty["0"] || 0;
+        const strikes1 = nextPenalty["1"] || 0;
+        if (strikes0 >= 3 && strikes1 >= 3) {
+          nextPenalty["0"] = 0;
+          nextPenalty["1"] = 0;
+          updatedCurrent.__stuck__ = { "0": 0, "1": 0 };
+        }
+        let winnerSeat = null;
+        if (strikes0 >= 3 && strikes1 < 3) {
+          winnerSeat = 1;
+        } else if (strikes1 >= 3 && strikes0 < 3) {
+          winnerSeat = 0;
+        }
+        if (winnerSeat !== null) {
+          await finishMatch(winnerSeat);
+          return;
+        }
+        await supabase
+          .from("war_sessions")
+          .update({
+            current: {
+              ...updatedCurrent,
+              "__ready__": nextReady,
+              "__deadline__": null,
+            },
+          })
+          .eq("id", session.id);
+        await doFlip();
+        return;
+      }
+      if (
+        nextPenalty["0"] !== penalty["0"] ||
+        nextPenalty["1"] !== penalty["1"]
+      ) {
+        await supabase
+          .from("war_sessions")
+          .update({
+            current: {
+              ...updatedCurrent,
+              "__ready__": ready,
+            },
+          })
+          .eq("id", session.id);
+      }
       await doFlip();
     },
-    [doFlip]
+    [doFlip, finishMatch]
   );
 
   const triggerFlip = useCallback(
@@ -595,9 +670,11 @@ export default function WarMP({
       if (ses?.stage !== "dealing") return;
       const currentState = ses.current || {};
       const ready = currentState.__ready__ || { "0": false, "1": false };
+      const penalty = currentState.__stuck__ || { "0": 0, "1": 0 };
       const key = String(seatIndex);
       if (ready[key]) return;
       const nextReady = { ...ready, [key]: true };
+      const nextPenalty = { ...penalty, [key]: 0 };
       const deadline =
         currentState.__deadline__ ||
         new Date(Date.now() + 5000).toISOString();
@@ -605,6 +682,7 @@ export default function WarMP({
         ...currentState,
         "__ready__": nextReady,
         "__deadline__": deadline,
+        "__stuck__": nextPenalty,
       };
       const { data, error } = await supabase
         .from("war_sessions")
