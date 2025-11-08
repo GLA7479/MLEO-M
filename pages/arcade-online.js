@@ -70,7 +70,7 @@ function fmt(n) {
   return String(n);
 }
 
-const TIERED_GAMES = ['poker', 'backgammon', 'roulette', 'blackjack'];
+const TIERED_GAMES = ['poker', 'backgammon', 'roulette', 'blackjack', 'war'];
 
 // Game Registry with lazy loading
 const GAME_REGISTRY = [
@@ -109,6 +109,15 @@ const GAME_REGISTRY = [
     color: "#EF4444",
     isMultiplayer: true,
     loader: () => import("../games-online/RouletteMP").then(m => m.default)
+  },
+  {
+    id: "war",
+    title: "War (Card Battle)",
+    emoji: "⚔️",
+    description: "1v1 card showdown. Flip, declare war, collect the pile!",
+    color: "#2563EB",
+    isMultiplayer: true,
+    loader: () => import("../games-online/WarMP").then(m => m.default)
   },
   {
     id: "poker-tables",
