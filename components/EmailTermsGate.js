@@ -17,6 +17,8 @@ const TERMS_KEY =
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 const RESEND_COOLDOWN_SEC = 30;
 
+const USE_LINKS = process.env.NEXT_PUBLIC_AUTH_USE_LINKS === "1";
+
 /** DEV AUTH BYPASS (client-side only):
  * Active when:
  *   - URL has ?devAuth=1  OR
@@ -152,16 +154,18 @@ export default function EmailTermsGate({ onPassed, onClose }) {
     }
     setSending(true);
     try {
-      const redirect =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/auth/callback`
-          : undefined;
+      let redirect;
+      const options = { shouldCreateUser: true };
+      if (USE_LINKS) {
+        const base =
+          process.env.NEXT_PUBLIC_AUTH_REDIRECT_BASE ||
+          (typeof window !== "undefined" ? window.location.origin : "");
+        redirect = base ? `${base}/auth/callback` : undefined;
+        if (redirect) options.emailRedirectTo = redirect;
+      }
       const { error } = await supabaseMP.auth.signInWithOtp({
         email,
-        options: {
-          emailRedirectTo: redirect,
-          shouldCreateUser: true,
-        },
+        options,
       });
       if (error) throw error;
       setStep("wait");
@@ -272,7 +276,9 @@ export default function EmailTermsGate({ onPassed, onClose }) {
               <div>
                 <div className="text-lg font-bold mb-1">Verify your email</div>
                 <div className="text-sm text-gray-600">
-                  Enter your email to get a magic link and a one-time code. Either method works.
+                  {USE_LINKS
+                    ? "Enter your email to get a magic link and a one-time code. Either method works."
+                    : "Enter your email to get a one-time verification code."}
                 </div>
               </div>
 
@@ -303,7 +309,9 @@ export default function EmailTermsGate({ onPassed, onClose }) {
                     ? "Sending…"
                     : cooldown > 0
                     ? `Resend (${cooldown}s)`
-                    : "Send link/code"}
+                    : USE_LINKS
+                    ? "Send link/code"
+                    : "Send code"}
                 </button>
 
                 <button
