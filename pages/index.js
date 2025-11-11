@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import PWAInstall from "../components/PWAInstall";
 import { useRouter } from "next/router";
 import dynamic from "next/dynamic";
-const EmailTermsGate = dynamic(() => import("../components/EmailTermsGate"), { ssr: false });
+const AuthEmailPassword = dynamic(() => import("../components/AuthEmailPassword"), { ssr: false });
 
 
 
@@ -833,7 +833,7 @@ export default function Home() {
   const [idx, setIdx] = useState(0);
   const [showHow, setShowHow] = useState(false);
 const router = useRouter();
-const [showGate, setShowGate] = useState(false);
+const [showAuth, setShowAuth] = useState(false);
 
 
   useEffect(() => {
@@ -905,11 +905,11 @@ const [showGate, setShowGate] = useState(false);
             <PWAInstall />
 
             <button
-  onClick={() => setShowGate(true)}
-  className="hidden sm:inline-flex px-3 py-2 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition text-sm"
->
-  {t.start}
-</button>
+              onClick={() => setShowAuth(true)}
+              className="hidden sm:inline-flex px-3 py-2 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition text-sm"
+            >
+              {t.start}
+            </button>
 
           </div>
         </header>
@@ -930,12 +930,12 @@ const [showGate, setShowGate] = useState(false);
             </p>
 
             <div className={`mt-8 flex ${dir==='rtl' ? 'flex-col sm:flex-row-reverse' : 'flex-col sm:flex-row'} gap-3`}>
-<button
-  onClick={() => setShowGate(true)}
-  className="px-6 py-3 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition"
->
-  {t.start}
-</button>
+            <button
+              onClick={() => setShowAuth(true)}
+              className="px-6 py-3 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition"
+            >
+              {t.start}
+            </button>
 
 
 
@@ -1033,12 +1033,12 @@ const [showGate, setShowGate] = useState(false);
         </div>,
         document.body
       )}
-{showGate && (
-  <EmailTermsGate
-    onPassed={() => router.push(GAME_ENTRY_URL)}
-    onClose={() => setShowGate(false)}
-  />
-)}
+      {showAuth && (
+        <AuthEmailPassword
+          onSuccess={() => router.push(GAME_ENTRY_URL)}
+          onClose={() => setShowAuth(false)}
+        />
+      )}
 
 
     </>

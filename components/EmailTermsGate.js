@@ -15,58 +15,43 @@ const TERMS_KEY =
   "mleo_terms";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
-const RESEND_COOLDOWN_SEC = 30;
 
-const USE_LINKS = process.env.NEXT_PUBLIC_AUTH_USE_LINKS === "1";
-
-/** DEV AUTH BYPASS (client-side only):
- * Active when:
- *   - URL has ?devAuth=1  OR
- *   - location.hostname is "localhost" or endsWith ".local"
- * Behavior:
- *   - Typing a valid email auto-continues to onPassed()
- *   - Clicking "Send link/code" also skips directly
- *   - Terms are auto-accepted (localStorage TERMS_KEY = "yes")
- */
 const DEV_AUTH_BYPASS =
   process.env.NEXT_PUBLIC_GATE_DEV_BYPASS === "1";
 
 export default function EmailTermsGate({ onPassed, onClose }) {
-  const [step, setStep] = useState("check"); // check | email | wait | terms
+  const [mode, setMode] = useState("login"); // login | signup
+  const [stage, setStage] = useState("check"); // check | auth | terms
   const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [err, setErr] = useState("");
-  const [sending, setSending] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
   const [termsChecked, setTermsChecked] = useState(false);
 
   const dir =
     (typeof document !== "undefined" &&
       (document.documentElement.getAttribute("dir") || "ltr")) || "ltr";
 
-  // Autofocus helpers
   const emailRef = useRef(null);
-  const otpRef = useRef(null);
+  const passwordRef = useRef(null);
 
-  // === BYPASS helper ===
   const devAutoPass = () => {
-    try { localStorage.setItem(TERMS_KEY, "yes"); } catch {}
+    try {
+      localStorage.setItem(TERMS_KEY, "yes");
+    } catch {}
     onPassed?.();
   };
 
   useEffect(() => {
-    if (step === "email" && emailRef.current) emailRef.current.focus();
-    if ((step === "wait" || step === "email") && otpRef.current) otpRef.current.focus();
-  }, [step]);
+    if (stage === "auth" && emailRef.current) emailRef.current.focus();
+  }, [stage]);
 
-  // Initial status check: verified? accepted terms? then pass-through
   useEffect(() => {
     let live = true;
     (async () => {
-      // If bypass is active → go straight to email step
       if (DEV_AUTH_BYPASS) {
-        setStep("email");
+        setStage("auth");
         return;
       }
       try {
@@ -75,17 +60,16 @@ export default function EmailTermsGate({ onPassed, onClose }) {
           localStorage.getItem(TERMS_KEY) === "yes";
         const { data } = await supabaseMP.auth.getSession();
         if (!live) return;
-
         if (data?.session && hasTerms) {
           onPassed?.();
-        } else if (!data?.session) {
-          setStep("email");
+        } else if (data?.session) {
+          setStage("terms");
         } else {
-          setStep("terms");
+          setStage("auth");
         }
       } catch {
         if (!live) return;
-        setStep("email");
+        setStage("auth");
       }
     })();
     return () => {
@@ -93,117 +77,83 @@ export default function EmailTermsGate({ onPassed, onClose }) {
     };
   }, [onPassed]);
 
-  // Resend timer
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const id = setInterval(() => setCooldown((s) => Math.max(0, s - 1)), 1000);
-    return () => clearInterval(id);
-  }, [cooldown]);
+  const canLogin = useMemo(
+    () => EMAIL_RE.test(email) && password.length >= 8,
+    [email, password]
+  );
 
-  // Provider detection for "Open inbox"
-  function inboxUrlFor(emailStr) {
-    const domain = (emailStr || "").split("@")[1]?.toLowerCase() || "";
-    if (domain.includes("gmail.")) return "https://mail.google.com/mail/u/0/#inbox";
-    if (domain.includes("outlook.") || domain.includes("hotmail.") || domain.includes("live."))
-      return "https://outlook.live.com/mail/0/inbox";
-    if (domain.includes("yahoo.")) return "https://mail.yahoo.com/";
-    if (domain.includes("icloud.") || domain.includes("me.com") || domain.includes("mac.com"))
-      return "https://www.icloud.com/mail";
-    // IL popular (keep if needed for your audience)
-    if (domain.includes("walla.")) return "https://mail.walla.co.il/";
-    if (domain.includes("013.net") || domain.includes("netvision")) return "https://webmail.netvision.net.il/";
-    // Default: Gmail web
-    return "https://mail.google.com/mail/u/0/#inbox";
-  }
+  const canSignup = useMemo(
+    () =>
+      EMAIL_RE.test(email) &&
+      password.length >= 8 &&
+      password === confirmPassword,
+    [email, password, confirmPassword]
+  );
 
-  // Try opening Gmail app, then fall back to web
-  function openGmailAppOrWeb(emailStr) {
-    const web = inboxUrlFor(emailStr);
-    const app = "googlegmail://";
-    const t = setTimeout(() => window.open(web, "_blank", "noopener,noreferrer"), 400);
-    try {
-      window.location.href = app;
-    } catch {
-      clearTimeout(t);
-      window.open(web, "_blank", "noopener,noreferrer");
-    }
-  }
-
-  const canSend = useMemo(() => EMAIL_RE.test(email), [email]);
-  const canVerify = useMemo(() => /^\d{6}$/.test(otp), [otp]);
-
-  // === BYPASS: auto-continue as soon as the user types a valid email ===
-  useEffect(() => {
-    if (DEV_AUTH_BYPASS && EMAIL_RE.test(email)) {
-      devAutoPass();
-    }
-  }, [email]);
-
-  async function sendLink() {
+  async function handleLogin() {
     setErr("");
 
-    // BYPASS: skip network, mark terms accepted, proceed
     if (DEV_AUTH_BYPASS) {
       devAutoPass();
       return;
     }
 
-    if (!canSend) {
-      setErr("Please enter a valid email.");
+    if (!canLogin) {
+      setErr("Please enter email and password (8+ characters).");
       return;
     }
-    setSending(true);
+
+    setSubmitting(true);
     try {
-      let redirect;
-      const options = { shouldCreateUser: true };
-      if (USE_LINKS) {
-        const base =
-          process.env.NEXT_PUBLIC_AUTH_REDIRECT_BASE ||
-          (typeof window !== "undefined" ? window.location.origin : "");
-        redirect = base ? `${base}/auth/callback` : undefined;
-        if (redirect) options.emailRedirectTo = redirect;
+      const { error } = await supabaseMP.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+      const { data } = await supabaseMP.auth.getSession();
+      if (data?.session) {
+        const hasTerms =
+          typeof window !== "undefined" &&
+          localStorage.getItem(TERMS_KEY) === "yes";
+        if (hasTerms) onPassed?.();
+        else setStage("terms");
+      } else {
+        setErr("Login failed. Please try again.");
       }
-      const { error } = await supabaseMP.auth.signInWithOtp({
-        email,
-        options,
-      });
-      if (error) throw error;
-      setStep("wait");
-      setCooldown(RESEND_COOLDOWN_SEC);
     } catch (e) {
-      setErr(e?.message || "Couldn't send the email. Please try again.");
+      setErr(e?.message || "Login failed. Please try again.");
     } finally {
-      setSending(false);
+      setSubmitting(false);
     }
   }
 
-  async function verifyOtp() {
+  async function handleSignup() {
     setErr("");
 
-    // BYPASS: shouldn't be needed, but keep symmetry
     if (DEV_AUTH_BYPASS) {
       devAutoPass();
       return;
     }
 
-    if (!canVerify) {
-      setErr("Enter the 6-digit code you received.");
+    if (!canSignup) {
+      setErr("Passwords must match and be at least 8 characters.");
       return;
     }
-    setVerifying(true);
+
+    setSubmitting(true);
     try {
-      const { error } = await supabaseMP.auth.verifyOtp({
+      const { error } = await supabaseMP.auth.signUp({
         email,
-        token: otp,
-        type: "email",
+        password,
+        options: { emailRedirectTo: undefined },
       });
       if (error) throw error;
-      setStep("terms");
+      setStage("terms");
       setErr("");
     } catch (e) {
-      setErr(e?.message || "Verification failed, please try again.");
+      setErr(e?.message || "Signup failed, please try again.");
     } finally {
-      setVerifying(false);
+      setSubmitting(false);
     }
   }
 
@@ -218,7 +168,6 @@ export default function EmailTermsGate({ onPassed, onClose }) {
     onPassed?.();
   }
 
-  // Tiny UI helper
   function Pill({ children }) {
     return (
       <span className="inline-block px-2 py-0.5 rounded bg-black/10 text-xs font-semibold">
@@ -241,7 +190,6 @@ export default function EmailTermsGate({ onPassed, onClose }) {
       }}
     >
       <div className="mx-auto w-[92%] max-w-md bg-white text-gray-900 rounded-2xl border border-black/10 shadow-2xl">
-        {/* Header */}
         <div className="sticky top-0 z-10 bg-white/95 backdrop-blur p-4 border-b border-black/10 rounded-t-2xl flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img
@@ -249,14 +197,13 @@ export default function EmailTermsGate({ onPassed, onClose }) {
               alt="MLEO"
               className="w-8 h-8 rounded-full object-contain"
             />
-            <div className="font-extrabold">Secure Sign-In</div>
+            <div className="font-extrabold">MLEO Sign-In</div>
           </div>
           <div className="flex items-center gap-2">
             <div className="text-xs text-gray-500">
-              <Pill>Magic Link</Pill> <Pill>OTP</Pill>
+              <Pill>Password</Pill>
               {DEV_AUTH_BYPASS && <Pill>DEV BYPASS</Pill>}
             </div>
-            {/* Close button (dismiss without registering) */}
             <button
               onClick={() => onClose?.()}
               className="ml-2 px-2.5 py-1.5 rounded-lg bg-black/5 hover:bg-black/10 text-sm"
@@ -268,21 +215,20 @@ export default function EmailTermsGate({ onPassed, onClose }) {
           </div>
         </div>
 
-        {/* Body */}
         <div className="p-5 space-y-4">
-          {/* EMAIL + OTP */}
-          {(step === "email" || step === "wait") && (
+          {stage === "auth" && (
             <>
               <div>
-                <div className="text-lg font-bold mb-1">Verify your email</div>
+                <div className="text-lg font-bold mb-1">
+                  {mode === "login" ? "Sign in to continue" : "Create your account"}
+                </div>
                 <div className="text-sm text-gray-600">
-                  {USE_LINKS
-                    ? "Enter your email to get a magic link and a one-time code. Either method works."
-                    : "Enter your email to get a one-time verification code."}
+                  {mode === "login"
+                    ? "Use your MLEO email and password."
+                    : "Set a secure password to access MLEO from any device."}
                 </div>
               </div>
 
-              {/* Email */}
               <label className="block text-sm font-medium">
                 Email address
                 <input
@@ -290,66 +236,93 @@ export default function EmailTermsGate({ onPassed, onClose }) {
                   type="email"
                   inputMode="email"
                   autoComplete="email"
-                  placeholder={DEV_AUTH_BYPASS ? "you@example.com (dev bypass: auto-continue)" : "you@example.com"}
+                  placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value.trim())}
                   className="mt-1 w-full border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                 />
               </label>
 
-              <div className={`flex ${dir === "rtl" ? "flex-col sm:flex-row-reverse" : "flex-col sm:flex-row"} gap-2`}>
-                <button
-                  onClick={sendLink}
-                  disabled={!DEV_AUTH_BYPASS && (sending || !EMAIL_RE.test(email) || cooldown > 0)}
-                  className="flex-1 px-4 py-3 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 disabled:opacity-60 disabled:hover:bg-yellow-400 transition"
-                >
-                  {DEV_AUTH_BYPASS
-                    ? "Continue (dev)"
-                    : sending
-                    ? "Sending…"
-                    : cooldown > 0
-                    ? `Resend (${cooldown}s)`
-                    : USE_LINKS
-                    ? "Send link/code"
-                    : "Send code"}
-                </button>
+              <label className="block text-sm font-medium">
+                Password
+                <input
+                  ref={passwordRef}
+                  type="password"
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  placeholder={mode === "login" ? "••••••••" : "At least 8 characters"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mt-1 w-full border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                />
+              </label>
 
-                <button
-                  onClick={() => openGmailAppOrWeb(email)}
-                  className="px-4 py-3 rounded-xl bg-black text-white font-semibold hover:bg-black/90 transition"
-                >
-                  Open inbox
-                </button>
-              </div>
-
-              {/* OTP */}
-              {!DEV_AUTH_BYPASS && (
+              {mode === "signup" && (
                 <label className="block text-sm font-medium">
-                  One-time code (if received)
-                  <div className="flex gap-2 mt-1">
-                    <input
-                      ref={otpRef}
-                      type="tel"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      placeholder="123456"
-                      maxLength={6}
-                      value={otp}
-                      onChange={(e) =>
-                        setOtp(e.target.value.replace(/[^\d]/g, "").slice(0, 6))
-                      }
-                      className="flex-1 border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                    />
-                    <button
-                      onClick={verifyOtp}
-                      disabled={!EMAIL_RE.test(email) || verifying || !canVerify}
-                      className="px-4 py-3 rounded-xl bg-gray-900 text-white font-semibold hover:bg-gray-800 disabled:opacity-60 transition"
-                    >
-                      {verifying ? "Checking…" : "Verify"}
-                    </button>
-                  </div>
+                  Confirm password
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="Repeat your password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="mt-1 w-full border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  />
                 </label>
               )}
+
+              <div className="flex items-center justify-between text-sm">
+                <button
+                  type="button"
+                  onClick={() => setMode(mode === "login" ? "signup" : "login")}
+                  className="text-yellow-600 hover:underline"
+                >
+                  {mode === "login"
+                    ? "New here? Create an account"
+                    : "Have an account? Sign in"}
+                </button>
+
+                {mode === "login" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!EMAIL_RE.test(email)) {
+                        setErr("Enter your email to receive reset instructions.");
+                        return;
+                      }
+                      const base =
+                        process.env.NEXT_PUBLIC_AUTH_REDIRECT_BASE ||
+                        (typeof window !== "undefined" ? window.location.origin : "");
+                      supabaseMP.auth
+                        .resetPasswordForEmail(email, {
+                          redirectTo: `${base}/auth/reset`,
+                        })
+                        .then(({ error }) => {
+                          if (error) setErr(error.message);
+                          else setErr("Password reset email sent. Check your inbox.");
+                        });
+                    }}
+                    className="text-gray-600 hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={mode === "login" ? handleLogin : handleSignup}
+                disabled={
+                  submitting || (mode === "login" ? !canLogin : !canSignup)
+                }
+                className="w-full px-4 py-3 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 disabled:opacity-60 disabled:hover:bg-yellow-400 transition"
+              >
+                {submitting
+                  ? mode === "login"
+                    ? "Signing in…"
+                    : "Creating account…"
+                  : mode === "login"
+                  ? "Sign in"
+                  : "Create account"}
+              </button>
 
               {err && (
                 <div className="text-sm text-red-600" aria-live="polite">
@@ -357,16 +330,13 @@ export default function EmailTermsGate({ onPassed, onClose }) {
                 </div>
               )}
 
-              {!DEV_AUTH_BYPASS && (
-                <div className="text-xs text-gray-500">
-                  Tip: If you don’t see the email, check your <span className="font-semibold">Spam</span> folder.
-                </div>
-              )}
+              <div className="text-xs text-gray-500">
+                Password must be at least 8 characters. Use a unique password to keep your account secure.
+              </div>
             </>
           )}
 
-          {/* TERMS (skipped in bypass because we autostore "yes") */}
-          {step === "terms" && !DEV_AUTH_BYPASS && (
+          {stage === "terms" && !DEV_AUTH_BYPASS && (
             <>
               <div>
                 <div className="text-lg font-bold mb-1">Terms & Privacy</div>
@@ -416,10 +386,9 @@ export default function EmailTermsGate({ onPassed, onClose }) {
           )}
         </div>
 
-        {/* Footer */}
         <div className="p-4 border-t border-black/10 text-xs text-gray-500 rounded-b-2xl flex items-center justify-between">
           <div>
-            Secure • Passwordless • Mobile-friendly
+            Secure • Email & password • Mobile-friendly
             {DEV_AUTH_BYPASS && " • DEV BYPASS ACTIVE"}
           </div>
           <button
