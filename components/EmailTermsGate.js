@@ -1,5 +1,6 @@
 // components/EmailTermsGate.js
 import { useEffect, useMemo, useRef, useState } from "react";
+import { supabaseMP } from "../lib/supabaseClients";
 
 /**
  * TERMS_KEY:
@@ -26,10 +27,7 @@ const RESEND_COOLDOWN_SEC = 30;
  *   - Terms are auto-accepted (localStorage TERMS_KEY = "yes")
  */
 const DEV_AUTH_BYPASS =
-  typeof window !== "undefined" &&
-  (new URLSearchParams(window.location.search).get("devAuth") === "1" ||
-    window.location.hostname === "localhost" ||
-    window.location.hostname.endsWith(".local"));
+  process.env.NEXT_PUBLIC_GATE_DEV_BYPASS === "1";
 
 export default function EmailTermsGate({ onPassed, onClose }) {
   const [step, setStep] = useState("check"); // check | email | wait | terms
@@ -73,15 +71,12 @@ export default function EmailTermsGate({ onPassed, onClose }) {
         const hasTerms =
           typeof window !== "undefined" &&
           localStorage.getItem(TERMS_KEY) === "yes";
-        const r = await fetch("/api/auth/email/status", {
-          credentials: "include",
-        });
-        const js = await r.json();
+        const { data } = await supabaseMP.auth.getSession();
         if (!live) return;
 
-        if (js?.verified && hasTerms) {
+        if (data?.session && hasTerms) {
           onPassed?.();
-        } else if (!js?.verified) {
+        } else if (!data?.session) {
           setStep("email");
         } else {
           setStep("terms");
@@ -133,7 +128,7 @@ export default function EmailTermsGate({ onPassed, onClose }) {
   }
 
   const canSend = useMemo(() => EMAIL_RE.test(email), [email]);
-  const canVerify = useMemo(() => otp.trim().length >= 4, [otp]);
+  const canVerify = useMemo(() => /^\d{6}$/.test(otp), [otp]);
 
   // === BYPASS: auto-continue as soon as the user types a valid email ===
   useEffect(() => {
@@ -157,13 +152,18 @@ export default function EmailTermsGate({ onPassed, onClose }) {
     }
     setSending(true);
     try {
-      const r = await fetch("/api/auth/email/link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email }),
+      const redirect =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/auth/callback`
+          : undefined;
+      const { error } = await supabaseMP.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: redirect,
+          shouldCreateUser: true,
+        },
       });
-      if (!r.ok) throw new Error("Failed to send link.");
+      if (error) throw error;
       setStep("wait");
       setCooldown(RESEND_COOLDOWN_SEC);
     } catch (e) {
@@ -183,19 +183,17 @@ export default function EmailTermsGate({ onPassed, onClose }) {
     }
 
     if (!canVerify) {
-      setErr("Enter the 4–6 digit code you received.");
+      setErr("Enter the 6-digit code you received.");
       return;
     }
     setVerifying(true);
     try {
-      const r = await fetch("/api/auth/email/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, otp }),
+      const { error } = await supabaseMP.auth.verifyOtp({
+        email,
+        token: otp,
+        type: "email",
       });
-      const js = await r.json();
-      if (!r.ok || !js?.verified) throw new Error("Invalid code, try again.");
+      if (error) throw error;
       setStep("terms");
       setErr("");
     } catch (e) {
@@ -327,13 +325,16 @@ export default function EmailTermsGate({ onPassed, onClose }) {
                       inputMode="numeric"
                       pattern="[0-9]*"
                       placeholder="123456"
+                      maxLength={6}
                       value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/[^\d]/g, ""))}
+                      onChange={(e) =>
+                        setOtp(e.target.value.replace(/[^\d]/g, "").slice(0, 6))
+                      }
                       className="flex-1 border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                     />
                     <button
                       onClick={verifyOtp}
-                      disabled={!EMAIL_RE.test(email) || verifying || otp.trim().length < 4}
+                      disabled={!EMAIL_RE.test(email) || verifying || !canVerify}
                       className="px-4 py-3 rounded-xl bg-gray-900 text-white font-semibold hover:bg-gray-800 disabled:opacity-60 transition"
                     >
                       {verifying ? "Checking…" : "Verify"}
