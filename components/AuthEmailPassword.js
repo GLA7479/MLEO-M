@@ -11,6 +11,11 @@ export default function AuthEmailPassword({ onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [msg, setMsg] = useState("");
+  const [remember, setRemember] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage?.getItem("mleo_remember_me");
+    return stored !== "false";
+  });
 
   useEffect(() => {
     setMsg("");
@@ -60,6 +65,9 @@ export default function AuthEmailPassword({ onClose, onSuccess }) {
   }
 
   async function doSignin() {
+    try {
+      window.localStorage?.setItem("mleo_remember_me", remember ? "true" : "false");
+    } catch {}
     setLoading(true);
     setMsg("");
     const { error } = await supabaseMP.auth.signInWithPassword({ email, password });
@@ -141,6 +149,17 @@ export default function AuthEmailPassword({ onClose, onSuccess }) {
           )}
 
           {msg && <div className="text-sm text-gray-600">{msg}</div>}
+
+          {mode === "signin" && (
+            <label className="inline-flex items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
+              Stay signed in on this device
+            </label>
+          )}
 
           {mode === "signup" && (
             <button

@@ -2,10 +2,28 @@
 import Head from "next/head";
 import { useEffect } from "react";
 import { initVaultShim } from "../lib/vaultShim";
+import { supabaseMP } from "../lib/supabaseClients";
 
 export default function Layout({ children, title }) {
   useEffect(() => {
     initVaultShim();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (typeof window === "undefined") return;
+      const remember = window.localStorage?.getItem("mleo_remember_me");
+      if (remember === "false") {
+        const { data } = await supabaseMP.auth.getSession();
+        if (!cancelled && data?.session) {
+          await supabaseMP.auth.signOut();
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (

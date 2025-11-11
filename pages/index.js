@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import PWAInstall from "../components/PWAInstall";
 import { useRouter } from "next/router";
 import dynamic from "next/dynamic";
+import { supabaseMP } from "../lib/supabaseClients";
 const AuthEmailPassword = dynamic(() => import("../components/AuthEmailPassword"), { ssr: false });
 
 
@@ -905,7 +906,19 @@ const [showAuth, setShowAuth] = useState(false);
             <PWAInstall />
 
             <button
-              onClick={() => setShowAuth(true)}
+              onClick={async () => {
+                try {
+                  const remember = typeof window !== "undefined"
+                    ? window.localStorage?.getItem("mleo_remember_me")
+                    : "true";
+                  const { data } = await supabaseMP.auth.getSession();
+                  if (data?.session && remember !== "false") {
+                    router.push(GAME_ENTRY_URL);
+                    return;
+                  }
+                } catch {}
+                setShowAuth(true);
+              }}
               className="hidden sm:inline-flex px-3 py-2 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition text-sm"
             >
               {t.start}
@@ -931,7 +944,19 @@ const [showAuth, setShowAuth] = useState(false);
 
             <div className={`mt-8 flex ${dir==='rtl' ? 'flex-col sm:flex-row-reverse' : 'flex-col sm:flex-row'} gap-3`}>
             <button
-              onClick={() => setShowAuth(true)}
+              onClick={async () => {
+                try {
+                  const remember = typeof window !== "undefined"
+                    ? window.localStorage?.getItem("mleo_remember_me")
+                    : "true";
+                  const { data } = await supabaseMP.auth.getSession();
+                  if (data?.session && remember !== "false") {
+                    router.push(GAME_ENTRY_URL);
+                    return;
+                  }
+                } catch {}
+                setShowAuth(true);
+              }}
               className="px-6 py-3 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition"
             >
               {t.start}

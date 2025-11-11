@@ -1,9 +1,11 @@
 // pages/mining.js
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import GamePoolStats from "../components/GamePoolStats";
+import { supabaseMP } from "../lib/supabaseClients";
 
 const BG_URL = "/images/games-hero.jpg";
 
@@ -12,6 +14,7 @@ const TEXT = {
   en: {
     name: "English", dir: "ltr", code: "en",
     back: "← BACK",
+    logout: "LOG OUT",
     liveTestnet: "Live Testnet • Earn in-game MLEO",
     chooseGame: "Choose Your Game",
     chooseGameDesc: "Two modes, one Vault. Play actively with upgrades (Miners) or let passive accrual run (Token Rush). You can switch anytime.",
@@ -104,6 +107,7 @@ const TEXT = {
   ar: {
     name: "العربية", dir: "rtl", code: "ar",
     back: "← العودة",
+    logout: "تسجيل الخروج",
     liveTestnet: "شبكة اختبار حية • اربح MLEO في اللعبة",
     chooseGame: "اختر لعبتك",
     chooseGameDesc: "وضعان، خزنة واحدة. العب بنشاط مع الترقيات (المنقبون) أو دع الاستحقاق السلبي يعمل (اندفاعة الرمز). يمكنك التبديل في أي وقت.",
@@ -196,6 +200,7 @@ const TEXT = {
   ru: {
     name: "Русский", dir: "ltr", code: "ru",
     back: "← Назад",
+    logout: "Выйти",
     liveTestnet: "Живая тестовая сеть • Зарабатывайте MLEO в игре",
     chooseGame: "Выберите свою игру",
     chooseGameDesc: "Два режима, одно хранилище. Играйте активно с улучшениями (Майнеры) или позвольте пассивному накоплению работать (Токен Раш). Вы можете переключаться в любое время.",
@@ -288,6 +293,7 @@ const TEXT = {
   es: {
     name: "Español", dir: "ltr", code: "es",
     back: "← Volver",
+    logout: "Cerrar sesión",
     liveTestnet: "Testnet en vivo • Gana MLEO en el juego",
     chooseGame: "Elige tu juego",
     chooseGameDesc: "Dos modos, una bóveda. Juega activamente con mejoras (Miners) o deja que la acumulación pasiva funcione (Token Rush). Puedes cambiar en cualquier momento.",
@@ -380,6 +386,7 @@ const TEXT = {
   fr: {
     name: "Français", dir: "ltr", code: "fr",
     back: "← Retour",
+    logout: "Se déconnecter",
     liveTestnet: "Testnet en direct • Gagnez MLEO dans le jeu",
     chooseGame: "Choisissez votre jeu",
     chooseGameDesc: "Deux modes, un coffre-fort. Jouez activement avec des améliorations (Miners) ou laissez l'accumulation passive fonctionner (Token Rush). Vous pouvez changer à tout moment.",
@@ -472,6 +479,7 @@ const TEXT = {
   de: {
     name: "Deutsch", dir: "ltr", code: "de",
     back: "← Zurück",
+    logout: "Abmelden",
     liveTestnet: "Live Testnet • Verdiene MLEO im Spiel",
     chooseGame: "Wähle dein Spiel",
     chooseGameDesc: "Zwei Modi, ein Vault. Spiele aktiv mit Upgrades (Miners) oder lass passives Sammeln laufen (Token Rush). Du kannst jederzeit wechseln.",
@@ -564,6 +572,7 @@ const TEXT = {
   zh: {
     name: "中文", dir: "ltr", code: "zh",
     back: "← 返回",
+    logout: "退出登录",
     liveTestnet: "实时测试网 • 在游戏中赚取MLEO",
     chooseGame: "选择你的游戏",
     chooseGameDesc: "两种模式，一个金库。主动升级游戏（矿工）或让被动累积运行（代币冲刺）。你可以随时切换。",
@@ -656,6 +665,7 @@ const TEXT = {
   ja: {
     name: "日本語", dir: "ltr", code: "ja",
     back: "← 戻る",
+    logout: "ログアウト",
     liveTestnet: "ライブテストネット • ゲーム内でMLEOを獲得",
     chooseGame: "ゲームを選択",
     chooseGameDesc: "2つのモード、1つのVault。アップグレードでアクティブにプレイ（Miners）またはパッシブ蓄積を実行（Token Rush）。いつでも切り替え可能。",
@@ -748,6 +758,7 @@ const TEXT = {
   ko: {
     name: "한국어", dir: "ltr", code: "ko",
     back: "← 돌아가기",
+    logout: "로그아웃",
     liveTestnet: "라이브 테스트넷 • 게임에서 MLEO 획득",
     chooseGame: "게임 선택",
     chooseGameDesc: "두 가지 모드, 하나의 금고. 업그레이드로 활발히 플레이(마이너) 또는 패시브 적립 실행(토큰 러시). 언제든지 전환 가능.",
@@ -840,6 +851,7 @@ const TEXT = {
   tr: {
     name: "Türkçe", dir: "ltr", code: "tr",
     back: "← Geri",
+    logout: "Çıkış Yap",
     liveTestnet: "Canlı Testnet • Oyunda MLEO Kazanın",
     chooseGame: "Oyununuzu Seçin",
     chooseGameDesc: "İki mod, bir kasa. Yükseltmelerle aktif oynayın (Minerlar) veya pasif birikim çalıştırın (Token Rush). İstediğiniz zaman değiştirebilirsiniz.",
@@ -932,6 +944,7 @@ const TEXT = {
   it: {
     name: "Italiano", dir: "ltr", code: "it",
     back: "← Indietro",
+    logout: "Esci",
     liveTestnet: "Testnet Live • Guadagna MLEO nel gioco",
     chooseGame: "Scegli il tuo gioco",
     chooseGameDesc: "Due modalità, una cassaforte. Gioca attivamente con miglioramenti (Miner) o lascia funzionare l'accumulo passivo (Token Rush). Puoi cambiare in qualsiasi momento.",
@@ -1024,6 +1037,7 @@ const TEXT = {
   ka: {
     name: "ქართული", dir: "ltr", code: "ka",
     back: "← უკან",
+    logout: "გასვლა",
     liveTestnet: "ცოცხალი ტესტნეტი • მიიღე MLEO თამაშში",
     chooseGame: "აირჩიე შენი თამაში",
     chooseGameDesc: "ორი რეჟიმი, ერთი საცავი. ითამაშე აქტივურად გაუმჯობესებებით (მაინერები) ან დაუშვი პასიური დაგროვება (ტოკენ ბუმი). შეგიძლია ნებისმიერ დროს შეცვალო.",
@@ -1116,6 +1130,7 @@ const TEXT = {
   pl: {
     name: "Polski", dir: "ltr", code: "pl",
     back: "← Wstecz",
+    logout: "Wyloguj",
     liveTestnet: "Live Testnet • Zarabiaj MLEO w grze",
     chooseGame: "Wybierz swoją grę",
     chooseGameDesc: "Dwa tryby, jeden skarbiec. Graj aktywnie z ulepszeniami (Górnicy) lub pozwól pasywnemu gromadzeniu działać (Token Rush). Możesz przełączać się w dowolnym momencie.",
@@ -1208,6 +1223,7 @@ const TEXT = {
   ro: {
     name: "Română", dir: "ltr", code: "ro",
     back: "← Înapoi",
+    logout: "Deconectare",
     liveTestnet: "Testnet Live • Câștigă MLEO în joc",
     chooseGame: "Alege jocul tău",
     chooseGameDesc: "Două moduri, un seif. Joacă activ cu upgrade-uri (Mineri) sau lasă acumularea pasivă să funcționeze (Token Rush). Poți schimba oricând.",
@@ -1300,6 +1316,7 @@ const TEXT = {
   cs: {
     name: "Čeština", dir: "ltr", code: "cs",
     back: "← Zpět",
+    logout: "Odhlásit se",
     liveTestnet: "Live Testnet • Získejte MLEO ve hře",
     chooseGame: "Vyberte si hru",
     chooseGameDesc: "Dva režimy, jeden trezor. Hrajte aktivně s vylepšeními (Horníci) nebo nechte pasivní akumulaci běžet (Token Rush). Můžete kdykoli přepnout.",
@@ -1392,6 +1409,7 @@ const TEXT = {
   nl: {
     name: "Nederlands", dir: "ltr", code: "nl",
     back: "← Terug",
+    logout: "Uitloggen",
     liveTestnet: "Live Testnet • Verdien MLEO in het spel",
     chooseGame: "Kies je spel",
     chooseGameDesc: "Twee modi, één kluis. Speel actief met upgrades (Mijnwerkers) of laat passieve accumulatie draaien (Token Rush). Je kunt altijd wisselen.",
@@ -1484,6 +1502,7 @@ const TEXT = {
   el: {
     name: "Ελληνικά", dir: "ltr", code: "el",
     back: "← Πίσω",
+    logout: "Αποσύνδεση",
     liveTestnet: "Live Testnet • Κέρδισε MLEO στο παιχνίδι",
     chooseGame: "Επίλεξε το παιχνίδι σου",
     chooseGameDesc: "Δύο λειτουργίες, ένα θησαυροφυλάκιο. Παίξε ενεργά με αναβαθμίσεις (Εξορυκτές) ή άσε την παθητική συσσώρευση να τρέχει (Token Rush). Μπορείς να αλλάξεις ανά πάσα στιγμή.",
@@ -1576,6 +1595,7 @@ const TEXT = {
   he: {
     name: "עברית", dir: "rtl", code: "he",
     back: "← חזרה",
+    logout: "התנתק",
     liveTestnet: "רשת בדיקה חיה • הרוויחו MLEO במשחק",
     chooseGame: "בחר את המשחק שלך",
     chooseGameDesc: "שני מצבים, Vault אחד. שחק באופן פעיל עם שדרוגים (כורים) או תן לצבירה פסיבית לרוץ (Token Rush). אתה יכול להחליף בכל עת.",
@@ -2123,6 +2143,7 @@ function LanguageSelector({ currentLang, onLanguageChange }) {
 
 // ===== GamesHub Component =====
 export default function GamesHub() {
+  const router = useRouter();
   const [modal, setModal] = useState(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -2162,6 +2183,18 @@ export default function GamesHub() {
 
   const handleLanguageChange = (newLang) => {
     setLang(newLang);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabaseMP.auth.signOut();
+    } catch (e) {
+      console.error("supabase signOut failed", e);
+    }
+    try {
+      window.localStorage?.setItem("mleo_remember_me", "false");
+    } catch {}
+    router.push("/");
   };
 
   const text = useMemo(() => TEXT[lang] || TEXT.en, [lang]);
@@ -2216,11 +2249,19 @@ export default function GamesHub() {
           <div className="max-w-4xl mx-auto">
             {/* Navigation */}
             <div className="flex items-center justify-between mb-6">
-              <Link href="/">
-                <button className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-500/30 transition-colors">
-                  {text.back}
+              <div className="flex items-center gap-2">
+                <Link href="/">
+                  <button className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-500/30 transition-colors">
+                    {text.back}
+                  </button>
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="bg-red-500/20 hover:bg-red-500/35 text-red-200 px-3 py-1.5 rounded-lg text-xs font-bold border border-red-400/40 transition-colors"
+                >
+                  {text.logout}
                 </button>
-              </Link>
+              </div>
               <div className="flex items-center gap-3">
                 <LanguageSelector currentLang={lang} onLanguageChange={handleLanguageChange} />
                 <div style={{ transform: 'scale(0.8)' }}>
