@@ -4,8 +4,10 @@ import { supabaseMP } from "../lib/supabaseClients";
 
 export default function AuthEmailPassword({ onClose, onSuccess }) {
   const [mode, setMode] = useState("signin"); // signin | signup | reset
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [signupStep, setSignupStep] = useState("form"); // form | otp
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,12 +24,26 @@ export default function AuthEmailPassword({ onClose, onSuccess }) {
     setPassword("");
     setSignupStep("form");
     setOtp("");
+    setUsername("");
+    setConfirmPassword("");
   }, [mode]);
 
   async function doSignup() {
     if (signupStep === "form") {
+      if (!username) {
+        setMsg("Choose a username.");
+        return;
+      }
+      if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+        setMsg("Username must be 3-20 characters (letters, numbers, underscore).");
+        return;
+      }
       if (!email || !password || password.length < 6) {
         setMsg("Please enter email and password (min 6 characters).");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setMsg("Passwords do not match.");
         return;
       }
       setLoading(true);
@@ -54,6 +70,27 @@ export default function AuthEmailPassword({ onClose, onSuccess }) {
     });
     setVerifying(false);
     if (error) return setMsg(error.message);
+
+    const { data: existing } = await supabaseMP
+      .from("user_profiles")
+      .select("user_id")
+      .eq("username", username)
+      .maybeSingle();
+
+    if (existing) {
+      setMsg("Username already taken. Choose another.");
+      setSignupStep("form");
+      return;
+    }
+
+    const { error: profileError } = await supabaseMP
+      .from("user_profiles")
+      .insert({ username });
+
+    if (profileError) {
+      setMsg(profileError.message);
+      return;
+    }
 
     const { data } = await supabaseMP.auth.getSession();
     if (data?.session) {
@@ -119,16 +156,48 @@ export default function AuthEmailPassword({ onClose, onSuccess }) {
             />
           </label>
 
-          {mode !== "reset" && signupStep === "form" && (
-            <label className="block text-sm font-medium">
-              Password
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 w-full border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-              />
-            </label>
+          {mode === "signup" && signupStep === "form" ? (
+            <>
+              <label className="block text-sm font-medium">
+                Username
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.trim())}
+                  className="mt-1 w-full border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                />
+              </label>
+              <label className="block text-sm font-medium">
+                Password
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mt-1 w-full border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                />
+              </label>
+              <label className="block text-sm font-medium">
+                Confirm password
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="mt-1 w-full border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                />
+              </label>
+            </>
+          ) : (
+            mode !== "reset" && (
+              <label className="block text-sm font-medium">
+                Password
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mt-1 w-full border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                />
+              </label>
+            )
           )}
 
           {mode === "signup" && signupStep === "otp" && (
