@@ -1,7 +1,13 @@
 // components/Layout.js
 import Head from "next/head";
+import { useEffect } from "react";
+import { initVaultShim } from "../lib/vaultShim";
 
 export default function Layout({ children, title }) {
+  useEffect(() => {
+    initVaultShim();
+  }, []);
+
   return (
     <>
       <Head>
