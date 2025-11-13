@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
+import { queueDelta, getBalance } from "../lib/vaultAdapter";
 
 const MIN_BET = 1000;
 const SEATS = 6;
@@ -88,18 +89,22 @@ function HandView({ hand, size = "normal", isDealing = false }) {
 }
 
 // ---------- Component ----------
-export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth }) {
-  // Use same vault functions as existing games
-  function getVault() {
-    const rushData = JSON.parse(localStorage.getItem("mleo_rush_core_v4") || "{}");
-    return rushData.vault || 0;
-  }
+export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, tierCode = '10K' }) {
+  const [localVault, setLocalVault] = useState(0);
+  useEffect(() => {
+    getBalance().then((bal) => {
+      setLocalVault(bal);
+      if (setVaultBoth) setVaultBoth(bal);
+    });
+  }, []);
 
-  function setVault(amount) {
-    const rushData = JSON.parse(localStorage.getItem("mleo_rush_core_v4") || "{}");
-    rushData.vault = amount;
-    localStorage.setItem("mleo_rush_core_v4", JSON.stringify(rushData));
-  }
+  const getVault = () => localVault;
+  const setVault = (amount) => {
+    const delta = amount - localVault;
+    setLocalVault(amount);
+    queueDelta(delta);
+    if (setVaultBoth) setVaultBoth(amount);
+  };
   const name = playerName || "Guest";
 
   // בדיקת חיבור מיידית
@@ -929,8 +934,8 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth })
 
       // עדכן את ה-vault אם זה השחקן המקומי
       if (p.player_name === name) {
-        const currentVault = getVault();
-        const newVault = currentVault + delta;
+        const avail = getVault();
+        const newVault = avail + delta;
         setVault(newVault);
         // עדכן גם את ה-state בדף הראשי
         if (setVaultBoth) {

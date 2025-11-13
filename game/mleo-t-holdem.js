@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseMP } from "../lib/supabaseClients";
 
 // ===== Vault helpers (aligned with your other games) =====
 function safeRead(key, fallback = {}) {
@@ -218,19 +218,8 @@ export default function HoldemPage() {
   useEffect(() => {
     if (!currentHandId || typeof window === "undefined") return;
     
-    // Initialize Supabase client (V1 - Legacy)
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL_V1;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY_V1;
-    
-    if (!supabaseUrl || !supabaseKey) {
-      console.log("Supabase not configured, using polling only");
-      return;
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
     // Subscribe to changes for current hand
-    const channel = supabase
+    const channel = supabaseMP
       .channel(`hand:${currentHandId}`)
       .on('postgres_changes', 
         { event: '*', schema: 'poker', table: 'poker_hands', filter: `id=eq.${currentHandId}` },
@@ -289,9 +278,9 @@ export default function HoldemPage() {
 
     return () => {
       console.log('Unsubscribing from realtime');
-      supabase.removeChannel(channel);
+      supabaseMP.removeChannel(channel);
     };
-  }, [currentHandId]);
+  }, [currentHandId, displayName]);
 
   // Persist name
   useEffect(()=> safeWrite(NAME_KEY, { name: displayName||"" }), [displayName]);

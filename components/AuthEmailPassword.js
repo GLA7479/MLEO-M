@@ -1,6 +1,8 @@
 // components/AuthEmailPassword.js
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import { supabaseMP } from "../lib/supabaseClients";
+import { playAsGuest } from "../lib/authGuest";
 
 export default function AuthEmailPassword({ onClose, onSuccess }) {
   const [mode, setMode] = useState("signin"); // signin | signup | reset
@@ -18,6 +20,7 @@ export default function AuthEmailPassword({ onClose, onSuccess }) {
     const stored = window.localStorage?.getItem("mleo_remember_me");
     return stored !== "false";
   });
+  const router = useRouter();
 
   useEffect(() => {
     setMsg("");
@@ -254,15 +257,22 @@ export default function AuthEmailPassword({ onClose, onSuccess }) {
               {loading ? "Signing in…" : "Sign in"}
             </button>
           )}
-          {mode === "reset" && (
-            <button
-              onClick={doReset}
-              disabled={loading}
-              className="w-full px-4 py-3 rounded-xl bg-yellow-400 text-black font-extrabold hover:bg-yellow-300 disabled:opacity-60"
-            >
-              {loading ? "Sending…" : "Send reset link"}
-            </button>
-          )}
+
+          <button
+            onClick={async () => {
+              try {
+                const { username } = await playAsGuest();
+                setMsg("");
+                onClose?.();
+                router.push("/mining");
+              } catch (e) {
+                setMsg(e.message || "Could not start guest session.");
+              }
+            }}
+            className="w-full px-4 py-3 rounded-xl border border-black/10 text-sm font-semibold text-gray-800 hover:bg-black/5 transition"
+          >
+            Continue as Guest
+          </button>
 
           <div className="text-xs text-gray-600 pt-2 flex flex-wrap gap-2 justify-between">
             {mode !== "signin" && (

@@ -1,7 +1,6 @@
 export const config = { runtime: "nodejs" };
 
-import { q } from "../../../lib/db";
-import { supabase } from "../../../lib/supabase";
+import { supabaseMP as supabase } from "../../../lib/supabaseClients";
 
 function buildDeck(){
   const R = ["2","3","4","5","6","7","8","9","T","J","Q","K","A"];
@@ -24,36 +23,44 @@ export default async function handler(req,res){
   }
 
   try {
-    const t = await q(`SELECT small_blind, big_blind FROM poker_tables WHERE id=$1`, [table_id]);
-    if (!t.rows.length) return res.status(404).json({ error:"table_not_found" });
-    const { small_blind: SB, big_blind: BB } = t.rows[0];
+    const t = await supabase.rpc('get_table_by_id', { p_table_id: table_id });
+    if (!t.data.length) return res.status(404).json({ error:"table_not_found" });
+    const { small_blind: SB, big_blind: BB } = t.data[0];
 
-    const seats = await q(
-      `SELECT seat_index, player_name, stack
-       FROM poker_seats WHERE table_id=$1 AND stack>0
-       ORDER BY seat_index`, [table_id]
-    );
-    if (seats.rows.length<2) return res.status(400).json({ error:"need_2_players" });
+    const seats = await supabase.rpc('get_seats_by_table_id', { p_table_id: table_id });
+    if (seats.data.length<2) return res.status(400).json({ error:"need_2_players" });
 
     const deck = buildDeck();
 
     // two cards to each (round-robin)
     const holeBySeat = {};
     for (let r=0;r<2;r++){
-      for (const s of seats.rows){
+      for (const s of seats.data){
         const c = deck.pop();
         (holeBySeat[s.seat_index] ||= []).push(c);
       }
     }
 
     // snapshot players for this hand
-    await q(`DELETE FROM poker_hand_players WHERE hand_id=$1`, [hand_id]);
-    for (const s of seats.rows){
-      await q(
-        `INSERT INTO poker_hand_players
-         (hand_id, table_id, seat_index, player_name, player_id, hole_cards, stack_start, stack_live, folded, all_in, bet_street, acted_street, in_hand)
-         VALUES ($1,$2,$3,$4,NULL,$5,$6,$6,false,false,0,false,true)`,
-        [hand_id, table_id, s.seat_index, s.player_name, holeBySeat[s.seat_index]||[], s.stack]
+    await supabase.rpc('delete_hand_players', { p_hand: hand_id });
+    for (const s of seats.data){
+      await supabase.rpc(
+        'insert_hand_players',
+        {
+          p_hand: hand_id,
+          p_table_id: table_id,
+          p_seat: s.seat_index,
+          p_player_name: s.player_name,
+          p_player_id: null, // Assuming player_id is not available in this context
+          p_hole_cards: holeBySeat[s.seat_index]||[],
+          p_stack_start: s.stack,
+          p_stack_live: s.stack, // Assuming stack_live is the same as stack_start for simplicity
+          p_folded: false,
+          p_all_in: false,
+          p_bet_street: 0,
+          p_acted_street: false,
+          p_in_hand: true
+        }
       );
       
       // Set hole cards using Supabase RPC
@@ -65,8 +72,8 @@ export default async function handler(req,res){
     }
 
     // sb/bb relative to dealer
-    const dealer = Number((await q(`SELECT dealer_seat FROM poker_hands WHERE id=$1`, [hand_id])).rows[0].dealer_seat);
-    const order = seats.rows.map(s=>s.seat_index).sort((a,b)=>a-b);
+    const dealer = Number((await supabase.rpc('get_hand_by_id', { p_hand: hand_id })).data[0].dealer_seat);
+    const order = seats.data.map(s=>s.seat_index).sort((a,b)=>a-b);
     const leftOf = (x) => {
       const idx = order.findIndex(s => s > x);
       return (idx >= 0 ? order[idx] : order[0]);
@@ -75,12 +82,12 @@ export default async function handler(req,res){
     const bbSeat = leftOf(sbSeat);
 
     // post blinds into snapshot + actions
-    await q(`UPDATE poker_hand_players
+    await supabase.rpc(`UPDATE poker_hand_players
              SET bet_street = CASE seat_index WHEN $2 THEN $4 WHEN $3 THEN $5 ELSE 0 END,
                  stack_live = stack_live - CASE seat_index WHEN $2 THEN $4 WHEN $3 THEN $5 ELSE 0 END
              WHERE hand_id=$1`,
           [hand_id, sbSeat, bbSeat, SB, BB]);
-    await q(`INSERT INTO poker_actions (hand_id, seat_index, action, amount) VALUES
+    await supabase.rpc(`INSERT INTO poker_actions (hand_id, seat_index, action, amount) VALUES
              ($1,$2,'post_sb',$4), ($1,$3,'post_bb',$5)`,
           [hand_id, sbSeat, bbSeat, SB, BB]);
 
@@ -89,7 +96,7 @@ export default async function handler(req,res){
     const deadline = new Date(Date.now() + 30_000);
 
     // Update hand stage and turn info
-    await q(
+    await supabase.rpc(
       `UPDATE poker_hands
          SET stage='preflop',
              current_turn=$2,
@@ -102,7 +109,7 @@ export default async function handler(req,res){
     await supabase.rpc('set_deck_remaining', { p_hand: hand_id, p_cards: deck });
     await supabase.rpc('set_board', { p_hand: hand_id, p_cards: [] });
 
-    res.json({ ok:true, players: seats.rows.length, current_turn: afterBB, to_call: BB });
+    res.json({ ok:true, players: seats.data.length, current_turn: afterBB, to_call: BB });
   } catch(e){
     console.error("API /poker/deal-init error:", e);
     res.status(500).json({ error:"server_error", details: String(e.message||e) });

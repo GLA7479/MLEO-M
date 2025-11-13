@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import { useAccount } from "wagmi";
-import { supabase } from "../lib/supabase";
+import { supabaseMP as supabase } from "../lib/supabaseClients";
 
 // --------------------------- Vault helpers (same as Coin Flip) --------------
 function safeRead(key, fallback = {}) {

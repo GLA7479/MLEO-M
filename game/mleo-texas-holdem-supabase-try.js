@@ -9,7 +9,7 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { supabase, TABLES, GAME_STATUS, PLAYER_STATUS } from "../lib/supabase";
+import { supabaseMP as supabase } from "../lib/supabaseClients";
 
 // VAULT System (same as other games)
 function safeRead(key, def) {

@@ -8,7 +8,7 @@ import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect } from "wagmi";
-import { supabase } from "../lib/supabase";
+import { supabaseMP as supabase } from "../lib/supabaseClients";
 
 // ============================================================================
 // VAULT SYSTEM

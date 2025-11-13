@@ -2,8 +2,7 @@
 // גרסת חדרים פרטיים יציבה ל-6 שחקנים, עם will_leave, טיימאאוט ו-RPCs תנ"ל.
 // דרישות: הספרייה של Supabase טעונה באפליקציה שלך (supabase-js).
 
-import { createClient } from '@supabase/supabase-js';
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL_V1, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY_V1);
+import { supabaseMP as supabase } from "../lib/supabaseClients";
 
 // ===== קבועים =====
 const BETTING_TIME_LIMIT_MS = 25_000; // 25 שניות לתור

@@ -16,3 +16,4 @@ on public.user_profiles
 for insert
 with check (auth.uid() = user_id);
 
+
