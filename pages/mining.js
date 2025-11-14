@@ -2415,15 +2415,6 @@ export default function GamesHub() {
                     <div className="w-5 h-0.5 bg-white"></div>
                   </div>
                 </button>
-                <LanguageSelector currentLang={lang} onLanguageChange={handleLanguageChange} />
-                <div style={{ transform: 'scale(0.8)' }}>
-                  <ConnectButton 
-                    chainStatus="none"
-                    accountStatus="avatar"
-                    showBalance={false}
-                    label="CONNECT"
-                  />
-                </div>
               </div>
             </div>
 
@@ -2620,6 +2611,25 @@ export default function GamesHub() {
                     {userInfo.isGuest ? 'Guest' : 'Connected'}
                   </span>
                 </div>
+              </div>
+            </div>
+
+            {/* Language Selector Section */}
+            <div className="bg-gray-100 rounded-lg p-3">
+              <h3 className="font-bold text-base mb-2">Language</h3>
+              <LanguageSelector currentLang={lang} onLanguageChange={handleLanguageChange} />
+            </div>
+
+            {/* Wallet Connect Button Section */}
+            <div className="bg-gray-100 rounded-lg p-3">
+              <h3 className="font-bold text-base mb-2">Wallet</h3>
+              <div style={{ transform: 'scale(0.9)' }}>
+                <ConnectButton 
+                  chainStatus="none"
+                  accountStatus="avatar"
+                  showBalance={false}
+                  label="CONNECT"
+                />
               </div>
             </div>
 
