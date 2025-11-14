@@ -2146,11 +2146,10 @@ function LanguageSelector({ currentLang, onLanguageChange }) {
         <>
           <div className="fixed inset-0 z-[100]" onClick={() => setIsOpen(false)} />
           <div 
-            className="absolute right-0 top-full mt-2 w-52 bg-gray-900 border border-white/20 rounded-xl shadow-2xl overflow-hidden z-[110] max-h-[400px] overflow-y-auto"
+            className="absolute right-0 top-full mt-2 w-52 bg-white border border-gray-300 rounded-xl shadow-2xl overflow-hidden z-[110] max-h-[400px] overflow-y-auto"
             style={{ 
               fontFamily: "system-ui, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol",
-              backdropFilter: "blur(10px)",
-              backgroundColor: "rgba(17, 24, 39, 0.95)"
+              backgroundColor: "white"
             }}
           >
             {ALL.map(opt => (
@@ -2160,8 +2159,8 @@ function LanguageSelector({ currentLang, onLanguageChange }) {
                   onLanguageChange(opt.code);
                   setIsOpen(false);
                 }}
-                className={`w-full px-4 py-3 text-left hover:bg-white/15 transition flex items-center gap-3 text-sm ${
-                  currentLang === opt.code ? 'bg-white/25 font-bold' : ''
+                className={`w-full px-4 py-3 text-left hover:bg-gray-100 transition flex items-center gap-3 text-sm text-gray-900 ${
+                  currentLang === opt.code ? 'bg-blue-100 font-bold' : ''
                 }`}
               >
                 <span className="text-lg mr-2">{FLAGS[opt.code] || '🌐'}</span>
