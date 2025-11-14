@@ -70,7 +70,7 @@ function fmt(n) {
   return String(n);
 }
 
-const TIERED_GAMES = ['poker', 'backgammon', 'roulette', 'blackjack', 'war'];
+const TIERED_GAMES = ['poker', 'backgammon', 'roulette', 'blackjack', 'war', 'ludo'];
 
 // Game Registry with lazy loading
 const GAME_REGISTRY = [
@@ -118,6 +118,15 @@ const GAME_REGISTRY = [
     color: "#2563EB",
     isMultiplayer: true,
     loader: () => import("../games-online/WarMP").then(m => m.default)
+  },
+  {
+    id: "ludo",
+    title: "Ludo",
+    emoji: "🎲",
+    description: "Classic Ludo board game! Play online with 2-4 players or vs Bot. Move your pieces around the board!",
+    color: "#9333EA",
+    isMultiplayer: true,
+    loader: () => import("../games-online/LudoMP").then(m => m.default)
   },
   {
     id: "poker-tables",
