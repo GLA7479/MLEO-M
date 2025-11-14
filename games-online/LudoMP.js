@@ -728,6 +728,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
   })();
 
   const seats = 4;
+  const inMatch = ses?.stage === "playing" && !!board;
 
   return (
     <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: '600px', height: '100%' }}>
@@ -819,7 +820,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
         {board ? (
           <>
             <div className="flex-1 h-full overflow-hidden" style={{ minHeight: '400px', height: '100%' }}>
-              <LudoBoard board={board} onPieceClick={onPieceClick} mySeat={mySeat} />
+              <LudoBoard board={board} onPieceClick={onPieceClick} mySeat={mySeat} showSidebar={!inMatch} />
             </div>
             <div className="text-[11px] text-white/60">
               * Images path for dog pieces:&nbsp;
@@ -848,6 +849,7 @@ function LudoVsBot({ vault }) {
   const vaultBalance = vault;
   const mySeat = 0;
   const botSeat = 1;
+  const playingNow = stage === "playing";
 
   const canStart = useMemo(() => {
     return stage === "lobby" && vaultBalance >= buyIn;
@@ -1094,7 +1096,7 @@ function LudoVsBot({ vault }) {
 
       <div className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 overflow-hidden" style={{ minHeight: '500px', height: '100%' }}>
         <div className="w-full h-full" style={{ minHeight: '400px', height: '100%' }}>
-          <LudoBoard board={board} mySeat={mySeat} onPieceClick={onPieceClick} />
+          <LudoBoard board={board} mySeat={mySeat} onPieceClick={onPieceClick} showSidebar={!playingNow} />
         </div>
       </div>
     </div>
@@ -1133,7 +1135,7 @@ function projectPieceOnBoard(seat, pos) {
   return { kind: "track", x, y };
 }
 
-function LudoBoard({ board, onPieceClick, mySeat }) {
+function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
   const active = board.activeSeats || [];
   const pieces = board.pieces || {};
   const colorClasses = ["bg-red-500", "bg-sky-500", "bg-emerald-500", "bg-amber-400"];
@@ -1232,6 +1234,7 @@ function LudoBoard({ board, onPieceClick, mySeat }) {
       </div>
 
       {/* פאנל מצב עבור כל Seat */}
+      {showSidebar && (
       <div className="w-full sm:w-56 flex flex-col gap-2 text-xs">
         {active.map((seat) => {
           const seatPieces = pieces[String(seat)] || [];
@@ -1284,6 +1287,7 @@ function LudoBoard({ board, onPieceClick, mySeat }) {
           );
         })}
       </div>
+      )}
     </div>
   );
 }
