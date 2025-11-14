@@ -343,42 +343,6 @@ export default function ArcadeHub() {
       href: "/ultimate-poker",
       color: "#6366F1",
     },
-    // 8.5. Texas Hold'em vs Dealer - NEW!
-    {
-      title: "Texas Hold'em",
-      emoji: "🎴",
-      description: "Classic Texas Hold'em vs Dealer! Strategic betting rounds - PRE-FLOP, FLOP, TURN, RIVER. Best hand wins the pot!",
-      prize: "Unlimited",
-      href: "/texas-holdem",
-      color: "#10B981",
-    },
-    // 8.6. Texas Hold'em Multiplayer - NEW!
-    {
-      title: "Texas Hold'em Multiplayer",
-      emoji: "🎴👥",
-      description: "Play Texas Hold'em with friends! 2-6 players, real-time P2P connection via WiFi. No server needed!",
-      prize: "Social",
-      href: "/texas-holdem-multiplayer",
-      color: "#059669",
-    },
-    // 8.6.1. Texas Hold'em Multiplayer - NEW!
-    {
-      title: "Texas Hold'em Multiplayer",
-      emoji: "🎴⚡",
-      description: "Real-time Texas Hold'em multiplayer with Supabase! Fast, reliable, and works anywhere. 2-6 players. BEST VERSION!",
-      prize: "Social",
-      href: "/texas-holdem-supabase-try",
-      color: "#10B981",
-    },
-    // 8.7. T-Hold'em Rooms - NEW!
-    {
-      title: "T-Hold'em Rooms",
-      emoji: "🎴💎",
-      description: "Private Texas Hold'em tables! 2-9 players, 30s turn timer, private room codes. Play with friends!",
-      prize: "Social",
-      href: "/mleo-t-holdem",
-      color: "#F59E0B",
-    },
     // 8.8. Texas Hold'em Rooms
     {
       title: "Texas Hold'em Rooms",
@@ -653,7 +617,7 @@ export default function ArcadeHub() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/40">
               <span className="text-2xl">🎮</span>
-              <span className="font-bold text-purple-300">28 Exciting Games to Play!</span>
+              <span className="font-bold text-purple-300">24 Exciting Games to Play!</span>
             </div>
           </div>
 

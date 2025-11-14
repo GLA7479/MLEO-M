@@ -3,7 +3,8 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { ConnectButton, useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
+import { useAccount, useDisconnect } from "wagmi";
 import GamePoolStats from "../components/GamePoolStats";
 import { supabaseMP } from "../lib/supabaseClients";
 
@@ -2148,6 +2149,22 @@ export default function GamesHub() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [lang, setLang] = useState("en");
+  const [showMenu, setShowMenu] = useState(false);
+  const [userInfo, setUserInfo] = useState({ email: null, username: null, isGuest: true });
+  
+  // Auth form state
+  const [authMode, setAuthMode] = useState("login"); // "login" or "signup"
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authConfirmPassword, setAuthConfirmPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  
+  // Wagmi hooks
+  const { openConnectModal } = useConnectModal();
+  const { openAccountModal } = useAccountModal();
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
   
   const open = (id) => setModal(id);
   const close = () => setModal(null);
@@ -2175,6 +2192,49 @@ export default function GamesHub() {
     } catch {}
   }, [lang, mounted]);
 
+  // Load user info from Supabase
+  useEffect(() => {
+    if (!mounted) return;
+    const loadUserInfo = async () => {
+      try {
+        const { data } = await supabaseMP.auth.getSession();
+        if (data?.session?.user) {
+          const user = data.session.user;
+          setUserInfo({
+            email: user.email || null,
+            username: user.user_metadata?.username || user.email?.split('@')[0] || 'User',
+            isGuest: false
+          });
+        } else {
+          setUserInfo({ email: null, username: null, isGuest: true });
+        }
+      } catch (error) {
+        console.error('Error loading user info:', error);
+        setUserInfo({ email: null, username: null, isGuest: true });
+      }
+    };
+    
+    loadUserInfo();
+    
+    // Listen for auth state changes
+    const { data: { subscription } } = supabaseMP.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        const user = session.user;
+        setUserInfo({
+          email: user.email || null,
+          username: user.user_metadata?.username || user.email?.split('@')[0] || 'User',
+          isGuest: false
+        });
+      } else {
+        setUserInfo({ email: null, username: null, isGuest: true });
+      }
+    });
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [mounted]);
+
   const handleAcceptTerms = () => {
     acceptTerms();
     setTermsAccepted(true);
@@ -2183,6 +2243,72 @@ export default function GamesHub() {
 
   const handleLanguageChange = (newLang) => {
     setLang(newLang);
+  };
+
+  // Email validation regex
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+  const handleLogin = async () => {
+    setAuthError("");
+    
+    if (!EMAIL_RE.test(authEmail) || authPassword.length < 8) {
+      setAuthError("Please enter a valid email and password (8+ characters).");
+      return;
+    }
+
+    setAuthSubmitting(true);
+    try {
+      const { error } = await supabaseMP.auth.signInWithPassword({
+        email: authEmail,
+        password: authPassword,
+      });
+      if (error) throw error;
+      
+      // Success - user info will be updated by the auth state listener
+      setAuthEmail("");
+      setAuthPassword("");
+      setAuthError("");
+      setAuthMode("login");
+    } catch (e) {
+      setAuthError(e?.message || "Login failed. Please try again.");
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
+
+  const handleSignup = async () => {
+    setAuthError("");
+    
+    if (!EMAIL_RE.test(authEmail) || authPassword.length < 8) {
+      setAuthError("Please enter a valid email and password (8+ characters).");
+      return;
+    }
+    
+    if (authPassword !== authConfirmPassword) {
+      setAuthError("Passwords do not match.");
+      return;
+    }
+
+    setAuthSubmitting(true);
+    try {
+      const { error } = await supabaseMP.auth.signUp({
+        email: authEmail,
+        password: authPassword,
+        options: { emailRedirectTo: undefined },
+      });
+      if (error) throw error;
+      
+      // Success - user info will be updated by the auth state listener
+      setAuthEmail("");
+      setAuthPassword("");
+      setAuthConfirmPassword("");
+      setAuthError("");
+      setAuthMode("login");
+    } catch (e) {
+      setAuthError(e?.message || "Signup failed. Please try again.");
+    } finally {
+      setAuthSubmitting(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -2263,6 +2389,17 @@ export default function GamesHub() {
                 </button>
               </div>
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowMenu(!showMenu)}
+                  className="p-2 rounded-lg bg-white/10 border border-white/20 hover:bg-white/20 transition-all"
+                  title="Menu"
+                >
+                  <div className="flex flex-col gap-1">
+                    <div className="w-5 h-0.5 bg-white"></div>
+                    <div className="w-5 h-0.5 bg-white"></div>
+                    <div className="w-5 h-0.5 bg-white"></div>
+                  </div>
+                </button>
                 <LanguageSelector currentLang={lang} onLanguageChange={handleLanguageChange} />
                 <div style={{ transform: 'scale(0.8)' }}>
                   <ConnectButton 
@@ -2438,7 +2575,217 @@ export default function GamesHub() {
 
       <Modal isOpen={modal === "terms"} onClose={close}>
         <Terms onAccept={handleAcceptTerms} onDecline={() => setModal(null)} />
-        </Modal>
+      </Modal>
+
+      {/* Menu Modal */}
+      <Modal isOpen={showMenu} onClose={() => setShowMenu(false)}>
+        <div className="max-w-md mx-auto space-y-3">
+          <h2 className="text-xl font-bold text-center mb-3">User Menu</h2>
+          
+          {/* User Info Section */}
+          <div className="space-y-2">
+            <div className="bg-gray-100 rounded-lg p-3">
+              <h3 className="font-bold text-base mb-2">User Information</h3>
+              <div className="space-y-1.5 text-gray-700 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">Username:</span>
+                  <span>{userInfo.username || 'Guest'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">Email:</span>
+                  <span>{userInfo.email || 'Not provided'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">Status:</span>
+                  <span className={`px-2 py-1 rounded text-sm font-bold ${
+                    userInfo.isGuest 
+                      ? 'bg-gray-300 text-gray-700' 
+                      : 'bg-green-300 text-green-700'
+                  }`}>
+                    {userInfo.isGuest ? 'Guest' : 'Connected'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Logout Button - Only show for connected users */}
+            {!userInfo.isGuest && (
+              <div className="bg-gray-100 rounded-lg p-3">
+                <button
+                  onClick={async () => {
+                    await handleLogout();
+                    setShowMenu(false);
+                  }}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+
+            {/* Auth Section - Only show for guests */}
+            {userInfo.isGuest && (
+              <div className="bg-gray-100 rounded-lg p-3">
+                <h3 className="font-bold text-base mb-2">
+                  {authMode === "login" ? "Login" : "Create Account"}
+                </h3>
+                
+                {/* Mode Toggle */}
+                <div className="flex gap-2 mb-3">
+                  <button
+                    onClick={() => {
+                      setAuthMode("login");
+                      setAuthError("");
+                    }}
+                    className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors ${
+                      authMode === "login"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAuthMode("signup");
+                      setAuthError("");
+                    }}
+                    className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors ${
+                      authMode === "signup"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
+                  >
+                    Sign Up
+                  </button>
+                </div>
+
+                {/* Error Message */}
+                {authError && (
+                  <div className="mb-2 p-2 bg-red-100 border border-red-300 rounded text-red-700 text-xs">
+                    {authError}
+                  </div>
+                )}
+
+                {/* Form */}
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-0.5">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      disabled={authSubmitting}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-0.5">
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      placeholder="8+ characters"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      disabled={authSubmitting}
+                    />
+                  </div>
+
+                  {authMode === "signup" && (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-0.5">
+                        Confirm Password
+                      </label>
+                      <input
+                        type="password"
+                        value={authConfirmPassword}
+                        onChange={(e) => setAuthConfirmPassword(e.target.value)}
+                        placeholder="Confirm password"
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        disabled={authSubmitting}
+                      />
+                    </div>
+                  )}
+
+                  <button
+                    onClick={authMode === "login" ? handleLogin : handleSignup}
+                    disabled={authSubmitting}
+                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-3 py-2 rounded text-sm font-bold transition-colors"
+                  >
+                    {authSubmitting
+                      ? "Processing..."
+                      : authMode === "login"
+                      ? "Login"
+                      : "Create Account"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Wallet Connection Section */}
+            <div className="bg-gray-100 rounded-lg p-3">
+              <h3 className="font-bold text-base mb-2">Wallet Connection</h3>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-gray-700 text-sm">Wallet Status:</span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                    isConnected 
+                      ? 'bg-green-300 text-green-700' 
+                      : 'bg-red-300 text-red-700'
+                  }`}>
+                    {isConnected ? 'Connected' : 'Not Connected'}
+                  </span>
+                </div>
+                {isConnected && address && (
+                  <div className="text-xs text-gray-600 break-all">
+                    <span className="font-semibold">Address:</span> {address}
+                  </div>
+                )}
+                <div className="flex gap-2 mt-2">
+                  {!isConnected ? (
+                    <button
+                      onClick={() => {
+                        openConnectModal?.();
+                        setShowMenu(false);
+                      }}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm font-bold transition-colors"
+                    >
+                      Connect Wallet
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          openAccountModal?.();
+                          setShowMenu(false);
+                        }}
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm font-bold transition-colors"
+                      >
+                        Account
+                      </button>
+                      <button
+                        onClick={() => {
+                          disconnect();
+                          setShowMenu(false);
+                        }}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-sm font-bold transition-colors"
+                      >
+                        Disconnect
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </Layout>
   );
 }
