@@ -1700,20 +1700,35 @@ function acceptTerms() {
 }
 
 // ===== Modal Component =====
-function Modal({ isOpen, onClose, children }) {
+function Modal({ isOpen, onClose, children, maxWidth = "2xl", padding = "6" }) {
   if (!isOpen) return null;
+  
+  const maxWidthClass = {
+    "sm": "max-w-sm",
+    "md": "max-w-md",
+    "lg": "max-w-lg",
+    "xl": "max-w-xl",
+    "2xl": "max-w-2xl"
+  }[maxWidth] || "max-w-2xl";
+  
+  const paddingClass = {
+    "3": "p-3",
+    "4": "p-4",
+    "5": "p-5",
+    "6": "p-6"
+  }[padding] || "p-6";
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/60" onClick={onClose}></div>
-      <div className="relative bg-white text-black rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+      <div className={`relative bg-white text-black rounded-2xl ${maxWidthClass} w-full max-h-[80vh] overflow-y-auto`}>
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-2xl font-bold text-gray-500 hover:text-gray-700"
         >
           ×
         </button>
-        <div className="p-6">
+        <div className={paddingClass}>
           {children}
         </div>
       </div>
@@ -2578,8 +2593,8 @@ export default function GamesHub() {
       </Modal>
 
       {/* Menu Modal */}
-      <Modal isOpen={showMenu} onClose={() => setShowMenu(false)}>
-        <div className="max-w-md mx-auto space-y-3">
+      <Modal isOpen={showMenu} onClose={() => setShowMenu(false)} maxWidth="md" padding="4">
+        <div className="space-y-3">
           <h2 className="text-xl font-bold text-center mb-3">User Menu</h2>
           
           {/* User Info Section */}
