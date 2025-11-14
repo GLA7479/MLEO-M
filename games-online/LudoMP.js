@@ -820,7 +820,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
             <LudoBoard board={board} onPieceClick={onPieceClick} mySeat={mySeat} />
             <div className="text-[11px] text-white/60">
               * Images path for dog pieces:&nbsp;
-              <code>/imege/ludo/dog_0.png ... dog_3.png</code>
+              <code>/images/ludo/dog_0.png ... dog_3.png</code>
             </div>
           </>
         ) : (
@@ -874,11 +874,41 @@ function LudoVsBot({ vault }) {
     if (stage !== "playing") return;
     if (board.winner != null) return;
     const turnSeat = board.turnSeat;
-    if (turnSeat !== mySeat) return;
-    if (board.dice != null) return;
+    if (turnSeat !== mySeat) return;     // רק אתה זורק
+    if (board.dice != null) return;      // כבר נזרקה קובייה
+
     const dice = 1 + Math.floor(Math.random() * 6);
-    setBoard((prev) => ({ ...prev, dice, lastDice: dice }));
+    const nextBoard = { ...board, dice, lastDice: dice };
+
+    // מעדכן את הלוח + דד־ליין רגיל
+    setBoard(nextBoard);
     setDeadline(Date.now() + TURN_SECONDS * 1000);
+    setMsg("");
+
+    // בדיקה אם יש בכלל מהלך חוקי
+    const moves = listMovablePieces(nextBoard, mySeat, dice);
+
+    if (!moves.length) {
+      // אין שום כלי שיכול לזוז → אחרי ~2 שניות עוברים תור
+      setTimeout(() => {
+        setBoard((prev) => {
+          // שמירה ממצב לא עדכני
+          if (
+            prev !== nextBoard ||          // כבר נעשה שינוי אחר
+            prev.turnSeat !== mySeat ||    // כבר לא התור שלך
+            prev.dice !== dice ||          // הקובייה השתנתה
+            stage !== "playing"
+          ) {
+            return prev;
+          }
+
+          const b2 = { ...prev, dice: null, lastDice: dice };
+          b2.turnSeat = nextTurnSeat(b2);
+          return b2;
+        });
+        setDeadline(Date.now() + TURN_SECONDS * 1000);
+      }, 1800); // ~1.8 שניות – בתוך הטווח של 2–3 ששאלת
+    }
   }
 
   function onPieceClick(pieceIndex) {
@@ -1068,148 +1098,314 @@ function LudoVsBot({ vault }) {
 
 // =================== BOARD COMPONENTS ===================
 
+// ===== Helpers for board projection =====
+const START_OFFSETS = [0, 13, 26, 39]; // נקודת התחלה לכל צבע על המסלול
+
+function projectPieceOnBoard(seat, pos) {
+  // אחוזים של מיקום על לוח 100x100
+  // seat: 0..3, pos: -1 (yard) או 0..LUDO_TRACK_LEN+...
+
+  // Yard – פינה לכל שחקן
+  if (pos < 0) {
+    const base = [
+      { x: 20, y: 80 }, // seat 0
+      { x: 80, y: 20 }, // seat 1
+      { x: 20, y: 20 }, // seat 2
+      { x: 80, y: 80 }, // seat 3
+    ][seat] || { x: 50, y: 50 };
+
+    return { kind: "yard", x: base.x, y: base.y };
+  }
+
+  // Home – במרכז
+  if (pos >= LUDO_TRACK_LEN + LUDO_PIECES_PER_PLAYER) {
+    return { kind: "home", x: 50, y: 50 };
+  }
+
+  // Track – מסלול עגול סביב המרכז
+  const offset = START_OFFSETS[seat] ?? 0;
+  const globalIndex = (offset + pos) % LUDO_TRACK_LEN;
+  const angle = (globalIndex / LUDO_TRACK_LEN) * 2 * Math.PI;
+
+  const radius = 36; // כמה קרוב למרכז (באחוזים)
+  const x = 50 + radius * Math.cos(angle);
+  const y = 50 + radius * Math.sin(angle);
+
+  return { kind: "track", x, y };
+}
+
 function LudoBoard({ board, onPieceClick, mySeat }) {
   const active = board.activeSeats || [];
   const pieces = board.pieces || {};
   const colorClasses = ["bg-red-500", "bg-sky-500", "bg-emerald-500", "bg-amber-400"];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 h-full">
-      {active.map((seat) => {
-        const seatKeyStr = String(seat);
-        const arr = pieces[seatKeyStr] || [];
-        const cls = colorClasses[seat] || "bg-white/40";
-        const isTurn = board.turnSeat === seat;
+    <div className="w-full h-full flex flex-col sm:flex-row gap-3">
+      {/* לוח מרכזי */}
+      <div className="flex-1 relative bg-gradient-to-br from-purple-900 via-slate-900 to-black rounded-2xl border border-white/10 overflow-hidden min-h-[260px]">
+        {/* ריבוע פנימי כמו משטח לודו */}
+        <div className="absolute inset-[8%] bg-slate-900/80 rounded-2xl border border-white/10" />
 
-        return (
-          <div
-            key={seat}
-            className="flex flex-col gap-1 border border-white/15 rounded-lg p-2 bg-black/40"
-          >
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <div className={`w-4 h-4 rounded-full ${cls}`} />
-                <span className="font-semibold">Seat {seat}</span>
-              </div>
-              <div className="text-white/70">
-                {isTurn ? "Your turn" : ""}
-                {board.winner === seat && " (Winner)"}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {arr.map((pos, idx) => {
-                const inYard = pos < 0;
-                const finished =
-                  pos >= LUDO_TRACK_LEN + LUDO_PIECES_PER_PLAYER ||
-                  board.finished?.[seatKeyStr] >= LUDO_PIECES_PER_PLAYER;
-                const canClick = mySeat === seat && board.dice && !finished;
-                const label = inYard ? "Yard" : finished ? "Home" : `Pos ${pos}`;
-                const imgSrc = `/imege/ludo/dog_${seat}.png`;
+        {/* בסיסים צבעוניים בארבע פינות */}
+        <div className="absolute left-[6%] bottom-[6%] w-[20%] h-[20%] rounded-xl bg-red-600/40 border border-red-400/60" />
+        <div className="absolute right-[6%] top-[6%] w-[20%] h-[20%] rounded-xl bg-sky-500/40 border border-sky-300/60" />
+        <div className="absolute left-[6%] top-[6%] w-[20%] h-[20%] rounded-xl bg-emerald-500/40 border border-emerald-300/60" />
+        <div className="absolute right-[6%] bottom-[6%] w-[20%] h-[20%] rounded-xl bg-amber-400/40 border border-amber-200/60" />
 
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => canClick && onPieceClick(idx)}
-                    className={`flex items-center gap-2 px-2 py-1 rounded border text-[11px] ${
-                      canClick
-                        ? "border-white/60 bg-white/10 hover:bg-white/20"
-                        : "border-white/20 bg-white/5"
-                    }`}
+        {/* מרכז */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[26%] h-[26%] rounded-2xl bg-black/80 border border-white/30 flex items-center justify-center">
+          <span className="text-[11px] sm:text-xs text-white/80 font-semibold">
+            MLEO Ludo
+          </span>
+        </div>
+
+        {/* הכלים עצמם */}
+        {active.map((seat) => {
+          const cls = colorClasses[seat] || "bg-white";
+          const seatPieces = pieces[String(seat)] || [];
+
+          return seatPieces.map((pos, idx) => {
+            const proj = projectPieceOnBoard(seat, pos);
+            const isMine = mySeat === seat;
+            const imgSrc = `/images/ludo/dog_${seat}.png`;
+
+            // חישוב אם החייל הזה חוקי להזזה עם הקובייה הנוכחית
+            const movableIndices =
+              board.dice != null ? listMovablePieces(board, seat, board.dice) : [];
+            const pieceCanClick = isMine && movableIndices.includes(idx);
+
+            return (
+              <button
+                key={`${seat}-${idx}`}
+                type="button"
+                onClick={() => pieceCanClick && onPieceClick && onPieceClick(idx)}
+                className="absolute -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${proj.x}%`, top: `${proj.y}%` }}
+              >
+                <div
+                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 shadow-lg flex items-center justify-center ${
+                    pieceCanClick
+                      ? "border-yellow-400 ring-2 ring-yellow-400/50"
+                      : isMine
+                      ? "border-white"
+                      : "border-black/50"
+                  }`}
+                >
+                  <div
+                    className={`w-full h-full rounded-full overflow-hidden ${cls} flex items-center justify-center`}
                   >
-                    <div className="w-6 h-6 rounded-full overflow-hidden bg-black/60 flex items-center justify-center">
-                      <img
-                        src={imgSrc}
-                        alt="dog"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                    </div>
-                    <div className="flex flex-col text-left">
-                      <span className="font-semibold">Piece {idx + 1}</span>
-                      <span className="text-white/60">{label}</span>
-                    </div>
-                  </button>
-                );
-              })}
+                    <img
+                      src={imgSrc}
+                      alt="dog"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  </div>
+                </div>
+              </button>
+            );
+          });
+        })}
+      </div>
+
+      {/* מידע לכל שחקן בצד – כמו בלוח המקורי שלך */}
+      <div className="w-full sm:w-56 flex flex-col gap-2 text-xs">
+        {active.map((seat) => {
+          const seatPieces = pieces[String(seat)] || [];
+          const cls = colorClasses[seat] || "bg-white";
+          const isMine = mySeat === seat;
+
+          return (
+            <div
+              key={seat}
+              className="border border-white/15 rounded-lg p-2 bg-black/40 flex flex-col gap-1"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${cls}`} />
+                  <span className="font-semibold">Seat {seat}</span>
+                </div>
+                <span className="text-white/60 text-[11px]">
+                  {board.turnSeat === seat ? "Turn" : ""}
+                  {board.winner === seat && " (Winner)"}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {seatPieces.map((pos, idx) => {
+                  const inYard = pos < 0;
+                  const finished =
+                    pos >= LUDO_TRACK_LEN + LUDO_PIECES_PER_PLAYER ||
+                    board.finished?.[String(seat)] >= LUDO_PIECES_PER_PLAYER;
+                  const label = inYard
+                    ? "Yard"
+                    : finished
+                    ? "Home"
+                    : `Pos ${pos}`;
+
+                  // חישוב אם החייל הזה חוקי להזזה עם הקובייה הנוכחית
+                  const movableIndices =
+                    board.dice != null ? listMovablePieces(board, seat, board.dice) : [];
+                  const pieceCanClick = isMine && movableIndices.includes(idx);
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => pieceCanClick && onPieceClick && onPieceClick(idx)}
+                      className={`px-2 py-[2px] rounded border text-[10px] flex flex-col text-left ${
+                        pieceCanClick
+                          ? "border-white/60 bg-white/10 hover:bg-white/20"
+                          : "border-white/20 bg-white/5"
+                      }`}
+                    >
+                      Piece {idx + 1}: {label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 function LudoBoardLocal({ board, mySeat, onPieceClick }) {
-  const colors = ["red", "blue"];
-  const colorClasses = ["bg-red-500", "bg-sky-500"];
   const pieces = board.pieces || {};
+  const colorClasses = ["bg-red-500", "bg-sky-500"];
+
+  const seats = [0, 1]; // אתה + בוט
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 h-full">
-      {[0, 1].map((seat) => {
-        const arr = pieces[String(seat)] || [];
-        const cls = colorClasses[seat] || "bg-white/40";
-        const isTurn = board.turnSeat === seat;
-        const canClick = seat === mySeat && board.dice && board.turnSeat === mySeat;
+    <div className="w-full h-full flex flex-col sm:flex-row gap-3">
+      {/* לוח מרכזי */}
+      <div className="flex-1 relative bg-gradient-to-br from-purple-900 via-slate-900 to-black rounded-2xl border border-white/10 overflow-hidden min-h-[260px]">
+        <div className="absolute inset-[8%] bg-slate-900/80 rounded-2xl border border-white/10" />
 
-        return (
-          <div
-            key={seat}
-            className="flex flex-col gap-1 border border-white/15 rounded-lg p-2 bg-black/40"
-          >
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <div className={`w-4 h-4 rounded-full ${cls}`} />
-                <span className="font-semibold">{seat === mySeat ? "You" : "Bot"}</span>
-              </div>
-              <div className="text-white/70">
-                {isTurn ? "Turn" : ""}
-                {board.winner === seat && " (Winner)"}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {arr.map((pos, idx) => {
-                const inYard = pos < 0;
-                const finished =
-                  pos >= LUDO_TRACK_LEN + LUDO_PIECES_PER_PLAYER ||
-                  board.finished?.[String(seat)] >= LUDO_PIECES_PER_PLAYER;
-                const label = inYard ? "Yard" : finished ? "Home" : `Pos ${pos}`;
-                const imgSrc = `/imege/ludo/dog_${seat}.png`;
-                const pieceCanClick = canClick && listMovablePieces(board, seat, board.dice).includes(idx);
+        {/* בסיס תחתון (אתה) + עליון (בוט) */}
+        <div className="absolute left-[6%] bottom-[6%] w-[22%] h-[22%] rounded-xl bg-red-600/35 border border-red-400/60" />
+        <div className="absolute right-[6%] top-[6%] w-[22%] h-[22%] rounded-xl bg-sky-500/35 border border-sky-300/60" />
 
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => pieceCanClick && onPieceClick(idx)}
-                    className={`flex items-center gap-2 px-2 py-1 rounded border text-[11px] ${
-                      pieceCanClick
-                        ? "border-white/60 bg-white/10 hover:bg-white/20"
-                        : "border-white/20 bg-white/5"
-                    }`}
+        {/* מרכז */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[26%] h-[26%] rounded-2xl bg-black/80 border border-white/30 flex items-center justify-center">
+          <span className="text-[11px] sm:text-xs text-white/80 font-semibold">
+            Ludo vs Bot
+          </span>
+        </div>
+
+        {/* כלים */}
+        {seats.map((seat) => {
+          const seatPieces = pieces[String(seat)] || [];
+          const cls = colorClasses[seat] || "bg-white";
+          const imgSrc = `/images/ludo/dog_${seat}.png`;
+          const isPlayer = seat === mySeat;
+
+          return seatPieces.map((pos, idx) => {
+            const proj = projectPieceOnBoard(seat, pos);
+
+            // חישוב אם החייל הזה חוקי להזזה עם הקובייה הנוכחית
+            const movableIndices =
+              board.dice != null ? listMovablePieces(board, seat, board.dice) : [];
+            const pieceCanClick = isPlayer && movableIndices.includes(idx);
+
+            return (
+              <button
+                key={`${seat}-${idx}`}
+                type="button"
+                onClick={() => pieceCanClick && onPieceClick && onPieceClick(idx)}
+                className="absolute -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${proj.x}%`, top: `${proj.y}%` }}
+              >
+                <div
+                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 shadow-lg flex items-center justify-center ${
+                    pieceCanClick
+                      ? "border-yellow-400 ring-2 ring-yellow-400/50"
+                      : isPlayer
+                      ? "border-white"
+                      : "border-black/60"
+                  }`}
+                >
+                  <div
+                    className={`w-full h-full rounded-full overflow-hidden ${cls} flex items-center justify-center`}
                   >
-                    <div className="w-6 h-6 rounded-full overflow-hidden bg-black/60 flex items-center justify-center">
-                      <img
-                        src={imgSrc}
-                        alt="dog"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                    </div>
-                    <div className="flex flex-col text-left">
-                      <span className="font-semibold">Piece {idx + 1}</span>
-                      <span className="text-white/60">{label}</span>
-                    </div>
-                  </button>
-                );
-              })}
+                    <img
+                      src={imgSrc}
+                      alt="dog"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  </div>
+                </div>
+              </button>
+            );
+          });
+        })}
+      </div>
+
+      {/* טקסט צדדי – מצב שלך ושל הבוט */}
+      <div className="w-full sm:w-56 flex flex-col gap-2 text-xs">
+        {seats.map((seat) => {
+          const seatPieces = pieces[String(seat)] || [];
+          const cls = colorClasses[seat] || "bg-white";
+          const isPlayer = seat === mySeat;
+
+          return (
+            <div
+              key={seat}
+              className="border border-white/15 rounded-lg p-2 bg-black/40 flex flex-col gap-1"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${cls}`} />
+                  <span className="font-semibold">
+                    {isPlayer ? "You" : "Bot"}
+                  </span>
+                </div>
+                <span className="text-white/60 text-[11px]">
+                  {board.turnSeat === seat ? "Turn" : ""}
+                  {board.winner === seat && " (Winner)"}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {seatPieces.map((pos, idx) => {
+                  const inYard = pos < 0;
+                  const finished =
+                    pos >= LUDO_TRACK_LEN + LUDO_PIECES_PER_PLAYER ||
+                    board.finished?.[String(seat)] >= LUDO_PIECES_PER_PLAYER;
+                  const label = inYard
+                    ? "Yard"
+                    : finished
+                    ? "Home"
+                    : `Pos ${pos}`;
+
+                  // חישוב אם החייל הזה חוקי להזזה עם הקובייה הנוכחית
+                  const movableIndices =
+                    board.dice != null ? listMovablePieces(board, seat, board.dice) : [];
+                  const pieceCanClick = seat === mySeat && movableIndices.includes(idx);
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => pieceCanClick && onPieceClick && onPieceClick(idx)}
+                      className={`px-2 py-[2px] rounded border text-[10px] flex flex-col text-left ${
+                        pieceCanClick
+                          ? "border-white/60 bg-white/10 hover:bg-white/20"
+                          : "border-white/20 bg-white/5"
+                      }`}
+                    >
+                      Piece {idx + 1}: {label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
