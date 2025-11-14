@@ -2584,15 +2584,15 @@ export default function GamesHub() {
       </Modal>
 
       {/* Menu Modal */}
-      <Modal isOpen={showMenu} onClose={() => setShowMenu(false)} maxWidth="md" padding="4">
-        <div className="space-y-3">
-          <h2 className="text-xl font-bold text-center mb-3">User Menu</h2>
+      <Modal isOpen={showMenu} onClose={() => setShowMenu(false)} maxWidth="md" padding="3">
+        <div className="space-y-2">
+          <h2 className="text-lg font-bold text-center mb-2">User Menu</h2>
           
           {/* User Info Section */}
-          <div className="space-y-2">
-            <div className="bg-gray-100 rounded-lg p-3">
-              <h3 className="font-bold text-base mb-2">User Information</h3>
-              <div className="space-y-1.5 text-gray-700 text-sm">
+          <div className="space-y-1.5">
+            <div className="bg-gray-100 rounded-lg p-2">
+              <h3 className="font-bold text-sm mb-1.5">User Information</h3>
+              <div className="space-y-1 text-gray-700 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold">Username:</span>
                   <span>{userInfo.username || 'Guest'}</span>
@@ -2614,34 +2614,34 @@ export default function GamesHub() {
               </div>
             </div>
 
-            {/* Language Selector Section */}
-            <div className="bg-gray-100 rounded-lg p-3">
-              <h3 className="font-bold text-base mb-2">Language</h3>
-              <LanguageSelector currentLang={lang} onLanguageChange={handleLanguageChange} />
-            </div>
-
-            {/* Wallet Connect Button Section */}
-            <div className="bg-gray-100 rounded-lg p-3">
-              <h3 className="font-bold text-base mb-2">Wallet</h3>
-              <div style={{ transform: 'scale(0.9)' }}>
-                <ConnectButton 
-                  chainStatus="none"
-                  accountStatus="avatar"
-                  showBalance={false}
-                  label="CONNECT"
-                />
+            {/* Language & Wallet - Same Row */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-gray-100 rounded-lg p-2">
+                <h3 className="font-bold text-xs mb-1">Language</h3>
+                <LanguageSelector currentLang={lang} onLanguageChange={handleLanguageChange} />
+              </div>
+              <div className="bg-gray-100 rounded-lg p-2">
+                <h3 className="font-bold text-xs mb-1">Wallet</h3>
+                <div style={{ transform: 'scale(0.85)' }}>
+                  <ConnectButton 
+                    chainStatus="none"
+                    accountStatus="avatar"
+                    showBalance={false}
+                    label="CONNECT"
+                  />
+                </div>
               </div>
             </div>
 
             {/* Logout Button - Only show for connected users */}
             {!userInfo.isGuest && (
-              <div className="bg-gray-100 rounded-lg p-3">
+              <div className="bg-gray-100 rounded-lg p-2">
                 <button
                   onClick={async () => {
                     await handleLogout();
                     setShowMenu(false);
                   }}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white px-2 py-1.5 rounded text-xs font-bold transition-colors"
                 >
                   Logout
                 </button>
@@ -2650,19 +2650,19 @@ export default function GamesHub() {
 
             {/* Auth Section - Only show for guests */}
             {userInfo.isGuest && (
-              <div className="bg-gray-100 rounded-lg p-3">
-                <h3 className="font-bold text-base mb-2">
+              <div className="bg-gray-100 rounded-lg p-2">
+                <h3 className="font-bold text-sm mb-1.5">
                   {authMode === "login" ? "Login" : "Create Account"}
                 </h3>
                 
                 {/* Mode Toggle */}
-                <div className="flex gap-2 mb-3">
+                <div className="flex gap-2 mb-2">
                   <button
                     onClick={() => {
                       setAuthMode("login");
                       setAuthError("");
                     }}
-                    className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors ${
+                    className={`flex-1 px-2 py-1.5 rounded text-xs font-semibold transition-colors ${
                       authMode === "login"
                         ? "bg-blue-600 text-white"
                         : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -2675,7 +2675,7 @@ export default function GamesHub() {
                       setAuthMode("signup");
                       setAuthError("");
                     }}
-                    className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors ${
+                    className={`flex-1 px-2 py-1.5 rounded text-xs font-semibold transition-colors ${
                       authMode === "signup"
                         ? "bg-blue-600 text-white"
                         : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -2687,13 +2687,13 @@ export default function GamesHub() {
 
                 {/* Error Message */}
                 {authError && (
-                  <div className="mb-2 p-2 bg-red-100 border border-red-300 rounded text-red-700 text-xs">
+                  <div className="mb-1.5 p-1.5 bg-red-100 border border-red-300 rounded text-red-700 text-xs">
                     {authError}
                   </div>
                 )}
 
                 {/* Form */}
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-0.5">
                       Email
@@ -2703,7 +2703,7 @@ export default function GamesHub() {
                       value={authEmail}
                       onChange={(e) => setAuthEmail(e.target.value)}
                       placeholder="your@email.com"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                       disabled={authSubmitting}
                     />
                   </div>
@@ -2717,7 +2717,7 @@ export default function GamesHub() {
                       value={authPassword}
                       onChange={(e) => setAuthPassword(e.target.value)}
                       placeholder="8+ characters"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                       disabled={authSubmitting}
                     />
                   </div>
@@ -2732,7 +2732,7 @@ export default function GamesHub() {
                         value={authConfirmPassword}
                         onChange={(e) => setAuthConfirmPassword(e.target.value)}
                         placeholder="Confirm password"
-                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                         disabled={authSubmitting}
                       />
                     </div>
@@ -2741,7 +2741,7 @@ export default function GamesHub() {
                   <button
                     onClick={authMode === "login" ? handleLogin : handleSignup}
                     disabled={authSubmitting}
-                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-3 py-2 rounded text-sm font-bold transition-colors"
+                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-2 py-1.5 rounded text-xs font-bold transition-colors"
                   >
                     {authSubmitting
                       ? "Processing..."
@@ -2754,12 +2754,12 @@ export default function GamesHub() {
             )}
 
             {/* Wallet Connection Section */}
-            <div className="bg-gray-100 rounded-lg p-3">
-              <h3 className="font-bold text-base mb-2">Wallet Connection</h3>
-              <div className="space-y-2">
+            <div className="bg-gray-100 rounded-lg p-2">
+              <h3 className="font-bold text-sm mb-1.5">Wallet Connection</h3>
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-gray-700 text-sm">Wallet Status:</span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                  <span className="font-semibold text-gray-700 text-xs">Wallet Status:</span>
+                  <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${
                     isConnected 
                       ? 'bg-green-300 text-green-700' 
                       : 'bg-red-300 text-red-700'
@@ -2772,14 +2772,14 @@ export default function GamesHub() {
                     <span className="font-semibold">Address:</span> {address}
                   </div>
                 )}
-                <div className="flex gap-2 mt-2">
+                <div className="flex gap-2 mt-1.5">
                   {!isConnected ? (
                     <button
                       onClick={() => {
                         openConnectModal?.();
                         setShowMenu(false);
                       }}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm font-bold transition-colors"
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1.5 rounded text-xs font-bold transition-colors"
                     >
                       Connect Wallet
                     </button>
@@ -2790,7 +2790,7 @@ export default function GamesHub() {
                           openAccountModal?.();
                           setShowMenu(false);
                         }}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm font-bold transition-colors"
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1.5 rounded text-xs font-bold transition-colors"
                       >
                         Account
                       </button>
@@ -2799,7 +2799,7 @@ export default function GamesHub() {
                           disconnect();
                           setShowMenu(false);
                         }}
-                        className="flex-1 bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-sm font-bold transition-colors"
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white px-2 py-1.5 rounded text-xs font-bold transition-colors"
                       >
                         Disconnect
                       </button>
