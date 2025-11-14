@@ -1107,6 +1107,7 @@ function LudoVsBot({ vault }) {
 
 // ===== Helpers for board projection =====
 const START_OFFSETS = [0, 13, 26, 39]; // נקודת התחלה לכל צבע על המסלול
+const BOARD_SIZE_EXPR = "min(520px, 92vw, 70vh)";
 
 function projectPieceOnBoard(seat, pos) {
   if (pos < 0) {
@@ -1145,8 +1146,11 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
       {/* לוח מרכזי */}
       <div className="flex-1 flex items-center justify-center">
         <div
-          className="relative w-full max-w-[520px] rounded-2xl border-2 border-white/30 overflow-hidden bg-black shadow-2xl"
-          style={{ aspectRatio: "1 / 1", minHeight: "360px" }}
+          className="relative rounded-2xl border-2 border-white/30 overflow-hidden bg-black shadow-2xl aspect-square"
+          style={{
+            width: BOARD_SIZE_EXPR,
+            height: BOARD_SIZE_EXPR,
+          }}
         >
           {/* רקע מאחורי הכל – אם אין תמונת לוח עדיין תראה משהו */}
           <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-slate-900 to-black z-0" />
