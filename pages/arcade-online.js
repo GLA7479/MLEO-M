@@ -256,13 +256,15 @@ function GameViewport({ gameId, vault, setVaultBoth, playerName, roomId, tierCod
   }
 
   return (
-    <GameComponent 
-      vault={vault} 
-      setVaultBoth={setVaultBoth}
-      playerName={playerName}
-      roomId={roomId}
-      tierCode={tierCode}
-    />
+    <div className="w-full h-full min-h-[500px]">
+      <GameComponent 
+        vault={vault} 
+        setVaultBoth={setVaultBoth}
+        playerName={playerName}
+        roomId={roomId}
+        tierCode={tierCode}
+      />
+    </div>
   );
 }
 
@@ -428,7 +430,7 @@ export default function ArcadeOnline() {
   return (
     <Layout address={address} isConnected={isConnected} vaultAmount={vaultAmt}>
       <div
-        className="relative w-full min-h-[var(--app-100vh,100svh)] overflow-y-auto bg-gradient-to-br from-indigo-900 via-black to-purple-900"
+        className="relative w-full min-h-[var(--app-100vh,100svh)] flex flex-col overflow-y-auto bg-gradient-to-br from-indigo-900 via-black to-purple-900"
       >
         {/* Header */}
         <header className="relative px-4 py-6 text-center">

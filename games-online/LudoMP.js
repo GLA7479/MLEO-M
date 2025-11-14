@@ -13,6 +13,7 @@ import {
   nextTurnSeat,
   LUDO_PIECES_PER_PLAYER,
   LUDO_TRACK_LEN,
+  LUDO_HOME_LEN,
 } from "../lib/ludoEngine";
 
 const TURN_SECONDS = Number(process.env.NEXT_PUBLIC_LUDO_TURN_SECONDS || 30);
@@ -729,7 +730,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
   const seats = 4;
 
   return (
-    <div className="w-full h-full flex flex-col gap-2 text-white">
+    <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: '600px', height: '100%' }}>
       {/* Seats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
         {Array.from({ length: seats }).map((_, idx) => {
@@ -814,10 +815,12 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
       </div>
 
       {/* Board */}
-      <div className="flex-1 min-h-[260px] bg-black/40 rounded-lg p-3 flex flex-col gap-2">
+      <div className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 flex flex-col gap-2 overflow-hidden" style={{ minHeight: '500px', height: '100%' }}>
         {board ? (
           <>
-            <LudoBoard board={board} onPieceClick={onPieceClick} mySeat={mySeat} />
+            <div className="flex-1 h-full overflow-hidden" style={{ minHeight: '400px', height: '100%' }}>
+              <LudoBoard board={board} onPieceClick={onPieceClick} mySeat={mySeat} />
+            </div>
             <div className="text-[11px] text-white/60">
               * Images path for dog pieces:&nbsp;
               <code>/images/ludo/dog_0.png ... dog_3.png</code>
@@ -1089,8 +1092,10 @@ function LudoVsBot({ vault }) {
         {msg && <span className="ml-2 text-amber-300">{msg}</span>}
       </div>
 
-      <div className="flex-1 min-h-[260px] bg-black/40 rounded-lg p-3">
-        <LudoBoardLocal board={board} mySeat={mySeat} onPieceClick={onPieceClick} />
+      <div className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 overflow-hidden" style={{ minHeight: '500px', height: '100%' }}>
+        <div className="w-full h-full" style={{ minHeight: '400px', height: '100%' }}>
+          <LudoBoard board={board} mySeat={mySeat} onPieceClick={onPieceClick} />
+        </div>
       </div>
     </div>
   );
@@ -1102,10 +1107,6 @@ function LudoVsBot({ vault }) {
 const START_OFFSETS = [0, 13, 26, 39]; // נקודת התחלה לכל צבע על המסלול
 
 function projectPieceOnBoard(seat, pos) {
-  // אחוזים של מיקום על לוח 100x100
-  // seat: 0..3, pos: -1 (yard) או 0..LUDO_TRACK_LEN+...
-
-  // Yard – פינה לכל שחקן
   if (pos < 0) {
     const base = [
       { x: 20, y: 80 }, // seat 0
@@ -1117,17 +1118,15 @@ function projectPieceOnBoard(seat, pos) {
     return { kind: "yard", x: base.x, y: base.y };
   }
 
-  // Home – במרכז
-  if (pos >= LUDO_TRACK_LEN + LUDO_PIECES_PER_PLAYER) {
+  if (pos >= LUDO_TRACK_LEN + LUDO_HOME_LEN) {
     return { kind: "home", x: 50, y: 50 };
   }
 
-  // Track – מסלול עגול סביב המרכז
   const offset = START_OFFSETS[seat] ?? 0;
   const globalIndex = (offset + pos) % LUDO_TRACK_LEN;
   const angle = (globalIndex / LUDO_TRACK_LEN) * 2 * Math.PI;
 
-  const radius = 36; // כמה קרוב למרכז (באחוזים)
+  const radius = 36;
   const x = 50 + radius * Math.cos(angle);
   const y = 50 + radius * Math.sin(angle);
 
@@ -1140,77 +1139,99 @@ function LudoBoard({ board, onPieceClick, mySeat }) {
   const colorClasses = ["bg-red-500", "bg-sky-500", "bg-emerald-500", "bg-amber-400"];
 
   return (
-    <div className="w-full h-full flex flex-col sm:flex-row gap-3">
+    <div className="w-full h-full flex flex-col sm:flex-row gap-3" style={{ minHeight: "420px" }}>
       {/* לוח מרכזי */}
-      <div className="flex-1 relative bg-gradient-to-br from-purple-900 via-slate-900 to-black rounded-2xl border border-white/10 overflow-hidden min-h-[260px]">
-        {/* ריבוע פנימי כמו משטח לודו */}
-        <div className="absolute inset-[8%] bg-slate-900/80 rounded-2xl border border-white/10" />
+      <div className="flex-1 flex items-center justify-center">
+        <div
+          className="relative w-full max-w-[520px] rounded-2xl border-2 border-white/30 overflow-hidden bg-black shadow-2xl"
+          style={{ aspectRatio: "1 / 1", minHeight: "360px" }}
+        >
+          {/* רקע מאחורי הכל – אם אין תמונת לוח עדיין תראה משהו */}
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-slate-900 to-black z-0" />
 
-        {/* בסיסים צבעוניים בארבע פינות */}
-        <div className="absolute left-[6%] bottom-[6%] w-[20%] h-[20%] rounded-xl bg-red-600/40 border border-red-400/60" />
-        <div className="absolute right-[6%] top-[6%] w-[20%] h-[20%] rounded-xl bg-sky-500/40 border border-sky-300/60" />
-        <div className="absolute left-[6%] top-[6%] w-[20%] h-[20%] rounded-xl bg-emerald-500/40 border border-emerald-300/60" />
-        <div className="absolute right-[6%] bottom-[6%] w-[20%] h-[20%] rounded-xl bg-amber-400/40 border border-amber-200/60" />
+          {/* תמונת הלוח מעל הרקע */}
+          <img
+            src="/images/ludo/board.png"
+            alt="Ludo board"
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10"
+            onError={(e) => {
+              console.error("Failed to load board image:", e);
+              e.currentTarget.style.display = "none";
+            }}
+          />
 
-        {/* מרכז */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[26%] h-[26%] rounded-2xl bg-black/80 border border-white/30 flex items-center justify-center">
-          <span className="text-[11px] sm:text-xs text-white/80 font-semibold">
-            MLEO Ludo
-          </span>
-        </div>
-
-        {/* הכלים עצמם */}
-        {active.map((seat) => {
+          {/* החיילים מעל הכל */}
+          {active.map((seat) => {
           const cls = colorClasses[seat] || "bg-white";
           const seatPieces = pieces[String(seat)] || [];
+          const isMe = seat === mySeat;
+          const imgSrc = `/images/ludo/dog_${seat}.png`;
 
           return seatPieces.map((pos, idx) => {
             const proj = projectPieceOnBoard(seat, pos);
-            const isMine = mySeat === seat;
-            const imgSrc = `/images/ludo/dog_${seat}.png`;
+            if (!proj) return null;
 
-            // חישוב אם החייל הזה חוקי להזזה עם הקובייה הנוכחית
-            const movableIndices =
-              board.dice != null ? listMovablePieces(board, seat, board.dice) : [];
-            const pieceCanClick = isMine && movableIndices.includes(idx);
+            const movable =
+              isMe &&
+              board.dice != null &&
+              listMovablePieces(board, seat, board.dice).includes(idx);
 
             return (
               <button
                 key={`${seat}-${idx}`}
                 type="button"
-                onClick={() => pieceCanClick && onPieceClick && onPieceClick(idx)}
-                className="absolute -translate-x-1/2 -translate-y-1/2"
-                style={{ left: `${proj.x}%`, top: `${proj.y}%` }}
+                onClick={() => movable && onPieceClick && onPieceClick(idx)}
+                className={`absolute rounded-full border-2 shadow-lg flex items-center justify-center transition-transform z-20 ${
+                  movable ? "ring-2 ring-amber-300 scale-105" : ""
+                }`}
+                style={{
+                  left: `${proj.x}%`,
+                  top: `${proj.y}%`,
+                  width: "9%",
+                  height: "9%",
+                  minWidth: '32px',
+                  minHeight: '32px',
+                  transform: "translate(-50%, -50%)",
+                  zIndex: 20,
+                  position: 'absolute'
+                }}
               >
-                <div
-                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 shadow-lg flex items-center justify-center ${
-                    pieceCanClick
-                      ? "border-yellow-400 ring-2 ring-yellow-400/50"
-                      : isMine
-                      ? "border-white"
-                      : "border-black/50"
-                  }`}
-                >
-                  <div
-                    className={`w-full h-full rounded-full overflow-hidden ${cls} flex items-center justify-center`}
-                  >
-                    <img
-                      src={imgSrc}
-                      alt="dog"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  </div>
+                <div className={`w-full h-full rounded-full overflow-hidden ${cls}`} style={{ position: 'relative', zIndex: 21 }}>
+                  <img
+                    src={imgSrc}
+                    alt="piece"
+                    className="w-full h-full object-cover"
+                    style={{ 
+                      opacity: 1,
+                      visibility: 'visible',
+                      display: 'block',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      zIndex: 21
+                    }}
+                    onError={(e) => {
+                      console.error(`Failed to load piece image for seat ${seat}:`, imgSrc, e);
+                      // אם אין תמונה – תשאר עיגול צבעוני
+                      e.currentTarget.style.display = "none";
+                    }}
+                    onLoad={(e) => {
+                      console.log(`Piece image loaded for seat ${seat}:`, imgSrc, e.target.width, e.target.height);
+                      e.target.style.opacity = "1";
+                      e.target.style.visibility = "visible";
+                    }}
+                  />
                 </div>
               </button>
             );
           });
-        })}
+          })}
+        </div>
       </div>
 
-      {/* מידע לכל שחקן בצד – כמו בלוח המקורי שלך */}
+      {/* פאנל מצב עבור כל Seat */}
       <div className="w-full sm:w-56 flex flex-col gap-2 text-xs">
         {active.map((seat) => {
           const seatPieces = pieces[String(seat)] || [];
@@ -1236,15 +1257,10 @@ function LudoBoard({ board, onPieceClick, mySeat }) {
                 {seatPieces.map((pos, idx) => {
                   const inYard = pos < 0;
                   const finished =
-                    pos >= LUDO_TRACK_LEN + LUDO_PIECES_PER_PLAYER ||
+                    pos >= LUDO_TRACK_LEN + LUDO_HOME_LEN ||
                     board.finished?.[String(seat)] >= LUDO_PIECES_PER_PLAYER;
-                  const label = inYard
-                    ? "Yard"
-                    : finished
-                    ? "Home"
-                    : `Pos ${pos}`;
+                  const label = inYard ? "Yard" : finished ? "Home" : `Pos ${pos}`;
 
-                  // חישוב אם החייל הזה חוקי להזזה עם הקובייה הנוכחית
                   const movableIndices =
                     board.dice != null ? listMovablePieces(board, seat, board.dice) : [];
                   const pieceCanClick = isMine && movableIndices.includes(idx);
