@@ -2166,6 +2166,8 @@ export default function GamesHub() {
   const [lang, setLang] = useState("en");
   const [showMenu, setShowMenu] = useState(false);
   const [userInfo, setUserInfo] = useState({ email: null, username: null, isGuest: true });
+  const [vault, setVault] = useState(0);
+  const [showVaultModal, setShowVaultModal] = useState(false);
   
   // Auth form state
   const [authMode, setAuthMode] = useState("login"); // "login" or "signup"
@@ -2260,6 +2262,37 @@ export default function GamesHub() {
   const handleLanguageChange = (newLang) => {
     setLang(newLang);
   };
+
+  // Read vault from RUSH game
+  function getVault() {
+    if (typeof window === "undefined") return 0;
+    try {
+      const rushData = localStorage.getItem("mleo_rush_core_v4");
+      if (!rushData) return 0;
+      const data = JSON.parse(rushData);
+      return data.vault || 0;
+    } catch {
+      return 0;
+    }
+  }
+  
+  function fmt(n) {
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
+    return Math.floor(n).toString();
+  }
+
+  // Load and update vault
+  useEffect(() => {
+    if (!mounted) return;
+    setVault(getVault());
+    
+    const interval = setInterval(() => {
+      setVault(getVault());
+    }, 2000);
+    
+    return () => clearInterval(interval);
+  }, [mounted]);
 
   // Email validation regex
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
@@ -2625,6 +2658,12 @@ export default function GamesHub() {
                   </span>
                 </div>
               </div>
+              <button
+                onClick={() => setShowVaultModal(true)}
+                className="w-full mt-2 bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1.5 rounded text-xs font-bold transition-colors"
+              >
+                VAULT: {fmt(vault)} MLEO
+              </button>
             </div>
 
             {/* Language & Wallet - Same Row */}
@@ -2840,6 +2879,80 @@ export default function GamesHub() {
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Vault Modal */}
+      <Modal isOpen={showVaultModal} onClose={() => setShowVaultModal(false)} maxWidth="md" padding="4">
+        <div className="space-y-3">
+          <h2 className="text-lg font-bold text-center mb-2">Player Vault</h2>
+          
+          {/* Vault Balance */}
+          <div className="bg-emerald-100 rounded-lg p-3 border-2 border-emerald-300">
+            <div className="text-center">
+              <div className="text-sm font-semibold text-gray-700 mb-1">Your MLEO Vault</div>
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-2xl">💰</span>
+                <span className="text-2xl font-bold text-emerald-700">{fmt(vault)} MLEO</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Player Information */}
+          <div className="bg-gray-100 rounded-lg p-3">
+            <h3 className="font-bold text-sm mb-2">Player Information</h3>
+            <div className="space-y-1.5 text-gray-700 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Username:</span>
+                <span>{userInfo.username || 'Guest'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Email:</span>
+                <span className="break-all text-right">{userInfo.email || 'Not provided'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Status:</span>
+                <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                  userInfo.isGuest 
+                    ? 'bg-gray-300 text-gray-700' 
+                    : 'bg-green-300 text-green-700'
+                }`}>
+                  {userInfo.isGuest ? 'Guest' : 'Connected'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Wallet Information */}
+          {isConnected && address && (
+            <div className="bg-gray-100 rounded-lg p-3">
+              <h3 className="font-bold text-sm mb-2">Wallet Information</h3>
+              <div className="space-y-1.5 text-gray-700 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">Status:</span>
+                  <span className="px-2 py-0.5 rounded text-xs font-bold bg-green-300 text-green-700">
+                    Connected
+                  </span>
+                </div>
+                <div className="break-all">
+                  <span className="font-semibold">Address:</span> {address}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Info Section */}
+          <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+            <div className="text-xs text-blue-800">
+              <p className="font-semibold mb-1">💡 About Your Vault:</p>
+              <ul className="space-y-0.5 list-disc list-inside">
+                <li>Your vault is shared between all MLEO games</li>
+                <li>Play games to earn more MLEO tokens</li>
+                <li>All winnings are automatically added to your vault</li>
+                <li>Use free play tokens to play without spending MLEO</li>
+              </ul>
             </div>
           </div>
         </div>
