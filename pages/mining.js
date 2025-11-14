@@ -4,11 +4,29 @@ import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
 import { ConnectButton, useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
-import { useAccount, useDisconnect } from "wagmi";
+import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
+import { parseUnits } from "viem";
 import GamePoolStats from "../components/GamePoolStats";
 import { supabaseMP } from "../lib/supabaseClients";
 
 const BG_URL = "/images/games-hero.jpg";
+
+// ==== On-chain Claim (TBNB) config ====
+const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
+const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || process.env.NEXT_PUBLIC_CLAIM_ADDRESS || "").trim();
+const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
+
+// ABI מינימלי של V3: claim(gameId, amount)
+const MINING_CLAIM_ABI = [{
+  type: "function",
+  name: "claim",
+  stateMutability: "nonpayable",
+  inputs: [
+    { name: "gameId", type: "uint256" },
+    { name: "amount", type: "uint256" }
+  ],
+  outputs: []
+}];
 
 // ===== Translations =====
 const TEXT = {
@@ -2168,6 +2186,8 @@ export default function GamesHub() {
   const [userInfo, setUserInfo] = useState({ email: null, username: null, isGuest: true });
   const [vault, setVault] = useState(0);
   const [showVaultModal, setShowVaultModal] = useState(false);
+  const [collectAmount, setCollectAmount] = useState(1000);
+  const [claiming, setClaiming] = useState(false);
   
   // Auth form state
   const [authMode, setAuthMode] = useState("login"); // "login" or "signup"
@@ -2183,6 +2203,10 @@ export default function GamesHub() {
   const { openAccountModal } = useAccountModal();
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
+  const { switchChain } = useSwitchChain();
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
+  const chainId = useChainId();
   
   const open = (id) => setModal(id);
   const close = () => setModal(null);
@@ -2371,6 +2395,76 @@ export default function GamesHub() {
       setAuthSubmitting(false);
     }
   };
+
+  // Collect MLEO to wallet
+  async function collectToWallet() {
+    if (!isConnected) {
+      openConnectModal?.();
+      return;
+    }
+
+    if (chainId !== CLAIM_CHAIN_ID) {
+      try {
+        await switchChain?.({ chainId: CLAIM_CHAIN_ID });
+      } catch {
+        alert("Switch to BSC Testnet (TBNB)");
+        return;
+      }
+    }
+
+    if (!CLAIM_ADDRESS) {
+      alert("Missing CLAIM address");
+      return;
+    }
+
+    if (collectAmount <= 0 || collectAmount > vault) {
+      alert("Invalid amount!");
+      return;
+    }
+
+    setClaiming(true);
+    try {
+      const amountUnits = parseUnits(
+        Number(collectAmount).toFixed(Math.min(2, MLEO_DECIMALS)),
+        MLEO_DECIMALS
+      );
+
+      const hash = await writeContractAsync({
+        address: CLAIM_ADDRESS,
+        abi: MINING_CLAIM_ABI,
+        functionName: "claim",
+        args: [BigInt(1), amountUnits], // GameId = 1 for Arcade
+        chainId: CLAIM_CHAIN_ID,
+        account: address,
+      });
+
+      await publicClient.waitForTransactionReceipt({ hash });
+
+      // Update local vault
+      const newVault = Math.max(0, vault - collectAmount);
+      setVault(newVault);
+      
+      // Update RUSH game vault
+      try {
+        const rushData = localStorage.getItem("mleo_rush_core_v4");
+        if (rushData) {
+          const data = JSON.parse(rushData);
+          data.vault = newVault;
+          localStorage.setItem("mleo_rush_core_v4", JSON.stringify(data));
+        }
+      } catch (e) {
+        console.error("Failed to update RUSH vault:", e);
+      }
+
+      alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
+      setCollectAmount(1000);
+    } catch (err) {
+      console.error(err);
+      alert("Claim failed or rejected");
+    } finally {
+      setClaiming(false);
+    }
+  }
 
   const handleLogout = async () => {
     try {
@@ -2943,6 +3037,47 @@ export default function GamesHub() {
             </div>
           )}
 
+          {/* Collect to Wallet Section */}
+          <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+            <h3 className="font-bold text-sm mb-2">Collect to Wallet</h3>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={collectAmount}
+                  onChange={(e) => setCollectAmount(Number(e.target.value))}
+                  className="flex-1 px-2 py-1.5 text-xs rounded border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  placeholder="Amount"
+                  min="1"
+                  max={vault}
+                  disabled={claiming}
+                />
+                <button
+                  onClick={() => setCollectAmount(vault)}
+                  className="px-3 py-1.5 text-xs rounded bg-amber-500/20 border border-amber-500/30 text-amber-700 hover:bg-amber-500/30 font-semibold"
+                  disabled={claiming}
+                >
+                  MAX
+                </button>
+              </div>
+              <div className="text-xs text-gray-600">
+                Available: {fmt(vault)} MLEO
+              </div>
+              <button
+                onClick={collectToWallet}
+                disabled={collectAmount <= 0 || collectAmount > vault || claiming || !isConnected}
+                className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-3 py-2 rounded text-sm font-bold transition-colors"
+              >
+                {claiming ? "Claiming..." : `CLAIM ${fmt(collectAmount)} MLEO`}
+              </button>
+              {!isConnected && (
+                <p className="text-xs text-amber-700 text-center">
+                  Connect your wallet to claim MLEO tokens
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Info Section */}
           <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
             <div className="text-xs text-blue-800">
@@ -2952,6 +3087,7 @@ export default function GamesHub() {
                 <li>Play games to earn more MLEO tokens</li>
                 <li>All winnings are automatically added to your vault</li>
                 <li>Use free play tokens to play without spending MLEO</li>
+                <li>Connect your wallet and claim MLEO tokens on-chain</li>
               </ul>
             </div>
           </div>
