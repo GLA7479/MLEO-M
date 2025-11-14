@@ -2170,6 +2170,7 @@ export default function GamesHub() {
   // Auth form state
   const [authMode, setAuthMode] = useState("login"); // "login" or "signup"
   const [authEmail, setAuthEmail] = useState("");
+  const [authUsername, setAuthUsername] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authConfirmPassword, setAuthConfirmPassword] = useState("");
   const [authError, setAuthError] = useState("");
@@ -2294,6 +2295,12 @@ export default function GamesHub() {
   const handleSignup = async () => {
     setAuthError("");
     
+    // Validate username
+    if (!authUsername || authUsername.trim().length < 3) {
+      setAuthError("Username must be at least 3 characters long.");
+      return;
+    }
+    
     if (!EMAIL_RE.test(authEmail) || authPassword.length < 8) {
       setAuthError("Please enter a valid email and password (8+ characters).");
       return;
@@ -2309,12 +2316,18 @@ export default function GamesHub() {
       const { error } = await supabaseMP.auth.signUp({
         email: authEmail,
         password: authPassword,
-        options: { emailRedirectTo: undefined },
+        options: { 
+          emailRedirectTo: undefined,
+          data: {
+            username: authUsername.trim()
+          }
+        },
       });
       if (error) throw error;
       
       // Success - user info will be updated by the auth state listener
       setAuthEmail("");
+      setAuthUsername("");
       setAuthPassword("");
       setAuthConfirmPassword("");
       setAuthError("");
@@ -2661,6 +2674,8 @@ export default function GamesHub() {
                     onClick={() => {
                       setAuthMode("login");
                       setAuthError("");
+                      setAuthUsername("");
+                      setAuthConfirmPassword("");
                     }}
                     className={`flex-1 px-2 py-1.5 rounded text-xs font-semibold transition-colors ${
                       authMode === "login"
@@ -2694,6 +2709,24 @@ export default function GamesHub() {
 
                 {/* Form */}
                 <div className="space-y-1.5">
+                  {authMode === "signup" && (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-0.5">
+                        Username
+                      </label>
+                      <input
+                        type="text"
+                        value={authUsername}
+                        onChange={(e) => setAuthUsername(e.target.value)}
+                        placeholder="Choose a username (3+ characters)"
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        disabled={authSubmitting}
+                        minLength={3}
+                        maxLength={20}
+                      />
+                    </div>
+                  )}
+                  
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-0.5">
                       Email
