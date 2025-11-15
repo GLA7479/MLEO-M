@@ -1867,7 +1867,7 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true, disableHig
                 key={`${seat}-${idx}`}
                 type="button"
                 onClick={() => movable && onPieceClick && onPieceClick(idx)}
-                className={`absolute rounded-full border-2 shadow-lg flex items-center justify-center transition-transform z-20 ${
+                className={`absolute flex items-center justify-center transition-transform z-20 ${
                   movable ? "ring-2 ring-amber-300 scale-105" : ""
                 }`}
                 title={`Piece ${idx + 1} • ${progressInfo.label}${
@@ -1882,30 +1882,45 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true, disableHig
                   minHeight: '32px',
                   transform: "translate(-50%, -50%)",
                   zIndex: 20,
-                  position: 'absolute'
+                  position: 'absolute',
+                  background: "transparent",
+                  border: "none",
+                  padding: 0
                 }}
               >
-                <div className={`w-full h-full rounded-full overflow-hidden ${cls}`} style={{ position: 'relative', zIndex: 21 }}>
+                <div className="w-full h-full relative pointer-events-none" style={{ zIndex: 21 }}>
                   <img
                     src={imgSrc}
                     alt="piece"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain pointer-events-none"
                     style={{ 
-                      opacity: 1,
-                      visibility: 'visible',
-                      display: 'block',
                       position: 'absolute',
                       top: 0,
                       left: 0,
                       width: '100%',
                       height: '100%',
-                      zIndex: 21
+                      zIndex: 21,
+                      background: 'transparent'
                     }}
                     onError={(e) => {
                       console.error(`Failed to load piece image for seat ${seat}:`, imgSrc, e);
-                      // אם אין תמונה – תשאר עיגול צבעוני
                       e.currentTarget.style.display = "none";
+                      const fallback = e.currentTarget.nextElementSibling;
+                      if (fallback) {
+                        fallback.classList.remove("hidden");
+                      }
                     }}
+                    onLoad={(e) => {
+                      e.currentTarget.style.display = "block";
+                      const fallback = e.currentTarget.nextElementSibling;
+                      if (fallback) {
+                        fallback.classList.add("hidden");
+                      }
+                    }}
+                  />
+                  <div
+                    className={`fallback-piece absolute inset-0 rounded-full border-2 border-white/40 ${cls} hidden`}
+                    style={{ zIndex: 20 }}
                   />
                   {stageText && (
                     <span
