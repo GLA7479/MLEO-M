@@ -370,9 +370,36 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
     return () => clearInterval(tickRef.current);
   }, [ses?.turn_deadline, ses?.stage, ses?.current_turn, mySeat]);
 
+  // 🔵 סנכרון session מהשרת כל ~1.5 שניות
+  useEffect(() => {
+    if (!ses?.id) return;
+
+    let cancelled = false;
+
+    const interval = setInterval(async () => {
+      if (cancelled) return;
+      await fetchSession(); // מביא את מצב המשחק המעודכן (stage, board_state וכו')
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [ses?.id]);
+
   async function fetchSession() {
     if (!ses?.id) return null;
-    const { data } = await supabase.from("ludo_sessions").select("*").eq("id", ses.id).single();
+    const { data, error } = await supabase
+      .from("ludo_sessions")
+      .select("*")
+      .eq("id", ses.id)
+      .single();
+
+    if (error) {
+      console.error("fetchSession error:", error);
+      return null;
+    }
+
     if (data) setSes(data);
     return data;
   }
