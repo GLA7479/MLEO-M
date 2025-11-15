@@ -407,19 +407,31 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
   async function autoAct() {
     const s = await fetchSession();
     if (!s || s.stage !== "playing") return;
+
     const b = s.board_state || {};
     const turnSeat = b.turnSeat ?? s.current_turn;
+
+    // רק מי שבתורו מבצע אוטומציה
     if (mySeat == null || mySeat !== turnSeat) return;
 
+    // אין קובייה → זורק אוטומטית
     if (!b.dice) {
       await doRoll();
       return;
     }
+
+    // יש קובייה – בודק אם יש מהלך חוקי
     const moves = listMovablePieces(b, turnSeat, b.dice);
+
+    // אין אף מהלך → מחכים ~2 שניות ואז מדלגים תור
     if (!moves.length) {
-      await endTurn(b);
+      setTimeout(() => {
+        endTurn(b);
+      }, 2000); // 2 שניות כדי לראות את הקובייה
       return;
     }
+
+    // יש מהלכים → רק מרענן דד־ליין, שייתן לשחקן זמן להזיז
     await bumpDeadline();
   }
 
@@ -633,9 +645,11 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
     // בודקים אם יש בכלל מהלך חוקי עם הקובייה הזו
     const moves = listMovablePieces(next, turnSeat, dice);
 
+    // אין אף מהלך חוקי – נותנים לראות את הקובייה ~2 שניות ואז עוברים תור
     if (!moves.length) {
-      // אין שום כלי שיכול לזוז -> מעבירים תור מיד
-      await endTurn(next);
+      setTimeout(() => {
+        endTurn(next);
+      }, 2000); // 2 שניות
     }
   }
 
