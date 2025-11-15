@@ -1418,6 +1418,22 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
       })),
     []
   );
+  const homeSegments = useMemo(() => {
+    const segments = [];
+    START_OFFSETS.forEach((startIdx, seat) => {
+      const entry = projectGlobalTrackCell(startIdx);
+      for (let i = 0; i < LUDO_HOME_LEN; i += 1) {
+        const t = (i + 1) / (LUDO_HOME_LEN + 1);
+        segments.push({
+          seat,
+          idx: i,
+          x: entry.x + (50 - entry.x) * t,
+          y: entry.y + (50 - entry.y) * t,
+        });
+      }
+    });
+    return segments;
+  }, []);
   const trackOccupancy = useMemo(() => {
     const map = new Map();
     active.forEach((seat) => {
@@ -1477,6 +1493,7 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
             layout={trackLayout}
             occupancy={trackOccupancy}
             highlights={highlightTargets}
+            homeSegments={homeSegments}
           />
 
           {/* החיילים מעל הכל */}
@@ -1614,11 +1631,29 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
   );
 }
 
-function TrackOverlay({ layout, occupancy, highlights }) {
+function TrackOverlay({ layout, occupancy, highlights, homeSegments }) {
   if (!layout?.length) return null;
   return (
     <div className="absolute inset-0 pointer-events-none z-10">
       <div className="absolute inset-[12%] rounded-full border border-white/10" />
+      {homeSegments?.map((segment) => (
+        <div
+          key={`home-${segment.seat}-${segment.idx}`}
+          className="absolute rounded-full border border-white/20 shadow-sm"
+          style={{
+            left: `${segment.x}%`,
+            top: `${segment.y}%`,
+            width: "2.8%",
+            height: "2.8%",
+            minWidth: "12px",
+            minHeight: "12px",
+            transform: "translate(-50%, -50%)",
+            backgroundColor: `${SEAT_HEX_COLORS[segment.seat]}55`,
+            borderColor: `${SEAT_HEX_COLORS[segment.seat]}99`,
+            boxShadow: `0 0 6px ${SEAT_HEX_COLORS[segment.seat]}55`,
+          }}
+        />
+      ))}
       {layout.map(({ idx, x, y }) => {
         const occupants = occupancy?.get(idx) || [];
         const seatColor =
@@ -1654,7 +1689,7 @@ function TrackOverlay({ layout, occupancy, highlights }) {
               />
             </div>
             <span
-              className="absolute text-[15px] sm:text-[17px] font-bold drop-shadow pointer-events-none select-none"
+              className="absolute text-[8px] sm:text-[14px] font-bold drop-shadow pointer-events-none select-none"
               style={{
                 left: `${labelX}%`,
                 top: `${labelY}%`,
