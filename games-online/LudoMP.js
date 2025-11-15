@@ -1922,20 +1922,6 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true, disableHig
                     className={`fallback-piece absolute inset-0 rounded-full border-2 border-white/40 ${cls} hidden`}
                     style={{ zIndex: 20 }}
                   />
-                  {stageText && (
-                    <span
-                      className="absolute text-[11px] font-black text-white pointer-events-none select-none"
-                      style={{
-                        zIndex: 24,
-                        textShadow: "0 1px 2px rgba(0,0,0,0.4)",
-                        left: "50%",
-                        bottom: "-8%",
-                        transform: "translateX(-50%)"
-                      }}
-                    >
-                      {stageText}
-                    </span>
-                  )}
                 </div>
               </button>
             );
