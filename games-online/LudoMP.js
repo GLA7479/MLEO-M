@@ -1070,83 +1070,80 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         })}
         </div>
       </div>
-      {/* Board */}
-      <div className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 flex flex-col gap-2 overflow-hidden" style={{ minHeight: '500px', height: '100%' }}>
-        {board ? (
-          <>
-            <div className="flex-1 h-full overflow-hidden" style={{ minHeight: '400px', height: '100%' }}>
-              <LudoBoard
-                board={board}
-                onPieceClick={onPieceClick}
-                mySeat={mySeat}
-                showSidebar={!inMatch}
-                disableHighlights={diceRolling}
+      {/* Board + Controls */}
+      <div className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 flex flex-col gap-3 overflow-hidden" style={{ minHeight: '500px', height: '100%' }}>
+        <div className="flex-1 h-full overflow-hidden" style={{ minHeight: '400px', height: '100%' }}>
+          {board ? (
+            <LudoBoard
+              board={board}
+              onPieceClick={onPieceClick}
+              mySeat={mySeat}
+              showSidebar={!inMatch}
+              disableHighlights={diceRolling}
+            />
+          ) : (
+            <div className="w-full h-full grid place-items-center text-white/60 text-sm">
+              Game not started yet.
+            </div>
+          )}
+        </div>
+
+        <div className="w-full text-xs flex flex-col gap-2">
+          <div className="flex justify-end items-center flex-wrap gap-2">
+            {msg && <span className="text-amber-300">{msg}</span>}
+          </div>
+          <div className="flex gap-2 items-center w-full overflow-x-auto">
+            {mySeat != null && (
+              <button
+                onClick={leaveSeat}
+                className={`${controlBtnBase} border-red-300/70 bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 whitespace-nowrap flex-shrink-0`}
+              >
+                Leave seat
+              </button>
+            )}
+            <button
+              onClick={startGame}
+              className={`${controlBtnBase} border-emerald-300/70 bg-gradient-to-r from-emerald-600 to-lime-500 hover:from-emerald-500 hover:to-lime-400 whitespace-nowrap flex-shrink-0`}
+            >
+              Start game
+            </button>
+            <button
+              onClick={offerDouble}
+              disabled={!canOfferDouble}
+              className={`${controlBtnBase} border-amber-300/70 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex-shrink-0`}
+            >
+              Double x{doubleState.value ?? 1}
+            </button>
+            <div className="flex-shrink-0">
+              <DiceDisplay
+                displayValue={diceDisplayValue}
+                rolling={diceRolling}
+                seat={board?.dice != null ? board?.turnSeat : liveTurnSeat}
               />
             </div>
-          </>
-        ) : (
-          <div className="w-full h-full grid place-items-center text-white/60 text-sm">
-            Game not started yet.
+            {doubleState.awaiting != null && (
+              <span className="text-amber-200 text-[10px] whitespace-nowrap flex-shrink-0">
+                Waiting Seat {doubleState.awaiting + 1}
+                {doubleCountdown != null ? ` • ${doubleCountdown}s` : ""}
+              </span>
+            )}
+            {doubleState.awaiting === mySeat && (
+              <>
+                <button
+                  onClick={() => respondDouble("accept")}
+                  className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 whitespace-nowrap flex-shrink-0"
+                >
+                  Accept
+                </button>
+                <button
+                  onClick={() => respondDouble("decline")}
+                  className="px-3 py-1 rounded bg-red-600/80 hover:bg-red-500 whitespace-nowrap flex-shrink-0"
+                >
+                  Decline
+                </button>
+              </>
+            )}
           </div>
-        )}
-      </div>
-
-      {/* Status + Controls */}
-      <div className="w-full bg-black/50 rounded-lg px-3 py-2 text-xs flex flex-col gap-2">
-        <div className="flex justify-end items-center flex-wrap gap-2">
-          {msg && <span className="text-amber-300">{msg}</span>}
-        </div>
-        <div className="flex gap-2 items-center w-full overflow-x-auto">
-          {mySeat != null && (
-            <button
-              onClick={leaveSeat}
-              className={`${controlBtnBase} border-red-300/70 bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 whitespace-nowrap flex-shrink-0`}
-            >
-              Leave seat
-            </button>
-          )}
-          <button
-            onClick={startGame}
-            className={`${controlBtnBase} border-emerald-300/70 bg-gradient-to-r from-emerald-600 to-lime-500 hover:from-emerald-500 hover:to-lime-400 whitespace-nowrap flex-shrink-0`}
-          >
-            Start game
-          </button>
-          <button
-            onClick={offerDouble}
-            disabled={!canOfferDouble}
-            className={`${controlBtnBase} border-amber-300/70 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex-shrink-0`}
-          >
-            Double x{doubleState.value ?? 1}
-          </button>
-          <div className="flex-shrink-0">
-            <DiceDisplay
-              displayValue={diceDisplayValue}
-              rolling={diceRolling}
-              seat={board?.dice != null ? board?.turnSeat : liveTurnSeat}
-            />
-          </div>
-          {doubleState.awaiting != null && (
-            <span className="text-amber-200 text-[10px] whitespace-nowrap flex-shrink-0">
-              Waiting Seat {doubleState.awaiting + 1}
-              {doubleCountdown != null ? ` • ${doubleCountdown}s` : ""}
-            </span>
-          )}
-          {doubleState.awaiting === mySeat && (
-            <>
-              <button
-                onClick={() => respondDouble("accept")}
-                className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 whitespace-nowrap flex-shrink-0"
-              >
-                Accept
-              </button>
-              <button
-                onClick={() => respondDouble("decline")}
-                className="px-3 py-1 rounded bg-red-600/80 hover:bg-red-500 whitespace-nowrap flex-shrink-0"
-              >
-                Decline
-              </button>
-            </>
-          )}
         </div>
       </div>
 
