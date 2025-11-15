@@ -911,27 +911,9 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
   const current = ses?.current || {};
   const doubleState = current.__double__ || { value: 1, proposed_by: null, awaiting: null };
 
-  const statusText = (() => {
-    if (!ses) return "Loading...";
-    if (ses.stage === "lobby") return "Waiting in lobby";
-    if (ses.stage === "playing") {
-      if (board?.winner != null) return `Winner: ${formatSeatLabel(board.winner)}`;
-      const turnSeat = board?.turnSeat ?? ses.current_turn;
-      const seatLabel = formatSeatLabel(turnSeat);
-      return `Turn: ${seatLabel} | Dice: ${board?.dice ?? "-"}`;
-    }
-    if (ses.stage === "finished") {
-      const res = current.__result__;
-      if (res?.winner != null) {
-        return `Game finished. Winner ${formatSeatLabel(res.winner)}, payout x${res.multiplier ?? 1}`;
-      }
-      return "Game finished.";
-    }
-    return "Unknown state";
-  })();
-
   const seats = 4;
   const inMatch = ses?.stage === "playing" && !!board;
+  const liveTurnSeat = board?.turnSeat ?? ses?.current_turn ?? null;
 
   return (
     <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: '600px', height: '100%' }}>
@@ -942,6 +924,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
           const row = seatMap.get(idx) || null;
           const isMe = row?.client_id === clientId;
           const seatColor = SEAT_HEX_COLORS[idx] || "rgba(255,255,255,0.1)";
+          const isTurnSeat = liveTurnSeat === idx;
           return (
             <button
               key={idx}
@@ -950,7 +933,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
                 isMe
                   ? "border-white shadow-inner shadow-white/50"
                   : "border-white/30 shadow"
-              }`}
+              } ${isTurnSeat ? "ring-2 ring-amber-300 animate-pulse" : ""}`}
               style={{
                 background: `linear-gradient(135deg, ${seatColor}dd, ${seatColor}aa)`,
                 color: "white",
@@ -970,8 +953,8 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
 
       {/* Status + Controls */}
       <div className="w-full bg-black/50 rounded-lg px-3 py-2 text-xs flex flex-col gap-2">
-        <div className="text-white/80 flex justify-between items-center flex-wrap gap-1">
-          <span>{statusText}</span>
+        <div className="flex justify-between items-center flex-wrap gap-2">
+          <DiceDisplay value={board?.dice ?? board?.lastDice ?? null} />
           {msg && <span className="text-amber-300">{msg}</span>}
         </div>
         <div className="flex gap-2 items-center w-full overflow-x-auto">
@@ -1245,21 +1228,6 @@ function LudoVsBot({ vault }) {
     return () => clearInterval(t);
   }, [deadline, board, stage]);
 
-  const statusText = (() => {
-    if (stage === "lobby") return "Ready to start vs Bot";
-    if (stage === "playing") {
-      if (board.winner === mySeat) return "You win!";
-      if (board.winner === botSeat) return "Bot wins.";
-      return `Turn: ${board.turnSeat === mySeat ? "You" : "Bot"} | Dice: ${
-        board.dice ?? "-"
-      }`;
-    }
-    if (stage === "finished") {
-      return board.winner === mySeat ? "Game finished – You win!" : "Game finished – Bot wins";
-    }
-    return "";
-  })();
-
   return (
     <div className="w-full h-full flex flex-col gap-2 text-white">
       <div className="flex gap-2 items-center text-xs">
@@ -1285,9 +1253,9 @@ function LudoVsBot({ vault }) {
         </button>
       </div>
 
-      <div className="text-xs text-white/80 bg-black/40 rounded px-3 py-1">
-        {statusText}
-        {msg && <span className="ml-2 text-amber-300">{msg}</span>}
+      <div className="text-xs text-white/80 bg-black/40 rounded px-3 py-2 flex items-center justify-between gap-2">
+        <DiceDisplay value={board.dice ?? board.lastDice ?? null} />
+        {msg && <span className="text-amber-300">{msg}</span>}
       </div>
 
       <div className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 overflow-hidden" style={{ minHeight: '500px', height: '100%' }}>
@@ -1389,6 +1357,35 @@ function formatSeatLabel(seat) {
   return color ? `Seat ${seatNumber} — ${color}` : `Seat ${seatNumber}`;
 }
 
+function useDiceRollAnimation(value) {
+  const [displayValue, setDisplayValue] = useState(value ?? null);
+  const [rolling, setRolling] = useState(false);
+
+  useEffect(() => {
+    if (value == null) return;
+
+    setRolling(true);
+    setDisplayValue(value);
+
+    const interval = setInterval(() => {
+      setDisplayValue(1 + Math.floor(Math.random() * 6));
+    }, 120);
+
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+      setDisplayValue(value);
+      setRolling(false);
+    }, 2000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [value]);
+
+  return { displayValue, rolling };
+}
+
 function useFinishFlash(activeSeats, pieces) {
   const prevPositionsRef = useRef(new Map());
   const finishFlashRef = useRef(new Map());
@@ -1462,6 +1459,26 @@ function useFinishFlash(activeSeats, pieces) {
       return finishFlashRef.current.has(`${seat}-${idx}`);
     },
     []
+  );
+}
+
+function DiceDisplay({ value }) {
+  const { displayValue, rolling } = useDiceRollAnimation(value);
+  const dots = displayValue ?? 1;
+
+  return (
+    <div className="flex items-center gap-1 sm:gap-2 text-white">
+      <div
+        className={`relative w-8 h-8 sm:w-10 sm:h-10 rounded-xl border-2 border-white/40 bg-black/70 grid place-items-center transition ${
+          rolling ? "animate-pulse" : ""
+        }`}
+      >
+        <span className="text-base sm:text-lg font-semibold">{dots}</span>
+      </div>
+      <span className="text-[10px] uppercase tracking-wide text-white/80">
+        {rolling ? "Rolling..." : "Dice"}
+      </span>
+    </div>
   );
 }
 
@@ -1668,11 +1685,14 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
           const seatPieces = pieces[String(seat)] || [];
           const cls = colorClasses[seat] || "bg-white";
           const isMine = mySeat === seat;
+          const isTurnSeat = board?.turnSeat === seat;
 
           return (
             <div
               key={seat}
-              className="border border-white/15 rounded-lg p-2 bg-black/40 flex flex-col gap-1"
+              className={`border border-white/15 rounded-lg p-2 bg-black/40 flex flex-col gap-1 ${
+                isTurnSeat ? "ring-2 ring-amber-300 animate-pulse" : ""
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
