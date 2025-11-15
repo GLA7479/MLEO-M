@@ -816,11 +816,12 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
     if (!ses || ses.stage !== "playing") return false;
     const b = ses.board_state || {};
     const activeSeats = b.activeSeats || [];
-    if (activeSeats.length !== 2) return false;
+    if (activeSeats.length < 2) return false;
     if (mySeat == null || mySeat !== (b.turnSeat ?? ses.current_turn)) return false;
-    const current = ses.current || {};
-    const dbl = current.__double__ || { value: 1, proposed_by: null, awaiting: null };
-    if (dbl.awaiting != null) return false;
+    if (b.dice == null) return false;
+    const dbl = ses.current?.__double__ || { proposed_by: null, awaiting: null, locks: {} };
+    if (dbl.proposed_by != null || dbl.awaiting != null) return false;
+    if (dbl.locks?.[mySeat]) return false;
     return true;
   }, [ses, mySeat]);
 
@@ -829,20 +830,37 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
     if (!s || s.stage !== "playing") return;
     const b = s.board_state || {};
     const activeSeats = b.activeSeats || [];
-    if (activeSeats.length !== 2) {
-      setMsg("Double is only enabled for 2-player games for now.");
+    if (mySeat == null || mySeat !== (b.turnSeat ?? s.current_turn)) return;
+    if (b.dice == null) {
+      setMsg("Roll the dice before doubling");
       return;
     }
-    if (mySeat == null || mySeat !== (b.turnSeat ?? s.current_turn)) return;
     const current = s.current || {};
-    const dbl = current.__double__ || { value: 1, proposed_by: null, awaiting: null };
-    if (dbl.awaiting != null) return;
+    const dbl = current.__double__ || DEFAULT_DOUBLE_STATE;
+    if (dbl.proposed_by != null || dbl.awaiting != null) {
+      setMsg("Another double proposal is pending");
+      return;
+    }
+    if (dbl.locks?.[mySeat]) {
+      setMsg("You already proposed double this round");
+      return;
+    }
 
-    const opponentSeat = activeSeats.find((x) => x !== mySeat);
+    const locks = { ...(dbl.locks || {}), [mySeat]: true };
+    const others = activeSeats.filter((seat) => seat !== mySeat);
+    if (!others.length) {
+      setMsg("No opponent to respond");
+      return;
+    }
+    const [nextSeat, ...rest] = others;
+
     const nextDouble = {
       value: dbl.value || 1,
       proposed_by: mySeat,
-      awaiting: opponentSeat,
+      awaiting: nextSeat,
+      pending: rest,
+      locks,
+      expires_at: Date.now() + 30_000,
     };
 
     const { data, error } = await supabase
@@ -866,7 +884,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
     const s = await fetchSession();
     if (!s || s.stage !== "playing") return;
     const current = s.current || {};
-    const dbl = current.__double__ || { value: 1, proposed_by: null, awaiting: null };
+    const dbl = current.__double__ || { value: 1, proposed_by: null, awaiting: null, locks: {}, expires_at: null };
     if (dbl.awaiting == null || mySeat == null || mySeat !== dbl.awaiting) return;
 
     if (answer === "decline") {
@@ -877,11 +895,42 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
     }
 
     if (answer === "accept") {
-      const nextDouble = {
-        value: (dbl.value || 1) * 2,
-        proposed_by: null,
-        awaiting: null,
-      };
+      const b = s.board_state || {};
+      const activeSeats = b.activeSeats || [];
+      const locks = dbl.locks || {};
+      const pending = dbl.pending || [];
+
+      if (pending.length > 0) {
+        const [nextSeat, ...rest] = pending;
+        const nextDouble = {
+          ...dbl,
+          awaiting: nextSeat,
+          pending: rest,
+          expires_at: Date.now() + 30_000,
+        };
+
+        const { data, error } = await supabase
+          .from("ludo_sessions")
+          .update({
+            current: {
+              ...current,
+              __double__: nextDouble,
+            },
+          })
+          .eq("id", s.id)
+          .select()
+          .single();
+        if (!error && data) {
+          setSes(data);
+        }
+        return;
+      }
+
+      const allLocked = activeSeats.every((seat) => locks[seat]);
+
+      const nextDouble = allLocked
+        ? { ...DEFAULT_DOUBLE_STATE, value: (dbl.value || 1) * 2 }
+        : { ...DEFAULT_DOUBLE_STATE, value: dbl.value || 1, locks };
       const { data, error } = await supabase
         .from("ludo_sessions")
         .update({
@@ -899,6 +948,86 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
     }
   }
 
+  async function handleDoubleTimeout(expiredSeat) {
+    const s = await fetchSession();
+    if (!s || s.stage !== "playing") return;
+    const current = s.current || {};
+    const dbl = current.__double__ || { awaiting: null };
+    if (dbl.awaiting !== expiredSeat) return;
+
+    const b = s.board_state || {};
+    const activeSeats = b.activeSeats || [];
+
+    if (activeSeats.length <= 2) {
+      const winnerSeat = dbl.proposed_by ?? activeSeats.find((seat) => seat !== expiredSeat) ?? null;
+      const nextBoard = { ...b, winner: winnerSeat };
+      await finishGame(nextBoard);
+      return;
+    }
+
+    const updatedActive = activeSeats.filter((seat) => seat !== expiredSeat);
+    const nextBoard = {
+      ...b,
+      activeSeats: updatedActive,
+      pieces: { ...(b.pieces || {}) },
+      finished: { ...(b.finished || {}) },
+    };
+    delete nextBoard.pieces[String(expiredSeat)];
+    delete nextBoard.finished[String(expiredSeat)];
+    if (!updatedActive.includes(nextBoard.turnSeat)) {
+      nextBoard.turnSeat = updatedActive[0] ?? null;
+    }
+
+    const nextDouble = { ...DEFAULT_DOUBLE_STATE, value: dbl.value || 1 };
+    const nextCurrent = { ...current, __double__: nextDouble };
+
+    const { data, error } = await supabase
+      .from("ludo_sessions")
+      .update({
+        board_state: nextBoard,
+        current_turn: nextBoard.turnSeat,
+        turn_deadline:
+          nextBoard.turnSeat != null ? new Date(Date.now() + TURN_SECONDS * 1000).toISOString() : null,
+        current: nextCurrent,
+      })
+      .eq("id", s.id)
+      .select()
+      .single();
+    if (!error && data) {
+      setSes(data);
+      setMsg(`Seat ${expiredSeat + 1} forfeited double response`);
+    }
+  }
+
+  const board = ses?.board_state || null;
+  const current = ses?.current || {};
+  const doubleState = current.__double__ || DEFAULT_DOUBLE_STATE;
+  useEffect(() => {
+    if (!doubleState.awaiting || !doubleState.expires_at) return undefined;
+    const ms = doubleState.expires_at - Date.now();
+    if (ms <= 0) {
+      handleDoubleTimeout(doubleState.awaiting);
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      handleDoubleTimeout(doubleState.awaiting);
+    }, ms);
+    return () => clearTimeout(timer);
+  }, [doubleState.awaiting, doubleState.expires_at]);
+
+  useEffect(() => {
+    if (!doubleState.awaiting || !doubleState.expires_at) {
+      setDoubleCountdown(null);
+      return undefined;
+    }
+    const update = () => {
+      setDoubleCountdown(Math.max(0, Math.ceil((doubleState.expires_at - Date.now()) / 1000)));
+    };
+    update();
+    const interval = setInterval(update, 500);
+    return () => clearInterval(interval);
+  }, [doubleState.awaiting, doubleState.expires_at]);
+
   if (!roomId) {
     return (
       <div className="w-full h-full grid place-items-center text-white/70 text-sm">
@@ -906,10 +1035,6 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
       </div>
     );
   }
-
-  const board = ses?.board_state || null;
-  const current = ses?.current || {};
-  const doubleState = current.__double__ || { value: 1, proposed_by: null, awaiting: null };
 
   const seats = 4;
   const inMatch = ses?.stage === "playing" && !!board;
@@ -919,6 +1044,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
   );
   const controlBtnBase =
     "inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-full border font-semibold text-[11px] uppercase tracking-wide shadow-md shadow-black/40 transition focus:outline-none focus:ring-2 focus:ring-white/30";
+  const [doubleCountdown, setDoubleCountdown] = useState(null);
 
   return (
     <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: '600px', height: '100%' }}>
@@ -986,6 +1112,12 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
           <div className="flex-shrink-0">
             <DiceDisplay displayValue={diceDisplayValue} rolling={diceRolling} />
           </div>
+          {doubleState.awaiting != null && (
+            <span className="text-amber-200 text-[10px] whitespace-nowrap flex-shrink-0">
+              Waiting Seat {doubleState.awaiting + 1}
+              {doubleCountdown != null ? ` • ${doubleCountdown}s` : ""}
+            </span>
+          )}
           {doubleState.awaiting === mySeat && (
             <>
               <button
@@ -1299,6 +1431,14 @@ const TRACK_RADIUS = 36;
 const SEAT_HEX_COLORS = ["#ef4444", "#38bdf8", "#22c55e", "#fbbf24"];
 const SEAT_COLOR_LABELS = ["RED", "BLUE", "GREEN", "YELLOW"];
 const FINISH_FLASH_MS = 2200;
+const DEFAULT_DOUBLE_STATE = {
+  value: 1,
+  proposed_by: null,
+  awaiting: null,
+  pending: [],
+  locks: {},
+  expires_at: null,
+};
 const YARD_POSITIONS = [
   [
     { x: 6, y: 94 },
