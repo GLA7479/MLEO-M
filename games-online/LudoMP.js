@@ -14,6 +14,7 @@ import {
   LUDO_PIECES_PER_PLAYER,
   LUDO_TRACK_LEN,
   LUDO_HOME_LEN,
+  toGlobalIndex,
 } from "../lib/ludoEngine";
 
 const TURN_SECONDS = Number(process.env.NEXT_PUBLIC_LUDO_TURN_SECONDS || 30);
@@ -1025,10 +1026,6 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
             <div className="flex-1 h-full overflow-hidden" style={{ minHeight: '400px', height: '100%' }}>
               <LudoBoard board={board} onPieceClick={onPieceClick} mySeat={mySeat} showSidebar={!inMatch} />
             </div>
-            <div className="text-[11px] text-white/60">
-              * Images path for dog pieces:&nbsp;
-              <code>/images/ludo/dog_0.png ... dog_3.png</code>
-            </div>
           </>
         ) : (
           <div className="w-full h-full grid place-items-center text-white/60 text-sm">
@@ -1311,6 +1308,54 @@ function LudoVsBot({ vault }) {
 // ===== Helpers for board projection =====
 const START_OFFSETS = [0, 13, 26, 39]; // נקודת התחלה לכל צבע על המסלול
 const BOARD_SIZE_EXPR = "min(520px, 92vw, 70vh)";
+const TRACK_RADIUS = 36;
+const SEAT_HEX_COLORS = ["#ef4444", "#38bdf8", "#22c55e", "#fbbf24"];
+
+function projectGlobalTrackCell(globalIndex) {
+  const safeIdx = ((globalIndex % LUDO_TRACK_LEN) + LUDO_TRACK_LEN) % LUDO_TRACK_LEN;
+  const angle = (safeIdx / LUDO_TRACK_LEN) * 2 * Math.PI;
+  const x = 50 + TRACK_RADIUS * Math.cos(angle);
+  const y = 50 + TRACK_RADIUS * Math.sin(angle);
+  return { x, y };
+}
+
+function describePieceProgress(seat, pos) {
+  const totalPath = LUDO_TRACK_LEN + LUDO_HOME_LEN;
+  if (pos < 0) {
+    return {
+      label: "Yard",
+      detail: "Roll 6 to launch",
+      progress: 0,
+      state: "yard",
+    };
+  }
+  if (pos >= totalPath) {
+    return {
+      label: "Finished",
+      detail: "Safe at home",
+      progress: 1,
+      state: "finished",
+    };
+  }
+  const normalizedProgress = Math.min(1, Math.max(0, pos / totalPath));
+  if (pos >= LUDO_TRACK_LEN) {
+    const homeIndex = pos - LUDO_TRACK_LEN;
+    return {
+      label: `Home ${homeIndex + 1}/${LUDO_HOME_LEN}`,
+      detail: `${Math.max(0, LUDO_HOME_LEN - homeIndex - 1)} left`,
+      progress: normalizedProgress,
+      state: "home",
+    };
+  }
+  const globalIndex = toGlobalIndex(seat, pos);
+  return {
+    label: `Track ${globalIndex != null ? globalIndex + 1 : pos + 1}`,
+    detail: `${totalPath - pos} steps to finish`,
+    progress: normalizedProgress,
+    globalIndex,
+    state: "track",
+  };
+}
 
 function projectPieceOnBoard(seat, pos) {
   if (pos < 0) {
@@ -1330,19 +1375,60 @@ function projectPieceOnBoard(seat, pos) {
 
   const offset = START_OFFSETS[seat] ?? 0;
   const globalIndex = (offset + pos) % LUDO_TRACK_LEN;
-  const angle = (globalIndex / LUDO_TRACK_LEN) * 2 * Math.PI;
+  const point = projectGlobalTrackCell(globalIndex);
 
-  const radius = 36;
-  const x = 50 + radius * Math.cos(angle);
-  const y = 50 + radius * Math.sin(angle);
-
-  return { kind: "track", x, y };
+  return { kind: "track", ...point, globalIndex };
 }
 
 function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
   const active = board.activeSeats || [];
   const pieces = board.pieces || {};
   const colorClasses = ["bg-red-500", "bg-sky-500", "bg-emerald-500", "bg-amber-400"];
+  const trackLayout = useMemo(
+    () =>
+      Array.from({ length: LUDO_TRACK_LEN }, (_, idx) => ({
+        idx,
+        ...projectGlobalTrackCell(idx),
+      })),
+    []
+  );
+  const trackOccupancy = useMemo(() => {
+    const map = new Map();
+    active.forEach((seat) => {
+      const seatPieces = pieces[String(seat)] || [];
+      seatPieces.forEach((pos, pieceIdx) => {
+        if (pos >= 0 && pos < LUDO_TRACK_LEN) {
+          const globalIndex = toGlobalIndex(seat, pos);
+          if (globalIndex != null) {
+            if (!map.has(globalIndex)) map.set(globalIndex, []);
+            map.get(globalIndex).push({ seat, piece: pieceIdx });
+          }
+        }
+      });
+    });
+    return map;
+  }, [active, pieces]);
+  const highlightTargets = useMemo(() => {
+    if (board.turnSeat == null || board.dice == null) return new Set();
+    const result = new Set();
+    const seatPieces = pieces[String(board.turnSeat)] || [];
+    const movable = listMovablePieces(board, board.turnSeat, board.dice);
+    movable.forEach((pieceIdx) => {
+      const pos = seatPieces[pieceIdx];
+      if (pos == null) return;
+      if (pos < 0) {
+        const entryIdx = toGlobalIndex(board.turnSeat, 0);
+        if (entryIdx != null) result.add(entryIdx);
+        return;
+      }
+      const targetPos = pos + board.dice;
+      if (targetPos < LUDO_TRACK_LEN) {
+        const gi = toGlobalIndex(board.turnSeat, targetPos);
+        if (gi != null) result.add(gi);
+      }
+    });
+    return result;
+  }, [board, pieces]);
 
   return (
     <div className="w-full h-full flex flex-col sm:flex-row gap-3" style={{ minHeight: "420px" }}>
@@ -1355,18 +1441,16 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
             height: BOARD_SIZE_EXPR,
           }}
         >
-          {/* רקע מאחורי הכל – אם אין תמונת לוח עדיין תראה משהו */}
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-slate-900 to-black z-0" />
+          {/* שכבות רקע חדשות שמתאימות למסלול המעגלי */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#0f172a] via-[#020617] to-black z-0" />
+          <div className="absolute inset-4 sm:inset-6 rounded-[32px] border border-white/5 bg-white/5 blur-[1px]" />
+          <div className="absolute inset-[9%] rounded-full border border-white/10 bg-black/50 shadow-inner shadow-black/70" />
 
-          {/* תמונת הלוח מעל הרקע */}
-          <img
-            src="/images/ludo/board.png"
-            alt="Ludo board"
-            className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10"
-            onError={(e) => {
-              console.error("Failed to load board image:", e);
-              e.currentTarget.style.display = "none";
-            }}
+          {/* מסלול מעגלי עם אינדיקציות */}
+          <TrackOverlay
+            layout={trackLayout}
+            occupancy={trackOccupancy}
+            highlights={highlightTargets}
           />
 
           {/* החיילים מעל הכל */}
@@ -1378,6 +1462,7 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
 
           return seatPieces.map((pos, idx) => {
             const proj = projectPieceOnBoard(seat, pos);
+            const progressInfo = describePieceProgress(seat, pos);
             if (!proj) return null;
 
             const movable =
@@ -1392,6 +1477,9 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
                 onClick={() => movable && onPieceClick && onPieceClick(idx)}
                 className={`absolute rounded-full border-2 shadow-lg flex items-center justify-center transition-transform z-20 ${
                   movable ? "ring-2 ring-amber-300 scale-105" : ""
+                }`}
+                title={`Piece ${idx + 1} • ${progressInfo.label}${
+                  progressInfo.detail ? ` • ${progressInfo.detail}` : ""
                 }`}
                 style={{
                   left: `${proj.x}%`,
@@ -1426,12 +1514,12 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
                       // אם אין תמונה – תשאר עיגול צבעוני
                       e.currentTarget.style.display = "none";
                     }}
-                    onLoad={(e) => {
-                      console.log(`Piece image loaded for seat ${seat}:`, imgSrc, e.target.width, e.target.height);
-                      e.target.style.opacity = "1";
-                      e.target.style.visibility = "visible";
-                    }}
                   />
+                  {progressInfo?.globalIndex != null && (
+                    <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[8px] font-mono text-white drop-shadow">
+                      {progressInfo.globalIndex + 1}
+                    </span>
+                  )}
                 </div>
               </button>
             );
@@ -1465,27 +1553,33 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
               </div>
               <div className="flex flex-wrap gap-1 mt-1">
                 {seatPieces.map((pos, idx) => {
-                  const inYard = pos < 0;
-                  const finished =
-                    pos >= LUDO_TRACK_LEN + LUDO_HOME_LEN ||
-                    board.finished?.[String(seat)] >= LUDO_PIECES_PER_PLAYER;
-                  const label = inYard ? "Yard" : finished ? "Home" : `Pos ${pos}`;
-
+                  const progressInfo = describePieceProgress(seat, pos);
                   const movableIndices =
                     board.dice != null ? listMovablePieces(board, seat, board.dice) : [];
                   const pieceCanClick = isMine && movableIndices.includes(idx);
+                  const progressPercent = Math.round((progressInfo.progress || 0) * 100);
 
                   return (
                     <button
                       key={idx}
                       onClick={() => pieceCanClick && onPieceClick && onPieceClick(idx)}
-                      className={`px-2 py-[2px] rounded border text-[10px] flex flex-col text-left ${
+                      className={`px-2 py-1 rounded border text-[10px] flex flex-col gap-0.5 text-left transition ${
                         pieceCanClick
                           ? "border-white/60 bg-white/10 hover:bg-white/20"
                           : "border-white/20 bg-white/5"
                       }`}
                     >
-                      Piece {idx + 1}: {label}
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold">Piece {idx + 1}</span>
+                        <span className="text-white/60 text-[9px]">{progressInfo.label}</span>
+                      </div>
+                      <span className="text-white/50 text-[9px]">{progressInfo.detail}</span>
+                      <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-white/70"
+                          style={{ width: `${progressPercent}%` }}
+                        />
+                      </div>
                     </button>
                   );
                 })}
@@ -1495,6 +1589,49 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
         })}
       </div>
       )}
+    </div>
+  );
+}
+
+function TrackOverlay({ layout, occupancy, highlights }) {
+  if (!layout?.length) return null;
+  return (
+    <div className="absolute inset-0 pointer-events-none z-10">
+      <div className="absolute inset-[12%] rounded-full border border-white/10" />
+      {layout.map(({ idx, x, y }) => {
+        const occupants = occupancy?.get(idx) || [];
+        const seatColor =
+          occupants.length > 0 ? SEAT_HEX_COLORS[occupants[0].seat] || "white" : "rgba(255,255,255,0.4)";
+        const size = occupants.length >= 2 ? 12 : occupants.length === 1 ? 9 : 6;
+        const isHighlighted = highlights?.has(idx);
+        const showLabel = idx % 4 === 0;
+        return (
+          <div
+            key={idx}
+            className="absolute flex flex-col items-center gap-0.5 transition-all duration-200"
+            style={{
+              left: `${x}%`,
+              top: `${y}%`,
+              transform: "translate(-50%, -50%)",
+            }}
+          >
+            <div
+              className={`rounded-full shadow ${isHighlighted ? "ring-2 ring-amber-300" : ""}`}
+              style={{
+                width: size,
+                height: size,
+                backgroundColor: seatColor,
+                opacity: isHighlighted ? 1 : occupants.length ? 0.85 : 0.35,
+              }}
+            />
+            {showLabel && (
+              <span className="text-[8px] font-mono text-white/45">
+                {idx + 1}
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
