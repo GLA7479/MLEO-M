@@ -1625,6 +1625,8 @@ function TrackOverlay({ layout, occupancy, highlights }) {
           occupants.length > 0 ? SEAT_HEX_COLORS[occupants[0].seat] || "white" : "rgba(255,255,255,0.4)";
         const size = occupants.length >= 2 ? 12 : occupants.length === 1 ? 9 : 6;
         const isHighlighted = highlights?.has(idx);
+        const labelColor =
+          occupants.length > 0 ? SEAT_HEX_COLORS[occupants[0].seat] || "#ffffff" : "rgba(255,255,255,0.75)";
         const dx = x - 50;
         const dy = y - 50;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -1652,11 +1654,12 @@ function TrackOverlay({ layout, occupancy, highlights }) {
               />
             </div>
             <span
-              className="absolute text-[15px] sm:text-[17px] font-bold text-white drop-shadow pointer-events-none select-none"
+              className="absolute text-[15px] sm:text-[17px] font-bold drop-shadow pointer-events-none select-none"
               style={{
                 left: `${labelX}%`,
                 top: `${labelY}%`,
                 transform: "translate(-50%, -50%)",
+                color: labelColor,
               }}
             >
               {idx + 1}
