@@ -1868,7 +1868,7 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true, disableHig
                 type="button"
                 onClick={() => movable && onPieceClick && onPieceClick(idx)}
                 className={`absolute flex items-center justify-center transition-transform z-20 ${
-                  movable ? "ring-2 ring-amber-300 scale-105" : ""
+                  movable ? "animate-pulse scale-105" : ""
                 }`}
                 title={`Piece ${idx + 1} • ${progressInfo.label}${
                   progressInfo.detail ? ` • ${progressInfo.detail}` : ""
@@ -1876,8 +1876,8 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true, disableHig
                 style={{
                   left: `${proj.x}%`,
                   top: `${proj.y}%`,
-                  width: "9%",
-                  height: "9%",
+                  width: "10.8%",
+                  height: "10.8%",
                   minWidth: '32px',
                   minHeight: '32px',
                   transform: "translate(-50%, -50%)",
