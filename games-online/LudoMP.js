@@ -48,6 +48,11 @@ function readVault() {
   const rush = safeRead("mleo_rush_core_v4", {});
   return Math.max(0, Number(rush.vault || 0));
 }
+function currentVaultBalance(externalValue) {
+  const val = Number(externalValue);
+  if (!Number.isNaN(val) && val > 0) return val;
+  return readVault();
+}
 function writeVault(nextValue) {
   const rush = safeRead("mleo_rush_core_v4", {});
   rush.vault = Math.max(0, Math.floor(Number(nextValue || 0)));
@@ -149,7 +154,27 @@ export default function LudoMP({ roomId, playerName, vault, setVaultBoth, tierCo
 
 function LudoOnline({ roomId, playerName, vault, tierCode }) {
   const name = playerName || "Guest";
-  const clientId = useMemo(() => getClientId(), []);
+  const baseClientIdRef = useRef(getClientId());
+  const clientId = useMemo(() => {
+    if (typeof window === "undefined") return baseClientIdRef.current;
+    try {
+      const SESSION_KEY = "mleo_ludo_tab_id";
+      let tabId = sessionStorage.getItem(SESSION_KEY);
+      if (!tabId) {
+        const suffix =
+          window.name && window.name.startsWith("mleo-ludo-tab-")
+            ? window.name
+            : `mleo-ludo-tab-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
+        tabId = suffix;
+        sessionStorage.setItem(SESSION_KEY, tabId);
+        window.name = suffix;
+      }
+      return `${baseClientIdRef.current}::${tabId}`;
+    } catch (err) {
+      console.warn("LudoMP tab id error:", err);
+      return baseClientIdRef.current;
+    }
+  }, []);
   const minRequired = MIN_BUYIN_OPTIONS[tierCode] ?? 0;
 
   const [ses, setSes] = useState(null);
@@ -173,9 +198,88 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
   const myRow = players.find((p) => p.client_id === clientId) || null;
   const mySeat = myRow?.seat_index ?? null;
 
-  // sessions channel
+  const ensureSession = useCallback(
+    async (room) => {
+      // 1) מנסים למצוא כל ה-sessions של החדר הזה
+      const { data: rows, error: fetchErr } = await supabase
+        .from("ludo_sessions")
+        .select("*")
+        .eq("room_id", room)
+        .order("id", { ascending: true });
+
+      if (fetchErr) {
+        console.error("ensureSession fetchErr:", fetchErr);
+      }
+
+      if (rows && rows.length > 0) {
+        // תמיד עובדים רק עם ה-session הראשון (הוותיק)
+        const primary = rows[0];
+        const extraIds = rows.slice(1).map((r) => r.id);
+
+        // אם בטעות נוצרו עוד sessions לאותו חדר – מעבירים אליהם שחקנים ומוחקים אותם
+        if (extraIds.length > 0) {
+          try {
+            // מעבירים את כל השחקנים לשורה הראשית
+            await supabase
+              .from("ludo_players")
+              .update({ session_id: primary.id })
+              .in("session_id", extraIds);
+
+            // מוחקים את ה-sessions המיותרים
+            await supabase
+              .from("ludo_sessions")
+              .delete()
+              .in("id", extraIds);
+          } catch (mergeErr) {
+            console.error("ensureSession mergeErr:", mergeErr);
+          }
+        }
+
+        return primary;
+      }
+
+      // 2) אם אין בכלל session לחדר הזה – יוצרים אחד חדש
+      const baseSession = {
+        room_id: room,
+        stage: "lobby",
+        seat_count: 4,
+        board_state: null,
+        current: {
+          __double__: { value: 1, proposed_by: null, awaiting: null },
+          __entry__: MIN_BUYIN_OPTIONS[tierCode] ?? 0,
+          __result__: null,
+        },
+        current_turn: null,
+        turn_deadline: null,
+      };
+
+      const { data: inserted, error: insertErr } = await supabase
+        .from("ludo_sessions")
+        .insert(baseSession)
+        .select()
+        .single();
+
+      if (insertErr && !inserted) {
+        // במקרה של מירוץ (race) – מישהו אחר כבר יצר session → לוקחים את הוותיק
+        console.error("ensureSession insertErr:", insertErr);
+        const { data: rows2 } = await supabase
+          .from("ludo_sessions")
+          .select("*")
+          .eq("room_id", room)
+          .order("id", { ascending: true });
+        return rows2?.[0] ?? null;
+      }
+
+      return inserted;
+    },
+    [tierCode]
+  );
+
+  // sessions channel – תמיד עובדים רק עם ה-session הראשי לחדר (ensureSession)
   useEffect(() => {
     if (!roomId) return;
+
+    let cancelled = false;
 
     const ch = supabase
       .channel("ludo_sessions:" + roomId)
@@ -188,12 +292,11 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
           filter: `room_id=eq.${roomId}`,
         },
         async () => {
-          const { data } = await supabase
-            .from("ludo_sessions")
-            .select("*")
-            .eq("room_id", roomId)
-            .maybeSingle();
-          setSes(data || null);
+          // בכל שינוי – דואגים שקיים רק session אחד ומעדכנים את כולם עליו
+          const primary = await ensureSession(roomId);
+          if (!cancelled) {
+            setSes(primary || null);
+          }
         }
       )
       .on("presence", { event: "sync" }, () => {
@@ -203,20 +306,20 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
-          const { data } = await supabase
-            .from("ludo_sessions")
-            .select("*")
-            .eq("room_id", roomId)
-            .maybeSingle();
-          setSes(data || null);
+          // גם בעת החיבור הראשון – מאחדים sessions לחדר ומחזירים את הראשי
+          const primary = await ensureSession(roomId);
+          if (!cancelled) {
+            setSes(primary || null);
+          }
           await ch.track({ player_name: name, online_at: new Date().toISOString() });
         }
       });
 
     return () => {
+      cancelled = true;
       ch.unsubscribe();
     };
-  }, [roomId, name]);
+  }, [roomId, name, ensureSession]);
 
   // players channel
   useEffect(() => {
@@ -303,49 +406,13 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
       .eq("id", ses.id);
   }
 
-  const ensureSession = useCallback(
-    async (room) => {
-      const { data: upserted, error } = await supabase
-        .from("ludo_sessions")
-        .upsert(
-          {
-            room_id: room,
-            stage: "lobby",
-            seat_count: 4,
-            board_state: null,
-            current: {
-              __double__: { value: 1, proposed_by: null, awaiting: null },
-              __entry__: MIN_BUYIN_OPTIONS[tierCode] ?? 0,
-              __result__: null,
-            },
-            current_turn: null,
-            turn_deadline: null,
-          },
-          { onConflict: "room_id", ignoreDuplicates: false }
-        )
-        .select()
-        .single();
-      if (error && error.code !== "23505") {
-        throw error;
-      }
-      if (upserted) return upserted;
-      const { data: existing } = await supabase
-        .from("ludo_sessions")
-        .select("*")
-        .eq("room_id", room)
-        .single();
-      return existing;
-    },
-    [tierCode]
-  );
-
   const takeSeat = useCallback(
     async (seatIndex) => {
-      if (!clientId) {
+    if (!clientId) {
         setMsg("Client not recognized");
         return;
       }
-      if (readVault() < minRequired) {
+      if (currentVaultBalance(vault) < minRequired) {
         setMsg(`Minimum buy-in is ${fmt(minRequired)}`);
         return;
       }
@@ -354,6 +421,17 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
         session = await ensureSession(roomId);
         setSes(session);
       }
+      // אם הגענו לפה ועדיין אין session -> נצא עם הודעה במקום לקרוס
+      if (!session || !session.id) {
+        setMsg("Failed to create or load game session");
+        return;
+      }
+      // אם קיימות רשומות ישנות עם ה-ID הישן (ללא סיומת), נעדכן אותן ל-ID של הטאב הנוכחי
+      await supabase
+        .from("ludo_players")
+        .update({ client_id: clientId })
+        .eq("session_id", session.id)
+        .eq("client_id", baseClientIdRef.current);
       const { data: occupied } = await supabase
         .from("ludo_players")
         .select("id,client_id")
@@ -385,6 +463,20 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
             client_id: clientId,
           });
       }
+
+      // 🔴 רענון לוקאלי של רשימת השחקנים – גם בלי Realtime
+      const { data: updatedPlayers, error: playersErr } = await supabase
+        .from("ludo_players")
+        .select("*")
+        .eq("session_id", session.id)
+        .order("seat_index");
+
+      if (playersErr) {
+        console.error("takeSeat fetch players error:", playersErr);
+      } else {
+        setPlayers(updatedPlayers || []);
+      }
+
       setMsg("");
     },
     [clientId, ensureSession, minRequired, name, roomId, ses]
@@ -405,24 +497,51 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
       return;
     }
     if (!ses?.id) return;
-    const seated = players.filter((p) => p.seat_index != null);
+
+    // 🟣 שלב 1: לקרוא רשימת שחקנים עדכנית מה-DB (לא מה-state המקומי)
+    const { data: freshPlayers, error: freshErr } = await supabase
+      .from("ludo_players")
+      .select("*")
+      .eq("session_id", ses.id)
+      .order("seat_index");
+
+    if (freshErr) {
+      console.error("startGame freshPlayers error:", freshErr);
+      setMsg("Failed to read players from server");
+      return;
+    }
+
+    // לעדכן גם את ה-state, כדי שהמסך יהיה מסונכרן
+    setPlayers(freshPlayers || []);
+
+    const seated = (freshPlayers || []).filter((p) => p.seat_index != null);
+
     if (seated.length < 2) {
       setMsg("Need at least 2 players seated");
       return;
     }
-    const vaultNow = readVault();
+
+    const vaultNow = currentVaultBalance(vault);
+    const minRequired = MIN_BUYIN_OPTIONS[tierCode] ?? 0;
+
     if (vaultNow < minRequired) {
       setMsg(`Need at least ${fmt(minRequired)} in vault`);
       return;
     }
-    const activeSeats = seated.map((p) => p.seat_index).sort((a, b) => a - b);
-    const initialBoard = createInitialBoard(activeSeats);
-    const entry = MIN_BUYIN_OPTIONS[tierCode] ?? 0;
 
+    // 🟣 שלב 2: קביעת ה-seats הפעילים
+    const activeSeats = [...new Set(seated.map((p) => p.seat_index))].sort(
+      (a, b) => a - b
+    );
+    const initialBoard = createInitialBoard(activeSeats);
+    const entry = minRequired;
+
+    // 🟣 שלב 3: הורדת הבאי-אין מהארנק למי שמחובר מהמכשיר הזה
     if (mySeat != null && vaultNow >= entry) {
       writeVault(vaultNow - entry);
     }
 
+    // 🟣 שלב 4: עדכון session ל-"playing"
     const { data, error } = await supabase
       .from("ludo_sessions")
       .update({
@@ -441,12 +560,13 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
       .single();
 
     if (error) {
+      console.error("startGame update session error:", error);
       setMsg(error.message || "Failed to start game");
     } else {
       setSes(data);
       setMsg("");
     }
-  }, [isLeader, ses?.id, players, minRequired, tierCode, mySeat]);
+  }, [isLeader, ses?.id, vault, tierCode, mySeat]);
 
   async function doRoll() {
     const s = await fetchSession();
