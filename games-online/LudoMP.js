@@ -1490,12 +1490,6 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
             const proj = projectPieceOnBoard(seat, pos, idx);
             const progressInfo = describePieceProgress(seat, pos);
             if (!proj) return null;
-            const dx = proj.x - 50;
-            const dy = proj.y - 50;
-            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            const labelDist = dist + 8;
-            const labelX = 50 + (dx / dist) * labelDist;
-            const labelY = 50 + (dy / dist) * labelDist;
 
             const movable =
               isMe &&
@@ -1503,66 +1497,52 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
               listMovablePieces(board, seat, board.dice).includes(idx);
 
             return (
-              <Fragment key={`${seat}-${idx}`}>
-                <button
-                  type="button"
-                  onClick={() => movable && onPieceClick && onPieceClick(idx)}
-                  className={`absolute rounded-full border-2 shadow-lg flex items-center justify-center transition-transform z-20 ${
-                    movable ? "ring-2 ring-amber-300 scale-105" : ""
-                  }`}
-                  title={`Piece ${idx + 1} • ${progressInfo.label}${
-                    progressInfo.detail ? ` • ${progressInfo.detail}` : ""
-                  }`}
-                  style={{
-                    left: `${proj.x}%`,
-                    top: `${proj.y}%`,
-                    width: "9%",
-                    height: "9%",
-                    minWidth: '32px',
-                    minHeight: '32px',
-                    transform: "translate(-50%, -50%)",
-                    zIndex: 20,
-                    position: 'absolute'
-                  }}
-                >
-                  <div className={`w-full h-full rounded-full overflow-hidden ${cls}`} style={{ position: 'relative', zIndex: 21 }}>
-                    <img
-                      src={imgSrc}
-                      alt="piece"
-                      className="w-full h-full object-cover"
-                      style={{ 
-                        opacity: 1,
-                        visibility: 'visible',
-                        display: 'block',
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        zIndex: 21
-                      }}
-                      onError={(e) => {
-                        console.error(`Failed to load piece image for seat ${seat}:`, imgSrc, e);
-                        // אם אין תמונה – תשאר עיגול צבעוני
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  </div>
-                </button>
-                {progressInfo?.globalIndex != null && (
-                  <span
-                    className="absolute text-[14px] sm:text-[16px] font-semibold text-white drop-shadow pointer-events-none select-none"
-                    style={{
-                      left: `${labelX}%`,
-                      top: `${labelY}%`,
-                      transform: "translate(-50%, -50%)",
-                      zIndex: 19,
+              <button
+                key={`${seat}-${idx}`}
+                type="button"
+                onClick={() => movable && onPieceClick && onPieceClick(idx)}
+                className={`absolute rounded-full border-2 shadow-lg flex items-center justify-center transition-transform z-20 ${
+                  movable ? "ring-2 ring-amber-300 scale-105" : ""
+                }`}
+                title={`Piece ${idx + 1} • ${progressInfo.label}${
+                  progressInfo.detail ? ` • ${progressInfo.detail}` : ""
+                }`}
+                style={{
+                  left: `${proj.x}%`,
+                  top: `${proj.y}%`,
+                  width: "9%",
+                  height: "9%",
+                  minWidth: '32px',
+                  minHeight: '32px',
+                  transform: "translate(-50%, -50%)",
+                  zIndex: 20,
+                  position: 'absolute'
+                }}
+              >
+                <div className={`w-full h-full rounded-full overflow-hidden ${cls}`} style={{ position: 'relative', zIndex: 21 }}>
+                  <img
+                    src={imgSrc}
+                    alt="piece"
+                    className="w-full h-full object-cover"
+                    style={{ 
+                      opacity: 1,
+                      visibility: 'visible',
+                      display: 'block',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      zIndex: 21
                     }}
-                  >
-                    {progressInfo.globalIndex + 1}
-                  </span>
-                )}
-              </Fragment>
+                    onError={(e) => {
+                      console.error(`Failed to load piece image for seat ${seat}:`, imgSrc, e);
+                      // אם אין תמונה – תשאר עיגול צבעוני
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                </div>
+              </button>
             );
           });
           })}
