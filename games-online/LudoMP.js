@@ -598,14 +598,20 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
   async function doRoll() {
     const s = await fetchSession();
     if (!s || s.stage !== "playing") return;
+
     const b = s.board_state || {};
     const turnSeat = b.turnSeat ?? s.current_turn;
+
+    // רק מי שבתורו זורק
     if (mySeat == null || mySeat !== turnSeat) return;
+
+    // כבר יש קובייה? אי אפשר שוב
     if (b.dice != null) return;
 
     const dice = 1 + Math.floor(Math.random() * 6);
     const next = { ...b, dice, lastDice: dice };
 
+    // קודם שומרים את מצב הקובייה ב-DB
     const { data, error } = await supabase
       .from("ludo_sessions")
       .update({
@@ -616,8 +622,20 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
       .select()
       .single();
 
-    if (!error && data) {
-      setSes(data);
+    if (error) {
+      console.error("doRoll error:", error);
+      return;
+    }
+
+    // מעדכנים state מקומי
+    setSes(data);
+
+    // בודקים אם יש בכלל מהלך חוקי עם הקובייה הזו
+    const moves = listMovablePieces(next, turnSeat, dice);
+
+    if (!moves.length) {
+      // אין שום כלי שיכול לזוז -> מעבירים תור מיד
+      await endTurn(next);
     }
   }
 
