@@ -942,12 +942,12 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
             <button
               key={idx}
               onClick={() => takeSeat(idx)}
-              className={`border rounded-md px-3 py-2 sm:px-2 sm:py-1 flex flex-col items-center justify-center ${
+              className={`border rounded-md px-2 py-1 flex flex-col items-center justify-center ${
                 isMe ? "bg-emerald-600/40 border-emerald-400" : "bg-black/40 border-white/20"
               }`}
             >
-              <span className="font-semibold text-sm sm:text-xs">Seat {idx}</span>
-              <span className="text-white/70 text-xs sm:text-[11px]">
+              <span className="font-semibold">Seat {idx}</span>
+              <span className="text-white/70">
                 {row?.player_name || "Empty"}
                 {isMe ? " (You)" : ""}
               </span>
@@ -961,14 +961,14 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
         {mySeat != null && (
           <button
             onClick={leaveSeat}
-            className="px-4 py-2 sm:px-3 sm:py-1 rounded bg-red-600/80 hover:bg-red-500 text-sm sm:text-xs"
+            className="px-3 py-1 rounded bg-red-600/80 hover:bg-red-500"
           >
             Leave seat
           </button>
         )}
         <button
           onClick={startGame}
-          className="px-4 py-2 sm:px-3 sm:py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 text-sm sm:text-xs"
+          className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500"
         >
           Start game
         </button>
@@ -982,7 +982,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
               board?.turnSeat !== mySeat ||
               board?.dice != null
             }
-            className="px-4 py-2 sm:px-3 sm:py-1 rounded bg-blue-600/80 hover:bg-blue-500 disabled:bg-gray-600/60 text-sm sm:text-xs"
+            className="px-3 py-1 rounded bg-blue-600/80 hover:bg-blue-500 disabled:bg-gray-600/60"
           >
             Roll ({board?.dice ?? "-"})
           </button>
@@ -990,7 +990,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
         <button
           onClick={offerDouble}
           disabled={!canOfferDouble}
-          className="px-4 py-2 sm:px-3 sm:py-1 rounded bg-yellow-500/80 hover:bg-yellow-400 disabled:bg-gray-600/60 text-sm sm:text-xs"
+          className="px-3 py-1 rounded bg-yellow-500/80 hover:bg-yellow-400 disabled:bg-gray-600/60"
         >
           Double x{doubleState.value ?? 1}
         </button>
@@ -998,13 +998,13 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
           <>
             <button
               onClick={() => respondDouble("accept")}
-              className="px-4 py-2 sm:px-3 sm:py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 text-sm sm:text-xs"
+              className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500"
             >
               Accept
             </button>
             <button
               onClick={() => respondDouble("decline")}
-              className="px-4 py-2 sm:px-3 sm:py-1 rounded bg-red-600/80 hover:bg-red-500 text-sm sm:text-xs"
+              className="px-3 py-1 rounded bg-red-600/80 hover:bg-red-500"
             >
               Decline
             </button>
@@ -1013,7 +1013,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
       </div>
 
       {/* Status */}
-      <div className="text-xs text-white/80 bg-black/40 rounded px-4 py-2 sm:px-3 sm:py-1">
+      <div className="text-xs text-white/80 bg-black/40 rounded px-3 py-1">
         {statusText}
         {msg && <span className="ml-2 text-amber-300">{msg}</span>}
       </div>
@@ -1024,6 +1024,10 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
           <>
             <div className="flex-1 h-full overflow-hidden" style={{ minHeight: '400px', height: '100%' }}>
               <LudoBoard board={board} onPieceClick={onPieceClick} mySeat={mySeat} showSidebar={!inMatch} />
+            </div>
+            <div className="text-[11px] text-white/60">
+              * Images path for dog pieces:&nbsp;
+              <code>/images/ludo/dog_0.png ... dog_3.png</code>
             </div>
           </>
         ) : (
@@ -1306,7 +1310,7 @@ function LudoVsBot({ vault }) {
 
 // ===== Helpers for board projection =====
 const START_OFFSETS = [0, 13, 26, 39]; // נקודת התחלה לכל צבע על המסלול
-const BOARD_SIZE_EXPR = "min(520px, 95vw)";
+const BOARD_SIZE_EXPR = "min(520px, 92vw, 70vh)";
 
 function projectPieceOnBoard(seat, pos) {
   if (pos < 0) {
@@ -1438,7 +1442,7 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
 
       {/* פאנל מצב עבור כל Seat */}
       {showSidebar && (
-      <div className="w-full sm:w-56 flex flex-col gap-2 text-xs mt-2 sm:mt-0">
+      <div className="w-full sm:w-56 flex flex-col gap-2 text-xs">
         {active.map((seat) => {
           const seatPieces = pieces[String(seat)] || [];
           const cls = colorClasses[seat] || "bg-white";
