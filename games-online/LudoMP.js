@@ -1462,6 +1462,7 @@ function LudoVsBot({ vault, onBackToMode }) {
 const START_OFFSETS = [0, 13, 26, 39]; // נקודת התחלה לכל צבע על המסלול
 const BOARD_SIZE_EXPR = "clamp(520px, min(96vw, 96vh), 820px)";
 const TRACK_RADIUS = 36;
+const TRACK_ANGLE_OFFSET = (5 * Math.PI) / 4; // 225° מבטיח שהכניסה קרובה לשחקן
 const SEAT_HEX_COLORS = ["#ef4444", "#38bdf8", "#22c55e", "#fbbf24"];
 const SEAT_COLOR_LABELS = ["RED", "BLUE", "GREEN", "YELLOW"];
 const FINISH_FLASH_MS = 2200;
@@ -1485,10 +1486,10 @@ function lightenColor(hex, factor = 0.25) {
 }
 const YARD_POSITIONS = [
   [
-    { x: 6, y: 94 },
-    { x: 14, y: 94 },
-    { x: 6, y: 86 },
-    { x: 14, y: 86 },
+    { x: 6, y: 6 },
+    { x: 14, y: 6 },
+    { x: 6, y: 14 },
+    { x: 14, y: 14 },
   ],
   [
     { x: 86, y: 6 },
@@ -1497,22 +1498,22 @@ const YARD_POSITIONS = [
     { x: 94, y: 14 },
   ],
   [
-    { x: 6, y: 6 },
-    { x: 14, y: 6 },
-    { x: 6, y: 14 },
-    { x: 14, y: 14 },
-  ],
-  [
     { x: 86, y: 86 },
     { x: 94, y: 86 },
     { x: 86, y: 94 },
     { x: 94, y: 94 },
   ],
+  [
+    { x: 6, y: 94 },
+    { x: 14, y: 94 },
+    { x: 6, y: 86 },
+    { x: 14, y: 86 },
+  ],
 ];
 
 function projectGlobalTrackCell(globalIndex) {
   const safeIdx = ((globalIndex % LUDO_TRACK_LEN) + LUDO_TRACK_LEN) % LUDO_TRACK_LEN;
-  const angle = (safeIdx / LUDO_TRACK_LEN) * 2 * Math.PI;
+  const angle = (safeIdx / LUDO_TRACK_LEN) * 2 * Math.PI + TRACK_ANGLE_OFFSET;
   const x = 50 + TRACK_RADIUS * Math.cos(angle);
   const y = 50 + TRACK_RADIUS * Math.sin(angle);
   return { x, y };
