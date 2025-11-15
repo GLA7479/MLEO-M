@@ -1812,14 +1812,19 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true, disableHig
           <div className="absolute inset-0 bg-gradient-to-br from-[#0f172a] via-[#020617] to-black z-0" />
           <div className="absolute inset-4 sm:inset-6 rounded-[32px] border border-white/5 bg-white/5 blur-[1px]" />
           <div className="absolute inset-[9%] rounded-full border border-white/10 bg-black/50 shadow-inner shadow-black/70" />
-          <img
-            src="/images/ludo/board.png"
-            alt="Ludo board"
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[64%] sm:w-[70%] h-[64%] sm:h-[70%] rounded-[28px] object-contain pointer-events-none opacity-95"
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
-            }}
-          />
+         <img
+  src="/images/ludo/board.png"
+  alt="Ludo board"
+  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[28px] object-contain pointer-events-none opacity-95"
+  style={{
+    width: "70%",   // תוכל לשחק: 55, 50, 45...
+    height: "70%",
+  }}
+  onError={(e) => {
+    e.currentTarget.style.display = "none";
+  }}
+/>
+
 
           {/* מסלול מעגלי עם אינדיקציות */}
           <TrackOverlay
