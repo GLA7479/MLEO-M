@@ -1110,7 +1110,11 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
             Double x{doubleState.value ?? 1}
           </button>
           <div className="flex-shrink-0">
-            <DiceDisplay displayValue={diceDisplayValue} rolling={diceRolling} />
+            <DiceDisplay
+              displayValue={diceDisplayValue}
+              rolling={diceRolling}
+              seat={board?.dice != null ? board?.turnSeat : liveTurnSeat}
+            />
           </div>
           {doubleState.awaiting != null && (
             <span className="text-amber-200 text-[10px] whitespace-nowrap flex-shrink-0">
@@ -1399,7 +1403,11 @@ function LudoVsBot({ vault }) {
         >
           Roll ({board.dice ?? "-"})
         </button>
-        <DiceDisplay displayValue={diceDisplayValue} rolling={diceRolling} />
+        <DiceDisplay
+          displayValue={diceDisplayValue}
+          rolling={diceRolling}
+          seat={board.dice != null ? board.turnSeat : board.turnSeat}
+        />
       </div>
 
       <div className="text-xs text-white/80 bg-black/40 rounded px-3 py-2 flex items-center justify-between gap-2">
@@ -1439,6 +1447,16 @@ const DEFAULT_DOUBLE_STATE = {
   locks: {},
   expires_at: null,
 };
+
+function lightenColor(hex, factor = 0.25) {
+  const normalized = hex?.replace("#", "") ?? "ffffff";
+  if (normalized.length !== 6) return hex || "#ffffff";
+  const num = parseInt(normalized, 16);
+  const r = Math.min(255, Math.round(((num >> 16) & 0xff) + (255 - ((num >> 16) & 0xff)) * factor));
+  const g = Math.min(255, Math.round(((num >> 8) & 0xff) + (255 - ((num >> 8) & 0xff)) * factor));
+  const b = Math.min(255, Math.round((num & 0xff) + (255 - (num & 0xff)) * factor));
+  return `rgb(${r}, ${g}, ${b})`;
+}
 const YARD_POSITIONS = [
   [
     { x: 6, y: 94 },
@@ -1625,17 +1643,26 @@ function useFinishFlash(activeSeats, pieces) {
   );
 }
 
-function DiceDisplay({ displayValue, rolling }) {
+function DiceDisplay({ displayValue, rolling, seat }) {
   const dots = displayValue ?? 1;
+  const color = SEAT_HEX_COLORS[seat] || "#f8fafc";
+  const highlight = lightenColor(color, 0.45);
 
   return (
     <div className="flex items-center gap-1 sm:gap-2 text-white">
-      <div
-        className={`relative w-8 h-8 sm:w-10 sm:h-10 rounded-xl border-2 border-white/40 bg-black/70 grid place-items-center transition ${
-          rolling ? "animate-pulse" : ""
-        }`}
-      >
-        <span className="text-base sm:text-lg font-semibold">{dots}</span>
+      <div className="relative w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0">
+        <div
+          className={`absolute inset-0 rounded-2xl border-2 shadow-lg shadow-black/40 transition ${
+            rolling ? "animate-pulse" : ""
+          }`}
+          style={{
+            borderColor: color,
+            background: `linear-gradient(145deg, ${highlight}, ${color})`,
+          }}
+        />
+        <span className="absolute inset-0 flex items-center justify-center text-lg sm:text-xl font-black text-black drop-shadow">
+          {dots}
+        </span>
       </div>
       <span className="text-[10px] uppercase tracking-wide text-white/80">
         {rolling ? "Rolling..." : "Dice"}
@@ -1658,6 +1685,16 @@ function projectPieceOnBoard(seat, pos, pieceIndex = 0) {
 
   if (pos >= LUDO_TRACK_LEN + LUDO_HOME_LEN) {
     return { kind: "home", x: 50, y: 50 };
+  }
+
+  if (pos >= LUDO_TRACK_LEN) {
+    const entryIdx = START_OFFSETS[seat] ?? 0;
+    const entryPoint = projectGlobalTrackCell(entryIdx);
+    const homeIndex = pos - LUDO_TRACK_LEN; // 0..5
+    const t = (homeIndex + 1) / (LUDO_HOME_LEN + 1);
+    const x = entryPoint.x + (50 - entryPoint.x) * t;
+    const y = entryPoint.y + (50 - entryPoint.y) * t;
+    return { kind: "home-stretch", x, y };
   }
 
   const offset = START_OFFSETS[seat] ?? 0;
@@ -1734,7 +1771,6 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true, disableHig
     return result;
   }, [board, pieces]);
   const effectiveHighlights = disableHighlights ? new Set() : highlightTargets;
-
   return (
     <div className="w-full h-full flex flex-col sm:flex-row gap-3" style={{ minHeight: "420px" }}>
       {/* לוח מרכזי */}
@@ -1791,6 +1827,14 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true, disableHig
               isMe &&
               board.dice != null &&
               listMovablePieces(board, seat, board.dice).includes(idx);
+            let stageText = "";
+            if (progressInfo.state === "track" && progressInfo.globalIndex != null) {
+              stageText = String(progressInfo.globalIndex + 1);
+            } else if (progressInfo.state === "home") {
+              stageText = `H${Math.max(1, pos - LUDO_TRACK_LEN + 1)}`;
+            } else if (progressInfo.state === "yard") {
+              stageText = "Y";
+            }
 
             return (
               <button
@@ -1837,6 +1881,14 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true, disableHig
                       e.currentTarget.style.display = "none";
                     }}
                   />
+                  {stageText && (
+                    <span
+                      className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-black drop-shadow pointer-events-none select-none"
+                      style={{ zIndex: 24 }}
+                    >
+                      {stageText}
+                    </span>
+                  )}
                 </div>
               </button>
             );
@@ -2034,6 +2086,14 @@ function LudoBoardLocal({ board, mySeat, onPieceClick }) {
             const movableIndices =
               board.dice != null ? listMovablePieces(board, seat, board.dice) : [];
             const pieceCanClick = isPlayer && movableIndices.includes(idx);
+            let stageText = "";
+            if (progressInfo.state === "track" && progressInfo.globalIndex != null) {
+              stageText = String(progressInfo.globalIndex + 1);
+            } else if (progressInfo.state === "home") {
+              stageText = `H${Math.max(1, pos - LUDO_TRACK_LEN + 1)}`;
+            } else if (progressInfo.state === "yard") {
+              stageText = "Y";
+            }
 
             return (
               <button
@@ -2063,6 +2123,14 @@ function LudoBoardLocal({ board, mySeat, onPieceClick }) {
                         e.currentTarget.style.display = "none";
                       }}
                     />
+                    {stageText && (
+                      <span
+                        className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-black drop-shadow pointer-events-none select-none"
+                        style={{ zIndex: 24 }}
+                      >
+                        {stageText}
+                      </span>
+                    )}
                   </div>
                 </div>
               </button>
