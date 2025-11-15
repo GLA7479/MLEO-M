@@ -936,7 +936,8 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
   return (
     <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: '600px', height: '100%' }}>
       {/* Seats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+      <div className="w-full overflow-x-auto">
+        <div className="flex gap-2 text-[11px] min-w-[480px]">
         {Array.from({ length: seats }).map((_, idx) => {
           const row = seatMap.get(idx) || null;
           const isMe = row?.client_id === clientId;
@@ -945,7 +946,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
             <button
               key={idx}
               onClick={() => takeSeat(idx)}
-              className={`border rounded-md px-2 py-1 flex flex-col items-center justify-center text-xs font-semibold transition ${
+              className={`border rounded-md px-2 py-1 flex flex-col items-center justify-center text-xs font-semibold transition flex-1 ${
                 isMe
                   ? "border-white shadow-inner shadow-white/50"
                   : "border-white/30 shadow"
@@ -956,7 +957,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
                 textShadow: "0 1px 2px rgba(0,0,0,0.7)",
               }}
             >
-              <span className="font-semibold">{formatSeatLabel(idx)}</span>
+              <span className="font-semibold">{`Seat ${idx + 1}`}</span>
               <span className="text-white/70">
                 {row?.player_name || "Empty"}
                 {isMe ? " (You)" : ""}
@@ -964,6 +965,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
             </button>
           );
         })}
+        </div>
       </div>
 
       {/* Controls */}
@@ -1690,7 +1692,7 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className={`w-3 h-3 rounded-full ${cls}`} />
-                  <span className="font-semibold">{formatSeatLabel(seat)}</span>
+                  <span className="font-semibold">{`Seat ${seat + 1}`}</span>
                 </div>
                 <span className="text-white/60 text-[11px]">
                   {board.turnSeat === seat ? "Turn" : ""}
