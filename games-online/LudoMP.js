@@ -1088,11 +1088,11 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
           )}
         </div>
 
-        <div className="w-full text-xs flex flex-col gap-2">
-          <div className="flex justify-end items-center flex-wrap gap-2">
-            {msg && <span className="text-amber-300">{msg}</span>}
+        <div className="w-full text-xs flex flex-col gap-2 items-center">
+          <div className="flex justify-center items-center flex-wrap gap-2">
+            {msg && <span className="text-amber-300 text-center">{msg}</span>}
           </div>
-          <div className="flex gap-2 items-center w-full overflow-x-auto">
+          <div className="flex gap-2 items-center justify-center w-full flex-wrap">
             {mySeat != null && (
               <button
                 onClick={leaveSeat}
