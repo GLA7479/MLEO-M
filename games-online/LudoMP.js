@@ -915,14 +915,15 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
     if (!ses) return "Loading...";
     if (ses.stage === "lobby") return "Waiting in lobby";
     if (ses.stage === "playing") {
-      if (board?.winner != null) return `Winner: seat ${board.winner}`;
+      if (board?.winner != null) return `Winner: ${formatSeatLabel(board.winner)}`;
       const turnSeat = board?.turnSeat ?? ses.current_turn;
-      return `Turn: Seat ${turnSeat} | Dice: ${board?.dice ?? "-"}`;
+      const seatLabel = formatSeatLabel(turnSeat);
+      return `Turn: ${seatLabel} | Dice: ${board?.dice ?? "-"}`;
     }
     if (ses.stage === "finished") {
       const res = current.__result__;
       if (res?.winner != null) {
-        return `Game finished. Winner seat ${res.winner}, payout x${res.multiplier ?? 1}`;
+        return `Game finished. Winner ${formatSeatLabel(res.winner)}, payout x${res.multiplier ?? 1}`;
       }
       return "Game finished.";
     }
@@ -939,15 +940,23 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
         {Array.from({ length: seats }).map((_, idx) => {
           const row = seatMap.get(idx) || null;
           const isMe = row?.client_id === clientId;
+          const seatColor = SEAT_HEX_COLORS[idx] || "rgba(255,255,255,0.1)";
           return (
             <button
               key={idx}
               onClick={() => takeSeat(idx)}
-              className={`border rounded-md px-2 py-1 flex flex-col items-center justify-center ${
-                isMe ? "bg-emerald-600/40 border-emerald-400" : "bg-black/40 border-white/20"
+              className={`border rounded-md px-2 py-1 flex flex-col items-center justify-center text-xs font-semibold transition ${
+                isMe
+                  ? "border-white shadow-inner shadow-white/50"
+                  : "border-white/30 shadow"
               }`}
+              style={{
+                background: `linear-gradient(135deg, ${seatColor}dd, ${seatColor}aa)`,
+                color: "white",
+                textShadow: "0 1px 2px rgba(0,0,0,0.7)",
+              }}
             >
-              <span className="font-semibold">Seat {idx}</span>
+              <span className="font-semibold">{formatSeatLabel(idx)}</span>
               <span className="text-white/70">
                 {row?.player_name || "Empty"}
                 {isMe ? " (You)" : ""}
@@ -1310,6 +1319,8 @@ const START_OFFSETS = [0, 13, 26, 39]; // נקודת התחלה לכל צבע ע
 const BOARD_SIZE_EXPR = "min(680px, 98vw, 90vh)";
 const TRACK_RADIUS = 36;
 const SEAT_HEX_COLORS = ["#ef4444", "#38bdf8", "#22c55e", "#fbbf24"];
+const SEAT_COLOR_LABELS = ["RED", "BLUE", "GREEN", "YELLOW"];
+const FINISH_FLASH_MS = 2200;
 const YARD_POSITIONS = [
   [
     { x: 6, y: 94 },
@@ -1383,6 +1394,90 @@ function describePieceProgress(seat, pos) {
   };
 }
 
+function formatSeatLabel(seat) {
+  if (seat == null || Number.isNaN(seat)) return "Seat ?";
+  const idx = Math.max(0, Number(seat));
+  const seatNumber = idx + 1;
+  const color = SEAT_COLOR_LABELS[idx];
+  return color ? `Seat ${seatNumber} — ${color}` : `Seat ${seatNumber}`;
+}
+
+function useFinishFlash(activeSeats, pieces) {
+  const prevPositionsRef = useRef(new Map());
+  const finishFlashRef = useRef(new Map());
+  const finishTimeoutsRef = useRef(new Map());
+  const [, forceFlashTick] = useState(0);
+
+  const positionsSignature = useMemo(() => {
+    return activeSeats
+      .map((seat) => {
+        const arr = pieces[String(seat)] || [];
+        return `${seat}:${arr.join(",")}`;
+      })
+      .join("|");
+  }, [activeSeats, pieces]);
+
+  useEffect(() => {
+    const totalPath = LUDO_TRACK_LEN + LUDO_HOME_LEN;
+    const prev = prevPositionsRef.current;
+    const next = new Map();
+    const newFinishes = [];
+
+    activeSeats.forEach((seat) => {
+      const seatPieces = pieces[String(seat)] || [];
+      seatPieces.forEach((pos, idx) => {
+        const key = `${seat}-${idx}`;
+        next.set(key, pos);
+        const prevPos = prev.get(key);
+        if ((prevPos == null || prevPos < totalPath) && pos >= totalPath) {
+          newFinishes.push(key);
+        }
+      });
+    });
+
+    prevPositionsRef.current = next;
+
+    newFinishes.forEach((key) => {
+      if (finishFlashRef.current.has(key)) return;
+      finishFlashRef.current.set(key, true);
+      forceFlashTick((n) => n + 1);
+      const timeoutId = setTimeout(() => {
+        finishFlashRef.current.delete(key);
+        finishTimeoutsRef.current.delete(key);
+        forceFlashTick((n) => n + 1);
+      }, FINISH_FLASH_MS);
+      finishTimeoutsRef.current.set(key, timeoutId);
+    });
+
+    Array.from(finishFlashRef.current.keys()).forEach((key) => {
+      const pos = next.get(key);
+      if (pos == null || pos < totalPath) {
+        finishFlashRef.current.delete(key);
+        const timeoutId = finishTimeoutsRef.current.get(key);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          finishTimeoutsRef.current.delete(key);
+        }
+      }
+    });
+  }, [positionsSignature, activeSeats, pieces]);
+
+  useEffect(() => {
+    return () => {
+      finishTimeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
+      finishTimeoutsRef.current.clear();
+    };
+  }, []);
+
+  return useCallback(
+    (seat, idx, isFinished) => {
+      if (!isFinished) return true;
+      return finishFlashRef.current.has(`${seat}-${idx}`);
+    },
+    []
+  );
+}
+
 function projectPieceOnBoard(seat, pos, pieceIndex = 0) {
   if (pos < 0) {
     const yardOptions = YARD_POSITIONS[seat];
@@ -1410,6 +1505,7 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
   const active = board.activeSeats || [];
   const pieces = board.pieces || {};
   const colorClasses = ["bg-red-500", "bg-sky-500", "bg-emerald-500", "bg-amber-400"];
+  const shouldRenderFinishedPiece = useFinishFlash(active, pieces);
   const trackLayout = useMemo(
     () =>
       Array.from({ length: LUDO_TRACK_LEN }, (_, idx) => ({
@@ -1515,6 +1611,10 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
             const proj = projectPieceOnBoard(seat, pos, idx);
             const progressInfo = describePieceProgress(seat, pos);
             if (!proj) return null;
+            const isFinished = progressInfo.state === "finished";
+            if (!shouldRenderFinishedPiece(seat, idx, isFinished)) {
+              return null;
+            }
 
             const movable =
               isMe &&
@@ -1590,7 +1690,7 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className={`w-3 h-3 rounded-full ${cls}`} />
-                  <span className="font-semibold">Seat {seat}</span>
+                  <span className="font-semibold">{formatSeatLabel(seat)}</span>
                 </div>
                 <span className="text-white/60 text-[11px]">
                   {board.turnSeat === seat ? "Turn" : ""}
@@ -1719,6 +1819,7 @@ function LudoBoardLocal({ board, mySeat, onPieceClick }) {
   const colorClasses = ["bg-red-500", "bg-sky-500"];
 
   const seats = [0, 1]; // אתה + בוט
+  const shouldRenderFinishedPiece = useFinishFlash(seats, pieces);
 
   return (
     <div className="w-full h-full flex flex-col sm:flex-row gap-3">
@@ -1746,6 +1847,11 @@ function LudoBoardLocal({ board, mySeat, onPieceClick }) {
 
           return seatPieces.map((pos, idx) => {
             const proj = projectPieceOnBoard(seat, pos, idx);
+            const progressInfo = describePieceProgress(seat, pos);
+            const isFinished = progressInfo.state === "finished";
+            if (!shouldRenderFinishedPiece(seat, idx, isFinished)) {
+              return null;
+            }
 
             // חישוב אם החייל הזה חוקי להזזה עם הקובייה הנוכחית
             const movableIndices =
