@@ -387,6 +387,28 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
     };
   }, [ses?.id]);
 
+  // 🔵 Auto-roll: בכל פעם שזה התור שלי ואין קובייה – זורק אוטומטית אחרי השהייה קצרה
+  useEffect(() => {
+    if (!ses || ses.stage !== "playing") return;
+
+    const b = ses.board_state || {};
+    const turnSeat = b.turnSeat ?? ses.current_turn;
+
+    // רק אם זה התור שלי
+    if (mySeat == null || mySeat !== turnSeat) return;
+
+    // אם כבר יש dice – לא לזרוק שוב
+    if (b.dice != null) return;
+
+    // השהייה קטנה לפני הזריקה (כדי שמי שעוקב יראה שהגיע תור חדש)
+    const timer = setTimeout(() => {
+      // אותה פונקציית doRoll קיימת כבר למעלה
+      doRoll();
+    }, 800); // אם אתה רוצה 2 שניות – תחליף ל-2000
+
+    return () => clearTimeout(timer);
+  }, [ses?.id, ses?.stage, ses?.board_state, ses?.current_turn, mySeat]);
+
   async function fetchSession() {
     if (!ses?.id) return null;
     const { data, error } = await supabase
@@ -950,19 +972,21 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
         >
           Start game
         </button>
-        <button
-          onClick={doRoll}
-          disabled={
-            !ses ||
-            ses.stage !== "playing" ||
-            mySeat == null ||
-            board?.turnSeat !== mySeat ||
-            board?.dice != null
-          }
-          className="px-3 py-1 rounded bg-blue-600/80 hover:bg-blue-500 disabled:bg-gray-600/60"
-        >
-          Roll ({board?.dice ?? "-"})
-        </button>
+        {false && (
+          <button
+            onClick={doRoll}
+            disabled={
+              !ses ||
+              ses.stage !== "playing" ||
+              mySeat == null ||
+              board?.turnSeat !== mySeat ||
+              board?.dice != null
+            }
+            className="px-3 py-1 rounded bg-blue-600/80 hover:bg-blue-500 disabled:bg-gray-600/60"
+          >
+            Roll ({board?.dice ?? "-"})
+          </button>
+        )}
         <button
           onClick={offerDouble}
           disabled={!canOfferDouble}
