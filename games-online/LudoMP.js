@@ -4,7 +4,7 @@
 //  - Vs Bot (local, 1v1)
 // Uses lib/ludoEngine.js
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 import {
   createInitialBoard,
@@ -1307,9 +1307,35 @@ function LudoVsBot({ vault }) {
 
 // ===== Helpers for board projection =====
 const START_OFFSETS = [0, 13, 26, 39]; // נקודת התחלה לכל צבע על המסלול
-const BOARD_SIZE_EXPR = "min(520px, 92vw, 70vh)";
+const BOARD_SIZE_EXPR = "min(680px, 98vw, 90vh)";
 const TRACK_RADIUS = 36;
 const SEAT_HEX_COLORS = ["#ef4444", "#38bdf8", "#22c55e", "#fbbf24"];
+const YARD_POSITIONS = [
+  [
+    { x: 18, y: 82 },
+    { x: 28, y: 82 },
+    { x: 18, y: 92 },
+    { x: 28, y: 92 },
+  ],
+  [
+    { x: 72, y: 18 },
+    { x: 82, y: 18 },
+    { x: 72, y: 8 },
+    { x: 82, y: 8 },
+  ],
+  [
+    { x: 18, y: 18 },
+    { x: 28, y: 18 },
+    { x: 18, y: 8 },
+    { x: 28, y: 8 },
+  ],
+  [
+    { x: 72, y: 82 },
+    { x: 82, y: 82 },
+    { x: 72, y: 92 },
+    { x: 82, y: 92 },
+  ],
+];
 
 function projectGlobalTrackCell(globalIndex) {
   const safeIdx = ((globalIndex % LUDO_TRACK_LEN) + LUDO_TRACK_LEN) % LUDO_TRACK_LEN;
@@ -1357,16 +1383,16 @@ function describePieceProgress(seat, pos) {
   };
 }
 
-function projectPieceOnBoard(seat, pos) {
+function projectPieceOnBoard(seat, pos, pieceIndex = 0) {
   if (pos < 0) {
-    const base = [
-      { x: 20, y: 80 }, // seat 0
-      { x: 80, y: 20 }, // seat 1
-      { x: 20, y: 20 }, // seat 2
-      { x: 80, y: 80 }, // seat 3
-    ][seat] || { x: 50, y: 50 };
-
-    return { kind: "yard", x: base.x, y: base.y };
+    const yardOptions = YARD_POSITIONS[seat];
+    if (yardOptions && yardOptions.length) {
+      const yardPoint = yardOptions[pieceIndex % yardOptions.length];
+      if (yardPoint) {
+        return { kind: "yard", x: yardPoint.x, y: yardPoint.y };
+      }
+    }
+    return { kind: "yard", x: 50, y: 50 };
   }
 
   if (pos >= LUDO_TRACK_LEN + LUDO_HOME_LEN) {
@@ -1461,9 +1487,15 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
           const imgSrc = `/images/ludo/dog_${seat}.png`;
 
           return seatPieces.map((pos, idx) => {
-            const proj = projectPieceOnBoard(seat, pos);
+            const proj = projectPieceOnBoard(seat, pos, idx);
             const progressInfo = describePieceProgress(seat, pos);
             if (!proj) return null;
+            const dx = proj.x - 50;
+            const dy = proj.y - 50;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const labelDist = dist + 8;
+            const labelX = 50 + (dx / dist) * labelDist;
+            const labelY = 50 + (dy / dist) * labelDist;
 
             const movable =
               isMe &&
@@ -1471,57 +1503,66 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
               listMovablePieces(board, seat, board.dice).includes(idx);
 
             return (
-              <button
-                key={`${seat}-${idx}`}
-                type="button"
-                onClick={() => movable && onPieceClick && onPieceClick(idx)}
-                className={`absolute rounded-full border-2 shadow-lg flex items-center justify-center transition-transform z-20 ${
-                  movable ? "ring-2 ring-amber-300 scale-105" : ""
-                }`}
-                title={`Piece ${idx + 1} • ${progressInfo.label}${
-                  progressInfo.detail ? ` • ${progressInfo.detail}` : ""
-                }`}
-                style={{
-                  left: `${proj.x}%`,
-                  top: `${proj.y}%`,
-                  width: "9%",
-                  height: "9%",
-                  minWidth: '32px',
-                  minHeight: '32px',
-                  transform: "translate(-50%, -50%)",
-                  zIndex: 20,
-                  position: 'absolute'
-                }}
-              >
-                <div className={`w-full h-full rounded-full overflow-hidden ${cls}`} style={{ position: 'relative', zIndex: 21 }}>
-                  <img
-                    src={imgSrc}
-                    alt="piece"
-                    className="w-full h-full object-cover"
-                    style={{ 
-                      opacity: 1,
-                      visibility: 'visible',
-                      display: 'block',
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: '100%',
-                      zIndex: 21
+              <Fragment key={`${seat}-${idx}`}>
+                <button
+                  type="button"
+                  onClick={() => movable && onPieceClick && onPieceClick(idx)}
+                  className={`absolute rounded-full border-2 shadow-lg flex items-center justify-center transition-transform z-20 ${
+                    movable ? "ring-2 ring-amber-300 scale-105" : ""
+                  }`}
+                  title={`Piece ${idx + 1} • ${progressInfo.label}${
+                    progressInfo.detail ? ` • ${progressInfo.detail}` : ""
+                  }`}
+                  style={{
+                    left: `${proj.x}%`,
+                    top: `${proj.y}%`,
+                    width: "9%",
+                    height: "9%",
+                    minWidth: '32px',
+                    minHeight: '32px',
+                    transform: "translate(-50%, -50%)",
+                    zIndex: 20,
+                    position: 'absolute'
+                  }}
+                >
+                  <div className={`w-full h-full rounded-full overflow-hidden ${cls}`} style={{ position: 'relative', zIndex: 21 }}>
+                    <img
+                      src={imgSrc}
+                      alt="piece"
+                      className="w-full h-full object-cover"
+                      style={{ 
+                        opacity: 1,
+                        visibility: 'visible',
+                        display: 'block',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        zIndex: 21
+                      }}
+                      onError={(e) => {
+                        console.error(`Failed to load piece image for seat ${seat}:`, imgSrc, e);
+                        // אם אין תמונה – תשאר עיגול צבעוני
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  </div>
+                </button>
+                {progressInfo?.globalIndex != null && (
+                  <span
+                    className="absolute text-[14px] sm:text-[16px] font-semibold text-white drop-shadow pointer-events-none select-none"
+                    style={{
+                      left: `${labelX}%`,
+                      top: `${labelY}%`,
+                      transform: "translate(-50%, -50%)",
+                      zIndex: 19,
                     }}
-                    onError={(e) => {
-                      console.error(`Failed to load piece image for seat ${seat}:`, imgSrc, e);
-                      // אם אין תמונה – תשאר עיגול צבעוני
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                  {progressInfo?.globalIndex != null && (
-                    <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[8px] font-mono text-white drop-shadow">
-                      {progressInfo.globalIndex + 1}
-                    </span>
-                  )}
-                </div>
-              </button>
+                  >
+                    {progressInfo.globalIndex + 1}
+                  </span>
+                )}
+              </Fragment>
             );
           });
           })}
@@ -1604,32 +1645,43 @@ function TrackOverlay({ layout, occupancy, highlights }) {
           occupants.length > 0 ? SEAT_HEX_COLORS[occupants[0].seat] || "white" : "rgba(255,255,255,0.4)";
         const size = occupants.length >= 2 ? 12 : occupants.length === 1 ? 9 : 6;
         const isHighlighted = highlights?.has(idx);
-        const showLabel = idx % 4 === 0;
+        const dx = x - 50;
+        const dy = y - 50;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const labelDist = dist + 7;
+        const labelX = 50 + (dx / dist) * labelDist;
+        const labelY = 50 + (dy / dist) * labelDist;
         return (
-          <div
-            key={idx}
-            className="absolute flex flex-col items-center gap-0.5 transition-all duration-200"
-            style={{
-              left: `${x}%`,
-              top: `${y}%`,
-              transform: "translate(-50%, -50%)",
-            }}
-          >
+          <Fragment key={idx}>
             <div
-              className={`rounded-full shadow ${isHighlighted ? "ring-2 ring-amber-300" : ""}`}
+              className="absolute flex flex-col items-center gap-0.5 transition-all duration-200"
               style={{
-                width: size,
-                height: size,
-                backgroundColor: seatColor,
-                opacity: isHighlighted ? 1 : occupants.length ? 0.85 : 0.35,
+                left: `${x}%`,
+                top: `${y}%`,
+                transform: "translate(-50%, -50%)",
               }}
-            />
-            {showLabel && (
-              <span className="text-[8px] font-mono text-white/45">
-                {idx + 1}
-              </span>
-            )}
-          </div>
+            >
+              <div
+                className={`rounded-full shadow ${isHighlighted ? "ring-2 ring-amber-300" : ""}`}
+                style={{
+                  width: size,
+                  height: size,
+                  backgroundColor: seatColor,
+                  opacity: isHighlighted ? 1 : occupants.length ? 0.85 : 0.35,
+                }}
+              />
+            </div>
+            <span
+              className="absolute text-[15px] sm:text-[17px] font-bold text-white drop-shadow pointer-events-none select-none"
+              style={{
+                left: `${labelX}%`,
+                top: `${labelY}%`,
+                transform: "translate(-50%, -50%)",
+              }}
+            >
+              {idx + 1}
+            </span>
+          </Fragment>
         );
       })}
     </div>
@@ -1667,7 +1719,7 @@ function LudoBoardLocal({ board, mySeat, onPieceClick }) {
           const isPlayer = seat === mySeat;
 
           return seatPieces.map((pos, idx) => {
-            const proj = projectPieceOnBoard(seat, pos);
+            const proj = projectPieceOnBoard(seat, pos, idx);
 
             // חישוב אם החייל הזה חוקי להזזה עם הקובייה הנוכחית
             const movableIndices =
