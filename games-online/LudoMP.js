@@ -1817,8 +1817,8 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true, disableHig
   alt="Ludo board"
   className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[28px] object-contain pointer-events-none opacity-95"
   style={{
-    width: "70%",   // תוכל לשחק: 55, 50, 45...
-    height: "70%",
+    width: "75%",   // תוכל לשחק: 55, 50, 45...
+    height: "75%",
   }}
   onError={(e) => {
     e.currentTarget.style.display = "none";
