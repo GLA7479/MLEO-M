@@ -914,6 +914,8 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
   const seats = 4;
   const inMatch = ses?.stage === "playing" && !!board;
   const liveTurnSeat = board?.turnSeat ?? ses?.current_turn ?? null;
+  const controlBtnBase =
+    "inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-full border font-semibold text-[11px] uppercase tracking-wide shadow-md shadow-black/40 transition focus:outline-none focus:ring-2 focus:ring-white/30";
 
   return (
     <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: '600px', height: '100%' }}>
@@ -960,21 +962,21 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
           {mySeat != null && (
             <button
               onClick={leaveSeat}
-              className="px-3 py-1 rounded bg-red-600/80 hover:bg-red-500 whitespace-nowrap flex-shrink-0"
+              className={`${controlBtnBase} border-red-300/70 bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 whitespace-nowrap flex-shrink-0`}
             >
               Leave seat
             </button>
           )}
           <button
             onClick={startGame}
-            className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 whitespace-nowrap flex-shrink-0"
+            className={`${controlBtnBase} border-emerald-300/70 bg-gradient-to-r from-emerald-600 to-lime-500 hover:from-emerald-500 hover:to-lime-400 whitespace-nowrap flex-shrink-0`}
           >
             Start game
           </button>
           <button
             onClick={offerDouble}
             disabled={!canOfferDouble}
-            className="px-3 py-1 rounded bg-yellow-500/80 hover:bg-yellow-400 disabled:bg-gray-600/60 whitespace-nowrap flex-shrink-0"
+            className={`${controlBtnBase} border-amber-300/70 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex-shrink-0`}
           >
             Double x{doubleState.value ?? 1}
           </button>
