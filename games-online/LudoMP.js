@@ -2056,7 +2056,7 @@ function TrackOverlay({ layout, occupancy, highlights, homeSegments }) {
               />
             </div>
             <span
-              className="absolute text-[8px] sm:text-[14px] font-bold drop-shadow pointer-events-none select-none"
+              className="absolute text-[10px] sm:text-[16px] font-bold drop-shadow pointer-events-none select-none"
               style={{
                 left: `${labelX}%`,
                 top: `${labelY}%`,
