@@ -968,66 +968,51 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="flex flex-wrap gap-2 items-center text-xs">
-        {mySeat != null && (
-          <button
-            onClick={leaveSeat}
-            className="px-3 py-1 rounded bg-red-600/80 hover:bg-red-500"
-          >
-            Leave seat
-          </button>
-        )}
-        <button
-          onClick={startGame}
-          className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500"
-        >
-          Start game
-        </button>
-        {false && (
-          <button
-            onClick={doRoll}
-            disabled={
-              !ses ||
-              ses.stage !== "playing" ||
-              mySeat == null ||
-              board?.turnSeat !== mySeat ||
-              board?.dice != null
-            }
-            className="px-3 py-1 rounded bg-blue-600/80 hover:bg-blue-500 disabled:bg-gray-600/60"
-          >
-            Roll ({board?.dice ?? "-"})
-          </button>
-        )}
-        <button
-          onClick={offerDouble}
-          disabled={!canOfferDouble}
-          className="px-3 py-1 rounded bg-yellow-500/80 hover:bg-yellow-400 disabled:bg-gray-600/60"
-        >
-          Double x{doubleState.value ?? 1}
-        </button>
-        {doubleState.awaiting === mySeat && (
-          <>
+      {/* Status + Controls */}
+      <div className="w-full bg-black/50 rounded-lg px-3 py-2 text-xs flex flex-col gap-2">
+        <div className="text-white/80 flex justify-between items-center flex-wrap gap-1">
+          <span>{statusText}</span>
+          {msg && <span className="text-amber-300">{msg}</span>}
+        </div>
+        <div className="flex gap-2 items-center w-full overflow-x-auto">
+          {mySeat != null && (
             <button
-              onClick={() => respondDouble("accept")}
-              className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500"
+              onClick={leaveSeat}
+              className="px-3 py-1 rounded bg-red-600/80 hover:bg-red-500 whitespace-nowrap flex-shrink-0"
             >
-              Accept
+              Leave seat
             </button>
-            <button
-              onClick={() => respondDouble("decline")}
-              className="px-3 py-1 rounded bg-red-600/80 hover:bg-red-500"
-            >
-              Decline
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Status */}
-      <div className="text-xs text-white/80 bg-black/40 rounded px-3 py-1">
-        {statusText}
-        {msg && <span className="ml-2 text-amber-300">{msg}</span>}
+          )}
+          <button
+            onClick={startGame}
+            className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 whitespace-nowrap flex-shrink-0"
+          >
+            Start game
+          </button>
+          <button
+            onClick={offerDouble}
+            disabled={!canOfferDouble}
+            className="px-3 py-1 rounded bg-yellow-500/80 hover:bg-yellow-400 disabled:bg-gray-600/60 whitespace-nowrap flex-shrink-0"
+          >
+            Double x{doubleState.value ?? 1}
+          </button>
+          {doubleState.awaiting === mySeat && (
+            <>
+              <button
+                onClick={() => respondDouble("accept")}
+                className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 whitespace-nowrap flex-shrink-0"
+              >
+                Accept
+              </button>
+              <button
+                onClick={() => respondDouble("decline")}
+                className="px-3 py-1 rounded bg-red-600/80 hover:bg-red-500 whitespace-nowrap flex-shrink-0"
+              >
+                Decline
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Board */}
