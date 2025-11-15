@@ -953,8 +953,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
 
       {/* Status + Controls */}
       <div className="w-full bg-black/50 rounded-lg px-3 py-2 text-xs flex flex-col gap-2">
-        <div className="flex justify-between items-center flex-wrap gap-2">
-          <DiceDisplay value={board?.dice ?? board?.lastDice ?? null} />
+        <div className="flex justify-end items-center flex-wrap gap-2">
           {msg && <span className="text-amber-300">{msg}</span>}
         </div>
         <div className="flex gap-2 items-center w-full overflow-x-auto">
@@ -979,6 +978,9 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
           >
             Double x{doubleState.value ?? 1}
           </button>
+          <div className="flex-shrink-0">
+            <DiceDisplay value={board?.dice ?? board?.lastDice ?? null} />
+          </div>
           {doubleState.awaiting === mySeat && (
             <>
               <button
@@ -1230,7 +1232,7 @@ function LudoVsBot({ vault }) {
 
   return (
     <div className="w-full h-full flex flex-col gap-2 text-white">
-      <div className="flex gap-2 items-center text-xs">
+      <div className="flex gap-2 items-center text-xs flex-wrap">
         <button
           onClick={startGame}
           disabled={!canStart}
@@ -1251,10 +1253,11 @@ function LudoVsBot({ vault }) {
         >
           Roll ({board.dice ?? "-"})
         </button>
+        <DiceDisplay value={board.dice ?? board.lastDice ?? null} />
       </div>
 
       <div className="text-xs text-white/80 bg-black/40 rounded px-3 py-2 flex items-center justify-between gap-2">
-        <DiceDisplay value={board.dice ?? board.lastDice ?? null} />
+        <div />
         {msg && <span className="text-amber-300">{msg}</span>}
       </div>
 
