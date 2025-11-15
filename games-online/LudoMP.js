@@ -1460,7 +1460,7 @@ function LudoVsBot({ vault, onBackToMode }) {
 
 // ===== Helpers for board projection =====
 const START_OFFSETS = [0, 13, 26, 39]; // נקודת התחלה לכל צבע על המסלול
-const BOARD_SIZE_EXPR = "min(720px, 98vw, 95vh)";
+const BOARD_SIZE_EXPR = "clamp(360px, min(90vw, 90vh), 720px)";
 const TRACK_RADIUS = 36;
 const SEAT_HEX_COLORS = ["#ef4444", "#38bdf8", "#22c55e", "#fbbf24"];
 const SEAT_COLOR_LABELS = ["RED", "BLUE", "GREEN", "YELLOW"];
