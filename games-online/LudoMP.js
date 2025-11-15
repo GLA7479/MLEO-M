@@ -914,6 +914,9 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
   const seats = 4;
   const inMatch = ses?.stage === "playing" && !!board;
   const liveTurnSeat = board?.turnSeat ?? ses?.current_turn ?? null;
+  const { displayValue: diceDisplayValue, rolling: diceRolling } = useDiceRollAnimation(
+    board?.dice ?? board?.lastDice ?? null
+  );
   const controlBtnBase =
     "inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-full border font-semibold text-[11px] uppercase tracking-wide shadow-md shadow-black/40 transition focus:outline-none focus:ring-2 focus:ring-white/30";
 
@@ -981,7 +984,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
             Double x{doubleState.value ?? 1}
           </button>
           <div className="flex-shrink-0">
-            <DiceDisplay value={board?.dice ?? board?.lastDice ?? null} />
+            <DiceDisplay displayValue={diceDisplayValue} rolling={diceRolling} />
           </div>
           {doubleState.awaiting === mySeat && (
             <>
@@ -1007,7 +1010,13 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
         {board ? (
           <>
             <div className="flex-1 h-full overflow-hidden" style={{ minHeight: '400px', height: '100%' }}>
-              <LudoBoard board={board} onPieceClick={onPieceClick} mySeat={mySeat} showSidebar={!inMatch} />
+              <LudoBoard
+                board={board}
+                onPieceClick={onPieceClick}
+                mySeat={mySeat}
+                showSidebar={!inMatch}
+                disableHighlights={diceRolling}
+              />
             </div>
           </>
         ) : (
@@ -1033,6 +1042,9 @@ function LudoVsBot({ vault }) {
   const mySeat = 0;
   const botSeat = 1;
   const playingNow = stage === "playing";
+  const { displayValue: diceDisplayValue, rolling: diceRolling } = useDiceRollAnimation(
+    board.dice ?? board.lastDice ?? null
+  );
 
   const canStart = useMemo(() => {
     return stage === "lobby" && vaultBalance >= buyIn;
@@ -1255,7 +1267,7 @@ function LudoVsBot({ vault }) {
         >
           Roll ({board.dice ?? "-"})
         </button>
-        <DiceDisplay value={board.dice ?? board.lastDice ?? null} />
+        <DiceDisplay displayValue={diceDisplayValue} rolling={diceRolling} />
       </div>
 
       <div className="text-xs text-white/80 bg-black/40 rounded px-3 py-2 flex items-center justify-between gap-2">
@@ -1265,7 +1277,13 @@ function LudoVsBot({ vault }) {
 
       <div className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 overflow-hidden" style={{ minHeight: '500px', height: '100%' }}>
         <div className="w-full h-full" style={{ minHeight: '400px', height: '100%' }}>
-          <LudoBoard board={board} mySeat={mySeat} onPieceClick={onPieceClick} showSidebar={!playingNow} />
+          <LudoBoard
+            board={board}
+            mySeat={mySeat}
+            onPieceClick={onPieceClick}
+            showSidebar={!playingNow}
+            disableHighlights={diceRolling}
+          />
         </div>
       </div>
     </div>
@@ -1467,8 +1485,7 @@ function useFinishFlash(activeSeats, pieces) {
   );
 }
 
-function DiceDisplay({ value }) {
-  const { displayValue, rolling } = useDiceRollAnimation(value);
+function DiceDisplay({ displayValue, rolling }) {
   const dots = displayValue ?? 1;
 
   return (
@@ -1510,7 +1527,7 @@ function projectPieceOnBoard(seat, pos, pieceIndex = 0) {
   return { kind: "track", ...point, globalIndex };
 }
 
-function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
+function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true, disableHighlights = false }) {
   const active = board.activeSeats || [];
   const pieces = board.pieces || {};
   const colorClasses = ["bg-red-500", "bg-sky-500", "bg-emerald-500", "bg-amber-400"];
@@ -1576,6 +1593,7 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
     });
     return result;
   }, [board, pieces]);
+  const effectiveHighlights = disableHighlights ? new Set() : highlightTargets;
 
   return (
     <div className="w-full h-full flex flex-col sm:flex-row gap-3" style={{ minHeight: "420px" }}>
@@ -1605,7 +1623,7 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
           <TrackOverlay
             layout={trackLayout}
             occupancy={trackOccupancy}
-            highlights={highlightTargets}
+            highlights={effectiveHighlights}
             homeSegments={homeSegments}
           />
 
@@ -1621,11 +1639,15 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true }) {
             const progressInfo = describePieceProgress(seat, pos);
             if (!proj) return null;
             const isFinished = progressInfo.state === "finished";
+            if (isFinished) {
+              return null;
+            }
             if (!shouldRenderFinishedPiece(seat, idx, isFinished)) {
               return null;
             }
 
             const movable =
+              !disableHighlights &&
               isMe &&
               board.dice != null &&
               listMovablePieces(board, seat, board.dice).includes(idx);
@@ -1861,6 +1883,9 @@ function LudoBoardLocal({ board, mySeat, onPieceClick }) {
             const proj = projectPieceOnBoard(seat, pos, idx);
             const progressInfo = describePieceProgress(seat, pos);
             const isFinished = progressInfo.state === "finished";
+            if (isFinished) {
+              return null;
+            }
             if (!shouldRenderFinishedPiece(seat, idx, isFinished)) {
               return null;
             }
