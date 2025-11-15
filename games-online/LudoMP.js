@@ -117,24 +117,6 @@ export default function LudoMP({ roomId, playerName, vault, setVaultBoth, tierCo
   // Top-level wrapper with "Back to mode menu" button
   return (
     <div className="w-full h-full flex flex-col text-white">
-      <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-lg text-xs sm:text-sm mb-2">
-        <div className="flex flex-col">
-          <span className="font-semibold">Ludo {mode === "online" ? "Online" : "vs Bot"}</span>
-          {mode === "online" && roomId && (
-            <span className="text-white/60">Room: {roomId.slice(0, 8)}…</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-white/70 text-xs">Vault: {fmt(vault)}</span>
-          <button
-            onClick={() => setMode(null)}
-            className="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-[11px]"
-          >
-            Mode
-          </button>
-        </div>
-      </div>
-
       <div className="flex-1 min-h-0">
         {mode === "online" ? (
           <LudoOnline
@@ -142,9 +124,10 @@ export default function LudoMP({ roomId, playerName, vault, setVaultBoth, tierCo
             playerName={playerName}
             vault={vault}
             tierCode={tierCode}
+            onBackToMode={() => setMode(null)}
           />
         ) : (
-          <LudoVsBot vault={vault} />
+          <LudoVsBot vault={vault} onBackToMode={() => setMode(null)} />
         )}
       </div>
     </div>
@@ -153,7 +136,7 @@ export default function LudoMP({ roomId, playerName, vault, setVaultBoth, tierCo
 
 // =================== ONLINE MULTIPLAYER ===================
 
-function LudoOnline({ roomId, playerName, vault, tierCode }) {
+function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const name = playerName || "Guest";
   const baseClientIdRef = useRef(getClientId());
   const clientId = useMemo(() => {
@@ -177,7 +160,6 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
     }
   }, []);
   const minRequired = MIN_BUYIN_OPTIONS[tierCode] ?? 0;
-
   const [ses, setSes] = useState(null);
   const [players, setPlayers] = useState([]);
   const [roomMembers, setRoomMembers] = useState([]);
@@ -196,6 +178,16 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
     () => new Map(players.map((p) => [p.seat_index, p])),
     [players]
   );
+  const board = ses?.board_state || null;
+  const current = ses?.current || {};
+  const doubleState = current.__double__ || DEFAULT_DOUBLE_STATE;
+  const currentPot = useMemo(() => {
+    if (!current) return minRequired;
+    const dblValue = current.__double__?.value || 1;
+    const entry = current.__entry__ ?? minRequired;
+    const playerCount = board?.activeSeats?.length || 0;
+    return entry * playerCount * dblValue;
+  }, [current, board, minRequired]);
   const myRow = players.find((p) => p.client_id === clientId) || null;
   const mySeat = myRow?.seat_index ?? null;
 
@@ -999,9 +991,6 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
     }
   }
 
-  const board = ses?.board_state || null;
-  const current = ses?.current || {};
-  const doubleState = current.__double__ || DEFAULT_DOUBLE_STATE;
   useEffect(() => {
     if (!doubleState.awaiting || !doubleState.expires_at) return undefined;
     const ms = doubleState.expires_at - Date.now();
@@ -1081,6 +1070,26 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
         })}
         </div>
       </div>
+      {/* Board */}
+      <div className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 flex flex-col gap-2 overflow-hidden" style={{ minHeight: '500px', height: '100%' }}>
+        {board ? (
+          <>
+            <div className="flex-1 h-full overflow-hidden" style={{ minHeight: '400px', height: '100%' }}>
+              <LudoBoard
+                board={board}
+                onPieceClick={onPieceClick}
+                mySeat={mySeat}
+                showSidebar={!inMatch}
+                disableHighlights={diceRolling}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="w-full h-full grid place-items-center text-white/60 text-sm">
+            Game not started yet.
+          </div>
+        )}
+      </div>
 
       {/* Status + Controls */}
       <div className="w-full bg-black/50 rounded-lg px-3 py-2 text-xs flex flex-col gap-2">
@@ -1141,33 +1150,35 @@ function LudoOnline({ roomId, playerName, vault, tierCode }) {
         </div>
       </div>
 
-      {/* Board */}
-      <div className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 flex flex-col gap-2 overflow-hidden" style={{ minHeight: '500px', height: '100%' }}>
-        {board ? (
-          <>
-            <div className="flex-1 h-full overflow-hidden" style={{ minHeight: '400px', height: '100%' }}>
-              <LudoBoard
-                board={board}
-                onPieceClick={onPieceClick}
-                mySeat={mySeat}
-                showSidebar={!inMatch}
-                disableHighlights={diceRolling}
-              />
-            </div>
-          </>
-        ) : (
-          <div className="w-full h-full grid place-items-center text-white/60 text-sm">
-            Game not started yet.
-          </div>
-        )}
+      {/* Footer */}
+      <div className="w-full bg-black/40 rounded-lg px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-col">
+          <span className="font-semibold">Ludo Online</span>
+          {roomId && (
+            <span className="text-white/60">Room: {roomId.slice(0, 8)}…</span>
+          )}
+          <span className="text-white/60">Pot: {fmt(currentPot)} </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-white/70 text-xs">Vault: {fmt(vault)}</span>
+          {onBackToMode && (
+            <button
+              onClick={onBackToMode}
+              className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20 text-xs"
+            >
+              Mode
+            </button>
+          )}
+        </div>
       </div>
+
     </div>
   );
 }
 
 // =================== VS BOT (LOCAL) ===================
 
-function LudoVsBot({ vault }) {
+function LudoVsBot({ vault, onBackToMode }) {
   const [board, setBoard] = useState(() => createInitialBoard([0, 1]));
   const [stage, setStage] = useState("lobby"); // 'lobby' | 'playing' | 'finished'
   const [msg, setMsg] = useState("");
@@ -1424,6 +1435,24 @@ function LudoVsBot({ vault }) {
             showSidebar={!playingNow}
             disableHighlights={diceRolling}
           />
+        </div>
+      </div>
+
+      <div className="w-full bg-black/40 rounded-lg px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-col">
+          <span className="font-semibold">Ludo vs Bot</span>
+          <span className="text-white/60">Buy-in: {fmt(buyIn)}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-white/70 text-xs">Vault: {fmt(readVault())}</span>
+          {onBackToMode && (
+            <button
+              onClick={onBackToMode}
+              className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20 text-xs"
+            >
+              Mode
+            </button>
+          )}
         </div>
       </div>
     </div>
