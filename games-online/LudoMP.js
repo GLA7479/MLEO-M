@@ -208,6 +208,24 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   }, [current, board, minRequired]);
   const myRow = players.find((p) => p.client_id === clientId) || null;
   const mySeat = myRow?.seat_index ?? null;
+  const [diceSeatOwner, setDiceSeatOwner] = useState(null);
+  const dicePresenceRef = useRef(false);
+
+  useEffect(() => {
+    if (!board) {
+      dicePresenceRef.current = false;
+      setDiceSeatOwner(null);
+      return;
+    }
+    const hasDice = board.dice != null;
+    if (hasDice && !dicePresenceRef.current) {
+      setDiceSeatOwner(board.turnSeat ?? liveTurnSeat ?? null);
+    }
+    if (!hasDice && !board.lastDice) {
+      setDiceSeatOwner(null);
+    }
+    dicePresenceRef.current = hasDice;
+  }, [board, liveTurnSeat]);
 
   const ensureSession = useCallback(
     async (room) => {
@@ -1099,7 +1117,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
               disableHighlights={diceRolling}
               diceValue={diceDisplayValue}
               diceRolling={diceRolling}
-              diceSeat={board?.dice != null ? board?.turnSeat : liveTurnSeat}
+              diceSeat={diceSeatOwner ?? board?.turnSeat ?? liveTurnSeat}
             />
           ) : (
             <div className="w-full h-full grid place-items-center text-white/60 text-sm">
@@ -1193,6 +1211,8 @@ function LudoVsBot({ vault, onBackToMode }) {
   const [stage, setStage] = useState("lobby"); // 'lobby' | 'playing' | 'finished'
   const [msg, setMsg] = useState("");
   const [deadline, setDeadline] = useState(null);
+  const [diceSeatOwner, setDiceSeatOwner] = useState(null);
+  const dicePresenceRef = useRef(false);
 
   const buyIn = 1000;
   const vaultBalance = vault;
@@ -1207,6 +1227,17 @@ function LudoVsBot({ vault, onBackToMode }) {
   const canStart = useMemo(() => {
     return stage === "lobby" && vaultBalance >= buyIn;
   }, [stage, vaultBalance, buyIn]);
+
+  useEffect(() => {
+    const hasDice = board.dice != null;
+    if (hasDice && !dicePresenceRef.current) {
+      setDiceSeatOwner(board.turnSeat ?? mySeat);
+    }
+    if (!hasDice && !board.lastDice) {
+      setDiceSeatOwner(null);
+    }
+    dicePresenceRef.current = hasDice;
+  }, [board.dice, board.lastDice, board.turnSeat, mySeat]);
 
   function resetGame() {
     setBoard(createInitialBoard([0, 1]));
@@ -1320,7 +1351,7 @@ function LudoVsBot({ vault, onBackToMode }) {
     if (!board.dice) {
       const dice = 1 + Math.floor(Math.random() * 6);
       setTimeout(() => {
-        setBoard((prev) => ({ ...prev, dice, lastDice: dice }));
+    setBoard((prev) => ({ ...prev, dice, lastDice: dice }));
         setDeadline(Date.now() + TURN_SECONDS * 1000);
       }, 1500);
       return;
@@ -1500,7 +1531,7 @@ function LudoVsBot({ vault, onBackToMode }) {
             disableHighlights={diceRolling}
             diceValue={diceDisplayValue}
             diceRolling={diceRolling}
-            diceSeat={board.dice != null ? board.turnSeat : board.turnSeat}
+            diceSeat={diceSeatOwner ?? board.turnSeat ?? mySeat}
           />
         </div>
 
@@ -1561,6 +1592,8 @@ function LudoLocal({ onBackToMode }) {
   const [stage, setStage] = useState("setup"); // 'setup' | 'playing' | 'finished'
   const [board, setBoard] = useState(() => createInitialBoard([0, 1]));
   const [msg, setMsg] = useState("");
+  const [diceSeatOwner, setDiceSeatOwner] = useState(null);
+  const dicePresenceRef = useRef(false);
 
   useEffect(() => {
     if (stage !== "setup") return;
@@ -1573,6 +1606,17 @@ function LudoLocal({ onBackToMode }) {
     board.dice ?? null,
     board.lastDice ?? null
   );
+
+  useEffect(() => {
+    const hasDice = board.dice != null;
+    if (hasDice && !dicePresenceRef.current) {
+      setDiceSeatOwner(board.turnSeat ?? 0);
+    }
+    if (!hasDice && !board.lastDice) {
+      setDiceSeatOwner(null);
+    }
+    dicePresenceRef.current = hasDice;
+  }, [board.dice, board.lastDice, board.turnSeat]);
 
   function startGame() {
     const seats = Array.from({ length: playerCount }, (_, i) => i);
@@ -1733,7 +1777,7 @@ function LudoLocal({ onBackToMode }) {
             disableHighlights={diceRolling}
             diceValue={diceDisplayValue}
             diceRolling={diceRolling}
-            diceSeat={board.turnSeat ?? 0}
+            diceSeat={diceSeatOwner ?? board.turnSeat ?? 0}
           />
         </div>
 
@@ -1779,13 +1823,6 @@ function LudoLocal({ onBackToMode }) {
             >
               Reset
             </button>
-            <div className="flex-shrink-0">
-              <DiceDisplay
-                displayValue={diceDisplayValue}
-                rolling={diceRolling}
-                seat={board.turnSeat ?? 0}
-              />
-            </div>
           </div>
         </div>
       </div>
