@@ -2284,9 +2284,10 @@ function LudoBoard({
           {/* החיילים מעל הכל */}
           {active.map((seat) => {
           const cls = colorClasses[seat] || "bg-white";
-          const seatPieces = pieces[String(seat)] || [];
-          const isMe = seat === mySeat;
-          const imgSrc = `/images/ludo/dog_${seat}.png`;
+        const seatPieces = pieces[String(seat)] || [];
+        const isMe = seat === mySeat;
+        const imgSrc = `/images/ludo/dog_${seat}.png`;
+        const seatColorHex = SEAT_HEX_COLORS[seat] || "#ffffff";
 
           return seatPieces.map((pos, idx) => {
             const proj = projectPieceOnBoard(seat, pos, idx);
@@ -2371,8 +2372,18 @@ function LudoBoard({
                     }}
                   />
                   <div
-                    className={`fallback-piece absolute inset-0 rounded-full border-2 border-white/40 ${cls} hidden`}
-                    style={{ zIndex: 20 }}
+                    className="fallback-piece absolute hidden"
+                    style={{
+                      zIndex: 20,
+                      width: "27%",
+                      height: "27%",
+                      borderRadius: "999px",
+                      border: "2px solid rgba(255,255,255,0.4)",
+                      background: seatColorHex,
+                      left: "50%",
+                      top: "50%",
+                      transform: "translate(-50%, -50%)",
+                    }}
                   />
                 </div>
               </button>
