@@ -2231,6 +2231,25 @@ function LudoBoard({
     return result;
   }, [board, pieces]);
   const effectiveHighlights = disableHighlights ? new Set() : highlightTargets;
+  const highlightNumbers = useMemo(() => {
+    const numbers = new Set();
+    if (!disableHighlights && effectiveHighlights.size > 0) {
+      effectiveHighlights.forEach((idx) => numbers.add(idx));
+    }
+    if (!disableHighlights && board.turnSeat != null && board.dice != null) {
+      const seatPieces = pieces[String(board.turnSeat)] || [];
+      const movable = listMovablePieces(board, board.turnSeat, board.dice);
+      movable.forEach((pieceIdx) => {
+        const pos = seatPieces[pieceIdx];
+        if (pos == null) return;
+        const targetPos = pos + board.dice;
+        if (targetPos >= LUDO_TRACK_LEN && targetPos < LUDO_TRACK_LEN + LUDO_HOME_LEN) {
+          numbers.add(`home-${board.turnSeat}-${targetPos - LUDO_TRACK_LEN}`);
+        }
+      });
+    }
+    return numbers;
+  }, [disableHighlights, effectiveHighlights, board, pieces]);
   return (
     <div className="w-full h-full flex flex-col sm:flex-row gap-3" style={{ minHeight: "420px" }}>
       {/* לוח מרכזי */}
@@ -2279,6 +2298,7 @@ function LudoBoard({
             occupancy={trackOccupancy}
             highlights={effectiveHighlights}
             homeSegments={homeSegments}
+            highlightNumbers={highlightNumbers}
           />
 
           {/* החיילים מעל הכל */}
@@ -2329,8 +2349,8 @@ function LudoBoard({
                 style={{
                   left: `${proj.x}%`,
                   top: `${proj.y}%`,
-                  width: "10.8%",
-                  height: "10.8%",
+                  width: "13%",
+                  height: "13%",
                   minWidth: '32px',
                   minHeight: '32px',
                   transform: "translate(-50%, -50%)",
@@ -2461,29 +2481,37 @@ function LudoBoard({
   );
 }
 
-function TrackOverlay({ layout, occupancy, highlights, homeSegments }) {
+function TrackOverlay({ layout, occupancy, highlights, homeSegments, highlightNumbers = new Set() }) {
   if (!layout?.length) return null;
   return (
     <div className="absolute inset-0 pointer-events-none z-10">
       <div className="absolute inset-[12%] rounded-full border border-white/10" />
-      {homeSegments?.map((segment) => (
-        <div
-          key={`home-${segment.seat}-${segment.idx}`}
-          className="absolute rounded-full border border-white/20 shadow-sm"
-          style={{
-            left: `${segment.x}%`,
-            top: `${segment.y}%`,
-            width: "2.8%",
-            height: "2.8%",
-            minWidth: "12px",
-            minHeight: "12px",
-            transform: "translate(-50%, -50%)",
-            backgroundColor: `${SEAT_HEX_COLORS[segment.seat]}55`,
-            borderColor: `${SEAT_HEX_COLORS[segment.seat]}99`,
-            boxShadow: `0 0 6px ${SEAT_HEX_COLORS[segment.seat]}55`,
-          }}
-        />
-      ))}
+      {homeSegments?.map((segment) => {
+        const key = `home-${segment.seat}-${segment.idx}`;
+        const isHighlight = highlightNumbers.has(key);
+        return (
+          <div
+            key={key}
+            className={`absolute rounded-full border border-white/20 shadow-sm ${
+              isHighlight ? "ring-2 ring-amber-300 animate-pulse" : ""
+            }`}
+            style={{
+              left: `${segment.x}%`,
+              top: `${segment.y}%`,
+              width: "2.8%",
+              height: "2.8%",
+              minWidth: "12px",
+              minHeight: "12px",
+              transform: "translate(-50%, -50%)",
+              backgroundColor: `${SEAT_HEX_COLORS[segment.seat]}${isHighlight ? "aa" : "55"}`,
+              borderColor: `${SEAT_HEX_COLORS[segment.seat]}99`,
+              boxShadow: isHighlight
+                ? `0 0 12px ${SEAT_HEX_COLORS[segment.seat]}aa`
+                : `0 0 6px ${SEAT_HEX_COLORS[segment.seat]}55`,
+            }}
+          />
+        );
+      })}
       {layout.map(({ idx, x, y }) => {
         const occupants = occupancy?.get(idx) || [];
         const seatColor =
@@ -2519,12 +2547,17 @@ function TrackOverlay({ layout, occupancy, highlights, homeSegments }) {
               />
             </div>
             <span
-              className="absolute text-[10px] sm:text-[16px] font-bold drop-shadow pointer-events-none select-none"
+              className={`absolute text-[10px] sm:text-[16px] font-bold drop-shadow pointer-events-none select-none ${
+                highlightNumbers.has(idx) ? "text-amber-300 animate-pulse" : ""
+              }`}
               style={{
                 left: `${labelX}%`,
                 top: `${labelY}%`,
                 transform: "translate(-50%, -50%)",
-                color: labelColor,
+                color: highlightNumbers.has(idx) ? "#fbbf24" : labelColor,
+                textShadow: highlightNumbers.has(idx)
+                  ? "0 0 6px rgba(251,191,36,0.8)"
+                  : "0 1px 2px rgba(0,0,0,0.4)",
               }}
             >
               {idx + 1}
