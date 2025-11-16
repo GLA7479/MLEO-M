@@ -1049,8 +1049,6 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const { displayValue: diceDisplayValue, rolling: diceRolling } = useDiceRollAnimation(
     board?.dice ?? board?.lastDice ?? null
   );
-  const controlBtnBase =
-    "inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-full border font-semibold text-[11px] uppercase tracking-wide shadow-md shadow-black/40 transition focus:outline-none focus:ring-2 focus:ring-white/30";
   const [doubleCountdown, setDoubleCountdown] = useState(null);
 
   return (
@@ -1096,7 +1094,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
               board={board}
               onPieceClick={onPieceClick}
               mySeat={mySeat}
-              showSidebar={!inMatch}
+            showSidebar={false}
               disableHighlights={diceRolling}
             />
           ) : (
@@ -1114,21 +1112,21 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
             {mySeat != null && (
               <button
                 onClick={leaveSeat}
-                className={`${controlBtnBase} border-red-300/70 bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 whitespace-nowrap flex-shrink-0`}
+                className={`${CONTROL_BTN_BASE} border-red-300/70 bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 whitespace-nowrap flex-shrink-0`}
               >
                 Leave seat
               </button>
             )}
             <button
               onClick={startGame}
-              className={`${controlBtnBase} border-emerald-300/70 bg-gradient-to-r from-emerald-600 to-lime-500 hover:from-emerald-500 hover:to-lime-400 whitespace-nowrap flex-shrink-0`}
+            className={`${CONTROL_BTN_BASE} border-emerald-300/70 bg-gradient-to-r from-emerald-600 to-lime-500 hover:from-emerald-500 hover:to-lime-400 whitespace-nowrap flex-shrink-0`}
             >
               Start game
             </button>
             <button
               onClick={offerDouble}
               disabled={!canOfferDouble}
-              className={`${controlBtnBase} border-amber-300/70 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex-shrink-0`}
+            className={`${CONTROL_BTN_BASE} border-amber-300/70 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex-shrink-0`}
             >
               Double x{doubleState.value ?? 1}
             </button>
@@ -1422,43 +1420,122 @@ function LudoVsBot({ vault, onBackToMode }) {
     return () => clearInterval(t);
   }, [deadline, board, stage]);
 
+  const seatCards = [
+    {
+      seat: 0,
+      label: "Seat 1",
+      name: "You",
+      color: SEAT_HEX_COLORS[0],
+      isTurn: stage === "playing" && board.turnSeat === 0,
+    },
+    {
+      seat: 1,
+      label: "Seat 2",
+      name: "Bot",
+      color: SEAT_HEX_COLORS[1],
+      isTurn: stage === "playing" && board.turnSeat === 1,
+    },
+    {
+      seat: 2,
+      label: "Seat 3",
+      name: "Unused",
+      color: SEAT_HEX_COLORS[2],
+      isTurn: false,
+      inactive: true,
+    },
+    {
+      seat: 3,
+      label: "Seat 4",
+      name: "Unused",
+      color: SEAT_HEX_COLORS[3],
+      isTurn: false,
+      inactive: true,
+    },
+  ];
+
   return (
-    <div className="w-full h-full flex flex-col gap-2 text-white">
-      <div className="flex gap-2 items-center text-xs flex-wrap">
-        <button
-          onClick={startGame}
-          disabled={stage === "playing"}
-          className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 disabled:bg-gray-600/60"
-        >
-          Start vs Bot
-        </button>
-        <button
-          onClick={resetGame}
-          className="px-3 py-1 rounded bg-slate-600/80 hover:bg-slate-500"
-        >
-          Reset
-        </button>
-        <DiceDisplay
-          displayValue={diceDisplayValue}
-          rolling={diceRolling}
-          seat={board.dice != null ? board.turnSeat : board.turnSeat}
-        />
+    <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: "600px", height: "100%" }}>
+      <div className="w-full overflow-x-auto">
+        <div className="flex gap-2 text-[11px] min-w-[480px]">
+          {seatCards.map((card, idx) => (
+            <div
+              key={idx}
+              className={`border rounded-md px-2 py-1 flex flex-col items-center justify-center text-xs font-semibold transition flex-1 ${
+                card.inactive ? "border-white/20 opacity-50" : "border-white/30 shadow"
+              } ${card.isTurn ? "ring-2 ring-amber-300 animate-pulse" : ""}`}
+              style={{
+                background: `linear-gradient(135deg, ${card.color}dd, ${card.color}aa)`,
+                color: "white",
+                textShadow: "0 1px 2px rgba(0,0,0,0.7)",
+              }}
+            >
+              <span className="font-semibold">{card.label}</span>
+              <span className="text-white/70">{card.name}</span>
+              {!card.inactive && (
+                <span className="text-white/60 text-[10px]">
+                  {stage === "playing"
+                    ? board.turnSeat === card.seat
+                      ? "Turn"
+                      : "Waiting"
+                    : stage === "lobby"
+                    ? "Lobby"
+                    : stage === "finished"
+                    ? "Finished"
+                    : ""}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="text-xs text-white/80 bg-black/40 rounded px-3 py-2 flex items-center justify-between gap-2">
-        <div />
-        {msg && <span className="text-amber-300">{msg}</span>}
-      </div>
-
-      <div className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 overflow-hidden" style={{ minHeight: '500px', height: '100%' }}>
-        <div className="w-full h-full" style={{ minHeight: '400px', height: '100%' }}>
+      <div
+        className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 flex flex-col gap-3 overflow-hidden"
+        style={{ minHeight: "500px", height: "100%" }}
+      >
+        <div className="flex-1 h-full overflow-hidden" style={{ minHeight: "400px", height: "100%" }}>
           <LudoBoard
             board={board}
             mySeat={mySeat}
             onPieceClick={onPieceClick}
-            showSidebar={!playingNow}
+            showSidebar={false}
             disableHighlights={diceRolling}
           />
+        </div>
+
+        <div className="w-full text-xs flex flex-col gap-2 items-center">
+          <div className="flex justify-center items-center flex-wrap gap-2">
+            <span className="text-white/70">
+              {stage === "lobby"
+                ? `Buy-in: ${fmt(buyIn)} required to start`
+                : stage === "playing"
+                ? "Auto-roll enabled • Tap your piece to move"
+                : "Game finished - reset to play again"}
+            </span>
+            {msg && <span className="text-amber-300 text-center">{msg}</span>}
+          </div>
+          <div className="flex gap-2 items-center justify-center w-full flex-wrap">
+            <button
+              onClick={startGame}
+              disabled={stage === "playing"}
+              className={`${CONTROL_BTN_BASE} border-emerald-300/70 bg-gradient-to-r from-emerald-600 to-lime-500 hover:from-emerald-500 hover:to-lime-400 disabled:bg-gray-600/60 disabled:cursor-not-allowed`}
+            >
+              Start vs Bot
+            </button>
+            <button
+              onClick={resetGame}
+              className={`${CONTROL_BTN_BASE} border-white/30 bg-slate-600/80 hover:bg-slate-500`}
+            >
+              Reset
+            </button>
+            <div className="flex-shrink-0">
+              <DiceDisplay
+                displayValue={diceDisplayValue}
+                rolling={diceRolling}
+                seat={board.dice != null ? board.turnSeat : board.turnSeat}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1600,82 +1677,135 @@ function LudoLocal({ onBackToMode }) {
   }, [stage, board]);
 
   const canStart = stage === "setup";
+  const seatCards = Array.from({ length: 4 }, (_, idx) => {
+    const active = idx < playerCount;
+    return {
+      seat: idx,
+      label: `Seat ${idx + 1}`,
+      name: active ? `Player ${idx + 1}` : "Unused",
+      color: SEAT_HEX_COLORS[idx],
+      isTurn: active && stage === "playing" && board.turnSeat === idx,
+      inactive: !active,
+    };
+  });
 
   return (
-    <div className="w-full h-full flex flex-col gap-2 text-white">
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-white/80 font-semibold">Local multiplayer (offline)</span>
-
-        <div className="flex items-center gap-1">
-          <span className="text-white/60">Players:</span>
-          {[2, 3, 4].map((n) => (
-            <button
-              key={n}
-              onClick={() => setPlayerCount(n)}
-              disabled={stage !== "setup"}
-              className={`px-2 py-1 rounded border text-[11px] ${
-                playerCount === n && stage === "setup"
-                  ? "border-emerald-400 bg-emerald-500/40"
-                  : "border-white/30 bg-white/5"
-              } disabled:opacity-60`}
+    <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: "600px", height: "100%" }}>
+      <div className="w-full overflow-x-auto">
+        <div className="flex gap-2 text-[11px] min-w-[480px]">
+          {seatCards.map((card, idx) => (
+            <div
+              key={idx}
+              className={`border rounded-md px-2 py-1 flex flex-col items-center justify-center text-xs font-semibold transition flex-1 ${
+                card.inactive ? "border-white/20 opacity-50" : "border-white/30 shadow"
+              } ${card.isTurn ? "ring-2 ring-amber-300 animate-pulse" : ""}`}
+              style={{
+                background: `linear-gradient(135deg, ${card.color}dd, ${card.color}aa)`,
+                color: "white",
+                textShadow: "0 1px 2px rgba(0,0,0,0.7)",
+              }}
             >
-              {n}
-            </button>
+              <span className="font-semibold">{card.label}</span>
+              <span className="text-white/70">{card.name}</span>
+              {!card.inactive && (
+                <span className="text-white/60 text-[10px]">
+                  {stage === "playing"
+                    ? board.turnSeat === card.seat
+                      ? "Turn"
+                      : "Waiting"
+                    : stage === "setup"
+                    ? "Setup"
+                    : stage === "finished"
+                    ? "Finished"
+                    : ""}
+                </span>
+              )}
+            </div>
           ))}
         </div>
-
-        <button
-          onClick={startGame}
-          disabled={!canStart}
-          className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 disabled:bg-gray-600/60"
-        >
-          Start local game
-        </button>
-
-        <button
-          onClick={resetGame}
-          className="px-3 py-1 rounded bg-slate-600/80 hover:bg-slate-500"
-        >
-          Reset
-        </button>
-
-        <DiceDisplay
-          displayValue={diceDisplayValue}
-          rolling={diceRolling}
-          seat={board.dice != null ? board.turnSeat : board.turnSeat}
-        />
-
-        {onBackToMode && (
-          <button
-            onClick={onBackToMode}
-            className="ml-auto px-3 py-1 rounded bg-white/10 hover:bg-white/20"
-          >
-            Mode
-          </button>
-        )}
-      </div>
-
-      <div className="text-xs text-white/80 bg-black/40 rounded px-3 py-2 flex items-center justify-between gap-2">
-        <span className="text-white/60">
-          {stage === "setup" && "Choose number of players and press Start"}
-          {stage === "playing" && "Pass the device to the player whose turn it is"}
-          {stage === "finished" && "Game finished – you can Reset or Start again"}
-        </span>
-        {msg && <span className="text-amber-300">{msg}</span>}
       </div>
 
       <div
-        className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 overflow-hidden"
+        className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 flex flex-col gap-3 overflow-hidden"
         style={{ minHeight: "500px", height: "100%" }}
       >
-        <div className="w-full h-full" style={{ minHeight: "400px", height: "100%" }}>
+        <div className="flex-1 h-full overflow-hidden" style={{ minHeight: "400px", height: "100%" }}>
           <LudoBoard
             board={board}
             mySeat={board.turnSeat}
             onPieceClick={onPieceClick}
-            showSidebar={true}
+            showSidebar={false}
             disableHighlights={diceRolling}
           />
+        </div>
+
+        <div className="w-full text-xs flex flex-col gap-2 items-center">
+          <div className="flex justify-center items-center flex-wrap gap-2">
+            <span className="text-white/70">
+              {stage === "setup"
+                ? "Choose number of players and press Start"
+                : stage === "playing"
+                ? "Pass the device to the active player • Auto-roll enabled"
+                : "Game finished – Reset or Start again"}
+            </span>
+            {msg && <span className="text-amber-300 text-center">{msg}</span>}
+          </div>
+          <div className="flex gap-2 items-center justify-center w-full flex-wrap">
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full border border-white/20 bg-white/5">
+              <span className="text-white/60 text-[10px] uppercase tracking-wide">Players</span>
+              {[2, 3, 4].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setPlayerCount(n)}
+                  disabled={stage !== "setup"}
+                  className={`px-2 py-0.5 rounded-full text-[11px] ${
+                    playerCount === n && stage === "setup"
+                      ? "bg-emerald-500/50 text-white border border-emerald-300/70"
+                      : "bg-white/10 border border-white/20"
+                  } disabled:opacity-50`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={startGame}
+              disabled={!canStart}
+              className={`${CONTROL_BTN_BASE} border-emerald-300/70 bg-gradient-to-r from-emerald-600 to-lime-500 hover:from-emerald-500 hover:to-lime-400 disabled:bg-gray-600/60 disabled:cursor-not-allowed`}
+            >
+              Start local game
+            </button>
+            <button
+              onClick={resetGame}
+              className={`${CONTROL_BTN_BASE} border-white/30 bg-slate-600/80 hover:bg-slate-500`}
+            >
+              Reset
+            </button>
+            <div className="flex-shrink-0">
+              <DiceDisplay
+                displayValue={diceDisplayValue}
+                rolling={diceRolling}
+                seat={board.turnSeat ?? 0}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="w-full bg-black/40 rounded-lg px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-col">
+          <span className="font-semibold">Ludo Local</span>
+          <span className="text-white/60">Players: {playerCount}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {onBackToMode && (
+            <button
+              onClick={onBackToMode}
+              className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20 text-xs"
+            >
+              Mode
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -1692,6 +1822,8 @@ const TRACK_ANGLE_OFFSET = (5 * Math.PI) / 4; // 225° מבטיח שהכניסה
 const SEAT_HEX_COLORS = ["#ef4444", "#38bdf8", "#22c55e", "#fbbf24"];
 const SEAT_COLOR_LABELS = ["RED", "BLUE", "GREEN", "YELLOW"];
 const FINISH_FLASH_MS = 2200;
+const CONTROL_BTN_BASE =
+  "inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-full border font-semibold text-[11px] uppercase tracking-wide shadow-md shadow-black/40 transition focus:outline-none focus:ring-2 focus:ring-white/30";
 const DEFAULT_DOUBLE_STATE = {
   value: 1,
   proposed_by: null,
