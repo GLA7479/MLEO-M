@@ -415,7 +415,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     const timer = setTimeout(() => {
       // אותה פונקציית doRoll קיימת כבר למעלה
       doRoll();
-    }, 800); // אם אתה רוצה 2 שניות – תחליף ל-2000
+    }, 1500);
 
     return () => clearTimeout(timer);
   }, [ses?.id, ses?.stage, ses?.board_state, ses?.current_turn, mySeat]);
@@ -1047,7 +1047,8 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const inMatch = ses?.stage === "playing" && !!board;
   const liveTurnSeat = board?.turnSeat ?? ses?.current_turn ?? null;
   const { displayValue: diceDisplayValue, rolling: diceRolling } = useDiceRollAnimation(
-    board?.dice ?? board?.lastDice ?? null
+    board?.dice ?? null,
+    board?.lastDice ?? null
   );
   const [doubleCountdown, setDoubleCountdown] = useState(null);
 
@@ -1203,7 +1204,8 @@ function LudoVsBot({ vault, onBackToMode }) {
   const botSeat = 1;
   const playingNow = stage === "playing";
   const { displayValue: diceDisplayValue, rolling: diceRolling } = useDiceRollAnimation(
-    board.dice ?? board.lastDice ?? null
+    board.dice ?? null,
+    board.lastDice ?? null
   );
 
   const canStart = useMemo(() => {
@@ -1324,7 +1326,7 @@ function LudoVsBot({ vault, onBackToMode }) {
       setTimeout(() => {
         setBoard((prev) => ({ ...prev, dice, lastDice: dice }));
         setDeadline(Date.now() + TURN_SECONDS * 1000);
-      }, 600);
+      }, 1500);
       return;
     }
 
@@ -1336,7 +1338,7 @@ function LudoVsBot({ vault, onBackToMode }) {
         next.turnSeat = nextTurnSeat(next);
         setBoard(next);
         setDeadline(Date.now() + TURN_SECONDS * 1000);
-      }, 600);
+      }, 1500);
       return;
     }
 
@@ -1372,7 +1374,7 @@ function LudoVsBot({ vault, onBackToMode }) {
       next.turnSeat = nextTurnSeat(next);
       setBoard(next);
       setDeadline(Date.now() + TURN_SECONDS * 1000);
-    }, 800);
+    }, 1500);
   }, [board, stage]);
 
   // Auto-roll for player (no manual Roll button)
@@ -1386,7 +1388,7 @@ function LudoVsBot({ vault, onBackToMode }) {
 
     const timer = setTimeout(() => {
       doRoll();
-    }, 800);
+    }, 1500);
 
     return () => clearTimeout(timer);
   }, [stage, board, mySeat]);
@@ -1576,7 +1578,8 @@ function LudoLocal({ onBackToMode }) {
   }, [playerCount, stage]);
 
   const { displayValue: diceDisplayValue, rolling: diceRolling } = useDiceRollAnimation(
-    board.dice ?? board.lastDice ?? null
+    board.dice ?? null,
+    board.lastDice ?? null
   );
 
   function startGame() {
@@ -1671,7 +1674,7 @@ function LudoLocal({ onBackToMode }) {
 
     const timer = setTimeout(() => {
       doRollLocal();
-    }, 800);
+    }, 1500);
 
     return () => clearTimeout(timer);
   }, [stage, board]);
@@ -1923,15 +1926,20 @@ function formatSeatLabel(seat) {
   return color ? `Seat ${seatNumber} — ${color}` : `Seat ${seatNumber}`;
 }
 
-function useDiceRollAnimation(value) {
-  const [displayValue, setDisplayValue] = useState(value ?? null);
+function useDiceRollAnimation(currentDice, fallbackValue = null) {
+  const [displayValue, setDisplayValue] = useState(fallbackValue ?? null);
   const [rolling, setRolling] = useState(false);
 
   useEffect(() => {
-    if (value == null) return;
+    if (currentDice == null) {
+      if (fallbackValue != null) {
+        setDisplayValue(fallbackValue);
+      }
+      setRolling(false);
+      return;
+    }
 
     setRolling(true);
-    setDisplayValue(value);
 
     const interval = setInterval(() => {
       setDisplayValue(1 + Math.floor(Math.random() * 6));
@@ -1939,7 +1947,7 @@ function useDiceRollAnimation(value) {
 
     const timeout = setTimeout(() => {
       clearInterval(interval);
-      setDisplayValue(value);
+      setDisplayValue(currentDice);
       setRolling(false);
     }, 2000);
 
@@ -1947,7 +1955,7 @@ function useDiceRollAnimation(value) {
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [value]);
+  }, [currentDice, fallbackValue]);
 
   return { displayValue, rolling };
 }
