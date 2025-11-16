@@ -1145,7 +1145,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
               onPieceClick={onPieceClick}
               mySeat={mySeat}
               showSidebar={false}
-              disableHighlights={diceRolling}
+              disableHighlights={diceRolling || board?.dice == null}
               diceValue={diceDisplayValue}
               diceRolling={diceRolling}
               diceSeat={diceSeatOwner ?? board?.turnSeat ?? liveTurnSeat}
@@ -2165,8 +2165,16 @@ function LudoBoard({
   diceRolling = false,
   diceSeat = null,
 }) {
-  const active = board.activeSeats || [];
   const pieces = board.pieces || {};
+
+  // fallback: אם activeSeats ריק (במיוחד באופליין) – נגזור אותו מה־pieces
+  let active = Array.isArray(board.activeSeats) ? board.activeSeats : [];
+  if (!active.length) {
+    active = [0, 1, 2, 3].filter((seat) => {
+      const arr = pieces[String(seat)];
+      return Array.isArray(arr) && arr.length > 0;
+    });
+  }
   const colorClasses = ["bg-red-500", "bg-sky-500", "bg-emerald-500", "bg-amber-400"];
   const shouldRenderFinishedPiece = useFinishFlash(active, pieces);
   const trackLayout = useMemo(
