@@ -396,7 +396,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       if (Date.now() >= d) {
         await autoAct();
       }
-    }, 250);
+    }, 150);
     return () => clearInterval(tickRef.current);
   }, [ses?.turn_deadline, ses?.stage, ses?.current_turn, mySeat]);
 
@@ -409,11 +409,42 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     const interval = setInterval(async () => {
       if (cancelled) return;
       await fetchSession(); // מביא את מצב המשחק המעודכן (stage, board_state וכו')
-    }, 400);
+    }, 2000);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
+    };
+  }, [ses?.id]);
+
+  // 🔵 realtime session updates (Supabase channel)
+  useEffect(() => {
+    if (!ses?.id) return;
+
+    const sessionChannel = supabase
+      .channel(`ludo_sessions:${ses.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "ludo_sessions",
+          filter: `id=eq.${ses.id}`,
+        },
+        (payload) => {
+          if (payload.new) {
+            setSes((prev) => {
+              if (!prev) return payload.new;
+              if (prev.updated_at === payload.new.updated_at) return prev;
+              return payload.new;
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      sessionChannel.unsubscribe();
     };
   }, [ses?.id]);
 
