@@ -395,6 +395,9 @@ useEffect(() => {
     }
     const query = { ...router.query, game: selectedGame, room: roomId };
     if (tierCode) query.tier = tierCode;
+    if (selectedGame === "ludo") {
+      query.mode = "online";
+    }
     router.push({ pathname: router.pathname, query }, undefined, { shallow: true });
   }
 

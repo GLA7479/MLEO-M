@@ -199,6 +199,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const board = ses?.board_state || null;
   const current = ses?.current || {};
   const doubleState = current.__double__ || DEFAULT_DOUBLE_STATE;
+  const liveTurnSeat = board?.turnSeat ?? ses?.current_turn ?? null;
   const currentPot = useMemo(() => {
     if (!current) return minRequired;
     const dblValue = current.__double__?.value || 1;
@@ -1063,7 +1064,6 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
 
   const seats = 4;
   const inMatch = ses?.stage === "playing" && !!board;
-  const liveTurnSeat = board?.turnSeat ?? ses?.current_turn ?? null;
   const { displayValue: diceDisplayValue, rolling: diceRolling } = useDiceRollAnimation(
     board?.dice ?? null,
     board?.lastDice ?? null
