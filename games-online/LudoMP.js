@@ -2074,7 +2074,7 @@ function DiceDisplay({ displayValue, rolling, seat }) {
   const highlight = lightenColor(color, 0.45);
 
   return (
-    <div className="relative w-14 h-14 sm:w-16 sm:h-16 text-white">
+    <div className="relative w-12 h-12 sm:w-14 sm:h-14 text-white">
       <div
         className={`absolute inset-0 rounded-2xl border-2 shadow-lg shadow-black/40 transition ${
           rolling ? "animate-pulse" : ""
@@ -2084,7 +2084,7 @@ function DiceDisplay({ displayValue, rolling, seat }) {
           background: `linear-gradient(145deg, ${highlight}, ${color})`,
         }}
       />
-      <span className="absolute inset-0 flex items-center justify-center text-2xl sm:text-3xl font-black text-black drop-shadow">
+      <span className="absolute inset-0 flex items-center justify-center text-[28px] sm:text-[36px] font-black text-black drop-shadow">
         {dots}
       </span>
     </div>
