@@ -1095,8 +1095,11 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
               board={board}
               onPieceClick={onPieceClick}
               mySeat={mySeat}
-            showSidebar={false}
+              showSidebar={false}
               disableHighlights={diceRolling}
+              diceValue={diceDisplayValue}
+              diceRolling={diceRolling}
+              diceSeat={board?.dice != null ? board?.turnSeat : liveTurnSeat}
             />
           ) : (
             <div className="w-full h-full grid place-items-center text-white/60 text-sm">
@@ -1131,13 +1134,6 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
             >
               Double x{doubleState.value ?? 1}
             </button>
-            <div className="flex-shrink-0">
-              <DiceDisplay
-                displayValue={diceDisplayValue}
-                rolling={diceRolling}
-                seat={board?.dice != null ? board?.turnSeat : liveTurnSeat}
-              />
-            </div>
             {doubleState.awaiting != null && (
               <span className="text-amber-200 text-[10px] whitespace-nowrap flex-shrink-0">
                 Waiting Seat {doubleState.awaiting + 1}
@@ -1502,6 +1498,9 @@ function LudoVsBot({ vault, onBackToMode }) {
             onPieceClick={onPieceClick}
             showSidebar={false}
             disableHighlights={diceRolling}
+            diceValue={diceDisplayValue}
+            diceRolling={diceRolling}
+            diceSeat={board.dice != null ? board.turnSeat : board.turnSeat}
           />
         </div>
 
@@ -1530,13 +1529,6 @@ function LudoVsBot({ vault, onBackToMode }) {
             >
               Reset
             </button>
-            <div className="flex-shrink-0">
-              <DiceDisplay
-                displayValue={diceDisplayValue}
-                rolling={diceRolling}
-                seat={board.dice != null ? board.turnSeat : board.turnSeat}
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -1739,6 +1731,9 @@ function LudoLocal({ onBackToMode }) {
             onPieceClick={onPieceClick}
             showSidebar={false}
             disableHighlights={diceRolling}
+            diceValue={diceDisplayValue}
+            diceRolling={diceRolling}
+            diceSeat={board.turnSeat ?? 0}
           />
         </div>
 
@@ -2042,23 +2037,18 @@ function DiceDisplay({ displayValue, rolling, seat }) {
   const highlight = lightenColor(color, 0.45);
 
   return (
-    <div className="flex items-center gap-1 sm:gap-2 text-white">
-      <div className="relative w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0">
-        <div
-          className={`absolute inset-0 rounded-2xl border-2 shadow-lg shadow-black/40 transition ${
-            rolling ? "animate-pulse" : ""
-          }`}
-          style={{
-            borderColor: color,
-            background: `linear-gradient(145deg, ${highlight}, ${color})`,
-          }}
-        />
-        <span className="absolute inset-0 flex items-center justify-center text-lg sm:text-xl font-black text-black drop-shadow">
-          {dots}
-        </span>
-      </div>
-      <span className="text-[10px] uppercase tracking-wide text-white/80">
-        {rolling ? "Rolling..." : "Dice"}
+    <div className="relative w-14 h-14 sm:w-16 sm:h-16 text-white">
+      <div
+        className={`absolute inset-0 rounded-2xl border-2 shadow-lg shadow-black/40 transition ${
+          rolling ? "animate-pulse" : ""
+        }`}
+        style={{
+          borderColor: color,
+          background: `linear-gradient(145deg, ${highlight}, ${color})`,
+        }}
+      />
+      <span className="absolute inset-0 flex items-center justify-center text-2xl sm:text-3xl font-black text-black drop-shadow">
+        {dots}
       </span>
     </div>
   );
@@ -2097,7 +2087,16 @@ function projectPieceOnBoard(seat, pos, pieceIndex = 0) {
   return { kind: "track", ...point, globalIndex };
 }
 
-function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true, disableHighlights = false }) {
+function LudoBoard({
+  board,
+  onPieceClick,
+  mySeat,
+  showSidebar = true,
+  disableHighlights = false,
+  diceValue = null,
+  diceRolling = false,
+  diceSeat = null,
+}) {
   const active = board.activeSeats || [];
   const pieces = board.pieces || {};
   const colorClasses = ["bg-red-500", "bg-sky-500", "bg-emerald-500", "bg-amber-400"];
@@ -2179,18 +2178,31 @@ function LudoBoard({ board, onPieceClick, mySeat, showSidebar = true, disableHig
           <div className="absolute inset-0 bg-gradient-to-br from-[#0f172a] via-[#020617] to-black z-0" />
           <div className="absolute inset-4 sm:inset-6 rounded-[32px] border border-white/5 bg-white/5 blur-[1px]" />
           <div className="absolute inset-[9%] rounded-full border border-white/10 bg-black/50 shadow-inner shadow-black/70" />
-         <img
-  src="/images/ludo/board.png"
-  alt="Ludo board"
-  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[28px] object-contain pointer-events-none opacity-95"
-  style={{
-    width: "85%",   // תוכל לשחק: 55, 50, 45...
-    height: "85%",
-  }}
-  onError={(e) => {
-    e.currentTarget.style.display = "none";
-  }}
-/>
+          <img
+            src="/images/ludo/board.png"
+            alt="Ludo board"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[28px] object-contain pointer-events-none opacity-95"
+            style={{
+              width: "85%",
+              height: "85%",
+            }}
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+
+          {diceValue != null && (
+            <div
+              className="absolute z-30 pointer-events-none"
+              style={{
+                left: "50%",
+                top: "78%",
+                transform: "translate(-50%, -50%)",
+              }}
+            >
+              <DiceDisplay displayValue={diceValue} rolling={diceRolling} seat={diceSeat} />
+            </div>
+          )}
 
 
           {/* מסלול מעגלי עם אינדיקציות */}
