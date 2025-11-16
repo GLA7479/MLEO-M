@@ -81,7 +81,7 @@ export default function LudoMP({ roomId, playerName, vault, setVaultBoth, tierCo
     };
   }, [setVaultBoth]);
 
-  const [mode, setMode] = useState(null); // null | "online" | "bot"
+  const [mode, setMode] = useState(null); // null | "online" | "bot" | "local"
 
   // Simple overlay menu for mode selection
   if (!mode) {
@@ -90,25 +90,31 @@ export default function LudoMP({ roomId, playerName, vault, setVaultBoth, tierCo
         <div className="bg-black/70 border border-white/20 rounded-2xl p-4 sm:p-6 max-w-sm w-full flex flex-col gap-4">
           <div className="text-center">
             <div className="text-lg font-semibold mb-1">Ludo</div>
-            <div className="text-xs text-white/70">
-              Choose how you want to play
-            </div>
+            <div className="text-xs text-white/70">Choose how you want to play</div>
           </div>
+
           <button
             onClick={() => setMode("online")}
             className="w-full px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold"
           >
             Online • 2–4 Players
           </button>
+
           <button
             onClick={() => setMode("bot")}
             className="w-full px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-sm font-semibold"
           >
             Vs Bot • 1v1
           </button>
-          <div className="text-[11px] text-white/60 text-center">
-            Vault: {fmt(vault)}
-          </div>
+
+          <button
+            onClick={() => setMode("local")}
+            className="w-full px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-sm font-semibold"
+          >
+            Local • 2–4 players (offline, same device)
+          </button>
+
+          <div className="text-[11px] text-white/60 text-center">Vault: {fmt(vault)}</div>
         </div>
       </div>
     );
@@ -118,7 +124,7 @@ export default function LudoMP({ roomId, playerName, vault, setVaultBoth, tierCo
   return (
     <div className="w-full h-full flex flex-col text-white">
       <div className="flex-1 min-h-0">
-        {mode === "online" ? (
+        {mode === "online" && (
           <LudoOnline
             roomId={roomId}
             playerName={playerName}
@@ -126,9 +132,11 @@ export default function LudoMP({ roomId, playerName, vault, setVaultBoth, tierCo
             tierCode={tierCode}
             onBackToMode={() => setMode(null)}
           />
-        ) : (
-          <LudoVsBot vault={vault} onBackToMode={() => setMode(null)} />
         )}
+
+        {mode === "bot" && <LudoVsBot vault={vault} onBackToMode={() => setMode(null)} />}
+
+        {mode === "local" && <LudoLocal onBackToMode={() => setMode(null)} />}
       </div>
     </div>
   );
@@ -1359,6 +1367,22 @@ function LudoVsBot({ vault, onBackToMode }) {
     }, 800);
   }, [board, stage]);
 
+  // Auto-roll for player (no manual Roll button)
+  useEffect(() => {
+    if (stage !== "playing") return;
+    if (board.winner != null) return;
+
+    const turnSeat = board.turnSeat;
+    if (turnSeat !== mySeat) return;
+    if (board.dice != null) return;
+
+    const timer = setTimeout(() => {
+      doRoll();
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [stage, board, mySeat]);
+
   // local deadline
   useEffect(() => {
     if (!deadline || stage !== "playing") return;
@@ -1393,7 +1417,7 @@ function LudoVsBot({ vault, onBackToMode }) {
       <div className="flex gap-2 items-center text-xs flex-wrap">
         <button
           onClick={startGame}
-          disabled={!canStart}
+          disabled={stage === "playing"}
           className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 disabled:bg-gray-600/60"
         >
           Start vs Bot
@@ -1403,13 +1427,6 @@ function LudoVsBot({ vault, onBackToMode }) {
           className="px-3 py-1 rounded bg-slate-600/80 hover:bg-slate-500"
         >
           Reset
-        </button>
-        <button
-          onClick={doRoll}
-          disabled={!(stage === "playing" && board.turnSeat === mySeat && board.dice == null)}
-          className="px-3 py-1 rounded bg-blue-600/80 hover:bg-blue-500 disabled:bg-gray-600/60"
-        >
-          Roll ({board.dice ?? "-"})
         </button>
         <DiceDisplay
           displayValue={diceDisplayValue}
@@ -1450,6 +1467,205 @@ function LudoVsBot({ vault, onBackToMode }) {
               Mode
             </button>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =================== LOCAL MULTIPLAYER (OFFLINE, SAME DEVICE) ===================
+
+function LudoLocal({ onBackToMode }) {
+  const [playerCount, setPlayerCount] = useState(2); // 2–4 players on this device
+  const [stage, setStage] = useState("setup"); // 'setup' | 'playing' | 'finished'
+  const [board, setBoard] = useState(() => createInitialBoard([0, 1]));
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    if (stage !== "setup") return;
+    const seats = Array.from({ length: playerCount }, (_, i) => i);
+    setBoard(createInitialBoard(seats));
+    setMsg("");
+  }, [playerCount, stage]);
+
+  const { displayValue: diceDisplayValue, rolling: diceRolling } = useDiceRollAnimation(
+    board.dice ?? board.lastDice ?? null
+  );
+
+  function startGame() {
+    const seats = Array.from({ length: playerCount }, (_, i) => i);
+    const initial = createInitialBoard(seats);
+    setBoard(initial);
+    setStage("playing");
+    setMsg("");
+  }
+
+  function resetGame() {
+    setStage("setup");
+  }
+
+  function doRollLocal() {
+    if (stage !== "playing") return;
+    if (board.winner != null) return;
+    if (board.dice != null) return;
+
+    const turnSeat = board.turnSeat;
+    if (turnSeat == null) return;
+
+    const dice = 1 + Math.floor(Math.random() * 6);
+    const next = { ...board, dice, lastDice: dice };
+    setBoard(next);
+    setMsg("");
+
+    const moves = listMovablePieces(next, turnSeat, dice);
+
+    if (!moves.length) {
+      setTimeout(() => {
+        setBoard((prev) => {
+          if (prev.dice == null || prev.turnSeat !== turnSeat) return prev;
+
+          const after = { ...prev, dice: null, lastDice: dice };
+          after.turnSeat = nextTurnSeat(after);
+          return after;
+        });
+      }, 1800);
+    }
+  }
+
+  function onPieceClick(pieceIndex) {
+    if (stage !== "playing") return;
+    if (board.winner != null) return;
+    if (board.dice == null) return;
+
+    const seat = board.turnSeat;
+    if (seat == null) return;
+
+    const moves = listMovablePieces(board, seat, board.dice);
+    if (!moves.includes(pieceIndex)) {
+      setMsg("No legal move for that piece");
+      return;
+    }
+
+    const { ok, board: next } = applyMove(board, seat, pieceIndex, board.dice);
+    if (!ok) {
+      setMsg("Move not allowed");
+      return;
+    }
+
+    if (next.winner != null) {
+      finishGame(next);
+      return;
+    }
+
+    next.turnSeat = nextTurnSeat(next);
+    next.dice = null;
+    setBoard(next);
+    setMsg("");
+  }
+
+  function finishGame(nextBoard) {
+    setBoard(nextBoard);
+    setStage("finished");
+    const winnerSeat = nextBoard.winner;
+    if (winnerSeat != null) {
+      setMsg(`Seat ${winnerSeat + 1} won!`);
+    } else {
+      setMsg("Game finished");
+    }
+  }
+
+  useEffect(() => {
+    if (stage !== "playing") return;
+    if (board.winner != null) return;
+
+    const turnSeat = board.turnSeat;
+    if (turnSeat == null) return;
+    if (board.dice != null) return;
+
+    const timer = setTimeout(() => {
+      doRollLocal();
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [stage, board]);
+
+  const canStart = stage === "setup";
+
+  return (
+    <div className="w-full h-full flex flex-col gap-2 text-white">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-white/80 font-semibold">Local multiplayer (offline)</span>
+
+        <div className="flex items-center gap-1">
+          <span className="text-white/60">Players:</span>
+          {[2, 3, 4].map((n) => (
+            <button
+              key={n}
+              onClick={() => setPlayerCount(n)}
+              disabled={stage !== "setup"}
+              className={`px-2 py-1 rounded border text-[11px] ${
+                playerCount === n && stage === "setup"
+                  ? "border-emerald-400 bg-emerald-500/40"
+                  : "border-white/30 bg-white/5"
+              } disabled:opacity-60`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={startGame}
+          disabled={!canStart}
+          className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 disabled:bg-gray-600/60"
+        >
+          Start local game
+        </button>
+
+        <button
+          onClick={resetGame}
+          className="px-3 py-1 rounded bg-slate-600/80 hover:bg-slate-500"
+        >
+          Reset
+        </button>
+
+        <DiceDisplay
+          displayValue={diceDisplayValue}
+          rolling={diceRolling}
+          seat={board.dice != null ? board.turnSeat : board.turnSeat}
+        />
+
+        {onBackToMode && (
+          <button
+            onClick={onBackToMode}
+            className="ml-auto px-3 py-1 rounded bg-white/10 hover:bg-white/20"
+          >
+            Mode
+          </button>
+        )}
+      </div>
+
+      <div className="text-xs text-white/80 bg-black/40 rounded px-3 py-2 flex items-center justify-between gap-2">
+        <span className="text-white/60">
+          {stage === "setup" && "Choose number of players and press Start"}
+          {stage === "playing" && "Pass the device to the player whose turn it is"}
+          {stage === "finished" && "Game finished – you can Reset or Start again"}
+        </span>
+        {msg && <span className="text-amber-300">{msg}</span>}
+      </div>
+
+      <div
+        className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 overflow-hidden"
+        style={{ minHeight: "500px", height: "100%" }}
+      >
+        <div className="w-full h-full" style={{ minHeight: "400px", height: "100%" }}>
+          <LudoBoard
+            board={board}
+            mySeat={board.turnSeat}
+            onPieceClick={onPieceClick}
+            showSidebar={true}
+            disableHighlights={diceRolling}
+          />
         </div>
       </div>
     </div>

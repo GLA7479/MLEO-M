@@ -190,7 +190,7 @@ function GameCard({ game, onSelect }) {
 }
 
 // Game Viewport Component
-function GameViewport({ gameId, vault, setVaultBoth, playerName, roomId, tierCode }) {
+function GameViewport({ gameId, vault, setVaultBoth, playerName, roomId, tierCode, mode }) {
   const [GameComponent, setGameComponent] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -263,6 +263,7 @@ function GameViewport({ gameId, vault, setVaultBoth, playerName, roomId, tierCod
         playerName={playerName}
         roomId={roomId}
         tierCode={tierCode}
+        mode={mode}
       />
     </div>
   );
@@ -276,9 +277,11 @@ export default function ArcadeOnline() {
   const [vaultAmt, setVaultAmt] = useState(0);
   const [playerName, setPlayerName] = useState("");
   const [selectedGame, setSelectedGame] = useState(null);
-  const [selectedRoomId, setSelectedRoomId] = useState(null);
-  const [selectedTier, setSelectedTier] = useState(null);
-  const [showRoomBrowser, setShowRoomBrowser] = useState(false);
+const [selectedRoomId, setSelectedRoomId] = useState(null);
+const [selectedTier, setSelectedTier] = useState(null);
+const [showRoomBrowser, setShowRoomBrowser] = useState(false);
+const [showLudoModePicker, setShowLudoModePicker] = useState(false);
+const [selectedMode, setSelectedMode] = useState(null); // 'online' | 'bot' | 'local'
 
   useEffect(() => {
     setMounted(true);
@@ -294,25 +297,30 @@ export default function ArcadeOnline() {
   }, [playerName]);
 
   // Handle game selection from URL or clicks
-  useEffect(() => {
-    const gameId = router.query.game;
-    const roomId = router.query.room;
-    const tierParam = router.query.tier;
-    
-    if (gameId && GAME_REGISTRY.some(g => g.id === gameId)) {
-      setSelectedGame(gameId);
-      if (roomId) {
-        setSelectedRoomId(roomId);
-      }
-      if (tierParam) {
-        setSelectedTier(String(tierParam));
-      }
+useEffect(() => {
+  const gameId = router.query.game;
+  const roomId = router.query.room;
+  const tierParam = router.query.tier;
+  const modeParam = router.query.mode || router.query.variant;
+
+  if (gameId && GAME_REGISTRY.some(g => g.id === gameId)) {
+    setSelectedGame(gameId);
+    setSelectedRoomId(roomId || null);
+    setSelectedTier(tierParam ? String(tierParam) : null);
+    setSelectedMode(modeParam ? String(modeParam) : null);
+    if (gameId === "ludo") {
+      setShowLudoModePicker(!modeParam && !roomId);
     } else {
-      setSelectedGame(null);
-      setSelectedRoomId(null);
-      setSelectedTier(null);
+      setShowLudoModePicker(false);
     }
-  }, [router.query.game, router.query.room, router.query.tier]);
+  } else {
+    setSelectedGame(null);
+    setSelectedRoomId(null);
+    setSelectedTier(null);
+    setSelectedMode(null);
+    setShowLudoModePicker(false);
+  }
+}, [router.query.game, router.query.room, router.query.tier, router.query.mode, router.query.variant]);
 
   function setVaultBoth(next) {
     setVault(next);
@@ -333,17 +341,40 @@ export default function ArcadeOnline() {
       window.location.href = game.href;
       return;
     }
+
+    if (gameId === "ludo") {
+      setSelectedGame("ludo");
+      setSelectedRoomId(null);
+      setSelectedTier(null);
+      setShowRoomBrowser(false);
+      setShowLudoModePicker(true);
+      setSelectedMode(null);
+
+      const query = { ...router.query };
+      delete query.game;
+      delete query.room;
+      delete query.tier;
+      delete query.mode;
+      delete query.variant;
+
+      router.push({ pathname: router.pathname, query }, undefined, { shallow: true });
+      return;
+    }
     
     if (game?.isMultiplayer) {
       // For multiplayer games, show room browser first
       setSelectedGame(gameId);
       setShowRoomBrowser(true);
+      setShowLudoModePicker(false);
+      setSelectedMode(null);
     } else {
       // For single player games, go directly to game
       const url = {
         pathname: router.pathname,
         query: { ...router.query, game: gameId }
       };
+      setShowLudoModePicker(false);
+      setSelectedMode(null);
       router.push(url, undefined, { shallow: true });
     }
   }
@@ -358,9 +389,37 @@ export default function ArcadeOnline() {
     setSelectedRoomId(roomId);
     setSelectedTier(tierCode || '10K');
     setShowRoomBrowser(false);
+    setShowLudoModePicker(false);
+    if (selectedGame === "ludo") {
+      setSelectedMode("online");
+    }
     const query = { ...router.query, game: selectedGame, room: roomId };
     if (tierCode) query.tier = tierCode;
     router.push({ pathname: router.pathname, query }, undefined, { shallow: true });
+  }
+
+  function chooseLudoMode(mode) {
+    if (mode === "online") {
+      setSelectedMode("online");
+      setShowLudoModePicker(false);
+      setShowRoomBrowser(true);
+      setSelectedRoomId(null);
+      setSelectedTier(null);
+      return;
+    }
+
+    const baseQuery = { ...router.query, game: "ludo", mode };
+    delete baseQuery.room;
+    delete baseQuery.tier;
+
+    setSelectedMode(mode);
+    setShowLudoModePicker(false);
+    setShowRoomBrowser(false);
+    setSelectedRoomId(null);
+    setSelectedTier(null);
+    setSelectedGame("ludo");
+
+    router.push({ pathname: router.pathname, query: baseQuery }, undefined, { shallow: true });
   }
 
   async function leaveTable() {
@@ -399,18 +458,31 @@ export default function ArcadeOnline() {
     setSelectedRoomId(null);
     setSelectedTier(null);
     setShowRoomBrowser(false);
+    setShowLudoModePicker(false);
+    setSelectedMode(null);
     router.push('/arcade-online', undefined, { shallow: true });
   }
 
   function goBack() {
     if (showRoomBrowser) {
       setShowRoomBrowser(false);
-      setSelectedGame(null);
       setSelectedTier(null);
+      setSelectedRoomId(null);
+      if (selectedGame === "ludo") {
+        setShowLudoModePicker(true);
+        setSelectedMode(null);
+      } else {
+        setSelectedGame(null);
+        setShowLudoModePicker(false);
+        setSelectedMode(null);
+      }
     } else if (selectedGame) {
       setSelectedGame(null);
       setSelectedRoomId(null);
       setSelectedTier(null);
+      setShowRoomBrowser(false);
+      setShowLudoModePicker(false);
+      setSelectedMode(null);
       router.push('/arcade-online', undefined, { shallow: true });
     } else {
       router.push('/mining');
@@ -481,7 +553,42 @@ export default function ArcadeOnline() {
         </header>
 
         {/* Content */}
-        {showRoomBrowser ? (
+{showLudoModePicker && selectedGame === "ludo" && !selectedMode ? (
+          <div className="flex-1 px-4 pb-8">
+            <div className="max-w-md mx-auto h-full flex items-center">
+              <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-6">
+                <div className="text-center mb-6">
+                  <div className="text-4xl mb-2">🎲</div>
+                  <h2 className="text-2xl font-bold text-white mb-1">Ludo</h2>
+                  <p className="text-white/60 text-sm">Choose how you want to play</p>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => chooseLudoMode("online")}
+                    className="w-full px-4 py-2.5 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-sm font-semibold text-white"
+                  >
+                    Online Multiplayer (Rooms)
+                  </button>
+                  <button
+                    onClick={() => chooseLudoMode("bot")}
+                    className="w-full px-4 py-2.5 rounded-xl bg-sky-600/90 hover:bg-sky-500 text-sm font-semibold text-white"
+                  >
+                    Vs Bot (offline)
+                  </button>
+                  <button
+                    onClick={() => chooseLudoMode("local")}
+                    className="w-full px-4 py-2.5 rounded-xl bg-purple-600/90 hover:bg-purple-500 text-sm font-semibold text-white"
+                  >
+                    Local 2–4 players (offline)
+                  </button>
+                </div>
+                <p className="mt-4 text-xs text-white/50 text-center">
+                  Bot & Local modes do not require rooms or internet connection.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : showRoomBrowser ? (
           /* Room Browser for Multiplayer Games */
           <div className="flex-1 px-4 pb-8">
             <div className="max-w-4xl mx-auto h-full">
@@ -511,6 +618,7 @@ export default function ArcadeOnline() {
                 playerName={playerName}
                 roomId={selectedRoomId}
                 tierCode={TIERED_GAMES.includes(selectedGame) ? (selectedTier || '10K') : undefined}
+                mode={selectedMode}
               />
             </div>
           </div>
