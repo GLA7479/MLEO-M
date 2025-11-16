@@ -400,7 +400,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     return () => clearInterval(tickRef.current);
   }, [ses?.turn_deadline, ses?.stage, ses?.current_turn, mySeat]);
 
-  // 🔵 סנכרון session מהשרת כל ~1.5 שניות
+  // 🔵 סנכרון session מהשרת בקצב מהיר יותר (כ-0.4 שנ')
   useEffect(() => {
     if (!ses?.id) return;
 
@@ -409,7 +409,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     const interval = setInterval(async () => {
       if (cancelled) return;
       await fetchSession(); // מביא את מצב המשחק המעודכן (stage, board_state וכו')
-    }, 1500);
+    }, 400);
 
     return () => {
       cancelled = true;
@@ -434,7 +434,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     const timer = setTimeout(() => {
       // אותה פונקציית doRoll קיימת כבר למעלה
       doRoll();
-    }, 1500);
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [ses?.id, ses?.stage, ses?.board_state, ses?.current_turn, mySeat]);
@@ -475,11 +475,11 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     // יש קובייה – בודק אם יש מהלך חוקי
     const moves = listMovablePieces(b, turnSeat, b.dice);
 
-    // אין אף מהלך → מחכים ~2 שניות ואז מדלגים תור
+    // אין אף מהלך → מחכים רגע ואז מדלגים תור
     if (!moves.length) {
       setTimeout(() => {
         endTurn(b);
-      }, 2000); // 2 שניות כדי לראות את הקובייה
+      }, 700); // השהייה קצרה יותר
       return;
     }
 
