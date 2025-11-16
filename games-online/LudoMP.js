@@ -5,6 +5,7 @@
 // Uses lib/ludoEngine.js
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/router";
 import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 import {
   createInitialBoard,
@@ -74,6 +75,7 @@ function fmt(n) {
 
 export default function LudoMP({ roomId, playerName, vault, setVaultBoth, tierCode = "10K" }) {
   // Single vault bridge, used both by MP and Bot
+  const router = useRouter();
   useEffect(() => {
     window.updateVaultCallback = setVaultBoth;
     return () => {
@@ -82,6 +84,14 @@ export default function LudoMP({ roomId, playerName, vault, setVaultBoth, tierCo
   }, [setVaultBoth]);
 
   const [mode, setMode] = useState(null); // null | "online" | "bot" | "local"
+
+  useEffect(() => {
+    const qMode =
+      typeof router?.query?.mode === "string" ? router.query.mode : null;
+    if (!mode && qMode && (qMode === "online" || qMode === "bot" || qMode === "local")) {
+      setMode(qMode);
+    }
+  }, [router?.query?.mode, mode, router]);
 
   // Simple overlay menu for mode selection
   if (!mode) {
