@@ -2343,6 +2343,16 @@ function LudoBoard({
               stageText = "Y";
             }
 
+            const totalPath = LUDO_TRACK_LEN + LUDO_HOME_LEN;
+            const stepsLeft =
+              progressInfo.state === "track"
+                ? Math.max(0, totalPath - pos)
+                : progressInfo.state === "home"
+                ? Math.max(0, totalPath - pos)
+                : progressInfo.state === "yard"
+                ? totalPath
+                : null;
+
             return (
               <button
                 key={`${seat}-${idx}`}
@@ -2413,6 +2423,20 @@ function LudoBoard({
                       transform: "translate(-50%, -50%)",
                     }}
                   />
+                  {stepsLeft != null && (
+                    <span
+                      className="absolute text-[10px] font-extrabold text-black pointer-events-none select-none"
+                      style={{
+                        zIndex: 24,
+                        textShadow: "0 1px 2px rgba(255,255,255,0.6)",
+                        left: "50%",
+                        bottom: "-4%",
+                        transform: "translate(-50%, -50%)",
+                      }}
+                    >
+                      {stepsLeft} S
+                    </span>
+                  )}
                 </div>
               </button>
             );
