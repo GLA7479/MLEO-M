@@ -63,6 +63,26 @@ function writeVault(nextValue) {
     window.updateVaultCallback(readVault());
   }
 }
+const HISTORY_STORAGE_KEY = "ludo_history_v1";
+function readHistoryMap() {
+  return safeRead(HISTORY_STORAGE_KEY, {});
+}
+function writeHistoryMap(map) {
+  safeWrite(HISTORY_STORAGE_KEY, map);
+}
+function appendHistoryRecord(playerName, entry) {
+  if (!playerName) return;
+  const map = readHistoryMap();
+  const list = Array.isArray(map[playerName]) ? map[playerName] : [];
+  list.unshift({ ...entry, timestamp: entry.timestamp ?? Date.now() });
+  map[playerName] = list.slice(0, 20);
+  writeHistoryMap(map);
+}
+function getPlayerHistory(playerName) {
+  if (!playerName) return [];
+  const map = readHistoryMap();
+  return Array.isArray(map[playerName]) ? map[playerName] : [];
+}
 function fmt(n) {
   n = Math.floor(Number(n || 0));
   if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
@@ -211,6 +231,8 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const mySeat = myRow?.seat_index ?? null;
   const [diceSeatOwner, setDiceSeatOwner] = useState(null);
   const dicePresenceRef = useRef(false);
+  const [seatModal, setSeatModal] = useState(null);
+  const historyStampRef = useRef(null);
 
   useEffect(() => {
     if (!board) {
@@ -227,6 +249,50 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     }
     dicePresenceRef.current = hasDice;
   }, [board, liveTurnSeat]);
+
+  useEffect(() => {
+    if (!roomId) return;
+    if (mySeat != null) {
+      safeWrite("ludo_last_online_seat", { roomId, seat: mySeat });
+    } else {
+      const stored = safeRead("ludo_last_online_seat", null);
+      if (stored?.roomId === roomId) {
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem("ludo_last_online_seat");
+        }
+      }
+    }
+  }, [mySeat, roomId]);
+
+  useEffect(() => {
+    if (!roomId || mySeat != null) return;
+    const stored = safeRead("ludo_last_online_seat", null);
+    if (!stored || stored.roomId !== roomId) return;
+    const row = seatMap.get(stored.seat);
+    if (!row) {
+      takeSeat(stored.seat);
+    } else if (row.client_id !== clientId) {
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("ludo_last_online_seat");
+      }
+    }
+  }, [seatMap, roomId, mySeat, clientId, takeSeat]);
+
+  useEffect(() => {
+    if (!board?.winner || ses?.stage !== "finished") return;
+    const stamp = `${ses.id || "session"}:${board.winner}:${JSON.stringify(board.finished)}`;
+    if (historyStampRef.current === stamp) return;
+    historyStampRef.current = stamp;
+    seatMap.forEach((row, idx) => {
+      if (!row?.player_name) return;
+      appendHistoryRecord(row.player_name, {
+        timestamp: Date.now(),
+        mode: "online",
+        room: roomId || null,
+        result: board.winner === idx ? "win" : "loss",
+      });
+    });
+  }, [board?.winner, board?.finished, ses?.stage, ses?.id, seatMap, roomId]);
 
   const ensureSession = useCallback(
     async (room) => {
@@ -1102,7 +1168,8 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const [doubleCountdown, setDoubleCountdown] = useState(null);
 
   return (
-    <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: '600px', height: '100%' }}>
+    <>
+      <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: '600px', height: '100%' }}>
       {/* Seats */}
       <div className="w-full overflow-x-auto">
         <div className="flex gap-2 text-[11px] min-w-[480px]">
@@ -1111,10 +1178,17 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
           const isMe = row?.client_id === clientId;
           const seatColor = SEAT_HEX_COLORS[idx] || "rgba(255,255,255,0.1)";
           const isTurnSeat = liveTurnSeat === idx;
+          const handleSeatClick = () => {
+            if (!row) {
+              takeSeat(idx);
+            } else {
+              setSeatModal(idx);
+            }
+          };
           return (
             <button
               key={idx}
-              onClick={() => takeSeat(idx)}
+              onClick={handleSeatClick}
               className={`border rounded-md px-2 py-1 flex flex-col items-center justify-center text-xs font-semibold transition flex-1 ${
                 isMe
                   ? "border-white shadow-inner shadow-white/50"
@@ -1230,8 +1304,19 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
           )}
         </div>
       </div>
-
     </div>
+      {seatModal != null && (
+        <PlayerInfoModal
+          seatIndex={seatModal}
+          playerName={seatMap.get(seatModal)?.player_name || `Seat ${seatModal + 1}`}
+          color={SEAT_HEX_COLORS[seatModal] || "#ffffff"}
+          board={board}
+          mode="online"
+          history={getPlayerHistory(seatMap.get(seatModal)?.player_name)}
+          onClose={() => setSeatModal(null)}
+        />
+      )}
+    </>
   );
 }
 
@@ -1242,6 +1327,7 @@ function LudoVsBot({ vault, onBackToMode }) {
   const [stage, setStage] = useState("lobby"); // 'lobby' | 'playing' | 'finished'
   const [msg, setMsg] = useState("");
   const [deadline, setDeadline] = useState(null);
+  const [seatModal, setSeatModal] = useState(null);
   const [diceSeatOwner, setDiceSeatOwner] = useState(null);
   const dicePresenceRef = useRef(false);
 
@@ -1254,6 +1340,12 @@ function LudoVsBot({ vault, onBackToMode }) {
     board.dice ?? null,
     board.lastDice ?? null
   );
+  const canPlayerRoll =
+    stage === "playing" &&
+    board.turnSeat === mySeat &&
+    board.dice == null &&
+    !diceRolling &&
+    board.winner == null;
 
   const canStart = useMemo(() => {
     return stage === "lobby" && vaultBalance >= buyIn;
@@ -1331,6 +1423,11 @@ function LudoVsBot({ vault, onBackToMode }) {
     }
   }
 
+  function handlePlayerDiceClick() {
+    if (!canPlayerRoll) return;
+    doRoll();
+  }
+
   function onPieceClick(pieceIndex) {
     if (stage !== "playing") return;
     if (board.winner != null) return;
@@ -1369,6 +1466,16 @@ function LudoVsBot({ vault, onBackToMode }) {
     } else {
       setMsg("Bot won");
     }
+    appendHistoryRecord("You", {
+      timestamp: Date.now(),
+      mode: "bot",
+      result: winnerSeat === mySeat ? "win" : "loss",
+    });
+    appendHistoryRecord("Bot", {
+      timestamp: Date.now(),
+      mode: "bot",
+      result: winnerSeat === botSeat ? "win" : "loss",
+    });
   }
 
   // Simple bot logic
@@ -1435,22 +1542,6 @@ function LudoVsBot({ vault, onBackToMode }) {
     }, 1500);
   }, [board, stage]);
 
-  // Auto-roll for player (no manual Roll button)
-  useEffect(() => {
-    if (stage !== "playing") return;
-    if (board.winner != null) return;
-
-    const turnSeat = board.turnSeat;
-    if (turnSeat !== mySeat) return;
-    if (board.dice != null) return;
-
-    const timer = setTimeout(() => {
-      doRoll();
-    }, 1500);
-
-    return () => clearTimeout(timer);
-  }, [stage, board, mySeat]);
-
   // local deadline
   useEffect(() => {
     if (!deadline || stage !== "playing") return;
@@ -1462,9 +1553,8 @@ function LudoVsBot({ vault, onBackToMode }) {
           return;
         }
         if (!board.dice) {
-          if (turnSeat === mySeat) {
-            doRoll();
-          }
+          setDeadline(Date.now() + TURN_SECONDS * 1000);
+          return;
         } else {
           const dice = board.dice;
           const moves = listMovablePieces(board, turnSeat, dice);
@@ -1514,14 +1604,17 @@ function LudoVsBot({ vault, onBackToMode }) {
   ];
 
   return (
-    <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: "600px", height: "100%" }}>
-      <div className="w-full overflow-x-auto">
-        <div className="flex gap-2 text-[11px] min-w-[480px]">
+    <>
+      <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: "600px", height: "100%" }}>
+        <div className="w-full overflow-x-auto">
+          <div className="flex gap-2 text-[11px] min-w-[480px]">
           {seatCards.map((card, idx) => (
-            <div
+            <button
+              type="button"
               key={idx}
+              onClick={() => !card.inactive && setSeatModal(card.seat)}
               className={`border rounded-md px-2 py-1 flex flex-col items-center justify-center text-xs font-semibold transition flex-1 ${
-                card.inactive ? "border-white/20 opacity-50" : "border-white/30 shadow"
+                card.inactive ? "border-white/20 opacity-50 cursor-default" : "border-white/30 shadow hover:border-white/60"
               } ${card.isTurn ? "ring-2 ring-amber-300 animate-pulse" : ""}`}
               style={{
                 background: `linear-gradient(135deg, ${card.color}dd, ${card.color}aa)`,
@@ -1544,16 +1637,16 @@ function LudoVsBot({ vault, onBackToMode }) {
                     : ""}
                 </span>
               )}
-            </div>
+            </button>
           ))}
+          </div>
         </div>
-      </div>
 
-      <div
-        className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 flex flex-col gap-3 overflow-hidden"
-        style={{ minHeight: "500px", height: "100%" }}
-      >
-        <div className="flex-1 h-full overflow-hidden" style={{ minHeight: "400px", height: "100%" }}>
+        <div
+          className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 flex flex-col gap-3 overflow-hidden"
+          style={{ minHeight: "500px", height: "100%" }}
+        >
+          <div className="flex-1 h-full overflow-hidden" style={{ minHeight: "400px", height: "100%" }}>
           <LudoBoard
             board={board}
             mySeat={mySeat}
@@ -1563,16 +1656,18 @@ function LudoVsBot({ vault, onBackToMode }) {
             diceValue={diceDisplayValue}
             diceRolling={diceRolling}
             diceSeat={diceSeatOwner ?? board.turnSeat ?? mySeat}
+            diceClickable={canPlayerRoll}
+            onDiceClick={handlePlayerDiceClick}
           />
-        </div>
+          </div>
 
-        <div className="w-full text-xs flex flex-col gap-2 items-center">
+          <div className="w-full text-xs flex flex-col gap-2 items-center">
           <div className="flex justify-center items-center flex-wrap gap-2">
             <span className="text-white/70">
               {stage === "lobby"
                 ? `Buy-in: ${fmt(buyIn)} required to start`
                 : stage === "playing"
-                ? "Auto-roll enabled • Tap your piece to move"
+                ? "Tap the die on the board to roll, then tap your piece"
                 : "Game finished - reset to play again"}
             </span>
             {msg && <span className="text-amber-300 text-center">{msg}</span>}
@@ -1613,6 +1708,18 @@ function LudoVsBot({ vault, onBackToMode }) {
         </div>
       </div>
     </div>
+      {seatModal != null && (
+        <PlayerInfoModal
+          seatIndex={seatModal}
+          playerName={seatCards.find((c) => c.seat === seatModal)?.name || `Seat ${seatModal + 1}`}
+          color={SEAT_HEX_COLORS[seatModal] || "#ffffff"}
+          board={board}
+          mode="bot"
+          history={getPlayerHistory(seatCards.find((c) => c.seat === seatModal)?.name)}
+          onClose={() => setSeatModal(null)}
+        />
+      )}
+    </>
   );
 }
 
@@ -1625,6 +1732,7 @@ function LudoLocal({ onBackToMode }) {
   const [msg, setMsg] = useState("");
   const [diceSeatOwner, setDiceSeatOwner] = useState(null);
   const dicePresenceRef = useRef(false);
+  const [seatModal, setSeatModal] = useState(null);
 
   useEffect(() => {
     if (stage !== "setup") return;
@@ -1729,24 +1837,25 @@ function LudoLocal({ onBackToMode }) {
     } else {
       setMsg("Game finished");
     }
+    const now = Date.now();
+    Array.from({ length: playerCount }, (_, seat) => {
+      const name = `Player ${seat + 1}`;
+      appendHistoryRecord(name, {
+        timestamp: now,
+        mode: "local",
+        result: winnerSeat === seat ? "win" : "loss",
+      });
+    });
   }
 
-  useEffect(() => {
-    if (stage !== "playing") return;
-    if (board.winner != null) return;
-
-    const turnSeat = board.turnSeat;
-    if (turnSeat == null) return;
-    if (board.dice != null) return;
-
-    const timer = setTimeout(() => {
-      doRollLocal();
-    }, 1500);
-
-    return () => clearTimeout(timer);
-  }, [stage, board]);
-
   const canStart = stage === "setup";
+  function handleLocalDiceClick() {
+    const canRoll =
+      stage === "playing" && board.dice == null && board.winner == null && !diceRolling;
+    if (!canRoll) return;
+    doRollLocal();
+  }
+
   const seatCards = Array.from({ length: 4 }, (_, idx) => {
     const active = idx < playerCount;
     return {
@@ -1760,14 +1869,17 @@ function LudoLocal({ onBackToMode }) {
   });
 
   return (
-    <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: "600px", height: "100%" }}>
+    <>
+      <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: "600px", height: "100%" }}>
       <div className="w-full overflow-x-auto">
         <div className="flex gap-2 text-[11px] min-w-[480px]">
           {seatCards.map((card, idx) => (
-            <div
+            <button
+              type="button"
               key={idx}
+              onClick={() => !card.inactive && setSeatModal(card.seat)}
               className={`border rounded-md px-2 py-1 flex flex-col items-center justify-center text-xs font-semibold transition flex-1 ${
-                card.inactive ? "border-white/20 opacity-50" : "border-white/30 shadow"
+                card.inactive ? "border-white/20 opacity-50 cursor-default" : "border-white/30 shadow hover:border-white/60"
               } ${card.isTurn ? "ring-2 ring-amber-300 animate-pulse" : ""}`}
               style={{
                 background: `linear-gradient(135deg, ${card.color}dd, ${card.color}aa)`,
@@ -1790,7 +1902,7 @@ function LudoLocal({ onBackToMode }) {
                     : ""}
                 </span>
               )}
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -1805,10 +1917,12 @@ function LudoLocal({ onBackToMode }) {
             mySeat={board.turnSeat}
             onPieceClick={onPieceClick}
             showSidebar={false}
-            disableHighlights={diceRolling}
+            disableHighlights
             diceValue={diceDisplayValue}
             diceRolling={diceRolling}
             diceSeat={diceSeatOwner ?? board.turnSeat ?? 0}
+            diceClickable={stage === "playing" && board.dice == null && board.winner == null && !diceRolling}
+            onDiceClick={handleLocalDiceClick}
           />
         </div>
 
@@ -1818,7 +1932,7 @@ function LudoLocal({ onBackToMode }) {
               {stage === "setup"
                 ? "Choose number of players and press Start"
                 : stage === "playing"
-                ? "Pass the device to the active player • Auto-roll enabled"
+                ? "Pass the device to the active player • Tap the die to roll"
                 : "Game finished – Reset or Start again"}
             </span>
             {msg && <span className="text-amber-300 text-center">{msg}</span>}
@@ -1855,26 +1969,38 @@ function LudoLocal({ onBackToMode }) {
               Reset
             </button>
           </div>
+          </div>
         </div>
-      </div>
 
-      <div className="w-full bg-black/40 rounded-lg px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-col">
-          <span className="font-semibold">Ludo Local</span>
-          <span className="text-white/60">Players: {playerCount}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          {onBackToMode && (
-            <button
-              onClick={onBackToMode}
-              className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20 text-xs"
-            >
-              Mode
-            </button>
-          )}
+        <div className="w-full bg-black/40 rounded-lg px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-col">
+            <span className="font-semibold">Ludo Local</span>
+            <span className="text-white/60">Players: {playerCount}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {onBackToMode && (
+              <button
+                onClick={onBackToMode}
+                className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20 text-xs"
+              >
+                Mode
+              </button>
+            )}
         </div>
       </div>
     </div>
+      {seatModal != null && (
+        <PlayerInfoModal
+          seatIndex={seatModal}
+          playerName={seatCards.find((c) => c.seat === seatModal)?.name || `Player ${seatModal + 1}`}
+          color={SEAT_HEX_COLORS[seatModal] || "#ffffff"}
+          board={board}
+          mode="local"
+          history={getPlayerHistory(seatCards.find((c) => c.seat === seatModal)?.name)}
+          onClose={() => setSeatModal(null)}
+        />
+      )}
+    </>
   );
 }
 
@@ -1979,6 +2105,21 @@ function describePieceProgress(seat, pos) {
     globalIndex,
     state: "track",
   };
+}
+
+function summarizeSeat(board, seat) {
+  const totalPath = LUDO_TRACK_LEN + LUDO_HOME_LEN;
+  const arr = board?.pieces?.[String(seat)] || [];
+  const yard = arr.filter((pos) => pos < 0).length;
+  const home = arr.filter((pos) => pos >= totalPath).length;
+  const track = arr.length - yard - home;
+  const finishedCount = (board?.finished?.[String(seat)] ?? 0) + home;
+  const stepsRemaining = arr.reduce((sum, pos) => {
+    if (pos < 0) return sum + totalPath;
+    if (pos >= totalPath) return sum;
+    return sum + Math.max(0, totalPath - pos);
+  }, 0);
+  return { yard, track, home, finished: finishedCount, stepsRemaining };
 }
 
 function formatSeatLabel(seat) {
@@ -2099,13 +2240,17 @@ function useFinishFlash(activeSeats, pieces) {
   );
 }
 
-function DiceDisplay({ displayValue, rolling, seat }) {
-  const dots = displayValue ?? 1;
+function DiceDisplay({ displayValue, rolling, seat, clickable = false }) {
+  const dots = displayValue ?? "•";
   const color = SEAT_HEX_COLORS[seat] || "#f8fafc";
   const highlight = lightenColor(color, 0.45);
 
   return (
-    <div className="relative w-12 h-12 sm:w-14 sm:h-14 text-white">
+    <div
+      className={`relative w-12 h-12 sm:w-14 sm:h-14 text-white transition-transform duration-150 ${
+        clickable ? "hover:scale-105" : ""
+      }`}
+    >
       <div
         className={`absolute inset-0 rounded-2xl border-2 shadow-lg shadow-black/40 transition ${
           rolling ? "animate-pulse" : ""
@@ -2164,6 +2309,8 @@ function LudoBoard({
   diceValue = null,
   diceRolling = false,
   diceSeat = null,
+  diceClickable = false,
+  onDiceClick = null,
 }) {
   const pieces = board.pieces || {};
 
@@ -2286,16 +2433,37 @@ function LudoBoard({
             }}
           />
 
-          {diceValue != null && (
+          {(diceValue != null || diceClickable) && (
             <div
-              className="absolute z-30 pointer-events-none"
+              className={`absolute z-30 ${diceClickable ? "cursor-pointer" : "pointer-events-none"}`}
+              role={diceClickable ? "button" : undefined}
+              tabIndex={diceClickable ? 0 : undefined}
+              aria-label={diceClickable ? "Roll dice" : "Dice"}
+              onClick={() => {
+                if (diceClickable && !diceRolling && typeof onDiceClick === "function") {
+                  onDiceClick();
+                }
+              }}
+              onKeyDown={(evt) => {
+                if (!diceClickable || diceRolling || typeof onDiceClick !== "function") return;
+                if (evt.key === "Enter" || evt.key === " ") {
+                  evt.preventDefault();
+                  onDiceClick();
+                }
+              }}
               style={{
                 left: "50%",
                 top: "78%",
                 transform: "translate(-50%, -50%)",
+                pointerEvents: diceClickable ? "auto" : "none",
               }}
             >
-              <DiceDisplay displayValue={diceValue} rolling={diceRolling} seat={diceSeat} />
+              <DiceDisplay
+                displayValue={diceValue}
+                rolling={diceRolling}
+                seat={diceSeat}
+                clickable={diceClickable && !diceRolling}
+              />
             </div>
           )}
 
@@ -2330,7 +2498,6 @@ function LudoBoard({
             }
 
             const movable =
-              !disableHighlights &&
               isMe &&
               board.dice != null &&
               listMovablePieces(board, seat, board.dice).includes(idx);
@@ -2376,7 +2543,9 @@ function LudoBoard({
                   position: 'absolute',
                   background: "transparent",
                   border: "none",
-                  padding: 0
+                  padding: 0,
+                  transition: "left 0.35s ease, top 0.35s ease",
+                  willChange: "left, top"
                 }}
               >
                 <div className="w-full h-full relative pointer-events-none" style={{ zIndex: 21 }}>
@@ -2425,12 +2594,12 @@ function LudoBoard({
                   />
                   {stepsLeft != null && (
                     <span
-                      className="absolute text-[10px] font-extrabold text-black pointer-events-none select-none"
+                      className="absolute text-[11px] font-extrabold text-white pointer-events-none select-none"
                       style={{
                         zIndex: 24,
-                        textShadow: "0 1px 2px rgba(255,255,255,0.6)",
+                        textShadow: "0 1px 3px rgba(0,0,0,0.8)",
                         left: "50%",
-                        bottom: "-4%",
+                        bottom: "0%",
                         transform: "translate(-50%, -50%)",
                       }}
                     >
@@ -2597,6 +2766,79 @@ function TrackOverlay({ layout, occupancy, highlights, homeSegments, highlightNu
           </Fragment>
         );
       })}
+    </div>
+  );
+}
+
+function PlayerInfoModal({ seatIndex, playerName, color, board, history = [], mode, onClose }) {
+  const stats = summarizeSeat(board, seatIndex);
+  const readableName = playerName || `Seat ${seatIndex + 1}`;
+  const recentHistory = Array.isArray(history) ? history.slice(0, 5) : [];
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+      <div className="w-full max-w-md bg-slate-900 rounded-2xl border border-white/10 shadow-2xl p-4 text-white">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-xs uppercase tracking-widest text-white/60">Seat {seatIndex + 1}</p>
+            <h2 className="text-xl font-bold">{readableName}</h2>
+          </div>
+          <div
+            className="w-10 h-10 rounded-full border-2 border-white/40"
+            style={{ background: color }}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="bg-white/5 rounded-xl p-3">
+            <p className="text-white/60 text-xs uppercase">Yard</p>
+            <p className="text-lg font-bold">{stats.yard}</p>
+          </div>
+          <div className="bg-white/5 rounded-xl p-3">
+            <p className="text-white/60 text-xs uppercase">On Track</p>
+            <p className="text-lg font-bold">{stats.track}</p>
+          </div>
+          <div className="bg-white/5 rounded-xl p-3">
+            <p className="text-white/60 text-xs uppercase">Finished</p>
+            <p className="text-lg font-bold">{stats.finished}</p>
+          </div>
+          <div className="bg-white/5 rounded-xl p-3">
+            <p className="text-white/60 text-xs uppercase">Steps Remaining</p>
+            <p className="text-lg font-bold">{stats.stepsRemaining}</p>
+          </div>
+        </div>
+        <div className="mt-5">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs uppercase tracking-widest text-white/60">Recent games</p>
+            <span className="text-[10px] text-white/40">{mode || "game"}</span>
+          </div>
+          {recentHistory.length === 0 ? (
+            <p className="text-white/60 text-sm">No history recorded yet.</p>
+          ) : (
+            <ul className="flex flex-col gap-2 max-h-40 overflow-y-auto pr-1">
+              {recentHistory.map((item, idx) => (
+                <li
+                  key={idx}
+                  className="bg-white/5 rounded-lg px-3 py-2 text-sm flex items-center justify-between"
+                >
+                  <span className={`font-semibold ${item.result === "win" ? "text-emerald-300" : "text-red-300"}`}>
+                    {item.result === "win" ? "Win" : "Loss"}
+                  </span>
+                  <span className="text-white/60 text-xs">
+                    {new Date(item.timestamp).toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="mt-5 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 rounded-full border border-white/30 text-sm hover:bg-white/10 transition"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
