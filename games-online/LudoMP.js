@@ -2241,7 +2241,7 @@ function useFinishFlash(activeSeats, pieces) {
 }
 
 function DiceDisplay({ displayValue, rolling, seat, clickable = false }) {
-  const dots = displayValue ?? "•";
+  const dots = displayValue ?? 1;
   const color = SEAT_HEX_COLORS[seat] || "#f8fafc";
   const highlight = lightenColor(color, 0.45);
 

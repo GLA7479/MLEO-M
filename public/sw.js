@@ -1,6 +1,14 @@
 // Very minimal SW: cache only a tiny local allowlist; never touch dev/HMR or external domains.
 const CACHE = "mleo-app-v1";
-const LOCAL_ASSETS = ["/", "/favicon.ico"]; // add only stable local files if you want
+const LOCAL_ASSETS = [
+  "/",
+  "/favicon.ico",
+  "/images/ludo/board.png",
+  "/images/ludo/dog_0.png",
+  "/images/ludo/dog_1.png",
+  "/images/ludo/dog_2.png",
+  "/images/ludo/dog_3.png",
+]; // add only stable local files if you want
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
