@@ -1330,6 +1330,7 @@ function LudoVsBot({ vault, onBackToMode }) {
   const [seatModal, setSeatModal] = useState(null);
   const [diceSeatOwner, setDiceSeatOwner] = useState(null);
   const dicePresenceRef = useRef(false);
+  const diceSeatDelayRef = useRef(null);
 
   const buyIn = 1000;
   const vaultBalance = vault;
@@ -1351,16 +1352,40 @@ function LudoVsBot({ vault, onBackToMode }) {
     return stage === "lobby" && vaultBalance >= buyIn;
   }, [stage, vaultBalance, buyIn]);
 
+  const setDiceSeatOwnerInstant = useCallback((seat) => {
+    if (diceSeatDelayRef.current) {
+      clearTimeout(diceSeatDelayRef.current);
+      diceSeatDelayRef.current = null;
+    }
+    setDiceSeatOwner(seat);
+  }, []);
+
+  const scheduleDiceSeatOwner = useCallback(
+    (seat) => {
+      if (diceSeatDelayRef.current) clearTimeout(diceSeatDelayRef.current);
+      diceSeatDelayRef.current = setTimeout(() => {
+        setDiceSeatOwnerInstant(seat);
+      }, 2000);
+    },
+    [setDiceSeatOwnerInstant]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (diceSeatDelayRef.current) {
+        clearTimeout(diceSeatDelayRef.current);
+        diceSeatDelayRef.current = null;
+      }
+    };
+  }, []);
+
   useEffect(() => {
     const hasDice = board.dice != null;
     if (hasDice && !dicePresenceRef.current) {
-      setDiceSeatOwner(board.turnSeat ?? mySeat);
-    }
-    if (!hasDice && !board.lastDice) {
-      setDiceSeatOwner(null);
+      setDiceSeatOwnerInstant(board.turnSeat ?? mySeat);
     }
     dicePresenceRef.current = hasDice;
-  }, [board.dice, board.lastDice, board.turnSeat, mySeat]);
+  }, [board.dice, board.turnSeat, mySeat, setDiceSeatOwnerInstant]);
 
   function resetGame() {
     setBoard(createInitialBoard([0, 1]));
@@ -1401,14 +1426,12 @@ function LudoVsBot({ vault, onBackToMode }) {
     const moves = listMovablePieces(nextBoard, mySeat, dice);
 
     if (!moves.length) {
-      // אין שום כלי שיכול לזוז → אחרי ~2 שניות עוברים תור
       setTimeout(() => {
         setBoard((prev) => {
-          // שמירה ממצב לא עדכני
           if (
-            prev !== nextBoard ||          // כבר נעשה שינוי אחר
-            prev.turnSeat !== mySeat ||    // כבר לא התור שלך
-            prev.dice !== dice ||          // הקובייה השתנתה
+            prev !== nextBoard ||
+            prev.turnSeat !== mySeat ||
+            prev.dice !== dice ||
             stage !== "playing"
           ) {
             return prev;
@@ -1416,10 +1439,11 @@ function LudoVsBot({ vault, onBackToMode }) {
 
           const b2 = { ...prev, dice: null, lastDice: dice };
           b2.turnSeat = nextTurnSeat(b2);
+          scheduleDiceSeatOwner(b2.turnSeat ?? null);
           return b2;
         });
         setDeadline(Date.now() + TURN_SECONDS * 1000);
-      }, 1800); // ~1.8 שניות – בתוך הטווח של 2–3 ששאלת
+      }, 1800);
     }
   }
 
@@ -1449,7 +1473,9 @@ function LudoVsBot({ vault, onBackToMode }) {
       return;
     }
     next.turnSeat = nextTurnSeat(next);
+    next.dice = null;
     setBoard(next);
+    setDiceSeatOwnerInstant(next.turnSeat ?? null);
     setDeadline(Date.now() + TURN_SECONDS * 1000);
     setMsg("");
   }
@@ -1503,6 +1529,7 @@ function LudoVsBot({ vault, onBackToMode }) {
         next.turnSeat = nextTurnSeat(next);
         setBoard(next);
         setDeadline(Date.now() + TURN_SECONDS * 1000);
+        scheduleDiceSeatOwner(next.turnSeat ?? null);
       }, 1500);
       return;
     }
@@ -1530,6 +1557,7 @@ function LudoVsBot({ vault, onBackToMode }) {
         next2.turnSeat = nextTurnSeat(next2);
         setBoard(next2);
         setDeadline(Date.now() + TURN_SECONDS * 1000);
+        scheduleDiceSeatOwner(next2.turnSeat ?? null);
         return;
       }
       if (next.winner != null) {
@@ -1539,6 +1567,7 @@ function LudoVsBot({ vault, onBackToMode }) {
       next.turnSeat = nextTurnSeat(next);
       setBoard(next);
       setDeadline(Date.now() + TURN_SECONDS * 1000);
+      scheduleDiceSeatOwner(next.turnSeat ?? null);
     }, 1500);
   }, [board, stage]);
 
@@ -1562,6 +1591,7 @@ function LudoVsBot({ vault, onBackToMode }) {
             const next = { ...board, dice: null, lastDice: dice };
             next.turnSeat = nextTurnSeat(next);
             setBoard(next);
+            scheduleDiceSeatOwner(next.turnSeat ?? null);
           }
         }
         setDeadline(Date.now() + TURN_SECONDS * 1000);
@@ -1720,6 +1750,7 @@ function LudoLocal({ onBackToMode }) {
   const [diceSeatOwner, setDiceSeatOwner] = useState(null);
   const dicePresenceRef = useRef(false);
   const [seatModal, setSeatModal] = useState(null);
+  const diceSeatDelayRef = useRef(null);
 
   useEffect(() => {
     if (stage !== "setup") return;
@@ -1733,16 +1764,41 @@ function LudoLocal({ onBackToMode }) {
     board.lastDice ?? null
   );
 
+  const setDiceSeatOwnerInstant = useCallback((seat) => {
+    if (diceSeatDelayRef.current) {
+      clearTimeout(diceSeatDelayRef.current);
+      diceSeatDelayRef.current = null;
+    }
+    setDiceSeatOwner(seat);
+  }, []);
+
+  const scheduleDiceSeatOwner = useCallback(
+    (seat) => {
+      if (diceSeatDelayRef.current) clearTimeout(diceSeatDelayRef.current);
+      diceSeatDelayRef.current = setTimeout(() => {
+        setDiceSeatOwnerInstant(seat);
+        diceSeatDelayRef.current = null;
+      }, 2000);
+    },
+    [setDiceSeatOwnerInstant]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (diceSeatDelayRef.current) {
+        clearTimeout(diceSeatDelayRef.current);
+        diceSeatDelayRef.current = null;
+      }
+    };
+  }, []);
+
   useEffect(() => {
     const hasDice = board.dice != null;
     if (hasDice && !dicePresenceRef.current) {
-      setDiceSeatOwner(board.turnSeat ?? 0);
-    }
-    if (!hasDice && !board.lastDice) {
-      setDiceSeatOwner(null);
+      setDiceSeatOwnerInstant(board.turnSeat ?? 0);
     }
     dicePresenceRef.current = hasDice;
-  }, [board.dice, board.lastDice, board.turnSeat]);
+  }, [board.dice, board.turnSeat, setDiceSeatOwnerInstant]);
 
   function startGame() {
     const seats = Array.from({ length: playerCount }, (_, i) => i);
@@ -1778,6 +1834,7 @@ function LudoLocal({ onBackToMode }) {
 
           const after = { ...prev, dice: null, lastDice: dice };
           after.turnSeat = nextTurnSeat(after);
+          scheduleDiceSeatOwner(after.turnSeat ?? null);
           return after;
         });
       }, 1800);
@@ -1812,6 +1869,7 @@ function LudoLocal({ onBackToMode }) {
     next.turnSeat = nextTurnSeat(next);
     next.dice = null;
     setBoard(next);
+    setDiceSeatOwnerInstant(next.turnSeat ?? null);
     setMsg("");
   }
 
