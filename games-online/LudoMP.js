@@ -232,6 +232,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const [diceSeatOwner, setDiceSeatOwner] = useState(null);
   const dicePresenceRef = useRef(false);
   const [seatModal, setSeatModal] = useState(null);
+  const [autoRoll, setAutoRoll] = useState(false);
   const historyStampRef = useRef(null);
 
   useEffect(() => {
@@ -1452,6 +1453,15 @@ function LudoVsBot({ vault, onBackToMode }) {
     doRoll();
   }
 
+  useEffect(() => {
+    if (!autoRoll) return;
+    if (!canPlayerRoll) return;
+    const timer = setTimeout(() => {
+      doRoll();
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [autoRoll, canPlayerRoll, doRoll]);
+
   function onPieceClick(pieceIndex) {
     if (stage !== "playing") return;
     if (board.winner != null) return;
@@ -1703,6 +1713,16 @@ function LudoVsBot({ vault, onBackToMode }) {
             >
               Reset
             </button>
+            <button
+              onClick={() => setAutoRoll((v) => !v)}
+              className={`${CONTROL_BTN_BASE} border-sky-300/70 ${
+                autoRoll
+                  ? "bg-sky-600/80 hover:bg-sky-500"
+                  : "bg-white/10 hover:bg-white/20"
+              }`}
+            >
+              Auto dice: {autoRoll ? "ON" : "OFF"}
+            </button>
           </div>
         </div>
       </div>
@@ -1751,6 +1771,7 @@ function LudoLocal({ onBackToMode }) {
   const dicePresenceRef = useRef(false);
   const [seatModal, setSeatModal] = useState(null);
   const diceSeatDelayRef = useRef(null);
+  const [autoRoll, setAutoRoll] = useState(false);
 
   useEffect(() => {
     if (stage !== "setup") return;
@@ -1901,6 +1922,16 @@ function LudoLocal({ onBackToMode }) {
     doRollLocal();
   }
 
+  useEffect(() => {
+    const canRoll =
+      stage === "playing" && board.dice == null && board.winner == null && !diceRolling;
+    if (!autoRoll || !canRoll) return;
+    const timer = setTimeout(() => {
+      doRollLocal();
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [autoRoll, stage, board.dice, board.winner, diceRolling]);
+
   const seatCards = Array.from({ length: 4 }, (_, idx) => {
     const active = idx < playerCount;
     return {
@@ -1999,6 +2030,14 @@ function LudoLocal({ onBackToMode }) {
               className={`${CONTROL_BTN_BASE} border-white/30 bg-slate-600/80 hover:bg-slate-500`}
             >
               Reset
+            </button>
+            <button
+              onClick={() => setAutoRoll((v) => !v)}
+              className={`${CONTROL_BTN_BASE} border-sky-300/70 ${
+                autoRoll ? "bg-sky-600/80 hover:bg-sky-500" : "bg-white/10 hover:bg-white/20"
+              }`}
+            >
+              Auto dice: {autoRoll ? "ON" : "OFF"}
             </button>
           </div>
           </div>
