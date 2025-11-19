@@ -1172,7 +1172,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: '600px', height: '100%' }}>
       {/* Seats */}
       <div className="w-full overflow-x-auto">
-        <div className="flex gap-2 text-[11px] min-w-[480px]">
+        <div className="flex gap-1 text-[9px] min-w-[320px]">
         {Array.from({ length: seats }).map((_, idx) => {
           const row = seatMap.get(idx) || null;
           const isMe = row?.client_id === clientId;
@@ -1189,7 +1189,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
             <button
               key={idx}
               onClick={handleSeatClick}
-              className={`border rounded-md px-2 py-1 flex flex-col items-center justify-center text-xs font-semibold transition flex-1 ${
+              className={`border rounded-md px-1.5 py-0.5 flex flex-col items-center justify-center text-[10px] font-semibold transition flex-1 ${
                 isMe
                   ? "border-white shadow-inner shadow-white/50"
                   : "border-white/30 shadow"
@@ -1200,8 +1200,8 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
                 textShadow: "0 1px 2px rgba(0,0,0,0.7)",
               }}
             >
-              <span className="font-semibold">{`Seat ${idx + 1}`}</span>
-              <span className="text-white/70">
+              <span className="font-semibold text-[10px]">{`Seat ${idx + 1}`}</span>
+              <span className="text-white/70 text-[9px]">
                 {row?.player_name || "Empty"}
                 {isMe ? " (You)" : ""}
               </span>
@@ -1607,13 +1607,13 @@ function LudoVsBot({ vault, onBackToMode }) {
     <>
       <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: "600px", height: "100%" }}>
         <div className="w-full overflow-x-auto">
-          <div className="flex gap-2 text-[11px] min-w-[480px]">
+          <div className="flex gap-1 text-[9px] min-w-[320px]">
           {seatCards.map((card, idx) => (
             <button
               type="button"
               key={idx}
               onClick={() => !card.inactive && setSeatModal(card.seat)}
-              className={`border rounded-md px-2 py-1 flex flex-col items-center justify-center text-xs font-semibold transition flex-1 ${
+              className={`border rounded-md px-1.5 py-0.5 flex flex-col items-center justify-center text-[10px] font-semibold transition flex-1 ${
                 card.inactive ? "border-white/20 opacity-50 cursor-default" : "border-white/30 shadow hover:border-white/60"
               } ${card.isTurn ? "ring-2 ring-amber-300 animate-pulse" : ""}`}
               style={{
@@ -1622,21 +1622,8 @@ function LudoVsBot({ vault, onBackToMode }) {
                 textShadow: "0 1px 2px rgba(0,0,0,0.7)",
               }}
             >
-              <span className="font-semibold">{card.label}</span>
-              <span className="text-white/70">{card.name}</span>
-              {!card.inactive && (
-                <span className="text-white/60 text-[10px]">
-                  {stage === "playing"
-                    ? board.turnSeat === card.seat
-                      ? "Turn"
-                      : "Waiting"
-                    : stage === "lobby"
-                    ? "Lobby"
-                    : stage === "finished"
-                    ? "Finished"
-                    : ""}
-                </span>
-              )}
+              <span className="font-semibold text-[10px]">{card.label}</span>
+              <span className="text-white/70 text-[9px]">{card.name}</span>
             </button>
           ))}
           </div>
@@ -1872,13 +1859,13 @@ function LudoLocal({ onBackToMode }) {
     <>
       <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: "600px", height: "100%" }}>
       <div className="w-full overflow-x-auto">
-        <div className="flex gap-2 text-[11px] min-w-[480px]">
+        <div className="flex gap-1 text-[9px] min-w-[320px]">
           {seatCards.map((card, idx) => (
             <button
               type="button"
               key={idx}
               onClick={() => !card.inactive && setSeatModal(card.seat)}
-              className={`border rounded-md px-2 py-1 flex flex-col items-center justify-center text-xs font-semibold transition flex-1 ${
+              className={`border rounded-md px-1.5 py-0.5 flex flex-col items-center justify-center text-[10px] font-semibold transition flex-1 ${
                 card.inactive ? "border-white/20 opacity-50 cursor-default" : "border-white/30 shadow hover:border-white/60"
               } ${card.isTurn ? "ring-2 ring-amber-300 animate-pulse" : ""}`}
               style={{
@@ -1887,21 +1874,8 @@ function LudoLocal({ onBackToMode }) {
                 textShadow: "0 1px 2px rgba(0,0,0,0.7)",
               }}
             >
-              <span className="font-semibold">{card.label}</span>
-              <span className="text-white/70">{card.name}</span>
-              {!card.inactive && (
-                <span className="text-white/60 text-[10px]">
-                  {stage === "playing"
-                    ? board.turnSeat === card.seat
-                      ? "Turn"
-                      : "Waiting"
-                    : stage === "setup"
-                    ? "Setup"
-                    : stage === "finished"
-                    ? "Finished"
-                    : ""}
-                </span>
-              )}
+              <span className="font-semibold text-[10px]">{card.label}</span>
+              <span className="text-white/70 text-[9px]">{card.name}</span>
             </button>
           ))}
         </div>
