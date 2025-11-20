@@ -43,6 +43,14 @@ const LOCAL_GAMES = [
     blurb: "Mine MLEO locally, buy upgrades, keep vault in storage.",
     color: "from-yellow-500/80 to-amber-500/80",
   },
+  {
+    slug: "math-master",
+    title: "Math Master Challenge",
+    emoji: "🧮",
+    mode: "Single Player • Educational",
+    blurb: "Practice math skills with addition, subtraction, and multiplication. Multiple difficulty levels.",
+    color: "from-blue-500/80 to-cyan-500/80",
+  },
 ];
 
 export default function LocalArcadePage() {

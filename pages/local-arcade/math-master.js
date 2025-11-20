@@ -1,0 +1,512 @@
+import { useState, useEffect, useRef } from "react";
+import Layout from "../../components/Layout";
+import { useRouter } from "next/router";
+import { useIOSViewportFix } from "../../hooks/useIOSViewportFix";
+
+const LEVELS = {
+  easy: {
+    name: "Easy",
+    addition: { max: 9 },
+    subtraction: { min: 1, max: 20 },
+    multiplication: { max: 5 },
+  },
+  medium: {
+    name: "Medium",
+    addition: { max: 50 },
+    subtraction: { min: 10, max: 100 },
+    multiplication: { max: 10 },
+  },
+  hard: {
+    name: "Hard",
+    addition: { max: 100 },
+    subtraction: { min: 50, max: 200 },
+    multiplication: { max: 12 },
+  },
+};
+
+const OPERATIONS = ["addition", "subtraction", "multiplication", "mixed"];
+
+const STORAGE_KEY = "mleo_math_master";
+
+function generateQuestion(level, operation) {
+  const ops = operation === "mixed" 
+    ? ["addition", "subtraction", "multiplication"][Math.floor(Math.random() * 3)]
+    : operation;
+  
+  let a, b, correctAnswer, question;
+  
+  switch (ops) {
+    case "addition":
+      a = Math.floor(Math.random() * level.addition.max) + 1;
+      b = Math.floor(Math.random() * level.addition.max) + 1;
+      correctAnswer = a + b;
+      question = `${a} + ${b} = ?`;
+      break;
+      
+    case "subtraction":
+      const max = level.subtraction.max;
+      const min = level.subtraction.min;
+      a = Math.floor(Math.random() * (max - min + 1)) + min;
+      b = Math.floor(Math.random() * (a - 1)) + 1;
+      correctAnswer = a - b;
+      question = `${a} - ${b} = ?`;
+      break;
+      
+    case "multiplication":
+      a = Math.floor(Math.random() * level.multiplication.max) + 1;
+      b = Math.floor(Math.random() * level.multiplication.max) + 1;
+      correctAnswer = a * b;
+      question = `${a} × ${b} = ?`;
+      break;
+      
+    default:
+      return generateQuestion(level, "addition");
+  }
+  
+  // Generate wrong answers
+  const wrongAnswers = new Set();
+  while (wrongAnswers.size < 3) {
+    let wrong;
+    if (ops === "multiplication") {
+      wrong = correctAnswer + Math.floor(Math.random() * 20) - 10;
+    } else {
+      wrong = correctAnswer + Math.floor(Math.random() * 10) - 5;
+    }
+    if (wrong !== correctAnswer && wrong > 0 && !wrongAnswers.has(wrong)) {
+      wrongAnswers.add(wrong);
+    }
+  }
+  
+  const allAnswers = [correctAnswer, ...Array.from(wrongAnswers)];
+  
+  // Shuffle answers
+  for (let i = allAnswers.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allAnswers[i], allAnswers[j]] = [allAnswers[j], allAnswers[i]];
+  }
+  
+  return {
+    question,
+    correctAnswer,
+    answers: allAnswers,
+    operation: ops,
+  };
+}
+
+export default function MathMaster() {
+  useIOSViewportFix();
+  const router = useRouter();
+  const wrapRef = useRef(null);
+  const headerRef = useRef(null);
+  const gameRef = useRef(null);
+  const controlsRef = useRef(null);
+
+  const [mounted, setMounted] = useState(false);
+  const [level, setLevel] = useState("easy");
+  const [operation, setOperation] = useState("mixed");
+  const [gameActive, setGameActive] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [correct, setCorrect] = useState(0);
+  const [wrong, setWrong] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [feedback, setFeedback] = useState(null);
+  const [bestScore, setBestScore] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+
+  useEffect(() => {
+    setMounted(true);
+    
+    // Load best scores
+    if (typeof window !== "undefined") {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+        const key = `${level}_${operation}`;
+        if (saved[key]) {
+          setBestScore(saved[key].bestScore || 0);
+          setBestStreak(saved[key].bestStreak || 0);
+        }
+      } catch {}
+    }
+  }, [level, operation]);
+
+  // Dynamic layout calculation - stable, no state dependencies
+  useEffect(() => {
+    if (!wrapRef.current || !mounted) return;
+    const calc = () => {
+      const rootH = window.visualViewport?.height ?? window.innerHeight;
+      const safeBottom =
+        Number(
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--satb")
+            .replace("px", "")
+        ) || 0;
+      const headH = headerRef.current?.offsetHeight || 0;
+      document.documentElement.style.setProperty("--head-h", headH + "px");
+      
+      const controlsH = controlsRef.current?.offsetHeight || 40;
+      const used =
+        headH +
+        controlsH +
+        100 + // Title, score, timer
+        safeBottom +
+        32;
+      const freeH = Math.max(300, rootH - used);
+      document.documentElement.style.setProperty("--game-h", freeH + "px");
+    };
+    const timer = setTimeout(calc, 100);
+    window.addEventListener("resize", calc);
+    window.visualViewport?.addEventListener("resize", calc);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", calc);
+      window.visualViewport?.removeEventListener("resize", calc);
+    };
+  }, [mounted]);
+
+  // Timer countdown
+  useEffect(() => {
+    if (!gameActive || timeLeft <= 0) return;
+    
+    const timer = setTimeout(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          handleTimeUp();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [gameActive, timeLeft]);
+
+  function startGame() {
+    setGameActive(true);
+    setScore(0);
+    setStreak(0);
+    setCorrect(0);
+    setWrong(0);
+    setTimeLeft(30);
+    setFeedback(null);
+    setSelectedAnswer(null);
+    generateNewQuestion();
+  }
+
+  function stopGame() {
+    setGameActive(false);
+    setCurrentQuestion(null);
+    setFeedback(null);
+    setSelectedAnswer(null);
+    
+    // Save best scores
+    if (typeof window !== "undefined") {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+        const key = `${level}_${operation}`;
+        saved[key] = {
+          bestScore: Math.max(saved[key]?.bestScore || 0, score),
+          bestStreak: Math.max(saved[key]?.bestStreak || 0, streak),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+        setBestScore(saved[key].bestScore);
+        setBestStreak(saved[key].bestStreak);
+      } catch {}
+    }
+  }
+
+  function generateNewQuestion() {
+    const question = generateQuestion(LEVELS[level], operation);
+    setCurrentQuestion(question);
+    setSelectedAnswer(null);
+    setFeedback(null);
+  }
+
+  function handleTimeUp() {
+    setWrong((prev) => prev + 1);
+    setStreak(0);
+    setFeedback("Time's up! ⏰");
+    setTimeout(() => {
+      generateNewQuestion();
+      setTimeLeft(30);
+    }, 1500);
+  }
+
+  function handleAnswer(answer) {
+    if (selectedAnswer || !gameActive) return;
+    
+    setSelectedAnswer(answer);
+    const isCorrect = answer === currentQuestion.correctAnswer;
+    
+    if (isCorrect) {
+      setScore((prev) => prev + (10 + streak));
+      setStreak((prev) => prev + 1);
+      setCorrect((prev) => prev + 1);
+      setFeedback("Correct! 🎉");
+      if ("vibrate" in navigator) navigator.vibrate?.(50);
+      
+      setTimeout(() => {
+        generateNewQuestion();
+        setTimeLeft(30);
+      }, 1000);
+    } else {
+      setWrong((prev) => prev + 1);
+      setStreak(0);
+      setFeedback(`Wrong! Correct: ${currentQuestion.correctAnswer} ❌`);
+      if ("vibrate" in navigator) navigator.vibrate?.(200);
+      
+      setTimeout(() => {
+        generateNewQuestion();
+        setTimeLeft(30);
+      }, 2000);
+    }
+  }
+
+  function resetStats() {
+    setScore(0);
+    setStreak(0);
+    setCorrect(0);
+    setWrong(0);
+    setBestScore(0);
+    setBestStreak(0);
+    if (typeof window !== "undefined") {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+        const key = `${level}_${operation}`;
+        delete saved[key];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      } catch {}
+    }
+  }
+
+  const backSafe = () => {
+    router.push("/local-arcade");
+  };
+
+  const getOperationName = (op) => {
+    switch (op) {
+      case "addition": return "+";
+      case "subtraction": return "-";
+      case "multiplication": return "×";
+      case "mixed": return "🎲 Mixed";
+      default: return op;
+    }
+  };
+
+  if (!mounted)
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#0a0f1d] to-[#141928] flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+
+  return (
+    <Layout>
+      <div
+        ref={wrapRef}
+        className="relative w-full overflow-hidden bg-gradient-to-b from-[#0a0f1d] to-[#141928]"
+        style={{ height: "100svh" }}
+      >
+        <div className="absolute inset-0 opacity-10 pointer-events-none">
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
+              backgroundSize: "30px 30px",
+            }}
+          />
+        </div>
+
+        <div
+          ref={headerRef}
+          className="absolute top-0 left-0 right-0 z-50 pointer-events-none"
+        >
+          <div
+            className="relative px-2 py-3"
+            style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}
+          >
+            <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
+              <button
+                onClick={backSafe}
+                className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+              >
+                BACK
+              </button>
+            </div>
+            <div className="absolute right-2 top-2 pointer-events-auto">
+              <span className="text-xs uppercase tracking-[0.3em] text-white/60">
+                Local
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="relative h-full flex flex-col items-center justify-start px-4 pb-4"
+          style={{
+            minHeight: "100%",
+            paddingTop: "calc(var(--head-h, 56px) + 8px)",
+          }}
+        >
+          <div className="text-center mb-1">
+            <h1 className="text-2xl font-extrabold text-white mb-0.5">
+              🧮 Math Master
+            </h1>
+            <p className="text-white/70 text-xs">
+              {LEVELS[level].name} • {getOperationName(operation)}
+            </p>
+          </div>
+
+          <div
+            ref={controlsRef}
+            className="grid grid-cols-4 gap-1 mb-1 w-full max-w-md"
+          >
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Score</div>
+              <div className="text-sm font-bold text-emerald-400">{score}</div>
+            </div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Streak</div>
+              <div className="text-sm font-bold text-amber-400">🔥{streak}</div>
+            </div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">✅</div>
+              <div className="text-sm font-bold text-green-400">{correct}</div>
+            </div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">⏰</div>
+              <div className="text-sm font-bold text-red-400">{timeLeft}</div>
+            </div>
+          </div>
+
+          {!gameActive ? (
+            <>
+              <div className="flex items-center justify-center gap-2 mb-1 flex-wrap w-full max-w-md">
+                <select
+                  value={level}
+                  onChange={(e) => {
+                    setLevel(e.target.value);
+                    setGameActive(false);
+                  }}
+                  className="h-9 px-3 rounded-lg bg-black/30 border border-white/20 text-white text-sm font-bold"
+                >
+                  {Object.keys(LEVELS).map((lvl) => (
+                    <option key={lvl} value={lvl}>
+                      {LEVELS[lvl].name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={operation}
+                  onChange={(e) => {
+                    setOperation(e.target.value);
+                    setGameActive(false);
+                  }}
+                  className="h-9 px-3 rounded-lg bg-black/30 border border-white/20 text-white text-sm font-bold"
+                >
+                  {OPERATIONS.map((op) => (
+                    <option key={op} value={op}>
+                      {getOperationName(op)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 mb-2 w-full max-w-md">
+                <div className="bg-black/20 border border-white/10 rounded-lg p-2 text-center">
+                  <div className="text-xs text-white/60">Best Score</div>
+                  <div className="text-lg font-bold text-emerald-400">{bestScore}</div>
+                </div>
+                <div className="bg-black/20 border border-white/10 rounded-lg p-2 text-center">
+                  <div className="text-xs text-white/60">Best Streak</div>
+                  <div className="text-lg font-bold text-amber-400">{bestStreak}</div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center gap-2 mb-2 flex-wrap w-full max-w-md">
+                <button
+                  onClick={startGame}
+                  className="h-10 px-6 rounded-lg bg-emerald-500/80 hover:bg-emerald-500 font-bold text-sm"
+                >
+                  ▶️ Start
+                </button>
+                {bestScore > 0 && (
+                  <button
+                    onClick={resetStats}
+                    className="h-10 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm"
+                  >
+                    🧹 Reset
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              {feedback && (
+                <div
+                  className={`mb-2 px-4 py-2 rounded-lg text-sm font-semibold text-center ${
+                    feedback.includes("Correct")
+                      ? "bg-emerald-500/20 text-emerald-200"
+                      : "bg-red-500/20 text-red-200"
+                  }`}
+                >
+                  {feedback}
+                </div>
+              )}
+
+              {currentQuestion && (
+                <div
+                  ref={gameRef}
+                  className="w-full max-w-md flex flex-col items-center justify-center mb-2 flex-1"
+                  style={{ height: "var(--game-h, 400px)", minHeight: "300px" }}
+                >
+                  <div className="text-4xl font-black text-white mb-6 text-center">
+                    {currentQuestion.question}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 w-full">
+                    {currentQuestion.answers.map((answer, idx) => {
+                      const isSelected = selectedAnswer === answer;
+                      const isCorrect = answer === currentQuestion.correctAnswer;
+                      const isWrong = isSelected && !isCorrect;
+
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => handleAnswer(answer)}
+                          disabled={!!selectedAnswer}
+                          className={`rounded-xl border-2 px-6 py-6 text-2xl font-bold transition-all active:scale-95 disabled:opacity-50 ${
+                            isCorrect && isSelected
+                              ? "bg-emerald-500/30 border-emerald-400 text-emerald-200"
+                              : isWrong
+                              ? "bg-red-500/30 border-red-400 text-red-200"
+                              : selectedAnswer && answer === currentQuestion.correctAnswer
+                              ? "bg-emerald-500/30 border-emerald-400 text-emerald-200"
+                              : "bg-black/30 border-white/15 text-white hover:border-white/40"
+                          }`}
+                        >
+                          {answer}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={stopGame}
+                className="h-9 px-4 rounded-lg bg-red-500/80 hover:bg-red-500 font-bold text-sm"
+              >
+                ⏹️ Stop
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </Layout>
+  );
+}
+
