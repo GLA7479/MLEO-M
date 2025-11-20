@@ -1,5 +1,7 @@
-import { useState, useMemo, useEffect } from "react";
-import LocalGameShell from "../../components/LocalGameShell";
+import { useState, useMemo, useEffect, useRef } from "react";
+import Layout from "../../components/Layout";
+import { useRouter } from "next/router";
+import { useIOSViewportFix } from "../../hooks/useIOSViewportFix";
 
 const SIZES = [3, 5, 7];
 
@@ -41,6 +43,14 @@ function checkWinner(board, size) {
 }
 
 export default function TicTacToeXL() {
+  useIOSViewportFix();
+  const router = useRouter();
+  const wrapRef = useRef(null);
+  const headerRef = useRef(null);
+  const boardRef = useRef(null);
+  const controlsRef = useRef(null);
+
+  const [mounted, setMounted] = useState(false);
   const [size, setSize] = useState(3);
   const [board, setBoard] = useState(() => makeBoard(3));
   const [currentPlayer, setCurrentPlayer] = useState("X");
@@ -50,6 +60,46 @@ export default function TicTacToeXL() {
 
   const winner = useMemo(() => checkWinner(board, size), [board, size]);
   const isBoardFull = board.every(Boolean);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Dynamic layout calculation - stable, no state dependencies
+  useEffect(() => {
+    if (!wrapRef.current || !mounted) return;
+    const calc = () => {
+      const rootH = window.visualViewport?.height ?? window.innerHeight;
+      const safeBottom =
+        Number(
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--satb")
+            .replace("px", "")
+        ) || 0;
+      const headH = headerRef.current?.offsetHeight || 0;
+      document.documentElement.style.setProperty("--head-h", headH + "px");
+      
+      // Measure once and use fixed calculations
+      const controlsH = controlsRef.current?.offsetHeight || 40;
+      const used =
+        headH +
+        controlsH +
+        60 + // Title and controls spacing
+        safeBottom +
+        32;
+      const freeH = Math.max(300, rootH - used);
+      document.documentElement.style.setProperty("--board-h", freeH + "px");
+    };
+    // Calculate after a small delay to ensure DOM is ready
+    const timer = setTimeout(calc, 100);
+    window.addEventListener("resize", calc);
+    window.visualViewport?.addEventListener("resize", calc);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", calc);
+      window.visualViewport?.removeEventListener("resize", calc);
+    };
+  }, [mounted]); // Only depend on mounted
 
   useEffect(() => {
     setBoard(makeBoard(size));
@@ -73,7 +123,7 @@ export default function TicTacToeXL() {
 
   function handleMove(idx, isBot = false) {
     if (winner || board[idx]) return;
-    if (!isBot && vsBot && currentPlayer === "O") return; // prevent tapping during bot turn
+    if (!isBot && vsBot && currentPlayer === "O") return;
 
     const nextBoard = [...board];
     nextBoard[idx] = currentPlayer;
@@ -109,108 +159,169 @@ export default function TicTacToeXL() {
     resetBoard();
   }
 
+  const backSafe = () => {
+    router.push("/local-arcade");
+  };
+
+  if (!mounted)
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#05070f] via-[#0e111b] to-[#020308] flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+
   return (
-    <LocalGameShell
-      title="Tic Tac Toe XL"
-      subtitle="Pick a board size (3×3 up to 7×7), trade turns, or toggle LeoBot for a casual solo battle."
-      eyebrow="Turn Based • Offline"
-      backgroundClass="bg-gradient-to-b from-[#05070f] via-[#0e111b] to-[#020308]"
-    >
-      <section className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 p-4 space-y-3 bg-white/5">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                ⚙️ Settings
-              </h2>
-              <label className="text-sm text-white/70 space-y-1 block">
-                Board size
-                <select
-                  value={size}
-                  onChange={(e) => setSize(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-lg bg-[#0d1528] border border-white/20"
-                >
-                  {SIZES.map((s) => (
-                    <option key={s} value={s}>
-                      {s} × {s}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex items-center gap-3 text-sm">
-                <input
-                  type="checkbox"
-                  checked={vsBot}
-                  onChange={(e) => {
-                    setVsBot(e.target.checked);
-                    resetBoard();
-                  }}
-                  className="w-5 h-5"
-                />
-                Play vs LeoBot (random bot)
-              </label>
+    <Layout>
+      <div
+        ref={wrapRef}
+        className="relative w-full overflow-hidden bg-gradient-to-b from-[#05070f] via-[#0e111b] to-[#020308]"
+        style={{ height: "100svh" }}
+      >
+        <div className="absolute inset-0 opacity-10 pointer-events-none">
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
+              backgroundSize: "30px 30px",
+            }}
+          />
+        </div>
+
+        <div
+          ref={headerRef}
+          className="absolute top-0 left-0 right-0 z-50 pointer-events-none"
+        >
+          <div
+            className="relative px-2 py-3"
+            style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}
+          >
+            <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
               <button
-                onClick={resetBoard}
-                className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20"
+                onClick={backSafe}
+                className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
               >
-                🔄 Reset board
-              </button>
-              <button
-                onClick={resetScore}
-                className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20"
-              >
-                🧹 Reset score
+                BACK
               </button>
             </div>
+            <div className="absolute right-2 top-2 pointer-events-auto">
+              <span className="text-xs uppercase tracking-[0.3em] text-white/60">
+                Local
+              </span>
+            </div>
+          </div>
+        </div>
 
-            <div className="rounded-2xl border border-white/10 p-4 space-y-3 bg-white/5 md:col-span-2">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="text-lg font-semibold">
-                  Turn:{" "}
-                  <span className="text-emerald-300">{currentPlayer}</span>{" "}
-                </div>
-                {winnerMessage && (
-                  <div className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-200 text-sm font-semibold">
-                    {winnerMessage}
-                  </div>
-                )}
-              </div>
-              <div
-                className="grid gap-2 mx-auto"
-                style={{
-                  gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
-                  maxWidth: "min(90vw, 420px)",
+        <div
+          className="relative h-full flex flex-col items-center justify-start px-4 pb-4"
+          style={{
+            minHeight: "100%",
+            paddingTop: "calc(var(--head-h, 56px) + 8px)",
+          }}
+        >
+          <div className="text-center mb-1">
+            <h1 className="text-2xl font-extrabold text-white mb-0.5">
+              ❌⭕️ Tic Tac Toe XL
+            </h1>
+            <p className="text-white/70 text-xs">
+              {size}×{size} Board • {vsBot ? "vs Bot" : "2 Players"}
+            </p>
+          </div>
+
+          <div
+            ref={controlsRef}
+            className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md"
+          >
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Player X</div>
+              <div className="text-sm font-bold text-emerald-400">{score.X}</div>
+            </div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Draws</div>
+              <div className="text-sm font-bold text-amber-400">{score.ties}</div>
+            </div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Player O</div>
+              <div className="text-sm font-bold text-purple-400">{score.O}</div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 mb-1 flex-wrap">
+            <select
+              value={size}
+              onChange={(e) => setSize(Number(e.target.value))}
+              className="h-9 px-3 rounded-lg bg-black/30 border border-white/20 text-white text-sm font-bold"
+            >
+              {SIZES.map((s) => (
+                <option key={s} value={s}>
+                  {s}×{s}
+                </option>
+              ))}
+            </select>
+            <label className="flex items-center gap-1.5 text-sm text-white/80">
+              <input
+                type="checkbox"
+                checked={vsBot}
+                onChange={(e) => {
+                  setVsBot(e.target.checked);
+                  resetBoard();
                 }}
-              >
-                {board.map((cell, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleMove(idx)}
-                    className="aspect-square rounded-xl bg-[#080c16] border border-white/15 text-3xl md:text-4xl font-bold flex items-center justify-center transition-all hover:bg-white/10"
-                  >
-                    {cell}
-                  </button>
-                ))}
-              </div>
-            </div>
+                className="w-5 h-5"
+              />
+              vs Bot
+            </label>
+            <button
+              onClick={resetBoard}
+              className="h-9 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm"
+            >
+              Reset
+            </button>
+            <button
+              onClick={resetScore}
+              className="h-9 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm"
+            >
+              Clear Score
+            </button>
+          </div>
 
-            <div className="md:col-span-3 rounded-2xl border border-white/10 p-4 bg-white/5">
-              <h2 className="text-lg font-semibold mb-3">📊 Match Score</h2>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <ScoreCard label="Player X" value={score.X} />
-                <ScoreCard label="Draws" value={score.ties} />
-                <ScoreCard label="Player O" value={score.O} />
-              </div>
+          {winnerMessage && (
+            <div className="mb-1 px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-200 text-sm font-semibold">
+              {winnerMessage}
             </div>
-      </section>
-    </LocalGameShell>
+          )}
+
+          <div
+            ref={boardRef}
+            className="w-full flex items-center justify-center mb-1 flex-1"
+            style={{ height: "var(--board-h, 400px)", minHeight: "300px" }}
+          >
+            <div
+              className="grid gap-2 w-full h-full"
+              style={{
+                gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
+                gridTemplateRows: `repeat(${size}, minmax(0, 1fr))`,
+                maxWidth: "min(95vw, 500px)",
+                maxHeight: "100%",
+              }}
+            >
+              {board.map((cell, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleMove(idx)}
+                  disabled={!!cell || !!winner}
+                  className="rounded-xl bg-black/30 border-2 border-white/15 text-3xl md:text-4xl font-bold flex items-center justify-center transition-all hover:bg-white/10 hover:border-white/30 disabled:opacity-50 active:scale-95"
+                >
+                  {cell}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="text-center text-sm text-white/80 font-semibold">
+            Turn: <span className="font-bold text-white text-lg">{currentPlayer}</span>
+          </div>
+        </div>
+      </div>
+    </Layout>
   );
 }
-
-function ScoreCard({ label, value }) {
-  return (
-    <div className="rounded-xl bg-[#11182a] border border-white/10 py-4">
-      <p className="text-sm text-white/60">{label}</p>
-      <p className="text-2xl font-bold text-white">{value}</p>
-    </div>
-  );
-}
-

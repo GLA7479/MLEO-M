@@ -1,5 +1,7 @@
-import { useState } from "react";
-import LocalGameShell from "../../components/LocalGameShell";
+import { useState, useRef, useEffect } from "react";
+import Layout from "../../components/Layout";
+import { useRouter } from "next/router";
+import { useIOSViewportFix } from "../../hooks/useIOSViewportFix";
 
 const CHOICES = [
   { id: "rock", label: "Rock", emoji: "🪨" },
@@ -18,6 +20,14 @@ function randomChoice() {
 }
 
 export default function RockPaperScissors() {
+  useIOSViewportFix();
+  const router = useRouter();
+  const wrapRef = useRef(null);
+  const headerRef = useRef(null);
+  const gameRef = useRef(null);
+  const controlsRef = useRef(null);
+
+  const [mounted, setMounted] = useState(false);
   const [vsBot, setVsBot] = useState(false);
   const [firstTo, setFirstTo] = useState(3);
   const [round, setRound] = useState(1);
@@ -28,6 +38,7 @@ export default function RockPaperScissors() {
   const [statusMessage, setStatusMessage] = useState(
     "Player 1: choose your move"
   );
+  const [lastResult, setLastResult] = useState(null);
 
   const matchWinner =
     score.p1 >= firstTo
@@ -38,11 +49,51 @@ export default function RockPaperScissors() {
         : "Player 2"
       : null;
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Dynamic layout calculation - stable, no state dependencies
+  useEffect(() => {
+    if (!wrapRef.current || !mounted) return;
+    const calc = () => {
+      const rootH = window.visualViewport?.height ?? window.innerHeight;
+      const safeBottom =
+        Number(
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--satb")
+            .replace("px", "")
+        ) || 0;
+      const headH = headerRef.current?.offsetHeight || 0;
+      document.documentElement.style.setProperty("--head-h", headH + "px");
+      
+      const controlsH = controlsRef.current?.offsetHeight || 40;
+      const used =
+        headH +
+        controlsH +
+        80 + // Title, controls, messages
+        safeBottom +
+        32;
+      const freeH = Math.max(300, rootH - used);
+      document.documentElement.style.setProperty("--game-h", freeH + "px");
+    };
+    const timer = setTimeout(calc, 100);
+    window.addEventListener("resize", calc);
+    window.visualViewport?.addEventListener("resize", calc);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", calc);
+      window.visualViewport?.removeEventListener("resize", calc);
+    };
+  }, [mounted]); // Only depend on mounted
+
   function resolveRound(p1Choice, p2Choice) {
     if (!p1Choice || !p2Choice) return;
     let winner = "tie";
     if (beats[p1Choice] === p2Choice) winner = "p1";
     if (beats[p2Choice] === p1Choice) winner = "p2";
+
+    setLastResult({ p1: p1Choice, p2: p2Choice, winner });
 
     setHistory((prev) => [
       {
@@ -51,7 +102,7 @@ export default function RockPaperScissors() {
         p2: p2Choice,
         winner,
       },
-      ...prev.slice(0, 9),
+      ...prev.slice(0, 4),
     ]);
 
     setScore((prev) => ({
@@ -81,7 +132,7 @@ export default function RockPaperScissors() {
     if (activeHuman === "p1") {
       setPendingChoice(choice);
       setActiveHuman("p2");
-      setStatusMessage("Player 2: your turn (no peeking!)");
+      setStatusMessage("Player 2: your turn");
     } else {
       resolveRound(pendingChoice, choice);
     }
@@ -94,155 +145,208 @@ export default function RockPaperScissors() {
     setPendingChoice(null);
     setActiveHuman("p1");
     setStatusMessage("Player 1: choose your move");
+    setLastResult(null);
     if (fullReset) {
       setVsBot(false);
       setFirstTo(3);
     }
   }
 
+  const backSafe = () => {
+    router.push("/local-arcade");
+  };
+
+  if (!mounted)
+    return (
+      <div className="min-h-screen bg-[#0a101d] flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+
   return (
-    <LocalGameShell
-      title="Rock · Paper · Scissors"
-      subtitle={`Best-of series up to ${firstTo} wins with optional LeoBot. Every round is logged so you can brag later.`}
-      eyebrow="Quick Match • Offline"
-      backgroundClass="bg-gradient-to-b from-[#05070f] via-[#0a101d] to-[#04050b]"
-    >
-      <section className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                ⚙️ Controls
-              </h2>
-              <label className="flex items-center justify-between text-sm">
-                vs Bot (LeoBot)
-                <input
-                  type="checkbox"
-                  checked={vsBot}
-                  onChange={(e) => {
-                    setVsBot(e.target.checked);
-                    resetMatch();
-                  }}
-                  className="w-5 h-5"
-                />
-              </label>
-              <label className="text-sm space-y-1 block">
-                Target wins
-                <select
-                  value={firstTo}
-                  onChange={(e) => {
-                    setFirstTo(Number(e.target.value));
-                    resetMatch();
-                  }}
-                  className="w-full px-3 py-2 rounded-lg bg-[#0d1528] border border-white/20"
+    <Layout>
+      <div
+        ref={wrapRef}
+        className="relative w-full overflow-hidden bg-[#0a101d]"
+        style={{ height: "100svh" }}
+      >
+        <div className="absolute inset-0 opacity-10 pointer-events-none">
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
+              backgroundSize: "30px 30px",
+            }}
+          />
+        </div>
+
+        <div
+          ref={headerRef}
+          className="absolute top-0 left-0 right-0 z-50 pointer-events-none"
+        >
+          <div
+            className="relative px-2 py-3"
+            style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}
+          >
+            <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
+              <button
+                onClick={backSafe}
+                className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10"
+              >
+                BACK
+              </button>
+            </div>
+            <div className="absolute right-2 top-2 pointer-events-auto">
+              <span className="text-xs uppercase tracking-[0.3em] text-white/60">
+                Local
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="relative h-full flex flex-col items-center justify-start px-4 pb-4"
+          style={{
+            minHeight: "100%",
+            paddingTop: "calc(var(--head-h, 56px) + 8px)",
+          }}
+        >
+          <div className="text-center mb-1">
+            <h1 className="text-2xl font-extrabold text-white mb-0.5">
+              🪨📄✂️ Rock Paper Scissors
+            </h1>
+            <p className="text-white/70 text-xs">
+              Round {round} • First to {firstTo}
+            </p>
+          </div>
+
+          <div
+            ref={controlsRef}
+            className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md"
+          >
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Player 1</div>
+              <div className="text-sm font-bold text-emerald-400">{score.p1}</div>
+            </div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Round</div>
+              <div className="text-sm font-bold text-amber-400">{round}</div>
+            </div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">
+                {vsBot ? "Bot" : "Player 2"}
+              </div>
+              <div className="text-sm font-bold text-purple-400">{score.p2}</div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 mb-1 flex-wrap">
+            <select
+              value={firstTo}
+              onChange={(e) => {
+                setFirstTo(Number(e.target.value));
+                resetMatch();
+              }}
+              className="h-9 px-3 rounded-lg bg-black/30 border border-white/20 text-white text-sm font-bold"
+            >
+              {[3, 5, 7].map((target) => (
+                <option key={target} value={target}>
+                  First to {target}
+                </option>
+              ))}
+            </select>
+            <label className="flex items-center gap-1.5 text-sm text-white/80">
+              <input
+                type="checkbox"
+                checked={vsBot}
+                onChange={(e) => {
+                  setVsBot(e.target.checked);
+                  resetMatch();
+                }}
+                className="w-5 h-5"
+              />
+              vs Bot
+            </label>
+            <button
+              onClick={() => resetMatch()}
+              className="h-9 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm"
+            >
+              Reset
+            </button>
+          </div>
+
+          {matchWinner && (
+            <div className="mb-1 px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-200 text-xs font-semibold">
+              {matchWinner} won the series!
+            </div>
+          )}
+
+          {lastResult && !matchWinner && (
+            <div className="mb-1 text-xs text-white/80">
+              {CHOICES.find((c) => c.id === lastResult.p1)?.emoji} vs{" "}
+              {CHOICES.find((c) => c.id === lastResult.p2)?.emoji} —{" "}
+              {lastResult.winner === "tie"
+                ? "Tie"
+                : lastResult.winner === "p1"
+                ? "P1 wins"
+                : vsBot
+                ? "Bot wins"
+                : "P2 wins"}
+            </div>
+          )}
+
+          <div
+            ref={gameRef}
+            className="w-full max-w-md flex flex-col items-center justify-center mb-1 flex-1"
+            style={{ height: "var(--game-h, 400px)", minHeight: "300px" }}
+          >
+            <div className="text-sm text-white/80 mb-3 text-center font-semibold">
+              {statusMessage}
+            </div>
+            <div className="grid grid-cols-3 gap-3 w-full max-w-sm">
+              {CHOICES.map((choice) => (
+                <button
+                  key={choice.id}
+                  onClick={() => handleHumanChoice(choice.id)}
+                  disabled={!!matchWinner}
+                  className="rounded-2xl border-2 border-white/15 bg-black/30 px-4 py-6 flex flex-col items-center gap-2 hover:border-white/40 transition disabled:opacity-50 active:scale-95"
                 >
-                  {[3, 5, 7].map((target) => (
-                    <option key={target} value={target}>
-                      First to {target}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                onClick={() => resetMatch()}
-                className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20"
-              >
-                🔄 Restart match
-              </button>
-              <button
-                onClick={() => resetMatch(true)}
-                className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20"
-              >
-                🧹 Full reset
-              </button>
+                  <span className="text-5xl">{choice.emoji}</span>
+                  <span className="text-sm font-semibold uppercase text-white/90">
+                    {choice.label}
+                  </span>
+                </button>
+              ))}
             </div>
+          </div>
 
-            <div className="md:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-widest text-white/50">
-                    Round {round}
-                  </p>
-                  <p className="text-lg font-semibold">{statusMessage}</p>
+          {history.length > 0 && (
+            <div className="w-full max-w-md text-xs text-white/60 space-y-1">
+              <div className="text-center font-semibold mb-1">Recent</div>
+              {history.slice(0, 3).map((entry, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between bg-black/20 px-2 py-1 rounded text-[10px]"
+                >
+                  <span>R{entry.round}</span>
+                  <span>
+                    {CHOICES.find((c) => c.id === entry.p1)?.emoji} vs{" "}
+                    {CHOICES.find((c) => c.id === entry.p2)?.emoji}
+                  </span>
+                  <span>
+                    {entry.winner === "tie"
+                      ? "Tie"
+                      : entry.winner === "p1"
+                      ? "P1"
+                      : "P2"}
+                  </span>
                 </div>
-                {matchWinner && (
-                  <div className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-200 text-sm font-semibold">
-                    {matchWinner} won the series!
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {CHOICES.map((choice) => (
-                  <button
-                    key={choice.id}
-                    onClick={() => handleHumanChoice(choice.id)}
-                    className="rounded-xl border border-white/15 bg-[#0d1322] px-4 py-5 flex flex-col items-center gap-2 hover:border-white/40 transition"
-                  >
-                    <span className="text-4xl">{choice.emoji}</span>
-                    <span className="text-sm font-semibold tracking-wide uppercase">
-                      {choice.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              ))}
             </div>
-
-            <div className="md:col-span-3 grid grid-cols-2 gap-4">
-              <ScorePanel
-                label="Player 1"
-                score={score.p1}
-                highlight={!matchWinner || matchWinner === "Player 1"}
-              />
-              <ScorePanel
-                label={vsBot ? "LeoBot" : "Player 2"}
-                score={score.p2}
-                highlight={!matchWinner || matchWinner !== "Player 1"}
-              />
-            </div>
-      </section>
-
-      <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-        <h2 className="text-lg font-semibold mb-3">📝 Round history</h2>
-        {history.length === 0 ? (
-          <p className="text-white/60 text-sm">No rounds played yet.</p>
-        ) : (
-          <ul className="space-y-2">
-            {history.map((entry) => (
-              <li
-                key={entry.round}
-                className="flex items-center justify-between text-sm bg-[#0c1424] px-3 py-2 rounded-xl border border-white/5"
-              >
-                <span className="text-white/60">Round {entry.round}</span>
-                <span>
-                  {entry.p1} vs {entry.p2}
-                </span>
-                <span className="font-semibold">
-                  {entry.winner === "tie"
-                    ? "Tie"
-                    : entry.winner === "p1"
-                    ? "Player 1"
-                    : vsBot
-                    ? "LeoBot"
-                    : "Player 2"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </LocalGameShell>
+          )}
+        </div>
+      </div>
+    </Layout>
   );
 }
-
-function ScorePanel({ label, score, highlight }) {
-  return (
-    <div
-      className={`rounded-2xl border p-4 text-center ${
-        highlight ? "border-emerald-400/40" : "border-white/10"
-      }`}
-    >
-      <p className="text-sm uppercase tracking-widest text-white/60">{label}</p>
-      <p className="text-4xl font-black">{score}</p>
-    </div>
-  );
-}
-
