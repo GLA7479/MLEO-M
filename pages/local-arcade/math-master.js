@@ -9,28 +9,31 @@ const LEVELS = {
     addition: { max: 9 },
     subtraction: { min: 1, max: 20 },
     multiplication: { max: 5 },
+    division: { max: 10, maxDivisor: 5 },
   },
   medium: {
     name: "Medium",
     addition: { max: 50 },
     subtraction: { min: 10, max: 100 },
     multiplication: { max: 10 },
+    division: { max: 100, maxDivisor: 10 },
   },
   hard: {
     name: "Hard",
     addition: { max: 100 },
     subtraction: { min: 50, max: 200 },
     multiplication: { max: 12 },
+    division: { max: 144, maxDivisor: 12 },
   },
 };
 
-const OPERATIONS = ["addition", "subtraction", "multiplication", "mixed"];
+const OPERATIONS = ["addition", "subtraction", "multiplication", "division", "mixed"];
 
 const STORAGE_KEY = "mleo_math_master";
 
 function generateQuestion(level, operation) {
   const ops = operation === "mixed" 
-    ? ["addition", "subtraction", "multiplication"][Math.floor(Math.random() * 3)]
+    ? ["addition", "subtraction", "multiplication", "division"][Math.floor(Math.random() * 4)]
     : operation;
   
   let a, b, correctAnswer, question;
@@ -57,6 +60,17 @@ function generateQuestion(level, operation) {
       b = Math.floor(Math.random() * level.multiplication.max) + 1;
       correctAnswer = a * b;
       question = `${a} × ${b} = ?`;
+      break;
+      
+    case "division":
+      // Generate division questions with whole number results
+      // Start with the result, then multiply by divisor to get dividend
+      const divisor = Math.floor(Math.random() * (level.division.maxDivisor - 1)) + 2; // 2 to maxDivisor
+      const quotient = Math.floor(Math.random() * Math.floor(level.division.max / divisor)) + 1;
+      a = divisor * quotient; // dividend
+      b = divisor;
+      correctAnswer = quotient;
+      question = `${a} ÷ ${b} = ?`;
       break;
       
     default:
@@ -110,7 +124,7 @@ export default function MathMaster() {
   const [streak, setStreak] = useState(0);
   const [correct, setCorrect] = useState(0);
   const [wrong, setWrong] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(20);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [bestScore, setBestScore] = useState(0);
@@ -189,7 +203,7 @@ export default function MathMaster() {
     setStreak(0);
     setCorrect(0);
     setWrong(0);
-    setTimeLeft(30);
+    setTimeLeft(20);
     setFeedback(null);
     setSelectedAnswer(null);
     generateNewQuestion();
@@ -227,11 +241,25 @@ export default function MathMaster() {
   function handleTimeUp() {
     setWrong((prev) => prev + 1);
     setStreak(0);
-    setFeedback("Time's up! ⏰");
-    setTimeout(() => {
-      generateNewQuestion();
-      setTimeLeft(30);
-    }, 1500);
+    setFeedback("Time's up! Game Over! ⏰");
+    setGameActive(false);
+    setCurrentQuestion(null);
+    setTimeLeft(20);
+    
+    // Save scores
+    if (typeof window !== "undefined") {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+        const key = `${level}_${operation}`;
+        saved[key] = {
+          bestScore: Math.max(saved[key]?.bestScore || 0, score),
+          bestStreak: Math.max(saved[key]?.bestStreak || 0, streak),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+        setBestScore(saved[key].bestScore);
+        setBestStreak(saved[key].bestStreak);
+      } catch {}
+    }
   }
 
   function handleAnswer(answer) {
@@ -249,7 +277,7 @@ export default function MathMaster() {
       
       setTimeout(() => {
         generateNewQuestion();
-        setTimeLeft(30);
+        setTimeLeft(20);
       }, 1000);
     } else {
       setWrong((prev) => prev + 1);
@@ -259,7 +287,7 @@ export default function MathMaster() {
       
       setTimeout(() => {
         generateNewQuestion();
-        setTimeLeft(30);
+        setTimeLeft(20);
       }, 2000);
     }
   }
@@ -290,6 +318,7 @@ export default function MathMaster() {
       case "addition": return "+";
       case "subtraction": return "-";
       case "multiplication": return "×";
+      case "division": return "÷";
       case "mixed": return "🎲 Mixed";
       default: return op;
     }
@@ -376,9 +405,23 @@ export default function MathMaster() {
               <div className="text-[10px] text-white/60">✅</div>
               <div className="text-sm font-bold text-green-400">{correct}</div>
             </div>
-            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
-              <div className="text-[10px] text-white/60">⏰</div>
-              <div className="text-sm font-bold text-red-400">{timeLeft}</div>
+            <div className={`rounded-lg p-1 text-center ${
+              gameActive && timeLeft <= 5 
+                ? "bg-red-500/30 border-2 border-red-400 animate-pulse" 
+                : gameActive 
+                ? "bg-black/30 border border-white/10"
+                : "bg-black/30 border border-white/10"
+            }`}>
+              <div className="text-[10px] text-white/60">⏰ Timer</div>
+              <div className={`text-lg font-black ${
+                gameActive && timeLeft <= 5 
+                  ? "text-red-400" 
+                  : gameActive 
+                  ? "text-yellow-400"
+                  : "text-white/60"
+              }`}>
+                {gameActive ? timeLeft : "--"}
+              </div>
             </div>
           </div>
 
