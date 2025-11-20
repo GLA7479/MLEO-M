@@ -15,7 +15,7 @@ const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || process.env
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
 const CLAIM_FN = process.env.NEXT_PUBLIC_MLEO_CLAIM_FN || "claim";
 
-// ABI מינימלי של V3: claim(gameId, amount)
+// Minimal ABI v3: claim(gameId, amount)
 const MINING_CLAIM_ABI = [{
   type: "function",
   name: "claim",
@@ -271,6 +271,15 @@ export default function ArcadeHub() {
   }, []);
 
   const games = [
+    // Local offline arcade
+    {
+      title: "Local Party Arcade",
+      emoji: "📴",
+      description: "Offline-ready collection (TicTacToe, Tap Battle, Memory, more) that runs fully on-device.",
+      prize: "Offline",
+      href: "/local-arcade",
+      color: "#F97316",
+    },
     // 1. Plinko
     {
       title: "Plinko",
