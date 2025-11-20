@@ -39,6 +39,11 @@ export default function RockPaperScissors() {
     "Player 1: choose your move"
   );
   const [lastResult, setLastResult] = useState(null);
+  const [showP1Choice, setShowP1Choice] = useState(false);
+  const [p1ChoiceDisplay, setP1ChoiceDisplay] = useState(null);
+  const [showResults, setShowResults] = useState(false);
+  const [resultsTimer, setResultsTimer] = useState(null);
+  const [finalResult, setFinalResult] = useState(null);
 
   const matchWinner =
     score.p1 >= firstTo
@@ -52,6 +57,50 @@ export default function RockPaperScissors() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Handle results countdown timer
+  useEffect(() => {
+    if (!showResults || resultsTimer === null || resultsTimer <= 0) return;
+    
+    const timer = setInterval(() => {
+      setResultsTimer((prev) => {
+        if (prev <= 1) {
+          // After countdown, finalize the round
+          if (finalResult) {
+            setLastResult(finalResult);
+            setHistory((prevHistory) => [
+              {
+                round,
+                p1: finalResult.p1,
+                p2: finalResult.p2,
+                winner: finalResult.winner,
+              },
+              ...prevHistory.slice(0, 4),
+            ]);
+
+            setScore((prevScore) => ({
+              p1: prevScore.p1 + (finalResult.winner === "p1" ? 1 : 0),
+              p2: prevScore.p2 + (finalResult.winner === "p2" ? 1 : 0),
+            }));
+
+            setRound((prevRound) => prevRound + 1);
+            setPendingChoice(null);
+            setActiveHuman("p1");
+            setStatusMessage("Player 1: choose your move");
+            setShowResults(false);
+            setFinalResult(null);
+            setShowP1Choice(false);
+            setP1ChoiceDisplay(null);
+            setResultsTimer(null);
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [showResults, resultsTimer, finalResult, round, vsBot]);
 
   // Dynamic layout calculation - stable, no state dependencies
   useEffect(() => {
@@ -93,47 +142,51 @@ export default function RockPaperScissors() {
     if (beats[p1Choice] === p2Choice) winner = "p1";
     if (beats[p2Choice] === p1Choice) winner = "p2";
 
-    setLastResult({ p1: p1Choice, p2: p2Choice, winner });
-
-    setHistory((prev) => [
-      {
-        round,
-        p1: p1Choice,
-        p2: p2Choice,
-        winner,
-      },
-      ...prev.slice(0, 4),
-    ]);
-
-    setScore((prev) => ({
-      p1: prev.p1 + (winner === "p1" ? 1 : 0),
-      p2: prev.p2 + (winner === "p2" ? 1 : 0),
-    }));
-
-    setRound((prev) => prev + 1);
-    setPendingChoice(null);
-    setActiveHuman("p1");
-    setStatusMessage("Player 1: choose your move");
+    const result = { p1: p1Choice, p2: p2Choice, winner };
+    setFinalResult(result);
+    setShowResults(true);
+    setResultsTimer(3);
   }
 
   function handleBotRound(choice) {
-    if (matchWinner) return;
-    const botPick = randomChoice();
-    resolveRound(choice, botPick);
+    if (matchWinner || showResults) return;
+    
+    // Show P1 choice for 1 second
+    setP1ChoiceDisplay(choice);
+    setShowP1Choice(true);
+    setStatusMessage("Your choice:");
+    
+    setTimeout(() => {
+      setShowP1Choice(false);
+      setP1ChoiceDisplay(null);
+      const botPick = randomChoice();
+      resolveRound(choice, botPick);
+    }, 1000);
   }
 
   function handleHumanChoice(choice) {
-    if (matchWinner) return;
+    if (matchWinner || showResults) return;
+    
     if (vsBot) {
       handleBotRound(choice);
       return;
     }
 
     if (activeHuman === "p1") {
-      setPendingChoice(choice);
-      setActiveHuman("p2");
-      setStatusMessage("Player 2: your turn");
+      // Show P1 choice for 1 second, then hide and pass to P2
+      setP1ChoiceDisplay(choice);
+      setShowP1Choice(true);
+      setStatusMessage("Player 1 chose:");
+      
+      setTimeout(() => {
+        setShowP1Choice(false);
+        setP1ChoiceDisplay(null);
+        setPendingChoice(choice);
+        setActiveHuman("p2");
+        setStatusMessage("Player 2: your turn (no peeking!)");
+      }, 1000);
     } else {
+      // P2 chose - show results with 3 second countdown
       resolveRound(pendingChoice, choice);
     }
   }
@@ -146,6 +199,11 @@ export default function RockPaperScissors() {
     setActiveHuman("p1");
     setStatusMessage("Player 1: choose your move");
     setLastResult(null);
+    setShowP1Choice(false);
+    setP1ChoiceDisplay(null);
+    setShowResults(false);
+    setResultsTimer(null);
+    setFinalResult(null);
     if (fullReset) {
       setVsBot(false);
       setFirstTo(3);
@@ -277,12 +335,35 @@ export default function RockPaperScissors() {
           </div>
 
           {matchWinner && (
-            <div className="mb-1 px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-200 text-xs font-semibold">
+            <div className="mb-1 px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-200 text-sm font-semibold">
               {matchWinner} won the series!
             </div>
           )}
 
-          {lastResult && !matchWinner && (
+          {showResults && finalResult && (
+            <div className="mb-1 px-4 py-2 rounded-lg bg-purple-500/20 text-purple-200 text-center">
+              <div className="text-2xl mb-1">
+                {CHOICES.find((c) => c.id === finalResult.p1)?.emoji} vs{" "}
+                {CHOICES.find((c) => c.id === finalResult.p2)?.emoji}
+              </div>
+              {resultsTimer > 0 && (
+                <div className="text-xl font-bold">{resultsTimer}</div>
+              )}
+              {resultsTimer === 0 && (
+                <div className="text-lg font-semibold">
+                  {finalResult.winner === "tie"
+                    ? "It's a Tie!"
+                    : finalResult.winner === "p1"
+                    ? "Player 1 Wins!"
+                    : vsBot
+                    ? "Bot Wins!"
+                    : "Player 2 Wins!"}
+                </div>
+              )}
+            </div>
+          )}
+
+          {lastResult && !matchWinner && !showResults && (
             <div className="mb-1 text-xs text-white/80">
               {CHOICES.find((c) => c.id === lastResult.p1)?.emoji} vs{" "}
               {CHOICES.find((c) => c.id === lastResult.p2)?.emoji} —{" "}
@@ -301,24 +382,64 @@ export default function RockPaperScissors() {
             className="w-full max-w-md flex flex-col items-center justify-center mb-1 flex-1"
             style={{ height: "var(--game-h, 400px)", minHeight: "300px" }}
           >
-            <div className="text-sm text-white/80 mb-3 text-center font-semibold">
-              {statusMessage}
-            </div>
-            <div className="grid grid-cols-3 gap-3 w-full max-w-sm">
-              {CHOICES.map((choice) => (
-                <button
-                  key={choice.id}
-                  onClick={() => handleHumanChoice(choice.id)}
-                  disabled={!!matchWinner}
-                  className="rounded-2xl border-2 border-white/15 bg-black/30 px-4 py-6 flex flex-col items-center gap-2 hover:border-white/40 transition disabled:opacity-50 active:scale-95"
-                >
-                  <span className="text-5xl">{choice.emoji}</span>
-                  <span className="text-sm font-semibold uppercase text-white/90">
-                    {choice.label}
+            {showP1Choice && p1ChoiceDisplay ? (
+              <div className="w-full max-w-md flex flex-col items-center justify-center">
+                <div className="text-sm text-white/80 mb-3 text-center font-semibold">
+                  {statusMessage}
+                </div>
+                <div className="rounded-2xl border-2 border-emerald-400/50 bg-emerald-500/20 px-8 py-8 flex flex-row items-center justify-center gap-6">
+                  <span className="text-7xl">
+                    {CHOICES.find((c) => c.id === p1ChoiceDisplay)?.emoji}
                   </span>
-                </button>
-              ))}
-            </div>
+                  <span className="text-3xl font-bold uppercase text-white/90">
+                    {CHOICES.find((c) => c.id === p1ChoiceDisplay)?.label}
+                  </span>
+                </div>
+              </div>
+            ) : showResults ? (
+              <div className="w-full max-w-md flex flex-col items-center justify-center">
+                <div className="text-sm text-white/80 mb-3 text-center font-semibold">
+                  Results in {resultsTimer}...
+                </div>
+                <div className="grid grid-cols-2 gap-4 w-full">
+                  <div className="rounded-2xl border-2 border-blue-400/50 bg-blue-500/20 px-6 py-6 flex flex-col items-center justify-center gap-3">
+                    <span className="text-2xl text-white/60">Player 1</span>
+                    <span className="text-6xl">
+                      {finalResult && CHOICES.find((c) => c.id === finalResult.p1)?.emoji}
+                    </span>
+                  </div>
+                  <div className="rounded-2xl border-2 border-purple-400/50 bg-purple-500/20 px-6 py-6 flex flex-col items-center justify-center gap-3">
+                    <span className="text-2xl text-white/60">
+                      {vsBot ? "Bot" : "Player 2"}
+                    </span>
+                    <span className="text-6xl">
+                      {finalResult && CHOICES.find((c) => c.id === finalResult.p2)?.emoji}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="w-full max-w-md flex flex-col items-center justify-center">
+                <div className="text-sm text-white/80 mb-3 text-center font-semibold">
+                  {statusMessage}
+                </div>
+                <div className="flex flex-col gap-4 w-full">
+                  {CHOICES.map((choice) => (
+                    <button
+                      key={choice.id}
+                      onClick={() => handleHumanChoice(choice.id)}
+                      disabled={!!matchWinner || showP1Choice || showResults}
+                      className="rounded-2xl border-2 border-white/15 bg-black/30 px-8 py-8 flex flex-row items-center justify-center gap-6 hover:border-white/40 transition disabled:opacity-50 active:scale-95"
+                    >
+                      <span className="text-7xl">{choice.emoji}</span>
+                      <span className="text-3xl font-bold uppercase text-white/90">
+                        {choice.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {history.length > 0 && (

@@ -309,7 +309,7 @@ export default function TicTacToeXL() {
                   key={idx}
                   onClick={() => handleMove(idx)}
                   disabled={!!cell || !!winner}
-                  className="rounded-xl bg-black/30 border-2 border-white/15 text-3xl md:text-4xl font-bold flex items-center justify-center transition-all hover:bg-white/10 hover:border-white/30 disabled:opacity-50 active:scale-95"
+                  className="rounded-xl bg-black/30 border-2 border-white/15 text-6xl md:text-8xl font-bold flex items-center justify-center transition-all hover:bg-white/10 hover:border-white/30 disabled:opacity-50 active:scale-95"
                 >
                   {cell}
                 </button>
