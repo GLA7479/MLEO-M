@@ -637,59 +637,62 @@ export default function MathMaster() {
                     </button>
                   </div>
 
-                  {/* Error message for division - non-integer result */}
-                  {tableMode === "division" && selectedCell && (selectedRow || selectedCol) && selectedResult && selectedDivisor && selectedResult % selectedDivisor !== 0 && (
-                    <div className="mb-3 px-4 py-2 rounded-lg bg-red-500/20 border border-red-400/50 text-center">
-                      <div className="text-sm text-red-200 font-semibold">
-                        ⚠️ Error: {selectedResult} ÷ {selectedDivisor} is not a whole number!
+                  {/* Result window - always visible to prevent jumping */}
+                  <div className="mb-3 min-h-[30px] flex items-center justify-center">
+                    {/* Error message for division - non-integer result */}
+                    {tableMode === "division" && selectedCell && (selectedRow || selectedCol) && selectedResult && selectedDivisor && selectedResult % selectedDivisor !== 0 && (
+                      <div className="px-3 py-0.5 rounded-lg bg-red-500/20 border border-red-400/50 text-center">
+                        <div className="text-xs text-red-200 font-semibold leading-tight">
+                          ⚠️ Error: {selectedResult} ÷ {selectedDivisor} is not a whole number!
+                        </div>
+                        <div className="text-[10px] text-red-300 leading-tight">
+                          Result: {Math.floor(selectedResult / selectedDivisor)} remainder {selectedResult % selectedDivisor}
+                        </div>
                       </div>
-                      <div className="text-xs text-red-300 mt-1">
-                        Result: {Math.floor(selectedResult / selectedDivisor)} remainder {selectedResult % selectedDivisor}
-                      </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Multiplication result */}
-                  {tableMode === "multiplication" && selectedCell && (selectedRow || selectedCol) && (
-                    <div className={`mb-3 px-4 py-2 rounded-lg border text-center ${
-                      (selectedRow || selectedCell.row) * (selectedCol || selectedCell.col) === selectedCell.value
-                        ? "bg-emerald-500/20 border-emerald-400/50"
-                        : "bg-red-500/20 border-red-400/50"
-                    }`}>
-                      <div className="text-sm text-white/80">
-                        {selectedRow || selectedCell.row} × {selectedCol || selectedCell.col} =
-                      </div>
-                      <div className={`text-2xl font-bold ${
+                    {/* Multiplication result */}
+                    {tableMode === "multiplication" && selectedCell && (selectedRow || selectedCol) && (
+                      <div className={`px-3 py-0.5 rounded-lg border text-center ${
                         (selectedRow || selectedCell.row) * (selectedCol || selectedCell.col) === selectedCell.value
-                          ? "text-emerald-300"
-                          : "text-red-300"
+                          ? "bg-emerald-500/20 border-emerald-400/50"
+                          : "bg-red-500/20 border-red-400/50"
                       }`}>
-                        {selectedCell.value}
-                      </div>
-                      {((selectedRow || selectedCell.row) * (selectedCol || selectedCell.col) !== selectedCell.value) && (
-                        <div className="text-xs text-red-300 mt-1 font-semibold">
-                          ⚠️ Incorrect! Should be {(selectedRow || selectedCell.row) * (selectedCol || selectedCell.col)}
+                        <div className="text-xs text-white/80 leading-tight">
+                          {selectedRow || selectedCell.row} × {selectedCol || selectedCell.col} =
                         </div>
-                      )}
-                    </div>
-                  )}
+                        <div className={`text-lg font-bold leading-tight ${
+                          (selectedRow || selectedCell.row) * (selectedCol || selectedCell.col) === selectedCell.value
+                            ? "text-emerald-300"
+                            : "text-red-300"
+                        }`}>
+                          {selectedCell.value}
+                        </div>
+                        {((selectedRow || selectedCell.row) * (selectedCol || selectedCell.col) !== selectedCell.value) && (
+                          <div className="text-[10px] text-red-300 leading-tight font-semibold">
+                            ⚠️ Incorrect! Should be {(selectedRow || selectedCell.row) * (selectedCol || selectedCell.col)}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                  {/* Division result */}
-                  {tableMode === "division" && selectedResult && selectedDivisor && selectedResult % selectedDivisor === 0 && (
-                    <div className="mb-3 px-4 py-2 rounded-lg bg-purple-500/20 border border-purple-400/50 text-center">
-                      <div className="text-sm text-white/80">
-                        {selectedResult} ÷ {selectedDivisor} =
-                      </div>
-                      <div className="text-2xl font-bold text-purple-300">
-                        {selectedResult / selectedDivisor}
-                      </div>
-                      {selectedCell && (
-                        <div className="text-xs text-white/60 mt-1">
-                          {selectedRow ? `Row ${selectedDivisor} × Column ${selectedResult / selectedDivisor}` : `Row ${selectedResult / selectedDivisor} × Column ${selectedDivisor}`}
+                    {/* Division result */}
+                    {tableMode === "division" && selectedResult && selectedDivisor && selectedResult % selectedDivisor === 0 && (
+                      <div className="px-3 py-0.5 rounded-lg bg-purple-500/20 border border-purple-400/50 text-center">
+                        <div className="text-xs text-white/80 leading-tight">
+                          {selectedResult} ÷ {selectedDivisor} =
                         </div>
-                      )}
-                    </div>
-                  )}
+                        <div className="text-lg font-bold text-purple-300 leading-tight">
+                          {selectedResult / selectedDivisor}
+                        </div>
+                        {selectedCell && (
+                          <div className="text-[10px] text-white/60 leading-tight">
+                            {selectedRow ? `Row ${selectedDivisor} × Column ${selectedResult / selectedDivisor}` : `Row ${selectedResult / selectedDivisor} × Column ${selectedDivisor}`}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse text-center">
                       <thead>
