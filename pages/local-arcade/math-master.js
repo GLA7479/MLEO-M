@@ -129,6 +129,10 @@ export default function MathMaster() {
   const [feedback, setFeedback] = useState(null);
   const [bestScore, setBestScore] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
+  const [showMultiplicationTable, setShowMultiplicationTable] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [selectedCol, setSelectedCol] = useState(null);
+  const [highlightedAnswer, setHighlightedAnswer] = useState(null);
 
   useEffect(() => {
     setMounted(true);
@@ -476,6 +480,12 @@ export default function MathMaster() {
                 >
                   ▶️ Start
                 </button>
+                <button
+                  onClick={() => setShowMultiplicationTable(true)}
+                  className="h-10 px-4 rounded-lg bg-blue-500/80 hover:bg-blue-500 font-bold text-sm"
+                >
+                  📊 Times Table
+                </button>
                 {bestScore > 0 && (
                   <button
                     onClick={resetStats}
@@ -546,6 +556,148 @@ export default function MathMaster() {
                 ⏹️ Stop
               </button>
             </>
+          )}
+
+          {/* Multiplication Table Modal */}
+          {showMultiplicationTable && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              <div
+                className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                onClick={() => {
+                  setShowMultiplicationTable(false);
+                  setSelectedRow(null);
+                  setSelectedCol(null);
+                  setHighlightedAnswer(null);
+                }}
+              />
+              <div className="relative w-full max-w-md max-h-[85vh] overflow-auto bg-gradient-to-b from-[#0a0f1d] to-[#141928] rounded-2xl border-2 border-white/20 shadow-2xl">
+                <div className="sticky top-0 bg-gradient-to-b from-[#0a0f1d] to-[#141928] border-b border-white/10 px-4 py-3 flex items-center justify-between z-10">
+                  <h2 className="text-xl font-bold text-white">📊 Multiplication Table</h2>
+                  <button
+                    onClick={() => {
+                      setShowMultiplicationTable(false);
+                      setSelectedRow(null);
+                      setSelectedCol(null);
+                      setHighlightedAnswer(null);
+                    }}
+                    className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-lg flex items-center justify-center"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="p-4">
+                  {(selectedRow && selectedCol) && (
+                    <div className="mb-3 px-4 py-2 rounded-lg bg-emerald-500/20 border border-emerald-400/50 text-center">
+                      <div className="text-sm text-white/80">
+                        {selectedRow} × {selectedCol} =
+                      </div>
+                      <div className="text-2xl font-bold text-emerald-300">
+                        {selectedRow * selectedCol}
+                      </div>
+                    </div>
+                  )}
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-center">
+                      <thead>
+                        <tr>
+                          <th className="font-bold text-white/80 p-2 bg-black/30 rounded">×</th>
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map((num) => (
+                            <th
+                              key={num}
+                              onClick={() => {
+                                if (selectedRow) {
+                                  setSelectedCol(num);
+                                  setHighlightedAnswer({ row: selectedRow, col: num });
+                                } else {
+                                  setSelectedCol(null);
+                                  setHighlightedAnswer(null);
+                                }
+                              }}
+                              className={`font-bold text-white/80 p-2 rounded min-w-[40px] cursor-pointer transition-all ${
+                                selectedCol === num
+                                  ? "bg-yellow-500/40 border-2 border-yellow-400"
+                                  : "bg-black/30 hover:bg-black/40"
+                              }`}
+                            >
+                              {num}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map((row) => (
+                          <tr key={row}>
+                            <td
+                              onClick={() => {
+                                if (selectedCol) {
+                                  setSelectedRow(row);
+                                  setHighlightedAnswer({ row, col: selectedCol });
+                                } else {
+                                  setSelectedRow(row);
+                                  setSelectedCol(null);
+                                  setHighlightedAnswer(null);
+                                }
+                              }}
+                              className={`font-bold text-white/80 p-2 rounded cursor-pointer transition-all ${
+                                selectedRow === row
+                                  ? "bg-yellow-500/40 border-2 border-yellow-400"
+                                  : "bg-black/30 hover:bg-black/40"
+                              }`}
+                            >
+                              {row}
+                            </td>
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map((col) => {
+                              const isHighlighted = highlightedAnswer?.row === row && highlightedAnswer?.col === col;
+                              const isRowSelected = selectedRow === row;
+                              return (
+                                <td
+                                  key={`${row}-${col}`}
+                                  onClick={() => {
+                                    if (selectedRow) {
+                                      setSelectedCol(col);
+                                      setHighlightedAnswer({ row: selectedRow, col });
+                                    } else {
+                                      setSelectedRow(row);
+                                      setSelectedCol(null);
+                                      setHighlightedAnswer(null);
+                                    }
+                                  }}
+                                  className={`p-2 rounded border text-white text-sm min-w-[40px] cursor-pointer transition-all ${
+                                    isHighlighted
+                                      ? "bg-emerald-500/40 border-2 border-emerald-400 text-emerald-200 font-bold text-base"
+                                      : isRowSelected
+                                      ? "bg-yellow-500/20 border border-yellow-400/30"
+                                      : "bg-black/20 border border-white/5 hover:bg-black/30"
+                                  }`}
+                                >
+                                  {row * col}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-4 text-center space-y-2">
+                    <div className="text-xs text-white/60 mb-2">
+                      Click a row number, then a column number to see the answer
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowMultiplicationTable(false);
+                        setSelectedRow(null);
+                        setSelectedCol(null);
+                        setHighlightedAnswer(null);
+                      }}
+                      className="px-6 py-2 rounded-lg bg-blue-500/80 hover:bg-blue-500 font-bold text-sm"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
