@@ -2772,11 +2772,11 @@ function LudoBoard({
                         zIndex: 24,
                         textShadow: "0 1px 3px rgba(0,0,0,0.8)",
                         left: "50%",
-                        bottom: "-7%",
+                        bottom: "-15%",
                         transform: "translate(-50%, -50%)",
                       }}
                     >
-                      {stepsLeft} S
+                      {stepsLeft}
                     </span>
                   )}
                 </div>
