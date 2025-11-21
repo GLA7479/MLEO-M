@@ -130,6 +130,7 @@ export default function MathMaster() {
   const [bestScore, setBestScore] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const [showMultiplicationTable, setShowMultiplicationTable] = useState(false);
+  const [playerName, setPlayerName] = useState("");
   const [selectedRow, setSelectedRow] = useState(null);
   const [selectedCol, setSelectedCol] = useState(null);
   const [highlightedAnswer, setHighlightedAnswer] = useState(null);
@@ -293,9 +294,33 @@ export default function MathMaster() {
       setFeedback(`Wrong! Correct: ${currentQuestion.correctAnswer} ❌`);
       if ("vibrate" in navigator) navigator.vibrate?.(200);
       
+      // Reset game and start new game after wrong answer
       setTimeout(() => {
-        generateNewQuestion();
+        // Save scores before reset
+        if (typeof window !== "undefined") {
+          try {
+            const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+            const key = `${level}_${operation}`;
+            saved[key] = {
+              bestScore: Math.max(saved[key]?.bestScore || 0, score),
+              bestStreak: Math.max(saved[key]?.bestStreak || 0, streak),
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+            setBestScore(saved[key].bestScore);
+            setBestStreak(saved[key].bestStreak);
+          } catch {}
+        }
+        
+        // Reset all game state - don't auto-start
+        setGameActive(false);
+        setCurrentQuestion(null);
+        setScore(0);
+        setStreak(0);
+        setCorrect(0);
+        setWrong(0);
         setTimeLeft(20);
+        setSelectedAnswer(null);
+        setFeedback(null);
       }, 2000);
     }
   }
@@ -393,7 +418,7 @@ export default function MathMaster() {
               🧮 Math Master
             </h1>
             <p className="text-white/70 text-xs">
-              {LEVELS[level].name} • {getOperationName(operation)}
+              {playerName || "Player"} • {LEVELS[level].name} • {getOperationName(operation)}
             </p>
           </div>
 
@@ -435,7 +460,15 @@ export default function MathMaster() {
 
           {!gameActive ? (
             <>
-              <div className="flex items-center justify-center gap-2 mb-1 flex-wrap w-full max-w-md">
+              <div className="flex items-center justify-center gap-2 mb-2 flex-wrap w-full max-w-md">
+                <input
+                  type="text"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  placeholder="Player Name"
+                  className="h-9 px-3 rounded-lg bg-black/30 border border-white/20 text-white text-sm font-bold placeholder:text-white/40 flex-1 min-w-[120px]"
+                  maxLength={15}
+                />
                 <select
                   value={level}
                   onChange={(e) => {
@@ -480,7 +513,8 @@ export default function MathMaster() {
               <div className="flex items-center justify-center gap-2 mb-2 flex-wrap w-full max-w-md">
                 <button
                   onClick={startGame}
-                  className="h-10 px-6 rounded-lg bg-emerald-500/80 hover:bg-emerald-500 font-bold text-sm"
+                  disabled={!playerName.trim()}
+                  className="h-10 px-6 rounded-lg bg-emerald-500/80 hover:bg-emerald-500 disabled:bg-gray-500/50 disabled:cursor-not-allowed font-bold text-sm"
                 >
                   ▶️ Start
                 </button>
@@ -499,6 +533,11 @@ export default function MathMaster() {
                   </button>
                 )}
               </div>
+              {!playerName.trim() && (
+                <p className="text-xs text-white/60 text-center mb-2">
+                  Enter your name to start
+                </p>
+              )}
             </>
           ) : (
             <>
@@ -581,20 +620,36 @@ export default function MathMaster() {
               <div className="relative w-full max-w-md max-h-[85vh] overflow-auto bg-gradient-to-b from-[#0a0f1d] to-[#141928] rounded-2xl border-2 border-white/20 shadow-2xl">
                 <div className="sticky top-0 bg-gradient-to-b from-[#0a0f1d] to-[#141928] border-b border-white/10 px-4 py-3 flex items-center justify-between z-10">
                   <h2 className="text-xl font-bold text-white">📊 Multiplication Table</h2>
-                  <button
-                    onClick={() => {
-                      setShowMultiplicationTable(false);
-                      setSelectedRow(null);
-                      setSelectedCol(null);
-                      setHighlightedAnswer(null);
-                      setTableMode("multiplication");
-                      setSelectedResult(null);
-                      setSelectedDivisor(null);
-                    }}
-                    className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-lg flex items-center justify-center"
-                  >
-                    ×
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setSelectedRow(null);
+                        setSelectedCol(null);
+                        setHighlightedAnswer(null);
+                        setSelectedResult(null);
+                        setSelectedDivisor(null);
+                        setSelectedCell(null);
+                      }}
+                      className="px-2 py-1 rounded text-xs font-bold bg-white/10 hover:bg-white/20 text-white"
+                    >
+                      RESET
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowMultiplicationTable(false);
+                        setSelectedRow(null);
+                        setSelectedCol(null);
+                        setHighlightedAnswer(null);
+                        setTableMode("multiplication");
+                        setSelectedResult(null);
+                        setSelectedDivisor(null);
+                        setSelectedCell(null);
+                      }}
+                      className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-lg flex items-center justify-center"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
                 <div className="p-4">
                   {/* Mode toggle */}
@@ -695,9 +750,10 @@ export default function MathMaster() {
                           <th className="font-bold text-white/80 p-2 bg-black/30 rounded">×</th>
                           {Array.from({ length: 12 }, (_, i) => i + 1).map((num) => {
                             // Check if this column number is selected
-                            // Highlight column number if: cell is selected AND (column is selected OR column matches the cell's column AND row is selected)
-                            const isColSelected = (tableMode === "multiplication" && selectedCell && 
-                                                    ((selectedCol && num === selectedCol) || (selectedRow && num === selectedCell.col))) ||
+                            // In multiplication: highlight if column is selected (with or without cell)
+                            // In division: highlight if divisor or answer column
+                            const isColSelected = (tableMode === "multiplication" && selectedCol && num === selectedCol) ||
+                                                  (tableMode === "multiplication" && selectedCell && selectedRow && num === selectedCell.col) ||
                                                   (tableMode === "division" && selectedCell && selectedResult && selectedDivisor && selectedResult % selectedDivisor === 0 &&
                                                     ((selectedCol && num === selectedDivisor) || // divisor col
                                                      (selectedCol && num === Math.floor(selectedResult / selectedDivisor) && Math.floor(selectedResult / selectedDivisor) >= 1 && Math.floor(selectedResult / selectedDivisor) <= 12) || // answer col (if col selected as divisor and answer in table)
@@ -708,21 +764,34 @@ export default function MathMaster() {
                             return (
                               <th
                                 key={num}
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
                                   if (tableMode === "multiplication") {
-                                    // Second click: select column number (outside the table)
-                                    if (selectedCell) {
+                                    // Click on column: select column number and highlight full column
+                                    // Second click on same column: toggle off
+                                    // Keep row selection - don't clear it!
+                                    if (selectedCol === num) {
+                                      // Already selected - toggle off
+                                      setSelectedCol(null);
+                                    } else {
                                       setSelectedCol(num);
-                                      setSelectedRow(null); // Clear row selection
+                                      // Don't clear row - allow both to be selected together!
                                     }
                                   } else {
-                                    // Division mode: second click selects divisor
+                                    // Division mode: click selects divisor
                                     // Allow if the result will be a whole number (any positive integer)
                                     if (selectedResult && selectedCell) {
                                       const quotient = selectedResult / num;
                                       if (quotient === Math.floor(quotient) && quotient > 0) {
-                                        setSelectedDivisor(num);
-                                        setSelectedRow(null);
+                                        if (selectedDivisor === num) {
+                                          // Already selected - toggle off
+                                          setSelectedDivisor(null);
+                                          setSelectedCol(null);
+                                        } else {
+                                          setSelectedDivisor(num);
+                                          setSelectedRow(null);
+                                        }
                                       }
                                     }
                                   }
@@ -736,6 +805,7 @@ export default function MathMaster() {
                                     ? "bg-red-500/20 border border-red-400/30 opacity-50 cursor-not-allowed"
                                     : "bg-black/30 hover:bg-black/40"
                                 }`}
+                                style={{ pointerEvents: 'auto', zIndex: 10 }}
                               >
                                 {num}
                               </th>
@@ -747,29 +817,42 @@ export default function MathMaster() {
                         {Array.from({ length: 12 }, (_, i) => i + 1).map((row) => (
                           <tr key={row}>
                             <td
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 if (tableMode === "multiplication") {
-                                  // Second click: select row number (outside the table)
-                                  if (selectedCell) {
+                                  // Click on row: select row number and highlight full row
+                                  // Second click on same row: toggle off
+                                  // Keep column selection - don't clear it!
+                                  if (selectedRow === row) {
+                                    // Already selected - toggle off
+                                    setSelectedRow(null);
+                                  } else {
                                     setSelectedRow(row);
-                                    setSelectedCol(null); // Clear column selection
+                                    // Don't clear column - allow both to be selected together!
                                   }
                                 } else {
-                                  // Division mode: second click selects divisor
+                                  // Division mode: click selects divisor
                                   // Allow if the result will be a whole number (any positive integer)
                                   if (selectedResult && selectedCell) {
                                     const quotient = selectedResult / row;
                                     if (quotient === Math.floor(quotient) && quotient > 0) {
-                                      setSelectedDivisor(row);
-                                      setSelectedCol(null);
+                                      if (selectedDivisor === row) {
+                                        // Already selected - toggle off
+                                        setSelectedDivisor(null);
+                                        setSelectedRow(null);
+                                      } else {
+                                        setSelectedDivisor(row);
+                                        setSelectedCol(null);
+                                      }
                                     }
                                   }
                                 }
                               }}
                               className={`font-bold text-white/80 p-2 rounded cursor-pointer transition-all ${
-                                // For multiplication: highlight row number
-                                (tableMode === "multiplication" && selectedCell && 
-                                  ((selectedRow && row === selectedRow) || (selectedCol && row === selectedCell.row))) ||
+                                // For multiplication: highlight row number (with or without cell)
+                                (tableMode === "multiplication" && selectedRow && row === selectedRow) ||
+                                (tableMode === "multiplication" && selectedCell && selectedCol && row === selectedCell.row) ||
                                 // For division: highlight divisor row OR answer row (if answer is 1-12)
                                 (tableMode === "division" && selectedCell && selectedResult && selectedDivisor && selectedResult % selectedDivisor === 0 &&
                                   ((selectedRow && row === selectedDivisor) || // divisor row
@@ -784,6 +867,7 @@ export default function MathMaster() {
                                   ? "bg-red-500/20 border border-red-400/30 opacity-50 cursor-not-allowed"
                                   : "bg-black/30 hover:bg-black/40"
                               }`}
+                              style={{ pointerEvents: 'auto', zIndex: 10 }}
                             >
                               {row}
                             </td>
@@ -791,6 +875,36 @@ export default function MathMaster() {
                               const value = row * col;
                               // Check if this is the selected cell from the table
                               const isCellSelected = selectedCell && selectedCell.row === row && selectedCell.col === col;
+                              
+                              // For multiplication: check if this cell is in the selected row or column (full row/col highlight)
+                              // Works with or without selectedCell - allows clicking rows/cols independently
+                              const isRowSelected = tableMode === "multiplication" && selectedRow && row === selectedRow;
+                              const isColSelected = tableMode === "multiplication" && selectedCol && col === selectedCol;
+                              
+                              // For multiplication: highlight the answer cell (intersection of selected row and column)
+                              let isAnswerCellMultiplication = false;
+                              if (tableMode === "multiplication") {
+                                if (selectedRow && selectedCol && row === selectedRow && col === selectedCol) {
+                                  // Both row and column selected - highlight intersection
+                                  isAnswerCellMultiplication = true;
+                                } else if (selectedRow && !selectedCol && selectedCell && row === selectedRow && col === selectedCell.col) {
+                                  // Row selected + cell from table - highlight intersection
+                                  isAnswerCellMultiplication = true;
+                                } else if (selectedCol && !selectedRow && selectedCell && row === selectedCell.row && col === selectedCol) {
+                                  // Column selected + cell from table - highlight intersection
+                                  isAnswerCellMultiplication = true;
+                                }
+                              }
+                              
+                              // For division: highlight cell at intersection of selected row/col
+                              let isDivisionIntersection = false;
+                              if (tableMode === "division" && selectedCell && selectedResult && selectedDivisor) {
+                                if (selectedRow && row === selectedRow && col === selectedCell.col) {
+                                  isDivisionIntersection = true;
+                                } else if (selectedCol && row === selectedCell.row && col === selectedCol) {
+                                  isDivisionIntersection = true;
+                                }
+                              }
                               
                               // For division: check if this is the answer cell
                               // If selectedResult ÷ selectedDivisor = answer, we need to highlight:
@@ -817,14 +931,6 @@ export default function MathMaster() {
                                 }
                               }
                               
-                              // For multiplication: check if this is the answer cell
-                              let isMultiplicationAnswer = false;
-                              if (tableMode === "multiplication" && selectedCell && (selectedRow || selectedCol)) {
-                                const expectedRow = selectedRow || selectedCell.row;
-                                const expectedCol = selectedCol || selectedCell.col;
-                                isMultiplicationAnswer = row === expectedRow && col === expectedCol;
-                              }
-                              
                               return (
                                 <td
                                   key={`${row}-${col}`}
@@ -849,12 +955,17 @@ export default function MathMaster() {
                                       ? tableMode === "multiplication"
                                         ? "bg-emerald-500/40 border-2 border-emerald-400 text-emerald-200 font-bold text-base"
                                         : "bg-purple-500/40 border-2 border-purple-400 text-purple-200 font-bold text-base"
+                                      : isAnswerCellMultiplication
+                                      ? "bg-emerald-500/40 border-2 border-emerald-400 text-emerald-200 font-bold text-base"
                                       : isAnswerCell
                                       ? "bg-purple-500/40 border-2 border-purple-400 text-purple-200 font-bold text-base"
-                                      : isMultiplicationAnswer && !isCellSelected
-                                      ? "bg-emerald-500/40 border-2 border-emerald-400 text-emerald-200 font-bold text-base"
+                                      : (isRowSelected || isColSelected)
+                                      ? "bg-yellow-500/20 border border-yellow-400/30"
+                                      : isDivisionIntersection && !isCellSelected
+                                      ? "bg-purple-500/30 border border-purple-400/50"
                                       : "bg-black/20 border border-white/5 hover:bg-black/30"
                                   }`}
+                                  style={{ pointerEvents: 'auto' }}
                                 >
                                   {value}
                                 </td>
