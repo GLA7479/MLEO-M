@@ -2414,48 +2414,52 @@ function LudoBoard({
   onDiceClick = null,
 }) {
   const boardRef = useRef(null);
-  const [boardSize, setBoardSize] = useState(520);
+  const containerRef = useRef(null);
+  const [boardSize, setBoardSize] = useState(null);
   
-  // Calculate board size dynamically for mobile
+  // Calculate board size dynamically - maximize to fit screen without scrolling
   useEffect(() => {
-    if (!boardRef.current) return;
+    if (!containerRef.current) return;
     
     const calc = () => {
-      const rootH = window.visualViewport?.height ?? window.innerHeight;
-      const rootW = window.innerWidth;
-      const safeBottom = Number(
-        getComputedStyle(document.documentElement)
-          .getPropertyValue("--satb")
-          .replace("px", "")
-      ) || 0;
-      
-      // Get available space (account for padding, gaps, etc.)
-      const container = boardRef.current?.closest('.flex-1');
+      // Get the container that holds the board
+      const container = containerRef.current;
       if (!container) return;
       
       const containerRect = container.getBoundingClientRect();
-      const availableH = containerRect.height - 40; // padding and gaps
-      const availableW = containerRect.width - 40;
+      // Account for minimal padding/gaps - maximize board size
+      // Only reduce by 20px total to maximize the board
+      const availableH = containerRect.height - 20;
+      const availableW = containerRect.width - 20;
       
-      // Use the smaller dimension to ensure square board fits
-      const maxSize = Math.min(availableH, availableW, rootW * 0.95, rootH * 0.7);
-      const minSize = 280; // Minimum size for mobile
-      const calculatedSize = Math.max(minSize, Math.min(maxSize, 820));
+      // Use the smaller dimension to ensure square board fits, maximize it
+      // Try to keep original size (820px) but reduce only if needed to prevent scrolling
+      const maxSize = Math.min(availableH, availableW);
+      // Prefer original size, only reduce if absolutely necessary
+      const calculatedSize = Math.min(maxSize, 820);
       
+      // Always set the calculated size - it will be as large as possible
       setBoardSize(calculatedSize);
     };
     
     calc();
     const ro = new ResizeObserver(calc);
-    if (boardRef.current) {
-      ro.observe(boardRef.current.closest('.flex-1') || document.body);
+    if (containerRef.current) {
+      ro.observe(containerRef.current);
     }
     window.addEventListener("resize", calc);
     window.addEventListener("orientationchange", calc);
+    const vv = window.visualViewport;
+    if (vv) {
+      vv.addEventListener("resize", calc);
+    }
     return () => {
       ro.disconnect();
       window.removeEventListener("resize", calc);
       window.removeEventListener("orientationchange", calc);
+      if (vv) {
+        vv.removeEventListener("resize", calc);
+      }
     };
   }, []);
   
@@ -2553,16 +2557,18 @@ function LudoBoard({
     return numbers;
   }, [disableHighlights, effectiveHighlights, board, pieces]);
   return (
-    <div className="w-full h-full flex flex-col sm:flex-row gap-3">
+    <div className="w-full h-full flex flex-col sm:flex-row gap-3" ref={containerRef}>
       {/* לוח מרכזי */}
-      <div className="flex-1 flex items-center justify-center" ref={boardRef}>
+      <div className="flex-1 flex items-center justify-center min-w-0">
         <div
           className="relative rounded-2xl border-2 border-white/30 overflow-hidden bg-black shadow-2xl aspect-square"
+          ref={boardRef}
           style={{
-            width: `${boardSize}px`,
-            height: `${boardSize}px`,
+            width: boardSize ? `${boardSize}px` : "clamp(520px, min(96vw, 96vh), 820px)",
+            height: boardSize ? `${boardSize}px` : "clamp(520px, min(96vw, 96vh), 820px)",
             maxWidth: "100%",
             maxHeight: "100%",
+            flexShrink: 0,
           }}
         >
           {/* שכבות רקע חדשות שמתאימות למסלול המעגלי */}
@@ -2994,41 +3000,49 @@ function PlayerInfoModal({ seatIndex, playerName, color, board, history = [], mo
 
 function LudoBoardLocal({ board, mySeat, onPieceClick }) {
   const boardRef = useRef(null);
-  const [boardSize, setBoardSize] = useState(400);
+  const containerRef = useRef(null);
+  const [boardSize, setBoardSize] = useState(null);
   
-  // Calculate board size dynamically for mobile
+  // Calculate board size dynamically - maximize to fit screen without scrolling
   useEffect(() => {
-    if (!boardRef.current) return;
+    if (!containerRef.current) return;
     
     const calc = () => {
-      const rootH = window.visualViewport?.height ?? window.innerHeight;
-      const rootW = window.innerWidth;
-      
-      const container = boardRef.current?.closest('.flex-1');
+      const container = containerRef.current;
       if (!container) return;
       
       const containerRect = container.getBoundingClientRect();
+      // Account for minimal padding/gaps - maximize board size
+      // Only reduce by 20px total to maximize the board
       const availableH = containerRect.height - 20;
       const availableW = containerRect.width - 20;
       
-      const maxSize = Math.min(availableH, availableW, rootW * 0.95, rootH * 0.7);
-      const minSize = 260;
-      const calculatedSize = Math.max(minSize, Math.min(maxSize, 600));
+      // Maximize to fit available space, keep original max (820px)
+      const maxSize = Math.min(availableH, availableW);
+      const calculatedSize = Math.min(maxSize, 820);
       
+      // Always set - maximize the size
       setBoardSize(calculatedSize);
     };
     
     calc();
     const ro = new ResizeObserver(calc);
-    if (boardRef.current) {
-      ro.observe(boardRef.current.closest('.flex-1') || document.body);
+    if (containerRef.current) {
+      ro.observe(containerRef.current);
     }
     window.addEventListener("resize", calc);
     window.addEventListener("orientationchange", calc);
+    const vv = window.visualViewport;
+    if (vv) {
+      vv.addEventListener("resize", calc);
+    }
     return () => {
       ro.disconnect();
       window.removeEventListener("resize", calc);
       window.removeEventListener("orientationchange", calc);
+      if (vv) {
+        vv.removeEventListener("resize", calc);
+      }
     };
   }, []);
   
@@ -3039,9 +3053,9 @@ function LudoBoardLocal({ board, mySeat, onPieceClick }) {
   const shouldRenderFinishedPiece = useFinishFlash(seats, pieces);
 
   return (
-    <div className="w-full h-full flex flex-col sm:flex-row gap-3">
+    <div className="w-full h-full flex flex-col sm:flex-row gap-3" ref={containerRef}>
       {/* לוח מרכזי */}
-      <div className="flex-1 relative bg-gradient-to-br from-purple-900 via-slate-900 to-black rounded-2xl border border-white/10 overflow-hidden" ref={boardRef} style={{ minHeight: `${boardSize}px`, aspectRatio: '1/1' }}>
+      <div className="flex-1 relative bg-gradient-to-br from-purple-900 via-slate-900 to-black rounded-2xl border border-white/10 overflow-hidden flex items-center justify-center" style={{ aspectRatio: '1/1', width: boardSize ? `${boardSize}px` : 'clamp(400px, min(96vw, 96vh), 820px)', maxWidth: '100%', maxHeight: '100%', flexShrink: 0 }}>
         <div className="absolute inset-[8%] bg-slate-900/80 rounded-2xl border border-white/10" />
 
         {/* בסיס תחתון (אתה) + עליון (בוט) */}
