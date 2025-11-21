@@ -2427,6 +2427,18 @@ function LudoBoard({
       if (!container) return;
       
       const containerRect = container.getBoundingClientRect();
+      
+      // If container has no size yet, use viewport
+      if (containerRect.height === 0 || containerRect.width === 0) {
+        const rootH = window.visualViewport?.height ?? window.innerHeight;
+        const rootW = window.innerWidth;
+        const availableH = rootH * 0.75; // Use 75% of viewport height
+        const availableW = rootW * 0.95; // Use 95% of viewport width
+        const maxSize = Math.min(availableH, availableW);
+        setBoardSize(Math.min(maxSize, 820));
+        return;
+      }
+      
       // Account for minimal padding/gaps - maximize board size
       // Only reduce by 20px total to maximize the board
       const availableH = containerRect.height - 20;
@@ -2439,10 +2451,14 @@ function LudoBoard({
       const calculatedSize = Math.min(maxSize, 820);
       
       // Always set the calculated size - it will be as large as possible
-      setBoardSize(calculatedSize);
+      // Minimum 500px to ensure good visibility
+      setBoardSize(Math.max(500, calculatedSize));
     };
     
+    // Delay initial calc to ensure container is rendered
+    const timer = setTimeout(calc, 100);
     calc();
+    
     const ro = new ResizeObserver(calc);
     if (containerRef.current) {
       ro.observe(containerRef.current);
@@ -2454,6 +2470,7 @@ function LudoBoard({
       vv.addEventListener("resize", calc);
     }
     return () => {
+      clearTimeout(timer);
       ro.disconnect();
       window.removeEventListener("resize", calc);
       window.removeEventListener("orientationchange", calc);
@@ -2564,8 +2581,8 @@ function LudoBoard({
           className="relative rounded-2xl border-2 border-white/30 overflow-hidden bg-black shadow-2xl aspect-square"
           ref={boardRef}
           style={{
-            width: boardSize ? `${boardSize}px` : "clamp(520px, min(96vw, 96vh), 820px)",
-            height: boardSize ? `${boardSize}px` : "clamp(520px, min(96vw, 96vh), 820px)",
+            width: boardSize ? `${boardSize}px` : "clamp(500px, min(95vw, 90vh), 820px)",
+            height: boardSize ? `${boardSize}px` : "clamp(500px, min(95vw, 90vh), 820px)",
             maxWidth: "100%",
             maxHeight: "100%",
             flexShrink: 0,
@@ -3021,8 +3038,8 @@ function LudoBoardLocal({ board, mySeat, onPieceClick }) {
       const maxSize = Math.min(availableH, availableW);
       const calculatedSize = Math.min(maxSize, 820);
       
-      // Always set - maximize the size
-      setBoardSize(calculatedSize);
+      // Always set - maximize the size, minimum 500px
+      setBoardSize(Math.max(500, calculatedSize));
     };
     
     calc();
@@ -3055,7 +3072,7 @@ function LudoBoardLocal({ board, mySeat, onPieceClick }) {
   return (
     <div className="w-full h-full flex flex-col sm:flex-row gap-3" ref={containerRef}>
       {/* לוח מרכזי */}
-      <div className="flex-1 relative bg-gradient-to-br from-purple-900 via-slate-900 to-black rounded-2xl border border-white/10 overflow-hidden flex items-center justify-center" style={{ aspectRatio: '1/1', width: boardSize ? `${boardSize}px` : 'clamp(400px, min(96vw, 96vh), 820px)', maxWidth: '100%', maxHeight: '100%', flexShrink: 0 }}>
+      <div className="flex-1 relative bg-gradient-to-br from-purple-900 via-slate-900 to-black rounded-2xl border border-white/10 overflow-hidden flex items-center justify-center" style={{ aspectRatio: '1/1', width: boardSize ? `${boardSize}px` : 'clamp(500px, min(95vw, 90vh), 820px)', maxWidth: '100%', maxHeight: '100%', flexShrink: 0 }}>
         <div className="absolute inset-[8%] bg-slate-900/80 rounded-2xl border border-white/10" />
 
         {/* בסיס תחתון (אתה) + עליון (בוט) */}
