@@ -91,41 +91,9 @@ function fmt(n) {
   return String(n);
 }
 
-// ===== viewport fix for iOS =====
-function useIOSViewportFix() {
-  useEffect(() => {
-    const root = document.documentElement;
-    const vv = window.visualViewport;
-    const setVH = () => {
-      const h = vv ? vv.height : window.innerHeight;
-      root.style.setProperty("--app-100vh", `${Math.round(h)}px`);
-      root.style.setProperty(
-        "--satb",
-        getComputedStyle(root).getPropertyValue("env(safe-area-inset-bottom,0px)")
-      );
-    };
-    const onOrient = () =>
-      requestAnimationFrame(() => setTimeout(setVH, 250));
-    setVH();
-    if (vv) {
-      vv.addEventListener("resize", setVH);
-      vv.addEventListener("scroll", setVH);
-    }
-    window.addEventListener("orientationchange", onOrient);
-    return () => {
-      if (vv) {
-        vv.removeEventListener("resize", setVH);
-        vv.removeEventListener("scroll", setVH);
-      }
-      window.removeEventListener("orientationchange", onOrient);
-    };
-  }, []);
-}
-
 // =================== PUBLIC ENTRY ===================
 
 export default function LudoMP({ roomId, playerName, vault, setVaultBoth, tierCode = "10K" }) {
-  useIOSViewportFix();
   // Single vault bridge, used both by MP and Bot
   const router = useRouter();
   useEffect(() => {
@@ -1202,9 +1170,9 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
 
   return (
     <>
-      <div className="w-full h-full flex flex-col gap-2 text-white" style={{ height: '100%', overflow: 'hidden' }}>
+      <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: '600px', height: '100%' }}>
       {/* Seats */}
-      <div className="w-full overflow-x-auto flex-shrink-0">
+      <div className="w-full overflow-x-auto">
         <div className="flex gap-1 text-[9px] min-w-[320px]">
         {Array.from({ length: seats }).map((_, idx) => {
           const row = seatMap.get(idx) || null;
@@ -1244,8 +1212,8 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         </div>
       </div>
       {/* Board + Controls */}
-      <div className="flex-1 min-h-0 bg-black/40 rounded-lg p-3 flex flex-col gap-3 overflow-hidden">
-        <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 flex flex-col gap-3 overflow-hidden" style={{ minHeight: '500px', height: '100%' }}>
+        <div className="flex-1 h-full overflow-hidden" style={{ minHeight: '400px', height: '100%' }}>
           {board ? (
             <LudoBoard
               board={board}
@@ -1677,8 +1645,8 @@ function LudoVsBot({ vault, onBackToMode }) {
 
   return (
     <>
-      <div className="w-full h-full flex flex-col gap-2 text-white" style={{ height: "100%", overflow: 'hidden' }}>
-        <div className="w-full overflow-x-auto flex-shrink-0">
+      <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: "600px", height: "100%" }}>
+        <div className="w-full overflow-x-auto">
           <div className="flex gap-1 text-[9px] min-w-[320px]">
           {seatCards.map((card, idx) => (
             <button
@@ -1702,9 +1670,10 @@ function LudoVsBot({ vault, onBackToMode }) {
         </div>
 
         <div
-          className="flex-1 min-h-0 bg-black/40 rounded-lg p-3 flex flex-col gap-3 overflow-hidden"
+          className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 flex flex-col gap-3 overflow-hidden"
+          style={{ minHeight: "500px", height: "100%" }}
         >
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 h-full overflow-hidden" style={{ minHeight: "400px", height: "100%" }}>
           <LudoBoard
             board={board}
             mySeat={mySeat}
@@ -1977,8 +1946,8 @@ function LudoLocal({ onBackToMode }) {
 
   return (
     <>
-      <div className="w-full h-full flex flex-col gap-2 text-white" style={{ height: "100%", overflow: 'hidden' }}>
-      <div className="w-full overflow-x-auto flex-shrink-0">
+      <div className="w-full h-full flex flex-col gap-2 text-white" style={{ minHeight: "600px", height: "100%" }}>
+      <div className="w-full overflow-x-auto">
         <div className="flex gap-1 text-[9px] min-w-[320px]">
           {seatCards.map((card, idx) => (
             <button
@@ -2002,9 +1971,10 @@ function LudoLocal({ onBackToMode }) {
       </div>
 
       <div
-        className="flex-1 min-h-0 bg-black/40 rounded-lg p-3 flex flex-col gap-3 overflow-hidden"
+        className="flex-1 min-h-[400px] h-full bg-black/40 rounded-lg p-3 flex flex-col gap-3 overflow-hidden"
+        style={{ minHeight: "500px", height: "100%" }}
       >
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 h-full overflow-hidden" style={{ minHeight: "400px", height: "100%" }}>
           <LudoBoard
             board={board}
             mySeat={board.turnSeat}
@@ -2109,7 +2079,7 @@ function LudoLocal({ onBackToMode }) {
 
 // ===== Helpers for board projection =====
 const START_OFFSETS = [0, 13, 26, 39]; // נקודת התחלה לכל צבע על המסלול
-// Board size will be calculated dynamically for mobile
+const BOARD_SIZE_EXPR = "clamp(520px, min(96vw, 96vh), 820px)";
 const TRACK_RADIUS = 36;
 const TRACK_ANGLE_OFFSET = (5 * Math.PI) / 4; // 225° מבטיח שהכניסה קרובה לשחקן
 const SEAT_HEX_COLORS = ["#ef4444", "#38bdf8", "#22c55e", "#fbbf24"];
@@ -2413,52 +2383,6 @@ function LudoBoard({
   diceClickable = false,
   onDiceClick = null,
 }) {
-  const boardRef = useRef(null);
-  const [boardSize, setBoardSize] = useState(520);
-  
-  // Calculate board size dynamically for mobile
-  useEffect(() => {
-    if (!boardRef.current) return;
-    
-    const calc = () => {
-      const rootH = window.visualViewport?.height ?? window.innerHeight;
-      const rootW = window.innerWidth;
-      const safeBottom = Number(
-        getComputedStyle(document.documentElement)
-          .getPropertyValue("--satb")
-          .replace("px", "")
-      ) || 0;
-      
-      // Get available space (account for padding, gaps, etc.)
-      const container = boardRef.current?.closest('.flex-1');
-      if (!container) return;
-      
-      const containerRect = container.getBoundingClientRect();
-      const availableH = containerRect.height - 40; // padding and gaps
-      const availableW = containerRect.width - 40;
-      
-      // Use the smaller dimension to ensure square board fits
-      const maxSize = Math.min(availableH, availableW, rootW * 0.95, rootH * 0.7);
-      const minSize = 280; // Minimum size for mobile
-      const calculatedSize = Math.max(minSize, Math.min(maxSize, 820));
-      
-      setBoardSize(calculatedSize);
-    };
-    
-    calc();
-    const ro = new ResizeObserver(calc);
-    if (boardRef.current) {
-      ro.observe(boardRef.current.closest('.flex-1') || document.body);
-    }
-    window.addEventListener("resize", calc);
-    window.addEventListener("orientationchange", calc);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", calc);
-      window.removeEventListener("orientationchange", calc);
-    };
-  }, []);
-  
   const pieces = board.pieces || {};
 
   // fallback: אם activeSeats ריק (במיוחד באופליין) – נגזור אותו מה־pieces
@@ -2553,16 +2477,14 @@ function LudoBoard({
     return numbers;
   }, [disableHighlights, effectiveHighlights, board, pieces]);
   return (
-    <div className="w-full h-full flex flex-col sm:flex-row gap-3">
+    <div className="w-full h-full flex flex-col sm:flex-row gap-3" style={{ minHeight: "420px" }}>
       {/* לוח מרכזי */}
-      <div className="flex-1 flex items-center justify-center" ref={boardRef}>
+      <div className="flex-1 flex items-center justify-center">
         <div
           className="relative rounded-2xl border-2 border-white/30 overflow-hidden bg-black shadow-2xl aspect-square"
           style={{
-            width: `${boardSize}px`,
-            height: `${boardSize}px`,
-            maxWidth: "100%",
-            maxHeight: "100%",
+            width: BOARD_SIZE_EXPR,
+            height: BOARD_SIZE_EXPR,
           }}
         >
           {/* שכבות רקע חדשות שמתאימות למסלול המעגלי */}
@@ -2993,45 +2915,6 @@ function PlayerInfoModal({ seatIndex, playerName, color, board, history = [], mo
 }
 
 function LudoBoardLocal({ board, mySeat, onPieceClick }) {
-  const boardRef = useRef(null);
-  const [boardSize, setBoardSize] = useState(400);
-  
-  // Calculate board size dynamically for mobile
-  useEffect(() => {
-    if (!boardRef.current) return;
-    
-    const calc = () => {
-      const rootH = window.visualViewport?.height ?? window.innerHeight;
-      const rootW = window.innerWidth;
-      
-      const container = boardRef.current?.closest('.flex-1');
-      if (!container) return;
-      
-      const containerRect = container.getBoundingClientRect();
-      const availableH = containerRect.height - 20;
-      const availableW = containerRect.width - 20;
-      
-      const maxSize = Math.min(availableH, availableW, rootW * 0.95, rootH * 0.7);
-      const minSize = 260;
-      const calculatedSize = Math.max(minSize, Math.min(maxSize, 600));
-      
-      setBoardSize(calculatedSize);
-    };
-    
-    calc();
-    const ro = new ResizeObserver(calc);
-    if (boardRef.current) {
-      ro.observe(boardRef.current.closest('.flex-1') || document.body);
-    }
-    window.addEventListener("resize", calc);
-    window.addEventListener("orientationchange", calc);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", calc);
-      window.removeEventListener("orientationchange", calc);
-    };
-  }, []);
-  
   const pieces = board.pieces || {};
   const colorClasses = ["bg-red-500", "bg-sky-500"];
 
@@ -3041,7 +2924,7 @@ function LudoBoardLocal({ board, mySeat, onPieceClick }) {
   return (
     <div className="w-full h-full flex flex-col sm:flex-row gap-3">
       {/* לוח מרכזי */}
-      <div className="flex-1 relative bg-gradient-to-br from-purple-900 via-slate-900 to-black rounded-2xl border border-white/10 overflow-hidden" ref={boardRef} style={{ minHeight: `${boardSize}px`, aspectRatio: '1/1' }}>
+      <div className="flex-1 relative bg-gradient-to-br from-purple-900 via-slate-900 to-black rounded-2xl border border-white/10 overflow-hidden min-h-[260px]">
         <div className="absolute inset-[8%] bg-slate-900/80 rounded-2xl border border-white/10" />
 
         {/* בסיס תחתון (אתה) + עליון (בוט) */}
