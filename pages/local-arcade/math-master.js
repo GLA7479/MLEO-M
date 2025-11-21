@@ -31,6 +31,100 @@ const OPERATIONS = ["addition", "subtraction", "multiplication", "division", "mi
 
 const STORAGE_KEY = "mleo_math_master";
 
+// Build top 10 scores by score (highest first)
+function buildTop10ByScore(saved, level) {
+  const allScores = [];
+
+  OPERATIONS.forEach((op) => {
+    const key = `${level}_${op}`;
+    const levelData = saved[key] || [];
+
+    if (Array.isArray(levelData)) {
+      // New format – array
+      levelData.forEach((entry) => {
+        const bestScore = entry.bestScore ?? entry.score ?? 0;
+        const bestStreak = entry.bestStreak ?? entry.streak ?? 0;
+
+        if (bestScore > 0) {
+          allScores.push({
+            name: entry.playerName || entry.name || "Player",
+            bestScore,
+            bestStreak,
+            operation: op,
+            timestamp: entry.timestamp || 0,
+          });
+        }
+      });
+    } else {
+      // Old format – object { [name]: {bestScore, bestStreak...} }
+      Object.entries(levelData).forEach(([name, data]) => {
+        const bestScore = data.bestScore ?? data.score ?? 0;
+        const bestStreak = data.bestStreak ?? data.streak ?? 0;
+
+        if (bestScore > 0) {
+          allScores.push({
+            name,
+            bestScore,
+            bestStreak,
+            operation: op,
+            timestamp: data.timestamp || 0,
+          });
+        }
+      });
+    }
+  });
+
+  // Sort: first by score, then by streak, then by timestamp (newer first)
+  const sorted = allScores
+    .sort((a, b) => {
+      if (b.bestScore !== a.bestScore) return b.bestScore - a.bestScore;
+      if (b.bestStreak !== a.bestStreak) return b.bestStreak - a.bestStreak;
+      return (b.timestamp || 0) - (a.timestamp || 0);
+    })
+    .slice(0, 10);
+
+  // If there are fewer than 10 records, fill with placeholders
+  while (sorted.length < 10) {
+    sorted.push({
+      name: "-",
+      bestScore: 0,
+      bestStreak: 0,
+      operation: "",
+      timestamp: 0,
+      placeholder: true,
+    });
+  }
+
+  return sorted;
+}
+
+// Save score entry - handles conversion from old format (object) to new format (array)
+function saveScoreEntry(saved, key, entry) {
+  let levelData = saved[key];
+
+  if (!levelData) {
+    // Nothing exists – start with new array
+    levelData = [];
+  } else if (!Array.isArray(levelData)) {
+    // Old format: convert to array of entries
+    levelData = Object.entries(levelData).map(([name, data]) => ({
+      playerName: name,
+      bestScore: data.bestScore ?? data.score ?? 0,
+      bestStreak: data.bestStreak ?? data.streak ?? 0,
+      timestamp: data.timestamp || 0,
+    }));
+  }
+
+  levelData.push(entry);
+
+  // Limit to 100 entries
+  if (levelData.length > 100) {
+    levelData = levelData.slice(-100);
+  }
+
+  saved[key] = levelData;
+}
+
 function generateQuestion(level, operation) {
   const ops = operation === "mixed" 
     ? ["addition", "subtraction", "multiplication", "division"][Math.floor(Math.random() * 4)]
@@ -130,6 +224,9 @@ export default function MathMaster() {
   const [bestScore, setBestScore] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const [showMultiplicationTable, setShowMultiplicationTable] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardLevel, setLeaderboardLevel] = useState("easy");
+  const [leaderboardData, setLeaderboardData] = useState([]);
   const [playerName, setPlayerName] = useState("");
   const [selectedRow, setSelectedRow] = useState(null);
   const [selectedCol, setSelectedCol] = useState(null);
@@ -142,18 +239,57 @@ export default function MathMaster() {
   useEffect(() => {
     setMounted(true);
     
-    // Load best scores
+    // Load best scores for current player
     if (typeof window !== "undefined") {
       try {
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
         const key = `${level}_${operation}`;
-        if (saved[key]) {
-          setBestScore(saved[key].bestScore || 0);
-          setBestStreak(saved[key].bestStreak || 0);
+        
+        if (saved[key] && playerName.trim()) {
+          // Handle both old format (object) and new format (array)
+          if (Array.isArray(saved[key])) {
+            // New format: array of score entries
+            const playerScores = saved[key].filter(s => s.playerName === playerName.trim());
+            if (playerScores.length > 0) {
+              const maxScore = Math.max(...playerScores.map(s => s.bestScore || 0), 0);
+              const maxStreak = Math.max(...playerScores.map(s => s.bestStreak || 0), 0);
+              setBestScore(maxScore);
+              setBestStreak(maxStreak);
+            } else {
+              setBestScore(0);
+              setBestStreak(0);
+            }
+          } else {
+            // Old format: object with player names as keys
+            if (saved[key][playerName.trim()]) {
+              setBestScore(saved[key][playerName.trim()].bestScore || 0);
+              setBestStreak(saved[key][playerName.trim()].bestStreak || 0);
+            } else {
+              setBestScore(0);
+              setBestStreak(0);
+            }
+          }
+        } else {
+          setBestScore(0);
+          setBestStreak(0);
         }
       } catch {}
     }
-  }, [level, operation]);
+  }, [level, operation, playerName]);
+
+  // Load leaderboard data when modal opens or level changes
+  useEffect(() => {
+    if (showLeaderboard && typeof window !== "undefined") {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+        const topScores = buildTop10ByScore(saved, leaderboardLevel);
+        setLeaderboardData(topScores);
+      } catch (e) {
+        console.error("Error loading leaderboard:", e);
+        setLeaderboardData([]);
+      }
+    }
+  }, [showLeaderboard, leaderboardLevel]);
 
   // Dynamic layout calculation - stable, no state dependencies
   useEffect(() => {
@@ -224,18 +360,38 @@ export default function MathMaster() {
     setFeedback(null);
     setSelectedAnswer(null);
     
-    // Save best scores
-    if (typeof window !== "undefined") {
+    // Save score as a new entry (don't overwrite)
+    if (typeof window !== "undefined" && playerName.trim()) {
       try {
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
         const key = `${level}_${operation}`;
-        saved[key] = {
-          bestScore: Math.max(saved[key]?.bestScore || 0, score),
-          bestStreak: Math.max(saved[key]?.bestStreak || 0, streak),
-        };
+        
+        saveScoreEntry(saved, key, {
+          playerName: playerName.trim(),
+          bestScore: score,
+          bestStreak: streak,
+          timestamp: Date.now(),
+        });
+        
         localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
-        setBestScore(saved[key].bestScore);
-        setBestStreak(saved[key].bestStreak);
+        
+        // Update best score for current player display
+        const playerScores = (saved[key] || []).filter(
+          (s) => s.playerName === playerName.trim()
+        );
+        const maxScore = Math.max(...playerScores.map((s) => s.bestScore || 0), 0);
+        const maxStreak = Math.max(
+          ...playerScores.map((s) => s.bestStreak || 0),
+          0
+        );
+        setBestScore(maxScore);
+        setBestStreak(maxStreak);
+        
+        // Refresh leaderboard if open
+        if (showLeaderboard) {
+          const topScores = buildTop10ByScore(saved, leaderboardLevel);
+          setLeaderboardData(topScores);
+        }
       } catch {}
     }
   }
@@ -255,18 +411,38 @@ export default function MathMaster() {
     setCurrentQuestion(null);
     setTimeLeft(20);
     
-    // Save scores
-    if (typeof window !== "undefined") {
+    // Save score as a new entry (don't overwrite)
+    if (typeof window !== "undefined" && playerName.trim()) {
       try {
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
         const key = `${level}_${operation}`;
-        saved[key] = {
-          bestScore: Math.max(saved[key]?.bestScore || 0, score),
-          bestStreak: Math.max(saved[key]?.bestStreak || 0, streak),
-        };
+        
+        saveScoreEntry(saved, key, {
+          playerName: playerName.trim(),
+          bestScore: score,
+          bestStreak: streak,
+          timestamp: Date.now(),
+        });
+        
         localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
-        setBestScore(saved[key].bestScore);
-        setBestStreak(saved[key].bestStreak);
+        
+        // Update best score for current player display
+        const playerScores = (saved[key] || []).filter(
+          (s) => s.playerName === playerName.trim()
+        );
+        const maxScore = Math.max(...playerScores.map((s) => s.bestScore || 0), 0);
+        const maxStreak = Math.max(
+          ...playerScores.map((s) => s.bestStreak || 0),
+          0
+        );
+        setBestScore(maxScore);
+        setBestStreak(maxStreak);
+        
+        // Refresh leaderboard if open
+        if (showLeaderboard) {
+          const topScores = buildTop10ByScore(saved, leaderboardLevel);
+          setLeaderboardData(topScores);
+        }
       } catch {}
     }
   }
@@ -296,18 +472,38 @@ export default function MathMaster() {
       
       // Reset game and start new game after wrong answer
       setTimeout(() => {
-        // Save scores before reset
-        if (typeof window !== "undefined") {
+        // Save score as a new entry before reset
+        if (typeof window !== "undefined" && playerName.trim()) {
           try {
             const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
             const key = `${level}_${operation}`;
-            saved[key] = {
-              bestScore: Math.max(saved[key]?.bestScore || 0, score),
-              bestStreak: Math.max(saved[key]?.bestStreak || 0, streak),
-            };
+            
+            saveScoreEntry(saved, key, {
+              playerName: playerName.trim(),
+              bestScore: score,
+              bestStreak: streak,
+              timestamp: Date.now(),
+            });
+            
             localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
-            setBestScore(saved[key].bestScore);
-            setBestStreak(saved[key].bestStreak);
+            
+            // Update best score for current player display
+            const playerScores = (saved[key] || []).filter(
+              (s) => s.playerName === playerName.trim()
+            );
+            const maxScore = Math.max(...playerScores.map((s) => s.bestScore || 0), 0);
+            const maxStreak = Math.max(
+              ...playerScores.map((s) => s.bestStreak || 0),
+              0
+            );
+            setBestScore(maxScore);
+            setBestStreak(maxStreak);
+            
+            // Refresh leaderboard if open
+            if (showLeaderboard) {
+              const topScores = buildTop10ByScore(saved, leaderboardLevel);
+              setLeaderboardData(topScores);
+            }
           } catch {}
         }
         
@@ -523,6 +719,12 @@ export default function MathMaster() {
                   className="h-10 px-4 rounded-lg bg-blue-500/80 hover:bg-blue-500 font-bold text-sm"
                 >
                   📊 Times Table
+                </button>
+                <button
+                  onClick={() => setShowLeaderboard(true)}
+                  className="h-10 px-4 rounded-lg bg-amber-500/80 hover:bg-amber-500 font-bold text-sm"
+                >
+                  🏆 Leaderboard
                 </button>
                 {bestScore > 0 && (
                   <button
@@ -994,6 +1196,124 @@ export default function MathMaster() {
                       Close
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Leaderboard Modal */}
+          {showLeaderboard && (
+            <div
+              className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+              onClick={() => setShowLeaderboard(false)}
+            >
+              <div
+                className="bg-gradient-to-br from-[#080c16] to-[#0a0f1d] border-2 border-white/20 rounded-2xl p-4 max-w-md w-full max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="text-center mb-4">
+                  <h2 className="text-2xl font-extrabold text-white mb-1">
+                    🏆 Leaderboard
+                  </h2>
+                  <p className="text-white/70 text-xs">Local High Scores</p>
+                </div>
+
+                {/* Level Selection */}
+                <div className="flex gap-2 mb-4 justify-center">
+                  {Object.keys(LEVELS).map((lvl) => (
+                    <button
+                      key={lvl}
+                      onClick={() => {
+                        setLeaderboardLevel(lvl);
+                        if (typeof window !== "undefined") {
+                          try {
+                            const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+                            const topScores = buildTop10ByScore(saved, lvl);
+                            setLeaderboardData(topScores);
+                          } catch (e) {
+                            console.error("Error loading leaderboard:", e);
+                          }
+                        }
+                      }}
+                      className={`px-3 py-2 rounded-lg font-bold text-sm transition-all ${
+                        leaderboardLevel === lvl
+                          ? "bg-amber-500/80 text-white"
+                          : "bg-white/10 text-white/70 hover:bg-white/20"
+                      }`}
+                    >
+                      {LEVELS[lvl].name}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Leaderboard Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-center">
+                    <thead>
+                      <tr className="border-b border-white/20">
+                        <th className="text-white/80 p-2 font-bold text-xs">Rank</th>
+                        <th className="text-white/80 p-2 font-bold text-xs">Player</th>
+                        <th className="text-white/80 p-2 font-bold text-xs">Score</th>
+                        <th className="text-white/80 p-2 font-bold text-xs">Streak</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leaderboardData.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="text-white/60 p-4 text-sm">
+                            No scores yet for {LEVELS[leaderboardLevel].name} level
+                          </td>
+                        </tr>
+                      ) : (
+                        leaderboardData.map((score, idx) => (
+                          <tr
+                            key={`${score.name}-${score.timestamp}-${idx}`}
+                            className={`border-b border-white/10 ${
+                              score.placeholder
+                                ? "opacity-40"
+                                : idx === 0
+                                ? "bg-amber-500/20"
+                                : idx === 1
+                                ? "bg-gray-500/20"
+                                : idx === 2
+                                ? "bg-amber-900/20"
+                                : ""
+                            }`}
+                          >
+                            <td className="text-white/80 p-2 text-sm font-bold">
+                              {score.placeholder
+                                ? `#${idx + 1}`
+                                : idx === 0
+                                ? "🥇"
+                                : idx === 1
+                                ? "🥈"
+                                : idx === 2
+                                ? "🥉"
+                                : `#${idx + 1}`}
+                            </td>
+                            <td className="text-white p-2 text-sm font-semibold">
+                              {score.name}
+                            </td>
+                            <td className="text-emerald-400 p-2 text-sm font-bold">
+                              {score.bestScore}
+                            </td>
+                            <td className="text-amber-400 p-2 text-sm font-bold">
+                              🔥{score.bestStreak}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={() => setShowLeaderboard(false)}
+                    className="px-6 py-2 rounded-lg bg-amber-500/80 hover:bg-amber-500 font-bold text-sm"
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
             </div>
