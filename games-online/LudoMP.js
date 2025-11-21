@@ -2031,23 +2031,33 @@ function LudoLocal({ onBackToMode }) {
             {msg && <span className="text-amber-300 text-center">{msg}</span>}
           </div>
           <div className="flex gap-2 items-center justify-center w-full flex-wrap">
-            <div className="flex items-center gap-1 px-2 py-1 rounded-full border border-white/20 bg-white/5">
-              <span className="text-white/60 text-[10px] uppercase tracking-wide">Players</span>
-              {[2, 3, 4].map((n) => (
-                <button
-                  key={n}
-                  onClick={() => setPlayerCount(n)}
-                  disabled={stage !== "setup"}
-                  className={`px-2 py-0.5 rounded-full text-[11px] ${
-                    playerCount === n && stage === "setup"
-                      ? "bg-emerald-500/50 text-white border border-emerald-300/70"
-                      : "bg-white/10 border border-white/20"
-                  } disabled:opacity-50`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
+            {stage === "setup" ? (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-full border border-white/20 bg-white/5">
+                <span className="text-white/60 text-[10px] uppercase tracking-wide">Players</span>
+                {[2, 3, 4].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setPlayerCount(n)}
+                    className={`px-2 py-0.5 rounded-full text-[11px] ${
+                      playerCount === n
+                        ? "bg-emerald-500/50 text-white border border-emerald-300/70"
+                        : "bg-white/10 border border-white/20"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <button
+                onClick={() => setAutoRoll((v) => !v)}
+                className={`${CONTROL_BTN_BASE} border-sky-300/70 ${
+                  autoRoll ? "bg-sky-600/80 hover:bg-sky-500" : "bg-white/10 hover:bg-white/20"
+                }`}
+              >
+                Auto dice: {autoRoll ? "ON" : "OFF"}
+              </button>
+            )}
             <button
               onClick={startGame}
               disabled={!canStart}
@@ -2060,14 +2070,6 @@ function LudoLocal({ onBackToMode }) {
               className={`${CONTROL_BTN_BASE} border-white/30 bg-slate-600/80 hover:bg-slate-500`}
             >
               Reset
-            </button>
-            <button
-              onClick={() => setAutoRoll((v) => !v)}
-              className={`${CONTROL_BTN_BASE} border-sky-300/70 ${
-                autoRoll ? "bg-sky-600/80 hover:bg-sky-500" : "bg-white/10 hover:bg-white/20"
-              }`}
-            >
-              Auto dice: {autoRoll ? "ON" : "OFF"}
             </button>
           </div>
           </div>
