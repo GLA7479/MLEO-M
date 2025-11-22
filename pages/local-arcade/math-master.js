@@ -27,22 +27,73 @@ const LEVELS = {
   },
 };
 
-const OPERATIONS = ["addition", "subtraction", "multiplication", "division", "mixed"];
+// הוספת סוג פעולה "fractions" לשברים
+const OPERATIONS = [
+  "addition",
+  "subtraction",
+  "multiplication",
+  "division",
+  "mixed",
+  "fractions",
+];
 
+// חלוקה לכיתות – אילו סוגי תרגילים מותר לכל כיתה
 const GRADES = {
   g1_2: {
     name: "Grade 1–2",
-    allowedOps: ["addition", "subtraction"],
+    operations: ["addition", "subtraction"], // בלי כפל/חילוק עדיין
   },
   g3_4: {
     name: "Grade 3–4",
-    allowedOps: ["addition", "subtraction", "multiplication"],
+    operations: ["addition", "subtraction", "multiplication"],
   },
   g5_6: {
     name: "Grade 5–6",
-    allowedOps: ["addition", "subtraction", "multiplication", "division", "mixed"],
+    operations: ["addition", "subtraction", "multiplication", "division", "mixed", "fractions"],
   },
 };
+
+// התאמת טווחי המספרים לפי כיתה + רמת קושי
+function getLevelForGrade(levelKey, gradeKey) {
+  const base = LEVELS[levelKey]; // easy/medium/hard המקורי שלך
+  let factor = 1;
+
+  // הכפלה/הקטנה לפי כיתה
+  switch (gradeKey) {
+    case "g1_2":
+      factor = 0.5; // המספרים יהיו בערך חצי
+      break;
+    case "g3_4":
+      factor = 1; // כמו LEVELS
+      break;
+    case "g5_6":
+      factor = 2; // גדול יותר, מתאים לכיתות גבוהות
+      break;
+    default:
+      factor = 1;
+  }
+
+  // לא ליפול למספרים קטנים מדיי
+  const clamp = (x, min, max) => Math.max(min, Math.min(max, x));
+
+  return {
+    name: base.name,
+    addition: {
+      max: clamp(Math.round(base.addition.max * factor), 10, 1000),
+    },
+    subtraction: {
+      min: base.subtraction.min,
+      max: clamp(Math.round(base.subtraction.max * factor), 20, 1000),
+    },
+    multiplication: {
+      max: clamp(Math.round(base.multiplication.max * factor), 5, 20), // עד 20×20 מקסימום
+    },
+    division: {
+      max: clamp(Math.round(base.division.max * factor), 20, 500),
+      maxDivisor: clamp(base.division.maxDivisor, 5, 20),
+    },
+  };
+}
 
 const MODES = {
   learning: {
@@ -151,69 +202,136 @@ function saveScoreEntry(saved, key, entry) {
   saved[key] = levelData;
 }
 
-function generateQuestion(level, operation) {
-  const ops =
-    operation === "mixed"
-      ? ["addition", "subtraction", "multiplication", "division"][
-          Math.floor(Math.random() * 4)
-        ]
-      : operation;
+function generateQuestion(level, operation, gradeKey) {
+  const isMixed = operation === "mixed";
+  const ops = isMixed
+    ? ["addition", "subtraction", "multiplication", "division"][
+        Math.floor(Math.random() * 4)
+      ]
+    : operation;
 
   let a, b, correctAnswer, question;
 
   switch (ops) {
-    case "addition":
+    case "addition": {
       a = Math.floor(Math.random() * level.addition.max) + 1;
       b = Math.floor(Math.random() * level.addition.max) + 1;
       correctAnswer = a + b;
       question = `${a} + ${b} = ?`;
       break;
+    }
 
     case "subtraction": {
       const max = level.subtraction.max;
       const min = level.subtraction.min;
       a = Math.floor(Math.random() * (max - min + 1)) + min;
-      b = Math.floor(Math.random() * (a - 1)) + 1;
+      b = Math.floor(Math.random() * a); // כולל 0, כדי שיצאו גם 0– וכאלה
       correctAnswer = a - b;
       question = `${a} - ${b} = ?`;
       break;
     }
 
-    case "multiplication":
-      a = Math.floor(Math.random() * level.multiplication.max) + 1;
-      b = Math.floor(Math.random() * level.multiplication.max) + 1;
+    case "multiplication": {
+      // לכיתות גבוהות – לפעמים שני מספרים דו־ספרתיים
+      let maxA = level.multiplication.max;
+      let maxB = level.multiplication.max;
+
+      if (gradeKey === "g5_6" && level.name !== "Easy") {
+        maxA = Math.min(20, level.multiplication.max * 2);
+        maxB = Math.min(20, level.multiplication.max * 2);
+      }
+
+      a = Math.floor(Math.random() * maxA) + 1;
+      b = Math.floor(Math.random() * maxB) + 1;
       correctAnswer = a * b;
       question = `${a} × ${b} = ?`;
       break;
+    }
 
     case "division": {
-      // Generate division questions with whole number results
+      // חילוק עם תוצאה שלמה
+      const maxDivisor = level.division.maxDivisor;
       const divisor =
-        Math.floor(Math.random() * (level.division.maxDivisor - 1)) + 2; // 2 to maxDivisor
+        Math.floor(Math.random() * (maxDivisor - 1)) + 2; // 2..maxDivisor
+
+      let maxQuotient = Math.floor(level.division.max / divisor);
+      if (gradeKey === "g5_6" && level.name === "Hard") {
+        maxQuotient = Math.min(maxQuotient, 50);
+      } else {
+        maxQuotient = Math.min(maxQuotient, 20);
+      }
+
       const quotient =
-        Math.floor(Math.random() * Math.floor(level.division.max / divisor)) + 1;
-      a = divisor * quotient; // dividend
+        Math.floor(Math.random() * Math.max(2, maxQuotient)) + 1;
+
+      a = divisor * quotient;
       b = divisor;
       correctAnswer = quotient;
       question = `${a} ÷ ${b} = ?`;
       break;
     }
 
-    default:
-      return generateQuestion(level, "addition");
+    case "fractions": {
+      // שברים – רק לכיתות הגבוהות, אחרת ניפול אחורה לחיבור רגיל
+      if (gradeKey !== "g5_6") {
+        return generateQuestion(level, "addition", gradeKey);
+      }
+
+      // שברים עם מכנה משותף
+      const denominators = [2, 3, 4, 5, 6, 8, 10, 12];
+      const denom =
+        denominators[Math.floor(Math.random() * denominators.length)];
+
+      let n1 = Math.floor(Math.random() * (denom - 1)) + 1;
+      let n2 = Math.floor(Math.random() * (denom - 1)) + 1;
+
+      // נשמור על תוצאה לא גדולה מידי
+      if (n1 + n2 > denom * 2) {
+        n2 = Math.max(1, denom * 2 - n1);
+      }
+
+      correctAnswer = `${n1 + n2}/${denom}`;
+      question = `${n1}/${denom} + ${n2}/${denom} = ?`;
+      break;
+    }
+
+    default: {
+      return generateQuestion(level, "addition", gradeKey);
+    }
   }
 
-  // Generate wrong answers
+  // יצירת תשובות שגויות
   const wrongAnswers = new Set();
-  while (wrongAnswers.size < 3) {
-    let wrong;
-    if (ops === "multiplication") {
-      wrong = correctAnswer + Math.floor(Math.random() * 20) - 10;
-    } else {
-      wrong = correctAnswer + Math.floor(Math.random() * 10) - 5;
+
+  if (ops === "fractions") {
+    // תשובות שגויות על בסיס מונה +-1 או +-2
+    const [numStr, denStr] = String(correctAnswer).split("/");
+    const num = parseInt(numStr, 10);
+    const den = parseInt(denStr, 10);
+
+    while (wrongAnswers.size < 3) {
+      const delta = [-2, -1, 1, 2][Math.floor(Math.random() * 4)];
+      const wrongNum = num + delta;
+      if (wrongNum <= 0 || wrongNum === num) continue;
+      const wrong = `${wrongNum}/${den}`;
+      if (wrong !== correctAnswer) {
+        wrongAnswers.add(wrong);
+      }
     }
-    if (wrong !== correctAnswer && wrong > 0 && !wrongAnswers.has(wrong)) {
-      wrongAnswers.add(wrong);
+  } else {
+    while (wrongAnswers.size < 3) {
+      let wrong;
+      if (ops === "multiplication") {
+        wrong = correctAnswer + Math.floor(Math.random() * 20) - 10;
+      } else if (ops === "division") {
+        wrong = correctAnswer + Math.floor(Math.random() * 10) - 5;
+      } else {
+        wrong = correctAnswer + Math.floor(Math.random() * 20) - 10;
+      }
+
+      if (wrong !== correctAnswer && wrong > 0 && !wrongAnswers.has(wrong)) {
+        wrongAnswers.add(wrong);
+      }
     }
   }
 
@@ -330,11 +448,11 @@ export default function MathMaster() {
     }
   }, [level, operation, playerName]);
 
-  // כשמשנים כיתה – לוודא שה־operation חוקי לכיתה הזו
+  // לוודא שהפעולה שתבחר קיימת לכיתה שנבחרה
   useEffect(() => {
-    const allowedOps = GRADES[grade].allowedOps;
-    if (!allowedOps.includes(operation)) {
-      setOperation(allowedOps[0]);
+    const allowed = GRADES[grade].operations;
+    if (!allowed.includes(operation)) {
+      setOperation(allowed[0]);
     }
   }, [grade, operation]);
 
@@ -458,7 +576,8 @@ export default function MathMaster() {
   }
 
   function generateNewQuestion() {
-    const question = generateQuestion(LEVELS[level], operation);
+    const levelConfig = getLevelForGrade(level, grade);
+    const question = generateQuestion(levelConfig, operation, grade);
     setCurrentQuestion(question);
     setSelectedAnswer(null);
     setFeedback(null);
@@ -625,6 +744,8 @@ export default function MathMaster() {
         return "÷";
       case "mixed":
         return "🎲 Mixed";
+      case "fractions":
+        return "⅟ Fractions";
       default:
         return op;
     }
@@ -637,7 +758,6 @@ export default function MathMaster() {
       </div>
     );
 
-  const allowedOps = GRADES[grade].allowedOps;
   const accuracy =
     totalQuestions > 0 ? Math.round((correct / totalQuestions) * 100) : 0;
 
@@ -817,13 +937,11 @@ export default function MathMaster() {
                   }}
                   className="h-9 px-3 rounded-lg bg-black/30 border border-white/20 text-white text-xs font-bold"
                 >
-                  {OPERATIONS.filter((op) => allowedOps.includes(op)).map(
-                    (op) => (
-                      <option key={op} value={op}>
-                        {getOperationName(op)}
-                      </option>
-                    )
-                  )}
+                  {GRADES[grade].operations.map((op) => (
+                    <option key={op} value={op}>
+                      {getOperationName(op)}
+                    </option>
+                  ))}
                 </select>
               </div>
 
