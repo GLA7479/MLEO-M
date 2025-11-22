@@ -41,11 +41,11 @@ const OPERATIONS = [
 const GRADES = {
   g1_2: {
     name: "Grade 1–2",
-    operations: ["addition", "subtraction"], // בלי כפל/חילוק עדיין
+    operations: ["addition", "subtraction", "mixed"], // מיקס של חיבור וחיסור
   },
   g3_4: {
     name: "Grade 3–4",
-    operations: ["addition", "subtraction", "multiplication"],
+    operations: ["addition", "subtraction", "multiplication", "mixed"], // מיקס של חיבור, חיסור וכפל
   },
   g5_6: {
     name: "Grade 5–6",
@@ -103,6 +103,18 @@ const MODES = {
   challenge: {
     name: "Challenge",
     description: "Timer + lives, high score race",
+  },
+  speed: {
+    name: "Speed Run",
+    description: "Fast answers = more points! ⚡",
+  },
+  marathon: {
+    name: "Marathon",
+    description: "How many questions can you solve? 🏃",
+  },
+  practice: {
+    name: "Practice",
+    description: "Focus on one operation 📚",
   },
 };
 
@@ -202,13 +214,19 @@ function saveScoreEntry(saved, key, entry) {
   saved[key] = levelData;
 }
 
-function generateQuestion(level, operation, gradeKey) {
+function generateQuestion(level, operation, gradeKey, useStory = false) {
   const isMixed = operation === "mixed";
-  const ops = isMixed
-    ? ["addition", "subtraction", "multiplication", "division"][
-        Math.floor(Math.random() * 4)
-      ]
-    : operation;
+  let ops;
+  
+  if (isMixed) {
+    // מיקס לפי הפעולות הזמינות לכל כיתה
+    const availableOps = GRADES[gradeKey].operations.filter(
+      (op) => op !== "mixed" && op !== "fractions"
+    );
+    ops = availableOps[Math.floor(Math.random() * availableOps.length)];
+  } else {
+    ops = operation;
+  }
 
   let a, b, correctAnswer, question;
 
@@ -217,7 +235,16 @@ function generateQuestion(level, operation, gradeKey) {
       a = Math.floor(Math.random() * level.addition.max) + 1;
       b = Math.floor(Math.random() * level.addition.max) + 1;
       correctAnswer = a + b;
-      question = `${a} + ${b} = ?`;
+      if (useStory) {
+        const stories = [
+          `יש לך ${a} תפוחים וקיבלת עוד ${b}. כמה תפוחים יש לך?`,
+          `בכיתה יש ${a} ילדים, הגיעו עוד ${b}. כמה ילדים יש עכשיו?`,
+          `יש לך ${a} כדורים, קנית עוד ${b}. כמה כדורים יש לך?`,
+        ];
+        question = stories[Math.floor(Math.random() * stories.length)];
+      } else {
+        question = `${a} + ${b} = ?`;
+      }
       break;
     }
 
@@ -227,7 +254,16 @@ function generateQuestion(level, operation, gradeKey) {
       a = Math.floor(Math.random() * (max - min + 1)) + min;
       b = Math.floor(Math.random() * a); // כולל 0, כדי שיצאו גם 0– וכאלה
       correctAnswer = a - b;
-      question = `${a} - ${b} = ?`;
+      if (useStory) {
+        const stories = [
+          `היו לך ${a} ממתקים, אכלת ${b}. כמה נשאר?`,
+          `בקופסה היו ${a} צעצועים, הוצאת ${b}. כמה נשאר?`,
+          `היו ${a} בלונים, ${b} התפוצצו. כמה נשארו?`,
+        ];
+        question = stories[Math.floor(Math.random() * stories.length)];
+      } else {
+        question = `${a} - ${b} = ?`;
+      }
       break;
     }
 
@@ -244,7 +280,16 @@ function generateQuestion(level, operation, gradeKey) {
       a = Math.floor(Math.random() * maxA) + 1;
       b = Math.floor(Math.random() * maxB) + 1;
       correctAnswer = a * b;
-      question = `${a} × ${b} = ?`;
+      if (useStory) {
+        const stories = [
+          `יש לך ${a} קופסאות, בכל אחת ${b} כדורים. כמה כדורים יש?`,
+          `בכל שורה יש ${a} עציצים, יש ${b} שורות. כמה עציצים יש?`,
+          `כל ילד קיבל ${a} ממתקים, יש ${b} ילדים. כמה ממתקים בסך הכל?`,
+        ];
+        question = stories[Math.floor(Math.random() * stories.length)];
+      } else {
+        question = `${a} × ${b} = ?`;
+      }
       break;
     }
 
@@ -267,7 +312,16 @@ function generateQuestion(level, operation, gradeKey) {
       a = divisor * quotient;
       b = divisor;
       correctAnswer = quotient;
-      question = `${a} ÷ ${b} = ?`;
+      if (useStory) {
+        const stories = [
+          `יש לך ${a} ממתקים, אתה רוצה לחלק אותם שווה בשווה ל-${b} ילדים. כמה ממתקים כל ילד יקבל?`,
+          `יש ${a} כדורים, אתה רוצה לשים אותם ב-${b} קופסאות שוות. כמה כדורים בכל קופסה?`,
+          `יש לך ${a} ספרים, אתה רוצה לחלק אותם ל-${b} ערימות שוות. כמה ספרים בכל ערימה?`,
+        ];
+        question = stories[Math.floor(Math.random() * stories.length)];
+      } else {
+        question = `${a} ÷ ${b} = ?`;
+      }
       break;
     }
 
@@ -350,8 +404,28 @@ function generateQuestion(level, operation, gradeKey) {
     operation: ops,
     a,
     b,
+    isStory: useStory,
   };
 }
+
+// פונקציה ליצירת רמז
+function getHint(question, operation) {
+  if (!question || !question.a || !question.b) return "";
+  
+  switch (operation) {
+    case "addition":
+      return `נסה לספור: ${question.a} + ${question.b}. אפשר להתחיל מ-${question.a} ולספור עוד ${question.b}`;
+    case "subtraction":
+      return `כמה צריך להוסיף ל-${question.b} כדי להגיע ל-${question.a}?`;
+    case "multiplication":
+      return `${question.a} × ${question.b} = ${question.a} + ${question.a} + ... (${question.b} פעמים)`;
+    case "division":
+      return `כמה פעמים ${question.b} נכנס ב-${question.a}?`;
+    default:
+      return "נסה לחשוב על הפתרון צעד אחר צעד";
+  }
+}
+
 
 export default function MathMaster() {
   useIOSViewportFix();
@@ -388,6 +462,43 @@ export default function MathMaster() {
   const [totalQuestions, setTotalQuestions] = useState(0);
   const [avgTime, setAvgTime] = useState(0);
   const [questionStartTime, setQuestionStartTime] = useState(null);
+
+  // מניעת שאלות חוזרות
+  const [recentQuestions, setRecentQuestions] = useState(new Set());
+
+  // מערכת כוכבים ותגים
+  const [stars, setStars] = useState(0);
+  const [badges, setBadges] = useState([]);
+  const [showBadge, setShowBadge] = useState(null);
+
+  // מערכת רמות עם XP
+  const [playerLevel, setPlayerLevel] = useState(1);
+  const [xp, setXp] = useState(0);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+
+  // מערכת התקדמות אישית
+  const [progress, setProgress] = useState({
+    addition: { total: 0, correct: 0 },
+    subtraction: { total: 0, correct: 0 },
+    multiplication: { total: 0, correct: 0 },
+    division: { total: 0, correct: 0 },
+    fractions: { total: 0, correct: 0 },
+  });
+
+  // תחרויות יומיות
+  const [dailyChallenge, setDailyChallenge] = useState({
+    date: new Date().toDateString(),
+    bestScore: 0,
+    questions: 0,
+  });
+
+  // רמזים
+  const [showHint, setShowHint] = useState(false);
+  const [hintUsed, setHintUsed] = useState(false);
+
+  // מצב story questions
+  const [useStoryQuestions, setUseStoryQuestions] = useState(false);
+  const [storyOnly, setStoryOnly] = useState(false); // שאלות מילוליות בלבד
 
   const [showMultiplicationTable, setShowMultiplicationTable] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -456,6 +567,27 @@ export default function MathMaster() {
     }
   }, [grade, operation]);
 
+  // בדיקה אם זה יום חדש לתחרות יומית
+  useEffect(() => {
+    const today = new Date().toDateString();
+    if (dailyChallenge.date !== today) {
+      setDailyChallenge({ date: today, bestScore: 0, questions: 0 });
+    }
+  }, [dailyChallenge.date]);
+
+  // טעינת נתונים מ-localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY + "_progress") || "{}");
+      if (saved.stars) setStars(saved.stars);
+      if (saved.badges) setBadges(saved.badges);
+      if (saved.playerLevel) setPlayerLevel(saved.playerLevel);
+      if (saved.xp) setXp(saved.xp);
+      if (saved.progress) setProgress(saved.progress);
+    } catch {}
+  }, []);
+
   // Load leaderboard data when modal opens or level changes
   useEffect(() => {
     if (showLeaderboard && typeof window !== "undefined") {
@@ -504,9 +636,9 @@ export default function MathMaster() {
     };
   }, [mounted]);
 
-  // Timer countdown (רק במצב Challenge)
+  // Timer countdown (רק במצב Challenge או Speed)
   useEffect(() => {
-    if (!gameActive || mode !== "challenge") return;
+    if (!gameActive || (mode !== "challenge" && mode !== "speed")) return;
     if (timeLeft == null) return;
 
     if (timeLeft <= 0) {
@@ -577,14 +709,55 @@ export default function MathMaster() {
 
   function generateNewQuestion() {
     const levelConfig = getLevelForGrade(level, grade);
-    const question = generateQuestion(levelConfig, operation, grade);
+    let question;
+    let attempts = 0;
+    const maxAttempts = 50; // מקסימום ניסיונות למצוא שאלה חדשה
+
+    do {
+      question = generateQuestion(
+        levelConfig,
+        operation,
+        grade,
+        useStoryQuestions || storyOnly // אם storyOnly מופעל, תמיד שאלות מילוליות
+      );
+      attempts++;
+
+      // יצירת מפתח ייחודי לשאלה
+      const questionKey = question.question;
+
+      // אם השאלה לא הייתה לאחרונה, נשתמש בה
+      if (!recentQuestions.has(questionKey)) {
+        // שמירת השאלה החדשה בהיסטוריה
+        setRecentQuestions((prev) => {
+          const newSet = new Set(prev);
+          newSet.add(questionKey);
+          // שמירה רק על 20 שאלות אחרונות
+          if (newSet.size > 20) {
+            const first = Array.from(newSet)[0];
+            newSet.delete(first);
+          }
+          return newSet;
+        });
+        break;
+      }
+    } while (attempts < maxAttempts);
+
+    // אם לא מצאנו שאלה חדשה אחרי 50 ניסיונות, נשתמש בכל מקרה
+    if (attempts >= maxAttempts) {
+      // איפוס ההיסטוריה כדי לאפשר שאלות חוזרות
+      setRecentQuestions(new Set());
+    }
+
     setCurrentQuestion(question);
     setSelectedAnswer(null);
     setFeedback(null);
     setQuestionStartTime(Date.now());
+    setShowHint(false);
+    setHintUsed(false);
   }
 
   function startGame() {
+    setRecentQuestions(new Set()); // איפוס ההיסטוריה
     setGameActive(true);
     setScore(0);
     setStreak(0);
@@ -596,11 +769,18 @@ export default function MathMaster() {
     setFeedback(null);
     setSelectedAnswer(null);
     setLives(mode === "challenge" ? 3 : 0);
+    setShowHint(false);
+    setHintUsed(false);
+    setShowBadge(null);
+    setShowLevelUp(false);
 
+    // הגדרת טיימר לפי מצב
     if (mode === "challenge") {
       setTimeLeft(20);
+    } else if (mode === "speed") {
+      setTimeLeft(10); // טיימר קצר יותר למצב מהירות
     } else {
-      setTimeLeft(null); // אין טיימר קשוח במצב למידה
+      setTimeLeft(null);
     }
 
     generateNewQuestion();
@@ -615,7 +795,7 @@ export default function MathMaster() {
   }
 
   function handleTimeUp() {
-    // Time up – רק במצב Challenge
+    // Time up – במצב Challenge או Speed
     setWrong((prev) => prev + 1);
     setStreak(0);
     setFeedback("Time's up! Game Over! ⏰");
@@ -648,9 +828,125 @@ export default function MathMaster() {
     const isCorrect = answer === currentQuestion.correctAnswer;
 
     if (isCorrect) {
-      setScore((prev) => prev + (10 + streak));
+      // חישוב נקודות לפי מצב
+      let points = 10 + streak;
+      if (mode === "speed") {
+        const timeBonus = timeLeft ? Math.floor(timeLeft * 2) : 0;
+        points += timeBonus; // בונוס זמן במצב מהירות
+      }
+      
+      setScore((prev) => prev + points);
       setStreak((prev) => prev + 1);
       setCorrect((prev) => prev + 1);
+      
+      // עדכון התקדמות אישית
+      const op = currentQuestion.operation;
+      setProgress((prev) => ({
+        ...prev,
+        [op]: {
+          total: (prev[op]?.total || 0) + 1,
+          correct: (prev[op]?.correct || 0) + 1,
+        },
+      }));
+
+      // מערכת כוכבים - כוכב כל 5 תשובות נכונות
+      const newCorrect = correct + 1;
+      if (newCorrect % 5 === 0) {
+        setStars((prev) => {
+          const newStars = prev + 1;
+          // שמירה ל-localStorage
+          if (typeof window !== "undefined") {
+            try {
+              const saved = JSON.parse(localStorage.getItem(STORAGE_KEY + "_progress") || "{}");
+              saved.stars = newStars;
+              localStorage.setItem(STORAGE_KEY + "_progress", JSON.stringify(saved));
+            } catch {}
+          }
+          return newStars;
+        });
+      }
+
+      // מערכת תגים
+      const newStreak = streak + 1;
+      if (newStreak === 10 && !badges.includes("🔥 Hot Streak")) {
+        const newBadge = "🔥 Hot Streak";
+        setBadges((prev) => [...prev, newBadge]);
+        setShowBadge(newBadge);
+        setTimeout(() => setShowBadge(null), 3000);
+        if (typeof window !== "undefined") {
+          try {
+            const saved = JSON.parse(localStorage.getItem(STORAGE_KEY + "_progress") || "{}");
+            saved.badges = [...badges, newBadge];
+            localStorage.setItem(STORAGE_KEY + "_progress", JSON.stringify(saved));
+          } catch {}
+        }
+      } else if (newStreak === 25 && !badges.includes("⚡ Lightning Fast")) {
+        const newBadge = "⚡ Lightning Fast";
+        setBadges((prev) => [...prev, newBadge]);
+        setShowBadge(newBadge);
+        setTimeout(() => setShowBadge(null), 3000);
+        if (typeof window !== "undefined") {
+          try {
+            const saved = JSON.parse(localStorage.getItem(STORAGE_KEY + "_progress") || "{}");
+            saved.badges = [...badges, newBadge];
+            localStorage.setItem(STORAGE_KEY + "_progress", JSON.stringify(saved));
+          } catch {}
+        }
+      } else if (newStreak === 50 && !badges.includes("🌟 Master")) {
+        const newBadge = "🌟 Master";
+        setBadges((prev) => [...prev, newBadge]);
+        setShowBadge(newBadge);
+        setTimeout(() => setShowBadge(null), 3000);
+        if (typeof window !== "undefined") {
+          try {
+            const saved = JSON.parse(localStorage.getItem(STORAGE_KEY + "_progress") || "{}");
+            saved.badges = [...badges, newBadge];
+            localStorage.setItem(STORAGE_KEY + "_progress", JSON.stringify(saved));
+          } catch {}
+        }
+      }
+
+      // מערכת XP ורמות
+      const xpGain = hintUsed ? 5 : 10; // פחות XP אם השתמש ברמז
+      setXp((prev) => {
+        const newXp = prev + xpGain;
+        const xpNeeded = playerLevel * 100;
+        
+        if (newXp >= xpNeeded) {
+          setPlayerLevel((prevLevel) => {
+            const newLevel = prevLevel + 1;
+            setShowLevelUp(true);
+            setTimeout(() => setShowLevelUp(false), 3000);
+            if (typeof window !== "undefined") {
+              try {
+                const saved = JSON.parse(localStorage.getItem(STORAGE_KEY + "_progress") || "{}");
+                saved.playerLevel = newLevel;
+                saved.xp = newXp - xpNeeded;
+                localStorage.setItem(STORAGE_KEY + "_progress", JSON.stringify(saved));
+              } catch {}
+            }
+            return newLevel;
+          });
+          return newXp - xpNeeded;
+        }
+        
+        if (typeof window !== "undefined") {
+          try {
+            const saved = JSON.parse(localStorage.getItem(STORAGE_KEY + "_progress") || "{}");
+            saved.xp = newXp;
+            localStorage.setItem(STORAGE_KEY + "_progress", JSON.stringify(saved));
+          } catch {}
+        }
+        return newXp;
+      });
+
+      // עדכון תחרות יומית
+      setDailyChallenge((prev) => ({
+        ...prev,
+        bestScore: Math.max(prev.bestScore, score + points),
+        questions: prev.questions + 1,
+      }));
+
       setFeedback("Correct! 🎉");
       if ("vibrate" in navigator) navigator.vibrate?.(50);
 
@@ -658,6 +954,8 @@ export default function MathMaster() {
         generateNewQuestion();
         if (mode === "challenge") {
           setTimeLeft(20);
+        } else if (mode === "speed") {
+          setTimeLeft(10);
         } else {
           setTimeLeft(null);
         }
@@ -665,6 +963,17 @@ export default function MathMaster() {
     } else {
       setWrong((prev) => prev + 1);
       setStreak(0);
+      
+      // עדכון התקדמות אישית
+      const op = currentQuestion.operation;
+      setProgress((prev) => ({
+        ...prev,
+        [op]: {
+          total: (prev[op]?.total || 0) + 1,
+          correct: prev[op]?.correct || 0,
+        },
+      }));
+      
       if ("vibrate" in navigator) navigator.vibrate?.(200);
 
       if (mode === "learning") {
@@ -823,7 +1132,11 @@ export default function MathMaster() {
 
           <div
             ref={controlsRef}
-            className="grid grid-cols-5 gap-1 mb-1 w-full max-w-md"
+            className={`grid gap-1 mb-1 w-full max-w-md ${
+              stars > 0 || playerLevel > 1
+                ? "grid-cols-6"
+                : "grid-cols-5"
+            }`}
           >
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">Score</div>
@@ -833,6 +1146,18 @@ export default function MathMaster() {
               <div className="text-[10px] text-white/60">Streak</div>
               <div className="text-sm font-bold text-amber-400">🔥{streak}</div>
             </div>
+            {stars > 0 && (
+              <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+                <div className="text-[10px] text-white/60">Stars</div>
+                <div className="text-sm font-bold text-yellow-400">⭐{stars}</div>
+              </div>
+            )}
+            {playerLevel > 1 && (
+              <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+                <div className="text-[10px] text-white/60">Level</div>
+                <div className="text-sm font-bold text-purple-400">Lv.{playerLevel}</div>
+              </div>
+            )}
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">✅</div>
               <div className="text-sm font-bold text-green-400">{correct}</div>
@@ -845,7 +1170,7 @@ export default function MathMaster() {
             </div>
             <div
               className={`rounded-lg p-1 text-center ${
-                gameActive && mode === "challenge" && timeLeft <= 5
+                gameActive && (mode === "challenge" || mode === "speed") && timeLeft <= 5
                   ? "bg-red-500/30 border-2 border-red-400 animate-pulse"
                   : "bg-black/30 border border-white/10"
               }`}
@@ -853,15 +1178,15 @@ export default function MathMaster() {
               <div className="text-[10px] text-white/60">⏰ Timer</div>
               <div
                 className={`text-lg font-black ${
-                  gameActive && mode === "challenge" && timeLeft <= 5
+                  gameActive && (mode === "challenge" || mode === "speed") && timeLeft <= 5
                     ? "text-red-400"
-                    : gameActive && mode === "challenge"
+                    : gameActive && (mode === "challenge" || mode === "speed")
                     ? "text-yellow-400"
                     : "text-white/60"
                 }`}
               >
                 {gameActive
-                  ? mode === "challenge"
+                  ? mode === "challenge" || mode === "speed"
                     ? timeLeft ?? "--"
                     : "∞"
                   : "--"}
@@ -889,6 +1214,27 @@ export default function MathMaster() {
               </button>
             ))}
           </div>
+
+          {/* הודעות מיוחדות */}
+          {showBadge && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
+              <div className="bg-gradient-to-br from-yellow-400 to-orange-500 text-white px-8 py-6 rounded-2xl shadow-2xl text-center animate-bounce">
+                <div className="text-4xl mb-2">🎉</div>
+                <div className="text-2xl font-bold">New Badge!</div>
+                <div className="text-xl">{showBadge}</div>
+              </div>
+            </div>
+          )}
+          
+          {showLevelUp && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
+              <div className="bg-gradient-to-br from-purple-500 to-pink-500 text-white px-8 py-6 rounded-2xl shadow-2xl text-center animate-pulse">
+                <div className="text-4xl mb-2">🌟</div>
+                <div className="text-2xl font-bold">Level Up!</div>
+                <div className="text-xl">You're now Level {playerLevel}!</div>
+              </div>
+            </div>
+          )}
 
           {!gameActive ? (
             <>
@@ -965,6 +1311,71 @@ export default function MathMaster() {
                   </div>
                 </div>
               </div>
+              
+              {/* תצוגת כוכבים, רמה ותגים */}
+              {(stars > 0 || playerLevel > 1 || badges.length > 0) && (
+                <div className="grid grid-cols-3 gap-2 mb-2 w-full max-w-md">
+                  {stars > 0 && (
+                    <div className="bg-black/20 border border-white/10 rounded-lg p-2 text-center">
+                      <div className="text-xs text-white/60">Stars</div>
+                      <div className="text-lg font-bold text-yellow-400">
+                        ⭐ {stars}
+                      </div>
+                    </div>
+                  )}
+                  {playerLevel > 1 && (
+                    <div className="bg-black/20 border border-white/10 rounded-lg p-2 text-center">
+                      <div className="text-xs text-white/60">Level</div>
+                      <div className="text-lg font-bold text-purple-400">
+                        Lv.{playerLevel} ({xp}/{playerLevel * 100} XP)
+                      </div>
+                    </div>
+                  )}
+                  {badges.length > 0 && (
+                    <div className="bg-black/20 border border-white/10 rounded-lg p-2 text-center">
+                      <div className="text-xs text-white/60">Badges</div>
+                      <div className="text-sm font-bold text-orange-400">
+                        {badges.length} 🏅
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* תחרות יומית */}
+              <div className="bg-black/20 border border-white/10 rounded-lg p-2 mb-2 w-full max-w-md text-center">
+                <div className="text-xs text-white/60 mb-1">Daily Challenge</div>
+                <div className="text-sm text-white">
+                  Best: {dailyChallenge.bestScore} • Questions: {dailyChallenge.questions}
+                </div>
+              </div>
+              
+              {/* אפשרות לשאלות עם סיפור */}
+              <div className="flex items-center justify-center gap-4 mb-2 w-full max-w-md flex-wrap">
+                <label className="flex items-center gap-2 text-white text-sm">
+                  <input
+                    type="checkbox"
+                    checked={useStoryQuestions}
+                    onChange={(e) => {
+                      setUseStoryQuestions(e.target.checked);
+                      if (!e.target.checked) setStoryOnly(false); // אם מכבים story, גם מכבים storyOnly
+                    }}
+                    className="w-4 h-4"
+                  />
+                  📖 Story Questions
+                </label>
+                {useStoryQuestions && (
+                  <label className="flex items-center gap-2 text-white text-sm">
+                    <input
+                      type="checkbox"
+                      checked={storyOnly}
+                      onChange={(e) => setStoryOnly(e.target.checked)}
+                      className="w-4 h-4"
+                    />
+                    📝 Story Only
+                  </label>
+                )}
+              </div>
 
               <div className="flex items-center justify-center gap-2 mb-2 flex-wrap w-full max-w-md">
                 <button
@@ -1023,9 +1434,59 @@ export default function MathMaster() {
                   className="w-full max-w-md flex flex-col items-center justify-center mb-2 flex-1"
                   style={{ height: "var(--game-h, 400px)", minHeight: "300px" }}
                 >
+                  {/* ויזואליזציה של מספרים (רק לכיתות נמוכות) */}
+                  {grade === "g1_2" && currentQuestion.operation === "addition" && (
+                    <div className="mb-2 flex gap-4 items-center">
+                      {currentQuestion.a <= 10 && (
+                        <div className="flex flex-wrap gap-1 justify-center max-w-[100px]">
+                          {Array(Math.min(currentQuestion.a, 10))
+                            .fill(0)
+                            .map((_, i) => (
+                              <span
+                                key={i}
+                                className="inline-block w-3 h-3 bg-blue-500 rounded-full"
+                              />
+                            ))}
+                        </div>
+                      )}
+                      <span className="text-white text-2xl">+</span>
+                      {currentQuestion.b <= 10 && (
+                        <div className="flex flex-wrap gap-1 justify-center max-w-[100px]">
+                          {Array(Math.min(currentQuestion.b, 10))
+                            .fill(0)
+                            .map((_, i) => (
+                              <span
+                                key={i}
+                                className="inline-block w-3 h-3 bg-green-500 rounded-full"
+                              />
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   <div className="text-4xl font-black text-white mb-4 text-center">
                     {currentQuestion.question}
                   </div>
+                  
+                  {/* כפתור רמז */}
+                  {!hintUsed && !selectedAnswer && (
+                    <button
+                      onClick={() => {
+                        setShowHint(true);
+                        setHintUsed(true);
+                      }}
+                      className="mb-2 px-4 py-2 rounded-lg bg-blue-500/80 hover:bg-blue-500 text-sm font-bold"
+                    >
+                      💡 Hint
+                    </button>
+                  )}
+                  
+                  {showHint && (
+                    <div className="mb-2 px-4 py-2 rounded-lg bg-blue-500/20 border border-blue-400/50 text-blue-200 text-sm text-center max-w-md">
+                      {getHint(currentQuestion, currentQuestion.operation)}
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-3 w-full mb-3">
                     {currentQuestion.answers.map((answer, idx) => {
@@ -1055,45 +1516,46 @@ export default function MathMaster() {
                     })}
                   </div>
 
-                  {/* כפתור חיבור לטבלת כפל/חילוק – בעיקר לכיתות גבוהות */}
-                  {(currentQuestion.operation === "multiplication" ||
-                    currentQuestion.operation === "division") && (
-                    <button
-                      onClick={() => {
-                        setShowMultiplicationTable(true);
-                        setTableMode(
-                          currentQuestion.operation === "multiplication"
-                            ? "multiplication"
-                            : "division"
-                        );
-                        if (currentQuestion.operation === "multiplication") {
-                          const a = currentQuestion.a;
-                          const b = currentQuestion.b;
-                          if (a >= 1 && a <= 12 && b >= 1 && b <= 12) {
-                            const value = a * b;
-                            setSelectedCell({ row: a, col: b, value });
-                            setSelectedRow(null);
-                            setSelectedCol(null);
-                            setSelectedResult(null);
-                            setSelectedDivisor(null);
+                  {/* כפתור חיבור לטבלת כפל/חילוק – רק במצב למידה */}
+                  {mode === "learning" &&
+                    (currentQuestion.operation === "multiplication" ||
+                      currentQuestion.operation === "division") && (
+                      <button
+                        onClick={() => {
+                          setShowMultiplicationTable(true);
+                          setTableMode(
+                            currentQuestion.operation === "multiplication"
+                              ? "multiplication"
+                              : "division"
+                          );
+                          if (currentQuestion.operation === "multiplication") {
+                            const a = currentQuestion.a;
+                            const b = currentQuestion.b;
+                            if (a >= 1 && a <= 12 && b >= 1 && b <= 12) {
+                              const value = a * b;
+                              setSelectedCell({ row: a, col: b, value });
+                              setSelectedRow(null);
+                              setSelectedCol(null);
+                              setSelectedResult(null);
+                              setSelectedDivisor(null);
+                            }
+                          } else {
+                            const { a, b } = currentQuestion;
+                            const value = a;
+                            if (b >= 1 && b <= 12) {
+                              setSelectedCell({ row: 1, col: b, value });
+                              setSelectedResult(value);
+                              setSelectedDivisor(b);
+                              setSelectedRow(null);
+                              setSelectedCol(null);
+                            }
                           }
-                        } else {
-                          const { a, b } = currentQuestion;
-                          const value = a;
-                          if (b >= 1 && b <= 12) {
-                            setSelectedCell({ row: 1, col: b, value });
-                            setSelectedResult(value);
-                            setSelectedDivisor(b);
-                            setSelectedRow(null);
-                            setSelectedCol(null);
-                          }
-                        }
-                      }}
-                      className="px-4 py-2 rounded-lg bg-blue-500/80 hover:bg-blue-500 text-sm font-bold"
-                    >
-                      📊 Show on table
-                    </button>
-                  )}
+                        }}
+                        className="px-4 py-2 rounded-lg bg-blue-500/80 hover:bg-blue-500 text-sm font-bold"
+                      >
+                        📊 Show on table
+                      </button>
+                    )}
                 </div>
               )}
 
