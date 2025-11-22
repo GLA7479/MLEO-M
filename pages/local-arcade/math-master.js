@@ -53,46 +53,85 @@ const GRADES = {
   },
 };
 
-// התאמת טווחי המספרים לפי כיתה + רמת קושי
+// התאמת טווחי המספרים לפי כיתה + רמת קושי (במקום factor כללי)
 function getLevelForGrade(levelKey, gradeKey) {
-  const base = LEVELS[levelKey]; // easy/medium/hard המקורי שלך
-  let factor = 1;
+  const base = LEVELS[levelKey];
 
-  // הכפלה/הקטנה לפי כיתה
+  // ברירת מחדל – נתחיל מה־LEVELS שלך
+  const cfg = {
+    name: base.name,
+    addition: { max: base.addition.max },
+    subtraction: { min: base.subtraction.min, max: base.subtraction.max },
+    multiplication: { max: base.multiplication.max },
+    division: { max: base.division.max, maxDivisor: base.division.maxDivisor },
+  };
+
   switch (gradeKey) {
-    case "g1_2":
-      factor = 0.5; // המספרים יהיו בערך חצי
+    case "g1_2": {
+      // כיתה א–ב: רק חיבור/חיסור קטן, לא מתעסקים במספרים גדולים
+      if (levelKey === "easy") {
+        cfg.addition.max = 10;           // 1–10
+        cfg.subtraction = { min: 1, max: 10 };
+      } else if (levelKey === "medium") {
+        cfg.addition.max = 20;           // 1–20
+        cfg.subtraction = { min: 1, max: 20 };
+      } else {
+        cfg.addition.max = 30;           // 1–30
+        cfg.subtraction = { min: 1, max: 30 };
+      }
+      // למקרה שיום אחד תאפשר כפל/חילוק בכיתות האלה – נשאיר קטן
+      cfg.multiplication.max = 5;
+      cfg.division = { max: 20, maxDivisor: 5 };
       break;
-    case "g3_4":
-      factor = 1; // כמו LEVELS
+    }
+
+    case "g3_4": {
+      // כיתה ג–ד: חיבור/חיסור עד 100–200, כפל עד 10–12
+      if (levelKey === "easy") {
+        cfg.addition.max = 50;           // 1–50
+        cfg.subtraction = { min: 1, max: 50 };
+        cfg.multiplication.max = 6;      // 1–6
+      } else if (levelKey === "medium") {
+        cfg.addition.max = 100;          // 1–100
+        cfg.subtraction = { min: 1, max: 100 };
+        cfg.multiplication.max = 10;     // 1–10
+      } else {
+        cfg.addition.max = 200;          // 1–200
+        cfg.subtraction = { min: 1, max: 200 };
+        cfg.multiplication.max = 12;     // 1–12
+      }
+      // אם בעתיד תוסיף חילוק לכיתות האלה
+      cfg.division = { max: 100, maxDivisor: 10 };
       break;
-    case "g5_6":
-      factor = 2; // גדול יותר, מתאים לכיתות גבוהות
+    }
+
+    case "g5_6": {
+      // כיתה ה–ו: כבר אפשר מספרים גדולים יותר
+      if (levelKey === "easy") {
+        cfg.addition.max = 200;            // 1–200
+        cfg.subtraction = { min: 1, max: 200 };
+        cfg.multiplication.max = 10;       // 1–10
+        cfg.division = { max: 100, maxDivisor: 10 };
+      } else if (levelKey === "medium") {
+        cfg.addition.max = 500;            // 1–500
+        cfg.subtraction = { min: 1, max: 500 };
+        cfg.multiplication.max = 12;       // 1–12
+        cfg.division = { max: 200, maxDivisor: 12 };
+      } else {
+        cfg.addition.max = 1000;           // 1–1000
+        cfg.subtraction = { min: 1, max: 1000 };
+        cfg.multiplication.max = 20;       // עד 20×20
+        cfg.division = { max: 500, maxDivisor: 20 };
+      }
       break;
+    }
+
     default:
-      factor = 1;
+      // fallback – אם נוסיף כיתה חדשה בעתיד
+      break;
   }
 
-  // לא ליפול למספרים קטנים מדיי
-  const clamp = (x, min, max) => Math.max(min, Math.min(max, x));
-
-  return {
-    name: base.name,
-    addition: {
-      max: clamp(Math.round(base.addition.max * factor), 10, 1000),
-    },
-    subtraction: {
-      min: base.subtraction.min,
-      max: clamp(Math.round(base.subtraction.max * factor), 20, 1000),
-    },
-    multiplication: {
-      max: clamp(Math.round(base.multiplication.max * factor), 5, 20), // עד 20×20 מקסימום
-    },
-    division: {
-      max: clamp(Math.round(base.division.max * factor), 20, 500),
-      maxDivisor: clamp(base.division.maxDivisor, 5, 20),
-    },
-  };
+  return cfg;
 }
 
 const MODES = {
@@ -214,7 +253,14 @@ function saveScoreEntry(saved, key, entry) {
   saved[key] = levelData;
 }
 
-function generateQuestion(level, operation, gradeKey, useStory = false, mixedOps = null) {
+function generateQuestion(
+  level,
+  operation,
+  gradeKey,
+  useStory = false,
+  mixedOps = null,
+  practiceFocus = "default"
+) {
   const isMixed = operation === "mixed";
   let ops;
   
@@ -249,8 +295,15 @@ function generateQuestion(level, operation, gradeKey, useStory = false, mixedOps
 
   switch (ops) {
     case "addition": {
-      a = Math.floor(Math.random() * level.addition.max) + 1;
-      b = Math.floor(Math.random() * level.addition.max) + 1;
+      let maxAdd = level.addition.max;
+
+      // תרגול ממוקד: חיבור עד 20
+      if (practiceFocus === "add_to_20") {
+        maxAdd = Math.min(maxAdd, 20);
+      }
+
+      a = Math.floor(Math.random() * maxAdd) + 1;
+      b = Math.floor(Math.random() * maxAdd) + 1;
       correctAnswer = a + b;
       if (useStory) {
         const stories = [
@@ -294,8 +347,16 @@ function generateQuestion(level, operation, gradeKey, useStory = false, mixedOps
         maxB = Math.min(20, level.multiplication.max * 2);
       }
 
-      a = Math.floor(Math.random() * maxA) + 1;
-      b = Math.floor(Math.random() * maxB) + 1;
+      // תרגול ממוקד: טבלת כפל 6–8
+      if (practiceFocus === "times_6_8") {
+        const baseFactors = [6, 7, 8];
+        a = baseFactors[Math.floor(Math.random() * baseFactors.length)];
+        b = Math.floor(Math.random() * Math.min(12, maxB)) + 1;
+      } else {
+        a = Math.floor(Math.random() * maxA) + 1;
+        b = Math.floor(Math.random() * maxB) + 1;
+      }
+
       correctAnswer = a * b;
       if (useStory) {
         const stories = [
@@ -421,25 +482,173 @@ function generateQuestion(level, operation, gradeKey, useStory = false, mixedOps
     operation: ops,
     a,
     b,
-    isStory: useStory,
+    isStory: useStory || false,
   };
 }
 
 // פונקציה ליצירת רמז
-function getHint(question, operation) {
-  if (!question || !question.a || !question.b) return "";
-  
+function getHint(question, operation, gradeKey) {
+  if (!question) return "";
+
+  // לשברים לא חייבים a/b
+  if (operation !== "fractions" && (!question.a || !question.b)) {
+    return "";
+  }
+
+  const { a, b } = question;
+
   switch (operation) {
     case "addition":
-      return `נסה לספור: ${question.a} + ${question.b}. אפשר להתחיל מ-${question.a} ולספור עוד ${question.b}`;
+      if (gradeKey === "g1_2") {
+        return `התחל מהמספר הגדול (${Math.max(a, b)}) וספור קדימה עוד ${Math.min(a, b)} צעדים.`;
+      }
+      return `נסה לפרק לעשרות ויחידות: לדוגמה ${a} + ${b} = (עשרות) + (יחידות).`;
+
     case "subtraction":
-      return `כמה צריך להוסיף ל-${question.b} כדי להגיע ל-${question.a}\u200F?`;
+      if (gradeKey === "g1_2") {
+        return `תחשוב: כמה חסר ל-${b} כדי להגיע ל-${a}\u200F? אפשר לספור קדימה.`;
+      }
+      return `נסה להשתמש ב"חיסור בהשלמה": מה-${b} ל-${a} כמה קפיצות יש\u200F?`;
+
     case "multiplication":
-      return `${question.a} × ${question.b} = ${question.a} + ${question.a} + ... (${question.b} פעמים)`;
+      if (gradeKey === "g3_4") {
+        return `${a} × ${b} זה בעצם ${a} + ${a} + ... (${b} פעמים).`;
+      }
+      return `חלק את אחד המספרים: לדוגמה ${a} × ${b} = ${a} × (${Math.floor(
+        b / 2
+      )} + ${Math.ceil(b / 2)}) ואז חיבור התוצאות.`;
+
     case "division":
-      return `כמה פעמים ${question.b} נכנס ב-${question.a}\u200F?`;
+      if (gradeKey === "g3_4") {
+        return `דמיין ${a} פריטים שחולקו ל-${b} קבוצות שוות. כמה בכל קבוצה\u200F?`;
+      }
+      return `חישוב חילוק ארוך: כמה פעמים ${b} "נכנס" ב-${a}, ומה נשאר בכל צעד.`;
+
+    case "fractions":
+      return `כשמחברים שברים עם אותו מכנה:
+1. המכנה נשאר אותו דבר.
+2. מחברים רק את המונים (המספרים העליונים).
+3. אם אפשר, מצמצמים את השבר (מחלקים גם את המונה וגם את המכנה באותו מספר).`;
+
     default:
-      return "נסה לחשוב על הפתרון צעד אחר צעד";
+      return "נסה לחשוב על הפתרון צעד אחר צעד.";
+  }
+}
+
+// הסבר מפורט צעד-אחר-צעד לפי סוג תרגיל וכיתה
+function getSolutionSteps(question, operation, gradeKey) {
+  if (!question) return [];
+  const { a, b, correctAnswer } = question;
+
+  switch (operation) {
+    case "addition": {
+      if (gradeKey === "g1_2") {
+        return [
+          `1. נכתוב את התרגיל: ${a} + ${b}.`,
+          `2. בוחרים את המספר הגדול יותר: ${Math.max(a, b)}.`,
+          `3. סופרים קדימה עוד ${Math.min(a, b)} צעדים (אפשר על אצבעות או על המספרים על המסך).`,
+          `4. המספר שבו נעצרים הוא התוצאה: ${correctAnswer}.`,
+        ];
+      }
+      // ג–ו: שיטת עשרות-יחידות
+      return [
+        `1. נפרק את המספרים לעשרות ויחידות.`,
+        `2. נחבר קודם את העשרות, ואז את היחידות.`,
+        `3. אם קיבלנו יותר מ-10 ביחידות – נעביר 1 לעשרות.`,
+        `4. נסכם את העשרות והיחידות ונקבל ${correctAnswer}.`,
+      ];
+    }
+
+    case "subtraction": {
+      if (gradeKey === "g1_2") {
+        return [
+          `1. נכתוב את התרגיל: ${a} - ${b}.`,
+          `2. נתחיל מ-${a} ונלך אחורה ${b} צעדים.`,
+          `3. נספור כל צעד בקול.`,
+          `4. המספר שבו נעצרים הוא התוצאה: ${correctAnswer}.`,
+        ];
+      }
+      return [
+        `1. נכתוב את התרגיל אחד מעל השני בטור.`,
+        `2. נחסר יחידות מיחידות. אם אי אפשר – נשאיל "1" מעמודת העשרות.`,
+        `3. נחסר עשרות מעשרות (כולל ההשאלה אם הייתה).`,
+        `4. נבדוק שהתוצאה הגיונית (קטנה מ-${a}) – התוצאה: ${correctAnswer}.`,
+      ];
+    }
+
+    case "multiplication": {
+      if (gradeKey === "g3_4") {
+        return [
+          `1. נבין ש-${a} × ${b} פירושו ${a} חזרות של ${b} או ${b} חזרות של ${a}.`,
+          `2. נוכל לצייר טבלה עם ${a} שורות ו-${b} עמודות ולספור את כל הנקודות.`,
+          `3. נספור את כל הנקודות ונקבל ${correctAnswer}.`,
+        ];
+      }
+      // ה–ו: פירוק לגורמים נוחים
+      return [
+        `1. נפרק את אחד הגורמים (לדוגמה את ${b}) לסכום נוח – עשרות ויחידות.`,
+        `2. נחשב ${a} כפול העשרות, ואז ${a} כפול היחידות.`,
+        `3. נחבר את שתי התוצאות.`,
+        `4. נקבל את ${correctAnswer}.`,
+      ];
+    }
+
+    case "division": {
+      return [
+        `1. נבין ש-${a} ÷ ${b} פירושו "כמה קבוצות שוות של ${b} יש בתוך ${a}\u200F?".`,
+        `2. נוכל לצייר ${b} קופסאות ולחלק את ה-${a} פריטים שווה בשווה.`,
+        `3. נכניס פריט אחד בכל פעם לכל קופסה עד שנגמרים הפריטים.`,
+        `4. כמה פריטים יש בכל קופסה\u200F? זה התוצאה: ${correctAnswer}.`,
+      ];
+    }
+
+    case "fractions": {
+      return [
+        `1. כשמחברים שברים עם אותו מכנה – המכנה (המספר התחתון) נשאר אותו דבר.`,
+        `2. מחברים רק את המונים (המספרים העליונים).`,
+        `3. אם המונה גדול מהמכנה, אפשר להפוך לשבר מעורב (שלם ועוד שבר).`,
+        `4. אם אפשר – מצמצמים (מחלקים גם את המונה וגם את המכנה באותו מספר).`,
+      ];
+    }
+
+    default:
+      return [];
+  }
+}
+
+// "למה טעיתי?" – הסבר קצר לטעות נפוצה
+function getErrorExplanation(question, operation, wrongAnswer, gradeKey) {
+  if (!question) return "";
+  const userAnsNum = Number(wrongAnswer);
+  const correctNum = Number(question.correctAnswer);
+
+  switch (operation) {
+    case "addition":
+      if (!Number.isNaN(userAnsNum) && userAnsNum < correctNum) {
+        return "נראה שהפסקת לספור מוקדם מדי. נסה לספור שוב מהמספר הגדול ולהוסיף את השני.";
+      }
+      if (!Number.isNaN(userAnsNum) && userAnsNum > correctNum) {
+        return "נראה שהוספת יותר מדי. בדוק שוב את העשרות והיחידות.";
+      }
+      return "בדוק שוב: האם חיברת את שני המספרים בדיוק פעם אחת כל אחד?";
+
+    case "subtraction":
+      if (!Number.isNaN(userAnsNum) && userAnsNum > correctNum) {
+        return "נראה שהגדלת במקום להקטין – אולי חיברת במקום לחסר?";
+      }
+      return "תזכור: בחיסור אנחנו מתחילים מהמספר הגדול והולכים אחורה, לא קדימה.";
+
+    case "multiplication":
+      return "בכפל חשוב לזכור: זה חיבור חוזר. בדוק כמה פעמים חיברת את המספר, והאם זה בדיוק מספר הפעמים הנכון.";
+
+    case "division":
+      return "בדוק: כמה פעמים המספר המחלק נכנס במספר המחולק? אם מכפלת התוצאה במחלק לא יוצאת בדיוק – התוצאה לא נכונה.";
+
+    case "fractions":
+      return "בשברים עם אותו מכנה – מחברים רק את המספרים העליונים, והמכנה נשאר אותו דבר. אולי שינית גם את המכנה בטעות?";
+
+    default:
+      return "";
   }
 }
 
@@ -513,6 +722,15 @@ export default function MathMaster() {
   // רמזים
   const [showHint, setShowHint] = useState(false);
   const [hintUsed, setHintUsed] = useState(false);
+
+  // הסבר מפורט לשאלה
+  const [showSolution, setShowSolution] = useState(false);
+
+  // הסבר לטעות אחרונה
+  const [errorExplanation, setErrorExplanation] = useState("");
+
+  // תרגול ממוקד (רק במצב Practice)
+  const [practiceFocus, setPracticeFocus] = useState("default"); // default | add_to_20 | times_6_8
 
   // מצב story questions
   const [useStoryQuestions, setUseStoryQuestions] = useState(false);
@@ -769,7 +987,8 @@ export default function MathMaster() {
         operation,
         grade,
         useStoryQuestions || storyOnly, // אם storyOnly מופעל, תמיד שאלות מילוליות
-        operation === "mixed" ? mixedOperations : null // העבר את הפעולות שנבחרו למיקס
+        operation === "mixed" ? mixedOperations : null, // העבר את הפעולות שנבחרו למיקס
+        practiceFocus
       );
       attempts++;
 
@@ -805,6 +1024,8 @@ export default function MathMaster() {
     setQuestionStartTime(Date.now());
     setShowHint(false);
     setHintUsed(false);
+    setShowSolution(false);
+    setErrorExplanation("");
   }
 
   function startGame() {
@@ -824,6 +1045,8 @@ export default function MathMaster() {
     setHintUsed(false);
     setShowBadge(null);
     setShowLevelUp(false);
+    setShowSolution(false);
+    setErrorExplanation("");
 
     // הגדרת טיימר לפי מצב
     if (mode === "challenge") {
@@ -890,6 +1113,8 @@ export default function MathMaster() {
       setStreak((prev) => prev + 1);
       setCorrect((prev) => prev + 1);
       
+      setErrorExplanation("");
+
       // עדכון התקדמות אישית
       const op = currentQuestion.operation;
       setProgress((prev) => ({
@@ -1014,6 +1239,15 @@ export default function MathMaster() {
     } else {
       setWrong((prev) => prev + 1);
       setStreak(0);
+      
+      setErrorExplanation(
+        getErrorExplanation(
+          currentQuestion,
+          currentQuestion.operation,
+          answer,
+          grade
+        )
+      );
       
       // עדכון התקדמות אישית
       const op = currentQuestion.operation;
@@ -1368,6 +1602,19 @@ export default function MathMaster() {
                 </div>
               </div>
 
+              {/* בחירת נושא תרגול ממוקד – רק במצב Practice */}
+              {mode === "practice" && (
+                <select
+                  value={practiceFocus}
+                  onChange={(e) => setPracticeFocus(e.target.value)}
+                  className="h-9 px-3 rounded-lg bg-black/30 border border-white/20 text-white text-xs font-bold w-full max-w-md mb-2"
+                >
+                  <option value="default">📚 כל התרגילים</option>
+                  <option value="add_to_20">➕ חיבור עד 20</option>
+                  <option value="times_6_8">✖️ טבלת כפל 6–8</option>
+                </select>
+              )}
+
               <div className="grid grid-cols-3 gap-2 mb-2 w-full max-w-md">
                 <div className="bg-black/20 border border-white/10 rounded-lg p-2 text-center">
                   <div className="text-xs text-white/60">Best Score</div>
@@ -1501,7 +1748,12 @@ export default function MathMaster() {
                       : "bg-red-500/20 text-red-200"
                   }`}
                 >
-                  {feedback}
+                  <div>{feedback}</div>
+                  {errorExplanation && (
+                    <div className="mt-1 text-xs text-red-100/90 font-normal">
+                      {errorExplanation}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1542,7 +1794,7 @@ export default function MathMaster() {
                     </div>
                   )}
                   
-                  <div className="text-4xl font-black text-white mb-4 text-center" dir="rtl" style={{ unicodeBidi: "bidi-override" }}>
+                  <div className={`text-4xl font-black text-white mb-4 text-center ${currentQuestion.isStory ? "" : ""}`} dir={currentQuestion.isStory ? "rtl" : "ltr"} style={currentQuestion.isStory ? { unicodeBidi: "bidi-override" } : {}}>
                     {currentQuestion.question}
                   </div>
                   
@@ -1561,8 +1813,32 @@ export default function MathMaster() {
                   
                   {showHint && (
                     <div className="mb-2 px-4 py-2 rounded-lg bg-blue-500/20 border border-blue-400/50 text-blue-200 text-sm text-center max-w-md">
-                      {getHint(currentQuestion, currentQuestion.operation)}
+                      {getHint(currentQuestion, currentQuestion.operation, grade)}
                     </div>
+                  )}
+
+                  {/* כפתור הסבר מלא */}
+                  {currentQuestion && (
+                    <>
+                      <button
+                        onClick={() => setShowSolution((prev) => !prev)}
+                        className="mb-2 px-4 py-2 rounded-lg bg-emerald-500/80 hover:bg-emerald-500 text-sm font-bold"
+                      >
+                        📘 הסבר מלא
+                      </button>
+
+                      {showSolution && (
+                        <div className="mb-3 px-4 py-2 rounded-lg bg-emerald-500/15 border border-emerald-400/40 text-emerald-100 text-sm text-right space-y-1 max-w-md">
+                          {getSolutionSteps(
+                            currentQuestion,
+                            currentQuestion.operation,
+                            grade
+                          ).map((line, idx) => (
+                            <p key={idx}>{line}</p>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <div className="grid grid-cols-2 gap-3 w-full mb-3">
