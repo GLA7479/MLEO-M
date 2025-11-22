@@ -51,6 +51,14 @@ const LOCAL_GAMES = [
     blurb: "Practice math skills with addition, subtraction, and multiplication. Multiple difficulty levels.",
     color: "from-blue-500/80 to-cyan-500/80",
   },
+  {
+    slug: "geometry-master",
+    title: "Geometry Master Challenge",
+    emoji: "📐",
+    mode: "Single Player • Educational",
+    blurb: "Learn geometry and engineering with area, perimeter, volume, angles, and Pythagoras theorem.",
+    color: "from-purple-500/80 to-pink-500/80",
+  },
 ];
 
 export default function LocalArcadePage() {
