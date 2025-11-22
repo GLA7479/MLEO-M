@@ -59,6 +59,14 @@ const LOCAL_GAMES = [
     blurb: "Learn geometry and engineering with area, perimeter, volume, angles, and Pythagoras theorem.",
     color: "from-purple-500/80 to-pink-500/80",
   },
+  {
+    slug: "english-master",
+    title: "English Master Challenge",
+    emoji: "🇬🇧",
+    mode: "Single Player • Educational",
+    blurb: "Learn English with vocabulary, grammar, translation, and sentence building exercises.",
+    color: "from-indigo-500/80 to-blue-500/80",
+  },
 ];
 
 export default function LocalArcadePage() {

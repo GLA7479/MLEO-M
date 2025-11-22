@@ -6,45 +6,44 @@ import { useIOSViewportFix } from "../../hooks/useIOSViewportFix";
 const LEVELS = {
   easy: {
     name: "Easy",
-    maxSide: 10,
-    decimals: false,
+    maxWords: 5,
+    complexity: "basic",
   },
   medium: {
     name: "Medium",
-    maxSide: 20,
-    decimals: true,
+    maxWords: 10,
+    complexity: "intermediate",
   },
   hard: {
     name: "Hard",
-    maxSide: 50,
-    decimals: true,
+    maxWords: 15,
+    complexity: "advanced",
   },
 };
 
 const TOPICS = {
-  area: { name: "Area", description: "חישוב שטח", icon: "📐" },
-  perimeter: { name: "Perimeter", description: "חישוב היקף", icon: "📏" },
-  volume: { name: "Volume", description: "חישוב נפח", icon: "📦" },
-  angles: { name: "Angles", description: "זוויות", icon: "📐" },
-  pythagoras: { name: "Pythagoras", description: "משפט פיתגורס", icon: "🔺" },
+  vocabulary: { name: "Vocabulary", description: "אוצר מילים", icon: "📚" },
+  grammar: { name: "Grammar", description: "דקדוק", icon: "✏️" },
+  translation: { name: "Translation", description: "תרגום", icon: "🌐" },
+  sentences: { name: "Sentences", description: "משפטים", icon: "💬" },
   mixed: { name: "Mixed", description: "ערבוב", icon: "🎲" },
 };
 
 const GRADES = {
+  g1_2: {
+    name: "Grade 1–2",
+    topics: ["vocabulary", "translation", "mixed"],
+    wordLists: ["animals", "colors", "numbers", "family", "body"],
+  },
   g3_4: {
     name: "Grade 3–4",
-    topics: ["area", "perimeter"],
-    shapes: ["square", "rectangle", "circle", "triangle"],
+    topics: ["vocabulary", "grammar", "translation", "mixed"],
+    wordLists: ["animals", "colors", "numbers", "family", "body", "food", "school", "weather"],
   },
   g5_6: {
     name: "Grade 5–6",
-    topics: ["area", "perimeter", "volume", "mixed"],
-    shapes: ["square", "rectangle", "circle", "triangle", "parallelogram", "trapezoid"],
-  },
-  g7_8: {
-    name: "Grade 7–8",
-    topics: ["area", "perimeter", "volume", "angles", "pythagoras", "mixed"],
-    shapes: ["square", "rectangle", "circle", "triangle", "parallelogram", "trapezoid", "cylinder", "sphere", "cube"],
+    topics: ["vocabulary", "grammar", "translation", "sentences", "mixed"],
+    wordLists: ["animals", "colors", "numbers", "family", "body", "food", "school", "weather", "sports", "travel", "emotions"],
   },
 };
 
@@ -55,22 +54,134 @@ const MODES = {
   marathon: { name: "Marathon", description: "How many questions can you solve? 🏃" },
 };
 
-const STORAGE_KEY = "mleo_geometry_master";
+const STORAGE_KEY = "mleo_english_master";
+
+// Word lists for vocabulary questions
+const WORD_LISTS = {
+  animals: {
+    dog: "כלב",
+    cat: "חתול",
+    bird: "ציפור",
+    fish: "דג",
+    rabbit: "ארנב",
+    horse: "סוס",
+    cow: "פרה",
+    sheep: "כבשה",
+  },
+  colors: {
+    red: "אדום",
+    blue: "כחול",
+    yellow: "צהוב",
+    green: "ירוק",
+    orange: "כתום",
+    purple: "סגול",
+    pink: "ורוד",
+    black: "שחור",
+    white: "לבן",
+  },
+  numbers: {
+    one: "אחד",
+    two: "שניים",
+    three: "שלושה",
+    four: "ארבעה",
+    five: "חמישה",
+    six: "שישה",
+    seven: "שבעה",
+    eight: "שמונה",
+    nine: "תשעה",
+    ten: "עשרה",
+  },
+  family: {
+    mother: "אמא",
+    father: "אבא",
+    brother: "אח",
+    sister: "אחות",
+    grandmother: "סבתא",
+    grandfather: "סבא",
+    uncle: "דוד",
+    aunt: "דודה",
+  },
+  body: {
+    head: "ראש",
+    eye: "עין",
+    ear: "אוזן",
+    nose: "אף",
+    mouth: "פה",
+    hand: "יד",
+    foot: "רגל",
+    leg: "רגל",
+  },
+  food: {
+    apple: "תפוח",
+    bread: "לחם",
+    milk: "חלב",
+    egg: "ביצה",
+    cheese: "גבינה",
+    banana: "בננה",
+    water: "מים",
+    cake: "עוגה",
+  },
+  school: {
+    book: "ספר",
+    pen: "עט",
+    pencil: "עיפרון",
+    desk: "שולחן",
+    chair: "כיסא",
+    teacher: "מורה",
+    student: "תלמיד",
+    classroom: "כיתה",
+  },
+  weather: {
+    sun: "שמש",
+    rain: "גשם",
+    cloud: "ענן",
+    wind: "רוח",
+    snow: "שלג",
+    hot: "חם",
+    cold: "קר",
+    warm: "חמים",
+  },
+  sports: {
+    football: "כדורגל",
+    basketball: "כדורסל",
+    tennis: "טניס",
+    swimming: "שחייה",
+    running: "ריצה",
+    cycling: "רכיבה על אופניים",
+  },
+  travel: {
+    car: "מכונית",
+    bus: "אוטובוס",
+    train: "רכבת",
+    plane: "מטוס",
+    hotel: "מלון",
+    beach: "חוף",
+    mountain: "הר",
+  },
+  emotions: {
+    happy: "שמח",
+    sad: "עצוב",
+    angry: "כעס",
+    excited: "נרגש",
+    tired: "עייף",
+    scared: "מפחד",
+  },
+};
 
 function getLevelForGrade(levelKey, gradeKey) {
   const base = LEVELS[levelKey];
   let factor = 1;
   switch (gradeKey) {
-    case "g3_4": factor = 0.5; break;
-    case "g5_6": factor = 1; break;
-    case "g7_8": factor = 2; break;
+    case "g1_2": factor = 0.5; break;
+    case "g3_4": factor = 1; break;
+    case "g5_6": factor = 1.5; break;
     default: factor = 1;
   }
   const clamp = (x, min, max) => Math.max(min, Math.min(max, x));
   return {
     name: base.name,
-    maxSide: clamp(Math.round(base.maxSide * factor), 5, 100),
-    decimals: base.decimals,
+    maxWords: clamp(Math.round(base.maxWords * factor), 3, 20),
+    complexity: base.complexity,
   };
 }
 
@@ -169,153 +280,139 @@ function generateQuestion(level, topic, gradeKey, mixedOps = null) {
     selectedTopic = topic;
   }
 
-  const availableShapes = GRADES[gradeKey].shapes;
-  const shape = availableShapes[Math.floor(Math.random() * availableShapes.length)];
   let question, correctAnswer, params = {};
-  const roundTo = level.decimals ? 2 : 0;
-  const round = (num) => Math.round(num * Math.pow(10, roundTo)) / Math.pow(10, roundTo);
+  const availableWordLists = GRADES[gradeKey].wordLists;
+  const selectedList = availableWordLists[Math.floor(Math.random() * availableWordLists.length)];
+  const words = WORD_LISTS[selectedList];
+  const wordEntries = Object.entries(words);
+  const randomWord = wordEntries[Math.floor(Math.random() * wordEntries.length)];
 
   switch (selectedTopic) {
-    case "area": {
-      switch (shape) {
-        case "square": {
-          const side = Math.floor(Math.random() * level.maxSide) + 1;
-          params = { side };
-          correctAnswer = round(side * side);
-          question = `מה השטח של ריבוע עם צלע ${side}\u200F?`;
-          break;
-        }
-        case "rectangle": {
-          const length = Math.floor(Math.random() * level.maxSide) + 1;
-          const width = Math.floor(Math.random() * level.maxSide) + 1;
-          params = { length, width };
-          correctAnswer = round(length * width);
-          question = `מה השטח של מלבן עם אורך ${length} ורוחב ${width}\u200F?`;
-          break;
-        }
-        case "circle": {
-          const radius = Math.floor(Math.random() * (level.maxSide / 2)) + 1;
-          params = { radius };
-          correctAnswer = round(Math.PI * radius * radius);
-          question = `מה השטח של עיגול עם רדיוס ${radius}\u200F? (π = 3.14)`;
-          break;
-        }
-        case "triangle": {
-          const base = Math.floor(Math.random() * level.maxSide) + 1;
-          const height = Math.floor(Math.random() * level.maxSide) + 1;
-          params = { base, height };
-          correctAnswer = round((base * height) / 2);
-          question = `מה השטח של משולש עם בסיס ${base} וגובה ${height}\u200F?`;
-          break;
-        }
-        case "parallelogram": {
-          const base = Math.floor(Math.random() * level.maxSide) + 1;
-          const height = Math.floor(Math.random() * level.maxSide) + 1;
-          params = { base, height };
-          correctAnswer = round(base * height);
-          question = `מה השטח של מקבילית עם בסיס ${base} וגובה ${height}\u200F?`;
-          break;
-        }
-        case "trapezoid": {
-          const base1 = Math.floor(Math.random() * level.maxSide) + 1;
-          const base2 = Math.floor(Math.random() * level.maxSide) + 1;
-          const height = Math.floor(Math.random() * level.maxSide) + 1;
-          params = { base1, base2, height };
-          correctAnswer = round(((base1 + base2) * height) / 2);
-          question = `מה השטח של טרפז עם בסיסים ${base1} ו-${base2} וגובה ${height}\u200F?`;
-          break;
-        }
+    case "vocabulary": {
+      // שאלה: מה פירוש המילה?
+      const direction = Math.random() > 0.5; // true = אנגלית->עברית, false = עברית->אנגלית
+      if (direction) {
+        question = `מה פירוש המילה "${randomWord[0]}"\u200F?`;
+        correctAnswer = randomWord[1];
+        params = { word: randomWord[0], translation: randomWord[1], direction: "en_to_he" };
+      } else {
+        question = `מה פירוש המילה "${randomWord[1]}"\u200F?`;
+        correctAnswer = randomWord[0];
+        params = { word: randomWord[1], translation: randomWord[0], direction: "he_to_en" };
       }
       break;
     }
-    case "perimeter": {
-      switch (shape) {
-        case "square": {
-          const side = Math.floor(Math.random() * level.maxSide) + 1;
-          params = { side };
-          correctAnswer = round(side * 4);
-          question = `מה ההיקף של ריבוע עם צלע ${side}\u200F?`;
-          break;
-        }
-        case "rectangle": {
-          const length = Math.floor(Math.random() * level.maxSide) + 1;
-          const width = Math.floor(Math.random() * level.maxSide) + 1;
-          params = { length, width };
-          correctAnswer = round((length + width) * 2);
-          question = `מה ההיקף של מלבן עם אורך ${length} ורוחב ${width}\u200F?`;
-          break;
-        }
-        case "circle": {
-          const radius = Math.floor(Math.random() * (level.maxSide / 2)) + 1;
-          params = { radius };
-          correctAnswer = round(2 * Math.PI * radius);
-          question = `מה ההיקף של עיגול עם רדיוס ${radius}\u200F? (π = 3.14)`;
-          break;
-        }
-        case "triangle": {
-          const side1 = Math.floor(Math.random() * level.maxSide) + 1;
-          const side2 = Math.floor(Math.random() * level.maxSide) + 1;
-          const side3 = Math.floor(Math.random() * level.maxSide) + 1;
-          params = { side1, side2, side3 };
-          correctAnswer = round(side1 + side2 + side3);
-          question = `מה ההיקף של משולש עם צלעות ${side1}, ${side2}, ${side3}\u200F?`;
-          break;
-        }
+
+    case "grammar": {
+      // שאלות דקדוק בסיסיות
+      const grammarTypes = [
+        {
+          question: `מה הצורה הנכונה: "I ___ a student"`,
+          options: ["am", "is", "are"],
+          correct: "am",
+          explanation: "I am - אני",
+        },
+        {
+          question: `מה הצורה הנכונה: "She ___ happy"`,
+          options: ["am", "is", "are"],
+          correct: "is",
+          explanation: "She is - היא",
+        },
+        {
+          question: `מה הצורה הנכונה: "They ___ friends"`,
+          options: ["am", "is", "are"],
+          correct: "are",
+          explanation: "They are - הם",
+        },
+        {
+          question: `מה הצורה הנכונה: "I have a ___" (כלב)`,
+          options: ["dog", "dogs", "doges"],
+          correct: "dog",
+          explanation: "a dog - כלב אחד",
+        },
+        {
+          question: `מה הצורה הנכונה: "I ___ to school" (הולך)`,
+          options: ["go", "goes", "going"],
+          correct: "go",
+          explanation: "I go - אני הולך",
+        },
+      ];
+      const grammarQ = grammarTypes[Math.floor(Math.random() * grammarTypes.length)];
+      question = grammarQ.question;
+      correctAnswer = grammarQ.correct;
+      params = { explanation: grammarQ.explanation };
+      break;
+    }
+
+    case "translation": {
+      // משפטים פשוטים לתרגום
+      const sentences = [
+        { en: "I love you", he: "אני אוהב אותך" },
+        { en: "How are you?", he: "מה שלומך?" },
+        { en: "Thank you", he: "תודה" },
+        { en: "Good morning", he: "בוקר טוב" },
+        { en: "Good night", he: "לילה טוב" },
+        { en: "What is your name?", he: "מה השם שלך?" },
+        { en: "My name is", he: "השם שלי הוא" },
+        { en: "I am happy", he: "אני שמח" },
+        { en: "I am sad", he: "אני עצוב" },
+        { en: "I like apples", he: "אני אוהב תפוחים" },
+      ];
+      const sentence = sentences[Math.floor(Math.random() * sentences.length)];
+      const direction = Math.random() > 0.5;
+      if (direction) {
+        question = `תרגם: "${sentence.en}"`;
+        correctAnswer = sentence.he;
+        params = { sentence: sentence.en, translation: sentence.he, direction: "en_to_he" };
+      } else {
+        question = `תרגם: "${sentence.he}"`;
+        correctAnswer = sentence.en;
+        params = { sentence: sentence.he, translation: sentence.en, direction: "he_to_en" };
       }
       break;
     }
-    case "volume": {
-      switch (shape) {
-        case "cube": {
-          const side = Math.floor(Math.random() * (level.maxSide / 2)) + 1;
-          params = { side };
-          correctAnswer = round(side * side * side);
-          question = `מה הנפח של קובייה עם צלע ${side}\u200F?`;
-          break;
-        }
-        case "cylinder": {
-          const radius = Math.floor(Math.random() * (level.maxSide / 3)) + 1;
-          const height = Math.floor(Math.random() * level.maxSide) + 1;
-          params = { radius, height };
-          correctAnswer = round(Math.PI * radius * radius * height);
-          question = `מה הנפח של גליל עם רדיוס ${radius} וגובה ${height}\u200F? (π = 3.14)`;
-          break;
-        }
-        case "sphere": {
-          const radius = Math.floor(Math.random() * (level.maxSide / 3)) + 1;
-          params = { radius };
-          correctAnswer = round((4 / 3) * Math.PI * radius * radius * radius);
-          question = `מה הנפח של כדור עם רדיוס ${radius}\u200F? (π = 3.14)`;
-          break;
-        }
-        case "rectangular_prism": {
-          const length = Math.floor(Math.random() * (level.maxSide / 2)) + 1;
-          const width = Math.floor(Math.random() * (level.maxSide / 2)) + 1;
-          const height = Math.floor(Math.random() * level.maxSide) + 1;
-          params = { length, width, height };
-          correctAnswer = round(length * width * height);
-          question = `מה הנפח של תיבה עם אורך ${length}, רוחב ${width} וגובה ${height}\u200F?`;
-          break;
-        }
-      }
+
+    case "sentences": {
+      // השלמת משפט
+      const sentenceTemplates = [
+        {
+          template: "I ___ a book",
+          options: ["read", "reads", "reading"],
+          correct: "read",
+          explanation: "I read - אני קורא",
+        },
+        {
+          template: "She ___ to school",
+          options: ["go", "goes", "going"],
+          correct: "goes",
+          explanation: "She goes - היא הולכת",
+        },
+        {
+          template: "We ___ friends",
+          options: ["am", "is", "are"],
+          correct: "are",
+          explanation: "We are - אנחנו",
+        },
+        {
+          template: "He ___ a car",
+          options: ["have", "has", "having"],
+          correct: "has",
+          explanation: "He has - יש לו",
+        },
+        {
+          template: "They ___ playing",
+          options: ["am", "is", "are"],
+          correct: "are",
+          explanation: "They are - הם",
+        },
+      ];
+      const template = sentenceTemplates[Math.floor(Math.random() * sentenceTemplates.length)];
+      question = `השלם את המשפט: "${template.template}"`;
+      correctAnswer = template.correct;
+      params = { template: template.template, explanation: template.explanation };
       break;
     }
-    case "angles": {
-      const angle1 = Math.floor(Math.random() * 180) + 1;
-      const angle2 = Math.floor(Math.random() * (180 - angle1)) + 1;
-      const angle3 = 180 - angle1 - angle2;
-      correctAnswer = round(angle3);
-      question = `במשולש, זווית אחת היא ${angle1}° וזווית שנייה היא ${angle2}°. מה הזווית השלישית\u200F?`;
-      break;
-    }
-    case "pythagoras": {
-      const a = Math.floor(Math.random() * level.maxSide) + 1;
-      const b = Math.floor(Math.random() * level.maxSide) + 1;
-      const c = Math.sqrt(a * a + b * b);
-      correctAnswer = round(c);
-      question = `במשולש ישר זווית, הניצבים הם ${a} ו-${b}. מה אורך היתר\u200F?`;
-      break;
-    }
+
     case "mixed": {
       const availableTopics = GRADES[gradeKey].topics.filter((t) => t !== "mixed");
       const randomTopic = availableTopics[Math.floor(Math.random() * availableTopics.length)];
@@ -323,12 +420,37 @@ function generateQuestion(level, topic, gradeKey, mixedOps = null) {
     }
   }
 
+  // יצירת תשובות שגויות
   const wrongAnswers = new Set();
   while (wrongAnswers.size < 3) {
-    const variation = Math.floor(Math.random() * 3) + 1;
-    const sign = Math.random() > 0.5 ? 1 : -1;
-    let wrong = round(correctAnswer + sign * (correctAnswer * 0.1 * variation));
-    if (wrong !== correctAnswer && wrong > 0 && !wrongAnswers.has(wrong)) {
+    let wrong;
+    if (selectedTopic === "vocabulary") {
+      // אם השאלה בעברית, התשובות צריכות להיות באנגלית
+      if (params.direction === "he_to_en") {
+        // תשובות שגויות באנגלית
+        const allEnglishWords = Object.values(WORD_LISTS).flatMap(list => Object.keys(list));
+        wrong = allEnglishWords[Math.floor(Math.random() * allEnglishWords.length)];
+      } else {
+        // אם השאלה באנגלית, התשובות בעברית
+        const allHebrewWords = Object.values(WORD_LISTS).flatMap(list => Object.values(list));
+        wrong = allHebrewWords[Math.floor(Math.random() * allHebrewWords.length)];
+      }
+    } else if (selectedTopic === "grammar" || selectedTopic === "sentences") {
+      // תשובות שגויות מהאופציות האחרות
+      const allOptions = ["am", "is", "are", "go", "goes", "have", "has", "read", "reads", "dog", "dogs"];
+      wrong = allOptions[Math.floor(Math.random() * allOptions.length)];
+    } else {
+      // תרגום שגוי
+      if (params.direction === "he_to_en") {
+        // אם השאלה בעברית, התשובות באנגלית
+        const allEnglishWords = Object.values(WORD_LISTS).flatMap(list => Object.keys(list));
+        wrong = allEnglishWords[Math.floor(Math.random() * allEnglishWords.length)];
+      } else {
+        const allHebrewWords = Object.values(WORD_LISTS).flatMap(list => Object.values(list));
+        wrong = allHebrewWords[Math.floor(Math.random() * allHebrewWords.length)];
+      }
+    }
+    if (wrong !== correctAnswer && !wrongAnswers.has(wrong)) {
       wrongAnswers.add(wrong);
     }
   }
@@ -344,7 +466,6 @@ function generateQuestion(level, topic, gradeKey, mixedOps = null) {
     correctAnswer,
     answers: allAnswers,
     topic: selectedTopic,
-    shape,
     params,
   };
 }
@@ -353,51 +474,25 @@ function generateQuestion(level, topic, gradeKey, mixedOps = null) {
 function getHint(question, topic, gradeKey) {
   if (!question || !question.params) return "";
   switch (topic) {
-    case "area":
-      if (question.shape === "square") {
-        return `שטח ריבוע = צלע × צלע = ${question.params.side} × ${question.params.side}`;
-      } else if (question.shape === "rectangle") {
-        return `שטח מלבן = אורך × רוחב = ${question.params.length} × ${question.params.width}`;
-      } else if (question.shape === "circle") {
-        return `שטח עיגול = π × רדיוס² = 3.14 × ${question.params.radius}²`;
-      } else if (question.shape === "triangle") {
-        return `שטח משולש = (בסיס × גובה) ÷ 2 = (${question.params.base} × ${question.params.height}) ÷ 2`;
-      } else if (question.shape === "parallelogram") {
-        return `שטח מקבילית = בסיס × גובה = ${question.params.base} × ${question.params.height}`;
-      } else if (question.shape === "trapezoid") {
-        return `שטח טרפז = ((בסיס1 + בסיס2) × גובה) ÷ 2 = ((${question.params.base1} + ${question.params.base2}) × ${question.params.height}) ÷ 2`;
+    case "vocabulary":
+      if (question.params.direction === "en_to_he") {
+        return `נסה לחשוב על המילה "${question.params.word}" - מה הפירוש שלה בעברית?`;
+      } else {
+        return `נסה לחשוב על המילה "${question.params.word}" - מה הפירוש שלה באנגלית?`;
       }
-      break;
-    case "perimeter":
-      if (question.shape === "square") {
-        return `היקף ריבוע = צלע × 4 = ${question.params.side} × 4`;
-      } else if (question.shape === "rectangle") {
-        return `היקף מלבן = (אורך + רוחב) × 2 = (${question.params.length} + ${question.params.width}) × 2`;
-      } else if (question.shape === "circle") {
-        return `היקף עיגול = 2 × π × רדיוס = 2 × 3.14 × ${question.params.radius}`;
-      } else if (question.shape === "triangle") {
-        return `היקף משולש = צלע1 + צלע2 + צלע3 = ${question.params.side1} + ${question.params.side2} + ${question.params.side3}`;
+    case "grammar":
+      return question.params.explanation || "זכור: I am, You/We/They are, He/She/It is";
+    case "translation":
+      if (question.params.direction === "en_to_he") {
+        return `תרגם מילה אחר מילה: "${question.params.sentence}"`;
+      } else {
+        return `תרגם מילה אחר מילה: "${question.params.sentence}"`;
       }
-      break;
-    case "volume":
-      if (question.shape === "cube") {
-        return `נפח קובייה = צלע³ = ${question.params.side}³`;
-      } else if (question.shape === "cylinder") {
-        return `נפח גליל = π × רדיוס² × גובה = 3.14 × ${question.params.radius}² × ${question.params.height}`;
-      } else if (question.shape === "sphere") {
-        return `נפח כדור = (4/3) × π × רדיוס³ = (4/3) × 3.14 × ${question.params.radius}³`;
-      } else if (question.shape === "rectangular_prism") {
-        return `נפח תיבה = אורך × רוחב × גובה = ${question.params.length} × ${question.params.width} × ${question.params.height}`;
-      }
-      break;
-    case "angles":
-      return `סכום זוויות במשולש = 180°. אם יש ${question.params?.angle1 || 0}° ו-${question.params?.angle2 || 0}°, אז השלישית = 180° - (שתי הזוויות)`;
-    case "pythagoras":
-      return `משפט פיתגורס: a² + b² = c². כאן: ${question.params?.a || 0}² + ${question.params?.b || 0}² = c²`;
+    case "sentences":
+      return question.params.explanation || "בדוק מה מתאים: I/You/We/They = are, He/She/It = is";
     default:
-      return "נסה לחשוב על הנוסחה המתאימה";
+      return "נסה לחשוב על התשובה צעד אחר צעד";
   }
-  return "נסה לחשוב על הנוסחה המתאימה";
 }
 
 // הסבר מפורט צעד-אחר-צעד לפי נושא וכיתה
@@ -406,140 +501,57 @@ function getSolutionSteps(question, topic, gradeKey) {
   const { correctAnswer } = question;
 
   switch (topic) {
-    case "area": {
-      if (question.shape === "square") {
+    case "vocabulary": {
+      if (question.params.direction === "en_to_he") {
         return [
-          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: שטח ריבוע = צלע × צלע.</span>,
-          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: שטח = {question.params.side} × {question.params.side}.</span>,
-          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.side} × {question.params.side} = {correctAnswer}.</span>,
-          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות שטח.</span>,
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נבין שהמילה "{question.params.word}" היא באנגלית.</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נחפש את הפירוש של המילה בעברית.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. הפירוש הנכון הוא: {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. נבדוק שהפירוש הגיוני ונכון.</span>,
         ];
-      } else if (question.shape === "rectangle") {
+      } else {
         return [
-          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: שטח מלבן = אורך × רוחב.</span>,
-          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: שטח = {question.params.length} × {question.params.width}.</span>,
-          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.length} × {question.params.width} = {correctAnswer}.</span>,
-          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות שטח.</span>,
-        ];
-      } else if (question.shape === "circle") {
-        return [
-          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: שטח עיגול = π × רדיוס².</span>,
-          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: שטח = 3.14 × {question.params.radius}².</span>,
-          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.radius}² = {question.params.radius * question.params.radius}, ואז 3.14 × {question.params.radius * question.params.radius} = {correctAnswer}.</span>,
-          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות שטח.</span>,
-        ];
-      } else if (question.shape === "triangle") {
-        return [
-          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: שטח משולש = (בסיס × גובה) ÷ 2.</span>,
-          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: שטח = ({question.params.base} × {question.params.height}) ÷ 2.</span>,
-          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.base} × {question.params.height} = {question.params.base * question.params.height}, ואז {question.params.base * question.params.height} ÷ 2 = {correctAnswer}.</span>,
-          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות שטח.</span>,
-        ];
-      } else if (question.shape === "parallelogram") {
-        return [
-          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: שטח מקבילית = בסיס × גובה.</span>,
-          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: שטח = {question.params.base} × {question.params.height}.</span>,
-          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.base} × {question.params.height} = {correctAnswer}.</span>,
-          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות שטח.</span>,
-        ];
-      } else if (question.shape === "trapezoid") {
-        return [
-          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: שטח טרפז = ((בסיס1 + בסיס2) × גובה) ÷ 2.</span>,
-          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: שטח = (({question.params.base1} + {question.params.base2}) × {question.params.height}) ÷ 2.</span>,
-          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.base1} + {question.params.base2} = {question.params.base1 + question.params.base2}, ואז ({question.params.base1 + question.params.base2} × {question.params.height}) ÷ 2 = {correctAnswer}.</span>,
-          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות שטח.</span>,
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נבין שהמילה "{question.params.word}" היא בעברית.</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נחפש את הפירוש של המילה באנגלית.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. הפירוש הנכון הוא: {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. נבדוק שהפירוש הגיוני ונכון.</span>,
         ];
       }
-      break;
     }
 
-    case "perimeter": {
-      if (question.shape === "square") {
-        return [
-          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: היקף ריבוע = צלע × 4.</span>,
-          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: היקף = {question.params.side} × 4.</span>,
-          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.side} × 4 = {correctAnswer}.</span>,
-          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות אורך.</span>,
-        ];
-      } else if (question.shape === "rectangle") {
-        return [
-          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: היקף מלבן = (אורך + רוחב) × 2.</span>,
-          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: היקף = ({question.params.length} + {question.params.width}) × 2.</span>,
-          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.length} + {question.params.width} = {question.params.length + question.params.width}, ואז {question.params.length + question.params.width} × 2 = {correctAnswer}.</span>,
-          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות אורך.</span>,
-        ];
-      } else if (question.shape === "circle") {
-        return [
-          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: היקף עיגול = 2 × π × רדיוס.</span>,
-          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: היקף = 2 × 3.14 × {question.params.radius}.</span>,
-          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: 2 × 3.14 = 6.28, ואז 6.28 × {question.params.radius} = {correctAnswer}.</span>,
-          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות אורך.</span>,
-        ];
-      } else if (question.shape === "triangle") {
-        return [
-          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: היקף משולש = צלע1 + צלע2 + צלע3.</span>,
-          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: היקף = {question.params.side1} + {question.params.side2} + {question.params.side3}.</span>,
-          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.side1} + {question.params.side2} + {question.params.side3} = {correctAnswer}.</span>,
-          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות אורך.</span>,
-        ];
-      }
-      break;
-    }
-
-    case "volume": {
-      if (question.shape === "cube") {
-        return [
-          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: נפח קובייה = צלע³.</span>,
-          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: נפח = {question.params.side}³.</span>,
-          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.side} × {question.params.side} × {question.params.side} = {correctAnswer}.</span>,
-          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות נפח.</span>,
-        ];
-      } else if (question.shape === "cylinder") {
-        return [
-          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: נפח גליל = π × רדיוס² × גובה.</span>,
-          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: נפח = 3.14 × {question.params.radius}² × {question.params.height}.</span>,
-          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.radius}² = {question.params.radius * question.params.radius}, ואז 3.14 × {question.params.radius * question.params.radius} × {question.params.height} = {correctAnswer}.</span>,
-          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות נפח.</span>,
-        ];
-      } else if (question.shape === "sphere") {
-        return [
-          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: נפח כדור = (4/3) × π × רדיוס³.</span>,
-          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: נפח = (4/3) × 3.14 × {question.params.radius}³.</span>,
-          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.radius}³ = {question.params.radius * question.params.radius * question.params.radius}, ואז (4/3) × 3.14 × {question.params.radius * question.params.radius * question.params.radius} = {correctAnswer}.</span>,
-          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות נפח.</span>,
-        ];
-      } else if (question.shape === "rectangular_prism") {
-        return [
-          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: נפח תיבה = אורך × רוחב × גובה.</span>,
-          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: נפח = {question.params.length} × {question.params.width} × {question.params.height}.</span>,
-          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.length} × {question.params.width} × {question.params.height} = {correctAnswer}.</span>,
-          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות נפח.</span>,
-        ];
-      }
-      break;
-    }
-
-    case "angles": {
+    case "grammar": {
       return [
-        <span key="1" dir="ltr" style={{ display: "block" }}>1. נזכור: סכום הזוויות במשולש תמיד שווה ל-180°.</span>,
-        <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: זווית1 = {question.params?.angle1 || 0}°, זווית2 = {question.params?.angle2 || 0}°.</span>,
-        <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: זווית3 = 180° - ({question.params?.angle1 || 0}° + {question.params?.angle2 || 0}°) = 180° - {(question.params?.angle1 || 0) + (question.params?.angle2 || 0)}° = {correctAnswer}°.</span>,
-        <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: הזווית השלישית היא {correctAnswer}°.</span>,
+        <span key="1" dir="ltr" style={{ display: "block" }}>1. נבין את כללי הדקדוק באנגלית.</span>,
+        <span key="2" dir="ltr" style={{ display: "block" }}>2. I (אני) = am, You/We/They (אתה/אנחנו/הם) = are, He/She/It (הוא/היא/זה) = is.</span>,
+        <span key="3" dir="ltr" style={{ display: "block" }}>3. התשובה הנכונה היא: {correctAnswer}.</span>,
+        <span key="4" dir="ltr" style={{ display: "block" }}>4. {question.params.explanation || "נבדוק שהתשובה מתאימה לנושא המשפט"}.</span>,
       ];
     }
 
-    case "pythagoras": {
-      const a = question.params?.a || 0;
-      const b = question.params?.b || 0;
-      const aSquared = a * a;
-      const bSquared = b * b;
-      const sum = aSquared + bSquared;
+    case "translation": {
+      if (question.params.direction === "en_to_he") {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נקרא את המשפט באנגלית: "{question.params.sentence}".</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נתרגם כל מילה: {question.params.sentence.split(" ").map((w, i) => `${w} = ...`).join(", ")}.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחבר את המילים למשפט בעברית.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התרגום הנכון: {correctAnswer}.</span>,
+        ];
+      } else {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נקרא את המשפט בעברית: "{question.params.sentence}".</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נתרגם כל מילה לאנגלית.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחבר את המילים למשפט באנגלית.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התרגום הנכון: {correctAnswer}.</span>,
+        ];
+      }
+    }
+
+    case "sentences": {
       return [
-        <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את משפט פיתגורס: a² + b² = c² (כאשר c הוא היתר).</span>,
-        <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: {a}² + {b}² = c².</span>,
-        <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {a}² = {aSquared}, {b}² = {bSquared}.</span>,
-        <span key="4" dir="ltr" style={{ display: "block" }}>4. נחבר: {aSquared} + {bSquared} = {sum}.</span>,
-        <span key="5" dir="ltr" style={{ display: "block" }}>5. נוציא שורש: c = √{sum} = {correctAnswer}.</span>,
+        <span key="1" dir="ltr" style={{ display: "block" }}>1. נקרא את המשפט: "{question.params.template}".</span>,
+        <span key="2" dir="ltr" style={{ display: "block" }}>2. נבין מה חסר במשפט - איזו מילה או צורה דקדוקית.</span>,
+        <span key="3" dir="ltr" style={{ display: "block" }}>3. נבדוק מה מתאים לפי כללי הדקדוק: I/You/We/They = are, He/She/It = is.</span>,
+        <span key="4" dir="ltr" style={{ display: "block" }}>4. התשובה הנכונה: {correctAnswer}. {question.params.explanation || ""}</span>,
       ];
     }
 
@@ -552,49 +564,34 @@ function getSolutionSteps(question, topic, gradeKey) {
 // "למה טעיתי?" – הסבר קצר לטעות נפוצה
 function getErrorExplanation(question, topic, wrongAnswer, gradeKey) {
   if (!question) return "";
-  const userAnsNum = Number(wrongAnswer);
-  const correctNum = Number(question.correctAnswer);
+  const userAns = String(wrongAnswer).toLowerCase();
+  const correctAns = String(question.correctAnswer).toLowerCase();
 
   switch (topic) {
-    case "area":
-      if (!Number.isNaN(userAnsNum) && userAnsNum < correctNum) {
-        return "נראה ששכחת לכפול או לחלק. בדוק שוב את הנוסחה – האם כפלת/חלקת את כל המספרים?";
-      }
-      if (!Number.isNaN(userAnsNum) && userAnsNum > correctNum) {
-        return "נראה שהוספת במקום לכפול, או שכחת לחלק. בדוק שוב את הנוסחה.";
-      }
-      return "בדוק שוב: האם השתמשת בנוסחה הנכונה? זכור: שטח ריבוע = צלע × צלע, שטח מלבן = אורך × רוחב, שטח משולש = (בסיס × גובה) ÷ 2.";
+    case "vocabulary":
+      return "בדוק שוב: האם הפירוש שאתה בחרת מתאים למילה? נסה לחשוב על המילה בעברית/אנגלית ולמצוא את הפירוש הנכון.";
 
-    case "perimeter":
-      if (!Number.isNaN(userAnsNum) && userAnsNum < correctNum) {
-        return "נראה ששכחת לכפול ב-2 (במלבן) או ב-4 (בריבוע), או ששכחת צלע אחת. בדוק שוב.";
+    case "grammar":
+      if (userAns === "is" && correctAns === "am") {
+        return "זכור: I (אני) תמיד עם am, לא is. I am = אני.";
       }
-      return "בדוק שוב: האם חיברת את כל הצלעות? זכור: היקף ריבוע = צלע × 4, היקף מלבן = (אורך + רוחב) × 2.";
+      if (userAns === "am" && (correctAns === "is" || correctAns === "are")) {
+        return "זכור: am משמש רק עם I (אני). He/She/It = is, You/We/They = are.";
+      }
+      return "בדוק שוב את כללי הדקדוק: I am, You/We/They are, He/She/It is.";
 
-    case "volume":
-      if (!Number.isNaN(userAnsNum) && userAnsNum < correctNum) {
-        return "נראה ששכחת לכפול באחד הממדים. בדוק שוב את הנוסחה – האם כפלת את כל הממדים?";
-      }
-      return "בדוק שוב: האם השתמשת בנוסחה הנכונה? זכור: נפח קובייה = צלע³, נפח תיבה = אורך × רוחב × גובה.";
+    case "translation":
+      return "בדוק שוב: האם תרגמת את כל המילים נכון? נסה לחשוב על המשמעות של המשפט ולא רק על מילים בודדות.";
 
-    case "angles":
-      if (!Number.isNaN(userAnsNum) && userAnsNum > correctNum) {
-        return "נראה שהוספת במקום לחסר. זכור: סכום הזוויות במשולש = 180°, אז הזווית השלישית = 180° - (זווית1 + זווית2).";
-      }
-      return "בדוק שוב: סכום הזוויות במשולש תמיד שווה ל-180°. חסר את שתי הזוויות מ-180° כדי למצוא את השלישית.";
-
-    case "pythagoras":
-      if (!Number.isNaN(userAnsNum) && userAnsNum < correctNum) {
-        return "נראה ששכחת להוציא שורש, או שכחת לכפול אחד המספרים בעצמו. זכור: a² + b² = c², אז c = √(a² + b²).";
-      }
-      return "בדוק שוב: משפט פיתגורס אומר a² + b² = c². חשב את a² ו-b², חבר אותם, ואז הוצא שורש.";
+    case "sentences":
+      return "בדוק שוב: האם המילה שבחרת מתאימה לנושא המשפט? זכור: I/You/We/They = are, He/She/It = is.";
 
     default:
       return "";
   }
 }
 
-export default function GeometryMaster() {
+export default function EnglishMaster() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);
@@ -604,10 +601,10 @@ export default function GeometryMaster() {
   const topicSelectRef = useRef(null);
 
   const [mounted, setMounted] = useState(false);
-  const [grade, setGrade] = useState("g5_6");
+  const [grade, setGrade] = useState("g3_4");
   const [mode, setMode] = useState("learning");
   const [level, setLevel] = useState("easy");
-  const [topic, setTopic] = useState("area");
+  const [topic, setTopic] = useState("vocabulary");
   const [gameActive, setGameActive] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [score, setScore] = useState(0);
@@ -631,11 +628,10 @@ export default function GeometryMaster() {
   const [xp, setXp] = useState(0);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [progress, setProgress] = useState({
-    area: { total: 0, correct: 0 },
-    perimeter: { total: 0, correct: 0 },
-    volume: { total: 0, correct: 0 },
-    angles: { total: 0, correct: 0 },
-    pythagoras: { total: 0, correct: 0 },
+    vocabulary: { total: 0, correct: 0 },
+    grammar: { total: 0, correct: 0 },
+    translation: { total: 0, correct: 0 },
+    sentences: { total: 0, correct: 0 },
   });
   const [dailyChallenge, setDailyChallenge] = useState({
     date: new Date().toDateString(),
@@ -650,13 +646,13 @@ export default function GeometryMaster() {
 
   // הסבר לטעות אחרונה
   const [errorExplanation, setErrorExplanation] = useState("");
+
   const [showMixedSelector, setShowMixedSelector] = useState(false);
   const [mixedTopics, setMixedTopics] = useState({
-    area: true,
-    perimeter: true,
-    volume: false,
-    angles: false,
-    pythagoras: false,
+    vocabulary: true,
+    grammar: false,
+    translation: true,
+    sentences: false,
   });
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardLevel, setLeaderboardLevel] = useState("easy");
@@ -727,11 +723,10 @@ export default function GeometryMaster() {
   useEffect(() => {
     const availableTopics = GRADES[grade].topics.filter((t) => t !== "mixed");
     const newMixedTopics = {
-      area: availableTopics.includes("area"),
-      perimeter: availableTopics.includes("perimeter"),
-      volume: availableTopics.includes("volume"),
-      angles: availableTopics.includes("angles"),
-      pythagoras: availableTopics.includes("pythagoras"),
+      vocabulary: availableTopics.includes("vocabulary"),
+      grammar: availableTopics.includes("grammar"),
+      translation: availableTopics.includes("translation"),
+      sentences: availableTopics.includes("sentences"),
     };
     setMixedTopics(newMixedTopics);
   }, [grade]);
@@ -971,6 +966,7 @@ export default function GeometryMaster() {
       setCorrect((prev) => prev + 1);
       
       setErrorExplanation("");
+
       const top = currentQuestion.topic;
       setProgress((prev) => ({
         ...prev,
@@ -1225,7 +1221,7 @@ export default function GeometryMaster() {
         >
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">
-              📐 Geometry Master
+              🇬🇧 English Master
             </h1>
             <p className="text-white/70 text-xs">
               {playerName || "Player"} • {GRADES[grade].name} •{" "}
@@ -1532,7 +1528,7 @@ export default function GeometryMaster() {
                   className="w-full max-w-md flex flex-col items-center justify-center mb-2 flex-1"
                   style={{ height: "var(--game-h, 400px)", minHeight: "300px" }}
                 >
-                  <div className="text-4xl font-black text-white mb-4 text-center" dir="rtl" style={{ unicodeBidi: "bidi-override" }}>
+                  <div className="text-4xl font-black text-white mb-4 text-center" dir="auto">
                     {currentQuestion.question}
                   </div>
 
