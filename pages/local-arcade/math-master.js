@@ -214,15 +214,32 @@ function saveScoreEntry(saved, key, entry) {
   saved[key] = levelData;
 }
 
-function generateQuestion(level, operation, gradeKey, useStory = false) {
+function generateQuestion(level, operation, gradeKey, useStory = false, mixedOps = null) {
   const isMixed = operation === "mixed";
   let ops;
   
   if (isMixed) {
-    // מיקס לפי הפעולות הזמינות לכל כיתה
-    const availableOps = GRADES[gradeKey].operations.filter(
-      (op) => op !== "mixed" && op !== "fractions"
-    );
+    // מיקס לפי הפעולות שנבחרו או הפעולות הזמינות לכל כיתה
+    let availableOps;
+    if (mixedOps) {
+      // השתמש בפעולות שנבחרו
+      availableOps = Object.entries(mixedOps)
+        .filter(([op, selected]) => selected && op !== "fractions")
+        .map(([op]) => op);
+    } else {
+      // ברירת מחדל - כל הפעולות הזמינות
+      availableOps = GRADES[gradeKey].operations.filter(
+        (op) => op !== "mixed" && op !== "fractions"
+      );
+    }
+    
+    // אם אין פעולות נבחרות, נשתמש בברירת מחדל
+    if (availableOps.length === 0) {
+      availableOps = GRADES[gradeKey].operations.filter(
+        (op) => op !== "mixed" && op !== "fractions"
+      );
+    }
+    
     ops = availableOps[Math.floor(Math.random() * availableOps.length)];
   } else {
     ops = operation;
@@ -434,6 +451,7 @@ export default function MathMaster() {
   const headerRef = useRef(null);
   const gameRef = useRef(null);
   const controlsRef = useRef(null);
+  const operationSelectRef = useRef(null);
 
   const [mounted, setMounted] = useState(false);
 
@@ -442,7 +460,7 @@ export default function MathMaster() {
   const [mode, setMode] = useState("learning");
 
   const [level, setLevel] = useState("easy");
-  const [operation, setOperation] = useState("mixed");
+  const [operation, setOperation] = useState("addition"); // לא mixed כברירת מחדל כדי שה-modal לא יפתח אוטומטית
   const [gameActive, setGameActive] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [score, setScore] = useState(0);
@@ -499,6 +517,15 @@ export default function MathMaster() {
   // מצב story questions
   const [useStoryQuestions, setUseStoryQuestions] = useState(false);
   const [storyOnly, setStoryOnly] = useState(false); // שאלות מילוליות בלבד
+
+  // בחירת פעולות למיקס
+  const [showMixedSelector, setShowMixedSelector] = useState(false);
+  const [mixedOperations, setMixedOperations] = useState({
+    addition: true,
+    subtraction: true,
+    multiplication: false,
+    division: false,
+  });
 
   const [showMultiplicationTable, setShowMultiplicationTable] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -561,11 +588,32 @@ export default function MathMaster() {
 
   // לוודא שהפעולה שתבחר קיימת לכיתה שנבחרה
   useEffect(() => {
+    // אל תשנה אם ה-modal פתוח
+    if (showMixedSelector) return;
+    
     const allowed = GRADES[grade].operations;
     if (!allowed.includes(operation)) {
-      setOperation(allowed[0]);
+      // מצא את הפעולה הראשונה שזמינה (לא mixed)
+      const firstAllowed = allowed.find(op => op !== "mixed") || allowed[0];
+      setOperation(firstAllowed);
     }
-  }, [grade, operation]);
+  }, [grade]); // רק כשהכיתה משתנה, לא כשהפעולה משתנה
+
+  // עדכון mixedOperations לפי הכיתה
+  useEffect(() => {
+    const availableOps = GRADES[grade].operations.filter(
+      (op) => op !== "mixed" && op !== "fractions"
+    );
+    const newMixedOps = {
+      addition: availableOps.includes("addition"),
+      subtraction: availableOps.includes("subtraction"),
+      multiplication: availableOps.includes("multiplication"),
+      division: availableOps.includes("division"),
+    };
+    setMixedOperations(newMixedOps);
+  }, [grade]);
+
+  // לא צריך useEffect - ה-modal נפתח ישירות ב-onChange
 
   // בדיקה אם זה יום חדש לתחרות יומית
   useEffect(() => {
@@ -574,6 +622,8 @@ export default function MathMaster() {
       setDailyChallenge({ date: today, bestScore: 0, questions: 0 });
     }
   }, [dailyChallenge.date]);
+
+  // לא צריך event listener - ה-modal נפתח רק ב-onChange או דרך כפתור ⚙️
 
   // טעינת נתונים מ-localStorage
   useEffect(() => {
@@ -718,7 +768,8 @@ export default function MathMaster() {
         levelConfig,
         operation,
         grade,
-        useStoryQuestions || storyOnly // אם storyOnly מופעל, תמיד שאלות מילוליות
+        useStoryQuestions || storyOnly, // אם storyOnly מופעל, תמיד שאלות מילוליות
+        operation === "mixed" ? mixedOperations : null // העבר את הפעולות שנבחרו למיקס
       );
       attempts++;
 
@@ -1275,20 +1326,46 @@ export default function MathMaster() {
                     </option>
                   ))}
                 </select>
-                <select
-                  value={operation}
-                  onChange={(e) => {
-                    setOperation(e.target.value);
-                    setGameActive(false);
-                  }}
-                  className="h-9 px-3 rounded-lg bg-black/30 border border-white/20 text-white text-xs font-bold"
-                >
-                  {GRADES[grade].operations.map((op) => (
-                    <option key={op} value={op}>
-                      {getOperationName(op)}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-1">
+                  <select
+                    ref={operationSelectRef}
+                    value={operation}
+                    onChange={(e) => {
+                      const newOp = e.target.value;
+                      setGameActive(false);
+                      // אם בוחרים mixed, פתח את ה-modal לבחירת פעולות
+                      if (newOp === "mixed") {
+                        // עדכן את operation
+                        setOperation(newOp);
+                        // פתח את ה-modal מיד
+                        setShowMixedSelector(true);
+                      } else {
+                        setOperation(newOp);
+                        // סגור את ה-modal אם הוא היה פתוח
+                        setShowMixedSelector(false);
+                      }
+                    }}
+                    className="h-9 px-3 rounded-lg bg-black/30 border border-white/20 text-white text-xs font-bold flex-1"
+                  >
+                    {GRADES[grade].operations.map((op) => (
+                      <option key={op} value={op}>
+                        {getOperationName(op)}
+                      </option>
+                    ))}
+                  </select>
+                  {/* כפתור לפתיחת modal אם operation הוא mixed */}
+                  {operation === "mixed" && (
+                    <button
+                      onClick={() => {
+                        setShowMixedSelector(true);
+                      }}
+                      className="h-9 w-9 rounded-lg bg-blue-500/80 hover:bg-blue-500 border border-white/20 text-white text-xs font-bold flex items-center justify-center"
+                      title="ערוך פעולות למיקס"
+                    >
+                      ⚙️
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-2 mb-2 w-full max-w-md">
@@ -2148,6 +2225,115 @@ export default function MathMaster() {
                     className="px-6 py-2 rounded-lg bg-amber-500/80 hover:bg-amber-500 font-bold text-sm"
                   >
                     Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Mixed Operations Selector Modal */}
+          {showMixedSelector && (
+            <div
+              className="fixed inset-0 bg-black/80 flex items-center justify-center z-[200] p-4"
+              onClick={() => {
+                setShowMixedSelector(false);
+                // אם לא נבחרו פעולות, חזור לפעולה הקודמת
+                const hasSelected = Object.values(mixedOperations).some(
+                  (selected) => selected
+                );
+                if (!hasSelected && operation === "mixed") {
+                  const allowed = GRADES[grade].operations;
+                  setOperation(allowed.find(op => op !== "mixed") || allowed[0]);
+                }
+              }}
+            >
+              <div
+                className="bg-gradient-to-br from-[#080c16] to-[#0a0f1d] border-2 border-white/20 rounded-2xl p-6 max-w-md w-full"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="text-center mb-4">
+                  <h2 className="text-2xl font-extrabold text-white mb-2">
+                    🎲 בחר פעולות למיקס
+                  </h2>
+                  <p className="text-white/70 text-sm">
+                    בחר אילו פעולות לכלול במיקס
+                  </p>
+                </div>
+
+                <div className="space-y-3 mb-4">
+                  {GRADES[grade].operations
+                    .filter((op) => op !== "mixed" && op !== "fractions")
+                    .map((op) => (
+                      <label
+                        key={op}
+                        className="flex items-center gap-3 p-3 rounded-lg bg-black/30 border border-white/10 hover:bg-black/40 cursor-pointer transition-all"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={mixedOperations[op] || false}
+                          onChange={(e) => {
+                            setMixedOperations((prev) => ({
+                              ...prev,
+                              [op]: e.target.checked,
+                            }));
+                          }}
+                          className="w-5 h-5 rounded"
+                        />
+                        <span className="text-white font-semibold text-lg">
+                          {getOperationName(op)}
+                        </span>
+                      </label>
+                    ))}
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      // בחר הכל
+                      const availableOps = GRADES[grade].operations.filter(
+                        (op) => op !== "mixed" && op !== "fractions"
+                      );
+                      const allSelected = {};
+                      availableOps.forEach((op) => {
+                        allSelected[op] = true;
+                      });
+                      setMixedOperations(allSelected);
+                    }}
+                    className="flex-1 px-4 py-2 rounded-lg bg-blue-500/80 hover:bg-blue-500 font-bold text-sm"
+                  >
+                    הכל
+                  </button>
+                  <button
+                    onClick={() => {
+                      // בטל הכל
+                      const availableOps = GRADES[grade].operations.filter(
+                        (op) => op !== "mixed" && op !== "fractions"
+                      );
+                      const noneSelected = {};
+                      availableOps.forEach((op) => {
+                        noneSelected[op] = false;
+                      });
+                      setMixedOperations(noneSelected);
+                    }}
+                    className="flex-1 px-4 py-2 rounded-lg bg-gray-500/80 hover:bg-gray-500 font-bold text-sm"
+                  >
+                    בטל הכל
+                  </button>
+                  <button
+                    onClick={() => {
+                      // בדוק שיש לפחות פעולה אחת נבחרת
+                      const hasSelected = Object.values(mixedOperations).some(
+                        (selected) => selected
+                      );
+                      if (hasSelected) {
+                        setShowMixedSelector(false);
+                      } else {
+                        alert("אנא בחר לפחות פעולה אחת");
+                      }
+                    }}
+                    className="flex-1 px-4 py-2 rounded-lg bg-emerald-500/80 hover:bg-emerald-500 font-bold text-sm"
+                  >
+                    שמור
                   </button>
                 </div>
               </div>
