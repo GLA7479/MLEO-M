@@ -254,9 +254,9 @@ function generateQuestion(level, operation, gradeKey, useStory = false, mixedOps
       correctAnswer = a + b;
       if (useStory) {
         const stories = [
-          `יש לך ${a} תפוחים וקיבלת עוד ${b}. כמה תפוחים יש לך?`,
-          `בכיתה יש ${a} ילדים, הגיעו עוד ${b}. כמה ילדים יש עכשיו?`,
-          `יש לך ${a} כדורים, קנית עוד ${b}. כמה כדורים יש לך?`,
+          `יש לך ${a} תפוחים וקיבלת עוד ${b}. כמה תפוחים יש לך\u200F?`,
+          `בכיתה יש ${a} ילדים, הגיעו עוד ${b}. כמה ילדים יש עכשיו\u200F?`,
+          `יש לך ${a} כדורים, קנית עוד ${b}. כמה כדורים יש לך\u200F?`,
         ];
         question = stories[Math.floor(Math.random() * stories.length)];
       } else {
@@ -273,9 +273,9 @@ function generateQuestion(level, operation, gradeKey, useStory = false, mixedOps
       correctAnswer = a - b;
       if (useStory) {
         const stories = [
-          `היו לך ${a} ממתקים, אכלת ${b}. כמה נשאר?`,
-          `בקופסה היו ${a} צעצועים, הוצאת ${b}. כמה נשאר?`,
-          `היו ${a} בלונים, ${b} התפוצצו. כמה נשארו?`,
+          `היו לך ${a} ממתקים, אכלת ${b}. כמה נשאר\u200F?`,
+          `בקופסה היו ${a} צעצועים, הוצאת ${b}. כמה נשאר\u200F?`,
+          `היו ${a} בלונים, ${b} התפוצצו. כמה נשארו\u200F?`,
         ];
         question = stories[Math.floor(Math.random() * stories.length)];
       } else {
@@ -299,9 +299,9 @@ function generateQuestion(level, operation, gradeKey, useStory = false, mixedOps
       correctAnswer = a * b;
       if (useStory) {
         const stories = [
-          `יש לך ${a} קופסאות, בכל אחת ${b} כדורים. כמה כדורים יש?`,
-          `בכל שורה יש ${a} עציצים, יש ${b} שורות. כמה עציצים יש?`,
-          `כל ילד קיבל ${a} ממתקים, יש ${b} ילדים. כמה ממתקים בסך הכל?`,
+          `יש לך ${a} קופסאות, בכל אחת ${b} כדורים. כמה כדורים יש\u200F?`,
+          `בכל שורה יש ${a} עציצים, יש ${b} שורות. כמה עציצים יש\u200F?`,
+          `כל ילד קיבל ${a} ממתקים, יש ${b} ילדים. כמה ממתקים בסך הכל\u200F?`,
         ];
         question = stories[Math.floor(Math.random() * stories.length)];
       } else {
@@ -331,9 +331,9 @@ function generateQuestion(level, operation, gradeKey, useStory = false, mixedOps
       correctAnswer = quotient;
       if (useStory) {
         const stories = [
-          `יש לך ${a} ממתקים, אתה רוצה לחלק אותם שווה בשווה ל-${b} ילדים. כמה ממתקים כל ילד יקבל?`,
-          `יש ${a} כדורים, אתה רוצה לשים אותם ב-${b} קופסאות שוות. כמה כדורים בכל קופסה?`,
-          `יש לך ${a} ספרים, אתה רוצה לחלק אותם ל-${b} ערימות שוות. כמה ספרים בכל ערימה?`,
+          `יש לך ${a} ממתקים, אתה רוצה לחלק אותם שווה בשווה ל-${b} ילדים. כמה ממתקים כל ילד יקבל\u200F?`,
+          `יש ${a} כדורים, אתה רוצה לשים אותם ב-${b} קופסאות שוות. כמה כדורים בכל קופסה\u200F?`,
+          `יש לך ${a} ספרים, אתה רוצה לחלק אותם ל-${b} ערימות שוות. כמה ספרים בכל ערימה\u200F?`,
         ];
         question = stories[Math.floor(Math.random() * stories.length)];
       } else {
@@ -433,11 +433,11 @@ function getHint(question, operation) {
     case "addition":
       return `נסה לספור: ${question.a} + ${question.b}. אפשר להתחיל מ-${question.a} ולספור עוד ${question.b}`;
     case "subtraction":
-      return `כמה צריך להוסיף ל-${question.b} כדי להגיע ל-${question.a}?`;
+      return `כמה צריך להוסיף ל-${question.b} כדי להגיע ל-${question.a}\u200F?`;
     case "multiplication":
       return `${question.a} × ${question.b} = ${question.a} + ${question.a} + ... (${question.b} פעמים)`;
     case "division":
-      return `כמה פעמים ${question.b} נכנס ב-${question.a}?`;
+      return `כמה פעמים ${question.b} נכנס ב-${question.a}\u200F?`;
     default:
       return "נסה לחשוב על הפתרון צעד אחר צעד";
   }
@@ -1542,7 +1542,7 @@ export default function MathMaster() {
                     </div>
                   )}
                   
-                  <div className="text-4xl font-black text-white mb-4 text-center">
+                  <div className="text-4xl font-black text-white mb-4 text-center" dir="rtl" style={{ unicodeBidi: "bidi-override" }}>
                     {currentQuestion.question}
                   </div>
                   
