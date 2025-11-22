@@ -1817,8 +1817,8 @@ export default function MathMaster() {
                     </div>
                   )}
 
-                  {/* כפתור הסבר מלא */}
-                  {currentQuestion && (
+                  {/* כפתור הסבר מלא – רק במצב Learning */}
+                  {mode === "learning" && currentQuestion && (
                     <>
                       <button
                         onClick={() => setShowSolution((prev) => !prev)}
@@ -1828,14 +1828,12 @@ export default function MathMaster() {
                       </button>
 
                       {showSolution && (
-                        <div className="mb-3 px-4 py-2 rounded-lg bg-emerald-500/15 border border-emerald-400/40 text-emerald-100 text-sm text-right space-y-1 max-w-md">
+                        <div className="mb-3 px-4 py-2 rounded-lg bg-emerald-500/15 border border-emerald-400/40 text-emerald-100 text-sm space-y-1 max-w-md">
                           {getSolutionSteps(
                             currentQuestion,
                             currentQuestion.operation,
                             grade
-                          ).map((line, idx) => (
-                            <p key={idx}>{line}</p>
-                          ))}
+                          )}
                         </div>
                       )}
                     </>

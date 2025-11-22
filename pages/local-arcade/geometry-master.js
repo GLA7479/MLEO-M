@@ -349,7 +349,8 @@ function generateQuestion(level, topic, gradeKey, mixedOps = null) {
   };
 }
 
-function getHint(question, topic) {
+// פונקציה ליצירת רמז
+function getHint(question, topic, gradeKey) {
   if (!question || !question.params) return "";
   switch (topic) {
     case "area":
@@ -361,6 +362,10 @@ function getHint(question, topic) {
         return `שטח עיגול = π × רדיוס² = 3.14 × ${question.params.radius}²`;
       } else if (question.shape === "triangle") {
         return `שטח משולש = (בסיס × גובה) ÷ 2 = (${question.params.base} × ${question.params.height}) ÷ 2`;
+      } else if (question.shape === "parallelogram") {
+        return `שטח מקבילית = בסיס × גובה = ${question.params.base} × ${question.params.height}`;
+      } else if (question.shape === "trapezoid") {
+        return `שטח טרפז = ((בסיס1 + בסיס2) × גובה) ÷ 2 = ((${question.params.base1} + ${question.params.base2}) × ${question.params.height}) ÷ 2`;
       }
       break;
     case "perimeter":
@@ -370,6 +375,8 @@ function getHint(question, topic) {
         return `היקף מלבן = (אורך + רוחב) × 2 = (${question.params.length} + ${question.params.width}) × 2`;
       } else if (question.shape === "circle") {
         return `היקף עיגול = 2 × π × רדיוס = 2 × 3.14 × ${question.params.radius}`;
+      } else if (question.shape === "triangle") {
+        return `היקף משולש = צלע1 + צלע2 + צלע3 = ${question.params.side1} + ${question.params.side2} + ${question.params.side3}`;
       }
       break;
     case "volume":
@@ -377,6 +384,10 @@ function getHint(question, topic) {
         return `נפח קובייה = צלע³ = ${question.params.side}³`;
       } else if (question.shape === "cylinder") {
         return `נפח גליל = π × רדיוס² × גובה = 3.14 × ${question.params.radius}² × ${question.params.height}`;
+      } else if (question.shape === "sphere") {
+        return `נפח כדור = (4/3) × π × רדיוס³ = (4/3) × 3.14 × ${question.params.radius}³`;
+      } else if (question.shape === "rectangular_prism") {
+        return `נפח תיבה = אורך × רוחב × גובה = ${question.params.length} × ${question.params.width} × ${question.params.height}`;
       }
       break;
     case "angles":
@@ -387,6 +398,200 @@ function getHint(question, topic) {
       return "נסה לחשוב על הנוסחה המתאימה";
   }
   return "נסה לחשוב על הנוסחה המתאימה";
+}
+
+// הסבר מפורט צעד-אחר-צעד לפי נושא וכיתה
+function getSolutionSteps(question, topic, gradeKey) {
+  if (!question || !question.params) return [];
+  const { correctAnswer } = question;
+
+  switch (topic) {
+    case "area": {
+      if (question.shape === "square") {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: שטח ריבוע = צלע × צלע.</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: שטח = {question.params.side} × {question.params.side}.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.side} × {question.params.side} = {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות שטח.</span>,
+        ];
+      } else if (question.shape === "rectangle") {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: שטח מלבן = אורך × רוחב.</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: שטח = {question.params.length} × {question.params.width}.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.length} × {question.params.width} = {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות שטח.</span>,
+        ];
+      } else if (question.shape === "circle") {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: שטח עיגול = π × רדיוס².</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: שטח = 3.14 × {question.params.radius}².</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.radius}² = {question.params.radius * question.params.radius}, ואז 3.14 × {question.params.radius * question.params.radius} = {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות שטח.</span>,
+        ];
+      } else if (question.shape === "triangle") {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: שטח משולש = (בסיס × גובה) ÷ 2.</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: שטח = ({question.params.base} × {question.params.height}) ÷ 2.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.base} × {question.params.height} = {question.params.base * question.params.height}, ואז {question.params.base * question.params.height} ÷ 2 = {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות שטח.</span>,
+        ];
+      } else if (question.shape === "parallelogram") {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: שטח מקבילית = בסיס × גובה.</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: שטח = {question.params.base} × {question.params.height}.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.base} × {question.params.height} = {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות שטח.</span>,
+        ];
+      } else if (question.shape === "trapezoid") {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: שטח טרפז = ((בסיס1 + בסיס2) × גובה) ÷ 2.</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: שטח = (({question.params.base1} + {question.params.base2}) × {question.params.height}) ÷ 2.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.base1} + {question.params.base2} = {question.params.base1 + question.params.base2}, ואז ({question.params.base1 + question.params.base2} × {question.params.height}) ÷ 2 = {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות שטח.</span>,
+        ];
+      }
+      break;
+    }
+
+    case "perimeter": {
+      if (question.shape === "square") {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: היקף ריבוע = צלע × 4.</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: היקף = {question.params.side} × 4.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.side} × 4 = {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות אורך.</span>,
+        ];
+      } else if (question.shape === "rectangle") {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: היקף מלבן = (אורך + רוחב) × 2.</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: היקף = ({question.params.length} + {question.params.width}) × 2.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.length} + {question.params.width} = {question.params.length + question.params.width}, ואז {question.params.length + question.params.width} × 2 = {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות אורך.</span>,
+        ];
+      } else if (question.shape === "circle") {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: היקף עיגול = 2 × π × רדיוס.</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: היקף = 2 × 3.14 × {question.params.radius}.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: 2 × 3.14 = 6.28, ואז 6.28 × {question.params.radius} = {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות אורך.</span>,
+        ];
+      } else if (question.shape === "triangle") {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: היקף משולש = צלע1 + צלע2 + צלע3.</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: היקף = {question.params.side1} + {question.params.side2} + {question.params.side3}.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.side1} + {question.params.side2} + {question.params.side3} = {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות אורך.</span>,
+        ];
+      }
+      break;
+    }
+
+    case "volume": {
+      if (question.shape === "cube") {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: נפח קובייה = צלע³.</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: נפח = {question.params.side}³.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.side} × {question.params.side} × {question.params.side} = {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות נפח.</span>,
+        ];
+      } else if (question.shape === "cylinder") {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: נפח גליל = π × רדיוס² × גובה.</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: נפח = 3.14 × {question.params.radius}² × {question.params.height}.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.radius}² = {question.params.radius * question.params.radius}, ואז 3.14 × {question.params.radius * question.params.radius} × {question.params.height} = {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות נפח.</span>,
+        ];
+      } else if (question.shape === "sphere") {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: נפח כדור = (4/3) × π × רדיוס³.</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: נפח = (4/3) × 3.14 × {question.params.radius}³.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.radius}³ = {question.params.radius * question.params.radius * question.params.radius}, ואז (4/3) × 3.14 × {question.params.radius * question.params.radius * question.params.radius} = {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות נפח.</span>,
+        ];
+      } else if (question.shape === "rectangular_prism") {
+        return [
+          <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את הנוסחה: נפח תיבה = אורך × רוחב × גובה.</span>,
+          <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: נפח = {question.params.length} × {question.params.width} × {question.params.height}.</span>,
+          <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {question.params.length} × {question.params.width} × {question.params.height} = {correctAnswer}.</span>,
+          <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: {correctAnswer} יחידות נפח.</span>,
+        ];
+      }
+      break;
+    }
+
+    case "angles": {
+      return [
+        <span key="1" dir="ltr" style={{ display: "block" }}>1. נזכור: סכום הזוויות במשולש תמיד שווה ל-180°.</span>,
+        <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: זווית1 = {question.params?.angle1 || 0}°, זווית2 = {question.params?.angle2 || 0}°.</span>,
+        <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: זווית3 = 180° - ({question.params?.angle1 || 0}° + {question.params?.angle2 || 0}°) = 180° - {(question.params?.angle1 || 0) + (question.params?.angle2 || 0)}° = {correctAnswer}°.</span>,
+        <span key="4" dir="ltr" style={{ display: "block" }}>4. התוצאה: הזווית השלישית היא {correctAnswer}°.</span>,
+      ];
+    }
+
+    case "pythagoras": {
+      const a = question.params?.a || 0;
+      const b = question.params?.b || 0;
+      const aSquared = a * a;
+      const bSquared = b * b;
+      const sum = aSquared + bSquared;
+      return [
+        <span key="1" dir="ltr" style={{ display: "block" }}>1. נכתוב את משפט פיתגורס: a² + b² = c² (כאשר c הוא היתר).</span>,
+        <span key="2" dir="ltr" style={{ display: "block" }}>2. נציב את הערכים: {a}² + {b}² = c².</span>,
+        <span key="3" dir="ltr" style={{ display: "block" }}>3. נחשב: {a}² = {aSquared}, {b}² = {bSquared}.</span>,
+        <span key="4" dir="ltr" style={{ display: "block" }}>4. נחבר: {aSquared} + {bSquared} = {sum}.</span>,
+        <span key="5" dir="ltr" style={{ display: "block" }}>5. נוציא שורש: c = √{sum} = {correctAnswer}.</span>,
+      ];
+    }
+
+    default:
+      return [];
+  }
+  return [];
+}
+
+// "למה טעיתי?" – הסבר קצר לטעות נפוצה
+function getErrorExplanation(question, topic, wrongAnswer, gradeKey) {
+  if (!question) return "";
+  const userAnsNum = Number(wrongAnswer);
+  const correctNum = Number(question.correctAnswer);
+
+  switch (topic) {
+    case "area":
+      if (!Number.isNaN(userAnsNum) && userAnsNum < correctNum) {
+        return "נראה ששכחת לכפול או לחלק. בדוק שוב את הנוסחה – האם כפלת/חלקת את כל המספרים?";
+      }
+      if (!Number.isNaN(userAnsNum) && userAnsNum > correctNum) {
+        return "נראה שהוספת במקום לכפול, או שכחת לחלק. בדוק שוב את הנוסחה.";
+      }
+      return "בדוק שוב: האם השתמשת בנוסחה הנכונה? זכור: שטח ריבוע = צלע × צלע, שטח מלבן = אורך × רוחב, שטח משולש = (בסיס × גובה) ÷ 2.";
+
+    case "perimeter":
+      if (!Number.isNaN(userAnsNum) && userAnsNum < correctNum) {
+        return "נראה ששכחת לכפול ב-2 (במלבן) או ב-4 (בריבוע), או ששכחת צלע אחת. בדוק שוב.";
+      }
+      return "בדוק שוב: האם חיברת את כל הצלעות? זכור: היקף ריבוע = צלע × 4, היקף מלבן = (אורך + רוחב) × 2.";
+
+    case "volume":
+      if (!Number.isNaN(userAnsNum) && userAnsNum < correctNum) {
+        return "נראה ששכחת לכפול באחד הממדים. בדוק שוב את הנוסחה – האם כפלת את כל הממדים?";
+      }
+      return "בדוק שוב: האם השתמשת בנוסחה הנכונה? זכור: נפח קובייה = צלע³, נפח תיבה = אורך × רוחב × גובה.";
+
+    case "angles":
+      if (!Number.isNaN(userAnsNum) && userAnsNum > correctNum) {
+        return "נראה שהוספת במקום לחסר. זכור: סכום הזוויות במשולש = 180°, אז הזווית השלישית = 180° - (זווית1 + זווית2).";
+      }
+      return "בדוק שוב: סכום הזוויות במשולש תמיד שווה ל-180°. חסר את שתי הזוויות מ-180° כדי למצוא את השלישית.";
+
+    case "pythagoras":
+      if (!Number.isNaN(userAnsNum) && userAnsNum < correctNum) {
+        return "נראה ששכחת להוציא שורש, או שכחת לכפול אחד המספרים בעצמו. זכור: a² + b² = c², אז c = √(a² + b²).";
+      }
+      return "בדוק שוב: משפט פיתגורס אומר a² + b² = c². חשב את a² ו-b², חבר אותם, ואז הוצא שורש.";
+
+    default:
+      return "";
+  }
 }
 
 export default function GeometryMaster() {
@@ -439,6 +644,12 @@ export default function GeometryMaster() {
   });
   const [showHint, setShowHint] = useState(false);
   const [hintUsed, setHintUsed] = useState(false);
+
+  // הסבר מפורט לשאלה
+  const [showSolution, setShowSolution] = useState(false);
+
+  // הסבר לטעות אחרונה
+  const [errorExplanation, setErrorExplanation] = useState("");
   const [showMixedSelector, setShowMixedSelector] = useState(false);
   const [mixedTopics, setMixedTopics] = useState({
     area: true,
@@ -672,6 +883,8 @@ export default function GeometryMaster() {
     setQuestionStartTime(Date.now());
     setShowHint(false);
     setHintUsed(false);
+    setShowSolution(false);
+    setErrorExplanation("");
   }
 
   function startGame() {
@@ -691,6 +904,8 @@ export default function GeometryMaster() {
     setHintUsed(false);
     setShowBadge(null);
     setShowLevelUp(false);
+    setShowSolution(false);
+    setErrorExplanation("");
     if (mode === "challenge") {
       setTimeLeft(20);
     } else if (mode === "speed") {
@@ -745,6 +960,8 @@ export default function GeometryMaster() {
       setScore((prev) => prev + points);
       setStreak((prev) => prev + 1);
       setCorrect((prev) => prev + 1);
+      
+      setErrorExplanation("");
       const top = currentQuestion.topic;
       setProgress((prev) => ({
         ...prev,
@@ -855,6 +1072,16 @@ export default function GeometryMaster() {
     } else {
       setWrong((prev) => prev + 1);
       setStreak(0);
+      
+      setErrorExplanation(
+        getErrorExplanation(
+          currentQuestion,
+          currentQuestion.topic,
+          answer,
+          grade
+        )
+      );
+      
       const top = currentQuestion.topic;
       setProgress((prev) => ({
         ...prev,
@@ -1273,7 +1500,12 @@ export default function GeometryMaster() {
                       : "bg-red-500/20 text-red-200"
                   }`}
                 >
-                  {feedback}
+                  <div>{feedback}</div>
+                  {errorExplanation && (
+                    <div className="mt-1 text-xs text-red-100/90 font-normal" dir="ltr">
+                      {errorExplanation}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1300,9 +1532,31 @@ export default function GeometryMaster() {
                   )}
 
                   {showHint && (
-                    <div className="mb-2 px-4 py-2 rounded-lg bg-blue-500/20 border border-blue-400/50 text-blue-200 text-sm text-center max-w-md">
-                      {getHint(currentQuestion, currentQuestion.topic)}
+                    <div className="mb-2 px-4 py-2 rounded-lg bg-blue-500/20 border border-blue-400/50 text-blue-200 text-sm text-center max-w-md" dir="ltr">
+                      {getHint(currentQuestion, currentQuestion.topic, grade)}
                     </div>
+                  )}
+
+                  {/* כפתור הסבר מלא – רק במצב Learning */}
+                  {mode === "learning" && currentQuestion && (
+                    <>
+                      <button
+                        onClick={() => setShowSolution((prev) => !prev)}
+                        className="mb-2 px-4 py-2 rounded-lg bg-emerald-500/80 hover:bg-emerald-500 text-sm font-bold"
+                      >
+                        📘 הסבר מלא
+                      </button>
+
+                      {showSolution && (
+                        <div className="mb-3 px-4 py-2 rounded-lg bg-emerald-500/15 border border-emerald-400/40 text-emerald-100 text-sm space-y-1 max-w-md">
+                          {getSolutionSteps(
+                            currentQuestion,
+                            currentQuestion.topic,
+                            grade
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <div className="grid grid-cols-2 gap-3 w-full mb-3">
