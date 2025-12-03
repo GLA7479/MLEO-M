@@ -29,8 +29,6 @@ const LS_KEYS = {
   MASTERY: "mleo_rush_mastery_v4",
 };
 
-const OTHER_GAME_CORE_KEY = "mleoMiningEconomy_v2.1"; // MLEO-MINERS
-
 const ENV = {
   CLAIM_CHAIN_ID: Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97),
   CLAIM_ADDRESS: (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || process.env.NEXT_PUBLIC_CLAIM_ADDRESS || "").trim(),
@@ -268,12 +266,123 @@ function usePresenceAndMining(getMultiplier, liveModifierMult) {
     sessRef.current = sess; // Keep ref in sync
   }, [sess]);
 
-  // Init: schedule modifiers & chest
+  // Init: schedule modifiers & chest + handle offline earnings
   useEffect(() => {
-    if (core.offlineStart && core.offlineStart > 0) setCore(c => ({ ...c, mode: "offline" }));
+    const savedCore = safeRead(LS_KEYS.CORE, initialCore);
+    const now = Date.now();
+    
+    // אם היה במצב אופליין כשסגרנו את הדף, לחשב את הרווחים
+    if (savedCore.mode === "offline" && savedCore.offlineStart > 0) {
+      const elapsedMs = now - savedCore.offlineStart;
+      const capped = Math.min(elapsedMs, CONFIG.OFFLINE_MAX_HOURS * 3600 * 1000);
+      const hours = capped / 3600000;
+      
+      // חישוב המכפיל
+      const mult = upgradesMultiplier(
+        savedCore.upgrades || {}, 
+        savedCore.guild || null, 
+        1 + ((savedCore.prestigePoints || 0) * CONFIG.PRESTIGE_MULT_PER_POINT)
+      );
+      
+      const perHour = CONFIG.ONLINE_BASE_RATE * CONFIG.OFFLINE_RATE_FACTOR * mult;
+      const earned = Math.floor(perHour * hours);
+      
+      if (earned > 0) {
+        setCore(c => ({
+          ...c,
+          miningPool: (c.miningPool || 0) + earned,
+          totalMined: (c.totalMined || 0) + earned,
+          mode: "online",
+          offlineStart: 0,
+          lastActiveAt: now
+        }));
+      } else {
+        setCore(c => ({ 
+          ...c, 
+          mode: "online", 
+          offlineStart: 0, 
+          lastActiveAt: now 
+        }));
+      }
+    } else if (savedCore.lastActiveAt && (now - savedCore.lastActiveAt) > CONFIG.IDLE_TO_OFFLINE_MS) {
+      // אם עבר זמן רב מאז הפעילות האחרונה, להתחיל במצב אופליין
+      const elapsedMs = now - savedCore.lastActiveAt;
+      const capped = Math.min(elapsedMs, CONFIG.OFFLINE_MAX_HOURS * 3600 * 1000);
+      const hours = capped / 3600000;
+      
+      const mult = upgradesMultiplier(
+        savedCore.upgrades || {}, 
+        savedCore.guild || null, 
+        1 + ((savedCore.prestigePoints || 0) * CONFIG.PRESTIGE_MULT_PER_POINT)
+      );
+      
+      const perHour = CONFIG.ONLINE_BASE_RATE * CONFIG.OFFLINE_RATE_FACTOR * mult;
+      const earned = Math.floor(perHour * hours);
+      
+      if (earned > 0) {
+        setCore(c => ({
+          ...c,
+          miningPool: (c.miningPool || 0) + earned,
+          totalMined: (c.totalMined || 0) + earned,
+          mode: "online",
+          offlineStart: 0,
+          lastActiveAt: now
+        }));
+      }
+    }
+    
     resetIdleTimer();
     scheduleNextModifier(setSess);
     maybeSpawnChest(setSess);
+    
+    // טיפול ב-visibility change - שמירת זמן כשיוצאים מהדף
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        // יוצאים מהדף - שמירת זמן
+        setCore(c => {
+          if (c.mode === "online") {
+            return { ...c, lastActiveAt: Date.now() };
+          }
+          return c;
+        });
+      } else if (document.visibilityState === "visible") {
+        // חוזרים לדף - בדיקה אם צריך לחשב רווחים אופליין
+        const currentCore = safeRead(LS_KEYS.CORE, initialCore);
+        const now = Date.now();
+        const timeSinceLastActive = now - (currentCore.lastActiveAt || now);
+        
+        if (timeSinceLastActive > CONFIG.IDLE_TO_OFFLINE_MS && currentCore.mode === "online") {
+          const capped = Math.min(timeSinceLastActive, CONFIG.OFFLINE_MAX_HOURS * 3600 * 1000);
+          const hours = capped / 3600000;
+          
+          const mult = upgradesMultiplier(
+            currentCore.upgrades || {}, 
+            currentCore.guild || null, 
+            1 + ((currentCore.prestigePoints || 0) * CONFIG.PRESTIGE_MULT_PER_POINT)
+          );
+          
+          const perHour = CONFIG.ONLINE_BASE_RATE * CONFIG.OFFLINE_RATE_FACTOR * mult;
+          const earned = Math.floor(perHour * hours);
+          
+          if (earned > 0) {
+            setCore(c => ({
+              ...c,
+              miningPool: (c.miningPool || 0) + earned,
+              totalMined: (c.totalMined || 0) + earned,
+              lastActiveAt: now
+            }));
+          } else {
+            setCore(c => ({ ...c, lastActiveAt: now }));
+          }
+        }
+      }
+    };
+    
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
     // eslint-disable-next-line
   }, []);
 
@@ -641,49 +750,6 @@ export default function MLEOTokenRushPage() {
   // Guild
   const { joinRandomGuild, leaveGuild } = useGuildActions(setCore);
 
-  // Bridge
-  const [bridgeAmount, setBridgeAmount] = useState("");
-  const [otherVault, setOtherVault] = useState(() => {
-    const other = safeRead(OTHER_GAME_CORE_KEY, null);
-    return other && typeof other.vault === "number" ? other.vault : 0;
-  });
-
-  const refreshOtherVault = () => {
-    const other = safeRead(OTHER_GAME_CORE_KEY, null);
-    setOtherVault(other && typeof other.vault === "number" ? other.vault : 0);
-  };
-
-  const bridgeFromOther = () => {
-    const amt = Math.max(0, Math.floor(Number(bridgeAmount) || 0));
-    if (amt <= 0) { showToast("❌ Enter a positive amount"); return; }
-    
-    const minersData = localStorage.getItem(OTHER_GAME_CORE_KEY);
-    if (!minersData) { showToast("❌ No MLEO-MINERS data found"); return; }
-    
-    const minersState = JSON.parse(minersData);
-    const available = Number((minersState?.vault || 0).toFixed(2));
-    
-    if (amt > available) { showToast("❌ Not enough balance in MLEO-MINERS"); return; }
-    
-    const newMinersState = {
-      ...minersState,
-      vault: Number((available - amt).toFixed(2)),
-      history: Array.isArray(minersState.history) ? minersState.history : []
-    };
-    newMinersState.history.unshift({ 
-      t: Date.now(), 
-      kind: 'bridge_to_rush', 
-      amount: amt 
-    });
-    
-    localStorage.setItem(OTHER_GAME_CORE_KEY, JSON.stringify(newMinersState));
-    
-    setCore(c => ({ ...c, vault: c.vault + amt }));
-    setBridgeAmount(""); 
-    setOtherVault(available - amt);
-    showToast(`✅ Bridged ${fmt(amt)} MLEO from MINERS!`);
-  };
-
   // Actions
   const collectMined = () => {
     const amt = Math.floor(core.miningPool || 0);
@@ -909,13 +975,37 @@ export default function MLEOTokenRushPage() {
       showToast("⏳ Preparing transaction...");
 
       console.log("🔵 Simulating contract call...");
-    const { request } = await publicClient.simulateContract({
-      address: ENV.CLAIM_ADDRESS,
-      abi: CLAIM_ABI_V3,
-      functionName: "claim",
-        args: [GAME_ID_BI, units],
-      account: address,
-    });
+      
+      // Try to simulate the contract call first
+      let request;
+      try {
+        const simulateResult = await publicClient.simulateContract({
+          address: ENV.CLAIM_ADDRESS,
+          abi: CLAIM_ABI_V3,
+          functionName: "claim",
+          args: [GAME_ID_BI, units],
+          account: address,
+        });
+        request = simulateResult.request;
+      } catch (simulateErr) {
+        // Handle simulation errors (like daily cap)
+        const errMsg = String(simulateErr?.shortMessage || simulateErr?.message || simulateErr || "");
+        console.error("❌ Simulation error:", errMsg);
+        
+        if (errMsg.includes("daily cap") || errMsg.includes("Daily cap") || errMsg.includes("DAILY_CAP")) {
+          showToast("⚠️ Daily claim limit reached! Try a smaller amount or wait until tomorrow.");
+          return;
+        } else if (errMsg.includes("insufficient") || errMsg.includes("balance")) {
+          showToast("❌ Insufficient balance or daily limit reached");
+          return;
+        } else if (errMsg.includes("cap") || errMsg.includes("limit")) {
+          showToast("⚠️ Claim limit reached! Please try a smaller amount.");
+          return;
+        } else {
+          // Re-throw if it's not a known error
+          throw simulateErr;
+        }
+      }
 
       console.log("🔵 Writing contract...");
       showToast("⏳ Please confirm in wallet...");
@@ -962,11 +1052,19 @@ export default function MLEOTokenRushPage() {
       console.error("❌ Claim error:", err);
       const msg = String(err?.shortMessage || err?.message || err);
       
-      // Don't show confusing technical errors
+      // Handle specific error cases
       if (msg.includes("User rejected") || msg.includes("user rejected")) {
         showToast("❌ Transaction cancelled");
+      } else if (msg.includes("daily cap") || msg.includes("Daily cap") || msg.includes("DAILY_CAP")) {
+        showToast("⚠️ Daily claim limit reached! Try again tomorrow or claim a smaller amount.");
+      } else if (msg.includes("insufficient") || msg.includes("balance")) {
+        showToast("❌ Insufficient balance or daily limit reached");
+      } else if (msg.includes("cap") || msg.includes("limit")) {
+        showToast("⚠️ Claim limit reached! Please try a smaller amount or wait until tomorrow.");
       } else if (!/Cannot convert undefined to a BigInt/i.test(msg)) {
-        showToast(`❌ Error: ${msg.slice(0, 50)}`);
+        // Show user-friendly error message
+        const errorMsg = msg.length > 60 ? msg.slice(0, 60) + "..." : msg;
+        showToast(`❌ Error: ${errorMsg}`);
       }
     } finally {
       claimingRef.current = false;
@@ -1033,22 +1131,22 @@ export default function MLEOTokenRushPage() {
 
           {/* TOP STATS */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-  <Stat
+            <Stat
               label="Mining Status"
     value={
                 <span className={`inline-flex items-center gap-2 ${core.mode === "online" ? "text-emerald-400" : "text-amber-400"}`}>
                   <span className={`w-3 h-3 rounded-full animate-pulse ${core.mode === "online" ? "bg-emerald-400" : "bg-amber-400"}`} />
-        {core.mode.toUpperCase()}
+        {core.mode === "online" ? "ONLINE" : "OFFLINE"}
       </span>
     }
-              sub={core.mode === "online" ? "Active mining" : "Offline (reduced rate)"}
+              sub={core.mode === "online" ? "⛏️ Mining actively" : "💤 Idle (60% rate, max 12h)"}
               onInfo={() => setInfoModal('mining_status')}
             />
 
             <Stat 
               label="Mining Pool" 
               value={fmt(core.miningPool)} 
-              sub="Click COLLECT to claim"
+              sub={core.miningPool > 0 ? "💰 Click COLLECT to add to Vault" : "Accumulating from mining..."}
               onInfo={() => setInfoModal('mining_pool')}
             />
 
@@ -1174,8 +1272,22 @@ export default function MLEOTokenRushPage() {
         </button>
       </div>
 
-              <div className="mt-3 text-xs opacity-60">
-                Collect your mined MLEO to the vault. Use it for upgrades or claim to your wallet.
+              <div className="mt-3 space-y-2">
+                <div className="p-3 rounded-lg bg-emerald-600/10 border border-emerald-500/20">
+                  <div className="text-xs font-semibold text-emerald-400 mb-1">💡 How it works:</div>
+                  <div className="text-xs opacity-80 space-y-1">
+                    <div>• <strong>Mining Pool</strong> = MLEO accumulating from mining (click COLLECT to move to Vault)</div>
+                    <div>• <strong>Vault</strong> = Your main balance (use for upgrades or claim to wallet)</div>
+                    <div>• Stay <strong>ONLINE</strong> for maximum mining speed (100% rate)</div>
+                    <div>• <strong>OFFLINE</strong> mode gives 60% rate, max 12 hours</div>
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg bg-amber-600/10 border border-amber-500/20">
+                  <div className="text-xs font-semibold text-amber-400 mb-1">⚠️ Daily Claim Limit:</div>
+                  <div className="text-xs opacity-80">
+                    There is a daily limit on wallet claims. If you see "daily cap" error, try a smaller amount or wait until tomorrow.
+                  </div>
+                </div>
       </div>
             </Section>
 
@@ -1209,43 +1321,8 @@ export default function MLEOTokenRushPage() {
   </Section>
           </div>
 
-          {/* BRIDGE + GUILD - Same Row */}
-          <div className="grid lg:grid-cols-2 gap-4 mb-6">
-            {/* BRIDGE */}
-            <Section 
-              title="🌉 Bridge from MINERS"
-              onInfo={() => setInfoModal('bridge')}
-            >
-              <div className="flex flex-col gap-2">
-                <div className="text-xs opacity-60">
-                  MINERS Vault: <span className="font-semibold text-emerald-400">{fmt(otherVault)}</span>
-                  <button className="ml-2 underline" onClick={refreshOtherVault}>↻</button>
-                </div>
-                <div className="flex gap-2">
-                  <input 
-                    type="number" 
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                    value={bridgeAmount} 
-                    onChange={e=>setBridgeAmount(e.target.value)} 
-                    placeholder="Amount" 
-                    min="0" 
-                  />
-                  <button
-                    onClick={bridgeFromOther} 
-                    disabled={(Number(bridgeAmount)||0) <= 0}
-                    className={`px-4 py-2 rounded-lg font-bold text-white transition-all text-sm whitespace-nowrap ${
-                      (Number(bridgeAmount)||0) <= 0
-                        ? "bg-zinc-700 cursor-not-allowed opacity-50" 
-                        : "bg-gradient-to-r from-teal-600 to-cyan-500 hover:from-teal-500 hover:to-cyan-400"
-                    }`}
-                  >
-                    Bridge
-        </button>
-      </div>
-    </div>
-  </Section>
-
-            {/* GUILD */}
+          {/* GUILD */}
+          <div className="mb-6">
             <Section 
               title="👥 Mining Guild"
               onInfo={() => setInfoModal('guild')}
@@ -1435,11 +1512,17 @@ export default function MLEOTokenRushPage() {
 
           {/* INFO MODALS */}
           <InfoModal isOpen={infoModal === 'vault'} onClose={() => setInfoModal(null)} title="💰 MLEO Vault">
-            <p><strong>Mining Pool:</strong> Accumulates passively from your mining operations.</p>
-            <p><strong>COLLECT MINED:</strong> Transfers your Mining Pool into the Vault.</p>
-            <p><strong>Vault:</strong> Your main MLEO balance. Use it to buy upgrades or claim to your wallet.</p>
-            <p><strong>CLAIM TO WALLET:</strong> Sends MLEO to your connected wallet on the blockchain (requires gas fees).</p>
-            <p className="mt-3 text-amber-400"><strong>⚡ BOOST Button:</strong> When online, clicking boosts your mining speed by +2% per click. When offline, it resumes mining and collects your offline earnings (max 12 hours).</p>
+            <p><strong>📊 Two-Step System:</strong></p>
+            <ol className="list-decimal pl-5 space-y-2 mt-2">
+              <li><strong>Mining Pool</strong> - MLEO accumulates here automatically from mining</li>
+              <li><strong>Vault</strong> - Your main balance after clicking "COLLECT MINED"</li>
+            </ol>
+            <p className="mt-3"><strong>💰 COLLECT MINED:</strong> Transfers all MLEO from Mining Pool to Vault.</p>
+            <p><strong>🔗 CLAIM TO WALLET:</strong> Sends MLEO from Vault to your connected blockchain wallet (requires gas fees).</p>
+            <p className="mt-3 p-3 rounded-lg bg-amber-600/10 border border-amber-500/20">
+              <strong className="text-amber-400">⚠️ Daily Claim Limit:</strong> There is a daily limit on how much MLEO you can claim to your wallet. If you see "daily cap" error, try claiming a smaller amount or wait until tomorrow.
+            </p>
+            <p className="mt-3 text-emerald-400"><strong>💡 Use Vault MLEO for:</strong> Buying upgrades, claiming to wallet, or saving for prestige!</p>
           </InfoModal>
 
           <InfoModal isOpen={infoModal === 'gifts'} onClose={() => setInfoModal(null)} title="🎁 Gifts & Bonuses">
@@ -1447,13 +1530,6 @@ export default function MLEOTokenRushPage() {
             <p><strong>Daily Bonus:</strong> Claim once per day. Streak increases reward amount (up to 7 days).</p>
             <p><strong>Time Chest:</strong> Spawns randomly every 20-40 minutes. You have 60 seconds to claim it!</p>
             <p><strong>Events:</strong> Random modifiers appear every 15 minutes for 5 minutes (×2 Gifts, +30% Mining, -25% Upgrade costs, etc.)</p>
-          </InfoModal>
-
-          <InfoModal isOpen={infoModal === 'bridge'} onClose={() => setInfoModal(null)} title="🌉 Bridge">
-            <p><strong>What is Bridge?</strong> Transfer MLEO tokens from your MLEO-MINERS game to this game's vault.</p>
-            <p><strong>Why use it?</strong> If you have MLEO in the other game, you can move it here to buy upgrades faster.</p>
-            <p><strong>How it works:</strong> Enter amount → Click BRIDGE → Tokens are moved from MINERS vault to RUSH vault.</p>
-            <p className="text-amber-400"><strong>⚠️ Note:</strong> This is a one-way transfer. Tokens moved here cannot be moved back automatically.</p>
           </InfoModal>
 
           <InfoModal isOpen={infoModal === 'upgrades'} onClose={() => setInfoModal(null)} title="⬆️ Upgrades">
@@ -1496,17 +1572,22 @@ export default function MLEOTokenRushPage() {
           </InfoModal>
 
           <InfoModal isOpen={infoModal === 'mining_status'} onClose={() => setInfoModal(null)} title="⛏️ Mining Status">
-            <p><strong>ONLINE:</strong> Active mining at full speed with all bonuses applied.</p>
-            <p><strong>OFFLINE:</strong> Reduced mining rate (50% of online speed) with a 12-hour cap.</p>
-            <p><strong>Switch:</strong> Click the BOOST button to toggle between online/offline modes.</p>
-            <p className="text-emerald-400 mt-2"><strong>💡 Tip:</strong> Stay online for maximum mining efficiency!</p>
+            <p><strong>🟢 ONLINE:</strong> Active mining at 100% speed with all bonuses applied. Best for maximum earnings!</p>
+            <p><strong>🟡 OFFLINE:</strong> Reduced mining rate (60% of online speed) when inactive. Maximum 12 hours of offline earnings.</p>
+            <p><strong>⚡ BOOST Button:</strong> When online, click to boost mining speed. When offline, click to resume and collect offline earnings.</p>
+            <p className="text-emerald-400 mt-2"><strong>💡 Tip:</strong> Stay online for maximum mining efficiency! Offline mode is automatic after 5 minutes of inactivity.</p>
           </InfoModal>
 
           <InfoModal isOpen={infoModal === 'mining_pool'} onClose={() => setInfoModal(null)} title="⛏️ Mining Pool">
-            <p><strong>Mining Pool</strong> accumulates MLEO from your passive mining operations.</p>
-            <p><strong>Collection:</strong> Click "COLLECT MINED" to transfer all accumulated MLEO to your Vault.</p>
-            <p><strong>Rate:</strong> Mining speed depends on your upgrades, guild bonus, and prestige multiplier.</p>
-            <p className="text-blue-400 mt-2"><strong>💡 Tip:</strong> Collect regularly to avoid losing progress!</p>
+            <p><strong>Mining Pool</strong> accumulates MLEO from your passive mining operations in real-time.</p>
+            <p><strong>How it works:</strong></p>
+            <ul className="list-disc pl-5 space-y-1 mt-2">
+              <li>MLEO accumulates here automatically while you play</li>
+              <li>Click <strong>"COLLECT MINED"</strong> to transfer all accumulated MLEO to your Vault</li>
+              <li>Mining speed depends on: upgrades, guild bonus, prestige multiplier, and boost</li>
+              <li>Online mode: 100% rate | Offline mode: 60% rate (max 12 hours)</li>
+            </ul>
+            <p className="text-blue-400 mt-2"><strong>💡 Tip:</strong> Collect regularly to use MLEO for upgrades or claim to wallet!</p>
           </InfoModal>
 
           <InfoModal isOpen={infoModal === 'total_mined'} onClose={() => setInfoModal(null)} title="📊 Total Mined">
