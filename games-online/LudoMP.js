@@ -1362,6 +1362,7 @@ function LudoVsBot({ vault, onBackToMode }) {
   const [deadline, setDeadline] = useState(null);
   const [seatModal, setSeatModal] = useState(null);
   const [diceSeatOwner, setDiceSeatOwner] = useState(null);
+  const [autoRoll, setAutoRoll] = useState(false);
   const dicePresenceRef = useRef(false);
   const diceSeatDelayRef = useRef(null);
 
