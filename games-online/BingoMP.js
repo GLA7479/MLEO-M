@@ -440,8 +440,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       })
       .eq("id", ses.id)
       .eq("stage", "lobby")
-      .select()
-      .single();
+      .select();
 
     if (error) {
       console.error(error);
@@ -449,12 +448,19 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       return;
     }
 
-    if (!data) {
+    if (!data || data.length === 0) {
+      // מישהו כבר התחיל / כבר playing -> תטען את הסשן הקיים במקום לזרוק שגיאה
+      const { data: fresh } = await supabase
+        .from("bingo_sessions")
+        .select("*")
+        .eq("id", ses.id)
+        .single();
+      if (fresh) setSes(fresh);
       setMsg("Game already started");
       return;
     }
 
-    setSes(data);
+    setSes(data[0]);
     setPlayers(freshPlayers || []);
     setMsg("");
   }, [ses?.id, entryFee]);
@@ -620,15 +626,14 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     if (ses.stage !== "playing") return;
 
     const interval = setInterval(async () => {
-      // always read fresh state from DB to avoid getting stuck on old state
-      const { data: fresh, error: readErr } = await supabase
+      // קרא מצב טרי
+      const { data: fresh } = await supabase
         .from("bingo_sessions")
         .select("id, stage, deck, deck_pos, called")
         .eq("id", ses.id)
         .single();
 
-      if (readErr || !fresh) return;
-      if (fresh.stage !== "playing") return;
+      if (!fresh || fresh.stage !== "playing") return;
 
       const pos = Number(fresh.deck_pos || 0);
       const deck = Array.isArray(fresh.deck) ? fresh.deck : [];
@@ -637,8 +642,8 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       const next = deck[pos];
       const nextCalled = [...(Array.isArray(fresh.called) ? fresh.called : []), next];
 
-      // atomic update: advance deck_pos + add number
-      await supabase
+      // עדכן DB
+      const { error: updErr } = await supabase
         .from("bingo_sessions")
         .update({
           deck_pos: pos + 1,
@@ -646,10 +651,36 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
           called: nextCalled,
         })
         .eq("id", fresh.id);
-    }, 15000); // 15 seconds
+
+      if (!updErr) {
+        // ⭐ הכי חשוב: עדכן גם לוקאלית כדי שתראה שינוי גם בלי Realtime
+        setSes((prev) => ({
+          ...(prev || {}),
+          deck_pos: pos + 1,
+          last_number: next,
+          called: nextCalled,
+        }));
+      }
+    }, 15000); // ⭐ 15 שניות
 
     return () => clearInterval(interval);
   }, [ses?.id, ses?.stage, isCaller]);
+
+  // ---------------- polling for all players (to see numbers without Realtime) ----------------
+  useEffect(() => {
+    if (!ses?.id) return;
+
+    const t = setInterval(async () => {
+      const { data } = await supabase
+        .from("bingo_sessions")
+        .select("*")
+        .eq("id", ses.id)
+        .single();
+      if (data) setSes(data);
+    }, 2000);
+
+    return () => clearInterval(t);
+  }, [ses?.id]);
 
   // initial load
   useEffect(() => {
@@ -782,6 +813,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
               marks={myMarks}
               calledSet={calledSet}
               onCellClick={onCellClick}
+              lastNumber={ses?.last_number}
             />
           )}
         </div>
@@ -1028,6 +1060,7 @@ function BingoLocal({ vault, onBackToMode }) {
             marks={marks[activePlayer] || makeEmptyMarks()}
             calledSet={calledSet}
             onCellClick={(n) => onMark(activePlayer, n)}
+            lastNumber={last}
           />
         )}
       </div>
@@ -1038,7 +1071,7 @@ function BingoLocal({ vault, onBackToMode }) {
 // ===========================================================
 // UI: Bingo Card
 // ===========================================================
-function BingoCard({ title, card, marks, calledSet, onCellClick }) {
+function BingoCard({ title, card, marks, calledSet, onCellClick, lastNumber }) {
   const headers = ["B", "I", "N", "G", "O"];
 
   return (
@@ -1058,16 +1091,19 @@ function BingoCard({ title, card, marks, calledSet, onCellClick }) {
           const isFree = n === 0 && idx === 12;
           const isMarked = marks[idx];
           const isCallable = isFree || calledSet.has(n);
+          const isLastCalled = lastNumber != null && n === lastNumber && !isFree;
 
           return (
             <button
               key={idx}
               onClick={() => (isFree ? null : onCellClick(n))}
               className={`aspect-square rounded-lg border text-sm font-semibold grid place-items-center transition
-                ${isMarked ? "bg-emerald-500/40 border-emerald-300/50" : "bg-white/5 border-white/15 hover:bg-white/10"}
+                ${isLastCalled ? "bg-amber-500/70 border-amber-300 shadow-lg shadow-amber-500/50 ring-2 ring-amber-400" : ""}
+                ${isMarked && !isLastCalled ? "bg-emerald-500/40 border-emerald-300/50" : ""}
+                ${!isMarked && !isLastCalled ? "bg-white/5 border-white/15 hover:bg-white/10" : ""}
                 ${isCallable ? "" : "opacity-50"}
               `}
-              title={isFree ? "FREE" : isCallable ? "Called" : "Not called yet"}
+              title={isFree ? "FREE" : isLastCalled ? "Just called!" : isCallable ? "Called" : "Not called yet"}
             >
               {isFree ? "FREE" : n}
             </button>
