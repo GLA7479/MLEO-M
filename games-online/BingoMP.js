@@ -178,6 +178,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const [claims, setClaims] = useState([]);
   const [roomMembers, setRoomMembers] = useState([]);
   const [msg, setMsg] = useState("");
+  const [timer, setTimer] = useState(5);
 
   const seatMap = useMemo(() => new Map(players.map((p) => [p.seat_index, p])), [players]);
   const myRow = useMemo(() => players.find((p) => p.client_id === clientId) || null, [players, clientId]);
@@ -661,10 +662,27 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
           called: nextCalled,
         }));
       }
-    }, 10000); // ⭐ 10 שניות
+    }, 5000); // ⭐ 5 שניות
 
     return () => clearInterval(interval);
   }, [ses?.id, ses?.stage, isCaller]);
+
+  // ---------------- timer countdown (5 seconds) ----------------
+  useEffect(() => {
+    if (!ses?.id || ses.stage !== "playing") {
+      setTimer(5);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setTimer((prev) => {
+        if (prev <= 1) return 5; // reset to 5 when reaches 0
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [ses?.id, ses?.stage, ses?.last_number]); // reset timer when new number is called
 
   // ---------------- polling for all players (to see numbers without Realtime) ----------------
   useEffect(() => {
@@ -676,11 +694,17 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         .select("*")
         .eq("id", ses.id)
         .single();
-      if (data) setSes(data);
+      if (data) {
+        setSes(data);
+        // reset timer when new number appears
+        if (data.last_number !== ses?.last_number) {
+          setTimer(5);
+        }
+      }
     }, 2000);
 
     return () => clearInterval(t);
-  }, [ses?.id]);
+  }, [ses?.id, ses?.last_number]);
 
   // initial load
   useEffect(() => {
@@ -738,6 +762,11 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
           <div className="text-xs text-white/60">Stage: {stage}</div>
           <div className="text-xs text-white/60">Entry: {fmt(entryFee)} • Pot: {fmt(potTotal)} • House: {fmt(houseCut)}</div>
           <div className="text-xs text-white/60">Last: {ses?.last_number ?? "-"}</div>
+          {stage === "playing" && (
+            <div className="text-xs font-bold text-amber-400 mt-1">
+              Next number in: {timer}s
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -822,11 +851,21 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         <div className="bg-black/40 rounded-xl p-3 overflow-auto">
           <div className="text-sm font-semibold mb-2">Called</div>
           <div className="flex flex-wrap gap-2">
-            {called.length ? called.slice().reverse().map((n, idx) => (
-              <span key={`${n}-${idx}`} className="px-2 py-1 rounded bg-white/10 border border-white/10 text-xs">
-                {n}
-              </span>
-            )) : <div className="text-white/60 text-sm">No numbers yet</div>}
+            {called.length ? called.slice().reverse().map((n, idx) => {
+              const isLast = idx === 0; // First in reversed array is the last called
+              return (
+                <span
+                  key={`${n}-${idx}`}
+                  className={`px-2 py-1 rounded border text-xs font-semibold ${
+                    isLast
+                      ? "bg-emerald-500/80 border-emerald-400 text-white shadow-lg shadow-emerald-500/50"
+                      : "bg-white/10 border-white/10"
+                  }`}
+                >
+                  {n}
+                </span>
+              );
+            }) : <div className="text-white/60 text-sm">No numbers yet</div>}
           </div>
         </div>
       </div>
