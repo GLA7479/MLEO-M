@@ -230,6 +230,33 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     return m;
   }, [claims]);
 
+  // ---------------- win detection by Called (not just Marks) ----------------
+  function isCellSatisfied(n, calledSet) {
+    // FREE תמיד נחשב "מסומן"
+    if (n === 0) return true;
+    return calledSet.has(n);
+  }
+
+  function isRowWonByCalls(card, calledSet, rowIndex) {
+    if (!card) return false;
+    for (let c = 0; c < 5; c++) {
+      const n = card[rowIndex][c];
+      if (!isCellSatisfied(n, calledSet)) return false;
+    }
+    return true;
+  }
+
+  function isFullWonByCalls(card, calledSet) {
+    if (!card) return false;
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 5; c++) {
+        const n = card[r][c];
+        if (!isCellSatisfied(n, calledSet)) return false;
+      }
+    }
+    return true;
+  }
+
   // ---------------- ensure session (like Ludo: keep only 1 per room) ----------------
   const ensureSession = useCallback(
     async (room) => {
@@ -511,16 +538,23 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     async (prizeKey) => {
       if (!ses?.id || ses.stage !== "playing" || !ses.round_id) return;
       if (mySeat == null) return;
+      if (!myCard) return;
 
-      // client-side validation:
+      // client-side validation: Marks או Called
       if (prizeKey.startsWith("row")) {
         const r = Number(prizeKey.replace("row", "")) - 1;
-        if (r < 0 || r > 4 || !isRowComplete(myMarks, r)) {
+        if (r < 0 || r > 4) return;
+
+        const ok = isRowComplete(myMarks, r) || isRowWonByCalls(myCard, calledSet, r);
+
+        if (!ok) {
           setMsg("Row not complete yet");
           return;
         }
       } else if (prizeKey === "full") {
-        if (!isFullComplete(myMarks)) {
+        const ok = isFullComplete(myMarks) || isFullWonByCalls(myCard, calledSet);
+
+        if (!ok) {
           setMsg("Full board not complete yet");
           return;
         }
@@ -553,13 +587,14 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
 
       await refreshClaims(ses.id, ses.round_id);
     },
-    [ses?.id, ses?.stage, ses?.round_id, mySeat, myMarks, clientId, name, refreshClaims]
+    [ses?.id, ses?.stage, ses?.round_id, mySeat, myMarks, myCard, calledSet, clientId, name, refreshClaims]
   );
 
-  // ---------------- auto-claim (rows + full) when player completes them ----------------
+  // ---------------- auto-claim (rows + full) based on Called ----------------
   useEffect(() => {
     if (!ses?.id || !ses?.round_id) return;
     if (ses.stage !== "playing") return;
+    if (!myCard) return;
 
     const tryAuto = (key) => {
       // אם כבר נטען ב-DB שמישהו לקח — לא לנסות
@@ -569,36 +604,38 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       const lock = `${ses.id}:${ses.round_id}:${key}`;
       if (autoClaimRef.current.has(lock)) return;
 
-      // בדיקה לפי הסימונים של השחקן הזה
+      // בדיקה לפי Called (האם כל המספרים של השורה/כרטיס הופיעו ב-Called)
       if (key.startsWith("row")) {
         const r = Number(key.replace("row", "")) - 1;
         if (r < 0 || r > 4) return;
-        if (!isRowComplete(myMarks, r)) return;
+        if (!isRowWonByCalls(myCard, calledSet, r)) return;
       } else if (key === "full") {
-        if (!isFullComplete(myMarks)) return;
+        if (!isFullWonByCalls(myCard, calledSet)) return;
       } else {
         return;
       }
 
       autoClaimRef.current.add(lock);
-      claimPrize(key); // משתמש בפונקציה הקיימת שלך: RPC + credit ל-vault למנצח בלבד
+      claimPrize(key); // משתמש ב-RPC שלך (מכריז לכולם דרך claims + מסיים אם FULL)
     };
 
-    // שורות
+    // תבע שורות
     tryAuto("row1");
     tryAuto("row2");
     tryAuto("row3");
     tryAuto("row4");
     tryAuto("row5");
 
-    // מלא
+    // תבע FULL (זה יסיים את המשחק ב-DB)
     tryAuto("full");
   }, [
     ses?.id,
     ses?.round_id,
     ses?.stage,
+    ses?.last_number, // חשוב כדי שהאפקט ירוץ בכל מספר חדש
+    myCard,
+    calledSet,
     claimedMap,
-    myMarks,
     claimPrize,
   ]);
 
