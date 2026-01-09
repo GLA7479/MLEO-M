@@ -73,6 +73,16 @@ function keyCred(sessionId, roundId, prizeKey) {
   return `mleo_bingo_credit:${sessionId}:${roundId}:${prizeKey}`;
 }
 
+// ---------- UUID helper ----------
+function uuidv4() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // v4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 // ===========================================================
 // PUBLIC ENTRY (Mode selector like Ludo)
 // ===========================================================
@@ -173,11 +183,15 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const myRow = useMemo(() => players.find((p) => p.client_id === clientId) || null, [players, clientId]);
   const mySeat = myRow?.seat_index ?? null;
 
-  const isLeader = useMemo(() => {
-    if (!roomMembers.length || !name) return false;
-    const sorted = [...roomMembers].sort((a, b) => (a.player_name || "").localeCompare(b.player_name || ""));
-    return sorted[0]?.player_name === name;
-  }, [roomMembers, name]);
+  // Caller is the player in the lowest seat index (Seat 1 if taken)
+  const callerClientId = useMemo(() => {
+    const seated = (players || [])
+      .filter((p) => p.seat_index != null)
+      .sort((a, b) => a.seat_index - b.seat_index);
+    return seated[0]?.client_id || null;
+  }, [players]);
+
+  const isCaller = callerClientId === clientId;
 
   const stage = ses?.stage || "lobby";
   const roundId = ses?.round_id || null;
@@ -382,12 +396,8 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     await refreshPlayers(ses.id);
   }, [ses?.id, clientId, refreshPlayers]);
 
-  // ---------------- start game (leader) ----------------
+  // ---------------- start game ----------------
   const startGame = useCallback(async () => {
-    if (!isLeader) {
-      setMsg("Only leader can start");
-      return;
-    }
     if (!ses?.id) return;
 
     const { data: freshPlayers } = await supabase
@@ -405,7 +415,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     const activeSeats = [...new Set(seated.map((p) => p.seat_index))].sort((a, b) => a - b);
 
     // new round
-    const newRoundId = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+    const newRoundId = uuidv4();
     const newSeed = `bingo:${Date.now()}:${Math.random().toString(16).slice(2)}`;
 
     const deck = buildDeck(`${newSeed}::${newRoundId}`);
@@ -429,6 +439,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         finished_at: null,
       })
       .eq("id", ses.id)
+      .eq("stage", "lobby")
       .select()
       .single();
 
@@ -438,44 +449,16 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       return;
     }
 
+    if (!data) {
+      setMsg("Game already started");
+      return;
+    }
+
     setSes(data);
     setPlayers(freshPlayers || []);
     setMsg("");
-  }, [isLeader, ses?.id, entryFee]);
+  }, [ses?.id, entryFee]);
 
-  // ---------------- call next (leader) ----------------
-  const callNext = useCallback(async () => {
-    if (!isLeader) return;
-    if (!ses?.id || ses.stage !== "playing") return;
-
-    const s = await ensureSession(roomId);
-    if (!s || s.stage !== "playing") return;
-
-    const pos = Number(s.deck_pos || 0);
-    const deck = Array.isArray(s.deck) ? s.deck : [];
-    if (pos >= deck.length) return;
-
-    const next = deck[pos];
-    const nextCalled = [...(Array.isArray(s.called) ? s.called : []), next];
-
-    const { data, error } = await supabase
-      .from("bingo_sessions")
-      .update({
-        deck_pos: pos + 1,
-        last_number: next,
-        called: nextCalled,
-      })
-      .eq("id", s.id)
-      .select()
-      .single();
-
-    if (error) {
-      console.error(error);
-      setMsg("Failed to call number");
-      return;
-    }
-    setSes(data);
-  }, [isLeader, ses?.id, ensureSession, roomId]);
 
   // ---------------- local payment when round starts (burn if you leave) ----------------
   useEffect(() => {
@@ -626,6 +609,48 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     return () => ch.unsubscribe();
   }, [ses?.id, ses?.round_id, refreshClaims]);
 
+  // ---------------- auto call next number every 15 seconds (only caller) ----------------
+  useEffect(() => {
+    if (!ses?.id) return;
+
+    // only the caller activates the timer
+    if (!isCaller) return;
+
+    // only during gameplay
+    if (ses.stage !== "playing") return;
+
+    const interval = setInterval(async () => {
+      // always read fresh state from DB to avoid getting stuck on old state
+      const { data: fresh, error: readErr } = await supabase
+        .from("bingo_sessions")
+        .select("id, stage, deck, deck_pos, called")
+        .eq("id", ses.id)
+        .single();
+
+      if (readErr || !fresh) return;
+      if (fresh.stage !== "playing") return;
+
+      const pos = Number(fresh.deck_pos || 0);
+      const deck = Array.isArray(fresh.deck) ? fresh.deck : [];
+      if (pos >= deck.length) return;
+
+      const next = deck[pos];
+      const nextCalled = [...(Array.isArray(fresh.called) ? fresh.called : []), next];
+
+      // atomic update: advance deck_pos + add number
+      await supabase
+        .from("bingo_sessions")
+        .update({
+          deck_pos: pos + 1,
+          last_number: next,
+          called: nextCalled,
+        })
+        .eq("id", fresh.id);
+    }, 15000); // 15 seconds
+
+    return () => clearInterval(interval);
+  }, [ses?.id, ses?.stage, isCaller]);
+
   // initial load
   useEffect(() => {
     (async () => {
@@ -692,15 +717,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
           )}
 
           <button onClick={startGame} className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 text-xs">
-            Start
-          </button>
-
-          <button
-            onClick={callNext}
-            disabled={!isLeader || stage !== "playing"}
-            className="px-3 py-1 rounded bg-amber-500/80 hover:bg-amber-400 disabled:opacity-50 text-xs"
-          >
-            Call next
+            Start Game
           </button>
 
           <button onClick={onBackToMode} className="px-3 py-1 rounded bg-white/10 hover:bg-white/20 text-xs">
