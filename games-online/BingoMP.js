@@ -179,6 +179,10 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const [roomMembers, setRoomMembers] = useState([]);
   const [msg, setMsg] = useState("");
   const [timer, setTimer] = useState(5);
+  const [announcement, setAnnouncement] = useState("");
+
+  const autoClaimRef = useRef(new Set());
+  const seenClaimIdsRef = useRef(new Set());
 
   const seatMap = useMemo(() => new Map(players.map((p) => [p.seat_index, p])), [players]);
   const myRow = useMemo(() => players.find((p) => p.client_id === clientId) || null, [players, clientId]);
@@ -552,6 +556,78 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     [ses?.id, ses?.stage, ses?.round_id, mySeat, myMarks, clientId, name, refreshClaims]
   );
 
+  // ---------------- auto-claim (rows + full) when player completes them ----------------
+  useEffect(() => {
+    if (!ses?.id || !ses?.round_id) return;
+    if (ses.stage !== "playing") return;
+
+    const tryAuto = (key) => {
+      // אם כבר נטען ב-DB שמישהו לקח — לא לנסות
+      if (claimedMap.has(key)) return;
+
+      // מנגנון נעילה מקומי כדי לא לשלוח שוב ושוב
+      const lock = `${ses.id}:${ses.round_id}:${key}`;
+      if (autoClaimRef.current.has(lock)) return;
+
+      // בדיקה לפי הסימונים של השחקן הזה
+      if (key.startsWith("row")) {
+        const r = Number(key.replace("row", "")) - 1;
+        if (r < 0 || r > 4) return;
+        if (!isRowComplete(myMarks, r)) return;
+      } else if (key === "full") {
+        if (!isFullComplete(myMarks)) return;
+      } else {
+        return;
+      }
+
+      autoClaimRef.current.add(lock);
+      claimPrize(key); // משתמש בפונקציה הקיימת שלך: RPC + credit ל-vault למנצח בלבד
+    };
+
+    // שורות
+    tryAuto("row1");
+    tryAuto("row2");
+    tryAuto("row3");
+    tryAuto("row4");
+    tryAuto("row5");
+
+    // מלא
+    tryAuto("full");
+  }, [
+    ses?.id,
+    ses?.round_id,
+    ses?.stage,
+    claimedMap,
+    myMarks,
+    claimPrize,
+  ]);
+
+  // ---------------- announcement when someone wins ----------------
+  useEffect(() => {
+    if (!claims || claims.length === 0) return;
+
+    // מצא claims חדשים שעוד לא הוצגו
+    const fresh = claims
+      .filter((c) => c?.id != null && !seenClaimIdsRef.current.has(c.id))
+      .sort((a, b) => a.id - b.id);
+
+    if (fresh.length === 0) return;
+
+    // סמן כ"נראו"
+    for (const c of fresh) seenClaimIdsRef.current.add(c.id);
+
+    // הכרז על האחרון (או תעשה תור אם אתה רוצה)
+    const last = fresh[fresh.length - 1];
+
+    const label =
+      last.prize_key === "full"
+        ? "🏆 FULL BOARD"
+        : `🎉 ROW ${Number(last.prize_key.replace("row", ""))}`;
+
+    setAnnouncement(`${label} — ${last.claimed_by_name} won +${fmt(last.amount)} MLEO`);
+    setTimeout(() => setAnnouncement(""), 3500);
+  }, [claims]);
+
   // ---------------- realtime subscriptions ----------------
   useEffect(() => {
     if (!roomId) return;
@@ -824,6 +900,12 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
           </div>
         )}
       </div>
+
+      {announcement ? (
+        <div className="text-emerald-300 text-xs text-center font-semibold bg-emerald-500/20 border border-emerald-400/30 rounded-lg p-2">
+          {announcement}
+        </div>
+      ) : null}
 
       {msg ? <div className="text-amber-300 text-xs text-center">{msg}</div> : null}
 
