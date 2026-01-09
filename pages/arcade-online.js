@@ -70,7 +70,7 @@ function fmt(n) {
   return String(n);
 }
 
-const TIERED_GAMES = ['poker', 'backgammon', 'roulette', 'blackjack', 'war', 'ludo'];
+const TIERED_GAMES = ['poker', 'backgammon', 'roulette', 'blackjack', 'war', 'ludo', 'bingo'];
 
 // Game Registry with lazy loading
 const GAME_REGISTRY = [
@@ -127,6 +127,15 @@ const GAME_REGISTRY = [
     color: "#9333EA",
     isMultiplayer: true,
     loader: () => import("../games-online/LudoMP").then(m => m.default)
+  },
+  {
+    id: "bingo",
+    title: "Bingo",
+    emoji: "🎯",
+    description: "Bingo like Ludo! Online multiplayer (2-6 players) or local play. Win prizes for rows and full board!",
+    color: "#EC4899",
+    isMultiplayer: true,
+    loader: () => import("../games-online/BingoMP").then(m => m.default)
   },
   {
     id: "poker-tables",

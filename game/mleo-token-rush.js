@@ -1271,24 +1271,6 @@ export default function MLEOTokenRushPage() {
                   {isPending ? "⏳ CLAIMING..." : "🔗 CLAIM"}
         </button>
       </div>
-
-              <div className="mt-3 space-y-2">
-                <div className="p-3 rounded-lg bg-emerald-600/10 border border-emerald-500/20">
-                  <div className="text-xs font-semibold text-emerald-400 mb-1">💡 How it works:</div>
-                  <div className="text-xs opacity-80 space-y-1">
-                    <div>• <strong>Mining Pool</strong> = MLEO accumulating from mining (click COLLECT to move to Vault)</div>
-                    <div>• <strong>Vault</strong> = Your main balance (use for upgrades or claim to wallet)</div>
-                    <div>• Stay <strong>ONLINE</strong> for maximum mining speed (100% rate)</div>
-                    <div>• <strong>OFFLINE</strong> mode gives 60% rate, max 12 hours</div>
-                  </div>
-                </div>
-                <div className="p-3 rounded-lg bg-amber-600/10 border border-amber-500/20">
-                  <div className="text-xs font-semibold text-amber-400 mb-1">⚠️ Daily Claim Limit:</div>
-                  <div className="text-xs opacity-80">
-                    There is a daily limit on wallet claims. If you see "daily cap" error, try a smaller amount or wait until tomorrow.
-                  </div>
-                </div>
-      </div>
             </Section>
 
             {/* GIFTS & BONUSES */}
@@ -1512,15 +1494,17 @@ export default function MLEOTokenRushPage() {
 
           {/* INFO MODALS */}
           <InfoModal isOpen={infoModal === 'vault'} onClose={() => setInfoModal(null)} title="💰 MLEO Vault">
-            <p><strong>📊 Two-Step System:</strong></p>
-            <ol className="list-decimal pl-5 space-y-2 mt-2">
-              <li><strong>Mining Pool</strong> - MLEO accumulates here automatically from mining</li>
-              <li><strong>Vault</strong> - Your main balance after clicking "COLLECT MINED"</li>
-            </ol>
+            <p><strong>📊 How it works:</strong></p>
+            <ul className="list-disc pl-5 space-y-2 mt-2">
+              <li><strong>Mining Pool</strong> - MLEO accumulates here automatically from mining (click COLLECT to move to Vault)</li>
+              <li><strong>Vault</strong> - Your main balance (use for upgrades or claim to wallet)</li>
+              <li>Stay <strong>ONLINE</strong> for maximum mining speed (100% rate)</li>
+              <li><strong>OFFLINE</strong> mode gives 60% rate, max 12 hours</li>
+            </ul>
             <p className="mt-3"><strong>💰 COLLECT MINED:</strong> Transfers all MLEO from Mining Pool to Vault.</p>
             <p><strong>🔗 CLAIM TO WALLET:</strong> Sends MLEO from Vault to your connected blockchain wallet (requires gas fees).</p>
             <p className="mt-3 p-3 rounded-lg bg-amber-600/10 border border-amber-500/20">
-              <strong className="text-amber-400">⚠️ Daily Claim Limit:</strong> There is a daily limit on how much MLEO you can claim to your wallet. If you see "daily cap" error, try claiming a smaller amount or wait until tomorrow.
+              <strong className="text-amber-400">⚠️ Daily Claim Limit:</strong> There is a daily limit on wallet claims. If you see "daily cap" error, try a smaller amount or wait until tomorrow.
             </p>
             <p className="mt-3 text-emerald-400"><strong>💡 Use Vault MLEO for:</strong> Buying upgrades, claiming to wallet, or saving for prestige!</p>
           </InfoModal>

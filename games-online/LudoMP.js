@@ -562,6 +562,17 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     return () => ch.unsubscribe();
   }, [ses?.id]);
 
+  // Helper: Check if player is gone (not in room but still in game)
+  const isPlayerGone = useCallback((player) => {
+    if (!player || !player.client_id) return false;
+    // Check if player is in room (presence)
+    const isInRoom = roomMembers.some(m => 
+      m.player_name === player.player_name || 
+      (m.client_id && m.client_id === player.client_id)
+    );
+    return !isInRoom;
+  }, [roomMembers]);
+
   // timer
   useEffect(() => {
     clearInterval(tickRef.current);
@@ -662,35 +673,199 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     return data;
   }
 
+  // Countdown system: Track missed turns for gone players
+  const MAX_MISSED_TURNS = 3; // After 3 missed turns, player loses
+
+  async function handleGonePlayerTimeout(turnSeat) {
+    const s = await fetchSession();
+    if (!s || s.stage !== "playing") return;
+
+    const b = s.board_state || {};
+    const currentTurnSeat = b.turnSeat ?? s.current_turn;
+    
+    // Make sure it's still this player's turn
+    if (currentTurnSeat !== turnSeat) return;
+
+    const turnPlayer = players.find(p => p.seat_index === turnSeat);
+    if (!turnPlayer) return;
+
+    // Get or initialize missed turns count
+    const missedTurnsKey = `missed_turns_${turnPlayer.id}`;
+    const currentMissed = Number(s.current?.[missedTurnsKey] || 0);
+    const newMissed = currentMissed + 1;
+
+    console.log(`Player ${turnPlayer.player_name} (seat ${turnSeat}) missed turn ${newMissed}/${MAX_MISSED_TURNS}`);
+
+    // Show warning message to other players
+    if (newMissed === 1) {
+      setMsg(`⚠️ ${turnPlayer.player_name} is not responding (${newMissed}/${MAX_MISSED_TURNS})`);
+    } else if (newMissed === 2) {
+      setMsg(`⚠️ ${turnPlayer.player_name} missed ${newMissed} turns (${newMissed}/${MAX_MISSED_TURNS})`);
+    }
+
+    // Update missed turns count in session
+    const updatedCurrent = {
+      ...(s.current || {}),
+      [missedTurnsKey]: newMissed
+    };
+
+    await supabase
+      .from("ludo_sessions")
+      .update({ current: updatedCurrent })
+      .eq("id", s.id);
+
+    // If reached max missed turns, eliminate player
+    if (newMissed >= MAX_MISSED_TURNS) {
+      await eliminatePlayer(turnSeat, turnPlayer);
+      return;
+    }
+
+    // Otherwise, skip turn and continue
+    await endTurn(b);
+  }
+
+  async function eliminatePlayer(seatIndex, player) {
+    const s = await fetchSession();
+    if (!s || s.stage !== "playing") return;
+
+    const b = s.board_state || {};
+    
+    console.log(`Eliminating player ${player.player_name} (seat ${seatIndex}) - too many missed turns`);
+    setMsg(`Player ${player.player_name} eliminated (missed ${MAX_MISSED_TURNS} turns)`);
+
+    // Remove player from active seats
+    const activeSeats = (b.activeSeats || []).filter(seat => seat !== seatIndex);
+    
+    // Remove player's pieces from board
+    const updatedBoard = { ...b };
+    const seatKey = String(seatIndex);
+    if (updatedBoard.pieces && updatedBoard.pieces[seatKey]) {
+      // Remove all pieces of this player (set to -1 = yard, but they're eliminated)
+      delete updatedBoard.pieces[seatKey];
+      if (updatedBoard.finished) {
+        delete updatedBoard.finished[seatKey];
+      }
+    }
+    
+    updatedBoard.activeSeats = activeSeats;
+
+    // If only one player left, they win
+    if (activeSeats.length === 1) {
+      updatedBoard.winner = activeSeats[0];
+      updatedBoard.finished = true;
+      
+      const { data } = await supabase
+        .from("ludo_sessions")
+        .update({
+          board_state: updatedBoard,
+          stage: "finished",
+          turn_deadline: null,
+        })
+        .eq("id", s.id)
+        .select()
+        .single();
+      
+      if (data) {
+        setSes(data);
+        await finishGame(updatedBoard);
+      }
+      return;
+    }
+
+    // Remove player from database
+    await supabase
+      .from("ludo_players")
+      .delete()
+      .eq("session_id", s.id)
+      .eq("seat_index", seatIndex);
+
+    // If it was this player's turn, move to next
+    const currentTurnSeat = b.turnSeat ?? s.current_turn;
+    let nextTurn = currentTurnSeat;
+    if (currentTurnSeat === seatIndex) {
+      // Find next active seat
+      const sortedActive = [...activeSeats].sort((a, b) => a - b);
+      const currentIdx = sortedActive.indexOf(seatIndex);
+      if (currentIdx >= 0) {
+        nextTurn = sortedActive[(currentIdx + 1) % sortedActive.length];
+      } else {
+        nextTurn = sortedActive[0] ?? null;
+      }
+      updatedBoard.turnSeat = nextTurn;
+      updatedBoard.dice = null;
+      updatedBoard.lastDice = null;
+    } else {
+      // Make sure turnSeat is still valid
+      if (!activeSeats.includes(updatedBoard.turnSeat)) {
+        updatedBoard.turnSeat = activeSeats[0] ?? null;
+      }
+    }
+
+    // Update session
+    const { data } = await supabase
+      .from("ludo_sessions")
+      .update({
+        board_state: updatedBoard,
+        current_turn: updatedBoard.turnSeat,
+        turn_deadline: updatedBoard.turnSeat != null 
+          ? new Date(Date.now() + TURN_SECONDS * 1000).toISOString()
+          : null,
+      })
+      .eq("id", s.id)
+      .select()
+      .single();
+
+    if (data) {
+      setSes(data);
+      // Refresh players list
+      const { data: updatedPlayers } = await supabase
+        .from("ludo_players")
+        .select("*")
+        .eq("session_id", s.id)
+        .order("seat_index");
+      if (updatedPlayers) setPlayers(updatedPlayers);
+    }
+  }
+
   async function autoAct() {
     const s = await fetchSession();
     if (!s || s.stage !== "playing") return;
 
     const b = s.board_state || {};
     const turnSeat = b.turnSeat ?? s.current_turn;
+    const turnPlayer = players.find(p => p.seat_index === turnSeat);
 
-    // רק מי שבתורו מבצע אוטומציה
-    if (mySeat == null || mySeat !== turnSeat) return;
+    // If it's my turn - normal auto action
+    if (mySeat != null && mySeat === turnSeat) {
+      // אין קובייה → זורק אוטומטית
+      if (!b.dice) {
+        await doRoll();
+        return;
+      }
 
-    // אין קובייה → זורק אוטומטית
-    if (!b.dice) {
-      await doRoll();
+      // יש קובייה – בודק אם יש מהלך חוקי
+      const moves = listMovablePieces(b, turnSeat, b.dice);
+
+      // אין אף מהלך → מחכים רגע ואז מדלגים תור
+      if (!moves.length) {
+        setTimeout(() => {
+          endTurn(b);
+        }, 700);
+        return;
+      }
+
+      // יש מהלכים → רק מרענן דד־ליין, שייתן לשחקן זמן להזיז
+      await bumpDeadline();
       return;
     }
 
-    // יש קובייה – בודק אם יש מהלך חוקי
-    const moves = listMovablePieces(b, turnSeat, b.dice);
-
-    // אין אף מהלך → מחכים רגע ואז מדלגים תור
-    if (!moves.length) {
-      setTimeout(() => {
-        endTurn(b);
-      }, 700); // השהייה קצרה יותר
+    // If it's another player's turn and they're gone - handle timeout
+    if (turnPlayer && isPlayerGone(turnPlayer)) {
+      await handleGonePlayerTimeout(turnSeat);
       return;
     }
 
-    // יש מהלכים → רק מרענן דד־ליין, שייתן לשחקן זמן להזיז
-    await bumpDeadline();
+    // Otherwise, do nothing (wait for the active player)
   }
 
   async function bumpDeadline() {
