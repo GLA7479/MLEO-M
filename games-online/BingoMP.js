@@ -1090,22 +1090,21 @@ function BingoCard({ title, card, marks, calledSet, onCellClick, lastNumber }) {
         {card.flat().map((n, idx) => {
           const isFree = n === 0 && idx === 12;
           const isMarked = marks[idx];
-          const isCallable = isFree || calledSet.has(n);
-          const isLastCalled = lastNumber != null && n === lastNumber && !isFree;
+          const isCalled = isFree || calledSet.has(n); // המספר נקרא (יש התאמה)
 
           return (
             <button
               key={idx}
               onClick={() => (isFree ? null : onCellClick(n))}
               className={`aspect-square rounded-lg border text-sm font-semibold grid place-items-center transition
-                ${isLastCalled ? "bg-amber-500/70 border-amber-300 shadow-lg shadow-amber-500/50 ring-2 ring-amber-400" : ""}
-                ${isMarked && !isLastCalled ? "bg-emerald-500/40 border-emerald-300/50" : ""}
-                ${!isMarked && !isLastCalled ? "bg-white/5 border-white/15 hover:bg-white/10" : ""}
-                ${isCallable ? "" : "opacity-50"}
+                ${isCalled ? "bg-yellow-500 border-yellow-400 shadow-lg shadow-yellow-500/60" : "bg-white/5 border-white/15 hover:bg-white/10"}
+                ${!isCalled ? "opacity-50" : ""}
               `}
-              title={isFree ? "FREE" : isLastCalled ? "Just called!" : isCallable ? "Called" : "Not called yet"}
+              title={isFree ? "FREE" : isCalled ? "Called" : "Not called yet"}
             >
-              {isFree ? "FREE" : n}
+              <span className={isCalled ? "text-white font-bold" : ""}>
+                {isFree ? "FREE" : n}
+              </span>
             </button>
           );
         })}
