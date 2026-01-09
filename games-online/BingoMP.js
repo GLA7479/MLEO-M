@@ -661,7 +661,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
           called: nextCalled,
         }));
       }
-    }, 15000); // ⭐ 15 שניות
+    }, 10000); // ⭐ 10 שניות
 
     return () => clearInterval(interval);
   }, [ses?.id, ses?.stage, isCaller]);
