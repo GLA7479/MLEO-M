@@ -541,23 +541,34 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       if (mySeat == null) return;
       if (!myCard) return;
 
-      // client-side validation: Marks או Called
+      // client-side validation: רק לפי סימון ידני (Marks) - בדיקה מדויקת תא אחר תא
       if (prizeKey.startsWith("row")) {
         const r = Number(prizeKey.replace("row", "")) - 1;
         if (r < 0 || r > 4) return;
 
-        const ok = isRowComplete(myMarks, r) || isRowWonByCalls(myCard, calledSet, r);
-
-        if (!ok) {
-          setMsg("Row not complete yet");
+        // בדיקה תא אחר תא - כל התאים בשורה חייבים להיות מסומנים
+        if (!myMarks || myMarks.length !== 25) {
+          setMsg("Row not complete yet - mark all numbers in the row");
           return;
         }
+        for (let c = 0; c < 5; c++) {
+          const idx = r * 5 + c;
+          if (!myMarks[idx]) {
+            setMsg("Row not complete yet - mark all numbers in the row");
+            return;
+          }
+        }
       } else if (prizeKey === "full") {
-        const ok = isFullComplete(myMarks) || isFullWonByCalls(myCard, calledSet);
-
-        if (!ok) {
-          setMsg("Full board not complete yet");
+        // בדיקה תא אחר תא - כל 25 התאים חייבים להיות מסומנים
+        if (!myMarks || myMarks.length !== 25) {
+          setMsg("Full board not complete yet - mark all numbers");
           return;
+        }
+        for (let i = 0; i < 25; i++) {
+          if (!myMarks[i]) {
+            setMsg("Full board not complete yet - mark all numbers");
+            return;
+          }
         }
       }
 
@@ -591,51 +602,75 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     [ses?.id, ses?.stage, ses?.round_id, mySeat, myMarks, myCard, calledSet, clientId, name, refreshClaims]
   );
 
-  // ---------------- auto-claim (rows + full) based on Called ----------------
+  // ---------------- auto-claim (rows + full) based on manual marks only ----------------
   useEffect(() => {
     if (!ses?.id || !ses?.round_id) return;
     if (ses.stage !== "playing") return;
     if (!myCard) return;
+    if (!myMarks || myMarks.length !== 25) return; // ודא ש-myMarks תקין
 
-    const tryAuto = (key) => {
-      // אם כבר נטען ב-DB שמישהו לקח — לא לנסות
-      if (claimedMap.has(key)) return;
+    // השתמש ב-setTimeout כדי לוודא שה-state התעדכן לגמרי לפני בדיקה
+    // זמן ארוך יותר כדי לוודא שהסימון האחרון כבר נוסף ל-state
+    const timeoutId = setTimeout(() => {
+      if (!myMarks || myMarks.length !== 25) return;
 
-      // מנגנון נעילה מקומי כדי לא לשלוח שוב ושוב
-      const lock = `${ses.id}:${ses.round_id}:${key}`;
-      if (autoClaimRef.current.has(lock)) return;
+      const tryAuto = (key) => {
+        // אם כבר נטען ב-DB שמישהו לקח — לא לנסות
+        if (claimedMap.has(key)) return;
 
-      // בדיקה לפי Called (האם כל המספרים של השורה/כרטיס הופיעו ב-Called)
-      if (key.startsWith("row")) {
-        const r = Number(key.replace("row", "")) - 1;
-        if (r < 0 || r > 4) return;
-        if (!isRowWonByCalls(myCard, calledSet, r)) return;
-      } else if (key === "full") {
-        if (!isFullWonByCalls(myCard, calledSet)) return;
-      } else {
-        return;
-      }
+        // מנגנון נעילה מקומי כדי לא לשלוח שוב ושוב
+        const lock = `${ses.id}:${ses.round_id}:${key}`;
+        if (autoClaimRef.current.has(lock)) return;
 
-      autoClaimRef.current.add(lock);
-      claimPrize(key); // משתמש ב-RPC שלך (מכריז לכולם דרך claims + מסיים אם FULL)
-    };
+        // בדיקה מדויקת - כל התאים חייבים להיות מסומנים
+        // קריאה נוספת ל-myMarks מהקונטקסט העדכני
+        const currentMarks = myMarks;
+        if (!currentMarks || currentMarks.length !== 25) return;
 
-    // תבע שורות
-    tryAuto("row1");
-    tryAuto("row2");
-    tryAuto("row3");
-    tryAuto("row4");
-    tryAuto("row5");
+        if (key.startsWith("row")) {
+          const r = Number(key.replace("row", "")) - 1;
+          if (r < 0 || r > 4) return;
+          // בדיקה תא אחר תא - חייבים כל 5 התאים בשורה להיות מסומנים
+          for (let c = 0; c < 5; c++) {
+            const idx = r * 5 + c;
+            if (!currentMarks[idx]) {
+              return; // אם תא אחד לא מסומן - לא לנסות
+            }
+          }
+        } else if (key === "full") {
+          // בדיקה מדויקת - כל 25 התאים חייבים להיות מסומנים (כולל FREE ב-12)
+          for (let i = 0; i < 25; i++) {
+            if (!currentMarks[i]) {
+              return; // אם תא אחד לא מסומן - לא לנסות
+            }
+          }
+        } else {
+          return;
+        }
 
-    // תבע FULL (זה יסיים את המשחק ב-DB)
-    tryAuto("full");
+        // רק אם כל התאים מסומנים - תביעה
+        autoClaimRef.current.add(lock);
+        claimPrize(key);
+      };
+
+      // תבע שורות
+      tryAuto("row1");
+      tryAuto("row2");
+      tryAuto("row3");
+      tryAuto("row4");
+      tryAuto("row5");
+
+      // תבע FULL (זה יסיים את המשחק ב-DB)
+      tryAuto("full");
+    }, 200); // המתן 200ms כדי לוודא שה-state התעדכן לגמרי
+
+    return () => clearTimeout(timeoutId);
   }, [
     ses?.id,
     ses?.round_id,
     ses?.stage,
-    ses?.last_number, // חשוב כדי שהאפקט ירוץ בכל מספר חדש
+    myMarks, // חשוב: האפקט ירוץ כשהסימונים משתנים (שחקן מסמן)
     myCard,
-    calledSet,
     claimedMap,
     claimPrize,
   ]);
