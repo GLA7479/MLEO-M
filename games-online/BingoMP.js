@@ -521,11 +521,12 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     if (typeof window !== "undefined") window.localStorage.setItem(k, "1");
   }, [ses?.id, ses?.stage, ses?.round_id, ses?.active_seats, mySeat, vault, entryFee]);
 
-  // ---------------- mark number ----------------
+  // ---------------- mark number (only called numbers can be marked) ----------------
   const onCellClick = useCallback(
     (n) => {
       if (!myCard) return;
       if (ses?.stage !== "playing") return;
+      // Only allow marking numbers that were called
       if (!calledSet.has(n)) return;
       const { marks, changed } = applyMark(myCard, myMarks, n);
       if (changed) setMyMarks(marks);
@@ -1075,6 +1076,7 @@ function BingoLocal({ vault, onBackToMode }) {
 
   function onMark(playerIndex, n) {
     if (stage !== "playing") return;
+    // Only allow marking numbers that were called
     if (!calledSet.has(n)) return;
 
     setMarks((prev) => {
@@ -1248,19 +1250,24 @@ function BingoCard({ title, card, marks, calledSet, onCellClick, lastNumber }) {
         {card.flat().map((n, idx) => {
           const isFree = n === 0 && idx === 12;
           const isMarked = marks[idx];
-          const isCalled = isFree || calledSet.has(n); // המספר נקרא (יש התאמה)
+          const isCalled = isFree || calledSet.has(n); // המספר נקרא
+          // צהוב רק אם השחקן סימן את המספר שיצא
+          const shouldShowYellow = isMarked && isCalled && !isFree;
 
           return (
             <button
               key={idx}
               onClick={() => (isFree ? null : onCellClick(n))}
+              disabled={!isCalled && !isFree}
               className={`aspect-square rounded-lg border text-sm font-semibold grid place-items-center transition
-                ${isCalled ? "bg-yellow-500 border-yellow-400 shadow-lg shadow-yellow-500/60" : "bg-white/5 border-white/15 hover:bg-white/10"}
-                ${!isCalled ? "opacity-50" : ""}
+                ${shouldShowYellow ? "bg-yellow-500 border-yellow-400 shadow-lg shadow-yellow-500/60" : ""}
+                ${isMarked && !shouldShowYellow ? "bg-emerald-500/60 border-emerald-400 shadow-lg shadow-emerald-500/50" : ""}
+                ${!isMarked ? "bg-white/5 border-white/15 hover:bg-white/10" : ""}
+                ${!isCalled && !isFree ? "opacity-50 cursor-not-allowed" : ""}
               `}
-              title={isFree ? "FREE" : isCalled ? "Called" : "Not called yet"}
+              title={isFree ? "FREE" : shouldShowYellow ? "Marked - Number was called" : isMarked ? "Marked" : isCalled ? "Called - Click to mark" : "Not called yet - cannot mark"}
             >
-              <span className={isCalled ? "text-white font-bold" : ""}>
+              <span className={isMarked || shouldShowYellow ? "text-white font-bold" : ""}>
                 {isFree ? "FREE" : n}
               </span>
             </button>
@@ -1269,7 +1276,7 @@ function BingoCard({ title, card, marks, calledSet, onCellClick, lastNumber }) {
       </div>
 
       <div className="text-center text-xs text-white/60 mt-3">
-        You can only mark called numbers.
+        Only called numbers can be marked. Yellow = marked called number.
       </div>
     </div>
   );
