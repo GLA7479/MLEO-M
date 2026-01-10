@@ -440,6 +440,12 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const startGame = useCallback(async () => {
     if (!ses?.id) return;
 
+    // רק lobby או finished יכולים להתחיל משחק חדש
+    if (ses.stage !== "lobby" && ses.stage !== "finished") {
+      setMsg("Game already in progress");
+      return;
+    }
+
     const { data: freshPlayers } = await supabase
       .from("bingo_players")
       .select("*")
@@ -479,7 +485,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         finished_at: null,
       })
       .eq("id", ses.id)
-      .eq("stage", "lobby")
+      .in("stage", ["lobby", "finished"]) // מאפשר גם lobby וגם finished
       .select();
 
     if (error) {
@@ -500,10 +506,21 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       return;
     }
 
+    // נקה את claims הישנים (למשחק החדש) - מחק את כל ה-claims של הסשן
+    await supabase
+      .from("bingo_claims")
+      .delete()
+      .eq("session_id", ses.id);
+
+    // נקה את ה-refs עבור המשחק החדש
+    autoClaimRef.current.clear();
+    seenClaimIdsRef.current.clear();
+
     setSes(data[0]);
     setPlayers(freshPlayers || []);
     setMsg("");
-  }, [ses?.id, entryFee]);
+    setAnnouncement(""); // נקה הכרזות ישנות
+  }, [ses?.id, ses?.stage, entryFee]);
 
 
   // ---------------- local payment when round starts (burn if you leave) ----------------
@@ -603,6 +620,18 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         const cur = readVault();
         writeVault(cur + amount);
         if (typeof window !== "undefined") window.localStorage.setItem(credKey, "1");
+      }
+
+      // אם זה FULL BOARD - המשחק הסתיים, עדכן את ה-session state
+      if (prizeKey === "full") {
+        const { data: freshSes } = await supabase
+          .from("bingo_sessions")
+          .select("*")
+          .eq("id", ses.id)
+          .single();
+        if (freshSes) {
+          setSes(freshSes);
+        }
       }
 
       await refreshClaims(ses.id, ses.round_id);
@@ -999,9 +1028,15 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
             </button>
           )}
 
-          <button onClick={startGame} className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 text-xs">
-            Start Game
-          </button>
+          {(stage === "lobby" || stage === "finished") && (
+            <button 
+              onClick={startGame} 
+              className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 text-xs"
+              title={stage === "finished" ? "Start new game (requires 2+ players)" : "Start game (requires 2+ players)"}
+            >
+              {stage === "finished" ? "New Game" : "Start Game"}
+            </button>
+          )}
 
           <button onClick={onBackToMode} className="px-3 py-1 rounded bg-white/10 hover:bg-white/20 text-xs">
             Mode
