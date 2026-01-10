@@ -342,17 +342,24 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
 
   const refreshClaims = useCallback(
     async (sessionId, rId) => {
-      if (!sessionId || !rId) {
+      if (!sessionId) {
         setClaims([]);
         return;
       }
-      const { data } = await supabase
+      // אם יש round_id - רענון רק של הסיבוב הנוכחי, אחרת כל ה-claims
+      let query = supabase
         .from("bingo_claims")
         .select("*")
-        .eq("session_id", sessionId)
-        .eq("round_id", rId)
-        .order("id", { ascending: true });
-      setClaims(data || []);
+        .eq("session_id", sessionId);
+      
+      if (rId) {
+        query = query.eq("round_id", rId);
+      }
+      
+      const { data } = await query.order("id", { ascending: true });
+      if (data) {
+        setClaims(data);
+      }
     },
     []
   );
@@ -754,15 +761,35 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     }
 
     const ch = supabase
-      .channel("bingo_claims:" + ses.id)
-      .on("postgres_changes", { event: "*", schema: "public", table: "bingo_claims", filter: `session_id=eq.${ses.id}` }, async () => {
-        await refreshClaims(ses.id, ses.round_id);
+      .channel("bingo_claims:" + ses.id + ":" + ses.round_id)
+      .on("postgres_changes", { 
+        event: "*", 
+        schema: "public", 
+        table: "bingo_claims", 
+        filter: `session_id=eq.${ses.id}` 
+      }, async (payload) => {
+        // רענון מיידי כשמתעדכן claim
+        if (payload.new?.round_id === ses.round_id || payload.old?.round_id === ses.round_id) {
+          await refreshClaims(ses.id, ses.round_id);
+        }
       })
       .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") await refreshClaims(ses.id, ses.round_id);
+        if (status === "SUBSCRIBED") {
+          await refreshClaims(ses.id, ses.round_id);
+        }
       });
 
-    return () => ch.unsubscribe();
+    // פולינג נוסף ל-claims כדי לוודא שהעדכונים מגיעים מיד (גם בלי Realtime)
+    const pollInterval = setInterval(async () => {
+      if (ses?.id && ses?.round_id) {
+        await refreshClaims(ses.id, ses.round_id);
+      }
+    }, 1000); // כל שנייה - תדירות גבוהה יותר
+
+    return () => {
+      ch.unsubscribe();
+      clearInterval(pollInterval);
+    };
   }, [ses?.id, ses?.round_id, refreshClaims]);
 
   // ---------------- auto call next number every 15 seconds (only caller) ----------------
@@ -833,11 +860,12 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     return () => clearInterval(interval);
   }, [ses?.id, ses?.stage, ses?.last_number]); // reset timer when new number is called
 
-  // ---------------- polling for all players (to see numbers without Realtime) ----------------
+  // ---------------- polling for all players (to see numbers and claims without Realtime) ----------------
   useEffect(() => {
     if (!ses?.id) return;
 
     const t = setInterval(async () => {
+      // רענון session
       const { data } = await supabase
         .from("bingo_sessions")
         .select("*")
@@ -850,10 +878,20 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
           setTimer(5);
         }
       }
-    }, 2000);
+      
+      // רענון players (חשוב לצבעים)
+      if (ses?.id) {
+        await refreshPlayers(ses.id);
+      }
+      
+      // רענון claims (חשוב להצגת זכיות)
+      if (ses?.round_id) {
+        await refreshClaims(ses.id, ses.round_id);
+      }
+    }, 1000); // כל שנייה - תדירות גבוהה יותר לעדכונים מיידיים
 
     return () => clearInterval(t);
-  }, [ses?.id, ses?.last_number]);
+  }, [ses?.id, ses?.last_number, ses?.round_id, refreshClaims, refreshPlayers]);
 
   // initial load
   useEffect(() => {
