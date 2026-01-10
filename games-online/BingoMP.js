@@ -888,16 +888,27 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
           {Array.from({ length: seats }).map((_, idx) => {
             const row = seatMap.get(idx) || null;
             const isMe = row?.client_id === clientId;
+            // 6 צבעים שונים לכל כסא - רקע מלא ובולט
+            const seatColors = [
+              "bg-red-600 border-red-400 text-white",      // Seat 1 - אדום
+              "bg-blue-600 border-blue-400 text-white",    // Seat 2 - כחול
+              "bg-green-600 border-green-400 text-white",  // Seat 3 - ירוק
+              "bg-yellow-500 border-yellow-300 text-black", // Seat 4 - צהוב (טקסט שחור)
+              "bg-purple-600 border-purple-400 text-white", // Seat 5 - סגול
+              "bg-cyan-600 border-cyan-400 text-white",    // Seat 6 - ציאן
+            ];
+            const seatColorClass = seatColors[idx] || "bg-gray-600 border-gray-400 text-white";
+            
             return (
               <button
                 key={idx}
                 onClick={() => (!row ? takeSeat(idx) : null)}
-                className={`border rounded-md px-2 py-1 flex flex-col items-center justify-center text-[10px] font-semibold transition flex-1 ${
-                  isMe ? "border-white shadow-inner shadow-white/40" : "border-white/30"
-                }`}
+                className={`${seatColorClass} border-2 rounded-md px-2 py-1 flex flex-col items-center justify-center text-[10px] font-semibold transition flex-1 ${
+                  isMe ? "shadow-lg ring-2 ring-white ring-offset-1 ring-offset-black" : ""
+                } ${!row ? "opacity-60" : "hover:brightness-110"}`}
               >
-                <span>{`Seat ${idx + 1}`}</span>
-                <span className="text-white/70">{row?.player_name || "Empty"}{isMe ? " (You)" : ""}</span>
+                <span className="font-bold">{`Seat ${idx + 1}`}</span>
+                <span className={row ? "text-current" : "opacity-70"}>{row?.player_name || "Empty"}{isMe ? " (You)" : ""}</span>
               </button>
             );
           })}
@@ -944,27 +955,73 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
 
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
           {["row1","row2","row3","row4","row5"].map((k, i) => {
-            const claimed = claimedMap.has(k);
+            const claim = claimedMap.get(k);
+            const claimed = !!claim;
+            // מצא את הכסא של המנצח לפי client_id
+            const winnerPlayer = claim?.claimed_by_client_id 
+              ? players.find(p => p.client_id === claim.claimed_by_client_id)
+              : null;
+            const winnerSeatIndex = winnerPlayer?.seat_index ?? null;
+            
+            // צבעים לפי כסא (אותם צבעים כמו הכסאות)
+            const seatColors = [
+              "bg-red-600 border-red-400 text-white",      // Seat 1 - אדום
+              "bg-blue-600 border-blue-400 text-white",    // Seat 2 - כחול
+              "bg-green-600 border-green-400 text-white",  // Seat 3 - ירוק
+              "bg-yellow-500 border-yellow-300 text-black", // Seat 4 - צהוב
+              "bg-purple-600 border-purple-400 text-white", // Seat 5 - סגול
+              "bg-cyan-600 border-cyan-400 text-white",    // Seat 6 - ציאן
+            ];
+            const winnerColorClass = winnerSeatIndex != null && winnerSeatIndex < seatColors.length
+              ? seatColors[winnerSeatIndex]
+              : "bg-sky-600/70 border-sky-400 text-white";
+            
             return (
               <button
                 key={k}
                 onClick={() => claimPrize(k)}
                 disabled={stage !== "playing" || claimed}
-                className="px-2 py-1 rounded bg-sky-600/70 hover:bg-sky-500 disabled:opacity-50 text-[11px]"
-                title={claimed ? `Claimed by ${claimedMap.get(k)?.claimed_by_name}` : "Claim this row"}
+                className={`px-2 py-1 rounded border-2 hover:brightness-110 disabled:opacity-50 text-[11px] font-semibold ${
+                  claimed ? winnerColorClass : "bg-sky-600/70 border-sky-400 text-white"
+                }`}
+                title={claimed ? `Claimed by ${claim?.claimed_by_name}` : "Claim this row"}
               >
                 Row {i + 1}
               </button>
             );
           })}
-          <button
-            onClick={() => claimPrize("full")}
-            disabled={stage !== "playing" || claimedMap.has("full")}
-            className="px-2 py-1 rounded bg-purple-600/70 hover:bg-purple-500 disabled:opacity-50 text-[11px]"
-            title={claimedMap.has("full") ? `Claimed by ${claimedMap.get("full")?.claimed_by_name}` : "Claim FULL board"}
-          >
-            FULL
-          </button>
+          {(() => {
+            const fullClaim = claimedMap.get("full");
+            const fullWinnerPlayer = fullClaim?.claimed_by_client_id 
+              ? players.find(p => p.client_id === fullClaim.claimed_by_client_id)
+              : null;
+            const fullWinnerSeatIndex = fullWinnerPlayer?.seat_index ?? null;
+            
+            const seatColors = [
+              "bg-red-600 border-red-400 text-white",
+              "bg-blue-600 border-blue-400 text-white",
+              "bg-green-600 border-green-400 text-white",
+              "bg-yellow-500 border-yellow-300 text-black",
+              "bg-purple-600 border-purple-400 text-white",
+              "bg-cyan-600 border-cyan-400 text-white",
+            ];
+            const fullWinnerColorClass = fullWinnerSeatIndex != null && fullWinnerSeatIndex < seatColors.length
+              ? seatColors[fullWinnerSeatIndex]
+              : "bg-purple-600/70 border-purple-400 text-white";
+            
+            return (
+              <button
+                onClick={() => claimPrize("full")}
+                disabled={stage !== "playing" || claimedMap.has("full")}
+                className={`px-2 py-1 rounded border-2 hover:brightness-110 disabled:opacity-50 text-[11px] font-semibold ${
+                  claimedMap.has("full") ? fullWinnerColorClass : "bg-purple-600/70 border-purple-400 text-white"
+                }`}
+                title={claimedMap.has("full") ? `Claimed by ${fullClaim?.claimed_by_name}` : "Claim FULL board"}
+              >
+                FULL
+              </button>
+            );
+          })()}
         </div>
 
         {stage === "finished" && (
@@ -1222,23 +1279,62 @@ function BingoLocal({ vault, onBackToMode }) {
             Row prize: {fmt(rowPrize)} • Full prize: {fmt(fullPrize)} • Payout cap (90%): {fmt(Math.floor((potTotal * PAYOUT_CAP_BPS) / 10000))}
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-            {["row1","row2","row3","row4","row5"].map((k, i) => (
-              <button
-                key={k}
-                onClick={() => claimLocal(k)}
-                disabled={stage !== "playing" || claimed[k] != null}
-                className="px-2 py-1 rounded bg-sky-600/70 hover:bg-sky-500 disabled:opacity-50 text-[11px]"
-              >
-                Row {i + 1}
-              </button>
-            ))}
-            <button
-              onClick={() => claimLocal("full")}
-              disabled={stage !== "playing" || claimed.full != null}
-              className="px-2 py-1 rounded bg-purple-600/70 hover:bg-purple-500 disabled:opacity-50 text-[11px]"
-            >
-              FULL
-            </button>
+            {["row1","row2","row3","row4","row5"].map((k, i) => {
+              const winnerIndex = claimed[k];
+              // צבעים לפי שחקן (מתאים לכסאות)
+              const playerColors = [
+                "bg-red-600 border-red-400 text-white",      // Player 1 - אדום
+                "bg-blue-600 border-blue-400 text-white",    // Player 2 - כחול
+                "bg-green-600 border-green-400 text-white",  // Player 3 - ירוק
+                "bg-yellow-500 border-yellow-300 text-black", // Player 4 - צהוב
+                "bg-purple-600 border-purple-400 text-white", // Player 5 - סגול
+                "bg-cyan-600 border-cyan-400 text-white",    // Player 6 - ציאן
+              ];
+              const winnerColorClass = winnerIndex != null && winnerIndex < playerColors.length
+                ? playerColors[winnerIndex]
+                : "bg-sky-600/70 border-sky-400 text-white";
+              
+              return (
+                <button
+                  key={k}
+                  onClick={() => claimLocal(k)}
+                  disabled={stage !== "playing" || winnerIndex != null}
+                  className={`px-2 py-1 rounded border-2 hover:brightness-110 disabled:opacity-50 text-[11px] font-semibold ${
+                    winnerIndex != null ? winnerColorClass : "bg-sky-600/70 border-sky-400 text-white"
+                  }`}
+                  title={winnerIndex != null ? `Won by Player ${winnerIndex + 1}` : "Claim this row"}
+                >
+                  Row {i + 1}
+                </button>
+              );
+            })}
+            {(() => {
+              const fullWinnerIndex = claimed.full;
+              const playerColors = [
+                "bg-red-600 border-red-400 text-white",
+                "bg-blue-600 border-blue-400 text-white",
+                "bg-green-600 border-green-400 text-white",
+                "bg-yellow-500 border-yellow-300 text-black",
+                "bg-purple-600 border-purple-400 text-white",
+                "bg-cyan-600 border-cyan-400 text-white",
+              ];
+              const fullWinnerColorClass = fullWinnerIndex != null && fullWinnerIndex < playerColors.length
+                ? playerColors[fullWinnerIndex]
+                : "bg-purple-600/70 border-purple-400 text-white";
+              
+              return (
+                <button
+                  onClick={() => claimLocal("full")}
+                  disabled={stage !== "playing" || claimed.full != null}
+                  className={`px-2 py-1 rounded border-2 hover:brightness-110 disabled:opacity-50 text-[11px] font-semibold ${
+                    claimed.full != null ? fullWinnerColorClass : "bg-purple-600/70 border-purple-400 text-white"
+                  }`}
+                  title={claimed.full != null ? `Won by Player ${claimed.full + 1}` : "Claim FULL board"}
+                >
+                  FULL
+                </button>
+              );
+            })()}
           </div>
         </div>
       )}
