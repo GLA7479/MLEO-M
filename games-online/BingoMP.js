@@ -180,6 +180,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const [msg, setMsg] = useState("");
   const [timer, setTimer] = useState(5);
   const [announcement, setAnnouncement] = useState("");
+  const [announcementColor, setAnnouncementColor] = useState({ bg: "bg-emerald-500/20", border: "border-emerald-400/30", text: "text-emerald-300" }); // default color
 
   const autoClaimRef = useRef(new Set());
   const seenClaimIdsRef = useRef(new Set());
@@ -699,14 +700,38 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     // הכרז על האחרון (או תעשה תור אם אתה רוצה)
     const last = fresh[fresh.length - 1];
 
+    // מצא את הכסא של המנצח לפי client_id
+    const winnerPlayer = last?.claimed_by_client_id 
+      ? players.find(p => p.client_id === last.claimed_by_client_id)
+      : null;
+    const winnerSeatIndex = winnerPlayer?.seat_index ?? null;
+    
+    // צבעים לפי כסא
+    const seatColorMap = {
+      0: { bg: "bg-red-500/20", border: "border-red-400/30", text: "text-red-300" }, // Seat 1 - אדום
+      1: { bg: "bg-blue-500/20", border: "border-blue-400/30", text: "text-blue-300" }, // Seat 2 - כחול
+      2: { bg: "bg-green-500/20", border: "border-green-400/30", text: "text-green-300" }, // Seat 3 - ירוק
+      3: { bg: "bg-yellow-500/20", border: "border-yellow-400/30", text: "text-yellow-300" }, // Seat 4 - צהוב
+      4: { bg: "bg-purple-500/20", border: "border-purple-400/30", text: "text-purple-300" }, // Seat 5 - סגול
+      5: { bg: "bg-cyan-500/20", border: "border-cyan-400/30", text: "text-cyan-300" }, // Seat 6 - ציאן
+    };
+    
+    const color = winnerSeatIndex != null && seatColorMap[winnerSeatIndex]
+      ? seatColorMap[winnerSeatIndex]
+      : { bg: "bg-emerald-500/20", border: "border-emerald-400/30", text: "text-emerald-300" }; // default
+
     const label =
       last.prize_key === "full"
         ? "🏆 FULL BOARD"
         : `🎉 ROW ${Number(last.prize_key.replace("row", ""))}`;
 
     setAnnouncement(`${label} — ${last.claimed_by_name} won +${fmt(last.amount)} MLEO`);
-    setTimeout(() => setAnnouncement(""), 3500);
-  }, [claims]);
+    setAnnouncementColor(color);
+    setTimeout(() => {
+      setAnnouncement("");
+      setAnnouncementColor({ bg: "bg-emerald-500/20", border: "border-emerald-400/30", text: "text-emerald-300" });
+    }, 3500);
+  }, [claims, players]);
 
   // ---------------- realtime subscriptions ----------------
   useEffect(() => {
@@ -1070,7 +1095,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       </div>
 
       {announcement ? (
-        <div className="text-emerald-300 text-xs text-center font-semibold bg-emerald-500/20 border border-emerald-400/30 rounded-lg p-2">
+        <div className={`${announcementColor.bg} ${announcementColor.border} ${announcementColor.text} text-xs text-center font-semibold border rounded-lg p-2`}>
           {announcement}
         </div>
       ) : null}
