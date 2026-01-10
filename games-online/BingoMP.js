@@ -1262,12 +1262,10 @@ function BingoCard({ title, card, marks, calledSet, onCellClick, lastNumber }) {
               className={`aspect-square rounded-lg border text-sm font-semibold grid place-items-center transition
                 ${shouldShowYellow ? "bg-yellow-500 border-yellow-400 shadow-lg shadow-yellow-500/60" : ""}
                 ${isMarked && !shouldShowYellow ? "bg-emerald-500/60 border-emerald-400 shadow-lg shadow-emerald-500/50" : ""}
-                ${!isMarked ? "bg-white/5 border-white/15 hover:bg-white/10" : ""}
-                ${!isCalled && !isFree ? "opacity-50 cursor-not-allowed" : ""}
+                ${!isMarked ? "bg-white/5 border-white/15" : ""}
               `}
-              title={isFree ? "FREE" : shouldShowYellow ? "Marked - Number was called" : isMarked ? "Marked" : isCalled ? "Called - Click to mark" : "Not called yet - cannot mark"}
             >
-              <span className={isMarked || shouldShowYellow ? "text-white font-bold" : ""}>
+              <span className={shouldShowYellow ? "text-white font-bold" : isMarked ? "text-white font-bold" : ""}>
                 {isFree ? "FREE" : n}
               </span>
             </button>
