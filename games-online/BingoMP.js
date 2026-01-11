@@ -110,7 +110,7 @@ export default function BingoMP({ roomId, playerName, vault, setVaultBoth, tierC
             onClick={() => setMode("online")}
             className="w-full px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold"
           >
-            Online • 2–6 Players
+            Online • 2–8 Players
           </button>
 
           <button
@@ -145,7 +145,7 @@ export default function BingoMP({ roomId, playerName, vault, setVaultBoth, tierC
 }
 
 // ===========================================================
-// ONLINE MULTIPLAYER (Supabase) - 6 seats
+// ONLINE MULTIPLAYER (Supabase) - 8 seats
 // ===========================================================
 function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const name = playerName || "Guest";
@@ -298,7 +298,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       const baseSession = {
         room_id: room,
         stage: "lobby",
-        seat_count: 6,
+        seat_count: 8,
         entry_fee: entryFee,
         house_bps: HOUSE_BPS,
         active_seats: [],
@@ -743,6 +743,8 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       3: { bg: "bg-yellow-500/20", border: "border-yellow-400/30", text: "text-yellow-300" }, // Seat 4 - צהוב
       4: { bg: "bg-purple-500/20", border: "border-purple-400/30", text: "text-purple-300" }, // Seat 5 - סגול
       5: { bg: "bg-cyan-500/20", border: "border-cyan-400/30", text: "text-cyan-300" }, // Seat 6 - ציאן
+      6: { bg: "bg-orange-500/20", border: "border-orange-400/30", text: "text-orange-300" }, // Seat 7 - כתום
+      7: { bg: "bg-amber-500/20", border: "border-amber-400/30", text: "text-amber-300" }, // Seat 8 - חום
     };
     
     const color = winnerSeatIndex != null && seatColorMap[winnerSeatIndex]
@@ -968,7 +970,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     );
   }
 
-  const seats = 6;
+  const seats = 8;
   const rowPrize = Math.floor((potTotal * ROW_BPS) / 10000);
   const fullPrize = Math.floor((potTotal * FULL_BPS) / 10000);
 
@@ -976,11 +978,11 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     <div className="w-full h-full flex flex-col gap-2 p-3" style={{ height: "100%", overflow: "hidden" }}>
       {/* Seats */}
       <div className="w-full overflow-x-auto flex-shrink-0">
-        <div className="flex gap-1 text-[9px] min-w-[420px]">
+        <div className="flex gap-1 text-[9px] min-w-[560px]">
           {Array.from({ length: seats }).map((_, idx) => {
             const row = seatMap.get(idx) || null;
             const isMe = row?.client_id === clientId;
-            // 6 צבעים שונים לכל כסא - רקע מלא ובולט
+            // 8 צבעים שונים לכל כסא - רקע מלא ובולט
             const seatColors = [
               "bg-red-600 border-red-400 text-white",      // Seat 1 - אדום
               "bg-blue-600 border-blue-400 text-white",    // Seat 2 - כחול
@@ -988,6 +990,8 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
               "bg-yellow-500 border-yellow-300 text-black", // Seat 4 - צהוב (טקסט שחור)
               "bg-purple-600 border-purple-400 text-white", // Seat 5 - סגול
               "bg-cyan-600 border-cyan-400 text-white",    // Seat 6 - ציאן
+              "bg-orange-600 border-orange-400 text-white", // Seat 7 - כתום
+              "bg-amber-500 border-amber-400 text-white",    // Seat 8 - חום
             ];
             const seatColorClass = seatColors[idx] || "bg-gray-600 border-gray-400 text-white";
             
@@ -1069,6 +1073,8 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
               "bg-yellow-500 border-yellow-300 text-black", // Seat 4 - צהוב
               "bg-purple-600 border-purple-400 text-white", // Seat 5 - סגול
               "bg-cyan-600 border-cyan-400 text-white",    // Seat 6 - ציאן
+              "bg-orange-600 border-orange-400 text-white", // Seat 7 - כתום
+              "bg-amber-500 border-amber-400 text-white",    // Seat 8 - חום
             ];
             const winnerColorClass = winnerSeatIndex != null && winnerSeatIndex < seatColors.length
               ? seatColors[winnerSeatIndex]
@@ -1102,6 +1108,8 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
               "bg-yellow-500 border-yellow-300 text-black",
               "bg-purple-600 border-purple-400 text-white",
               "bg-cyan-600 border-cyan-400 text-white",
+              "bg-orange-600 border-orange-400 text-white",
+              "bg-rose-600 border-rose-400 text-white",
             ];
             const fullWinnerColorClass = fullWinnerSeatIndex != null && fullWinnerSeatIndex < seatColors.length
               ? seatColors[fullWinnerSeatIndex]

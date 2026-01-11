@@ -17,7 +17,7 @@ create table if not exists public.bingo_sessions (
   id bigserial primary key,
   room_id text not null,
   stage text not null default 'lobby',          -- lobby | playing | finished
-  seat_count int not null default 6,
+  seat_count int not null default 8,            -- max 8 players per table
 
   -- entry config
   entry_fee int not null default 10000,         -- MLEO units (game currency)

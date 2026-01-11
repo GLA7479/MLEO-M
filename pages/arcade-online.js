@@ -132,7 +132,7 @@ const GAME_REGISTRY = [
     id: "bingo",
     title: "Bingo",
     emoji: "🎯",
-    description: "Bingo like Ludo! Online multiplayer (2-6 players) or local play. Win prizes for rows and full board!",
+    description: "Bingo like Ludo! Online multiplayer (2-8 players) or local play. Win prizes for rows and full board!",
     color: "#EC4899",
     isMultiplayer: true,
     loader: () => import("../games-online/BingoMP").then(m => m.default)
