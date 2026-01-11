@@ -984,14 +984,14 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
             const isMe = row?.client_id === clientId;
             // 8 צבעים שונים לכל כסא - רקע מלא ובולט
             const seatColors = [
-              "bg-red-600 border-red-400 text-black",      // Seat 1 - אדום
-              "bg-blue-600 border-blue-400 text-black",    // Seat 2 - כחול
-              "bg-green-600 border-green-400 text-black",  // Seat 3 - ירוק
-              "bg-yellow-500 border-yellow-300 text-black", // Seat 4 - צהוב
-              "bg-purple-600 border-purple-400 text-black", // Seat 5 - סגול
-              "bg-cyan-600 border-cyan-400 text-black",    // Seat 6 - ציאן
-              "bg-orange-600 border-orange-400 text-black", // Seat 7 - כתום
-              "bg-fuchsia-500 border-fuchsia-400 text-black",    // Seat 8 - פוקסיה
+              "bg-red-600 border-red-400 text-white",      // Seat 1 - אדום
+              "bg-blue-600 border-blue-400 text-white",    // Seat 2 - כחול
+              "bg-green-600 border-green-400 text-white",  // Seat 3 - ירוק
+              "bg-yellow-500 border-yellow-300 text-white", // Seat 4 - צהוב
+              "bg-purple-600 border-purple-400 text-white", // Seat 5 - סגול
+              "bg-cyan-600 border-cyan-400 text-white",    // Seat 6 - ציאן
+              "bg-orange-600 border-orange-400 text-white", // Seat 7 - כתום
+              "bg-fuchsia-500 border-fuchsia-400 text-white",    // Seat 8 - פוקסיה
             ];
             const seatColorClass = seatColors[idx] || "bg-gray-600 border-gray-400 text-white";
             
@@ -1001,10 +1001,10 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
                 onClick={() => (!row ? takeSeat(idx) : null)}
                 className={`${seatColorClass} border-2 rounded-md px-2 py-1 flex flex-col items-center justify-center text-[10px] font-semibold transition flex-1 ${
                   isMe ? "shadow-lg ring-2 ring-white ring-offset-1 ring-offset-black" : ""
-                } ${!row ? "opacity-60" : "hover:brightness-110"}`}
+                } ${!row ? "opacity-75" : "hover:brightness-110"}`}
               >
-                <span className="font-bold">{`Seat ${idx + 1}`}</span>
-                <span className={row ? "text-current" : "opacity-70"}>{row?.player_name || "Empty"}{isMe ? " (You)" : ""}</span>
+                <span className="font-bold text-white drop-shadow">{`Seat ${idx + 1}`}</span>
+                <span className="text-white drop-shadow">{row?.player_name || "Empty"}{isMe ? " (You)" : ""}</span>
               </button>
             );
           })}
@@ -1070,7 +1070,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
               "bg-red-600 border-red-400 text-white",      // Seat 1 - אדום
               "bg-blue-600 border-blue-400 text-white",    // Seat 2 - כחול
               "bg-green-600 border-green-400 text-white",  // Seat 3 - ירוק
-              "bg-yellow-500 border-yellow-300 text-black", // Seat 4 - צהוב
+              "bg-yellow-500 border-yellow-300 text-white", // Seat 4 - צהוב
               "bg-purple-600 border-purple-400 text-white", // Seat 5 - סגול
               "bg-cyan-600 border-cyan-400 text-white",    // Seat 6 - ציאן
               "bg-orange-600 border-orange-400 text-white", // Seat 7 - כתום
@@ -1105,7 +1105,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
               "bg-red-600 border-red-400 text-white",
               "bg-blue-600 border-blue-400 text-white",
               "bg-green-600 border-green-400 text-white",
-              "bg-yellow-500 border-yellow-300 text-black",
+              "bg-yellow-500 border-yellow-300 text-white",
               "bg-purple-600 border-purple-400 text-white",
               "bg-cyan-600 border-cyan-400 text-white",
               "bg-orange-600 border-orange-400 text-white",
@@ -1394,7 +1394,7 @@ function BingoLocal({ vault, onBackToMode }) {
                 "bg-red-600 border-red-400 text-white",      // Player 1 - אדום
                 "bg-blue-600 border-blue-400 text-white",    // Player 2 - כחול
                 "bg-green-600 border-green-400 text-white",  // Player 3 - ירוק
-                "bg-yellow-500 border-yellow-300 text-black", // Player 4 - צהוב
+                "bg-yellow-500 border-yellow-300 text-white", // Player 4 - צהוב
                 "bg-purple-600 border-purple-400 text-white", // Player 5 - סגול
                 "bg-cyan-600 border-cyan-400 text-white",    // Player 6 - ציאן
               ];
@@ -1422,7 +1422,7 @@ function BingoLocal({ vault, onBackToMode }) {
                 "bg-red-600 border-red-400 text-white",
                 "bg-blue-600 border-blue-400 text-white",
                 "bg-green-600 border-green-400 text-white",
-                "bg-yellow-500 border-yellow-300 text-black",
+                "bg-yellow-500 border-yellow-300 text-white",
                 "bg-purple-600 border-purple-400 text-white",
                 "bg-cyan-600 border-cyan-400 text-white",
               ];
