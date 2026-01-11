@@ -744,7 +744,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       4: { bg: "bg-purple-500/20", border: "border-purple-400/30", text: "text-purple-300" }, // Seat 5 - סגול
       5: { bg: "bg-cyan-500/20", border: "border-cyan-400/30", text: "text-cyan-300" }, // Seat 6 - ציאן
       6: { bg: "bg-orange-500/20", border: "border-orange-400/30", text: "text-orange-300" }, // Seat 7 - כתום
-      7: { bg: "bg-amber-500/20", border: "border-amber-400/30", text: "text-amber-300" }, // Seat 8 - חום
+      7: { bg: "bg-fuchsia-500/20", border: "border-fuchsia-400/30", text: "text-fuchsia-300" }, // Seat 8 - פוקסיה
     };
     
     const color = winnerSeatIndex != null && seatColorMap[winnerSeatIndex]
@@ -984,14 +984,14 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
             const isMe = row?.client_id === clientId;
             // 8 צבעים שונים לכל כסא - רקע מלא ובולט
             const seatColors = [
-              "bg-red-600 border-red-400 text-white",      // Seat 1 - אדום
-              "bg-blue-600 border-blue-400 text-white",    // Seat 2 - כחול
-              "bg-green-600 border-green-400 text-white",  // Seat 3 - ירוק
-              "bg-yellow-500 border-yellow-300 text-black", // Seat 4 - צהוב (טקסט שחור)
-              "bg-purple-600 border-purple-400 text-white", // Seat 5 - סגול
-              "bg-cyan-600 border-cyan-400 text-white",    // Seat 6 - ציאן
-              "bg-orange-600 border-orange-400 text-white", // Seat 7 - כתום
-              "bg-amber-500 border-amber-400 text-white",    // Seat 8 - חום
+              "bg-red-600 border-red-400 text-black",      // Seat 1 - אדום
+              "bg-blue-600 border-blue-400 text-black",    // Seat 2 - כחול
+              "bg-green-600 border-green-400 text-black",  // Seat 3 - ירוק
+              "bg-yellow-500 border-yellow-300 text-black", // Seat 4 - צהוב
+              "bg-purple-600 border-purple-400 text-black", // Seat 5 - סגול
+              "bg-cyan-600 border-cyan-400 text-black",    // Seat 6 - ציאן
+              "bg-orange-600 border-orange-400 text-black", // Seat 7 - כתום
+              "bg-fuchsia-500 border-fuchsia-400 text-black",    // Seat 8 - פוקסיה
             ];
             const seatColorClass = seatColors[idx] || "bg-gray-600 border-gray-400 text-white";
             
@@ -1058,7 +1058,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
           {["row1","row2","row3","row4","row5"].map((k, i) => {
             const claim = claimedMap.get(k);
-            const claimed = !!claim;
+            const claimed = !!claim; // צובע רק אם יש זכייה אמיתית
             // מצא את הכסא של המנצח לפי client_id
             const winnerPlayer = claim?.claimed_by_client_id 
               ? players.find(p => p.client_id === claim.claimed_by_client_id)
@@ -1074,7 +1074,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
               "bg-purple-600 border-purple-400 text-white", // Seat 5 - סגול
               "bg-cyan-600 border-cyan-400 text-white",    // Seat 6 - ציאן
               "bg-orange-600 border-orange-400 text-white", // Seat 7 - כתום
-              "bg-amber-500 border-amber-400 text-white",    // Seat 8 - חום
+              "bg-fuchsia-500 border-fuchsia-400 text-white",    // Seat 8 - פוקסיה
             ];
             const winnerColorClass = winnerSeatIndex != null && winnerSeatIndex < seatColors.length
               ? seatColors[winnerSeatIndex]
@@ -1086,7 +1086,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
                 onClick={() => claimPrize(k)}
                 disabled={stage !== "playing" || claimed}
                 className={`px-2 py-1 rounded border-2 hover:brightness-110 disabled:opacity-50 text-[11px] font-semibold ${
-                  claimed ? winnerColorClass : "bg-sky-600/70 border-sky-400 text-white"
+                  claimed ? winnerColorClass : "bg-slate-800/60 border-white/20 text-white/70"
                 }`}
                 title={claimed ? `Claimed by ${claim?.claimed_by_name}` : "Claim this row"}
               >
@@ -1109,20 +1109,22 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
               "bg-purple-600 border-purple-400 text-white",
               "bg-cyan-600 border-cyan-400 text-white",
               "bg-orange-600 border-orange-400 text-white",
-              "bg-rose-600 border-rose-400 text-white",
+              "bg-fuchsia-500 border-fuchsia-400 text-white",
             ];
             const fullWinnerColorClass = fullWinnerSeatIndex != null && fullWinnerSeatIndex < seatColors.length
               ? seatColors[fullWinnerSeatIndex]
               : "bg-purple-600/70 border-purple-400 text-white";
             
+            const fullClaimed = claimedMap.has("full"); // צובע רק אם יש זכייה אמיתית
+
             return (
               <button
                 onClick={() => claimPrize("full")}
-                disabled={stage !== "playing" || claimedMap.has("full")}
+                disabled={stage !== "playing" || fullClaimed}
                 className={`px-2 py-1 rounded border-2 hover:brightness-110 disabled:opacity-50 text-[11px] font-semibold ${
-                  claimedMap.has("full") ? fullWinnerColorClass : "bg-purple-600/70 border-purple-400 text-white"
+                  fullClaimed ? fullWinnerColorClass : "bg-slate-800/60 border-white/20 text-white/70"
                 }`}
-                title={claimedMap.has("full") ? `Claimed by ${fullClaim?.claimed_by_name}` : "Claim FULL board"}
+                title={fullClaimed ? `Claimed by ${fullClaim?.claimed_by_name}` : "Claim FULL board"}
               >
                 FULL
               </button>
