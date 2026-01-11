@@ -978,7 +978,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     <div className="w-full h-full flex flex-col gap-2 p-3" style={{ height: "100%", overflow: "hidden" }}>
       {/* Seats */}
       <div className="w-full overflow-x-auto flex-shrink-0">
-        <div className="flex gap-1 text-[9px] min-w-[560px]">
+        <div className="flex gap-1 text-[9px] min-w-[420px]">
           {Array.from({ length: seats }).map((_, idx) => {
             const row = seatMap.get(idx) || null;
             const isMe = row?.client_id === clientId;
