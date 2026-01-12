@@ -976,6 +976,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
 
   return (
     <div className="w-full h-full flex flex-col gap-2 p-3" style={{ height: "100%", overflow: "hidden" }}>
+      <div className="transform scale-90 origin-top w-full flex flex-col gap-2">
       {/* Seats */}
       <div className="w-full overflow-x-auto flex-shrink-0">
         <div className="flex gap-1 text-[9px] min-w-[420px]">
@@ -1045,6 +1046,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
           </button>
         </div>
       </div>
+      </div>
 
       {announcement ? (
         <div className={`${announcementColor.bg} ${announcementColor.border} ${announcementColor.text} text-xs text-center font-semibold border rounded-lg p-2`}>
@@ -1054,146 +1056,149 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
 
       {msg ? <div className="text-amber-300 text-xs text-center">{msg}</div> : null}
 
-      {/* Main area */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-2 overflow-hidden">
-        {/* Card */}
-        <div className="bg-black/40 rounded-xl p-3 overflow-auto">
-          {!myRow ? (
-            <div className="w-full h-full grid place-items-center text-white/60 text-sm">Take a seat to get your card.</div>
-          ) : !myCard ? (
-            <div className="w-full h-full grid place-items-center text-white/60 text-sm">Waiting for game…</div>
-          ) : (
-            <BingoCard
-              title="Your card"
-              card={myCard}
-              marks={myMarks}
-              calledSet={calledSet}
-              onCellClick={onCellClick}
-              lastNumber={ses?.last_number}
-            />
+      {/* Scale wrapper to shrink everything uniformly (includes seats, header, main, prizes, details) */}
+      <div className="transform scale-90 origin-top w-full flex flex-col gap-2">
+        {/* Main area */}
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-2 overflow-hidden">
+          {/* Card */}
+          <div className="bg-black/40 rounded-xl p-3 overflow-auto">
+            {!myRow ? (
+              <div className="w-full h-full grid place-items-center text-white/60 text-sm">Take a seat to get your card.</div>
+            ) : !myCard ? (
+              <div className="w-full h-full grid place-items-center text-white/60 text-sm">Waiting for game…</div>
+            ) : (
+              <BingoCard
+                title="Your card"
+                card={myCard}
+                marks={myMarks}
+                calledSet={calledSet}
+                onCellClick={onCellClick}
+                lastNumber={ses?.last_number}
+              />
+            )}
+          </div>
+
+          {/* Called list */}
+          <div className="bg-black/40 rounded-xl p-3 overflow-auto">
+            <div className="text-sm font-semibold mb-2">Called</div>
+            <div className="flex flex-wrap gap-2">
+              {called.length ? called.slice().reverse().map((n, idx) => {
+                const isLast = idx === 0; // First in reversed array is the last called
+                return (
+                  <span
+                    key={`${n}-${idx}`}
+                    className={`px-2 py-1 rounded border text-xs font-semibold ${
+                      isLast
+                        ? "bg-emerald-500/80 border-emerald-400 text-white shadow-lg shadow-emerald-500/50"
+                        : "bg-white/10 border-white/10"
+                    }`}
+                  >
+                    {n}
+                  </span>
+                );
+              }) : <div className="text-white/60 text-sm">No numbers yet</div>}
+            </div>
+          </div>
+        </div>
+
+        {/* Claims at bottom */}
+        <div className="bg-black/30 rounded-xl p-3 flex flex-col gap-2 flex-shrink-0">
+          <div className="text-xs text-white/70 flex items-center justify-between">
+            <span>Prizes</span>
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            {["row1","row2","row3","row4","row5"].map((k, i) => {
+              const claim = claimedMap.get(k);
+              const claimed = !!claim; // צובע רק אם יש זכייה אמיתית
+              // מצא את הכסא של המנצח לפי client_id
+              const winnerPlayer = claim?.claimed_by_client_id 
+                ? players.find(p => p.client_id === claim.claimed_by_client_id)
+                : null;
+              const winnerSeatIndex = winnerPlayer?.seat_index ?? null;
+              
+              // צבעים לפי כסא (אותם צבעים כמו הכסאות)
+              const seatColors = [
+                "bg-red-600 border-red-400 text-white",      // Seat 1 - אדום
+                "bg-blue-600 border-blue-400 text-white",    // Seat 2 - כחול
+                "bg-green-600 border-green-400 text-white",  // Seat 3 - ירוק
+                "bg-yellow-500 border-yellow-300 text-white", // Seat 4 - צהוב
+                "bg-purple-600 border-purple-400 text-white", // Seat 5 - סגול
+                "bg-cyan-600 border-cyan-400 text-white",    // Seat 6 - ציאן
+                "bg-orange-600 border-orange-400 text-white", // Seat 7 - כתום
+                "bg-fuchsia-500 border-fuchsia-400 text-white",    // Seat 8 - פוקסיה
+              ];
+              const winnerColorClass = winnerSeatIndex != null && winnerSeatIndex < seatColors.length
+                ? seatColors[winnerSeatIndex]
+                : "bg-sky-600/70 border-sky-400 text-white";
+              
+              return (
+                <button
+                  key={k}
+                  onClick={() => claimPrize(k)}
+                  disabled={stage !== "playing" || claimed}
+                  className={`px-2 py-1 rounded border-2 hover:brightness-110 disabled:opacity-50 text-[11px] font-semibold ${
+                    claimed ? winnerColorClass : "bg-slate-800/60 border-white/20 text-white/70"
+                  }`}
+                  title={claimed ? `Claimed by ${claim?.claimed_by_name}` : "Claim this row"}
+                >
+                  Row {i + 1}
+                </button>
+              );
+            })}
+            {(() => {
+              const fullClaim = claimedMap.get("full");
+              const fullWinnerPlayer = fullClaim?.claimed_by_client_id 
+                ? players.find(p => p.client_id === fullClaim.claimed_by_client_id)
+                : null;
+              const fullWinnerSeatIndex = fullWinnerPlayer?.seat_index ?? null;
+              
+              const seatColors = [
+                "bg-red-600 border-red-400 text-white",
+                "bg-blue-600 border-blue-400 text-white",
+                "bg-green-600 border-green-400 text-white",
+                "bg-yellow-500 border-yellow-300 text-white",
+                "bg-purple-600 border-purple-400 text-white",
+                "bg-cyan-600 border-cyan-400 text-white",
+                "bg-orange-600 border-orange-400 text-white",
+                "bg-fuchsia-500 border-fuchsia-400 text-white",
+              ];
+              const fullWinnerColorClass = fullWinnerSeatIndex != null && fullWinnerSeatIndex < seatColors.length
+                ? seatColors[fullWinnerSeatIndex]
+                : "bg-purple-600/70 border-purple-400 text-white";
+              
+              const fullClaimed = claimedMap.has("full"); // צובע רק אם יש זכייה אמיתית
+
+              return (
+                <button
+                  onClick={() => claimPrize("full")}
+                  disabled={stage !== "playing" || fullClaimed}
+                  className={`px-2 py-1 rounded border-2 hover:brightness-110 disabled:opacity-50 text-[11px] font-semibold ${
+                    fullClaimed ? fullWinnerColorClass : "bg-slate-800/60 border-white/20 text-white/70"
+                  }`}
+                  title={fullClaimed ? `Claimed by ${fullClaim?.claimed_by_name}` : "Claim FULL board"}
+                >
+                  FULL
+                </button>
+              );
+            })()}
+          </div>
+
+          {stage === "finished" && (
+            <div className="text-xs text-emerald-300 text-center">
+              Winner: {ses?.winner_name || "Unknown"}
+            </div>
           )}
         </div>
 
-        {/* Called list */}
-        <div className="bg-black/40 rounded-xl p-3 overflow-auto">
-          <div className="text-sm font-semibold mb-2">Called</div>
-          <div className="flex flex-wrap gap-2">
-            {called.length ? called.slice().reverse().map((n, idx) => {
-              const isLast = idx === 0; // First in reversed array is the last called
-              return (
-                <span
-                  key={`${n}-${idx}`}
-                  className={`px-2 py-1 rounded border text-xs font-semibold ${
-                    isLast
-                      ? "bg-emerald-500/80 border-emerald-400 text-white shadow-lg shadow-emerald-500/50"
-                      : "bg-white/10 border-white/10"
-                  }`}
-                >
-                  {n}
-                </span>
-              );
-            }) : <div className="text-white/60 text-sm">No numbers yet</div>}
-          </div>
+        {/* Details footer */}
+        <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-1 flex-shrink-0 text-xs text-white/70">
+          <div className="text-sm font-semibold text-white">Details</div>
+          <div>Stage: {stage} • Last: {ses?.last_number ?? "-"}</div>
+          <div>Entry: {fmt(entryFee)} • Pot: {fmt(potTotal)} • House: {fmt(houseCut)}</div>
+          <div>Row: {fmt(rowPrize)} • Full: {fmt(fullPrize)} • Cap: {fmt(payoutCap)}</div>
+          <div>Room: {roomId}</div>
         </div>
-      </div>
-
-    {/* Claims at bottom */}
-    <div className="bg-black/30 rounded-xl p-3 flex flex-col gap-2 flex-shrink-0">
-      <div className="text-xs text-white/70 flex items-center justify-between">
-        <span>Prizes</span>
-      </div>
-
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-          {["row1","row2","row3","row4","row5"].map((k, i) => {
-            const claim = claimedMap.get(k);
-            const claimed = !!claim; // צובע רק אם יש זכייה אמיתית
-            // מצא את הכסא של המנצח לפי client_id
-            const winnerPlayer = claim?.claimed_by_client_id 
-              ? players.find(p => p.client_id === claim.claimed_by_client_id)
-              : null;
-            const winnerSeatIndex = winnerPlayer?.seat_index ?? null;
-            
-            // צבעים לפי כסא (אותם צבעים כמו הכסאות)
-            const seatColors = [
-              "bg-red-600 border-red-400 text-white",      // Seat 1 - אדום
-              "bg-blue-600 border-blue-400 text-white",    // Seat 2 - כחול
-              "bg-green-600 border-green-400 text-white",  // Seat 3 - ירוק
-              "bg-yellow-500 border-yellow-300 text-white", // Seat 4 - צהוב
-              "bg-purple-600 border-purple-400 text-white", // Seat 5 - סגול
-              "bg-cyan-600 border-cyan-400 text-white",    // Seat 6 - ציאן
-              "bg-orange-600 border-orange-400 text-white", // Seat 7 - כתום
-              "bg-fuchsia-500 border-fuchsia-400 text-white",    // Seat 8 - פוקסיה
-            ];
-            const winnerColorClass = winnerSeatIndex != null && winnerSeatIndex < seatColors.length
-              ? seatColors[winnerSeatIndex]
-              : "bg-sky-600/70 border-sky-400 text-white";
-            
-            return (
-              <button
-                key={k}
-                onClick={() => claimPrize(k)}
-                disabled={stage !== "playing" || claimed}
-                className={`px-2 py-1 rounded border-2 hover:brightness-110 disabled:opacity-50 text-[11px] font-semibold ${
-                  claimed ? winnerColorClass : "bg-slate-800/60 border-white/20 text-white/70"
-                }`}
-                title={claimed ? `Claimed by ${claim?.claimed_by_name}` : "Claim this row"}
-              >
-                Row {i + 1}
-              </button>
-            );
-          })}
-          {(() => {
-            const fullClaim = claimedMap.get("full");
-            const fullWinnerPlayer = fullClaim?.claimed_by_client_id 
-              ? players.find(p => p.client_id === fullClaim.claimed_by_client_id)
-              : null;
-            const fullWinnerSeatIndex = fullWinnerPlayer?.seat_index ?? null;
-            
-            const seatColors = [
-              "bg-red-600 border-red-400 text-white",
-              "bg-blue-600 border-blue-400 text-white",
-              "bg-green-600 border-green-400 text-white",
-              "bg-yellow-500 border-yellow-300 text-white",
-              "bg-purple-600 border-purple-400 text-white",
-              "bg-cyan-600 border-cyan-400 text-white",
-              "bg-orange-600 border-orange-400 text-white",
-              "bg-fuchsia-500 border-fuchsia-400 text-white",
-            ];
-            const fullWinnerColorClass = fullWinnerSeatIndex != null && fullWinnerSeatIndex < seatColors.length
-              ? seatColors[fullWinnerSeatIndex]
-              : "bg-purple-600/70 border-purple-400 text-white";
-            
-            const fullClaimed = claimedMap.has("full"); // צובע רק אם יש זכייה אמיתית
-
-            return (
-              <button
-                onClick={() => claimPrize("full")}
-                disabled={stage !== "playing" || fullClaimed}
-                className={`px-2 py-1 rounded border-2 hover:brightness-110 disabled:opacity-50 text-[11px] font-semibold ${
-                  fullClaimed ? fullWinnerColorClass : "bg-slate-800/60 border-white/20 text-white/70"
-                }`}
-                title={fullClaimed ? `Claimed by ${fullClaim?.claimed_by_name}` : "Claim FULL board"}
-              >
-                FULL
-              </button>
-            );
-          })()}
-        </div>
-
-        {stage === "finished" && (
-          <div className="text-xs text-emerald-300 text-center">
-            Winner: {ses?.winner_name || "Unknown"}
-          </div>
-        )}
-      </div>
-
-      {/* Details footer */}
-      <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-1 flex-shrink-0 text-xs text-white/70">
-        <div className="text-sm font-semibold text-white">Details</div>
-        <div>Stage: {stage} • Last: {ses?.last_number ?? "-"}</div>
-        <div>Entry: {fmt(entryFee)} • Pot: {fmt(potTotal)} • House: {fmt(houseCut)}</div>
-        <div>Row: {fmt(rowPrize)} • Full: {fmt(fullPrize)} • Cap: {fmt(payoutCap)}</div>
-        <div>Room: {roomId}</div>
       </div>
     </div>
   );
