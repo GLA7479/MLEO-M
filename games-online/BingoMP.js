@@ -178,7 +178,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const [claims, setClaims] = useState([]);
   const [roomMembers, setRoomMembers] = useState([]);
   const [msg, setMsg] = useState("");
-  const [timer, setTimer] = useState(5);
+  const [timer, setTimer] = useState(10);
   const [announcement, setAnnouncement] = useState("");
   const [announcementColor, setAnnouncementColor] = useState({ bg: "bg-emerald-500/20", border: "border-emerald-400/30", text: "text-emerald-300" }); // default color
   const [lastCalledNumber, setLastCalledNumber] = useState(null); // המספר האחרון שיצא להצגה בולטת
@@ -900,16 +900,16 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     return () => clearInterval(interval);
   }, [ses?.id, ses?.stage, isCaller]);
 
-  // ---------------- timer countdown (5 seconds) ----------------
+  // ---------------- timer countdown (10 seconds) ----------------
   useEffect(() => {
     if (!ses?.id || ses.stage !== "playing") {
-      setTimer(5);
+      setTimer(10);
       return;
     }
 
     const interval = setInterval(() => {
       setTimer((prev) => {
-        if (prev <= 1) return 5; // reset to 5 when reaches 0
+        if (prev <= 1) return 10; // reset to 10 when reaches 0
         return prev - 1;
       });
     }, 1000);
@@ -1038,11 +1038,11 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         </div>
 
         {/* Center: Last called number display */}
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center min-h-[60px] relative">
           {lastCalledNumber ? (
-            <div className="bg-emerald-500/95 border-2 border-emerald-400 text-white text-center font-bold rounded-lg px-6 py-3 shadow-lg shadow-emerald-500/50 animate-pulse">
-              <div className="text-4xl mb-1">{lastCalledNumber}</div>
-              <div className="text-xs">Number Called!</div>
+            <div className="absolute bg-emerald-500/95 border-2 border-emerald-400 text-white text-center font-bold rounded-lg px-4 py-2 shadow-lg shadow-emerald-500/50 animate-pulse">
+              <div className="text-2xl mb-0.5">{lastCalledNumber}</div>
+              <div className="text-[10px]">Number Called!</div>
             </div>
           ) : null}
         </div>
