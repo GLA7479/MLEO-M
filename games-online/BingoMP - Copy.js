@@ -1015,8 +1015,6 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       <div className="bg-black/40 rounded-xl p-3 flex items-center justify-between gap-2 flex-shrink-0">
         <div className="flex flex-col">
           <div className="text-sm font-semibold">Bingo Online</div>
-          <div className="text-xs text-white/60">Stage: {stage}</div>
-          <div className="text-xs text-white/60">Entry: {fmt(entryFee)} • Pot: {fmt(potTotal)} • House: {fmt(houseCut)}</div>
           <div className="text-xs text-white/60">Last: {ses?.last_number ?? "-"}</div>
           {stage === "playing" && (
             <div className="text-xs font-bold text-amber-400 mt-1">
@@ -1048,12 +1046,62 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         </div>
       </div>
 
-      {/* Claims */}
-      <div className="bg-black/30 rounded-xl p-3 flex flex-col gap-2 flex-shrink-0">
-        <div className="text-xs text-white/70 flex items-center justify-between">
-          <span>Prizes (total payouts ≤ 90% of pot)</span>
-          <span className="text-white/50">Row: {fmt(rowPrize)} • Full: {fmt(fullPrize)} • Cap: {fmt(payoutCap)}</span>
+      {announcement ? (
+        <div className={`${announcementColor.bg} ${announcementColor.border} ${announcementColor.text} text-xs text-center font-semibold border rounded-lg p-2`}>
+          {announcement}
         </div>
+      ) : null}
+
+      {msg ? <div className="text-amber-300 text-xs text-center">{msg}</div> : null}
+
+      {/* Main area */}
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-2 overflow-hidden">
+        {/* Card */}
+        <div className="bg-black/40 rounded-xl p-3 overflow-auto">
+          {!myRow ? (
+            <div className="w-full h-full grid place-items-center text-white/60 text-sm">Take a seat to get your card.</div>
+          ) : !myCard ? (
+            <div className="w-full h-full grid place-items-center text-white/60 text-sm">Waiting for game…</div>
+          ) : (
+            <BingoCard
+              title="Your card"
+              card={myCard}
+              marks={myMarks}
+              calledSet={calledSet}
+              onCellClick={onCellClick}
+              lastNumber={ses?.last_number}
+            />
+          )}
+        </div>
+
+        {/* Called list */}
+        <div className="bg-black/40 rounded-xl p-3 overflow-auto">
+          <div className="text-sm font-semibold mb-2">Called</div>
+          <div className="flex flex-wrap gap-2">
+            {called.length ? called.slice().reverse().map((n, idx) => {
+              const isLast = idx === 0; // First in reversed array is the last called
+              return (
+                <span
+                  key={`${n}-${idx}`}
+                  className={`px-2 py-1 rounded border text-xs font-semibold ${
+                    isLast
+                      ? "bg-emerald-500/80 border-emerald-400 text-white shadow-lg shadow-emerald-500/50"
+                      : "bg-white/10 border-white/10"
+                  }`}
+                >
+                  {n}
+                </span>
+              );
+            }) : <div className="text-white/60 text-sm">No numbers yet</div>}
+          </div>
+        </div>
+      </div>
+
+    {/* Claims at bottom */}
+    <div className="bg-black/30 rounded-xl p-3 flex flex-col gap-2 flex-shrink-0">
+      <div className="text-xs text-white/70 flex items-center justify-between">
+        <span>Prizes</span>
+      </div>
 
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
           {["row1","row2","row3","row4","row5"].map((k, i) => {
@@ -1139,55 +1187,13 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         )}
       </div>
 
-      {announcement ? (
-        <div className={`${announcementColor.bg} ${announcementColor.border} ${announcementColor.text} text-xs text-center font-semibold border rounded-lg p-2`}>
-          {announcement}
-        </div>
-      ) : null}
-
-      {msg ? <div className="text-amber-300 text-xs text-center">{msg}</div> : null}
-
-      {/* Main area */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-2 overflow-hidden">
-        {/* Card */}
-        <div className="bg-black/40 rounded-xl p-3 overflow-auto">
-          {!myRow ? (
-            <div className="w-full h-full grid place-items-center text-white/60 text-sm">Take a seat to get your card.</div>
-          ) : !myCard ? (
-            <div className="w-full h-full grid place-items-center text-white/60 text-sm">Waiting for game…</div>
-          ) : (
-            <BingoCard
-              title="Your card"
-              card={myCard}
-              marks={myMarks}
-              calledSet={calledSet}
-              onCellClick={onCellClick}
-              lastNumber={ses?.last_number}
-            />
-          )}
-        </div>
-
-        {/* Called list */}
-        <div className="bg-black/40 rounded-xl p-3 overflow-auto">
-          <div className="text-sm font-semibold mb-2">Called</div>
-          <div className="flex flex-wrap gap-2">
-            {called.length ? called.slice().reverse().map((n, idx) => {
-              const isLast = idx === 0; // First in reversed array is the last called
-              return (
-                <span
-                  key={`${n}-${idx}`}
-                  className={`px-2 py-1 rounded border text-xs font-semibold ${
-                    isLast
-                      ? "bg-emerald-500/80 border-emerald-400 text-white shadow-lg shadow-emerald-500/50"
-                      : "bg-white/10 border-white/10"
-                  }`}
-                >
-                  {n}
-                </span>
-              );
-            }) : <div className="text-white/60 text-sm">No numbers yet</div>}
-          </div>
-        </div>
+      {/* Details footer */}
+      <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-1 flex-shrink-0 text-xs text-white/70">
+        <div className="text-sm font-semibold text-white">Details</div>
+        <div>Stage: {stage} • Last: {ses?.last_number ?? "-"}</div>
+        <div>Entry: {fmt(entryFee)} • Pot: {fmt(potTotal)} • House: {fmt(houseCut)}</div>
+        <div>Row: {fmt(rowPrize)} • Full: {fmt(fullPrize)} • Cap: {fmt(payoutCap)}</div>
+        <div>Room: {roomId}</div>
       </div>
     </div>
   );
