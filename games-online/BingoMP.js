@@ -1037,6 +1037,16 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
           )}
         </div>
 
+        {/* Center: Last called number display */}
+        <div className="flex-1 flex items-center justify-center">
+          {lastCalledNumber ? (
+            <div className="bg-emerald-500/95 border-2 border-emerald-400 text-white text-center font-bold rounded-lg px-6 py-3 shadow-lg shadow-emerald-500/50 animate-pulse">
+              <div className="text-4xl mb-1">{lastCalledNumber}</div>
+              <div className="text-xs">Number Called!</div>
+            </div>
+          ) : null}
+        </div>
+
         <div className="flex items-center gap-2 flex-wrap justify-end">
           {mySeat != null && (
             <button onClick={leaveSeat} className="px-3 py-1 rounded bg-red-600/80 hover:bg-red-500 text-xs">
@@ -1209,16 +1219,6 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         <div>Row: {fmt(rowPrize)} • Full: {fmt(fullPrize)} • Cap: {fmt(payoutCap)}</div>
         <div>Room: {roomId}</div>
       </div>
-
-      {/* Overlay for last called number */}
-      {lastCalledNumber ? (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
-          <div className="bg-emerald-500/95 border-4 border-emerald-400 text-white text-center font-bold rounded-xl p-8 shadow-2xl shadow-emerald-500/50 animate-pulse">
-            <div className="text-7xl mb-2">{lastCalledNumber}</div>
-            <div className="text-xl">Number Called!</div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
