@@ -138,6 +138,15 @@ const GAME_REGISTRY = [
     loader: () => import("../games-online/BingoMP").then(m => m.default)
   },
   {
+    id: "rummy51",
+    title: "Rummy 51",
+    emoji: "🃏",
+    description: "Classic Rummy 51! Initial meld must be 51+ points. Jokers are wild. Sets and runs with friends!",
+    color: "#F59E0B",
+    isMultiplayer: true,
+    loader: () => import("../games-online/Rummy51MP").then(m => m.default)
+  },
+  {
     id: "poker-tables",
     title: "Poker Tables",
     emoji: "🎰",
