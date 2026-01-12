@@ -900,27 +900,12 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     return () => clearInterval(interval);
   }, [ses?.id, ses?.stage, isCaller]);
 
-  // ---------------- timer countdown (10 seconds) ----------------
-  useEffect(() => {
-    if (!ses?.id || ses.stage !== "playing") {
-      setTimer(10);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setTimer((prev) => {
-        if (prev <= 1) return 10; // reset to 10 when reaches 0
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [ses?.id, ses?.stage, ses?.last_number]); // reset timer when new number is called
-
   // ---------------- display last called number prominently for 5 seconds ----------------
   useEffect(() => {
     if (ses?.last_number && ses.stage === "playing") {
       setLastCalledNumber(ses.last_number);
+      // התחל את הטיימר מ-10 מיד כשהמספר מוצג
+      setTimer(10);
       const timeout = setTimeout(() => {
         setLastCalledNumber(null);
       }, 5000); // 5 שניות
@@ -929,6 +914,27 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       setLastCalledNumber(null);
     }
   }, [ses?.last_number, ses?.stage]);
+
+  // ---------------- timer countdown (10 seconds) ----------------
+  useEffect(() => {
+    if (!ses?.id || ses.stage !== "playing") {
+      setTimer(10);
+      return;
+    }
+
+    // התחל את הטיימר - הוא ממשיך לספור גם כשהמספר מוצג
+    const interval = setInterval(() => {
+      setTimer((prev) => {
+        if (prev <= 1) {
+          // כשהטיימר מגיע ל-0, המספר יקרא אוטומטית (על ידי ה-interval של הקריאה)
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [ses?.id, ses?.stage]);
 
   // ---------------- polling for all players (to see numbers and claims without Realtime) ----------------
   useEffect(() => {
