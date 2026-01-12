@@ -245,7 +245,7 @@ export default function Rummy51MP({ roomId: propRoomId, playerName, vault, setVa
     if (!currentRoomId) return null;
     const { data, error } = await supabase.rpc("rummy51_ensure_session", {
       p_room_id: currentRoomId,
-      p_seat_count: 6,
+      p_seat_count: 4,
       p_entry_fee: entryFee,
     });
     if (error) {
@@ -575,8 +575,8 @@ export default function Rummy51MP({ roomId: propRoomId, playerName, vault, setVa
             <div className="mt-4 grid lg:grid-cols-2 gap-4">
               <div className="rounded-2xl p-4 bg-white/5 border border-white/10">
                 <div className="font-semibold mb-2">Seats</div>
-                <div className="grid grid-cols-3 gap-2">
-                  {Array.from({ length: 6 }).map((_, i) => {
+                <div className="grid grid-cols-2 gap-2">
+                  {Array.from({ length: 4 }).map((_, i) => {
                     const p = players.find((x) => x.seat_index === i);
                     const mine = p?.client_id === clientId;
                     return (
