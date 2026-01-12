@@ -181,6 +181,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const [timer, setTimer] = useState(5);
   const [announcement, setAnnouncement] = useState("");
   const [announcementColor, setAnnouncementColor] = useState({ bg: "bg-emerald-500/20", border: "border-emerald-400/30", text: "text-emerald-300" }); // default color
+  const [lastCalledNumber, setLastCalledNumber] = useState(null); // המספר האחרון שיצא להצגה בולטת
 
   const autoClaimRef = useRef(new Set());
   const seenClaimIdsRef = useRef(new Set());
@@ -848,7 +849,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     };
   }, [ses?.id, ses?.round_id, refreshClaims]);
 
-  // ---------------- auto call next number every 15 seconds (only caller) ----------------
+  // ---------------- auto call next number every 10 seconds (only caller) ----------------
   useEffect(() => {
     if (!ses?.id) return;
 
@@ -894,7 +895,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
           called: nextCalled,
         }));
       }
-    }, 5000); // ⭐ 5 שניות
+    }, 10000); // ⭐ 10 שניות
 
     return () => clearInterval(interval);
   }, [ses?.id, ses?.stage, isCaller]);
@@ -915,6 +916,19 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
 
     return () => clearInterval(interval);
   }, [ses?.id, ses?.stage, ses?.last_number]); // reset timer when new number is called
+
+  // ---------------- display last called number prominently for 5 seconds ----------------
+  useEffect(() => {
+    if (ses?.last_number && ses.stage === "playing") {
+      setLastCalledNumber(ses.last_number);
+      const timeout = setTimeout(() => {
+        setLastCalledNumber(null);
+      }, 5000); // 5 שניות
+      return () => clearTimeout(timeout);
+    } else {
+      setLastCalledNumber(null);
+    }
+  }, [ses?.last_number, ses?.stage]);
 
   // ---------------- polling for all players (to see numbers and claims without Realtime) ----------------
   useEffect(() => {
@@ -975,7 +989,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const fullPrize = Math.floor((potTotal * FULL_BPS) / 10000);
 
   return (
-    <div className="w-full h-full flex flex-col gap-2 p-3" style={{ height: "100%", overflow: "hidden" }}>
+    <div className="w-full h-full flex flex-col gap-2 p-3 relative" style={{ height: "100%", overflow: "hidden" }}>
       {/* Seats */}
       <div className="w-full overflow-x-auto flex-shrink-0">
         <div className="flex gap-1 text-[9px] min-w-[420px]">
@@ -1055,7 +1069,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       {msg ? <div className="text-amber-300 text-xs text-center">{msg}</div> : null}
 
       {/* Main area */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-2 overflow-hidden">
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-2 overflow-hidden relative">
         {/* Card */}
         <div className="bg-black/40 rounded-xl p-1 overflow-auto">
           {!myRow ? (
@@ -1195,6 +1209,16 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         <div>Row: {fmt(rowPrize)} • Full: {fmt(fullPrize)} • Cap: {fmt(payoutCap)}</div>
         <div>Room: {roomId}</div>
       </div>
+
+      {/* Overlay for last called number */}
+      {lastCalledNumber ? (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
+          <div className="bg-emerald-500/95 border-4 border-emerald-400 text-white text-center font-bold rounded-xl p-8 shadow-2xl shadow-emerald-500/50 animate-pulse">
+            <div className="text-7xl mb-2">{lastCalledNumber}</div>
+            <div className="text-xl">Number Called!</div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
