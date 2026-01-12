@@ -1504,13 +1504,13 @@ function BingoCard({ title, card, marks, calledSet, onCellClick, lastNumber }) {
               key={idx}
               onClick={() => (isFree ? null : onCellClick(n))}
               disabled={!isCalled && !isFree}
-              className={`h-8 rounded-lg border text-[10px] font-semibold grid place-items-center transition
+              className={`h-8 rounded-lg border font-semibold grid place-items-center transition
                 ${shouldShowYellow ? "bg-yellow-500 border-yellow-400 shadow-lg shadow-yellow-500/60" : ""}
                 ${isMarked && !shouldShowYellow ? "bg-emerald-500/60 border-emerald-400 shadow-lg shadow-emerald-500/50" : ""}
                 ${!isMarked ? "bg-white/5 border-white/15" : ""}
               `}
             >
-              <span className={shouldShowYellow ? "text-white font-bold" : isMarked ? "text-white font-bold" : ""}>
+              <span className={`text-sm ${shouldShowYellow ? "text-white font-bold" : isMarked ? "text-white font-bold" : ""}`}>
                 {isFree ? "FREE" : n}
               </span>
             </button>
