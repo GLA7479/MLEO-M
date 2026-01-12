@@ -1061,11 +1061,11 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         {/* Main area */}
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-2 overflow-hidden">
           {/* Card */}
-          <div className="bg-black/40 rounded-xl p-3 overflow-auto">
+          <div className="bg-black/40 rounded-xl p-2 overflow-auto">
             {!myRow ? (
-              <div className="w-full h-full grid place-items-center text-white/60 text-sm">Take a seat to get your card.</div>
+              <div className="w-full h-full grid place-items-center text-white/60 text-xs">Take a seat to get your card.</div>
             ) : !myCard ? (
-              <div className="w-full h-full grid place-items-center text-white/60 text-sm">Waiting for game…</div>
+              <div className="w-full h-full grid place-items-center text-white/60 text-xs">Waiting for game…</div>
             ) : (
               <BingoCard
                 title="Your card"
@@ -1458,9 +1458,9 @@ function BingoLocal({ vault, onBackToMode }) {
         </div>
       )}
 
-      <div className="flex-1 min-h-0 bg-black/40 rounded-xl p-3 overflow-auto">
+      <div className="flex-1 min-h-0 bg-black/40 rounded-xl p-2 overflow-auto">
         {stage === "setup" ? (
-          <div className="w-full h-full grid place-items-center text-white/60 text-sm">
+          <div className="w-full h-full grid place-items-center text-white/60 text-xs">
             Choose players and press Start
           </div>
         ) : (
@@ -1485,18 +1485,18 @@ function BingoCard({ title, card, marks, calledSet, onCellClick, lastNumber }) {
   const headers = ["B", "I", "N", "G", "O"];
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      <div className="text-center text-sm font-semibold mb-2">{title}</div>
+    <div className="w-full max-w-sm mx-auto transform scale-90 origin-center">
+      <div className="text-center text-xs font-semibold mb-1">{title}</div>
 
-      <div className="grid grid-cols-5 gap-1 mb-1">
+      <div className="grid grid-cols-5 gap-0.5 mb-0.5">
         {headers.map((h) => (
-          <div key={h} className="text-center text-xs font-bold bg-white/10 rounded py-1">
+          <div key={h} className="text-center text-[10px] font-bold bg-white/10 rounded py-0.5">
             {h}
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-5 gap-1">
+      <div className="grid grid-cols-5 gap-0.5">
         {card.flat().map((n, idx) => {
           const isFree = n === 0 && idx === 12;
           const isMarked = marks[idx];
@@ -1509,7 +1509,7 @@ function BingoCard({ title, card, marks, calledSet, onCellClick, lastNumber }) {
               key={idx}
               onClick={() => (isFree ? null : onCellClick(n))}
               disabled={!isCalled && !isFree}
-              className={`aspect-square rounded-lg border text-sm font-semibold grid place-items-center transition
+              className={`aspect-square rounded-lg border text-xs font-semibold grid place-items-center transition
                 ${shouldShowYellow ? "bg-yellow-500 border-yellow-400 shadow-lg shadow-yellow-500/60" : ""}
                 ${isMarked && !shouldShowYellow ? "bg-emerald-500/60 border-emerald-400 shadow-lg shadow-emerald-500/50" : ""}
                 ${!isMarked ? "bg-white/5 border-white/15" : ""}
@@ -1523,7 +1523,7 @@ function BingoCard({ title, card, marks, calledSet, onCellClick, lastNumber }) {
         })}
       </div>
 
-      <div className="text-center text-xs text-white/60 mt-3">
+      <div className="text-center text-[10px] text-white/60 mt-2">
         Only called numbers can be marked. Yellow = marked called number.
       </div>
     </div>
