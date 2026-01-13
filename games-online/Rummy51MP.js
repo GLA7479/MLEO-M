@@ -811,10 +811,10 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
 
     // Seat positions - each player on their own side of the table
     const coords = [
-      { x: 50, y: 85, s: 1.1 }, // seat 1 (index 0) - bottom (YOU)
-      { x: 10, y: 50, s: 1.0 }, // seat 2 (index 1) - left side
-      { x: 50, y: 15, s: 1.0 }, // seat 3 (index 2) - top
-      { x: 90, y: 50, s: 1.0 }, // seat 4 (index 3) - right side
+      { x: 50, y: 85, s: 0.55 }, // seat 1 (index 0) - bottom (YOU)
+      { x: 10, y: 50, s: 0.5 }, // seat 2 (index 1) - left side
+      { x: 50, y: 15, s: 0.5 }, // seat 3 (index 2) - top
+      { x: 90, y: 50, s: 0.5 }, // seat 4 (index 3) - right side
     ];
 
     return Array.from({ length: SEATS }).map((_, i) => {
@@ -1008,37 +1008,37 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
                 style={{
                   left: `${s.pos.x}%`,
                   top: `${s.pos.y}%`,
-                  transform: `translate(-50%, -50%) scale(${s.pos.s})`,
-                  minWidth: isMe ? "150px" : "160px",
+                  transform: `translate(-50%, -50%) scaleX(${s.pos.s}) scaleY(${s.pos.s * 1.5})`,
+                  minWidth: isMe ? "180px" : "180px",
                 }}
               >
-                <div className="px-3 py-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-xs font-bold truncate max-w-[120px]">
+                <div className="px-4 py-3">
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="text-base font-bold truncate flex-1 min-w-0">
                       {label}{isMe ? " (You)" : ""}
                     </div>
                     {p && (
-                      <div className="text-[11px] text-white/70">
+                      <div className="text-sm text-white/70 whitespace-nowrap">
                         Seat {s.seat + 1}
                       </div>
                     )}
                   </div>
 
                   {p ? (
-                    <div className="mt-1 text-[11px] text-white/70 flex items-center justify-between">
-                      <div>{count} cards</div>
-                      <div className={`${p.has_opened ? "text-emerald-300" : "text-white/50"}`}>
+                    <div className="mt-2 text-sm text-white/70 flex items-center justify-between gap-2">
+                      <div className="whitespace-nowrap">{count} cards</div>
+                      <div className={`whitespace-nowrap ${p.has_opened ? "text-emerald-300 font-semibold" : "text-white/50"}`}>
                         {p.has_opened ? "Opened" : "Not opened"}
                       </div>
                     </div>
                   ) : (
                     <button
                       onClick={() => takeSeat(s.seat)}
-                      className="mt-2 w-full px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold"
-                      disabled={ses?.stage !== "lobby"}
-                      title={ses?.stage !== "lobby" ? "Game in progress" : "Take seat"}
+                      className="mt-2 w-full px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-base font-bold"
+                      disabled={ses && ses.stage !== "lobby"}
+                      title={ses && ses.stage !== "lobby" ? "Game in progress" : "Take seat"}
                     >
-                      TAKE SEAT
+                      SEAT
                     </button>
                   )}
                 </div>
