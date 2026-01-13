@@ -384,6 +384,26 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
     return h;
   }, [myRow?.hand, handSortMode]);
 
+  // Debug logging to diagnose card distribution issues
+  useEffect(() => {
+    console.log("RUMMY DEBUG", {
+      roomId,
+      sessionId: ses?.id,
+      clientId,
+      players: players.map((p) => ({
+        seat: p.seat_index,
+        name: p.player_name,
+        cid: p.client_id,
+        hand_n: Array.isArray(p.hand) ? p.hand.length : 0,
+      })),
+      myRowFound: !!myRow,
+      mySeat,
+      myHandN: myHand.length,
+      turnSeat: ses?.turn_seat,
+      turnPhase: ses?.turn_phase,
+    });
+  }, [roomId, ses?.id, clientId, players, myRow, mySeat, myHand.length, ses?.turn_seat, ses?.turn_phase]);
+
   const discardTop = useMemo(() => {
     const d = Array.isArray(ses?.discard) ? ses.discard : [];
     return d.length ? d[d.length - 1] : null;
@@ -436,6 +456,54 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
     setPlayers(data || []);
   }, []);
 
+  // New: refreshState using rummy51_get_state RPC (returns my hand directly)
+  const refreshState = useCallback(async (sessionId) => {
+    if (!sessionId) return;
+    const { data, error } = await supabase.rpc("rummy51_get_state", {
+      p_session_id: sessionId,
+      p_client_id: clientId,
+    });
+    if (error) {
+      console.error("refreshState error:", error);
+      return;
+    }
+
+    // Build ses so UI continues to work
+    setSes((prev) => ({
+      ...(prev || {}),
+      ...(data.session || {}),
+      discard: data.discard || [],
+      melds: data.melds || [],
+      opened_seats: data.opened_seats || [],
+      // stock: we only show length, so create array of correct size
+      stock: Array(data.session?.stock_n || 0).fill("X"),
+    }));
+
+    // Build players: others have hand_n only, me has full hand
+    const otherPlayers = (data.players || []).map((p) => ({
+      seat_index: p.seat_index,
+      player_name: p.player_name,
+      has_opened: p.has_opened,
+      client_id: null, // not needed for others
+      hand: Array(p.hand_n || 0).fill("X"), // just for count display
+    }));
+
+    // Add me with full hand (if I'm seated)
+    if (data.me && data.me.seat_index != null) {
+      const mePlayer = {
+        seat_index: data.me.seat_index,
+        player_name: data.me.player_name,
+        has_opened: data.me.has_opened,
+        client_id: clientId,
+        hand: data.me.hand || [],
+      };
+      setPlayers([...otherPlayers, mePlayer]);
+    } else {
+      // I'm not seated, just show others
+      setPlayers(otherPlayers);
+    }
+  }, [clientId]);
+
   // Presence + session realtime
   useEffect(() => {
     if (!roomId) return;
@@ -445,7 +513,8 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
       .channel("rummy51_room:" + roomId, { config: { presence: { key: clientId } } })
       .on("postgres_changes", { event: "*", schema: "public", table: "rummy51_sessions", filter: `room_id=eq.${roomId}` }, async () => {
         if (cancelled) return;
-        await refreshSession();
+        const s = await ensureSession();
+        if (s?.id) await refreshState(s.id);
       })
       .on("presence", { event: "sync" }, () => {
         const state = ch.presenceState();
@@ -455,7 +524,7 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           const s = await ensureSession();
-          if (!cancelled && s?.id) await refreshPlayers(s.id);
+          if (!cancelled && s?.id) await refreshState(s.id);
           await ch.track({ player_name: name, online_at: new Date().toISOString() });
         }
       });
@@ -464,7 +533,7 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
       cancelled = true;
       supabase.removeChannel(ch);
     };
-  }, [roomId, clientId, name, ensureSession, refreshPlayers, refreshSession]);
+  }, [roomId, clientId, name, ensureSession, refreshState]);
 
   // Players realtime
   useEffect(() => {
@@ -474,7 +543,7 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
       .channel("rummy51_players:" + ses.id)
       .on("postgres_changes", { event: "*", schema: "public", table: "rummy51_players", filter: `session_id=eq.${ses.id}` }, async () => {
         if (cancelled) return;
-        await refreshPlayers(ses.id);
+        await refreshState(ses.id);
       })
       .subscribe();
 
@@ -482,7 +551,7 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
       cancelled = true;
       supabase.removeChannel(chP);
     };
-  }, [ses?.id, refreshPlayers]);
+  }, [ses?.id, refreshState]);
 
   // Actions realtime (for animation/sfx)
   useEffect(() => {
@@ -586,8 +655,8 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
       return;
     }
     const s = ses?.id ? ses : await ensureSession();
-    if (s?.id) await refreshPlayers(s.id);
-  }, [roomId, clientId, name, ses?.id, ensureSession, refreshPlayers, play]);
+    if (s?.id) await refreshState(s.id);
+  }, [roomId, clientId, name, ses?.id, ensureSession, refreshState, play]);
 
   const leaveSeat = useCallback(async () => {
     if (!ses?.id) return;
@@ -601,8 +670,8 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
       setMsg(error.message || "Leave failed");
       return;
     }
-    await refreshPlayers(ses.id);
-  }, [ses?.id, clientId, refreshPlayers, play]);
+    await refreshState(ses.id);
+  }, [ses?.id, clientId, refreshState, play]);
 
   const startRound = useCallback(async () => {
     if (!ses?.id) return;
@@ -620,8 +689,8 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
     setSelected([]);
     setSelectedMeldId(null);
     setSes(data);
-    await refreshPlayers(ses.id);
-  }, [ses?.id, clientId, refreshPlayers, play]);
+    await refreshState(ses.id);
+  }, [ses?.id, clientId, refreshState, play]);
 
   const drawStock = useCallback(async () => {
     if (!ses?.id) return;
@@ -636,7 +705,8 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
       return;
     }
     if (data) setSes(data);
-  }, [ses?.id, clientId, play]);
+    await refreshState(ses.id);
+  }, [ses?.id, clientId, refreshState, play]);
 
   const drawDiscard = useCallback(async () => {
     if (!ses?.id) return;
@@ -651,7 +721,8 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
       return;
     }
     if (data) setSes(data);
-  }, [ses?.id, clientId, play]);
+    await refreshState(ses.id);
+  }, [ses?.id, clientId, refreshState, play]);
 
   const addPendingMeld = useCallback(() => {
     setMsg("");
@@ -703,7 +774,8 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
     setPendingMelds([]);
     setSelected([]);
     if (data) setSes(data);
-  }, [ses?.id, myRow, pendingMelds, clientId, play]);
+    await refreshState(ses.id);
+  }, [ses?.id, myRow, pendingMelds, clientId, refreshState, play]);
 
   const playMeld = useCallback(async () => {
     if (!ses?.id) return;
@@ -733,7 +805,8 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
     }
     if (data) setSes(data);
     setSelected([]);
-  }, [ses?.id, myRow?.has_opened, selected, clientId, play]);
+    await refreshState(ses.id);
+  }, [ses?.id, myRow?.has_opened, selected, clientId, refreshState, play]);
 
   const layoff = useCallback(async () => {
     if (!ses?.id) return;
@@ -770,7 +843,9 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
     }
     if (data) setSes(data);
     setSelected([]);
-  }, [ses?.id, myRow?.has_opened, selected, selectedMeldId, layoffSide, clientId, play]);
+    setSelectedMeldId(null);
+    await refreshState(ses.id);
+  }, [ses?.id, myRow?.has_opened, selected, selectedMeldId, layoffSide, clientId, refreshState, play]);
 
   const discard = useCallback(async (cardOverride) => {
     if (!ses?.id) return;
@@ -794,7 +869,8 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
     }
     if (data) setSes(data);
     setSelected([]);
-  }, [ses?.id, selected, clientId, play]);
+    await refreshState(ses.id);
+  }, [ses?.id, selected, clientId, refreshState, play]);
 
   // -----------------------------
   // UI helpers
