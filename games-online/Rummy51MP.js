@@ -12,7 +12,7 @@ import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 // -----------------------------
 // Helpers
 // -----------------------------
-const SEATS = 6;
+const SEATS = 4;
 const SUIT_SYMBOL = { S: "♠", H: "♥", D: "♦", C: "♣" };
 
 function fmt(n) {
@@ -809,15 +809,12 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
       if (p.seat_index != null) seatToPlayer.set(p.seat_index, p);
     }
 
-    // Seat positions around table (percentage coords)
-    // 0 bottom center, then clockwise like poker-ish
+    // Seat positions - each player on their own side of the table
     const coords = [
-      { x: 50, y: 78, s: 1.1 }, // seat 1 (index 0) bottom-center (YOU)
-      { x: 18, y: 68, s: 0.95 },
-      { x: 18, y: 30, s: 0.90 },
-      { x: 50, y: 18, s: 0.95 },
-      { x: 82, y: 30, s: 0.90 },
-      { x: 82, y: 68, s: 0.95 },
+      { x: 50, y: 85, s: 1.1 }, // seat 1 (index 0) - bottom (YOU)
+      { x: 10, y: 50, s: 1.0 }, // seat 2 (index 1) - left side
+      { x: 50, y: 15, s: 1.0 }, // seat 3 (index 2) - top
+      { x: 90, y: 50, s: 1.0 }, // seat 4 (index 3) - right side
     ];
 
     return Array.from({ length: SEATS }).map((_, i) => {
