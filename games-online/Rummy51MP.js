@@ -1,26 +1,40 @@
+
 // games-online/Rummy51MP.js
-// Multiplayer Rummy 51 (classic): initial meld >= 51 points, jokers wild, Ace can be high (also allows A-2-3).
-// Built in the same style as BlackjackMP.js (Supabase + room_id + seat lobby + realtime sync + VAULT).
+// Rummy 51 (Classic) — Multiplayer UI v2
+// - Real "table" feel (green felt), card images, hand tray, drag-to-discard
+// - Other players: name + remaining card count only
+// - Animations (draw/discard) + simple SFX (no asset files needed)
+// Backend: uses RPC functions from rummy51_supabase.sql (ensure_session/take_seat/start_round/draw/open/new_meld/layoff/discard)
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
-import RoomBrowser from "../components/online/RoomBrowser";
 
-// ---------- Constants ----------
-const MIN_BUYIN_OPTIONS = {
-  '1K': 1_000,
-  '10K': 10_000,
-  '100K': 100_000,
-  '1M': 1_000_000,
-  '10M': 10_000_000,
-  '100M': 100_000_000,
-};
-
-// ---------- helpers ----------
+// -----------------------------
+// Helpers
+// -----------------------------
+const SEATS = 6;
 const SUIT_SYMBOL = { S: "♠", H: "♥", D: "♦", C: "♣" };
 
+function fmt(n) {
+  const x = Number(n || 0);
+  if (x >= 1_000_000_000) return `${(x / 1_000_000_000).toFixed(2)}B`;
+  if (x >= 1_000_000) return `${(x / 1_000_000).toFixed(2)}M`;
+  if (x >= 1_000) return `${(x / 1_000).toFixed(2)}K`;
+  return `${x}`;
+}
+
+function parseTierCode(tierCode) {
+  // "1K" | "10K" | "100K" | "1M" etc
+  const s = String(tierCode || "").toUpperCase();
+  if (s.endsWith("K")) return Math.round(Number(s.slice(0, -1)) * 1_000);
+  if (s.endsWith("M")) return Math.round(Number(s.slice(0, -1)) * 1_000_000);
+  if (s.endsWith("B")) return Math.round(Number(s.slice(0, -1)) * 1_000_000_000);
+  const num = Number(s);
+  return Number.isFinite(num) ? num : 10_000;
+}
+
 function cardFace(card) {
-  return (card || "").split(":")[0];
+  return (card || "").split(":")[0]; // "AS" / "TD" / "7H" / "JK"
 }
 function cardCopy(card) {
   return (card || "").split(":")[1] || "";
@@ -45,7 +59,8 @@ function rankToInt(tok) {
   if (tok === "Q") return 12;
   if (tok === "J") return 11;
   if (tok === "T") return 10;
-  return Number(tok);
+  const n = Number(tok);
+  return Number.isFinite(n) ? n : null;
 }
 function pointsFromRankInt(r) {
   if (r == null) return 0;
@@ -55,15 +70,14 @@ function pointsFromRankInt(r) {
 }
 function cardLabel(card) {
   if (!card) return "";
-  if (isJoker(card)) return `JOKER:${cardCopy(card)}`;
+  if (isJoker(card)) return `🃏`;
   const tok = cardRankToken(card);
   const s = cardSuit(card);
   const rank = tok === "T" ? "10" : tok;
-  return `${SUIT_SYMBOL[s] || s}${rank}`;
+  return `${rank}${SUIT_SYMBOL[s] || s}`;
 }
-
-function sortHand(a, b) {
-  // Jokers last
+function sortHandDefault(a, b) {
+  // Jokers last, suit then rank
   const aj = isJoker(a);
   const bj = isJoker(b);
   if (aj && !bj) return 1;
@@ -77,8 +91,22 @@ function sortHand(a, b) {
   const rb = rankToInt(cardRankToken(b));
   return (ra || 0) - (rb || 0);
 }
+function sortHandByRank(a, b) {
+  const aj = isJoker(a);
+  const bj = isJoker(b);
+  if (aj && !bj) return 1;
+  if (!aj && bj) return -1;
 
-// Client-side validator (used only for UX; server still validates open/meld/layoff).
+  const ra = rankToInt(cardRankToken(a)) || 0;
+  const rb = rankToInt(cardRankToken(b)) || 0;
+  if (ra !== rb) return ra - rb;
+
+  const sa = cardSuit(a) || "";
+  const sb = cardSuit(b) || "";
+  return sa.localeCompare(sb);
+}
+
+// Client-side validator (UX only; server enforces)
 function analyzeMeld(cards) {
   if (!Array.isArray(cards) || cards.length < 3) return { ok: false };
 
@@ -86,19 +114,18 @@ function analyzeMeld(cards) {
   const nonj = cards.filter((c) => !isJoker(c));
   if (nonj.length === 0) return { ok: false };
 
-  // Try set (3-4): same rank, different suits
+  // SET (3-4): same rank, different suits
   if (cards.length <= 4) {
     const r0 = rankToInt(cardRankToken(nonj[0]));
     if (nonj.every((c) => rankToInt(cardRankToken(c)) === r0)) {
       const suits = nonj.map(cardSuit);
-      const unique = new Set(suits);
-      if (unique.size === suits.length) {
-        return { ok: true, type: "set", points: (cards.length) * pointsFromRankInt(r0) };
+      if (new Set(suits).size === suits.length) {
+        return { ok: true, type: "set", points: cards.length * pointsFromRankInt(r0) };
       }
     }
   }
 
-  // Try run: same suit for non-jokers, consecutive with gaps filled by jokers
+  // RUN (3+): same suit for non-jokers, consecutive with jokers filling gaps (A can be high; also allow A-2-3)
   const suit0 = cardSuit(nonj[0]);
   if (!nonj.every((c) => cardSuit(c) === suit0)) return { ok: false };
 
@@ -106,13 +133,16 @@ function analyzeMeld(cards) {
   const nr = nonj.map((c) => rankToInt(cardRankToken(c)));
   if (new Set(nr).size !== nr.length) return { ok: false };
 
-  // brute force start (1..14-n+1)
   for (let start = 1; start <= 14 - n + 1; start++) {
     const target = [];
     for (let k = 0; k < n; k++) target.push(start + k);
+
     if (nr.every((x) => target.includes(x))) {
-      const pts = target.reduce((sum, r) => sum + pointsFromRankInt(r === 1 ? 14 : r), 0);
-      // Note: server uses Ace=11 always. Here, treat rank 1 as Ace as well.
+      // points: Ace always 11; face 10; others numeric
+      const pts = target.reduce((sum, r) => {
+        const rr = r === 1 ? 14 : r; // treat 1 as Ace if used in A-2-3
+        return sum + pointsFromRankInt(rr);
+      }, 0);
       return { ok: true, type: "run", points: pts, suit: suit0 };
     }
   }
@@ -120,118 +150,284 @@ function analyzeMeld(cards) {
   return { ok: false };
 }
 
-// Vault helpers
-function safeRead(key, fallback) {
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
+// -----------------------------
+// SFX (no external assets)
+// -----------------------------
+function useSfx() {
+  const ctxRef = useRef(null);
+
+  const play = useCallback((kind) => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+
+      if (!ctxRef.current) ctxRef.current = new AudioCtx();
+      const ctx = ctxRef.current;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+
+      const now = ctx.currentTime;
+      let f = 440;
+      let dur = 0.08;
+      let type = "triangle";
+
+      if (kind === "draw") { f = 620; dur = 0.06; type = "triangle"; }
+      if (kind === "discard") { f = 260; dur = 0.07; type = "square"; }
+      if (kind === "meld") { f = 520; dur = 0.09; type = "sine"; }
+      if (kind === "win") { f = 780; dur = 0.14; type = "sine"; }
+      if (kind === "error") { f = 140; dur = 0.10; type = "sawtooth"; }
+
+      o.type = type;
+      o.frequency.setValueAtTime(f, now);
+
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.12, now + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      o.connect(g);
+      g.connect(ctx.destination);
+
+      o.start(now);
+      o.stop(now + dur + 0.02);
+    } catch {}
+  }, []);
+
+  return { play };
+}
+
+// -----------------------------
+// Card UI (uses same back as Poker/Blackjack)
+// -----------------------------
+function toDeckApiCode(card) {
+  if (!card) return null;
+  const face = cardFace(card);
+  if (face === "JK") return null;
+  const r = face.slice(0, -1);
+  const s = face.slice(-1);
+  const rankMap = { A: "A", K: "K", Q: "Q", J: "J", T: "0" };
+  const suitMap = { S: "S", H: "H", D: "D", C: "C" };
+  const rr = rankMap[r] || r;
+  const ss = suitMap[s] || s;
+  return `${rr}${ss}`;
+}
+
+function PlayingCard({
+  card,
+  faceDown = false,
+  selected = false,
+  size = "md",
+  dim = false,
+  draggable = false,
+  onClick,
+  onDragStart,
+}) {
+  const sizeCls =
+    size === "sm"
+      ? "w-[40px] h-[56px] md:w-[46px] md:h-[66px]"
+      : "w-[54px] h-[76px] md:w-[66px] md:h-[94px]";
+
+  const base =
+    `relative ${sizeCls} rounded-md overflow-hidden shadow-lg border transition-transform duration-150 ` +
+    (selected ? "border-emerald-300 ring-2 ring-emerald-400/40 -translate-y-3" : "border-white/15") +
+    (dim ? " opacity-70" : "");
+
+  if (faceDown) {
+    return (
+      <div className={base}>
+        <img
+          src="/card-backs/poker-back.jpg"
+          alt="Card back"
+          className="w-full h-full object-cover rounded-md"
+          draggable={false}
+        />
+      </div>
+    );
   }
-}
 
-function safeWrite(key, val) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(val));
-  } catch {}
-}
-
-function readVault() {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  return Math.max(0, Number(rushData.vault || 0));
-}
-
-function writeVault(v) {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  rushData.vault = Math.max(0, Math.floor(v));
-  safeWrite("mleo_rush_core_v4", rushData);
-  
-  if (window.updateVaultCallback) {
-    window.updateVaultCallback(rushData.vault);
+  if (isJoker(card)) {
+    return (
+      <button
+        onClick={onClick}
+        draggable={draggable}
+        onDragStart={onDragStart}
+        className={`${base} bg-white/10 flex items-center justify-center`}
+        title="Joker"
+      >
+        <div className="text-base md:text-lg font-extrabold">🃏</div>
+      </button>
+    );
   }
+
+  const code = toDeckApiCode(card);
+  const url = code ? `https://deckofcardsapi.com/static/img/${code}.png` : null;
+
+  return (
+    <button
+      onClick={onClick}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      className={`${base} bg-white/5`}
+      title={cardLabel(card)}
+    >
+      {url ? (
+        <img
+          src={url}
+          alt={card}
+          className="w-full h-full object-cover"
+          draggable={false}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+            const fb = e.currentTarget.parentElement?.querySelector(".fallback");
+            if (fb) fb.style.display = "flex";
+          }}
+        />
+      ) : null}
+      <div className="fallback hidden absolute inset-0 items-center justify-center bg-white text-black">
+        <div className="text-xs font-bold">{cardLabel(card)}</div>
+      </div>
+    </button>
+  );
 }
 
-function fmt(n) {
-  n = Math.floor(Number(n || 0));
-  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
-  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
-  if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
-  return String(n);
+// -----------------------------
+// Animation overlay (draw/discard feel)
+// -----------------------------
+function AnimCard({ anim }) {
+  // anim: { key, from, to, card, doneCb }
+  const [atTo, setAtTo] = useState(false);
+
+  useEffect(() => {
+    if (!anim) return;
+    const t = requestAnimationFrame(() => setAtTo(true));
+    return () => cancelAnimationFrame(t);
+  }, [anim?.key]);
+
+  if (!anim) return null;
+
+  const style = atTo
+    ? {
+        position: "fixed",
+        left: anim.to.left,
+        top: anim.to.top,
+        width: anim.to.width,
+        height: anim.to.height,
+        transform: "translate(-50%, -50%)",
+        transition: "all 260ms ease",
+        pointerEvents: "none",
+        zIndex: 9999,
+      }
+    : {
+        position: "fixed",
+        left: anim.from.left,
+        top: anim.from.top,
+        width: anim.from.width,
+        height: anim.from.height,
+        transform: "translate(-50%, -50%)",
+        transition: "all 260ms ease",
+        pointerEvents: "none",
+        zIndex: 9999,
+      };
+
+  return (
+    <div
+      style={style}
+      onTransitionEnd={() => {
+        try { anim.doneCb?.(); } catch {}
+      }}
+    >
+      <PlayingCard card={anim.card} size="md" />
+    </div>
+  );
 }
 
-// ---------- Component ----------
-export default function Rummy51MP({ roomId: propRoomId, playerName, vault, setVaultBoth, tierCode = "10K" }) {
-  const [currentRoomId, setCurrentRoomId] = useState(propRoomId || null);
-  const name = playerName || "Guest";
-  const minRequired = MIN_BUYIN_OPTIONS[tierCode] ?? 0;
-  const entryFee = minRequired;
-
+// -----------------------------
+// Main Component
+// -----------------------------
+export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tierCode = "10K" }) {
+  const { play } = useSfx();
   const clientId = useMemo(() => getClientId("rummy51"), []);
+  const name = playerName || "Guest";
+  const entry = useMemo(() => parseTierCode(tierCode), [tierCode]);
+
   const [ses, setSes] = useState(null);
   const [players, setPlayers] = useState([]);
-  const [members, setMembers] = useState([]);
+  const [roomMembers, setRoomMembers] = useState([]);
   const [msg, setMsg] = useState("");
 
   const [selected, setSelected] = useState([]); // selected cards in my hand
-  const [pendingMelds, setPendingMelds] = useState([]); // array of {cards:[...], type, points}
+  const [pendingMelds, setPendingMelds] = useState([]); // [{cards, type, points}]
   const [selectedMeldId, setSelectedMeldId] = useState(null);
   const [layoffSide, setLayoffSide] = useState("right");
+  const [handSortMode, setHandSortMode] = useState("suit"); // suit | rank
 
-  // Vault sync
-  useEffect(() => {
-    const handler = (nextValue) => {
-      if (typeof setVaultBoth === "function") {
-        setVaultBoth(nextValue);
-      }
-    };
-    window.updateVaultCallback = handler;
-    handler(readVault());
-    return () => {
-      if (window.updateVaultCallback === handler) {
-        delete window.updateVaultCallback;
-      }
-    };
-  }, [setVaultBoth]);
+  const [dragCard, setDragCard] = useState(null);
+  const [anim, setAnim] = useState(null);
+  const animKeyRef = useRef(1);
 
-  const myPlayer = useMemo(() => {
-    if (!ses?.id) return null;
-    return players.find((p) => p.client_id === clientId) || null;
-  }, [players, ses?.id, clientId]);
+  const stockRef = useRef(null);
+  const discardRef = useRef(null);
+  const handRef = useRef(null);
 
-  const mySeat = myPlayer?.seat_index ?? null;
+  const myRow = useMemo(() => players.find((p) => p.client_id === clientId) || null, [players, clientId]);
+  const mySeat = myRow?.seat_index ?? null;
 
+  const isPlaying = ses?.stage === "playing";
   const isMyTurn = useMemo(() => {
-    if (!ses || ses.stage !== "playing") return false;
+    if (!isPlaying) return false;
     if (mySeat == null) return false;
     return ses.turn_seat === mySeat;
-  }, [ses, mySeat]);
+  }, [isPlaying, mySeat, ses?.turn_seat]);
 
   const myHand = useMemo(() => {
-    const h = Array.isArray(myPlayer?.hand) ? [...myPlayer.hand] : [];
-    h.sort(sortHand);
+    const h = Array.isArray(myRow?.hand) ? [...myRow.hand] : [];
+    h.sort(handSortMode === "rank" ? sortHandByRank : sortHandDefault);
     return h;
-  }, [myPlayer?.hand]);
+  }, [myRow?.hand, handSortMode]);
 
   const discardTop = useMemo(() => {
     const d = Array.isArray(ses?.discard) ? ses.discard : [];
     return d.length ? d[d.length - 1] : null;
   }, [ses?.discard]);
 
-  const melds = useMemo(() => {
-    const m = ses?.melds;
-    return Array.isArray(m) ? m : [];
-  }, [ses?.melds]);
+  const melds = useMemo(() => (Array.isArray(ses?.melds) ? ses.melds : []), [ses?.melds]);
 
-  const refreshSession = useCallback(async (rid) => {
-    const { data } = await supabase
-      .from("rummy51_sessions")
-      .select("*")
-      .eq("room_id", rid)
-      .single();
+  const seatedPlayers = useMemo(
+    () => players.filter((p) => p.seat_index != null).sort((a, b) => a.seat_index - b.seat_index),
+    [players]
+  );
+
+  const openPoints = useMemo(() => pendingMelds.reduce((s, m) => s + (m.points || 0), 0), [pendingMelds]);
+
+  const canDraw = isMyTurn && ses?.turn_phase === "draw";
+  const canMeld = isMyTurn && ses?.turn_phase === "meld";
+  const canDiscard = isMyTurn && ses?.turn_phase === "discard";
+
+  // -----------------------------
+  // Data sync
+  // -----------------------------
+  const ensureSession = useCallback(async () => {
+    if (!roomId) return null;
+    const { data, error } = await supabase.rpc("rummy51_ensure_session", {
+      p_room_id: roomId,
+      p_seat_count: SEATS,
+      p_entry_fee: 0,
+    });
+    if (error) {
+      setMsg(error.message || "Failed to load room");
+      return null;
+    }
+    setSes(data);
+    return data;
+  }, [roomId]);
+
+  const refreshSession = useCallback(async () => {
+    if (!roomId) return;
+    const { data } = await supabase.from("rummy51_sessions").select("*").eq("room_id", roomId).single();
     if (data) setSes(data);
-  }, []);
+  }, [roomId]);
 
   const refreshPlayers = useCallback(async (sessionId) => {
+    if (!sessionId) return;
     const { data } = await supabase
       .from("rummy51_players")
       .select("*")
@@ -240,45 +436,26 @@ export default function Rummy51MP({ roomId: propRoomId, playerName, vault, setVa
     setPlayers(data || []);
   }, []);
 
-  // Ensure / create session
-  const ensureSession = useCallback(async () => {
-    if (!currentRoomId) return null;
-    const { data, error } = await supabase.rpc("rummy51_ensure_session", {
-      p_room_id: currentRoomId,
-      p_seat_count: 4,
-      p_entry_fee: entryFee,
-    });
-    if (error) {
-      setMsg(error.message || "Failed to load room");
-      return null;
-    }
-    setSes(data);
-    await refreshPlayers(data.id);
-    return data;
-  }, [currentRoomId, entryFee, refreshPlayers]);
-
-  // Presence + realtime
+  // Presence + session realtime
   useEffect(() => {
-    if (!currentRoomId) return;
+    if (!roomId) return;
     let cancelled = false;
 
     const ch = supabase
-      .channel("rummy51_room:" + currentRoomId, { config: { presence: { key: clientId } } })
-      .on("postgres_changes", { event: "*", schema: "public", table: "rummy51_sessions", filter: `room_id=eq.${currentRoomId}` }, async () => {
+      .channel("rummy51_room:" + roomId, { config: { presence: { key: clientId } } })
+      .on("postgres_changes", { event: "*", schema: "public", table: "rummy51_sessions", filter: `room_id=eq.${roomId}` }, async () => {
         if (cancelled) return;
-        await refreshSession(currentRoomId);
+        await refreshSession();
       })
       .on("presence", { event: "sync" }, () => {
         const state = ch.presenceState();
         const list = Object.values(state).flat();
-        setMembers(list);
+        setRoomMembers(list);
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           const s = await ensureSession();
-          if (!cancelled && s?.id) {
-            await refreshPlayers(s.id);
-          }
+          if (!cancelled && s?.id) await refreshPlayers(s.id);
           await ch.track({ player_name: name, online_at: new Date().toISOString() });
         }
       });
@@ -287,12 +464,12 @@ export default function Rummy51MP({ roomId: propRoomId, playerName, vault, setVa
       cancelled = true;
       supabase.removeChannel(ch);
     };
-  }, [currentRoomId, clientId, name, ensureSession, refreshPlayers, refreshSession]);
+  }, [roomId, clientId, name, ensureSession, refreshPlayers, refreshSession]);
 
+  // Players realtime
   useEffect(() => {
     if (!ses?.id) return;
     let cancelled = false;
-
     const chP = supabase
       .channel("rummy51_players:" + ses.id)
       .on("postgres_changes", { event: "*", schema: "public", table: "rummy51_players", filter: `session_id=eq.${ses.id}` }, async () => {
@@ -307,42 +484,110 @@ export default function Rummy51MP({ roomId: propRoomId, playerName, vault, setVa
     };
   }, [ses?.id, refreshPlayers]);
 
-  // Charge entry fee when taking seat
-  const takeSeat = useCallback(
-    async (seatIndex) => {
-      setMsg("");
-      
-      // Check vault
-      const vaultNow = readVault();
-      if (vaultNow < entryFee) {
-        setMsg(`Need at least ${fmt(entryFee)} in vault to join`);
-        return;
-      }
+  // Actions realtime (for animation/sfx)
+  useEffect(() => {
+    if (!ses?.id) return;
 
-      const s = ses?.id ? ses : await ensureSession();
-      if (!s?.id) return;
+    let cancelled = false;
+    const chA = supabase
+      .channel("rummy51_actions:" + ses.id)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "rummy51_actions", filter: `session_id=eq.${ses.id}` }, (payload) => {
+        if (cancelled) return;
+        const a = payload.new;
+        if (!a) return;
 
-      // Charge vault
-      writeVault(vaultNow - entryFee);
-      if (setVaultBoth) setVaultBoth(readVault());
+        // SFX + Anim
+        const type = a.action_type;
+        const seat = a.seat_index;
+        const p = a.payload || {};
+        const card = p.card;
 
-      const { error } = await supabase.rpc("rummy51_take_seat", {
-        p_room_id: currentRoomId,
-        p_seat_index: seatIndex,
-        p_client_id: clientId,
-        p_player_name: name,
-      });
-      if (error) {
-        // Refund on error
-        writeVault(vaultNow);
-        if (setVaultBoth) setVaultBoth(readVault());
-        setMsg(error.message || "Seat failed");
-        return;
-      }
-      await refreshPlayers(s.id);
-    },
-    [ses, ensureSession, currentRoomId, clientId, name, refreshPlayers, entryFee, setVaultBoth]
-  );
+        // Winner
+        if (type === "WIN") play("win");
+
+        // Only animate for my seat (feels personal)
+        if (seat !== mySeat) {
+          if (type === "DISCARD") play("discard");
+          if (type === "DRAW_STOCK" || type === "DRAW_DISCARD") play("draw");
+          return;
+        }
+
+        if ((type === "DRAW_STOCK" || type === "DRAW_DISCARD") && card) {
+          play("draw");
+          animateBetween(type === "DRAW_STOCK" ? "stock" : "discard", "hand", card);
+        } else if (type === "DISCARD" && card) {
+          play("discard");
+          animateBetween("hand", "discard", card);
+        } else if (type === "OPEN" || type === "NEW_MELD" || type === "LAYOFF") {
+          play("meld");
+        }
+      })
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(chA);
+    };
+  }, [ses?.id, mySeat, play]);
+
+  // -----------------------------
+  // Animation helpers
+  // -----------------------------
+  const getAnchorRect = useCallback((which) => {
+    const el =
+      which === "stock" ? stockRef.current :
+      which === "discard" ? discardRef.current :
+      which === "hand" ? handRef.current :
+      null;
+
+    if (!el) return { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 66, height: 94 };
+
+    const r = el.getBoundingClientRect();
+    return {
+      left: r.left + r.width / 2,
+      top: r.top + r.height / 2,
+      width: Math.min(66, r.width),
+      height: Math.min(94, r.height),
+    };
+  }, []);
+
+  const animateBetween = useCallback((from, to, card) => {
+    const fromR = getAnchorRect(from);
+    const toR = getAnchorRect(to);
+    const key = animKeyRef.current++;
+
+    setAnim({
+      key,
+      from: fromR,
+      to: toR,
+      card,
+      doneCb: () => {
+        // clear only if same key
+        setAnim((cur) => (cur?.key === key ? null : cur));
+      },
+    });
+  }, [getAnchorRect]);
+
+  // -----------------------------
+  // Lobby / game RPC
+  // -----------------------------
+  const takeSeat = useCallback(async (seatIndex) => {
+    if (!roomId) return;
+    setMsg("");
+    const { error } = await supabase.rpc("rummy51_take_seat", {
+      p_room_id: roomId,
+      p_seat_index: seatIndex,
+      p_client_id: clientId,
+      p_player_name: name,
+    });
+    if (error) {
+      play("error");
+      setMsg(error.message || "Seat failed");
+      return;
+    }
+    const s = ses?.id ? ses : await ensureSession();
+    if (s?.id) await refreshPlayers(s.id);
+  }, [roomId, clientId, name, ses?.id, ensureSession, refreshPlayers, play]);
 
   const leaveSeat = useCallback(async () => {
     if (!ses?.id) return;
@@ -351,11 +596,15 @@ export default function Rummy51MP({ roomId: propRoomId, playerName, vault, setVa
       p_session_id: ses.id,
       p_client_id: clientId,
     });
-    if (error) setMsg(error.message || "Leave failed");
+    if (error) {
+      play("error");
+      setMsg(error.message || "Leave failed");
+      return;
+    }
     await refreshPlayers(ses.id);
-  }, [ses?.id, clientId, refreshPlayers]);
+  }, [ses?.id, clientId, refreshPlayers, play]);
 
-  const startGame = useCallback(async () => {
+  const startRound = useCallback(async () => {
     if (!ses?.id) return;
     setMsg("");
     const { data, error } = await supabase.rpc("rummy51_start_round", {
@@ -363,6 +612,7 @@ export default function Rummy51MP({ roomId: propRoomId, playerName, vault, setVa
       p_client_id: clientId,
     });
     if (error) {
+      play("error");
       setMsg(error.message || "Start failed");
       return;
     }
@@ -371,9 +621,8 @@ export default function Rummy51MP({ roomId: propRoomId, playerName, vault, setVa
     setSelectedMeldId(null);
     setSes(data);
     await refreshPlayers(ses.id);
-  }, [ses?.id, clientId, refreshPlayers]);
+  }, [ses?.id, clientId, refreshPlayers, play]);
 
-  // ---------- gameplay actions ----------
   const drawStock = useCallback(async () => {
     if (!ses?.id) return;
     setMsg("");
@@ -381,9 +630,13 @@ export default function Rummy51MP({ roomId: propRoomId, playerName, vault, setVa
       p_session_id: ses.id,
       p_client_id: clientId,
     });
-    if (error) setMsg(error.message || "Draw failed");
+    if (error) {
+      play("error");
+      setMsg(error.message || "Draw failed");
+      return;
+    }
     if (data) setSes(data);
-  }, [ses?.id, clientId]);
+  }, [ses?.id, clientId, play]);
 
   const drawDiscard = useCallback(async () => {
     if (!ses?.id) return;
@@ -392,40 +645,47 @@ export default function Rummy51MP({ roomId: propRoomId, playerName, vault, setVa
       p_session_id: ses.id,
       p_client_id: clientId,
     });
-    if (error) setMsg(error.message || "Draw failed");
+    if (error) {
+      play("error");
+      setMsg(error.message || "Draw failed");
+      return;
+    }
     if (data) setSes(data);
-  }, [ses?.id, clientId]);
+  }, [ses?.id, clientId, play]);
 
   const addPendingMeld = useCallback(() => {
     setMsg("");
     const cards = [...selected];
     const a = analyzeMeld(cards);
     if (!a.ok) {
-      setMsg("Invalid meld selection (need valid set/run, 3+ cards, suits/ranks rules).");
+      play("error");
+      setMsg("Invalid meld (need valid set/run, 3+ cards).");
       return;
     }
     setPendingMelds((prev) => [...prev, { cards, type: a.type, points: a.points }]);
     setSelected([]);
-  }, [selected]);
+  }, [selected, play]);
 
   const removePendingMeld = useCallback((idx) => {
     setPendingMelds((prev) => prev.filter((_, i) => i !== idx));
   }, []);
 
   const open51 = useCallback(async () => {
-    if (!ses?.id) return;
-    if (!myPlayer) return;
+    if (!ses?.id || !myRow) return;
     setMsg("");
-    if (myPlayer.has_opened) {
+    if (myRow.has_opened) {
+      play("error");
       setMsg("Already opened.");
       return;
     }
     if (pendingMelds.length === 0) {
+      play("error");
       setMsg("Add at least one meld to open.");
       return;
     }
     const total = pendingMelds.reduce((s, m) => s + (m.points || 0), 0);
     if (total < 51) {
+      play("error");
       setMsg(`Need 51+ points to open (you have ${total}).`);
       return;
     }
@@ -436,17 +696,19 @@ export default function Rummy51MP({ roomId: propRoomId, playerName, vault, setVa
       p_melds: pendingMelds.map((m) => m.cards),
     });
     if (error) {
+      play("error");
       setMsg(error.message || "Open failed");
       return;
     }
     setPendingMelds([]);
     setSelected([]);
     if (data) setSes(data);
-  }, [ses?.id, myPlayer, pendingMelds, clientId]);
+  }, [ses?.id, myRow, pendingMelds, clientId, play]);
 
   const playMeld = useCallback(async () => {
     if (!ses?.id) return;
-    if (!myPlayer?.has_opened) {
+    if (!myRow?.has_opened) {
+      play("error");
       setMsg("You must OPEN (51+) first.");
       return;
     }
@@ -454,33 +716,43 @@ export default function Rummy51MP({ roomId: propRoomId, playerName, vault, setVa
     const cards = [...selected];
     const a = analyzeMeld(cards);
     if (!a.ok) {
+      play("error");
       setMsg("Invalid meld.");
       return;
     }
+
     const { data, error } = await supabase.rpc("rummy51_new_meld", {
       p_session_id: ses.id,
       p_client_id: clientId,
       p_cards: cards,
     });
-    if (error) setMsg(error.message || "Meld failed");
+    if (error) {
+      play("error");
+      setMsg(error.message || "Meld failed");
+      return;
+    }
     if (data) setSes(data);
     setSelected([]);
-  }, [ses?.id, myPlayer?.has_opened, selected, clientId]);
+  }, [ses?.id, myRow?.has_opened, selected, clientId, play]);
 
   const layoff = useCallback(async () => {
     if (!ses?.id) return;
-    if (!myPlayer?.has_opened) {
+    if (!myRow?.has_opened) {
+      play("error");
       setMsg("You must OPEN (51+) first.");
       return;
     }
     if (!selectedMeldId) {
+      play("error");
       setMsg("Pick a meld on table first.");
       return;
     }
     if (selected.length !== 1) {
+      play("error");
       setMsg("Select exactly 1 card to lay off.");
       return;
     }
+
     const card = selected[0];
     setMsg("");
 
@@ -491,335 +763,552 @@ export default function Rummy51MP({ roomId: propRoomId, playerName, vault, setVa
       p_meld_id: selectedMeldId,
       p_side: layoffSide,
     });
-    if (error) setMsg(error.message || "Layoff failed");
+    if (error) {
+      play("error");
+      setMsg(error.message || "Layoff failed");
+      return;
+    }
     if (data) setSes(data);
     setSelected([]);
-  }, [ses?.id, myPlayer?.has_opened, selectedMeldId, selected, clientId, layoffSide]);
+  }, [ses?.id, myRow?.has_opened, selected, selectedMeldId, layoffSide, clientId, play]);
 
-  const discard = useCallback(async () => {
+  const discard = useCallback(async (cardOverride) => {
     if (!ses?.id) return;
-    if (selected.length !== 1) {
+    const card = cardOverride || (selected.length === 1 ? selected[0] : null);
+    if (!card) {
+      play("error");
       setMsg("Select exactly 1 card to discard.");
       return;
     }
-    const card = selected[0];
     setMsg("");
+
     const { data, error } = await supabase.rpc("rummy51_discard", {
       p_session_id: ses.id,
       p_client_id: clientId,
       p_card: card,
     });
-    if (error) setMsg(error.message || "Discard failed");
+    if (error) {
+      play("error");
+      setMsg(error.message || "Discard failed");
+      return;
+    }
     if (data) setSes(data);
     setSelected([]);
-  }, [ses?.id, selected, clientId]);
+  }, [ses?.id, selected, clientId, play]);
 
-  // ---------- UI ----------
-  const seatedPlayers = useMemo(() => players.filter((p) => p.seat_index != null).sort((a, b) => a.seat_index - b.seat_index), [players]);
+  // -----------------------------
+  // UI helpers
+  // -----------------------------
+  const toggleSelect = useCallback((card) => {
+    setSelected((prev) => (prev.includes(card) ? prev.filter((c) => c !== card) : [...prev, card]));
+  }, []);
 
-  const openPoints = useMemo(() => pendingMelds.reduce((s, m) => s + (m.points || 0), 0), [pendingMelds]);
+  const seatsWithMeta = useMemo(() => {
+    const seatToPlayer = new Map();
+    for (const p of seatedPlayers) {
+      if (p.seat_index != null) seatToPlayer.set(p.seat_index, p);
+    }
 
-  function toggleSelect(card) {
-    setSelected((prev) => {
-      if (prev.includes(card)) return prev.filter((c) => c !== card);
-      return [...prev, card];
+    // Seat positions around table (percentage coords)
+    // 0 bottom center, then clockwise like poker-ish
+    const coords = [
+      { x: 50, y: 78, s: 1.1 }, // seat 1 (index 0) bottom-center (YOU)
+      { x: 18, y: 68, s: 0.95 },
+      { x: 18, y: 30, s: 0.90 },
+      { x: 50, y: 18, s: 0.95 },
+      { x: 82, y: 30, s: 0.90 },
+      { x: 82, y: 68, s: 0.95 },
+    ];
+
+    return Array.from({ length: SEATS }).map((_, i) => {
+      const p = seatToPlayer.get(i) || null;
+      const me = p?.client_id === clientId;
+      const isTurn = isPlaying && ses?.turn_seat === i;
+      const hasOpened = !!p?.has_opened;
+      const count = Array.isArray(p?.hand) ? p.hand.length : 0;
+
+      return {
+        seat: i,
+        player: p,
+        me,
+        isTurn,
+        hasOpened,
+        count,
+        pos: coords[i] || { x: 50, y: 50, s: 1 },
+      };
     });
-  }
+  }, [seatedPlayers, clientId, isPlaying, ses?.turn_seat]);
 
-  // Show Room Browser if no roomId
-  if (!currentRoomId) {
+  // Drag-to-discard
+  const onHandDragStart = useCallback((e, card) => {
+    try {
+      setDragCard(card);
+      e.dataTransfer.setData("text/plain", card);
+      e.dataTransfer.effectAllowed = "move";
+    } catch {}
+  }, []);
+
+  const onDiscardDrop = useCallback((e) => {
+    e.preventDefault();
+    if (!canDiscard) return;
+    const card = e.dataTransfer.getData("text/plain") || dragCard;
+    if (!card) return;
+    discard(card);
+    setDragCard(null);
+  }, [canDiscard, dragCard, discard]);
+
+  const onDiscardDragOver = useCallback((e) => {
+    if (!canDiscard) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  }, [canDiscard]);
+
+  // -----------------------------
+  // Render
+  // -----------------------------
+  if (!roomId) {
     return (
-      <div className="w-full min-h-[calc(100vh-80px)] text-white">
-        <div className="max-w-4xl mx-auto p-4">
-          <div className="text-2xl font-bold mb-4">Rummy 51 • Multiplayer</div>
-          <div className="text-xs text-white/60 mb-4">Initial meld must be 51+ points. Jokers are wild. Sets up to 4 suits. Runs 3+.</div>
-          <div className="text-sm text-white/70 mb-4">Entry fee: {fmt(entryFee)} • Vault: {fmt(readVault())}</div>
-          <RoomBrowser
-            gameId="rummy51"
-            playerName={name}
-            onJoinRoom={(roomId, tier) => {
-              setCurrentRoomId(roomId);
-            }}
-          />
-        </div>
+      <div className="w-full h-full flex items-center justify-center text-white/70">
+        Missing roomId
       </div>
     );
   }
 
+  // Header values
+  const vaultNum = Number(vault || 0);
+  const pot = entry * seatedPlayers.length;
+
   return (
-    <div className="w-full min-h-[calc(100vh-80px)] text-white">
-      <div className="max-w-6xl mx-auto p-4">
-        <div className="flex items-center justify-between gap-3">
+    <div className="w-full h-full flex flex-col gap-3 text-white">
+      {/* Overlay animated card */}
+      <AnimCard anim={anim} />
+
+      {/* Top Bar (match your Blackjack style) */}
+      <div className="w-full max-w-6xl mx-auto px-2 sm:px-4">
+        <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3 flex items-center justify-between">
           <div>
-            <div className="text-2xl font-bold">Rummy 51 • Multiplayer</div>
-            <div className="text-xs text-white/60">Initial meld must be 51+ points. Jokers are wild. Sets up to 4 suits. Runs 3+.</div>
+            <div className="text-lg font-bold">Rummy 51</div>
+            <div className="text-xs text-white/70">
+              Room: <span className="font-semibold">{roomId.slice(0, 8)}…</span> · Online: {roomMembers.length} ·
+              Stage: <span className="font-semibold">{ses?.stage || "…"}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-white/60">Entry: {fmt(entryFee)} • Vault: {fmt(readVault())}</div>
-            <button className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm" onClick={() => setCurrentRoomId(null)}>
-              Leave Room
-            </button>
+          <div className="text-right text-xs sm:text-sm">
+            <div className="text-white/80">Min: <span className="font-semibold">{fmt(entry)}</span></div>
+            <div className="text-emerald-300 font-semibold">Vault: {fmt(vaultNum)}</div>
           </div>
         </div>
 
-        <div className="mt-6">
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <div className="px-3 py-2 rounded-xl bg-black/30 border border-white/10">Room: <span className="font-semibold">{currentRoomId}</span></div>
-            <div className="px-3 py-2 rounded-xl bg-black/30 border border-white/10">Online: {members.length}</div>
-            {ses?.stage && <div className="px-3 py-2 rounded-xl bg-black/30 border border-white/10">Stage: <span className="font-semibold">{ses.stage}</span></div>}
-            {msg && <div className="px-3 py-2 rounded-xl bg-red-500/20 border border-red-400/30 text-red-100 rounded-xl">{msg}</div>}
+        {msg && (
+          <div className="mt-2 px-3 py-2 rounded-xl bg-red-500/15 border border-red-400/25 text-red-100 text-sm">
+            {msg}
           </div>
+        )}
+      </div>
 
-          {/* Lobby */}
-          {ses?.stage !== "playing" && (
-            <div className="mt-4 grid lg:grid-cols-2 gap-4">
-              <div className="rounded-2xl p-4 bg-white/5 border border-white/10">
-                <div className="font-semibold mb-2">Seats</div>
-                <div className="grid grid-cols-2 gap-2">
-                  {Array.from({ length: 4 }).map((_, i) => {
-                    const p = players.find((x) => x.seat_index === i);
-                    const mine = p?.client_id === clientId;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => takeSeat(i)}
-                        className={`p-3 rounded-xl border text-left ${
-                          p
-                            ? mine
-                              ? "bg-emerald-600/30 border-emerald-400/40"
-                              : "bg-white/5 border-white/10"
-                            : "bg-black/30 border-white/10 hover:bg-black/40"
-                        }`}
-                      >
-                        <div className="text-xs text-white/60">Seat {i + 1}</div>
-                        <div className="font-semibold">{p ? p.player_name : "Empty"}</div>
-                        {mine && <div className="text-[11px] text-white/70">You</div>}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-3 flex gap-2">
-                  <button className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15" onClick={leaveSeat} disabled={!myPlayer}>
-                    Leave seat
-                  </button>
-                  <button
-                    className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-semibold"
-                    onClick={startGame}
-                    disabled={seatedPlayers.length < 2}
-                    title={seatedPlayers.length < 2 ? "Need 2+ seated" : "Start"}
-                  >
-                    Start round
-                  </button>
-                </div>
+      {/* Main table */}
+      <div className="w-full max-w-6xl mx-auto flex-1 min-h-0 px-2 sm:px-4 pb-2">
+        <div className="h-full min-h-[520px] rounded-2xl border border-white/10 overflow-hidden bg-[#0f3e1f] bg-[radial-gradient(circle_at_center,rgba(0,0,0,0.35)_0%,transparent_70%)] relative">
+          {/* Meld rail (top) */}
+          <div className="absolute top-2 left-2 right-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs text-white/80 font-semibold">
+                Melds on table: <span className="text-white/70">{melds.length}</span>
               </div>
-
-              <div className="rounded-2xl p-4 bg-white/5 border border-white/10">
-                <div className="font-semibold mb-2">Players</div>
-                <div className="space-y-2">
-                  {seatedPlayers.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between px-3 py-2 rounded-xl bg-black/30 border border-white/10">
-                      <div className="font-semibold">{p.player_name}</div>
-                      <div className="text-xs text-white/60">Seat {p.seat_index + 1}</div>
-                    </div>
-                  ))}
-                </div>
-                {ses?.winner_name && (
-                  <div className="mt-4 p-3 rounded-xl bg-emerald-600/20 border border-emerald-400/30">
-                    <div className="text-xs text-white/70">Last winner</div>
-                    <div className="font-semibold">{ses.winner_name}</div>
-                  </div>
-                )}
+              <div className="text-xs text-white/70">
+                Pot (UI): <span className="font-semibold">{fmt(pot)}</span>
               </div>
             </div>
-          )}
 
-          {/* Playing */}
-          {ses?.stage === "playing" && (
-            <div className="mt-4 grid lg:grid-cols-3 gap-4">
-              {/* Table */}
-              <div className="lg:col-span-2 rounded-2xl p-4 bg-white/5 border border-white/10">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="px-3 py-2 rounded-xl bg-black/30 border border-white/10">
-                    Turn: <span className="font-semibold">Seat {(ses.turn_seat ?? 0) + 1}</span>
+            <div className="mt-2 overflow-x-auto no-scrollbar">
+              <div className="inline-flex gap-3">
+                {melds.length === 0 && (
+                  <div className="text-xs text-white/60 px-3 py-2 rounded-xl bg-black/25 border border-white/10">
+                    No melds yet.
                   </div>
-                  <div className="px-3 py-2 rounded-xl bg-black/30 border border-white/10">
-                    Phase: <span className="font-semibold">{ses.turn_phase}</span>
-                  </div>
-                  <div className="px-3 py-2 rounded-xl bg-black/30 border border-white/10">
-                    Stock: <span className="font-semibold">{Array.isArray(ses.stock) ? ses.stock.length : 0}</span>
-                  </div>
-                  <div className="px-3 py-2 rounded-xl bg-black/30 border border-white/10">
-                    Discard: <span className="font-semibold">{discardTop ? cardLabel(discardTop) : "—"}</span>
-                  </div>
-                  {isMyTurn && <div className="text-emerald-300 font-semibold">Your turn</div>}
+                )}
+
+                {melds.map((m) => {
+                  const active = selectedMeldId === m.id;
+                  const cards = Array.isArray(m.cards) ? m.cards : [];
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => setSelectedMeldId(m.id)}
+                      className={`px-2 py-2 rounded-xl border transition-all ${
+                        active ? "bg-emerald-600/20 border-emerald-300/40" : "bg-black/25 border-white/10 hover:bg-black/35"
+                      }`}
+                      title="Click to target for layoff"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-[11px] text-white/80 font-semibold">
+                          {String(m.type || "").toUpperCase()} {m.suit ? SUIT_SYMBOL[m.suit] : ""} · Seat {(m.owner_seat ?? 0) + 1}
+                        </div>
+                        <div className="text-[11px] text-white/60">{cards.length}</div>
+                      </div>
+
+                      <div className="mt-2 flex items-end">
+                        {cards.slice(-8).map((c, idx) => (
+                          <div key={idx} className={idx === 0 ? "" : "-ml-6"}>
+                            <PlayingCard card={c} size="sm" dim={idx < cards.slice(-8).length - 3} />
+                          </div>
+                        ))}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Stock + Discard (center) */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex items-center gap-8">
+              <div className="text-center">
+                <div className="text-[11px] text-white/70 mb-1">STOCK</div>
+                <div ref={stockRef} className="inline-block">
+                  <PlayingCard faceDown size="md" />
                 </div>
-
-                <div className="mt-4 grid gap-3">
-                  <div className="rounded-xl p-3 bg-black/30 border border-white/10">
-                    <div className="text-xs text-white/60 mb-2">Melds on table (click to target for layoff)</div>
-                    <div className="space-y-2">
-                      {melds.length === 0 && <div className="text-sm text-white/60">No melds yet.</div>}
-                      {melds.map((m) => (
-                        <button
-                          key={m.id}
-                          onClick={() => setSelectedMeldId(m.id)}
-                          className={`w-full text-left px-3 py-2 rounded-xl border ${
-                            selectedMeldId === m.id ? "bg-emerald-600/20 border-emerald-400/40" : "bg-white/5 border-white/10 hover:bg-white/10"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm font-semibold">
-                              {m.type?.toUpperCase()} {m.suit ? SUIT_SYMBOL[m.suit] : ""} • Seat {(m.owner_seat ?? 0) + 1}
-                            </div>
-                            <div className="text-xs text-white/60">{m.cards?.length || 0} cards</div>
-                          </div>
-                          <div className="mt-1 flex flex-wrap gap-2">
-                            {(m.cards || []).map((c, idx) => (
-                              <span key={idx} className="px-2 py-1 rounded-lg bg-black/30 border border-white/10 text-sm">
-                                {cardLabel(c)}
-                              </span>
-                            ))}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                <div className="mt-1 text-[11px] text-white/60">
+                  {Array.isArray(ses?.stock) ? ses.stock.length : 0}
                 </div>
               </div>
 
-              {/* My panel */}
-              <div className="rounded-2xl p-4 bg-white/5 border border-white/10">
-                <div className="font-semibold mb-2">You</div>
-                <div className="text-sm text-white/70">
-                  {myPlayer ? (
-                    <>
-                      <div>Name: <span className="font-semibold">{myPlayer.player_name}</span></div>
-                      <div>Seat: <span className="font-semibold">{(mySeat ?? 0) + 1}</span></div>
-                      <div>Opened: <span className="font-semibold">{myPlayer.has_opened ? "Yes" : "No"}</span></div>
-                      <div>Hand: <span className="font-semibold">{myHand.length}</span></div>
-                    </>
+              <div className="text-center">
+                <div className="text-[11px] text-white/70 mb-1">DISCARD</div>
+                <div
+                  ref={discardRef}
+                  className={`inline-block ${canDiscard ? "ring-2 ring-amber-400/30 rounded-md" : ""}`}
+                  onDrop={onDiscardDrop}
+                  onDragOver={onDiscardDragOver}
+                  title={canDiscard ? "Drop a card here to discard" : "Discard pile"}
+                >
+                  {discardTop ? <PlayingCard card={discardTop} size="md" /> : <PlayingCard faceDown size="md" />}
+                </div>
+                <div className="mt-1 text-[11px] text-white/60">
+                  {Array.isArray(ses?.discard) ? ses.discard.length : 0}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Seats around table */}
+          {seatsWithMeta.map((s) => {
+            const p = s.player;
+            const isMe = s.me;
+            const isTurn = s.isTurn;
+            const label = p ? p.player_name : "Empty";
+            const count = p ? s.count : 0;
+
+            return (
+              <div
+                key={s.seat}
+                className={`absolute rounded-xl border shadow-lg transition-all ${
+                  isTurn ? "border-yellow-400 bg-yellow-400/15 ring-2 ring-yellow-400/25" :
+                  isMe ? "border-purple-400 bg-purple-400/15" :
+                  "border-white/15 bg-black/20"
+                }`}
+                style={{
+                  left: `${s.pos.x}%`,
+                  top: `${s.pos.y}%`,
+                  transform: `translate(-50%, -50%) scale(${s.pos.s})`,
+                  minWidth: isMe ? "150px" : "160px",
+                }}
+              >
+                <div className="px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-bold truncate max-w-[120px]">
+                      {label}{isMe ? " (You)" : ""}
+                    </div>
+                    {p && (
+                      <div className="text-[11px] text-white/70">
+                        Seat {s.seat + 1}
+                      </div>
+                    )}
+                  </div>
+
+                  {p ? (
+                    <div className="mt-1 text-[11px] text-white/70 flex items-center justify-between">
+                      <div>{count} cards</div>
+                      <div className={`${p.has_opened ? "text-emerald-300" : "text-white/50"}`}>
+                        {p.has_opened ? "Opened" : "Not opened"}
+                      </div>
+                    </div>
                   ) : (
-                    <div className="text-white/60">Take a seat to play.</div>
+                    <button
+                      onClick={() => takeSeat(s.seat)}
+                      className="mt-2 w-full px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold"
+                      disabled={ses?.stage !== "lobby"}
+                      title={ses?.stage !== "lobby" ? "Game in progress" : "Take seat"}
+                    >
+                      TAKE SEAT
+                    </button>
                   )}
                 </div>
 
-                <div className="mt-3 space-y-2">
-                  <button className="w-full px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15" onClick={leaveSeat} disabled={!myPlayer}>
-                    Leave seat
-                  </button>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <button className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-semibold" onClick={drawStock} disabled={!isMyTurn || ses.turn_phase !== "draw"}>
-                      Draw stock
-                    </button>
-                    <button className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-semibold" onClick={drawDiscard} disabled={!isMyTurn || ses.turn_phase !== "draw" || !discardTop}>
-                      Take discard
-                    </button>
-                  </div>
-
-                  <div className="rounded-xl p-3 bg-black/30 border border-white/10">
-                    <div className="text-xs text-white/60 mb-2">Selected: {selected.length}</div>
-                    <div className="flex flex-wrap gap-2">
-                      {selected.map((c) => (
-                        <span key={c} className="px-2 py-1 rounded-lg bg-emerald-600/20 border border-emerald-400/30 text-sm">
-                          {cardLabel(c)}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      <button className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-semibold" onClick={playMeld} disabled={!isMyTurn || ses.turn_phase !== "meld" || selected.length < 3}>
-                        New meld
-                      </button>
-                      <button className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-semibold" onClick={discard} disabled={!isMyTurn || ses.turn_phase !== "discard" || selected.length !== 1}>
-                        Discard
-                      </button>
-                    </div>
-
-                    <div className="mt-2">
-                      <div className="text-xs text-white/60 mb-1">Layoff target</div>
-                      <div className="flex gap-2">
-                        <select className="flex-1 px-3 py-2 rounded-xl bg-black/40 border border-white/10" value={layoffSide} onChange={(e) => setLayoffSide(e.target.value)}>
-                          <option value="left">Left (run)</option>
-                          <option value="right">Right (run)</option>
-                        </select>
-                        <button className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15" onClick={layoff} disabled={!isMyTurn || ses.turn_phase !== "meld" || selected.length !== 1 || !selectedMeldId}>
-                          Layoff
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Opening builder */}
-                  <div className="rounded-xl p-3 bg-black/30 border border-white/10">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-semibold">Open (51+)</div>
-                        <div className="text-xs text-white/60">Build melds, then open once.</div>
-                      </div>
-                      <div className="text-sm font-semibold">{openPoints} / 51</div>
-                    </div>
-
-                    <div className="mt-2 flex gap-2">
-                      <button className="flex-1 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15" onClick={addPendingMeld} disabled={!isMyTurn || ses.turn_phase !== "meld" || selected.length < 3}>
-                        Add meld
-                      </button>
-                      <button className="flex-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-semibold" onClick={open51} disabled={!isMyTurn || ses.turn_phase !== "meld" || pendingMelds.length === 0 || (myPlayer?.has_opened ?? false)}>
-                        OPEN
-                      </button>
-                    </div>
-
-                    <div className="mt-2 space-y-2">
-                      {pendingMelds.length === 0 && <div className="text-xs text-white/60">No pending melds.</div>}
-                      {pendingMelds.map((m, idx) => (
-                        <div key={idx} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10">
-                          <div className="flex items-center justify-between">
-                            <div className="text-xs text-white/70">{m.type?.toUpperCase()} • {m.points} pts</div>
-                            <button className="text-xs px-2 py-1 rounded-lg bg-white/10 hover:bg-white/15" onClick={() => removePendingMeld(idx)}>
-                              remove
-                            </button>
-                          </div>
-                          <div className="mt-1 flex flex-wrap gap-2">
-                            {m.cards.map((c) => (
-                              <span key={c} className="px-2 py-1 rounded-lg bg-black/30 border border-white/10 text-sm">
-                                {cardLabel(c)}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                </div>
+                {p && (
+                  <div className={`absolute -top-2 -right-2 w-3 h-3 rounded-full ${isTurn ? "bg-yellow-400 animate-pulse" : "bg-white/20"}`} />
+                )}
               </div>
+            );
+          })}
 
-              {/* My hand */}
-              <div className="lg:col-span-3 rounded-2xl p-4 bg-white/5 border border-white/10">
-                <div className="flex items-center justify-between">
-                  <div className="font-semibold">Your hand</div>
-                  <div className="text-xs text-white/60">Click to select cards</div>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {myHand.map((c) => {
-                    const sel = selected.includes(c);
-                    return (
-                      <button
-                        key={c}
-                        onClick={() => toggleSelect(c)}
-                        className={`px-3 py-2 rounded-xl border text-sm ${
-                          sel ? "bg-emerald-600/20 border-emerald-400/40" : "bg-black/30 border-white/10 hover:bg-black/40"
-                        }`}
-                      >
-                        {cardLabel(c)}
-                      </button>
-                    );
-                  })}
-                </div>
+          {/* Bottom hint */}
+          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-[11px] text-white/60">
+            <div>
+              Turn: <span className="text-white/80 font-semibold">Seat {(ses?.turn_seat ?? 0) + 1}</span> · Phase:{" "}
+              <span className="text-white/80 font-semibold">{ses?.turn_phase || "—"}</span>
+            </div>
+            <div className="hidden sm:block">
+              Tip: drag a card onto discard pile to throw it (your turn, discard phase)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom panel (hand + actions), like your Blackjack layout */}
+      <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pb-4">
+        <div className="grid md:grid-cols-3 gap-3">
+          {/* Hand tray */}
+          <div className="md:col-span-2 rounded-2xl bg-white/5 border border-white/10 p-3">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-bold">Your hand</div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setHandSortMode((m) => (m === "suit" ? "rank" : "suit"))}
+                  className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-semibold"
+                >
+                  Sort: {handSortMode === "suit" ? "Suit" : "Rank"}
+                </button>
+                <div className="text-xs text-white/60">{myHand.length} cards</div>
               </div>
             </div>
-          )}
+
+            <div ref={handRef} className="mt-2 overflow-x-auto whitespace-nowrap no-scrollbar py-2">
+              <div className="inline-flex items-end">
+                {myHand.map((c, idx) => {
+                  const sel = selected.includes(c);
+                  return (
+                    <div key={c} className={idx === 0 ? "" : "-ml-8 md:-ml-10"}>
+                      <PlayingCard
+                        card={c}
+                        selected={sel}
+                        size="md"
+                        draggable={true}
+                        onDragStart={(e) => onHandDragStart(e, c)}
+                        onClick={() => toggleSelect(c)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Pending open melds panel (compact) */}
+            {!myRow?.has_opened && (
+              <div className="mt-2 rounded-xl bg-black/25 border border-white/10 p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-semibold">Open (51+)</div>
+                    <div className="text-[11px] text-white/60">Build melds, then OPEN once.</div>
+                  </div>
+                  <div className="text-sm font-bold">{openPoints} / 51</div>
+                </div>
+
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    onClick={addPendingMeld}
+                    disabled={!canMeld || selected.length < 3}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+                      !canMeld || selected.length < 3
+                        ? "bg-white/5 border border-white/10 text-white/40"
+                        : "bg-emerald-600 hover:bg-emerald-500"
+                    }`}
+                  >
+                    Add Meld
+                  </button>
+
+                  <button
+                    onClick={open51}
+                    disabled={!canMeld || pendingMelds.length === 0 || openPoints < 51}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+                      !canMeld || pendingMelds.length === 0 || openPoints < 51
+                        ? "bg-white/5 border border-white/10 text-white/40"
+                        : "bg-emerald-600 hover:bg-emerald-500"
+                    }`}
+                  >
+                    OPEN
+                  </button>
+
+                  {pendingMelds.length > 0 && (
+                    <button
+                      onClick={() => { setPendingMelds([]); setSelected([]); }}
+                      className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-semibold"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {pendingMelds.length > 0 && (
+                  <div className="mt-2 grid sm:grid-cols-2 gap-2">
+                    {pendingMelds.map((m, i) => (
+                      <div key={i} className="rounded-xl bg-white/5 border border-white/10 p-2">
+                        <div className="flex items-center justify-between">
+                          <div className="text-[11px] text-white/70">
+                            {String(m.type || "").toUpperCase()} · {m.points} pts
+                          </div>
+                          <button
+                            onClick={() => removePendingMeld(i)}
+                            className="text-[11px] px-2 py-1 rounded-lg bg-white/10 hover:bg-white/15"
+                          >
+                            remove
+                          </button>
+                        </div>
+                        <div className="mt-2 flex items-end">
+                          {m.cards.map((c, idx) => (
+                            <div key={idx} className={idx === 0 ? "" : "-ml-6"}>
+                              <PlayingCard card={c} size="sm" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Actions + status */}
+          <div className="rounded-2xl bg-white/5 border border-white/10 p-3">
+            <div className="text-sm font-bold">Actions</div>
+            <div className="text-xs text-white/60 mt-1">
+              Your turn: <span className="font-semibold">{isMyTurn ? "YES" : "NO"}</span>
+            </div>
+
+            {/* Action buttons (match Blackjack sizing) */}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                onClick={drawStock}
+                disabled={!canDraw}
+                className={`px-3 py-2 rounded-lg text-sm font-bold ${
+                  !canDraw ? "bg-white/5 border border-white/10 text-white/40" : "bg-indigo-600 hover:bg-indigo-500"
+                }`}
+              >
+                DRAW
+              </button>
+
+              <button
+                onClick={drawDiscard}
+                disabled={!canDraw || !discardTop}
+                className={`px-3 py-2 rounded-lg text-sm font-bold ${
+                  !canDraw || !discardTop ? "bg-white/5 border border-white/10 text-white/40" : "bg-indigo-600 hover:bg-indigo-500"
+                }`}
+              >
+                TAKE
+              </button>
+
+              <button
+                onClick={playMeld}
+                disabled={!canMeld || !myRow?.has_opened || selected.length < 3}
+                className={`px-3 py-2 rounded-lg text-sm font-bold ${
+                  !canMeld || !myRow?.has_opened || selected.length < 3
+                    ? "bg-white/5 border border-white/10 text-white/40"
+                    : "bg-emerald-600 hover:bg-emerald-500"
+                }`}
+              >
+                MELD
+              </button>
+
+              <button
+                onClick={layoff}
+                disabled={!canMeld || !myRow?.has_opened || selected.length !== 1 || !selectedMeldId}
+                className={`px-3 py-2 rounded-lg text-sm font-bold ${
+                  !canMeld || !myRow?.has_opened || selected.length !== 1 || !selectedMeldId
+                    ? "bg-white/5 border border-white/10 text-white/40"
+                    : "bg-emerald-600 hover:bg-emerald-500"
+                }`}
+              >
+                LAYOFF
+              </button>
+
+              <button
+                onClick={() => discard()}
+                disabled={!canDiscard || selected.length !== 1}
+                className={`px-3 py-2 rounded-lg text-sm font-bold col-span-2 ${
+                  !canDiscard || selected.length !== 1
+                    ? "bg-white/5 border border-white/10 text-white/40"
+                    : "bg-rose-600 hover:bg-rose-500"
+                }`}
+                title="You can also drag a card onto discard pile"
+              >
+                DISCARD
+              </button>
+            </div>
+
+            {/* Layoff side selector */}
+            <div className="mt-2 flex items-center gap-2">
+              <div className="text-xs text-white/60">Layoff side:</div>
+              <select
+                className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-sm"
+                value={layoffSide}
+                onChange={(e) => setLayoffSide(e.target.value)}
+              >
+                <option value="left">Left (run)</option>
+                <option value="right">Right (run)</option>
+              </select>
+            </div>
+
+            {/* Selected display */}
+            <div className="mt-3 rounded-xl bg-black/25 border border-white/10 p-2">
+              <div className="text-xs text-white/70">Selected: {selected.length}</div>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {selected.slice(0, 6).map((c) => (
+                  <span key={c} className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-xs">
+                    {cardLabel(c)}
+                  </span>
+                ))}
+                {selected.length > 6 && <span className="text-xs text-white/50">+{selected.length - 6} more</span>}
+              </div>
+            </div>
+
+            {/* Lobby controls */}
+            <div className="mt-3 rounded-xl bg-black/25 border border-white/10 p-3">
+              <div className="text-xs font-semibold mb-2">Table</div>
+              <div className="flex gap-2">
+                <button
+                  onClick={leaveSeat}
+                  disabled={!myRow}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-bold ${
+                    !myRow ? "bg-white/5 border border-white/10 text-white/40" : "bg-white/10 hover:bg-white/15"
+                  }`}
+                >
+                  Leave seat
+                </button>
+                <button
+                  onClick={startRound}
+                  disabled={seatedPlayers.length < 2}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-bold ${
+                    seatedPlayers.length < 2 ? "bg-white/5 border border-white/10 text-white/40" : "bg-amber-500 hover:bg-amber-400 text-black"
+                  }`}
+                >
+                  Start round
+                </button>
+              </div>
+              <div className="mt-2 text-[11px] text-white/60">
+                Need 2+ seated. Best on desktop; mobile also works with horizontal hand scroll.
+              </div>
+            </div>
+
+            {/* Winner */}
+            {ses?.stage === "finished" && (
+              <div className="mt-3 rounded-xl bg-emerald-600/20 border border-emerald-400/30 p-3">
+                <div className="text-xs text-white/70">Winner</div>
+                <div className="text-sm font-bold">{ses.winner_name || `Seat ${(ses.winner_seat ?? 0) + 1}`}</div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
