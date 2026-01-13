@@ -441,9 +441,15 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
   }, [roomId]);
 
   const refreshSession = useCallback(async () => {
-    if (!roomId) return;
-    const { data } = await supabase.from("rummy51_sessions").select("*").eq("room_id", roomId).single();
+    if (!roomId) return null;
+    const { data, error } = await supabase
+      .from("rummy51_sessions")
+      .select("*")
+      .eq("room_id", roomId)
+      .single();
+    if (error) return null;
     if (data) setSes(data);
+    return data;
   }, [roomId]);
 
   const refreshPlayers = useCallback(async (sessionId) => {
@@ -513,7 +519,7 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
       .channel("rummy51_room:" + roomId, { config: { presence: { key: clientId } } })
       .on("postgres_changes", { event: "*", schema: "public", table: "rummy51_sessions", filter: `room_id=eq.${roomId}` }, async () => {
         if (cancelled) return;
-        const s = await ensureSession();
+        const s = await refreshSession();
         if (s?.id) await refreshState(s.id);
       })
       .on("presence", { event: "sync" }, () => {
@@ -552,6 +558,31 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
       supabase.removeChannel(chP);
     };
   }, [ses?.id, refreshState]);
+
+  // Polling fallback (keeps sync even if Realtime fails)
+  useEffect(() => {
+    if (!ses?.id) return;
+
+    let stop = false;
+
+    const tick = async () => {
+      if (stop) return;
+      const s = await refreshSession();
+      if (s?.id) await refreshState(s.id);
+    };
+
+    // Poll every 1.5s while playing (fallback if Realtime fails)
+    const interval = setInterval(() => {
+      if (ses?.stage === "playing") {
+        tick();
+      }
+    }, 1500);
+
+    return () => {
+      stop = true;
+      clearInterval(interval);
+    };
+  }, [ses?.id, ses?.stage, refreshSession, refreshState]);
 
   // Actions realtime (for animation/sfx)
   useEffect(() => {
