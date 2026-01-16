@@ -70,7 +70,7 @@ function fmt(n) {
   return String(n);
 }
 
-const TIERED_GAMES = ['poker', 'backgammon', 'roulette', 'blackjack', 'war', 'ludo', 'bingo'];
+const TIERED_GAMES = ['poker', 'backgammon', 'roulette', 'blackjack', 'war', 'ludo', 'bingo', 'checkers'];
 
 // Game Registry with lazy loading
 const GAME_REGISTRY = [
@@ -145,6 +145,15 @@ const GAME_REGISTRY = [
     color: "#F59E0B",
     isMultiplayer: true,
     loader: () => import("../games-online/Rummy51MP").then(m => m.default)
+  },
+  {
+    id: "checkers",
+    title: "Checkers",
+    emoji: "⚫",
+    description: "Classic Checkers (Draughts)! Two-player strategy game with mandatory captures and kings.",
+    color: "#3B82F6",
+    isMultiplayer: true,
+    loader: () => import("../games-online/CheckersMP").then(m => m.default)
   },
   {
     id: "poker-tables",

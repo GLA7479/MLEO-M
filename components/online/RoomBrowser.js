@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabaseMP as supabase, getClientId } from "../../lib/supabaseClients";
 
 const TIER_OPTIONS = ['1K','10K','100K','1M','10M','100M'];
-const TIERED_GAMES = ['poker', 'backgammon', 'roulette', 'blackjack', 'war', 'ludo', 'rummy51'];
+const TIERED_GAMES = ['poker', 'backgammon', 'roulette', 'blackjack', 'war', 'ludo', 'rummy51', 'checkers'];
 
 export default function RoomBrowser({ gameId, playerName, onJoinRoom }) {
   const [rooms, setRooms] = useState([]);
