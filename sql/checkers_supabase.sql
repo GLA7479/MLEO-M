@@ -50,6 +50,10 @@ for each row execute function public.touch_updated_at();
 alter table public.ck_sessions replica identity full;
 alter table public.ck_players replica identity full;
 
+-- Enable Realtime publication (required for postgres_changes)
+alter publication supabase_realtime add table public.ck_sessions;
+alter publication supabase_realtime add table public.ck_players;
+
 -- RLS (open like many arcade prototypes)
 alter table public.ck_sessions enable row level security;
 alter table public.ck_players enable row level security;

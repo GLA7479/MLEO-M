@@ -139,8 +139,13 @@ export default function CheckersMP({ roomId, playerName, vault, setVaultBoth, ti
 
   // ===== ensure session =====
   async function ensureCkSession(roomId) {
-    const { data: existing } = await supabase
+    const { data: existing, error: fetchError } = await supabase
       .from("ck_sessions").select("*").eq("room_id", roomId).order("created_at", { ascending: false }).limit(1);
+
+    if (fetchError) {
+      console.error("ck_sessions select failed:", fetchError);
+      throw new Error(`Failed to fetch session: ${fetchError.message || fetchError.code || "Unknown error"}`);
+    }
 
     if (existing && existing.length) return existing[0];
 
@@ -157,7 +162,15 @@ export default function CheckersMP({ roomId, playerName, vault, setVaultBoth, ti
       })
       .select().single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("ck_sessions insert failed:", error);
+      throw new Error(`Failed to create session: ${error.message || error.code || "Unknown error"}. Check RLS/Auth.`);
+    }
+    
+    if (!created) {
+      throw new Error("Session creation returned no data");
+    }
+    
     return created;
   }
 
@@ -172,8 +185,21 @@ export default function CheckersMP({ roomId, playerName, vault, setVaultBoth, ti
 
     let session = ses;
     if (!session || !session.id) {
-      session = await ensureCkSession(roomId);
-      setSes(session);
+      try {
+        session = await ensureCkSession(roomId);
+        setSes(session);
+      } catch (e) {
+        console.error("ensureCkSession failed:", e);
+        const errMsg = e?.message || e?.code || "Unknown error";
+        setMsg(`Failed to create session: ${errMsg}. Check RLS/Auth in Supabase.`);
+        return;
+      }
+    }
+
+    // If session creation failed, exit early
+    if (!session || !session.id) {
+      setMsg("Failed to create or load game session");
+      return;
     }
 
     // Don't allow seating if game already started
@@ -214,19 +240,30 @@ export default function CheckersMP({ roomId, playerName, vault, setVaultBoth, ti
       }
       writeVault(v - BUYIN_PER_MATCH);
 
-      const { error: upErr } = await supabase.from("ck_players").upsert({
+      const { data: inserted, error: upErr } = await supabase.from("ck_players").upsert({
         session_id: session.id,
         seat_index: seatIndex,
         player_name: playerName || "Guest",
         client_id: clientId,
         wins: 0,
-      }, { onConflict: "session_id,seat_index", ignoreDuplicates: false });
+      }, { onConflict: "session_id,seat_index", ignoreDuplicates: false }).select();
 
       if (upErr) {
+        console.error("ck_players upsert failed:", upErr);
         // If insert failed, refund the buy-in
         const v2 = readVault();
         writeVault(v2 + BUYIN_PER_MATCH);
-        setMsg(upErr.message?.includes("duplicate") ? "Seat taken" : upErr.message);
+        const errMsg = upErr.message || upErr.code || "Unknown error";
+        setMsg(upErr.message?.includes("duplicate") || upErr.code === "23505" ? "Seat taken" : `Failed to join seat: ${errMsg}. Check RLS/Auth.`);
+        return;
+      }
+      
+      if (!inserted || inserted.length === 0) {
+        // Upsert succeeded but no data returned (shouldn't happen, but handle it)
+        console.warn("ck_players upsert succeeded but no data returned");
+        const v2 = readVault();
+        writeVault(v2 + BUYIN_PER_MATCH);
+        setMsg("Failed to register seat (no data returned)");
         return;
       }
     }
