@@ -24,6 +24,11 @@ export default function App({ Component, pageProps }) {
       }
     }
 
+    // --- Fix scroll-behavior warning for Next.js ---
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-scroll-behavior", "smooth");
+    }
+
     // --- iOS 100vh fix (שיהיה גובה מלא גם בספארי) ---
     const root = document.documentElement;
     const vv = window.visualViewport;

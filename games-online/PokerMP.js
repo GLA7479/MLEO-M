@@ -283,7 +283,10 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       .limit(1);
 
     if (selErr) {
-      console.warn('ensureSession select error', selErr);
+      // Only log non-auth errors
+      if (!selErr.message?.includes('auth') && !selErr.code?.includes('401') && !selErr.code?.includes('403')) {
+        console.warn('ensureSession select error', selErr);
+      }
     }
     if (existing && existing.length) return existing[0];
 
@@ -304,7 +307,22 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       .single();
 
     if (insErr) {
-      console.error('ensureSession insert error', insErr);
+      // 409 conflict is expected when multiple players try to create session simultaneously
+      if (insErr.code === '23505' || insErr.message?.includes('duplicate') || insErr.code === '409') {
+        // Try to fetch the existing session
+        const { data: existing } = await supabase
+          .from('poker_sessions')
+          .select('*')
+          .eq('room_id', roomId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (existing) return existing;
+      }
+      // Only log non-conflict errors
+      if (!insErr.code?.includes('409') && !insErr.message?.includes('duplicate') && !insErr.message?.includes('auth')) {
+        console.error('ensureSession insert error', insErr);
+      }
       throw insErr;
     }
     return created;
@@ -440,7 +458,12 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       });
 
       if (upErr) {
-        setMsg(upErr.message?.includes('duplicate') ? "Seat is taken" : upErr.message);
+        // 409 conflict is expected when seat is already taken
+        if (upErr.code === '23505' || upErr.code === '409' || upErr.message?.includes('duplicate')) {
+          setMsg("Seat is taken");
+        } else if (!upErr.message?.includes('auth')) {
+          setMsg(upErr.message || "Failed to join seat");
+        }
         return;
       }
 
@@ -535,7 +558,10 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       all_in: (pl.stack_live - pay)===0
     }).eq("id", pl.id);
     await supabase.from("poker_pots").update({ total: (prizePool?.total||0) + pay }).eq("session_id", sessionId);
-    await supabase.from("poker_actions").insert({ session_id: sessionId, seat_index: seatIndex, action, amount: pay });
+    const { error: actErr } = await supabase.from("poker_actions").insert({ session_id: sessionId, seat_index: seatIndex, action, amount: pay });
+    if (actErr && !actErr.message?.includes('auth') && actErr.code !== '409') {
+      console.warn('poker_actions insert error:', actErr);
+    }
   }
 
   // ===== Quick Win Helper =====
@@ -595,12 +621,15 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       .eq('session_id', sessionId);
 
     // 6) רשום לוג פעולה "win"
-    await supabase.from('poker_actions').insert({
+    const { error: winErr } = await supabase.from('poker_actions').insert({
       session_id: sessionId,
       action: 'win',
       amount: totalPot,
       note: `winner seat=${winnerSeat} by fold`,
     });
+    if (winErr && !winErr.message?.includes('auth') && winErr.code !== '409') {
+      console.warn('poker_actions win insert error:', winErr);
+    }
   }
 
   // ===== All-In Capped Helper =====
@@ -798,12 +827,15 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     // ✅ תן לשחקן לתרום רק מה שמכוסה מול היריב/ים
     await applyAllInCapped(ses.id, myRow.seat_index);
 
-    await supabase.from('poker_actions').insert({
+    const { error: allinErr } = await supabase.from('poker_actions').insert({
       session_id: ses.id, 
       seat_index: myRow.seat_index, 
       action: 'allin', 
       amount: null
     });
+    if (allinErr && !allinErr.message?.includes('auth') && allinErr.code !== '409') {
+      console.warn('poker_actions allin insert error:', allinErr);
+    }
 
     // אם כולם נעולים (או מקופלים), מריצים ראנאאוט אוטומטי
     await maybeAutoRunoutToShowdown(ses.id);
@@ -852,13 +884,16 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       }).eq('id', ses.id);
 
       // לוג זכייה
-      await supabase.from('poker_actions').insert({
+      const { error: winErr2 } = await supabase.from('poker_actions').insert({
         session_id: ses.id,
         seat_index: winnerSeat,
         action: 'win',
         amount: totalPot,
         note: 'winner by fold'
       });
+      if (winErr2 && !winErr2.message?.includes('auth') && winErr2.code !== '409') {
+        console.warn('poker_actions win insert error:', winErr2);
+      }
       return; // לא ממשיכים חישובי תור/רחוב
     }
 
