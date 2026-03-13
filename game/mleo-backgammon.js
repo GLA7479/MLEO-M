@@ -88,11 +88,11 @@ function initBoard() {
 }
 
 function getBarEntryPoint(playerType, dieValue) {
-  // Player enters from bar moving right to left (points 1-6)
-  // Bot enters from bar moving left to right (points 19-24)
+  // Player enters into bot home: points 19-24
+  // Bot enters into player home: points 1-6
   return playerType === 1
-    ? dieValue - 1   // Player: dieValue 1 -> point 0, dieValue 6 -> point 5
-    : 24 - dieValue; // Bot: dieValue 1 -> point 23, dieValue 6 -> point 18
+    ? 24 - dieValue   // die 1 -> point 24, die 6 -> point 19
+    : dieValue - 1;   // die 1 -> point 1, die 6 -> point 6
 }
 
 function allCheckersInHome(board, bar, playerType) {
@@ -454,6 +454,16 @@ export default function BackgammonPage() {
   useEffect(() => { if (!wrapRef.current) return; const calc = () => { const rootH = window.visualViewport?.height ?? window.innerHeight; const safeBottom = Number(getComputedStyle(document.documentElement).getPropertyValue("--satb").replace("px", "")) || 0; const headH = headerRef.current?.offsetHeight || 0; document.documentElement.style.setProperty("--head-h", headH + "px"); const topPad = headH + 8; const used = headH + (metersRef.current?.offsetHeight || 0) + (betRef.current?.offsetHeight || 0) + (ctaRef.current?.offsetHeight || 0) + topPad + 48 + safeBottom + 24; const freeH = Math.max(200, rootH - used); document.documentElement.style.setProperty("--chart-h", freeH + "px"); }; calc(); window.addEventListener("resize", calc); window.visualViewport?.addEventListener("resize", calc); return () => { window.removeEventListener("resize", calc); window.visualViewport?.removeEventListener("resize", calc); }; }, [mounted]);
   useEffect(() => { if (gameResult) { setShowResultPopup(true); const timer = setTimeout(() => setShowResultPopup(false), 4000); return () => clearTimeout(timer); } }, [gameResult]);
 
+  // Show legal targets when player has checkers on bar
+  useEffect(() => {
+    if (!gameActive || currentPlayer !== 'player' || gameResult || turnDice.length === 0) return;
+    if (bar.player > 0 && selectedSource === null) {
+      const source = { type: 'bar', index: null };
+      const moves = getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, 1);
+      setLegalTargets(moves);
+    }
+  }, [gameActive, currentPlayer, bar.player, turnDice, usedDice, board, bar, borneOff, selectedSource, gameResult]);
+
   useEffect(() => {
     if (!gameActive || currentPlayer !== 'bot' || gameResult || turnDice.length === 0) return;
     
@@ -607,8 +617,16 @@ export default function BackgammonPage() {
         setBorneOff(result.borneOff);
         setUsedDice([...usedDice, move.dieIndex]);
         setSelectedSource(null);
-        setLegalTargets([]);
         playSfx(clickSound.current);
+        
+        // If still have checkers on bar, update legal targets
+        if (result.bar.player > 0) {
+          const newSource = { type: 'bar', index: null };
+          const newMoves = getLegalMovesForSource(result.board, result.bar, result.borneOff, newSource, turnDice, [...usedDice, move.dieIndex], 1);
+          setLegalTargets(newMoves);
+        } else {
+          setLegalTargets([]);
+        }
         
         const winner = checkGameOver(result.borneOff);
         if (winner) {
@@ -630,6 +648,61 @@ export default function BackgammonPage() {
       }
       
       return;
+    }
+    
+    // Check if all checkers are in home and only bear off moves are available
+    const allInHome = allCheckersInHome(board, bar, 1);
+    if (allInHome && selectedSource === null) {
+      // Check if there are any regular moves (not just bear off)
+      let hasRegularMoves = false;
+      for (let i = 0; i < 24; i++) {
+        if (board[i] > 0) {
+          const source = { type: 'point', index: i };
+          const moves = getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, 1);
+          const hasNonBearOffMove = moves.some(m => !m.bearOff);
+          if (hasNonBearOffMove) {
+            hasRegularMoves = true;
+            break;
+          }
+        }
+      }
+      
+      // If only bear off moves available, auto-bear off on click
+      if (!hasRegularMoves && board[pointIndex] > 0) {
+        const source = { type: 'point', index: pointIndex };
+        const moves = getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, 1);
+        const bearOffMove = moves.find(m => m.bearOff);
+        
+        if (bearOffMove) {
+          const result = makeMove(board, bar, borneOff, bearOffMove, 1);
+          setBoard(result.board);
+          setBar(result.bar);
+          setBorneOff(result.borneOff);
+          setUsedDice([...usedDice, bearOffMove.dieIndex]);
+          setSelectedSource(null);
+          setLegalTargets([]);
+          playSfx(clickSound.current);
+          
+          const winner = checkGameOver(result.borneOff);
+          if (winner) {
+            endGame(winner === 'player');
+          } else {
+            const remainingSequences = getLegalMoveSequences(
+              result.board,
+              result.bar,
+              result.borneOff,
+              turnDice,
+              [...usedDice, bearOffMove.dieIndex],
+              1
+            );
+            
+            if (remainingSequences.length === 0 || remainingSequences[0].length === 0) {
+              endTurn('bot');
+            }
+          }
+          return;
+        }
+      }
     }
     
     // Regular point selection - only if no checkers on bar
