@@ -189,7 +189,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
   const [isSlowingDown, setIsSlowingDown] = useState(false);
   const slowingDownStartRef = useRef(null);
   const bettingStartTimeRef = useRef(null);
-  const bettingStartAngleRef = useRef(null); // Store the initial angle when playing phase starts
+  const bettingStartAngleRef = useRef(null); // Store the initial angle when betting phase starts
   const animationRunningRef = useRef(false); // Prevent multiple animations
 
   const openBetPanel = () => {
@@ -220,14 +220,14 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Sync spinAngle with ref when it changes externally (but not during playing animation)
+  // Sync spinAngle with ref when it changes externally (but not during betting animation)
   useEffect(() => {
-    if (session?.stage !== "playing") {
+    if (session?.stage !== "betting") {
       currentSpinAngleRef.current = spinAngle;
     }
   }, [spinAngle, session?.stage]);
 
-  // Helper function to calculate current velocity at a given time in playing phase
+  // Helper function to calculate current velocity at a given time in betting phase
   // During 30 seconds: starts fast and gradually slows down
   const calculateCurrentVelocity = (elapsed, totalDuration) => {
     const initialVelocity = 360 / 0.5; // degrees per second - very fast at start (full rotation every 0.5 seconds)
@@ -244,35 +244,35 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     return ROULETTE_NUMBERS[idx]?.num ?? 0;
   };
 
-  // Continuous spin animation during playing stage (30 seconds) + 5 seconds slowdown
+  // Continuous spin animation during betting stage (30 seconds) + 5 seconds slowdown
   useEffect(() => {
     let animationFrameId = null;
     const BETTING_DURATION = BETTING_SECONDS;
     const FINAL_SLOWDOWN_DURATION = 10; // seconds
     
-    // Initialize playing start time when playing stage starts
-    if (session?.stage === "playing" && bettingTimeLeft > 0) {
+    // Initialize betting start time when betting stage starts
+    if (session?.stage === "betting" && bettingTimeLeft > 0) {
       if (!bettingStartTimeRef.current) {
-        // Calculate when playing actually started based on deadline
+        // Calculate when betting actually started based on deadline
         if (session?.betting_deadline) {
           const deadline = new Date(session.betting_deadline).getTime();
           bettingStartTimeRef.current = deadline - (BETTING_SECONDS * 1000);
         } else {
           bettingStartTimeRef.current = Date.now();
         }
-        // Store the initial angle when playing phase starts - this stays constant for the entire animation
+        // Store the initial angle when betting phase starts - this stays constant for the entire animation
         bettingStartAngleRef.current = currentSpinAngleRef.current || lastSpinAngleRef.current || 0;
         currentSpinAngleRef.current = bettingStartAngleRef.current;
         setSpinAngle(bettingStartAngleRef.current);
       }
     }
     
-    // Start final slowdown when playing time reaches 0
+    // Start final slowdown when betting time reaches 0
     // Ensure smooth transition - use the exact final velocity from 30-second phase
-    if (session?.stage === "playing" && bettingTimeLeft === 0 && !isSlowingDown && currentSpinAngleRef.current !== null && bettingStartTimeRef.current) {
+    if (session?.stage === "betting" && bettingTimeLeft === 0 && !isSlowingDown && currentSpinAngleRef.current !== null && bettingStartTimeRef.current) {
       // Use the final velocity that matches the end of the 30-second phase
       // This ensures perfect continuity - no jumps
-      const finalVelocityAt30s = 360 / 3; // degrees per second - matches finalVelocity in playing phase
+      const finalVelocityAt30s = 360 / 3; // degrees per second - matches finalVelocity in betting phase
       
       // Get the current angle - preserve it for smooth transition
       const currentAngle = currentSpinAngleRef.current || 0;
@@ -285,8 +285,8 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       };
     }
     
-    if (session?.stage === "playing" && bettingTimeLeft > 0 && bettingStartTimeRef.current && bettingStartAngleRef.current !== null && !animationRunningRef.current) {
-      // Reset slowing down state if playing restarted
+    if (session?.stage === "betting" && bettingTimeLeft > 0 && bettingStartTimeRef.current && bettingStartAngleRef.current !== null && !animationRunningRef.current) {
+      // Reset slowing down state if betting restarted
       if (isSlowingDown) {
         setIsSlowingDown(false);
         slowingDownStartRef.current = null;
@@ -295,7 +295,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       // Mark animation as running to prevent multiple instances
       animationRunningRef.current = true;
       
-      // Gradual slowdown during 30 seconds of playing - starts fast, ends slower
+      // Gradual slowdown during 30 seconds of betting - starts fast, ends slower
       const startTime = bettingStartTimeRef.current;
       const startAngle = bettingStartAngleRef.current; // Use the fixed start angle - never changes during animation
       const initialVelocity = 360 / 0.5; // degrees per second - very fast at start
@@ -304,12 +304,12 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       // Use requestAnimationFrame for smooth animation
       const animate = () => {
         // Check if we should continue animating
-        if (session?.stage !== "playing" || bettingTimeLeft <= 0 || !bettingStartTimeRef.current || bettingStartAngleRef.current === null) {
+        if (session?.stage !== "betting" || bettingTimeLeft <= 0 || !bettingStartTimeRef.current || bettingStartAngleRef.current === null) {
           animationRunningRef.current = false;
           return;
         }
         
-        const elapsed = (Date.now() - startTime) / 1000; // seconds since playing started
+        const elapsed = (Date.now() - startTime) / 1000; // seconds since betting started
         const timeProgress = Math.min(elapsed / BETTING_DURATION, 1); // 0 to 1
         
         // Calculate distance using integration of velocity curve
@@ -336,13 +336,13 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       
       animationFrameId = requestAnimationFrame(animate);
       
-    } else if (session?.stage === "playing" && isSlowingDown && slowingDownStartRef.current) {
+    } else if (session?.stage === "betting" && isSlowingDown && slowingDownStartRef.current) {
       // Final slowdown phase - 5 seconds of gradual slowdown to complete stop
       // This continues smoothly from where the 30-second phase ended
       const startData = slowingDownStartRef.current;
       const startTime = startData.time;
       const startAngle = startData.angle;
-      const initialVelocity = startData.velocity; // degrees per second at start of final slowdown (should match finalVelocity from playing phase)
+      const initialVelocity = startData.velocity; // degrees per second at start of final slowdown (should match finalVelocity from betting phase)
       
       // Use requestAnimationFrame for smooth slowdown animation
       const animate = () => {
@@ -381,7 +381,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       
       animationFrameId = requestAnimationFrame(animate);
       
-    } else if (session?.stage !== "playing") {
+    } else if (session?.stage !== "betting") {
       // Reset when stage changes
       animationRunningRef.current = false;
       if (isSlowingDown) {
@@ -464,7 +464,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
         label,
         amount: fmt(play.amount),
         status: play.is_winner,
-        prize: isWinner && play.prize_amount ? fmt(play.prize_amount) : null,
+        prize: isWinner && play.payout_amount ? fmt(play.payout_amount) : null,
         className: isWinner
           ? "bg-green-600/80 border-green-400 text-green-100"
           : isLoser
@@ -490,16 +490,16 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
   }, [allBetsThisRound]);
 
   // My plays - sorted and memoized
-  // Show plays from current spin, or keep previous spin plays until new playing starts
+  // Show plays from current spin, or keep previous spin plays until new betting starts
   const myBets = useMemo(() => {
     if (!myRow?.id) return [];
     
     // Get plays for current player
     const arr = plays.filter(b => b.player_id === myRow.id) || [];
     
-    // If in playing stage, only show unresolved plays (active plays)
+    // If in betting stage, only show unresolved plays (active plays)
     // Otherwise, show all plays (to show results from previous spin)
-    const filteredBets = session?.stage === "playing" 
+    const filteredBets = session?.stage === "betting" 
       ? arr.filter(b => b.is_winner === null)
       : arr; // Keep all plays during results/spinning/lobby to show winners/losers
     
@@ -513,9 +513,9 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     return filteredBets;
   }, [plays, myRow?.id, session?.stage]);
 
-  // Auto-open play panel when playing stage starts
+  // Auto-open play panel when betting stage starts
   useEffect(() => {
-    if (session?.stage === "playing" && bettingTimeLeft > 0) {
+    if (session?.stage === "betting" && bettingTimeLeft > 0) {
       if (panelDismissed) {
         if (showBetPanel) setShowBetPanel(false);
       } else if (!showBetPanel) {
@@ -613,7 +613,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
         filter: `session_id=eq.${session.id}`,
       }, async () => {
         // Get plays for current spin only (same spin_number as session)
-        // Keep plays from previous spin until new playing starts
+        // Keep plays from previous spin until new betting starts
         const { data } = await supabase
           .from("roulette_bets")
           .select("*")
@@ -779,7 +779,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     const { data, error } = await supabase
       .from("roulette_sessions")
       .update({
-        stage: "playing",
+        stage: "betting",
         betting_deadline: deadline,
         spin_result: null,
         spin_color: null,
@@ -820,7 +820,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
         const { data, error } = await supabase
           .from("roulette_sessions")
           .update({
-            stage: "playing",
+            stage: "betting",
             betting_deadline: deadline,
             spin_result: null,
             spin_color: null,
@@ -876,7 +876,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       return;
     }
 
-    if (sess.stage !== "playing") {
+    if (sess.stage !== "betting") {
       setMsg("Playing is closed");
       return;
     }
@@ -907,9 +907,9 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       bet_type: playType,
       bet_value: String(betValue),
       amount: amount,
-      prize_multiplier: multiplier,
+      payout_multiplier: multiplier,
       is_winner: null,
-      prize_amount: null,
+      payout_amount: null,
     });
 
     if (error) {
@@ -947,7 +947,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
   
   async function declareWinner(winningNumber) {
     if (!isLeader) return;
-    if (session && !["playing", "spinning"].includes(session.stage)) return;
+    if (session && !["betting", "spinning"].includes(session.stage)) return;
     
     // Guard against concurrent declarations
     if (spinningRef.current) return;
@@ -989,7 +989,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
         total_payouts: updatedSession.total_payouts || 0,
       });
 
-      // After results display, immediately start next playing round
+      // After results display, immediately start next betting round
       setTimeout(async () => {
         if (isLeader) {
           const deadline = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
@@ -1007,11 +1007,11 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
             .update({ total_bet: 0, total_won: 0 })
             .eq("session_id", updatedSession.id);
           
-          // Start playing stage immediately
+          // Start betting stage immediately
           const { data: newSession } = await supabase
             .from("roulette_sessions")
             .update({
-              stage: "playing",
+              stage: "betting",
               betting_deadline: deadline,
               spin_result: null,
               spin_color: null,
@@ -1025,7 +1025,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
           
           if (newSession) {
             setSession(newSession);
-            // Reset playing start time for new round
+            // Reset betting start time for new round
             bettingStartTimeRef.current = null;
           }
         }
@@ -1041,14 +1041,14 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
   // Legacy function - no longer used but kept for compatibility
   async function spinWheel() {
     if (!isLeader) return;
-    if (session?.stage !== "playing") return;
+    if (session?.stage !== "betting") return;
     
     // Guard against concurrent spins
     if (spinningRef.current) return;
     spinningRef.current = true;
     
     try {
-      // Close playing
+      // Close betting
       await supabase
         .from("roulette_sessions")
         .update({ stage: "spinning", betting_deadline: null })
@@ -1103,7 +1103,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
 
       // Move to results stage, then immediately start countdown for next round
       setTimeout(async () => {
-        // After results display, immediately start next playing round
+        // After results display, immediately start next betting round
         if (isLeader) {
           const deadline = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
           
@@ -1120,11 +1120,11 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
             .update({ total_bet: 0, total_won: 0 })
             .eq("session_id", updatedSession.id);
           
-          // Start playing stage immediately (with 30 second countdown)
+          // Start betting stage immediately (with 30 second countdown)
           const { data: newSession } = await supabase
             .from("roulette_sessions")
             .update({
-              stage: "playing",
+              stage: "betting",
               betting_deadline: deadline,
               spin_result: null,
               spin_color: null,
@@ -1144,7 +1144,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
           // For non-leaders, just update stage (plays will be cleared when leader starts new round)
           await supabase
             .from("roulette_sessions")
-            .update({ stage: "playing", spin_result: null, spin_color: null })
+            .update({ stage: "betting", spin_result: null, spin_color: null })
             .eq("id", updatedSession.id);
         }
         
@@ -1174,13 +1174,13 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
 
     for (const play of activeBets) {
       const isWinner = checkBetWin(play.bet_type, play.bet_value, result);
-      const prize = isWinner ? Math.floor(play.amount * play.prize_multiplier) : 0;
+      const prize = isWinner ? Math.floor(play.amount * play.payout_multiplier) : 0;
 
       await supabase
         .from("roulette_bets")
         .update({
           is_winner: isWinner,
-          prize_amount: prize,
+          payout_amount: prize,
         })
         .eq("id", play.id);
 
@@ -1254,7 +1254,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     if (timerRef.current) clearInterval(timerRef.current);
     
     // Update timer immediately
-    if (session?.betting_deadline && session.stage === "playing") {
+    if (session?.betting_deadline && session.stage === "betting") {
       const updateTimer = async () => {
         const now = Date.now();
         const deadline = new Date(session.betting_deadline).getTime();
@@ -1293,7 +1293,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       </div>
     );
 
-  const isBetting = session?.stage === "playing";
+  const isBetting = session?.stage === "betting";
   const isSpinningStage = session?.stage === "spinning";
   const isResults = session?.stage === "results";
   const canBet = isBetting && myRow && bettingTimeLeft > 0;
@@ -1567,8 +1567,8 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                           <span className={`ml-1 ${isPending ? 'text-yellow-400' : isWinner ? 'text-green-100' : 'text-red-100'}`}>
                             {fmt(play.amount)}
                           </span>
-                          {isWinner && play.prize_amount > 0 && (
-                            <span className="ml-1 text-green-200">+{fmt(play.prize_amount)}</span>
+                          {isWinner && play.payout_amount > 0 && (
+                            <span className="ml-1 text-green-200">+{fmt(play.payout_amount)}</span>
                           )}
                         </div>
                       );
@@ -1733,7 +1733,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
               {!canBet && (
                 <div className="text-white/60 text-sm mb-3 text-center">
                   {!myRow ? "Join the game to play." :
-                    session?.stage !== "playing" ? "Waiting for playing stage..." :
+                    session?.stage !== "betting" ? "Waiting for betting stage..." :
                     "Playing closed."}
                 </div>
               )}

@@ -98,19 +98,19 @@ function useIOSViewportFix() {
 
 // --- TIERS (entry fee per tier) ---
 const TIERS = [
-  { label: "1K",    min_buyin: 1_000 },
-  { label: "10K",   min_buyin: 10_000 },
-  { label: "100K",  min_buyin: 100_000 },
-  { label: "1M",    min_buyin: 1_000_000 },
-  { label: "10M",   min_buyin: 10_000_000 },
-  { label: "100M",  min_buyin: 100_000_000 },
+  { label: "1K",    min_entry_fee: 1_000 },
+  { label: "10K",   min_entry_fee: 10_000 },
+  { label: "100K",  min_entry_fee: 100_000 },
+  { label: "1M",    min_entry_fee: 1_000_000 },
+  { label: "10M",   min_entry_fee: 10_000_000 },
+  { label: "100M",  min_entry_fee: 100_000_000 },
 ];
 
 const SUITS = ['S','H','D','C'];
 const SUIT_SYMBOL = { S:'♠', H:'♥', D:'♦', C:'♣' };
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 const RANKS_ORDER = { A:14,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,J:11,Q:12,K:13 };
-const BETTING_TIME_LIMIT = 30000; // 30 seconds
+const PLAYING_TIME_LIMIT = 30000; // 30 seconds
 
 // Game status constants
 const GAME_STATUS = {
@@ -416,7 +416,7 @@ function PlayingCard({ card, hidden = false, delay = 0 }) {
 // MAIN COMPONENT
 // ============================================================================
 
-export default function TexasHoldemCasinoPage() {
+export default function CardRoomsPage() {
   useIOSViewportFix();
   const router = useRouter();
 
@@ -445,7 +445,7 @@ export default function TexasHoldemCasinoPage() {
   // Lobby state
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState(null);
-  const [selectedTier, setSelectedTier] = useState(null); // {label, min_buyin} or null
+  const [selectedTier, setSelectedTier] = useState(null); // {label, min_entry_fee} or null
   
   // Table state
   const [currentTableId, setCurrentTableId] = useState(null);
@@ -482,15 +482,15 @@ export default function TexasHoldemCasinoPage() {
   const listRef = useRef(null);
   const ctaRef = useRef(null);
 
-  // Group tables by min_buyin
+  // Group tables by min_entry_fee
   const groupedByMin = useMemo(() => {
     const m = new Map();
     (tables || []).forEach(r => {
-      const arr = m.get(r.min_buyin) || [];
+      const arr = m.get(r.min_entry_fee) || [];
       arr.push(r);
-      m.set(r.min_buyin, arr);
+      m.set(r.min_entry_fee, arr);
     });
-    return m; // Map<min_buyin, table[]>
+    return m; // Map<min_entry_fee, table[]>
   }, [tables]);
 
   // Track fullscreen state changes (optional visual cue)
@@ -615,17 +615,17 @@ export default function TexasHoldemCasinoPage() {
     // unique sorted
     const uniq = [...new Set(seats)].sort((a,b)=>a-b);
     const i = uniq.findIndex(s => s === fromSeat);
-    if (i === -1) return uniq[0];                 // if dealer seat not present (left table), take first seat
+    if (i === -1) return uniq[0];                 // if opponent seat not present (left table), take first seat
     return uniq[(i + 1) % uniq.length];
   };
 
   // given seat number -> array index in `players` (sorted by seat_index)
   const arrIndexFromSeat = (players, seat) => players.findIndex(p => p.seat_index === seat);
 
-  // first player to act on post-flop street = seat to the left of dealer that is not folded/all-in
-  const firstToActIndex = (playersSorted, dealerSeat) => {
+  // first player to act on post-flop street = seat to the left of opponent that is not folded/all-in
+  const firstToActIndex = (playersSorted, opponentSeat) => {
     const seats = seatRing(playersSorted);
-    let s = nextSeat(seats, dealerSeat);
+    let s = nextSeat(seats, opponentSeat);
     for (let k=0;k<playersSorted.length;k++) {
       const idx = arrIndexFromSeat(playersSorted, s);
       const p   = playersSorted[idx];
@@ -635,15 +635,15 @@ export default function TexasHoldemCasinoPage() {
     return 0;
   };
 
-  // compute positions for PREFLOP from dealerSeat on a sorted-by-seat array
-  const computePreflopPositions = (playersSorted, dealerSeat) => {
+  // compute positions for PREFLOP from opponentSeat on a sorted-by-seat array
+  const computePreflopPositions = (playersSorted, opponentSeat) => {
     const seats = seatRing(playersSorted);
-    const sbSeat = nextSeat(seats, dealerSeat);
+    const sbSeat = nextSeat(seats, opponentSeat);
     const bbSeat = nextSeat(seats, sbSeat);
     const first  = nextSeat(seats, bbSeat);
 
     return {
-      dealerSeat,
+      opponentSeat,
       smallBlindIdx: arrIndexFromSeat(playersSorted, sbSeat),
       bigBlindIdx:   arrIndexFromSeat(playersSorted, bbSeat),
       firstToActIdx: arrIndexFromSeat(playersSorted, first),
@@ -656,7 +656,7 @@ export default function TexasHoldemCasinoPage() {
       clearInterval(actionTimer);
     }
     
-    setTimeLeft(BETTING_TIME_LIMIT / 1000);
+    setTimeLeft(PLAYING_TIME_LIMIT / 1000);
     
     const timer = setInterval(() => {
       setTimeLeft(prev => {
@@ -815,7 +815,7 @@ export default function TexasHoldemCasinoPage() {
         .from('casino_tables')
         .select('*')
         .eq('status', 'active')
-        .order('min_buyin', { ascending: true });
+        .order('min_entry_fee', { ascending: true });
       
       if (tablesError) throw tablesError;
       
@@ -843,8 +843,8 @@ export default function TexasHoldemCasinoPage() {
       return;
     }
     
-    if (vaultAmount < table.min_buyin) {
-      setError(`You need at least ${fmt(table.min_buyin)} MLEO to join this table`);
+    if (vaultAmount < table.min_entry_fee) {
+      setError(`You need at least ${fmt(table.min_entry_fee)} MLEO to join this table`);
       return;
     }
     
@@ -883,7 +883,7 @@ export default function TexasHoldemCasinoPage() {
       }
       
       // Deduct from vault
-      const newVault = vaultAmount - table.min_buyin;
+      const newVault = vaultAmount - table.min_entry_fee;
       setVault(newVault);
       setVaultAmount(newVault);
       
@@ -894,7 +894,7 @@ export default function TexasHoldemCasinoPage() {
           table_id: table.id,
           player_name: playerName.trim(),
           player_wallet: address || "guest",
-          chips: table.min_buyin,
+          chips: table.min_entry_fee,
           seat_index: seatIndex,
           status: 'active'
         })
@@ -920,7 +920,7 @@ export default function TexasHoldemCasinoPage() {
     if (!selectedTable) return;
 
     // סכום מינימלי: entry fee מינימלי של השולחן
-    const min = selectedTable.min_buyin;
+    const min = selectedTable.min_entry_fee;
     const toBuy = Math.max(min, Math.floor(amount || 0));
 
     if (vaultAmount < toBuy) {
@@ -1249,7 +1249,7 @@ export default function TexasHoldemCasinoPage() {
 
     // צור חפיסת קלפים חדשה
     const deck = shuffleDeck(createDeck());
-    const dealerIndex = 0;
+    const opponentIndex = 0;
     const smallBlindIndex = 0;
     const bigBlindIndex = 1;
     const firstToAct = 0;
@@ -1261,7 +1261,7 @@ export default function TexasHoldemCasinoPage() {
         table_id: currentTableId,
         status: "playing", // <==== חשוב מאוד
         round: "preflop",
-        dealer_index: dealerIndex,
+        dealer_index: opponentIndex,
         current_player_index: firstToAct,
         current_player_seat: seatedPlayers[firstToAct].seat_index,
         last_raiser_index: bigBlindIndex,
@@ -1415,11 +1415,11 @@ export default function TexasHoldemCasinoPage() {
       // סגירת רחוב: כולם מיושרים **והתור חוזר לאגרסור האחרון**
       const reachedAggressor = (freshPlayers[nextIdx]?.seat_index ?? null) === newLastRaiserSeat;
       const moreThanOneCanAct = activeNotFolded.filter(canAct).length > 1;
-      const bettingDone = (!moreThanOneCanAct) || (everyoneMatched && reachedAggressor);
+      const playingDone = (!moreThanOneCanAct) || (everyoneMatched && reachedAggressor);
 
       stopActionTimer();
 
-      if (!bettingDone) {
+      if (!playingDone) {
         // ממשיכים להמר באותו רחוב
         await supabase.from('casino_games').update({
           prizePool,
@@ -1427,7 +1427,7 @@ export default function TexasHoldemCasinoPage() {
           last_raiser_seat: newLastRaiserSeat,
           last_raise_to: newLastRaiseTo,
           current_player_seat: freshPlayers[nextIdx]?.seat_index ?? null,
-          turn_deadline: new Date(Date.now() + BETTING_TIME_LIMIT).toISOString()
+          turn_deadline: new Date(Date.now() + PLAYING_TIME_LIMIT).toISOString()
         }).eq('id', currentGameId);
         return;
       }
@@ -1454,11 +1454,11 @@ export default function TexasHoldemCasinoPage() {
       // players ברגע זה מסודרים לפי seat_index (נבנה מערך מסודר)
       const playersSorted = [...freshPlayers].sort((a,b)=>a.seat_index - b.seat_index);
 
-      // dealerSeat נשמר ב-games.dealer_index (seat_index)
-      const dealerSeat = gNow?.dealer_index ?? playersSorted[0]?.seat_index ?? 0;
+      // opponentSeat נשמר ב-games.dealer_index (seat_index)
+      const opponentSeat = gNow?.dealer_index ?? playersSorted[0]?.seat_index ?? 0;
 
-      // מי פותח פעולה ברחוב הבא? משמאל לדילר שלא Fold/All-in
-      const startIdx = firstToActIndex(playersSorted, dealerSeat);
+      // מי פותח פעולה ברחוב הבא? משמאל ליריב שלא Fold/All-in
+      const startIdx = firstToActIndex(playersSorted, opponentSeat);
       const startSeat = playersSorted[startIdx]?.seat_index ?? playersSorted[0]?.seat_index ?? 0;
 
       // עדכון משחק לרחוב הבא:
@@ -1472,7 +1472,7 @@ export default function TexasHoldemCasinoPage() {
         community_cards: nextCommunity,
         community_visible: getCommunityVisible(nextRound),
         current_player_seat: startSeat,
-        turn_deadline: new Date(Date.now() + BETTING_TIME_LIMIT).toISOString()
+        turn_deadline: new Date(Date.now() + PLAYING_TIME_LIMIT).toISOString()
       }).eq('id', currentGameId);
 
       // אם עברנו לשואודאון בלי ALL-IN גורף – הכרז מנצח
@@ -1526,11 +1526,11 @@ export default function TexasHoldemCasinoPage() {
     return pots; // [{amount, eligibleIds}]
   }
 
-  function orderSeatsForRemainders(players, dealerIndex) {
+  function orderSeatsForRemainders(players, opponentIndex) {
     // החזרת מערך מזהי שחקנים לפי סדר קבלת "צ'יפ מוזר" (odd chip):
-    // החל מהשחקן משמאל לדילר, עם wrap-around
+    // החל מהשחקן משמאל ליריב, עם wrap-around
     const sorted = [...players].sort((a, b) => a.seat_index - b.seat_index);
-    const start = (dealerIndex + 1) % sorted.length;
+    const start = (opponentIndex + 1) % sorted.length;
     const ring = [];
     for (let i = 0; i < sorted.length; i++) {
       ring.push(sorted[(start + i) % sorted.length].id);
@@ -1579,7 +1579,7 @@ export default function TexasHoldemCasinoPage() {
       .eq('id', currentGameId);
   }
 
-  async function settleSidePots(currentGameId, dealerIndex, board5) {
+  async function settleSidePots(currentGameId, opponentIndex, board5) {
     // טען מצב נוכחי
     const { data: pls } = await supabase
       .from('casino_players')
@@ -1593,7 +1593,7 @@ export default function TexasHoldemCasinoPage() {
     const pots = buildSidePots(players); // [{amount, eligibleIds}]
 
     // הכנה לסדר שאריות
-    const oddOrder = orderSeatsForRemainders(players, dealerIndex);
+    const oddOrder = orderSeatsForRemainders(players, opponentIndex);
 
     // מצטבר עדכונים ל-DB
     const chipIncrements = new Map(); // playerId -> +chips
@@ -1622,7 +1622,7 @@ export default function TexasHoldemCasinoPage() {
       }
 
       if (remainder > 0) {
-        // חלק שאריות לפי סדר oddOrder (משמאל לדילר)
+        // חלק שאריות לפי סדר oddOrder (משמאל ליריב)
         for (const pid of oddOrder) {
           if (remainder === 0) break;
           if (winners.find(w => w.id === pid)) {
@@ -1789,11 +1789,11 @@ export default function TexasHoldemCasinoPage() {
     // עדכן תור + דדליין חדש
     await supabase.from('casino_games').update({
       current_player_seat: pls[nextIdx]?.seat_index ?? null,
-      turn_deadline: new Date(Date.now() + BETTING_TIME_LIMIT).toISOString()
+      turn_deadline: new Date(Date.now() + PLAYING_TIME_LIMIT).toISOString()
     }).eq('id', currentGameId);
   }
 
-  // Start new hand — seat-true dealer, include all table players with chips > 0
+  // Start new hand — seat-true opponent, include all table players with chips > 0
   const startNewHand = async () => {
     if (!currentTableId) return;
 
@@ -1826,16 +1826,16 @@ export default function TexasHoldemCasinoPage() {
         .update({ game_id: currentGameId })
         .in('id', participants.map(p => p.id));
 
-      // 3) בחר כיסא דילר חדש:
-      //    game.dealer_index מחזיק את "כיסא הדילר" של היד הקודמת (seat_index),
+      // 3) בחר כיסא יריב חדש:
+      //    game.dealer_index מחזיק את "כיסא היריב" של היד הקודמת (seat_index),
       //    אם לא קיים – קח את הכיסא הנמוך ביותר.
-      const prevDealerSeat = typeof game?.dealer_index === 'number'
+      const prevOpponentSeat = typeof game?.dealer_index === 'number'
         ? game.dealer_index : (participants[0]?.seat_index || 0);
-      const dealerSeat = nextSeat(seatRing(participants), prevDealerSeat);
+      const opponentSeat = nextSeat(seatRing(participants), prevOpponentSeat);
 
       // 4) סדר לפי seat_index, חשב עמדות
       const playersSorted = [...participants].sort((a,b)=>a.seat_index - b.seat_index);
-      const pos = computePreflopPositions(playersSorted, dealerSeat);
+      const pos = computePreflopPositions(playersSorted, opponentSeat);
 
       // 5) חלק קלפים ואפס סטטוסים/השקעה
       const updated = playersSorted.map((p, idx) => ({
@@ -1875,7 +1875,7 @@ export default function TexasHoldemCasinoPage() {
       const prizePool = updated.reduce((s, p) => s + (p.current_bet || 0), 0);
       const currentBet = Math.max(...updated.map(p => p.current_bet || 0), 0);
 
-      // NB: dealer_index ישמור את *seat_index* של הדילר, לא אינדקס מערך
+      // NB: dealer_index ישמור את *seat_index* של היריב, לא אינדקס מערך
       await supabase.from('casino_games').update({
         status: GAME_STATUS.PLAYING,
         deck,
@@ -1885,10 +1885,10 @@ export default function TexasHoldemCasinoPage() {
         round: 'preflop',
         community_cards: [],
         community_visible: 0,
-        dealer_index: dealerSeat,                    // ⬅️ seat_index
+        dealer_index: opponentSeat,                    // ⬅️ seat_index
         last_raiser_seat: playersSorted[pos.bigBlindIdx].seat_index,
         current_player_seat: playersSorted[pos.firstToActIdx].seat_index,
-        turn_deadline: new Date(Date.now() + BETTING_TIME_LIMIT).toISOString()
+        turn_deadline: new Date(Date.now() + PLAYING_TIME_LIMIT).toISOString()
       }).eq('id', currentGameId);
 
       await loadGameData();
@@ -2023,18 +2023,18 @@ export default function TexasHoldemCasinoPage() {
             {selectedTier === null && (
               <div className="w-full max-w-6xl grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-3">
                 {TIERS.map(t => {
-                  const list = groupedByMin.get(t.min_buyin) || [];
+                  const list = groupedByMin.get(t.min_entry_fee) || [];
                   const players = list.reduce((acc, r) => acc + (r.current_players || 0), 0);
                   const seats   = list.reduce((acc, r) => acc + (r.max_players || 6), 0);
                   return (
                     <button
-                      key={t.min_buyin}
+                      key={t.min_entry_fee}
                       onClick={() => setSelectedTier(t)}
                       className="rounded-xl p-3 text-left bg-white/10 backdrop-blur-sm border border-white/20 hover:border-purple-400/50 transition-all"
                     >
                       <div className="text-white font-bold text-base">{t.label}</div>
-                      <div className="text-white/60 text-[11px] mt-0.5">Min Buy-in</div>
-                      <div className="text-emerald-400 font-semibold text-sm">{fmt(t.min_buyin)} MLEO</div>
+                      <div className="text-white/60 text-[11px] mt-0.5">Min Entry Fee</div>
+                      <div className="text-emerald-400 font-semibold text-sm">{fmt(t.min_entry_fee)} MLEO</div>
                       <div className="mt-2 flex items-center justify-between text-[11px] text-white/70">
                         <span>{list.length} tables</span>
                         <span>{players}/{seats} players</span>
@@ -2065,7 +2065,7 @@ export default function TexasHoldemCasinoPage() {
                 className="w-full max-w-6xl grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 gap-2 overflow-y-auto pr-1"
                 style={{ maxHeight: 'calc(var(--lobby-list-h, 70vh) + 16vh)' }}
               >
-                {(groupedByMin.get(selectedTier.min_buyin) || [])
+                {(groupedByMin.get(selectedTier.min_entry_fee) || [])
                   .slice()
                   .sort((a,b)=>a.name.localeCompare(b.name))
                   .map((table) => (
@@ -2076,7 +2076,7 @@ export default function TexasHoldemCasinoPage() {
                       <div className="space-y-1">
                         <div className="text-sm md:text-base font-bold text-white">🎰🎴 {table.name}</div>
                         <div className="text-white/70 text-xs">
-                          Min Buy-in: <span className="text-emerald-400 font-semibold">{fmt(table.min_buyin)} MLEO</span>
+                          Min Entry Fee: <span className="text-emerald-400 font-semibold">{fmt(table.min_entry_fee)} MLEO</span>
                         </div>
                         <div className="text-white/70 text-xs">
                           Blinds: <span className="text-amber-400">{fmt(table.small_blind)}</span> / <span className="text-amber-400">{fmt(table.big_blind)}</span>
@@ -2094,9 +2094,9 @@ export default function TexasHoldemCasinoPage() {
 
                         <button
                           onClick={() => handleJoinTable(table)}
-                          disabled={table.current_players >= table.max_players || vaultAmount < table.min_buyin}
+                          disabled={table.current_players >= table.max_players || vaultAmount < table.min_entry_fee}
                           className={`w-full px-2 py-1.5 md:px-3 md:py-1.5 rounded-lg font-bold text-xs md:text-sm transition-all ${
-                            table.current_players >= table.max_players || vaultAmount < table.min_buyin
+                            table.current_players >= table.max_players || vaultAmount < table.min_entry_fee
                               ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                               : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:shadow-lg hover:scale-105'
                           }`}
@@ -2107,7 +2107,7 @@ export default function TexasHoldemCasinoPage() {
                     </div>
                   ))}
 
-                {(groupedByMin.get(selectedTier.min_buyin) || []).length === 0 && (
+                {(groupedByMin.get(selectedTier.min_entry_fee) || []).length === 0 && (
                   <div className="text-center py-12 text-white/50 col-span-full">
                     <div className="text-4xl mb-3">🎴</div>
                     <div>No tables available.</div>
@@ -2288,12 +2288,12 @@ export default function TexasHoldemCasinoPage() {
                   Leave Table
                 </button>
 
-                {myPlayer && myPlayer.chips < (selectedTable?.min_buyin || 0) && (
+                {myPlayer && myPlayer.chips < (selectedTable?.min_entry_fee || 0) && (
                   <button
-                    onClick={() => handleRebuy(selectedTable.min_buyin)}
+                    onClick={() => handleRebuy(selectedTable.min_entry_fee)}
                     className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-bold"
                   >
-                    Rebuy {fmt(selectedTable.min_buyin)}
+                    Rebuy {fmt(selectedTable.min_entry_fee)}
                   </button>
                 )}
               </div>

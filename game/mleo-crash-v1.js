@@ -466,7 +466,7 @@ export default function MLEOCrash() {
             <div className="text-center">
               <h1 className="text-3xl font-bold mb-1">
                 📈 {isFreePlay && <span className="text-amber-400">🎁 FREE PLAY - </span>}
-                Crash2
+                Sky Run
               </h1>
               <p className="text-zinc-400 text-sm">
                 {isFreePlay ? "Playing with a free token - good luck!" : "Cash out before the crash!"}

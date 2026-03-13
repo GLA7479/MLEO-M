@@ -1,7 +1,7 @@
-import TexasHoldemCasinoPage from "../game/mleo-texas-holdem-casino";
+import CardRoomsPage from "../game/mleo-texas-holdem-casino";
 
 export default function Tournament() {
-  return <TexasHoldemCasinoPage />;
+  return <CardRoomsPage />;
 }
 
 export async function getStaticProps() {

@@ -662,7 +662,7 @@ export default function Crash2Page() {
         >
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">
-              🚀 Crash
+              🚀 Sky Run
             </h1>
             <p className="text-white/70 text-xs">
               {phase === "playing"

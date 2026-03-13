@@ -643,8 +643,8 @@ export default function LimitRunPage() {
             <button
               onClick={() => {
                 const current = Number(playAmount) || MIN_PLAY;
-                const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000);
-                setPlayAmount(String(newBet));
+                const newPlay = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000);
+                setPlayAmount(String(newPlay));
                 playSfx(clickSound.current);
               }}
               disabled={rolling}
@@ -655,8 +655,8 @@ export default function LimitRunPage() {
             <button
               onClick={() => {
                 const current = Number(playAmount) || MIN_PLAY;
-                const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000);
-                setPlayAmount(String(newBet));
+                const newPlay = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000);
+                setPlayAmount(String(newPlay));
                 playSfx(clickSound.current);
               }}
               disabled={rolling}
@@ -667,8 +667,8 @@ export default function LimitRunPage() {
             <button
               onClick={() => {
                 const current = Number(playAmount) || MIN_PLAY;
-                const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000);
-                setPlayAmount(String(newBet));
+                const newPlay = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000);
+                setPlayAmount(String(newPlay));
                 playSfx(clickSound.current);
               }}
               disabled={rolling}
@@ -679,8 +679,8 @@ export default function LimitRunPage() {
             <button
               onClick={() => {
                 const current = Number(playAmount) || MIN_PLAY;
-                const newBet = current === MIN_PLAY ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000);
-                setPlayAmount(String(newBet));
+                const newPlay = current === MIN_PLAY ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000);
+                setPlayAmount(String(newPlay));
                 playSfx(clickSound.current);
               }}
               disabled={rolling}
@@ -691,8 +691,8 @@ export default function LimitRunPage() {
             <button
               onClick={() => {
                 const current = Number(playAmount) || MIN_PLAY;
-                const newBet = Math.max(MIN_PLAY, current - 1000);
-                setPlayAmount(String(newBet));
+                const newPlay = Math.max(MIN_PLAY, current - 1000);
+                setPlayAmount(String(newPlay));
                 playSfx(clickSound.current);
               }}
               disabled={rolling}
@@ -732,8 +732,8 @@ export default function LimitRunPage() {
             <button
               onClick={() => {
                 const current = Number(playAmount) || MIN_PLAY;
-                const newBet = Math.min(vault, current + 1000);
-                setPlayAmount(String(newBet));
+                const newPlay = Math.min(vault, current + 1000);
+                setPlayAmount(String(newPlay));
                 playSfx(clickSound.current);
               }}
               disabled={rolling}

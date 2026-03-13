@@ -349,7 +349,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     // השהייה זעירה למנוע רצף פעולות כפול בזמן realtime
     const t = setTimeout(() => { autopilot(session); }, 150);
     return () => clearTimeout(t);
-  }, [session?.id, session?.state, players.length, players.map?.(p=>p.status + ':' + p.play).join('|'), isLeader]);
+  }, [session?.id, session?.state, players.length, players.map?.(p=>p.status + ':' + p.bet).join('|'), isLeader]);
 
   // Timer tick for UI updates
   useEffect(() => {
@@ -474,7 +474,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       player_name: name,
       seat: free,
       stack: Math.min(getVault(), Math.max(10000, minRequired)),
-      play: 0,
+      bet: 0,
       hand: [],
       status: "seated",
       acted: false,
@@ -521,7 +521,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     }
 
     const { error } = await supabase.from("bj_players").update({
-      play: play,
+      bet: play,
       status: 'playing'
       // acted: true  <-- removed, so player can act in 'acting' phase
     }).eq("id", row.id);
@@ -567,7 +567,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       .select('*').eq('session_id', sessionId).order('seat,hand_idx');
 
     // רק משתתפים של הסיבוב (מי שהימרו)
-    const actables = (ps || []).filter(p => (p.play || 0) > 0 && p.status === 'acting');
+    const actables = (ps || []).filter(p => (p.bet || 0) > 0 && p.status === 'acting');
     if (!actables.length) {
       // כולם BJ/סטוד/באסט ⇒ סגור יד
       await dealerAndSettle();
@@ -635,12 +635,12 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
 
     // 0) אם המצב לא חוקי (acting אבל אין current_player_id או אין ידיים) – חזור ל-PLAYING
     if (s.state === 'acting') {
-      const { data: ps } = await supabase.from('bj_players').select('id,hand,play,status').eq('session_id', s.id);
+      const { data: ps } = await supabase.from('bj_players').select('id,hand,bet,status').eq('session_id', s.id);
       const anyHands = (ps || []).some(p => (p.hand?.length || 0) > 0);
       const someoneActing = (ps || []).some(p => p.status === 'acting');
       if (!anyHands || (!someoneActing && !s.current_player_id)) {
         const deadline = new Date(Date.now() + 15000).toISOString();
-        await supabase.from('bj_players').update({ hand: [], status: 'seated', acted: false, play: 0 }).eq('session_id', s.id);
+        await supabase.from('bj_players').update({ hand: [], status: 'seated', acted: false, bet: 0 }).eq('session_id', s.id);
         await supabase.from('bj_sessions').update({
           state: 'playing', dealer_hand: [], dealer_hidden: true,
           bet_deadline: deadline, current_player_id: null, turn_deadline: null, next_round_at: null
@@ -654,7 +654,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       .from('bj_players').select('*')
       .eq('session_id', s.id).order('seat,hand_idx');
 
-    const participants = (ps || []).filter(p => (p.play || 0) > 0 && p.status !== 'left');
+    const participants = (ps || []).filter(p => (p.bet || 0) > 0 && p.status !== 'left');
     const hasBets      = participants.length > 0;
     const everyoneDone = hasBets && participants.every(p => ['stood','busted','blackjack','settled'].includes(p.status));
 
@@ -663,7 +663,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       // אפס לכולם את היד הקודמת אם צריך (ב-ENDED)
       if (s.state === 'ended') {
         await supabase.from('bj_players').update({
-          hand: [], play: 0, result: null, acted: false
+          hand: [], bet: 0, result: null, acted: false
           // השאר את status ו-name כדי לא לאבד נראות
         }).eq('session_id', s.id);
       }
@@ -738,7 +738,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       .order("seat");
 
     // משתתפים אמיתיים בלבד
-    const participants = (ps || []).filter(p => (p.play || 0) >= (session.min_bet || MIN_PLAY) && p.status !== 'left');
+    const participants = (ps || []).filter(p => (p.bet || 0) >= (session.min_bet || MIN_PLAY) && p.status !== 'left');
     if (participants.length === 0) return; // סתם בטחון
 
     let shoe = session.shoe?.length ? [...session.shoe] : freshShoe(4);
@@ -813,7 +813,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
   async function double() {
     if (!session || !myTurn) return;
     if (!Array.isArray(myRow?.hand) || myRow.hand.length !== 2) return;
-    if (getVault() < (myRow?.play || 0)) { setMsg("Insufficient vault balance to double"); return; }
+    if (getVault() < (myRow?.bet || 0)) { setMsg("Insufficient vault balance to double"); return; }
 
     // משוך שורה עדכנית מה-DB (ולא מ-state) כדי לא לטעות עם lag
     const row = await withFreshMyRow();
@@ -824,7 +824,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
 
     // כסף ב-vault
     const currentVault = getVault();
-    const additionalBet = row.play;
+    const additionalBet = row.bet;
     if (currentVault < additionalBet) {
       setMsg("Insufficient vault balance to double");
       return;
@@ -839,12 +839,12 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     let shoe = [...(session.shoe || [])];
     const card = shoe.pop();
     const hand = [...row.hand, card];
-    const newBet = row.play * 2;
+    const newBet = row.bet * 2;
 
     // בדוק אם יש שינוי לפני PATCH
-    const updates = { play: newBet, hand, status: 'stood', acted: true };
+    const updates = { bet: newBet, hand, status: 'stood', acted: true };
     const nothingChanged =
-      newBet === row.play &&
+      newBet === row.bet &&
       JSON.stringify(hand) === JSON.stringify(row.hand) &&
       row.status === 'stood' && row.acted === true;
     
@@ -906,7 +906,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     
     // בדוק שיש מספיק כסף ב-vault
     const currentVault = getVault();
-    const newBet = row.play;
+    const newBet = row.bet;
     if (currentVault < newBet) {
       setMsg("Insufficient vault balance for split");
       return;
@@ -945,7 +945,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
         seat: row.seat,
         player_name: row.player_name,
         client_id: row.client_id,
-        play: newBet,
+        bet: newBet,
         hand: [h[1], newCard2],
         status: 'acting',
         split_from: row.id,
@@ -987,7 +987,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     // בדוק שהדילר מראה Ace
     const dealerFirstCard = session.dealer_hand?.[0];
     if (!dealerFirstCard || !dealerFirstCard.startsWith('A')) {
-      setMsg("Insurance only available when opponent shows Ace");
+      setMsg("Insurance only available when dealer shows Ace");
       return;
     }
     
@@ -999,7 +999,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     
     // בדוק שיש מספיק כסף
     const currentVault = getVault();
-    const insuranceAmount = Math.floor(myRow.play / 2);
+    const insuranceAmount = Math.floor(myRow.bet / 2);
     if (currentVault < insuranceAmount) {
       setMsg("Insufficient vault balance for insurance");
       return;
@@ -1028,7 +1028,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     
     // החזר חצי מההימור ל-vault
     const currentVault = getVault();
-    const refund = Math.floor(myRow.play / 2);
+    const refund = Math.floor(myRow.bet / 2);
     const newVault = currentVault + refund;
     setVault(newVault);
     // עדכן גם את ה-state בדף הראשי
@@ -1050,7 +1050,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     const { data: ps } = await supabase.from("bj_players")
       .select("*").eq("session_id", session.id).order('seat,hand_idx');
 
-    const participants = (ps || []).filter(p => (p.play || 0) > 0 && p.status !== 'left');
+    const participants = (ps || []).filter(p => (p.bet || 0) > 0 && p.status !== 'left');
     const done = participants.every(p => ['stood','busted','blackjack','settled'].includes(p.status));
     if (!done) { setMsg("Players still acting"); return; }
 
@@ -1101,7 +1101,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
           ? 'push' // גם הוא וגם הדילר ב-21
           : 'lose';
         await supabase.from('bj_players')
-          .update({ result, status: 'settled', play: 0 })
+          .update({ result, status: 'settled', bet: 0 })
           .eq('id', p.id);
       }
 
@@ -1120,11 +1120,11 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       const s = handValue(Array.isArray(p.hand) ? p.hand : []);
       let result='lose', prize=0;
 
-      if (p.status==='blackjack') { result='blackjack'; prize=Math.floor(p.play*3/2); }
-      else if (dealerBust && s<=21) { result='win'; prize=p.play; }
+      if (p.status==='blackjack') { result='blackjack'; prize=Math.floor(p.bet*3/2); }
+      else if (dealerBust && s<=21) { result='win'; prize=p.bet; }
       else if (s>21) { result='lose'; }
-      else if (s>dealerScore) { result='win'; prize=p.play; }
-      else if (s===dealerScore) { result='push'; prize=p.play; }
+      else if (s>dealerScore) { result='win'; prize=p.bet; }
+      else if (s===dealerScore) { result='push'; prize=p.bet; }
       else { result='lose'; }
 
       let delta = prize; // רק הזכייה - ההימור כבר ירד בהתחלה
@@ -1149,11 +1149,11 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
           setVaultBoth(newVault);
         }
         // שמור את התוצאה שלי להודעה מקומית
-        myResult = { result, delta, dealerBust, dealerScore, originalBet: p.play, insuranceWin: p.insurance_play > 0 && dealerBlackjack ? p.insurance_play * 2 : 0 };
+        myResult = { result, delta, dealerBust, dealerScore, originalBet: p.bet, insuranceWin: p.insurance_play > 0 && dealerBlackjack ? p.insurance_play * 2 : 0 };
       }
 
       await supabase.from('bj_players').update({
-        result, status:'settled', play:0, insurance_play:0
+        result, status:'settled', bet:0, insurance_play:0
       }).eq('id', p.id);
 
       const tag = result==='win' ? '+'
@@ -1169,7 +1169,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       player_name: p.player_name,
       hand: Array.isArray(p.hand) ? [...p.hand] : [],
       total: handValue(Array.isArray(p.hand) ? p.hand : []),
-      play: p.play ?? 0,
+      bet: p.bet ?? 0,
       result: p.result ?? null
     }));
     setEndedSnapshot({
@@ -1212,7 +1212,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
   async function resetRound() {
     if (!session) return;
     await supabase.from("bj_players").update({
-      hand: [], play: 0, result: null, status: 'seated', acted: false, insurance_play: 0
+      hand: [], bet: 0, result: null, status: 'seated', acted: false, insurance_play: 0
     }).eq("session_id", session.id);
     await supabase.from("bj_sessions").update({
       state: 'lobby', dealer_hand: [], dealer_hidden: true
@@ -1296,7 +1296,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
           {Array.from({length: SEATS}).map((_,i)=>{
             let occupant = players.find(p=>p.seat===i);
             let nameToShow = occupant?.player_name;
-            let betToShow = occupant?.play || 0;
+            let betToShow = occupant?.bet || 0;
             let handToShow = occupant?.hand;
 
             const useSnap = (session?.state === 'settling' || session?.state === 'ended') && endedSnapshot;
@@ -1305,7 +1305,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
               if (snap) {
                 // בזמן settling/ended – תמיד snapshot!
                 nameToShow = snap.player_name;
-                betToShow = snap.play || 0;
+                betToShow = snap.bet || 0;
                 handToShow = snap.hand;
               } else {
                 // אין snapshot (למשל כיסא ריק) – הצג ריק
@@ -1513,8 +1513,8 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
               <div className="text-yellow-400 font-bold text-lg mb-2">🛡️ Insurance Available</div>
               <div className="text-white/80 text-sm mb-4">
                 Opponent shows Ace!<br/>
-                Insurance: {fmt(Math.floor((myRow?.play || 0) / 2))} MLEO<br/>
-                Prize: 2:1 if opponent has 21
+                Insurance: {fmt(Math.floor((myRow?.bet || 0) / 2))} MLEO<br/>
+                Prize: 2:1 if dealer has 21
               </div>
               <div className="flex gap-3 justify-center">
                 <button 

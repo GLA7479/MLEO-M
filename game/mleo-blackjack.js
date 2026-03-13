@@ -162,7 +162,7 @@ export default function BlackjackPage() {
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [deck, setDeck] = useState([]);
   const [playerHand, setPlayerHand] = useState([]);
-  const [dealerHand, setDealerHand] = useState([]);
+  const [opponentHand, setOpponentHand] = useState([]);
   const [gameState, setGameState] = useState("playing");
   const [gameResult, setGameResult] = useState(null);
   const [isFreePlay, setIsFreePlay] = useState(false);
@@ -242,22 +242,22 @@ export default function BlackjackPage() {
     } catch (err) { console.error(err); alert("Claim failed or rejected"); } finally { setClaiming(false); }
   };
 
-  const checkDealerBlackjack = (dealer, player, play) => {
-    const dealerVal = calculateHandValue(dealer);
-    if (dealerVal === 21) {
+  const checkOpponentPerfect21 = (opponent, player, play) => {
+    const opponentVal = calculateHandValue(opponent);
+    if (opponentVal === 21) {
       const playerVal = calculateHandValue(player);
       if (playerVal === 21) {
         // Both have perfect 21 - push
         const newVault = getVault() + play;
         setVault(newVault); setVaultState(newVault);
-        setGameResult({ win: false, push: true, playerValue: 21, dealerValue: 21, prize: play, profit: 0, blackjack: false });
+        setGameResult({ win: false, push: true, playerValue: 21, opponentValue: 21, prize: play, profit: 0, blackjack: false });
         const newStats = { ...stats, totalHands: stats.totalHands + 1, pushes: stats.pushes + 1, totalPlay: stats.totalPlay + play, totalWon: stats.totalWon + play, lastPlay: play };
         setStats(newStats);
         setGameState("finished");
         return true;
       } else {
         // Opponent has perfect 21, player doesn't - opponent wins
-        setGameResult({ win: false, push: false, playerValue: playerVal, dealerValue: 21, prize: 0, profit: -play, blackjack: false });
+        setGameResult({ win: false, push: false, playerValue: playerVal, opponentValue: 21, prize: 0, profit: -play, blackjack: false });
         const newStats = { ...stats, totalHands: stats.totalHands + 1, losses: stats.losses + 1, totalPlay: stats.totalPlay + play, lastPlay: play };
         setStats(newStats);
         setGameState("finished");
@@ -297,19 +297,19 @@ export default function BlackjackPage() {
 
     const newDeck = shuffleDeck(createDeck());
     const player = [newDeck[0], newDeck[2]];
-    const dealer = [newDeck[1], newDeck[3]];
+    const opponent = [newDeck[1], newDeck[3]];
     setDeck(newDeck.slice(4));
     
     // Clear cards first
     setPlayerHand([]);
-    setDealerHand([]);
+    setOpponentHand([]);
     setGameResult(null);
     
-    // Deal cards one by one - Dealer → Player → Dealer (hidden) → Player
-    setTimeout(() => setDealerHand([dealer[0]]), 400);
+    // Deal cards one by one - Opponent → Player → Opponent (hidden) → Player
+    setTimeout(() => setOpponentHand([opponent[0]]), 400);
     setTimeout(() => setPlayerHand([player[0]]), 800);
     setTimeout(() => {
-      setDealerHand(dealer);
+      setOpponentHand(opponent);
       setGameState("dealing"); // Temporary state to keep second card hidden
     }, 1200);
     setTimeout(() => {
@@ -319,12 +319,12 @@ export default function BlackjackPage() {
       setTimeout(() => {
         // Check for perfect 21/insurance after all cards dealt AND animated AND visible
         const playerValue = calculateHandValue(player);
-        const dealerUpCard = dealer[0];
+        const opponentUpCard = opponent[0];
         
         if (playerValue === 21) {
-          // Player has perfect 21 - check if dealer also has it
+          // Player has perfect 21 - check if opponent also has it
           setTimeout(() => {
-            if (checkDealerBlackjack(dealer, player, play)) {
+            if (checkOpponentPerfect21(opponent, player, play)) {
               return;
             }
             // Player perfect 21 wins
@@ -333,7 +333,7 @@ export default function BlackjackPage() {
             setVault(newVault); 
             setVaultState(newVault);
             playSfx(winSound.current);
-            setGameResult({ win: true, push: false, playerValue: 21, dealerValue: calculateHandValue(dealer), prize, profit: prize - play, blackjack: true });
+            setGameResult({ win: true, push: false, playerValue: 21, opponentValue: calculateHandValue(opponent), prize, profit: prize - play, blackjack: true });
             const newStats = { ...stats, totalHands: stats.totalHands + 1, wins: stats.wins + 1, totalPlay: stats.totalPlay + play, totalWon: stats.totalWon + prize, biggestWin: Math.max(stats.biggestWin, prize), blackjacks: stats.blackjacks + 1, lastPlay: play };
             setStats(newStats);
             setGameState("finished");
@@ -341,7 +341,7 @@ export default function BlackjackPage() {
           return;
         }
         
-        if (dealerUpCard.value === "A") {
+        if (opponentUpCard.value === "A") {
           setShowInsurance(true);
         }
         
@@ -376,12 +376,12 @@ export default function BlackjackPage() {
     setInsuranceBet(insuranceAmount);
     setShowInsurance(false);
 
-    // Check for dealer perfect 21
-    const dealerVal = calculateHandValue(dealerHand);
-    if (dealerVal === 21) {
+    // Check for opponent perfect 21
+    const opponentVal = calculateHandValue(opponentHand);
+    if (opponentVal === 21) {
       // Insurance pays 2:1
-      const insurancePayout = insuranceAmount * 3; // play + 2x win
-      const newVault = getVault() + insurancePayout;
+      const insurancePrize = insuranceAmount * 3; // play + 2x win
+      const newVault = getVault() + insurancePrize;
       setVault(newVault); setVaultState(newVault);
       
       // Player loses main play but wins insurance
@@ -390,13 +390,13 @@ export default function BlackjackPage() {
         win: false, 
         push: false, 
         playerValue: playerVal, 
-        dealerValue: 21, 
-        prize: insurancePayout, 
+        opponentValue: 21, 
+        prize: insurancePrize, 
         profit: insuranceAmount - play, // Insurance win - main play loss
         blackjack: false,
         insurance: true
       });
-      const newStats = { ...stats, totalHands: stats.totalHands + 1, losses: stats.losses + 1, totalPlay: stats.totalPlay + play + insuranceAmount, totalWon: stats.totalWon + insurancePayout, insuranceWins: stats.insuranceWins + 1, lastPlay: play };
+      const newStats = { ...stats, totalHands: stats.totalHands + 1, losses: stats.losses + 1, totalPlay: stats.totalPlay + play + insuranceAmount, totalWon: stats.totalWon + insurancePrize, insuranceWins: stats.insuranceWins + 1, lastPlay: play };
       setStats(newStats);
       setGameState("finished");
       return;
@@ -416,8 +416,8 @@ export default function BlackjackPage() {
     playSfx(clickSound.current);
     setShowInsurance(false);
     
-    // Check for dealer perfect 21 anyway
-    if (checkDealerBlackjack(dealerHand, playerHand, Number(playAmount))) {
+    // Check for opponent perfect 21 anyway
+    if (checkOpponentPerfect21(opponentHand, playerHand, Number(playAmount))) {
       return;
     }
 
@@ -458,7 +458,7 @@ export default function BlackjackPage() {
       const value = calculateHandValue(newHand);
       if (value > 21) {
         setGameState("finished");
-        setTimeout(() => finishGame(newHand, dealerHand, play * 2, false), 800);
+        setTimeout(() => finishGame(newHand, opponentHand, play * 2, false), 800);
       } else {
         // Automatically stand after double down
         stand(newHand, play * 2);
@@ -519,32 +519,32 @@ export default function BlackjackPage() {
   };
 
   const finishSplitHands = (hands, individualBet) => {
-    setGameState("dealer");
-    let currentDealerHand = [...dealerHand];
+    setGameState("opponent");
+    let currentOpponentHand = [...opponentHand];
     let currentDeck = [...deck];
 
-    // Dealer plays - one card at a time
-    const dealerPlay = () => {
-      let dealerValue = calculateHandValue(currentDealerHand);
+    // Opponent plays - one card at a time
+    const opponentPlay = () => {
+      let opponentValue = calculateHandValue(currentOpponentHand);
       
       const drawNextCard = () => {
-        if (dealerValue >= 17) {
-          // Dealer done - evaluate split hands
-          setDealerHand([...currentDealerHand]);
+        if (opponentValue >= 17) {
+          // Opponent done - evaluate split hands
+          setOpponentHand([...currentOpponentHand]);
           setDeck(currentDeck);
           
           setTimeout(() => {
-            evaluateSplitResults(hands, currentDealerHand, individualBet);
+            evaluateSplitResults(hands, currentOpponentHand, individualBet);
           }, 1200);
           return;
         }
         
         // Draw one card
-        currentDealerHand.push(currentDeck[0]);
+        currentOpponentHand.push(currentDeck[0]);
         currentDeck = currentDeck.slice(1);
-        setDealerHand([...currentDealerHand]);
+        setOpponentHand([...currentOpponentHand]);
         setDeck(currentDeck);
-        dealerValue = calculateHandValue(currentDealerHand);
+        opponentValue = calculateHandValue(currentOpponentHand);
         
         // Wait for card animation, then draw next
         setTimeout(drawNextCard, 800);
@@ -553,11 +553,11 @@ export default function BlackjackPage() {
       drawNextCard();
     };
     
-    setTimeout(dealerPlay, 500);
+    setTimeout(opponentPlay, 500);
   };
   
-  const evaluateSplitResults = (hands, dealer, individualBet) => {
-    const dealerValue = calculateHandValue(dealer);
+  const evaluateSplitResults = (hands, opponent, individualBet) => {
+    const opponentValue = calculateHandValue(opponent);
 
     // Evaluate each hand
     let totalPrize = 0;
@@ -573,13 +573,13 @@ export default function BlackjackPage() {
 
       if (playerValue > 21) {
         win = false;
-      } else if (dealerValue > 21) {
+      } else if (opponentValue > 21) {
         win = true;
         prize = individualBet * 2;
-      } else if (playerValue > dealerValue) {
+      } else if (playerValue > opponentValue) {
         win = true;
         prize = individualBet * 2;
-      } else if (playerValue === dealerValue) {
+      } else if (playerValue === opponentValue) {
         push = true;
         prize = individualBet;
       }
@@ -646,7 +646,7 @@ export default function BlackjackPage() {
       win: false, 
       push: false, 
       playerValue: calculateHandValue(playerHand), 
-      dealerValue: 0, 
+      opponentValue: 0, 
       prize: refund, 
       profit: -Math.floor(play / 2),
       surrender: true
@@ -715,7 +715,7 @@ export default function BlackjackPage() {
         const value = calculateHandValue(newHand);
         if (value > 21) {
           setGameState("finished");
-          setTimeout(() => finishGame(newHand, dealerHand, Number(playAmount), false), 800);
+          setTimeout(() => finishGame(newHand, opponentHand, Number(playAmount), false), 800);
         } else if (value === 21) {
           stand(newHand);
         }
@@ -747,35 +747,35 @@ export default function BlackjackPage() {
       return;
     }
 
-    setGameState("dealer");
+    setGameState("opponent");
     setCanDouble(false);
     setCanSplit(false);
     setCanSurrender(false);
 
     const currentPlayerHand = hand || playerHand;
     const play = customBet || Number(playAmount);
-    let currentDealerHand = [...dealerHand];
+    let currentOpponentHand = [...opponentHand];
     let currentDeck = [...deck];
 
-    const dealerPlay = () => {
-      let dealerValue = calculateHandValue(currentDealerHand);
+    const opponentPlay = () => {
+      let opponentValue = calculateHandValue(currentOpponentHand);
       
       const drawNextCard = () => {
-        if (dealerValue >= 17) {
-          // Dealer done - wait for last card animation + pause
-          setDealerHand([...currentDealerHand]);
+        if (opponentValue >= 17) {
+          // Opponent done - wait for last card animation + pause
+          setOpponentHand([...currentOpponentHand]);
           setDeck(currentDeck);
           setGameState("finished");
-          setTimeout(() => finishGame(currentPlayerHand, currentDealerHand, play, false), 1200);
+          setTimeout(() => finishGame(currentPlayerHand, currentOpponentHand, play, false), 1200);
           return;
         }
         
         // Draw one card
-        currentDealerHand.push(currentDeck[0]);
+        currentOpponentHand.push(currentDeck[0]);
         currentDeck = currentDeck.slice(1);
-        setDealerHand([...currentDealerHand]);
+        setOpponentHand([...currentOpponentHand]);
         setDeck(currentDeck);
-        dealerValue = calculateHandValue(currentDealerHand);
+        opponentValue = calculateHandValue(currentOpponentHand);
         
         // Wait for card animation, then draw next
         setTimeout(drawNextCard, 800);
@@ -784,12 +784,12 @@ export default function BlackjackPage() {
       drawNextCard();
     };
 
-    setTimeout(dealerPlay, 500);
+    setTimeout(opponentPlay, 500);
   };
 
-  const finishGame = (player, dealer, play, isBlackjack) => {
+  const finishGame = (player, opponent, play, isBlackjack) => {
     const playerValue = calculateHandValue(player);
-    const dealerValue = calculateHandValue(dealer);
+    const opponentValue = calculateHandValue(opponent);
     let win = false;
     let push = false;
     let prize = 0;
@@ -799,13 +799,13 @@ export default function BlackjackPage() {
       prize = Math.floor(play * 2.5);
     } else if (playerValue > 21) {
       win = false;
-    } else if (dealerValue > 21) {
+    } else if (opponentValue > 21) {
       win = true;
       prize = play * 2;
-    } else if (playerValue > dealerValue) {
+    } else if (playerValue > opponentValue) {
       win = true;
       prize = play * 2;
-    } else if (playerValue === dealerValue) {
+    } else if (playerValue === opponentValue) {
       push = true;
       prize = play;
     }
@@ -816,7 +816,7 @@ export default function BlackjackPage() {
       if (win) playSfx(winSound.current);
     }
 
-    const resultData = { win, push, playerValue, dealerValue, prize, profit: win ? prize - play : push ? 0 : -play, blackjack: isBlackjack };
+    const resultData = { win, push, playerValue, opponentValue, prize, profit: win ? prize - play : push ? 0 : -play, blackjack: isBlackjack };
     setGameResult(resultData);
 
     const newStats = { ...stats, totalHands: stats.totalHands + 1, wins: win ? stats.wins + 1 : stats.wins, losses: (!win && !push) ? stats.losses + 1 : stats.losses, pushes: push ? stats.pushes + 1 : stats.pushes, totalPlay: stats.totalPlay + play, totalWon: (win || push) ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), blackjacks: isBlackjack ? stats.blackjacks + 1 : stats.blackjacks, lastPlay: play };
@@ -826,7 +826,7 @@ export default function BlackjackPage() {
   const newHand = () => { 
     setGameState("playing"); 
     setPlayerHand([]);
-    setDealerHand([]);
+    setOpponentHand([]);
     setGameResult(null); 
     setShowResultPopup(false);
     setCanDouble(false);
@@ -846,7 +846,7 @@ export default function BlackjackPage() {
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-red-900 via-black to-green-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
 
   const playerValue = calculateHandValue(playerHand);
-  const dealerValue = calculateHandValue(dealerHand);
+  const opponentValue = calculateHandValue(opponentHand);
   const potentialWin = Math.floor(Number(playAmount) * 2);
 
   return (
@@ -900,9 +900,9 @@ export default function BlackjackPage() {
 
           <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
             <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2" style={{ minHeight: '110px' }}>
-              <div className="text-xs text-white/60 mb-1">Opponent {gameState === "finished" && `(${dealerValue})`}</div>
+              <div className="text-xs text-white/60 mb-1">Opponent {gameState === "finished" && `(${opponentValue})`}</div>
               <div className="flex gap-1 flex-wrap min-h-[80px]">
-                {dealerHand.map((card, i) => (
+                {opponentHand.map((card, i) => (
                   <PlayingCard key={i} card={card} hidden={(gameState === "playing" || gameState === "insurance" || gameState === "dealing") && i === 1} delay={i * 200} />
                 ))}
               </div>
@@ -952,8 +952,8 @@ export default function BlackjackPage() {
                 <button onClick={surrender} disabled={!canSurrender} className="flex-1 h-12 rounded-lg font-bold text-[10px] bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed">SURR</button>
               </div>
             ) : (
-              <button onClick={gameState === "playing" ? () => dealCards(false) : newHand} disabled={gameState === "dealer"} className="w-full h-12 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
-                {gameState === "dealer" ? "Dealing..." : gameState === "finished" ? "NEW HAND" : "DEAL"}
+              <button onClick={gameState === "playing" ? () => dealCards(false) : newHand} disabled={gameState === "opponent"} className="w-full h-12 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
+                {gameState === "opponent" ? "Dealing..." : gameState === "finished" ? "NEW HAND" : "DEAL"}
               </button>
             )}
             <div className="flex gap-2">
@@ -977,7 +977,7 @@ export default function BlackjackPage() {
                 {gameResult.win || gameResult.push ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}
               </div>
               {!gameResult.surrender && !gameResult.split && (
-                <div className="text-sm opacity-80 mt-2">You: {gameResult.playerValue} • Opponent: {gameResult.dealerValue}</div>
+                <div className="text-sm opacity-80 mt-2">You: {gameResult.playerValue} • Opponent: {gameResult.opponentValue}</div>
               )}
               {gameResult.insurance && <div className="text-sm opacity-80 mt-1">🛡️ Insurance Paid!</div>}
             </div>
@@ -1037,7 +1037,7 @@ export default function BlackjackPage() {
                 <p>• <strong>SURRENDER:</strong> Forfeit & get ½ play back</p>
                 <p>• <strong>INSURANCE:</strong> Protect vs opponent Ace</p>
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-                  <p className="text-red-300 font-semibold">Payouts:</p>
+                  <p className="text-red-300 font-semibold">Prizes:</p>
                   <div className="text-xs text-white/80 mt-2 space-y-1">
                     <p>• Perfect 21: ×2.5 💎</p>
                     <p>• Win: ×2</p>

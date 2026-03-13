@@ -733,7 +733,7 @@ export default function Plinko2Page() {
         >
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">
-              🎯 Plinko
+              🎯 Drop Run
             </h1>
             <p className="text-white/70 text-xs">
               EXTREME MODE • ×40 GrandPrize!

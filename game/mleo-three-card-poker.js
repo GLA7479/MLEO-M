@@ -101,9 +101,9 @@ function evaluateHand(cards) {
   return { hand: "High Card", rank: 1 };
 }
 
-function compareHands(playerHand, dealerHand) {
-  if (playerHand.rank > dealerHand.rank) return "player";
-  if (dealerHand.rank > playerHand.rank) return "dealer";
+function compareHands(playerHand, opponentHand) {
+  if (playerHand.rank > opponentHand.rank) return "player";
+  if (opponentHand.rank > playerHand.rank) return "opponent";
   return "tie";
 }
 
@@ -151,10 +151,10 @@ export default function ThreeCardPokerPage() {
   const [playAmount, setPlayAmount] = useState("1000");
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [playerCards, setPlayerCards] = useState([]);
-  const [dealerCards, setDealerCards] = useState([]);
+  const [opponentCards, setOpponentCards] = useState([]);
   const [gameState, setGameState] = useState("playing");
   const [playerHand, setPlayerHand] = useState(null);
-  const [dealerHand, setDealerHand] = useState(null);
+  const [opponentHand, setOpponentHand] = useState(null);
   const [gameResult, setGameResult] = useState(null);
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
@@ -235,38 +235,38 @@ export default function ThreeCardPokerPage() {
 
     const deck = shuffleDeck(createDeck());
     const player = [deck[0], deck[2], deck[4]];
-    const dealer = [deck[1], deck[3], deck[5]];
+    const opponent = [deck[1], deck[3], deck[5]];
     
     // Clear cards first
     setPlayerCards([]);
-    setDealerCards([]);
+    setOpponentCards([]);
     setPlayerHand(null);
-    setDealerHand(null);
+    setOpponentHand(null);
     setGameState("showdown");
     
-    // Deal cards one by one: Dealer → Player → Dealer → Player → Dealer → Player
-    setTimeout(() => setDealerCards([dealer[0]]), 400);
+    // Deal cards one by one: Opponent → Player → Opponent → Player → Opponent → Player
+    setTimeout(() => setOpponentCards([opponent[0]]), 400);
     setTimeout(() => setPlayerCards([player[0]]), 800);
-    setTimeout(() => setDealerCards([dealer[0], dealer[1]]), 1200);
+    setTimeout(() => setOpponentCards([opponent[0], opponent[1]]), 1200);
     setTimeout(() => setPlayerCards([player[0], player[1]]), 1600);
-    setTimeout(() => setDealerCards(dealer), 2000);
+    setTimeout(() => setOpponentCards(opponent), 2000);
     setTimeout(() => {
       setPlayerCards(player);
       
       // Wait for last card animation + pause
       setTimeout(() => {
         const playerEval = evaluateHand(player);
-        const dealerEval = evaluateHand(dealer);
+        const opponentEval = evaluateHand(opponent);
         setPlayerHand(playerEval);
-        setDealerHand(dealerEval);
+        setOpponentHand(opponentEval);
         
-        setTimeout(() => finishGame(playerEval, dealerEval, play), 800);
+        setTimeout(() => finishGame(playerEval, opponentEval, play), 800);
       }, 1400);
     }, 2400);
   };
 
-  const finishGame = (playerEval, dealerEval, play) => {
-    const result = compareHands(playerEval, dealerEval);
+  const finishGame = (playerEval, opponentEval, play) => {
+    const result = compareHands(playerEval, opponentEval);
     let win = result === "player";
     let tie = result === "tie";
     let prize = 0;
@@ -284,7 +284,7 @@ export default function ThreeCardPokerPage() {
       if (win) playSfx(winSound.current);
     }
 
-    const resultData = { win, tie, playerHand: playerEval.hand, dealerHand: dealerEval.hand, prize, profit: win ? prize - play : tie ? 0 : -play };
+    const resultData = { win, tie, playerHand: playerEval.hand, opponentHand: opponentEval.hand, prize, profit: win ? prize - play : tie ? 0 : -play };
     setGameResult(resultData);
     setGameState("finished");
 
@@ -292,7 +292,7 @@ export default function ThreeCardPokerPage() {
     setStats(newStats);
   };
 
-  const newHand = () => { setGameState("playing"); setPlayerCards([]); setDealerCards([]); setPlayerHand(null); setDealerHand(null); setGameResult(null); setShowResultPopup(false); };
+  const newHand = () => { setGameState("playing"); setPlayerCards([]); setOpponentCards([]); setPlayerHand(null); setOpponentHand(null); setGameResult(null); setShowResultPopup(false); };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-pink-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -350,9 +350,9 @@ export default function ThreeCardPokerPage() {
 
           <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
             <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2" style={{ minHeight: '110px' }}>
-              <div className="text-xs text-white/60 mb-1">Opponent {dealerHand && `(${dealerHand.hand})`}</div>
+              <div className="text-xs text-white/60 mb-1">Opponent {opponentHand && `(${opponentHand.hand})`}</div>
               <div className="flex gap-1 flex-wrap min-h-[80px]">
-                {dealerCards.map((card, i) => (
+                {opponentCards.map((card, i) => (
                   <PlayingCard key={i} card={card} delay={i * 200} />
                 ))}
               </div>
@@ -407,7 +407,7 @@ export default function ThreeCardPokerPage() {
               <div className="text-4xl mb-2">{gameResult.win ? '🎉' : gameResult.tie ? '🤝' : '😔'}</div>
               <div className="text-2xl font-bold mb-1">{gameResult.tie ? 'TIE!' : gameResult.win ? 'YOU WIN!' : 'OPPONENT WINS'}</div>
               <div className="text-lg">{gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : gameResult.tie ? 'Money Back' : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div>
-              <div className="text-sm opacity-80 mt-2">You: {gameResult.playerHand} • Opponent: {gameResult.dealerHand}</div>
+              <div className="text-sm opacity-80 mt-2">You: {gameResult.playerHand} • Opponent: {gameResult.opponentHand}</div>
             </div>
           </div>
         )}
