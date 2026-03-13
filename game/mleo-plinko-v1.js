@@ -14,7 +14,7 @@ import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 // CONFIG
 // ============================================================================
 const LS_KEY = "mleo_plinko_v2_physics";
-const MIN_BET = 1000; // Minimum bet amount
+const MIN_PLAY = 1000; // Minimum play amount
 
 // 15 buckets (13 original + 2 zero buckets at edges)
 // Adjusted for RTP ~99% - High multipliers at edges for big wins!
@@ -164,12 +164,12 @@ export default function PlinkoPage() {
 
   const [result, setResult] = useState(null);
   const [finalBuckets, setFinalBuckets] = useState([]); // recent landings visual
-  const [betAmount, setBetAmount] = useState("1000"); // Default bet amount
+  const [playAmount, setPlayAmount] = useState("1000"); // Default play amount
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
   const [showResultPopup, setShowResultPopup] = useState(false);
   const [stats, setStats] = useState(() =>
-    safeRead(LS_KEY, { totalDrops: 0, totalBet: 0, totalWon: 0, biggestWin: 0, history: [], lastBet: MIN_BET })
+    safeRead(LS_KEY, { totalDrops: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, history: [], lastPlay: MIN_PLAY })
   );
 
   // Sounds
@@ -226,10 +226,10 @@ export default function PlinkoPage() {
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
 
-    // Load last bet amount
-    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
-    if (savedStats.lastBet) {
-      setBetAmount(String(savedStats.lastBet));
+    // Load last play amount
+    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
+    if (savedStats.lastPlay) {
+      setPlayAmount(String(savedStats.lastPlay));
     }
     
     const interval = setInterval(() => {
@@ -539,7 +539,7 @@ function buildBoardGeometry(w, h) {
 
     // Prize
     const mult = MULTIPLIERS[idx] ?? 0;
-    const prize = Math.floor(ball.betAmount * mult);
+    const prize = Math.floor(ball.playAmount * mult);
     if (prize > 0) {
       const newVault = getVault() + prize;
       setVault(newVault);
@@ -548,14 +548,14 @@ function buildBoardGeometry(w, h) {
 
       setStats(s => ({
         totalDrops: s.totalDrops + 1,
-        totalBet: (s.totalBet || 0) + ball.betAmount,
+        totalPlay: (s.totalPlay || 0) + ball.playAmount,
         totalWon: s.totalWon + prize,
         biggestWin: Math.max(s.biggestWin, prize),
         history: [
           { mult, prize, bucket: idx, timestamp: Date.now() },
           ...s.history.slice(0, 9)
         ],
-        lastBet: ball.betAmount
+        lastPlay: ball.playAmount
       }));
 
     setResult({
@@ -690,18 +690,18 @@ function buildBoardGeometry(w, h) {
   }
 
   const startFreePlay = () => {
-    setBetAmount("1000");
+    setPlayAmount("1000");
     dropBall(true);
   };
 
   // Drop ball
   function dropBall(isFreePlayParam = false) {
-    let bet = Number(betAmount) || MIN_BET;
+    let play = Number(playAmount) || MIN_PLAY;
     
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
       if (result.success) {
-        bet = result.amount;
+        play = result.amount;
         setIsFreePlay(false);
         router.replace('/plinko2', undefined, { shallow: true });
       } else {
@@ -710,19 +710,19 @@ function buildBoardGeometry(w, h) {
         return;
       }
     } else {
-      if (bet < MIN_BET) {
-        setResult({ error: true, message: `Minimum bet is ${fmt(MIN_BET)} MLEO!` });
+      if (play < MIN_PLAY) {
+        setResult({ error: true, message: `Minimum play is ${fmt(MIN_PLAY)} MLEO!` });
         return;
       }
       
       const currentVault = getVault();
-      if (currentVault < bet) {
-        setResult({ error: true, message: `Need ${fmt(bet)} MLEO!` });
+      if (currentVault < play) {
+        setResult({ error: true, message: `Need ${fmt(play)} MLEO!` });
         return;
       }
       // Deduct cost
-      setVault(currentVault - bet);
-      setVaultState(currentVault - bet);
+      setVault(currentVault - play);
+      setVaultState(currentVault - play);
     }
 
     const board = boardRef.current;
@@ -736,7 +736,7 @@ function buildBoardGeometry(w, h) {
       vx: (rand01() * 2 - 1) * 40,
       vy: PHYS.spawnVy + rand01() * 40,
       _landed: false,
-      betAmount: bet, // Store bet amount with ball
+      playAmount: play, // Store play amount with ball
     };
     ballsRef.current.push(ball);
 
@@ -887,31 +887,31 @@ function buildBoardGeometry(w, h) {
               
               <button
                 onClick={() => dropBall(false)}
-                disabled={vault < (Number(betAmount) || MIN_BET)}
+                disabled={vault < (Number(playAmount) || MIN_PLAY)}
                 className={`px-12 py-4 rounded-2xl font-bold text-2xl text-white transition-all shadow-lg ${
-                  vault < (Number(betAmount) || MIN_BET)
+                  vault < (Number(playAmount) || MIN_PLAY)
                     ? "bg-zinc-700 cursor-not-allowed opacity-50"
                     : "bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-500 hover:to-teal-500 hover:scale-105 active:scale-95"
                 }`}
               >
-                🎯 DROP BALL ({fmt(Number(betAmount) || MIN_BET)})
+                🎯 DROP BALL ({fmt(Number(playAmount) || MIN_PLAY)})
               </button>
             </div>
 
             {/* Real physics text */}
             <div className="text-sm opacity-70 mb-4 text-center">
-              Real physics • Multiple balls supported • Max win: {fmt((Number(betAmount) || MIN_BET) * 10)}
+              Real physics • Multiple balls supported • Max win: {fmt((Number(playAmount) || MIN_PLAY) * 10)}
             </div>
 
-            {/* Bet Amount */}
+            {/* Play Amount */}
             <div className="max-w-sm mx-auto mb-4">
-              <label className="block text-sm text-zinc-400 mb-2">Bet Amount (MLEO)</label>
+              <label className="block text-sm text-zinc-400 mb-2">Play Amount (MLEO)</label>
               <input 
                 type="number" 
-                min={MIN_BET} 
+                min={MIN_PLAY} 
                 step="100" 
-                value={betAmount} 
-                onChange={(e) => setBetAmount(e.target.value)} 
+                value={playAmount} 
+                onChange={(e) => setPlayAmount(e.target.value)} 
                 className="w-full rounded-lg bg-white/5 border border-white/10 px-4 py-3 text-white text-center text-lg font-bold focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500" 
                 placeholder="1000" 
               />
@@ -919,7 +919,7 @@ function buildBoardGeometry(w, h) {
                 {[1000, 2500, 5000, 10000].map((v) => (
                   <button 
                     key={v} 
-                    onClick={() => setBetAmount(String(v))} 
+                    onClick={() => setPlayAmount(String(v))} 
                     className="rounded-lg bg-white/10 border border-white/20 px-3 py-1 text-sm text-white hover:bg-white/20 transition-all"
                   >
                     {fmt(v)}
@@ -967,7 +967,7 @@ function buildBoardGeometry(w, h) {
             <h3 className="text-lg font-bold mb-4">🎯 Multiplier Buckets</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
               {[
-                { label: "×10", desc: "JACKPOT!", color: "yellow" },
+                { label: "×10", desc: "GRAND_PRIZE!", color: "yellow" },
                 { label: "×5", desc: "Big Win", color: "orange" },
                 { label: "×3", desc: "Great", color: "green" },
                 { label: "×2", desc: "Good", color: "blue" },
@@ -1016,7 +1016,7 @@ function buildBoardGeometry(w, h) {
               <li>• <strong>Click DROP BALL:</strong> Costs 1,000 MLEO per ball</li>
               <li>• <strong>Real physics:</strong> Gravity, elastic bounces, air drag & walls</li>
               <li>• <strong>Multiple balls:</strong> Drop as many as you want simultaneously</li>
-              <li>• <strong>Instant payout:</strong> Prize is awarded upon bucket capture</li>
+              <li>• <strong>Instant prize:</strong> Prize is awarded upon bucket capture</li>
             </ul>
             <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
               <p className="text-yellow-300 font-semibold mb-2">Prize Distribution (RTP ~99%):</p>
@@ -1072,16 +1072,16 @@ function buildBoardGeometry(w, h) {
               <div>
                 <div className="text-sm opacity-70">Return Rate</div>
                 <div className="text-2xl font-bold text-blue-400">
-                  {stats.totalDrops > 0 ? `${((stats.totalWon / stats.totalBet) * 100).toFixed(1)}%` : "0%"}
+                  {stats.totalDrops > 0 ? `${((stats.totalWon / stats.totalPlay) * 100).toFixed(1)}%` : "0%"}
                 </div>
               </div>
               <div className="col-span-2">
                 <div className="text-sm opacity-70">Net Profit/Loss</div>
                 <div className={`text-3xl font-bold ${
-                  stats.totalWon >= stats.totalBet ? "text-green-400" : "text-red-400"
+                  stats.totalWon >= stats.totalPlay ? "text-green-400" : "text-red-400"
                 }`}>
                   {stats.totalDrops > 0
-                    ? `${stats.totalWon >= stats.totalBet ? "+" : ""}${fmt(stats.totalWon - stats.totalBet)}`
+                    ? `${stats.totalWon >= stats.totalPlay ? "+" : ""}${fmt(stats.totalWon - stats.totalPlay)}`
                     : "0"}
                 </div>
               </div>

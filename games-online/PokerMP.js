@@ -376,7 +376,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     // במקביל, עדכן את ה-state המקומי
     setSes(session);
 
-    // בדיקת יתרה - minimum buy-in
+    // בדיקת יתרה - minimum entry fee
     const minBuyin = Math.max(Number(session?.min_buyin || 0), 1000);
     const want = Math.floor(Math.max(minBuyin, minBuyin));
     const currentVault = readVault();
@@ -521,7 +521,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       .select("*").eq("session_id", sessionId).eq("seat_index", seatIndex).maybeSingle();
     if(!pl) return; // ⬅️ אל תגבה ממושב ריק
     
-    const { data: pot } = await supabase.from("poker_pots").select("*").eq("session_id", sessionId).maybeSingle();
+    const { data: prizePool } = await supabase.from("poker_pots").select("*").eq("session_id", sessionId).maybeSingle();
 
     const pay = Math.min(amount, pl.stack_live);
     
@@ -534,7 +534,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       acted: true,
       all_in: (pl.stack_live - pay)===0
     }).eq("id", pl.id);
-    await supabase.from("poker_pots").update({ total: (pot?.total||0) + pay }).eq("session_id", sessionId);
+    await supabase.from("poker_pots").update({ total: (prizePool?.total||0) + pay }).eq("session_id", sessionId);
     await supabase.from("poker_actions").insert({ session_id: sessionId, seat_index: seatIndex, action, amount: pay });
   }
 
@@ -547,7 +547,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       .eq('id', sessionId)
       .single();
 
-    const { data: pot } = await supabase
+    const { data: prizePool } = await supabase
       .from('poker_pots')
       .select('total')
       .eq('session_id', sessionId)
@@ -558,9 +558,9 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       .select('seat_index, bet_street, stack_live, total_bet')
       .eq('session_id', sessionId);
 
-    // 2) חשב סך הכל על השולחן (pot + כל ההימורים הנוכחיים)
+    // 2) חשב סך הכל על השולחן (prizePool + כל ההימורים הנוכחיים)
     const streetSum = players.reduce((s,p)=> s + Number(p.bet_street||0), 0);
-    const potTotal = Number(ses.pot_total||0) + Number(pot?.total||0);
+    const potTotal = Number(ses.pot_total||0) + Number(prizePool?.total||0);
     const totalPot = potTotal + streetSum;
 
     // 3) אפס הימור נוכחי אצל כולם (כדי שלא "יישאר על השולחן")
@@ -770,12 +770,12 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     if (!isMyTurn(ses, myRow)) return;
     const { data: sesNow } = await supabase
       .from('poker_sessions').select('to_call').eq('id', ses.id).single();
-    if (Number(sesNow.to_call || 0) > 0) return; // כשיש חוב אסור "bet", רק call/raise
+    if (Number(sesNow.to_call || 0) > 0) return; // כשיש חוב אסור "play", רק call/raise
 
     const amt = Math.max(0, Math.floor(Number(amount || 0)));
     if (amt <= 0) return;
 
-    await takeChips(ses.id, myRow.seat_index, amt, 'bet');
+    await takeChips(ses.id, myRow.seat_index, amt, 'play');
     await supabase.from('poker_sessions').update({ last_raiser: myRow.seat_index }).eq('id', ses.id);
     await afterActionAdvanceStrict();
   }
@@ -923,7 +923,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   async function afterActionAdvance(resetOthers=false){
     // בדוק אם כולם פעלו או ALL-IN
     if(everyoneActedOrAllIn()){
-      // guard settlement: no to_call and equalized bets
+      // guard settlement: no to_call and equalized plays
       const active = players.filter(p => !p.folded && p.seat_index !== null);
       const maxBet = Math.max(...active.map(p=>Number(p.bet_street||0)), 0);
       const unsettled = active.some(p => Number(p.bet_street||0) !== maxBet);
@@ -1011,7 +1011,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   const myTurn = isMyTurn(ses, myRow);
   const canCall = Number(ses?.to_call || 0) > 0;   // For visual display only
   const canCheck = !canCall;
-  const pot = ses?.pot_total || players.reduce((sum,p)=> sum + (p.total_bet||0), 0);
+  const prizePool = ses?.pot_total || players.reduce((sum,p)=> sum + (p.total_bet||0), 0);
   
   // ===== Vault and Stack Management =====
   const myVault = readVault();
@@ -1046,7 +1046,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
             <div className="flex items-center gap-1 md:gap-2 text-white/90 text-[10px] md:text-xs">
               <span className="bg-green-800/50 px-2 py-0.5 rounded">Hand #{ses?.hand_no||"-"}</span>
               <span className="bg-green-800/50 px-2 py-0.5 rounded capitalize">{ses?.stage||"lobby"}</span>
-              <span className="bg-amber-600/50 px-2 py-0.5 rounded font-bold">💰 {fmt(pot)}</span>
+              <span className="bg-amber-600/50 px-2 py-0.5 rounded font-bold">💰 {fmt(prizePool)}</span>
             </div>
           </div>
         </div>
@@ -1144,10 +1144,10 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
                         {fmt(p.stack_live)} 💰
                       </div>
                       
-                      {/* Current bet */}
+                      {/* Current play */}
                       {p.bet_street > 0 && (
                         <div className="text-amber-300 text-[9px] md:text-xs">
-                          Bet: {fmt(p.bet_street)}
+                          Play: {fmt(p.bet_street)}
                         </div>
                       )}
                       
@@ -1257,18 +1257,18 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
                 <button onClick={()=>setBetInput(ses?.min_bet||20)} className="px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 font-bold text-xs">
                   BB
                 </button>
-                <button onClick={()=>setBetInput(Math.floor(pot/2))} className="px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 font-bold text-xs">
-                  ½ Pot
+                <button onClick={()=>setBetInput(Math.floor(prizePool/2))} className="px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 font-bold text-xs">
+                  ½ Prize Pool
                 </button>
-                <button onClick={()=>setBetInput(pot)} className="px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 font-bold text-xs">
-                  Pot
+                <button onClick={()=>setBetInput(prizePool)} className="px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 font-bold text-xs">
+                  Prize Pool
                 </button>
-                <button onClick={()=>setBetInput(pot * 2)} className="px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 font-bold text-xs">
-                  2× Pot
+                <button onClick={()=>setBetInput(prizePool * 2)} className="px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 font-bold text-xs">
+                  2× Prize Pool
                 </button>
                 <button onClick={()=>actBet(betInput)} disabled={!canActNow || canCall || betInput<=0} 
                   className="px-2 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">
-                  BET
+                  PLAY
                 </button>
                 <button onClick={()=>actRaise(betInput)} disabled={!canActNow || !canCall || betInput<=0}
                   className="px-2 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs transition-all disabled:opacity-40 shadow-lg">

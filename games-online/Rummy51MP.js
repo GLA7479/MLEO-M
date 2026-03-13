@@ -980,7 +980,7 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
 
   // Header values
   const vaultNum = Number(vault || 0);
-  const pot = entry * seatedPlayers.length;
+  const prizePool = entry * seatedPlayers.length;
 
   return (
     <div className="w-full h-full flex flex-col gap-3 text-white">
@@ -1020,7 +1020,7 @@ export default function Rummy51MP({ roomId, playerName, vault, setVaultBoth, tie
                 Melds on table: <span className="text-white/70">{melds.length}</span>
               </div>
               <div className="text-xs text-white/70">
-                Pot (UI): <span className="font-semibold">{fmt(pot)}</span>
+                Prize Pool (UI): <span className="font-semibold">{fmt(prizePool)}</span>
               </div>
             </div>
 

@@ -1,6 +1,6 @@
 // ============================================================================
 // MLEO Baccarat - Full-Screen Game Template
-// Classic card game - Bet on Player, Banker, or Tie!
+// Classic card game - Choose Player, Banker, or Tie!
 // ============================================================================
 
 import { useEffect, useRef, useState } from "react";
@@ -37,7 +37,7 @@ function useIOSViewportFix() {
 }
 
 const LS_KEY = "mleo_baccarat_v2";
-const MIN_BET = 1000;
+const MIN_PLAY = 1000;
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -51,13 +51,13 @@ function safeWrite(key, val) { if (typeof window === "undefined") return; try { 
 function getVault() { const rushData = safeRead("mleo_rush_core_v4", {}); return rushData.vault || 0; }
 function setVault(amount) { const rushData = safeRead("mleo_rush_core_v4", {}); rushData.vault = amount; safeWrite("mleo_rush_core_v4", rushData); }
 function fmt(n) { if (n >= 1e9) return (n / 1e9).toFixed(2) + "B"; if (n >= 1e6) return (n / 1e6).toFixed(2) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(2) + "K"; return Math.floor(n).toString(); }
-function formatBetDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
+function formatPlayDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
 function shortAddr(addr) { if (!addr || addr.length < 10) return addr || ""; return `${addr.slice(0, 6)}...${addr.slice(-4)}`; }
 
-const BET_TYPES = {
-  player: { name: "Player", payout: 2 },
-  banker: { name: "Banker", payout: 1.95 },
-  tie: { name: "Tie", payout: 8 }
+const PLAY_TYPES = {
+  player: { name: "Player", prize: 2 },
+  banker: { name: "Banker", prize: 1.95 },
+  tie: { name: "Tie", prize: 8 }
 };
 
 export default function BaccaratPage() {
@@ -79,9 +79,9 @@ export default function BaccaratPage() {
 
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
-  const [betAmount, setBetAmount] = useState("1000");
-  const [isEditingBet, setIsEditingBet] = useState(false);
-  const [selectedBet, setSelectedBet] = useState("player");
+  const [playAmount, setPlayAmount] = useState("1000");
+  const [isEditingPlay, setIsEditingPlay] = useState(false);
+  const [selectedPlay, setSelectedPlay] = useState("player");
   const [dealing, setDealing] = useState(false);
   const [playerScore, setPlayerScore] = useState(0);
   const [bankerScore, setBankerScore] = useState(0);
@@ -101,7 +101,7 @@ export default function BaccaratPage() {
   const clickSound = useRef(null);
   const winSound = useRef(null);
 
-  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalGames: 0, wins: 0, losses: 0, totalBet: 0, totalWon: 0, biggestWin: 0, ties: 0, lastBet: MIN_BET }));
+  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalGames: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, ties: 0, lastPlay: MIN_PLAY }));
 
   const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
 
@@ -112,8 +112,8 @@ export default function BaccaratPage() {
     setIsFreePlay(isFree);
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
-    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
-    if (savedStats.lastBet) setBetAmount(String(savedStats.lastBet));
+    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
+    if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
     const interval = setInterval(() => { const status = getFreePlayStatus(); setFreePlayTokens(status.tokens); setVaultState(getVault()); }, 2000);
     if (typeof Audio !== "undefined") {
       try { clickSound.current = new Audio(S_CLICK); winSound.current = new Audio(S_WIN); } catch {}
@@ -151,17 +151,17 @@ export default function BaccaratPage() {
     if (dealing) return;
     playSfx(clickSound.current);
     const currentVault = getVault();
-    let bet = Number(betAmount) || MIN_BET;
+    let play = Number(playAmount) || MIN_PLAY;
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
-      if (result.success) { bet = result.amount; setIsFreePlay(false); router.replace('/baccarat', undefined, { shallow: true }); }
+      if (result.success) { play = result.amount; setIsFreePlay(false); router.replace('/baccarat', undefined, { shallow: true }); }
       else { alert('No free play tokens available!'); setIsFreePlay(false); return; }
     } else {
-      if (bet < MIN_BET) { alert(`Minimum bet is ${MIN_BET} MLEO`); return; }
-      if (currentVault < bet) { alert('Insufficient MLEO in vault'); return; }
-      setVault(currentVault - bet); setVaultState(currentVault - bet);
+      if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
+      if (currentVault < play) { alert('Insufficient MLEO in vault'); return; }
+      setVault(currentVault - play); setVaultState(currentVault - play);
     }
-    setBetAmount(String(bet));
+    setPlayAmount(String(play));
     setDealing(true);
     setGameResult(null);
     
@@ -171,18 +171,18 @@ export default function BaccaratPage() {
       setPlayerScore(pScore);
       setBankerScore(bScore);
       setDealing(false);
-      checkResult(pScore, bScore, bet);
+      checkResult(pScore, bScore, play);
     }, 1500);
   };
 
-  const checkResult = (pScore, bScore, bet) => {
-    const betType = BET_TYPES[selectedBet];
+  const checkResult = (pScore, bScore, play) => {
+    const playType = PLAY_TYPES[selectedPlay];
     let win = false;
-    if (selectedBet === 'player') win = pScore > bScore;
-    else if (selectedBet === 'banker') win = bScore > pScore;
-    else if (selectedBet === 'tie') win = pScore === bScore;
+    if (selectedPlay === 'player') win = pScore > bScore;
+    else if (selectedPlay === 'banker') win = bScore > pScore;
+    else if (selectedPlay === 'tie') win = pScore === bScore;
 
-    const prize = win ? Math.floor(bet * betType.payout) : 0;
+    const prize = win ? Math.floor(play * playType.prize) : 0;
     if (win && prize > 0) {
       const newVault = getVault() + prize;
       setVault(newVault); setVaultState(newVault);
@@ -190,10 +190,10 @@ export default function BaccaratPage() {
     }
 
     const isTie = pScore === bScore;
-    const resultData = { win, playerScore: pScore, bankerScore: bScore, betType: betType.name, payout: betType.payout, prize, profit: win ? prize - bet : -bet, tie: isTie };
+    const resultData = { win, playerScore: pScore, bankerScore: bScore, playType: playType.name, prizeMultiplier: playType.prize, prize, profit: win ? prize - play : -play, tie: isTie };
     setGameResult(resultData);
 
-    const newStats = { ...stats, totalGames: stats.totalGames + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalBet: stats.totalBet + bet, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), ties: isTie ? stats.ties + 1 : stats.ties, lastBet: bet };
+    const newStats = { ...stats, totalGames: stats.totalGames + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalPlay: stats.totalPlay + play, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), ties: isTie ? stats.ties + 1 : stats.ties, lastPlay: play };
     setStats(newStats);
   };
 
@@ -202,7 +202,7 @@ export default function BaccaratPage() {
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-purple-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
 
-  const potentialWin = Math.floor(Number(betAmount) * BET_TYPES[selectedBet].payout);
+  const potentialWin = Math.floor(Number(playAmount) * PLAY_TYPES[selectedPlay].prize);
 
   return (
     <Layout>
@@ -232,8 +232,8 @@ export default function BaccaratPage() {
               <div className="text-sm font-bold text-emerald-400">{fmt(vault)}</div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
-              <div className="text-[10px] text-white/60">Bet</div>
-              <div className="text-sm font-bold text-amber-400">{fmt(Number(betAmount))}</div>
+              <div className="text-[10px] text-white/60">Play</div>
+              <div className="text-sm font-bold text-amber-400">{fmt(Number(playAmount))}</div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">Win</div>
@@ -247,27 +247,27 @@ export default function BaccaratPage() {
               <div className="text-center"><div className="text-sm text-white/70 mb-1">Banker</div><div className={`text-5xl font-bold ${dealing ? 'animate-pulse' : ''} ${gameResult?.bankerScore > gameResult?.playerScore ? 'text-green-400' : 'text-white'}`}>{bankerScore}</div></div>
                     </div>
             <div className="text-center" style={{ height: '28px' }}>
-              <div className={`text-base font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-red-400'}`}>{gameResult ? (gameResult.tie ? 'TIE!' : gameResult.win ? `${gameResult.betType} WINS!` : 'LOSE') : 'waiting'}</div>
+              <div className={`text-base font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-red-400'}`}>{gameResult ? (gameResult.tie ? 'TIE!' : gameResult.win ? `${gameResult.playType} WINS!` : 'LOSE') : 'waiting'}</div>
             </div>
 
             <div className="flex gap-2 mt-4 w-full">
-            {Object.entries(BET_TYPES).map(([key, bet]) => (
-              <button key={key} onClick={() => { setSelectedBet(key); playSfx(clickSound.current); }} disabled={dealing} className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all ${selectedBet === key ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white ring-2 ring-purple-300' : 'bg-white/10 text-white hover:bg-white/20'} disabled:opacity-50`}>
-                <div>{bet.name}</div><div className="text-yellow-400">×{bet.payout}</div>
+            {Object.entries(PLAY_TYPES).map(([key, play]) => (
+              <button key={key} onClick={() => { setSelectedPlay(key); playSfx(clickSound.current); }} disabled={dealing} className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all ${selectedPlay === key ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white ring-2 ring-purple-300' : 'bg-white/10 text-white hover:bg-white/20'} disabled:opacity-50`}>
+                <div>{play.name}</div><div className="text-yellow-400">×{play.prize}</div>
               </button>
             ))}
             </div>
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={dealing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={dealing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={dealing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={dealing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={dealing} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
-            <input type="text" value={isEditingBet ? betAmount : formatBetDisplay(betAmount)} onFocus={() => setIsEditingBet(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setBetAmount(val || '0'); }} onBlur={() => { setIsEditingBet(false); const current = Number(betAmount) || MIN_BET; setBetAmount(String(Math.max(MIN_BET, current))); }} disabled={dealing} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs" />
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={dealing} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
-            <button onClick={() => { setBetAmount(String(MIN_BET)); playSfx(clickSound.current); }} disabled={dealing} className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50" title="Reset to minimum bet">↺</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={dealing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={dealing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={dealing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={dealing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = Math.max(MIN_PLAY, current - 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={dealing} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
+            <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={dealing} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs" />
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = Math.min(vault, current + 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={dealing} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
+            <button onClick={() => { setPlayAmount(String(MIN_PLAY)); playSfx(clickSound.current); }} disabled={dealing} className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50" title="Reset to minimum play">↺</button>
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
@@ -309,12 +309,12 @@ export default function BaccaratPage() {
             <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
               <h2 className="text-2xl font-extrabold mb-4">♥️ How to Play</h2>
               <div className="space-y-3 text-sm">
-                <p><strong>1. Select Bet:</strong> Player, Banker, or Tie</p>
-                <p><strong>2. Set Amount:</strong> Min {MIN_BET} MLEO</p>
+                <p><strong>1. Select Play:</strong> Player, Banker, or Tie</p>
+                <p><strong>2. Set Amount:</strong> Min {MIN_PLAY} MLEO</p>
                 <p><strong>3. Deal:</strong> Cards dealt automatically</p>
                 <p><strong>4. Win:</strong> Highest score (0-9) wins!</p>
                 <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
-                  <p className="text-purple-300 font-semibold">Payouts:</p>
+                  <p className="text-purple-300 font-semibold">Prizes:</p>
                   <div className="text-xs text-white/80 mt-2 space-y-1">
                     <p>• Player: ×2</p>
                     <p>• Banker: ×1.95</p>
@@ -335,10 +335,10 @@ export default function BaccaratPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Games</div><div className="text-xl font-bold">{stats.totalGames}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalGames > 0 ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : 0}%</div></div>
-                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Bet</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Play</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalPlay)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div>
-                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalBet)}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalPlay >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalPlay)}</div></div>
                 </div>
                 <div className="bg-gradient-to-r from-purple-500/10 to-purple-600/10 border border-purple-500/30 rounded-lg p-4"><div className="text-sm font-semibold mb-2">🤝 Ties</div><div className="text-center"><div className="text-3xl font-bold text-purple-300">{stats.ties}</div><div className="text-xs text-white/60 mt-1">Player = Banker</div></div></div>
               </div>

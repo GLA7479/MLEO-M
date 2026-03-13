@@ -126,7 +126,7 @@ function evaluateFiveCards(cards) {
   if (isFlush && isStraight && values[0] === 14 && values[1] === 13) return { hand: "Royal Flush", rank: 10, highCard };
   if (isFlush && isStraight) return { hand: "Straight Flush", rank: 9, highCard };
   if (countsArray[0] === 4) return { hand: "Four of a Kind", rank: 8, highCard };
-  if (countsArray[0] === 3 && countsArray[1] === 2) return { hand: "Full House", rank: 7, highCard };
+  if (countsArray[0] === 3 && countsArray[1] === 2) return { hand: "Full Platform", rank: 7, highCard };
   if (isFlush) return { hand: "Flush", rank: 6, highCard };
   if (isStraight) return { hand: "Straight", rank: 5, highCard };
   if (countsArray[0] === 3) return { hand: "Three of a Kind", rank: 4, highCard };
@@ -203,8 +203,8 @@ function TexasHoldemMultiplayerPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAnswerModal, setShowAnswerModal] = useState(false);
   
-  // Betting states
-  const [betAmount, setBetAmount] = useState("100");
+  // Playing states
+  const [playAmount, setPlayAmount] = useState("100");
   const [maxEntryAmount] = useState(2000000);
   const [showBetModal, setShowBetModal] = useState(false);
   
@@ -542,7 +542,7 @@ function TexasHoldemMultiplayerPage() {
     playSfx(clickSound.current);
     
     const updatedPlayers = [...currentGameState.players];
-    let newPot = currentGameState.pot;
+    let newPot = currentGameState.prizePool;
     let newCurrentBet = currentGameState.currentBet;
     
     if (action === "fold") {
@@ -551,10 +551,10 @@ function TexasHoldemMultiplayerPage() {
         folded: true
       };
     } else if (action === "call") {
-      const callAmount = currentGameState.currentBet - currentPlayer.bet;
+      const callAmount = currentGameState.currentBet - currentPlayer.play;
       updatedPlayers[currentGameState.currentPlayerIndex] = {
         ...currentPlayer,
-        bet: currentGameState.currentBet,
+        play: currentGameState.currentBet,
         chips: currentPlayer.chips - callAmount
       };
       newPot += callAmount;
@@ -565,21 +565,21 @@ function TexasHoldemMultiplayerPage() {
       const raiseAmount = Math.min(amount, currentPlayer.chips);
       updatedPlayers[currentGameState.currentPlayerIndex] = {
         ...currentPlayer,
-        bet: currentPlayer.bet + raiseAmount,
+        play: currentPlayer.play + raiseAmount,
         chips: currentPlayer.chips - raiseAmount
       };
       newPot += raiseAmount;
-      newCurrentBet = currentPlayer.bet + raiseAmount;
+      newCurrentBet = currentPlayer.play + raiseAmount;
     } else if (action === "allin") {
       const allInAmount = currentPlayer.chips;
       updatedPlayers[currentGameState.currentPlayerIndex] = {
         ...currentPlayer,
-        bet: currentPlayer.bet + allInAmount,
+        play: currentPlayer.play + allInAmount,
         chips: 0,
         allIn: true
       };
       newPot += allInAmount;
-      newCurrentBet = Math.max(currentGameState.currentBet, currentPlayer.bet + allInAmount);
+      newCurrentBet = Math.max(currentGameState.currentBet, currentPlayer.play + allInAmount);
     }
     
     // Move to next player - תיקון: תמיכה ב-2-6 שחקנים
@@ -593,13 +593,13 @@ function TexasHoldemMultiplayerPage() {
     console.log("Guest action - Current index:", currentGameState.currentPlayerIndex, "Next index:", nextIndex);
     
     console.log("Guest action processed - current player index:", currentGameState.currentPlayerIndex, "next player index:", nextIndex);
-    console.log("Players after guest action:", updatedPlayers.map(p => ({ name: p.name, isHost: p.isHost, bet: p.bet })));
+    console.log("Players after guest action:", updatedPlayers.map(p => ({ name: p.name, isHost: p.isHost, play: p.play })));
     
     const updatedState = {
       ...currentGameState,
       players: updatedPlayers,
       currentPlayerIndex: nextIndex,
-      pot: newPot,
+      prizePool: newPot,
       currentBet: newCurrentBet
     };
     
@@ -654,7 +654,7 @@ function TexasHoldemMultiplayerPage() {
     const players = gameState.players.map((player, idx) => ({
       ...player,
       cards: [deck[idx * 2], deck[idx * 2 + 1]],
-      bet: player.isHost ? SMALL_BLIND : BIG_BLIND,
+      play: player.isHost ? SMALL_BLIND : BIG_BLIND,
       folded: false,
       chips: 10000 - (player.isHost ? SMALL_BLIND : BIG_BLIND),
       allIn: false
@@ -678,7 +678,7 @@ function TexasHoldemMultiplayerPage() {
       players: players,
       communityCards: communityCards,
       communityVisible: 0,
-      pot: SMALL_BLIND + BIG_BLIND,
+      prizePool: SMALL_BLIND + BIG_BLIND,
       currentPlayerIndex: hostIndex, // תמיד מתחיל מהמארח
       round: "pre-flop",
       currentBet: BIG_BLIND,
@@ -742,7 +742,7 @@ function TexasHoldemMultiplayerPage() {
     
     // Host processes his own actions
     const updatedPlayers = [...gameState.players];
-    let newPot = gameState.pot;
+    let newPot = gameState.prizePool;
     let newCurrentBet = gameState.currentBet;
     
     if (action === "fold") {
@@ -751,10 +751,10 @@ function TexasHoldemMultiplayerPage() {
         folded: true
       };
     } else if (action === "call") {
-      const callAmount = gameState.currentBet - currentPlayer.bet;
+      const callAmount = gameState.currentBet - currentPlayer.play;
       updatedPlayers[gameState.currentPlayerIndex] = {
         ...currentPlayer,
-        bet: gameState.currentBet,
+        play: gameState.currentBet,
         chips: currentPlayer.chips - callAmount
       };
       newPot += callAmount;
@@ -764,21 +764,21 @@ function TexasHoldemMultiplayerPage() {
       const raiseAmount = Math.min(amount, currentPlayer.chips);
       updatedPlayers[gameState.currentPlayerIndex] = {
         ...currentPlayer,
-        bet: currentPlayer.bet + raiseAmount,
+        play: currentPlayer.play + raiseAmount,
         chips: currentPlayer.chips - raiseAmount
       };
       newPot += raiseAmount;
-      newCurrentBet = currentPlayer.bet + raiseAmount;
+      newCurrentBet = currentPlayer.play + raiseAmount;
     } else if (action === "allin") {
       const allInAmount = currentPlayer.chips;
       updatedPlayers[gameState.currentPlayerIndex] = {
         ...currentPlayer,
-        bet: currentPlayer.bet + allInAmount,
+        play: currentPlayer.play + allInAmount,
         chips: 0,
         allIn: true
       };
       newPot += allInAmount;
-      newCurrentBet = Math.max(gameState.currentBet, currentPlayer.bet + allInAmount);
+      newCurrentBet = Math.max(gameState.currentBet, currentPlayer.play + allInAmount);
     }
     
     // Move to next player - תיקון: תמיכה ב-2-6 שחקנים
@@ -793,13 +793,13 @@ function TexasHoldemMultiplayerPage() {
     
     console.log("Host player action:", action, "amount:", amount);
     console.log("Current player index:", gameState.currentPlayerIndex, "Next player index:", nextIndex);
-    console.log("Players:", updatedPlayers.map(p => ({ name: p.name, isHost: p.isHost, bet: p.bet })));
+    console.log("Players:", updatedPlayers.map(p => ({ name: p.name, isHost: p.isHost, play: p.play })));
     
     const updatedState = {
       ...gameState,
       players: updatedPlayers,
       currentPlayerIndex: nextIndex,
-      pot: newPot,
+      prizePool: newPot,
       currentBet: newCurrentBet
     };
     
@@ -1250,7 +1250,7 @@ function TexasHoldemMultiplayerPage() {
   // GAME SCREEN
   if (screen === "game") {
     const players = gameState?.players || [];
-    const pot = gameState?.pot || 0;
+    const prizePool = gameState?.prizePool || 0;
     const communityCards = gameState?.communityCards || [];
     const communityVisible = gameState?.communityVisible || 0;
     const myPlayer = players.find(p => {
@@ -1306,7 +1306,7 @@ function TexasHoldemMultiplayerPage() {
           <div className="relative h-full flex flex-col items-center px-2 py-12">
             <div className="text-center mb-2">
               <div className="text-xs text-white/60">Room: {roomCode} • Round: {gameState?.round}</div>
-              <div className="text-2xl font-bold text-amber-400">POT: {fmt(pot)}</div>
+              <div className="text-2xl font-bold text-amber-400">PRIZE_POOL: {fmt(prizePool)}</div>
             </div>
 
             {/* Community Cards */}
@@ -1332,7 +1332,7 @@ function TexasHoldemMultiplayerPage() {
                       {player.folded && <span className="text-xs text-red-400">(Folded)</span>}
                       {player.id === currentPlayer?.id && !player.folded && <span className="text-xs text-yellow-400">⏰</span>}
                     </div>
-                    <div className="text-emerald-400 text-xs">{player.chips} | Bet: {player.bet}</div>
+                    <div className="text-emerald-400 text-xs">{player.chips} | Play: {player.play}</div>
                   </div>
                     {isMe && player.cards && (
                     <div className="flex gap-1 mt-2 justify-center">
@@ -1353,17 +1353,17 @@ function TexasHoldemMultiplayerPage() {
                   <button onClick={() => handlePlayerAction("fold")} className="flex-1 h-10 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 font-semibold text-xs">FOLD</button>
                   <button 
                     onClick={() => handlePlayerAction("check")} 
-                    disabled={gameState.currentBet > myPlayer.bet}
+                    disabled={gameState.currentBet > myPlayer.play}
                     className="flex-1 h-10 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     CHECK
                   </button>
                   <button 
                     onClick={() => handlePlayerAction("call")} 
-                    disabled={gameState.currentBet <= myPlayer.bet || myPlayer.chips < (gameState.currentBet - myPlayer.bet)}
+                    disabled={gameState.currentBet <= myPlayer.play || myPlayer.chips < (gameState.currentBet - myPlayer.play)}
                     className="flex-1 h-10 rounded-lg bg-green-500/20 border border-green-500/30 text-green-300 hover:bg-green-500/30 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    CALL {gameState.currentBet > myPlayer.bet ? `(${gameState.currentBet - myPlayer.bet})` : ''}
+                    CALL {gameState.currentBet > myPlayer.play ? `(${gameState.currentBet - myPlayer.play})` : ''}
                   </button>
                 </div>
                 
@@ -1373,7 +1373,7 @@ function TexasHoldemMultiplayerPage() {
                     disabled={myPlayer.chips === 0}
                     className="flex-1 h-10 rounded-lg bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    BET/RAISE
+                    PLAY/RAISE
                   </button>
                   <button 
                     onClick={() => handlePlayerAction("allin")} 
@@ -1414,9 +1414,9 @@ function TexasHoldemMultiplayerPage() {
                 <p><strong>Multiplayer Texas Hold'em:</strong></p>
                 <p>• Each player gets 2 hole cards</p>
                 <p>• 5 community cards are revealed (Flop, Turn, River)</p>
-                <p>• Best 5-card hand wins the pot!</p>
+                <p>• Best 5-card hand wins the prizePool!</p>
                 <p>• Small blind: {SMALL_BLIND} • Big blind: {BIG_BLIND}</p>
-                <p className="text-white/60 text-xs mt-4">Full betting rounds with Check/Fold/Call/Raise!</p>
+                <p className="text-white/60 text-xs mt-4">Full playing rounds with Check/Fold/Call/Raise!</p>
               </div>
               <button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
             </div>
@@ -1432,7 +1432,7 @@ function TexasHoldemMultiplayerPage() {
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Games</div><div className="text-xl font-bold">{stats.totalGames}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Wins</div><div className="text-xl font-bold text-green-400">{stats.wins}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Losses</div><div className="text-lg font-bold text-red-400">{stats.losses}</div></div>
-                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Pot</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestPot)}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Prize Pool</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestPot)}</div></div>
                 </div>
               </div>
               <button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>
@@ -1461,20 +1461,20 @@ function TexasHoldemMultiplayerPage() {
           </div>
         )}
 
-        {/* Bet Modal */}
+        {/* Play Modal */}
         {showBetModal && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
             <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl">
-              <h2 className="text-2xl font-extrabold mb-4">💰 Place Bet</h2>
+              <h2 className="text-2xl font-extrabold mb-4">💰 Place Play</h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Bet Amount</label>
+                  <label className="block text-sm font-semibold mb-2">Play Amount</label>
                   <input 
                     type="number" 
-                    value={betAmount} 
-                    onChange={(e) => setBetAmount(e.target.value)}
+                    value={playAmount} 
+                    onChange={(e) => setPlayAmount(e.target.value)}
                     className="w-full p-3 bg-gray-800 text-white rounded-lg border border-gray-600 focus:border-yellow-500 focus:outline-none"
-                    placeholder="Enter bet amount"
+                    placeholder="Enter play amount"
                     min="1"
                     max={myPlayer?.chips || 0}
                   />
@@ -1486,7 +1486,7 @@ function TexasHoldemMultiplayerPage() {
                 <div className="flex gap-2">
                   <button 
                     onClick={() => {
-                      const amount = Number(betAmount);
+                      const amount = Number(playAmount);
                       if (amount > 0 && amount <= (myPlayer?.chips || 0)) {
                         handlePlayerAction("raise", amount);
                         setShowBetModal(false);
@@ -1494,7 +1494,7 @@ function TexasHoldemMultiplayerPage() {
                     }}
                     className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-lg transition-colors"
                   >
-                    BET
+                    PLAY
                   </button>
                   <button 
                     onClick={() => setShowBetModal(false)}

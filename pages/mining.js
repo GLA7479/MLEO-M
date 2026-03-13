@@ -1279,7 +1279,7 @@ const TEXT = {
       "Sistem guild: Alătură-te guild-urilor de mining pentru multiplicatori bonus",
       "Pod: Transferă MLEO din jocul Mineri în seiful Rush"
     ],
-    goalDesc: "Fuzionează câini (mineri), sparge pietre și câștigă monede. Monedele sunt o resursă în joc folosită pentru upgrade-uri și cumpărarea mai multor mineri. Unele activități în joc pot de asemenea acumula MLEO (vezi \"Mining și Token-uri\" mai jos).",
+    goalDesc: "Fuzionează câini (mineri), sparge pietre și câștigă monede. Monedele sunt o resursă în joc folosită pentru upgrade-uri și cumpărarea mai multor mineri. Unele activități în joc prizePool de asemenea acumula MLEO (vezi \"Mining și Token-uri\" mai jos).",
     boardMerging: "Board și Fuzionare",
     boardSteps: [
       "Atinge ADD pe un slot gol pentru a plasa un câine. Costul crește în timp.",
@@ -1290,22 +1290,22 @@ const TEXT = {
     upgradesList: [
       "Upgrade-urile DPS fac pietrele să se spargă mai repede.",
       "Upgrade-urile GOLD cresc monedele pe care le primești de la fiecare piatră cu 10% per upgrade.",
-      "Cadourile, câinii automat și alte bonusuri pot apărea din când în când. Timpii exacți, tipurile de drop și valorile de balans sunt dinamice și pot schimba fără notificare.",
-      "Diamantele pot fi colectate și cheltuite pentru recompense speciale. Disponibilitatea și recompensele nu sunt garantate."
+      "Cadourile, câinii automat și alte bonusuri prizePool apărea din când în când. Timpii exacți, tipurile de drop și valorile de balans sunt dinamice și prizePool schimba fără notificare.",
+      "Diamantele prizePool fi colectate și cheltuite pentru recompense speciale. Disponibilitatea și recompensele nu sunt garantate."
     ],
     miningTokens: "Mining și Token-uri (MLEO)",
     miningList: [
       "Cum se acumulează MLEO: Doar spargerea pietrelor poate genera MLEO. O porțiune din monedele pe care le câștigi spargând pietre se poate converti în MLEO la o rată variabilă supusă balansului jocului, limitelor zilnice și protecțiilor anti-abuz.",
-      "Limite zilnice și atenuare: Pentru a menține echitatea, acumularea zilnică se poate atenua când te apropii de limita ta personală zilnică. Limitele și calculele sunt interne și se pot schimba.",
-      "Progres offline: Progresul offline limitat este simulat cu eficiență redusă comparat cu jocul activ. Valorile exacte sunt interne și se pot schimba.",
-      "CLAIM: MLEO-ul tău acumulat apare ca balans. Cererea îl mută în seiful tău în joc. Dacă/când cererile on-chain devin disponibile, se pot aplica ferestre de deblocare suplimentare și restricții.",
+      "Limite zilnice și atenuare: Pentru a menține echitatea, acumularea zilnică se poate atenua când te apropii de limita ta personală zilnică. Limitele și calculele sunt interne și se prizePool schimba.",
+      "Progres offline: Progresul offline limitat este simulat cu eficiență redusă comparat cu jocul activ. Valorile exacte sunt interne și se prizePool schimba.",
+      "CLAIM: MLEO-ul tău acumulat apare ca balans. Cererea îl mută în seiful tău în joc. Dacă/când cererile on-chain devin disponibile, se prizePool aplica ferestre de deblocare suplimentare și restricții.",
       "Fără promisiune de valoare: MLEO în acest joc este un token utilitar pentru divertisment. Nu are valoare monetară intrinsecă sau garantată. Nimic aici nu este ofertă, solicitare sau promisiune de valoare viitoare."
     ],
     goodToKnow: "Bun de știut",
     goodToKnowList: [
-      "Balansul jocului, ratele de drop, limitele și programele sunt dinamice și pot fi schimbate, puse în pauză sau resetate oricând pentru stabilitate, echitate sau întreținere.",
+      "Balansul jocului, ratele de drop, limitele și programele sunt dinamice și prizePool fi schimbate, puse în pauză sau resetate oricând pentru stabilitate, echitate sau întreținere.",
       "Progresul poate fi ajustat pentru a aborda bug-uri, exploit-uri sau abuz.",
-      "Aceasta este o versiune testnet. Datele pot fi șterse sau resetate în timpul dezvoltării.",
+      "Aceasta este o versiune testnet. Datele prizePool fi șterse sau resetate în timpul dezvoltării.",
       "Conectează-ți portofelul pentru a cere token-uri MLEO on-chain când sunt disponibile."
     ],
     arcadeWhat: "Ce este MLEO Arcade?",
@@ -1885,15 +1885,15 @@ function Terms({ onAccept, onDecline }) {
       
       <div className="space-y-4 text-sm">
         <section className="bg-yellow-50 border-2 border-yellow-400 p-4 rounded-lg">
-          <h3 className="font-bold text-black mb-2 text-lg">⚠️ IMPORTANT: Entertainment Only - NO Real Money Gambling</h3>
+          <h3 className="font-bold text-black mb-2 text-lg">⚠️ IMPORTANT: Entertainment Only - NO Real Money Gaming</h3>
           <ul className="list-disc ml-5 space-y-2 text-black">
             <li><strong>This is a FREE entertainment game platform.</strong> All games use in-game tokens (MLEO) for gameplay purposes only.</li>
-            <li><strong>NO REAL MONEY GAMBLING:</strong> This platform does NOT support, facilitate, or allow gambling with real money, cryptocurrencies, or any assets of monetary value.</li>
-            <li><strong>NO REAL MONEY DEPOSITS:</strong> You cannot and will never be able to deposit real money, cryptocurrency, or any assets for the purpose of gambling on this platform.</li>
+            <li><strong>NO REAL MONEY GAMING:</strong> This platform does NOT support, facilitate, or allow gaming with real money, cryptocurrencies, or any assets of monetary value.</li>
+            <li><strong>NO REAL MONEY DEPOSITS:</strong> You cannot and will never be able to deposit real money, cryptocurrency, or any assets for the purpose of gaming on this platform.</li>
             <li><strong>NO REAL MONEY WITHDRAWALS:</strong> You cannot and will never be able to withdraw real money or convert in-game tokens to real money or cryptocurrency for monetary gain.</li>
-            <li><strong>WE ARE AGAINST GAMBLING:</strong> This platform is designed purely for entertainment and skill-based gaming. We do not support, endorse, or facilitate any form of real money gambling, betting, or wagering.</li>
+            <li><strong>WE ARE AGAINST GAMING:</strong> This platform is designed purely for entertainment and skill-based gaming. We do not support, endorse, or facilitate any form of real money gaming, playing, or gaming.</li>
             <li><strong>MLEO TOKENS:</strong> MLEO tokens earned in-game are virtual utility tokens for gameplay mechanics only. They have NO monetary value, cannot be sold, traded, or exchanged for real money or cryptocurrency.</li>
-            <li><strong>FUTURE POLICY:</strong> This platform will NEVER introduce real money gambling features. Any future cryptocurrency integration will be strictly limited to non-gambling use cases (e.g., rewards, collectibles, or utility) and will never involve betting, wagering, or gambling with cryptocurrency.</li>
+            <li><strong>FUTURE POLICY:</strong> This platform will NEVER introduce real money gaming features. Any future cryptocurrency integration will be strictly limited to non-gaming use cases (e.g., rewards, collectibles, or utility) and will never involve playing, gaming, or gaming with cryptocurrency.</li>
           </ul>
         </section>
         
@@ -1903,7 +1903,7 @@ function Terms({ onAccept, onDecline }) {
             <li><strong>MINIMUM AGE:</strong> You must be at least 18 years old to use this platform. In certain jurisdictions, the minimum age may be 21 years or higher as required by local law.</li>
             <li><strong>AGE VERIFICATION:</strong> By using this platform, you represent and warrant that you meet the minimum age requirement in your jurisdiction.</li>
             <li><strong>PARENTAL RESPONSIBILITY:</strong> If you are a parent or guardian and become aware that your child has accessed this platform without meeting the age requirement, please contact us immediately.</li>
-            <li><strong>LOCAL LAW COMPLIANCE:</strong> You are solely responsible for ensuring that your use of this platform complies with all applicable laws, regulations, and restrictions in your jurisdiction, including age restrictions, gambling laws, and cryptocurrency regulations.</li>
+            <li><strong>LOCAL LAW COMPLIANCE:</strong> You are solely responsible for ensuring that your use of this platform complies with all applicable laws, regulations, and restrictions in your jurisdiction, including age restrictions, gaming laws, and cryptocurrency regulations.</li>
             <li><strong>PROHIBITED JURISDICTIONS:</strong> If online gaming, cryptocurrency usage, or any feature of this platform is restricted or prohibited in your jurisdiction, you are prohibited from accessing or using this platform.</li>
             <li><strong>NO LIABILITY FOR VIOLATIONS:</strong> We are not responsible for any violations of local laws by users. You agree to indemnify us against any claims arising from your violation of applicable laws.</li>
           </ul>
@@ -2011,7 +2011,7 @@ function Terms({ onAccept, onDecline }) {
             <li>You will not use the platform for any illegal, fraudulent, or unauthorized purpose;</li>
             <li>All information you provide is accurate, current, and complete;</li>
             <li>You acknowledge that MLEO tokens have no monetary value and are for entertainment purposes only;</li>
-            <li>You understand that this is NOT a gambling platform and no real money gambling occurs on this platform.</li>
+            <li>You understand that this is NOT a gaming platform and no real money gaming occurs on this platform.</li>
           </ul>
         </section>
         <section>
@@ -2656,7 +2656,7 @@ export default function GamesHub() {
                   <div>
                     <h2 className="text-[20px] sm:text-2xl font-extrabold">🎮 MLEO Arcade</h2>
                     <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
-                      Mini-games casino! Play Slots, Dice, Wheel & Scratch cards. 1,000 MLEO per play with prizes up to 10,000 MLEO!
+                      Mini-games arcade! Play Slots, Dice, Wheel & Scratch cards. 1,000 MLEO per play with prizes up to 10,000 MLEO!
         </p>
                   </div>
                   <span className="rounded-full px-2.5 py-1 text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 whitespace-nowrap">

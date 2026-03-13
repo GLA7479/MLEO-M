@@ -1,6 +1,6 @@
 // ============================================================================
 // MLEO DiceGame — plug-in component (for Arcade Hub /pages/arcade-online.js)
-// Specs: Min bet 1,000 MLEO, No Max, Daily Cap 100,000, House Edge 0%.
+// Specs: Min play 1,000 MLEO, No Max, Daily Cap 100,000, Platform Edge 0%.
 // Local Vault only; all UI text in EN.
 // ============================================================================
 import { useEffect, useState } from "react";
@@ -29,7 +29,7 @@ export default function DiceGame({ vault, setVaultBoth }){
     rushData.vault = amount;
     safeWrite("mleo_rush_core_v4", rushData);
   }
-  const [bet,setBet]=useState(DICE_MIN); 
+  const [play,setBet]=useState(DICE_MIN); 
   const [pick,setPick]=useState("high");
   const [state,setState]=useState(loadDice());
   const [spin,setSpin]=useState(false);
@@ -46,10 +46,10 @@ export default function DiceGame({ vault, setVaultBoth }){
   function resetDaily(){ const s={dailyWon:0,lastPlayed:todayISO()}; setState(s); saveDice(s); }
 
   async function onRoll(){
-    setErr(""); setMsg(""); const amount=clamp(bet);
+    setErr(""); setMsg(""); const amount=clamp(play);
     if(amount<DICE_MIN){ setErr(`Minimum is ${fmt(DICE_MIN)} MLEO`); return; }
     if(getVault()<amount){ setErr("Insufficient Vault balance"); return; }
-    if(amount>remaining){ setErr(`Daily win cap reached. You can bet up to ${fmt(remaining)} MLEO right now.`); return; }
+    if(amount>remaining){ setErr(`Daily win cap reached. You can play up to ${fmt(remaining)} MLEO right now.`); return; }
 
     setVault(getVault()-amount); setSpin(true);
     const t0=Date.now();
@@ -89,8 +89,8 @@ export default function DiceGame({ vault, setVaultBoth }){
         </div>
         <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
           <div className="flex items-center gap-2 bg-black/30 border border-white/15 rounded-lg px-2 py-2">
-            <span className="text-white/70 text-xs">Bet</span>
-            <input type="number" value={bet} min={DICE_MIN} step={DICE_MIN} onChange={(e)=>setBet(clamp(e.target.value))} className="flex-1 bg-transparent text-right text-white text-sm outline-none" />
+            <span className="text-white/70 text-xs">Play</span>
+            <input type="number" value={play} min={DICE_MIN} step={DICE_MIN} onChange={(e)=>setBet(clamp(e.target.value))} className="flex-1 bg-transparent text-right text-white text-sm outline-none" />
           </div>
           <button onClick={onRoll} disabled={spin} className={`px-4 py-2 rounded-lg font-bold text-sm ${spin?'bg-gray-600 text-gray-300':'bg-emerald-600 hover:bg-emerald-700 text-white'}`}>{spin?'Rolling…':'ROLL'}</button>
         </div>
@@ -101,7 +101,7 @@ export default function DiceGame({ vault, setVaultBoth }){
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-white/80">
           <div className="bg-white/5 border border-white/10 rounded-lg p-2">Vault: <span className="text-emerald-300 font-semibold">{fmt(getVault())}</span></div>
-          <div className="bg-white/5 border border-white/10 rounded-lg p-2">Min bet: <span className="text-amber-300 font-semibold">{fmt(DICE_MIN)}</span></div>
+          <div className="bg-white/5 border border-white/10 rounded-lg p-2">Min play: <span className="text-amber-300 font-semibold">{fmt(DICE_MIN)}</span></div>
           <div className="bg-white/5 border border-white/10 rounded-lg p-2">Daily Cap: <span className="text-emerald-300 font-semibold">{fmt(DICE_CAP)}</span></div>
           <div className="bg-white/5 border border-white/10 rounded-lg p-2">Today won: <span className="text-cyan-300 font-semibold">{fmt(state.dailyWon)}</span></div>
         </div>
@@ -112,7 +112,7 @@ export default function DiceGame({ vault, setVaultBoth }){
         {msg && <div className="mt-2 text-emerald-300 text-sm">{msg}</div>}
       </div>
 
-      <div className="mt-3 text-center text-xs text-white/60">Zero-edge 1:1 payout • Fun mode only • No real winnings</div>
+      <div className="mt-3 text-center text-xs text-white/60">Zero-edge 1:1 prize • Fun mode only • No real winnings</div>
     </div>
   );
 }

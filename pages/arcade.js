@@ -1,4 +1,4 @@
-// pages/arcade.js - MLEO Arcade/Casino Hub
+// pages/arcade.js - MLEO Arcade/Gaming Hub
 import { useState, useEffect } from "react";
 import Layout from "../components/Layout";
 import Link from "next/link";
@@ -106,7 +106,7 @@ function GameCard({ title, emoji, description, prize, href, color, freePlayStatu
             </div>
             <div>
               <h3 className="font-bold text-lg mb-2">How to Play</h3>
-              <p className="text-zinc-300">Click "PLAY NOW" to start the game. Each round costs 1,000 MLEO or more depending on your bet. Win multipliers and prizes based on the game outcome!</p>
+              <p className="text-zinc-300">Click "PLAY NOW" to start the game. Each round costs 1,000 MLEO or more depending on your play amount. Win multipliers and prizes based on the game outcome!</p>
             </div>
           </div>
         </Modal>
@@ -311,7 +311,7 @@ export default function ArcadeHub() {
     {
       title: "Blackjack",
       emoji: "♠️",
-      description: "Beat the dealer to 21! Classic card game with emoji cards.",
+      description: "Beat the opponent to 21! Classic card game with emoji cards.",
       prize: "×2",
       href: "/blackjack",
       color: "#10B981",
@@ -338,7 +338,7 @@ export default function ArcadeHub() {
     {
       title: "Three Card Poker",
       emoji: "♦️",
-      description: "Fast poker! 3 cards vs dealer - best hand wins with instant results.",
+      description: "Fast poker! 3 cards vs opponent - best hand wins with instant results.",
       prize: "×100",
       href: "/three-card-poker",
       color: "#EC4899",
@@ -347,7 +347,7 @@ export default function ArcadeHub() {
     {
       title: "Ultimate Poker",
       emoji: "🃏",
-      description: "Texas Hold'em strategy! Raise 4X, 2X, or 1X at different stages. Beat the dealer!",
+      description: "Texas Hold'em strategy! Raise 4X, 2X, or 1X at different stages. Beat the opponent!",
       prize: "×500",
       href: "/ultimate-poker",
       color: "#6366F1",
@@ -383,7 +383,7 @@ export default function ArcadeHub() {
     {
       title: "Mystery Box",
       emoji: "🎁",
-      description: "Choose 1 box from 10! Find the jackpot or walk away empty!",
+      description: "Choose 1 box from 10! Find the grand prize or walk away empty!",
       prize: "×4",
       href: "/mystery",
       color: "#F59E0B",
@@ -401,7 +401,7 @@ export default function ArcadeHub() {
     {
       title: "Horse Racing",
       emoji: "🏇",
-      description: "Bet on your favorite horse! Watch them race and win big!",
+      description: "Choose your favorite horse! Watch them race and win big!",
       prize: "×3.6",
       href: "/horse",
       color: "#16A34A",
@@ -419,7 +419,7 @@ export default function ArcadeHub() {
     {
       title: "Sic Bo",
       emoji: "🀄",
-      description: "Ancient Chinese dice game! Bet on totals, triples, and more!",
+      description: "Ancient Chinese dice game! Choose totals, triples, and more!",
       prize: "×50",
       href: "/sicbo",
       color: "#B91C1C",
@@ -428,7 +428,7 @@ export default function ArcadeHub() {
     {
       title: "Gold Rush Digger",
       emoji: "⛏️",
-      description: "Dig a 5×5 treasure map! Find gems and jackpots - avoid 6 skulls!",
+      description: "Dig a 5×5 treasure map! Find gems and grand prizes - avoid 6 skulls!",
       prize: "×61",
       href: "/goldrush",
       color: "#D97706",
@@ -455,7 +455,7 @@ export default function ArcadeHub() {
     {
       title: "Roulette",
       emoji: "🔴",
-      description: "Spin the wheel and win big! Classic casino wheel game with multiple betting options.",
+      description: "Spin the wheel and win big! Classic wheel game with multiple play options.",
       prize: "×36",
       href: "/roulette",
       color: "#7C3AED",
@@ -472,7 +472,7 @@ export default function ArcadeHub() {
     {
       title: "Slots Upgraded",
       emoji: "💰",
-      description: "5-reel mega slots! Match symbols for huge wins - 💎×500 jackpot!",
+      description: "5-reel mega slots! Match symbols for huge wins - 💎×500 grand prize!",
       prize: "×500",
       href: "/slots-upgraded",
       color: "#FBBF24",
@@ -480,7 +480,7 @@ export default function ArcadeHub() {
     {
       title: "Mega Wheel",
       emoji: "🎡",
-      description: "40 segments of fortune! Spin for prizes up to ×8 jackpot!",
+      description: "40 segments of fortune! Spin for prizes up to ×8 grand prize!",
       prize: "×8",
       href: "/mega-wheel",
       color: "#A855F7",
@@ -496,7 +496,7 @@ export default function ArcadeHub() {
     {
       title: "Craps",
       emoji: "🎲",
-      description: "Roll the dice and win big! Classic casino dice game with multiple betting options.",
+      description: "Roll the dice and win big! Classic dice game with multiple play options.",
       prize: "×31",
       href: "/craps",
       color: "#16A34A",
@@ -504,7 +504,7 @@ export default function ArcadeHub() {
     {
       title: "Baccarat",
       emoji: "♥️",
-      description: "Bet on Player, Banker, or Tie! Classic card game with simple rules.",
+      description: "Choose Player, Banker, or Tie! Classic card game with simple rules.",
       prize: "×8",
       href: "/baccarat",
       color: "#9333EA",
@@ -522,7 +522,7 @@ export default function ArcadeHub() {
     {
       title: "Crash2",
       emoji: "📈",
-      description: "Watch the multiplier grow! Cash out before it crashes to win your bet times the multiplier!",
+      description: "Watch the multiplier grow! Cash out before it crashes to win your play amount times the multiplier!",
       prize: "×10",
       href: "/crash2",
       color: "#EF4444",
@@ -638,7 +638,7 @@ export default function ArcadeHub() {
                 <h3 className="text-xl font-bold text-yellow-300 mb-2">Important Information</h3>
                 <ul className="text-sm text-white/90 space-y-2">
                   <li>• <strong>🎁 Free Play:</strong> Earn 1 free play token every hour (max 5 tokens). Use tokens on any game without spending MLEO!</li>
-                  <li>• <strong>Minimum Bet:</strong> Each game has a minimum bet of 1,000 MLEO (some games allow higher bets)</li>
+                  <li>• <strong>Minimum Play:</strong> Each game has a minimum play amount of 1,000 MLEO (some games allow higher play amounts)</li>
                   <li>• <strong>Source:</strong> MLEO is deducted from your vault when you play (not for free plays)</li>
                   <li>• <strong>Prizes:</strong> All winnings are automatically added back to your vault (including free play wins!)</li>
                   <li>• <strong>Game Info:</strong> Click the ℹ️ button on each game card to learn how to play and see prize details</li>
@@ -653,7 +653,7 @@ export default function ArcadeHub() {
           <div className="max-w-4xl mx-auto rounded-2xl bg-black/30 border border-white/10 p-8 text-center">
             <h3 className="text-2xl font-bold mb-4">🏆 Play Responsibly</h3>
             <p className="text-white/80 max-w-2xl mx-auto">
-              These are mini-games for entertainment. The house edge is balanced to provide fair gameplay.
+              These are mini-games for entertainment. The game balance is set to provide fair gameplay.
               Remember: you're using in-game MLEO tokens that you've earned from the main games.
               Have fun and good luck!
             </p>

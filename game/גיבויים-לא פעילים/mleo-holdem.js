@@ -55,7 +55,7 @@ const uniqDesc = (rs)=>{ const set=new Set(); const out=[]; for(const x of rs){ 
 const straightTop = (desc)=>{ const arr=[...desc]; if(arr.includes(14)) arr.push(1); let run=[arr[0]]; for(let i=1;i<arr.length;i++){ const p=arr[i-1],cur=arr[i]; if(cur===p)continue; if(cur===p-1) run.push(cur); else run=[cur]; if(run.length>=5){ const slice=run.slice(-5); return slice.includes(14)&&slice.includes(5)?5:Math.max(...slice);} } return null; };
 const findFlush = (c)=>{ const m=new Map(); for(const x of c){ const a=m.get(x.s)||[]; a.push(x); m.set(x.s,a);} for(const v of m.values()) if(v.length>=5) return v.sort((a,b)=>b.r-a.r).slice(0,5); return null; };
 const pickStraight = (cards)=>{ const u=uniqDesc(cards.map(c=>c.r)); const top=straightTop(u); if(!top) return null; const need=[]; const seq=(top===5)?[5,4,3,2,14]:[top,top-1,top-2,top-3,top-4]; for(const r of seq){ const pick=cards.find(c=>c.r===r&&!need.includes(c)); if(!pick) return null; need.push(pick);} return need.sort((a,b)=>b.r-a.r); };
-const tupleName = {9:'Straight Flush',8:'Four of a Kind',7:'Full House',6:'Flush',5:'Straight',4:'Three of a Kind',3:'Two Pair',2:'Pair',1:'High Card'};
+const tupleName = {9:'Straight Flush',8:'Four of a Kind',7:'Full Platform',6:'Flush',5:'Straight',4:'Three of a Kind',3:'Two Pair',2:'Pair',1:'High Card'};
 
 function handTuple(best5){
   if(!best5||best5.length!==5) return [0];
@@ -125,7 +125,7 @@ export default function HoldemPage(){
   const [game,setGame]=useState(null);
   const [me,setMe]=useState(null);
 
-  // Betting
+  // Playing
   const [raiseTo,setRaiseTo]=useState(null);
   const [actionTimer,setActionTimer]=useState(null);
   const [timeLeft,setTimeLeft]=useState(0);
@@ -187,7 +187,7 @@ export default function HoldemPage(){
     let seat=-1; for(let i=0;i<table.max_players;i++){ if(!occ.has(i)){ seat=i; break; } }
     if(seat===-1){ setError("אין כיסאות פנויים"); return; }
 
-    // deduct buy-in locally
+    // deduct entry fee locally
     const newV = vault - table.min_buyin; setVault(newV); setVaultState(newV);
 
     // insert player
@@ -277,7 +277,7 @@ export default function HoldemPage(){
       table_id: currentTableId, status: GAME_STATUS.PLAYING, deck,
       round: "preflop", dealer_index: dealerSeat,
       current_player_index: firstToActIdx, last_raiser_index: bigBlindIdx,
-      pot: 0, current_bet: 0, last_raise_to: 0, community_cards: [], community_visible: 0,
+      prizePool: 0, current_bet: 0, last_raise_to: 0, community_cards: [], community_visible: 0,
       turn_deadline: new Date(Date.now()+BETTING_TIME_LIMIT).toISOString()
     }).select().single();
     if(ge){ console.error(ge); setError(ge.message); return; }
@@ -312,10 +312,10 @@ export default function HoldemPage(){
         hole_cards:p.hole_cards, current_bet:p.current_bet, status:p.status, game_id:g.id, revealed:p.revealed, chips:p.chips, hand_invested:p.hand_invested
       }).eq("id",p.id);
     }
-    const pot = upd.reduce((s,p)=>s+(p.current_bet||0),0);
+    const prizePool = upd.reduce((s,p)=>s+(p.current_bet||0),0);
     const currentBet = Math.max(...upd.map(p=>p.current_bet||0),0);
     await supabase.from("casino_games").update({
-      pot, current_bet: currentBet, last_raise_to: currentBet, current_player_index: firstToActIdx, last_raiser_index: bigBlindIdx
+      prizePool, current_bet: currentBet, last_raise_to: currentBet, current_player_index: firstToActIdx, last_raiser_index: bigBlindIdx
     }).eq("id",g.id);
 
     setCurrentGameId(g.id);
@@ -410,23 +410,23 @@ export default function HoldemPage(){
   }
 
   async function nextTurnOrStreet(gNow, playersNow){
-    const pot = playersNow.reduce((s,p)=>s+(p.current_bet||0),0);
+    const prizePool = playersNow.reduce((s,p)=>s+(p.current_bet||0),0);
     const currentBet = Math.max(...playersNow.map(p=>p.current_bet||0),0);
 
     const canAct = (p)=>p.status!==PLAYER_STATUS.FOLDED && p.status!==PLAYER_STATUS.ALL_IN;
     const stillIn = playersNow.filter(p=>p.status!==PLAYER_STATUS.FOLDED);
-    // single player => award entire pot
+    // single player => award entire prizePool
     if(stillIn.length===1){
       const w = stillIn[0];
-      // give pot to winner
-      await supabase.from("casino_players").update({ chips:(w.chips||0)+pot }).eq("id",w.id);
+      // give prizePool to winner
+      await supabase.from("casino_players").update({ chips:(w.chips||0)+prizePool }).eq("id",w.id);
       await supabase.from("casino_players").update({ current_bet:0, hand_invested:0 }).eq("game_id",gNow.id);
-      await supabase.from("casino_games").update({ pot:0, current_bet:0, status:GAME_STATUS.FINISHED, round:"showdown", community_visible:5 }).eq("id",gNow.id);
+      await supabase.from("casino_games").update({ prizePool:0, current_bet:0, status:GAME_STATUS.FINISHED, round:"showdown", community_visible:5 }).eq("id",gNow.id);
       setTimeout(()=>startNextHand(), 2500);
       return;
     }
 
-    // determine if betting round complete
+    // determine if playing round complete
     const everyoneMatched = playersNow.filter(p=>p.status!==PLAYER_STATUS.FOLDED).every(p => p.status===PLAYER_STATUS.ALL_IN || (p.current_bet||0)===currentBet);
     let nextIdx = (gNow.current_player_index + 1) % playersNow.length;
     while(playersNow[nextIdx] && !canAct(playersNow[nextIdx])){
@@ -437,7 +437,7 @@ export default function HoldemPage(){
 
     if(!bettingDone){
       await supabase.from("casino_games").update({
-        pot, current_bet:currentBet, current_player_index:nextIdx,
+        prizePool, current_bet:currentBet, current_player_index:nextIdx,
         turn_deadline: new Date(Date.now()+BETTING_TIME_LIMIT).toISOString()
       }).eq("id",gNow.id);
       return;
@@ -462,13 +462,13 @@ export default function HoldemPage(){
     const startIdx = firstToActIndex(playersSorted, gNow.dealer_index);
 
     await supabase.from("casino_games").update({
-      pot, current_bet:0, last_raise_to:0, last_raiser_index:startIdx,
+      prizePool, current_bet:0, last_raise_to:0, last_raiser_index:startIdx,
       round: nextRound, community_cards: board, community_visible: Math.min(5, board.length),
       current_player_index: startIdx,
       turn_deadline: new Date(Date.now()+BETTING_TIME_LIMIT).toISOString()
     }).eq("id",gNow.id);
 
-    // If showdown -> pick winners (simple main pot)
+    // If showdown -> pick winners (simple main prizePool)
     if(nextRound==="showdown"){
       const board5 = (board||[]).slice(0,5);
       const ranked = playersNow.filter(p=>p.status!==PLAYER_STATUS.FOLDED).map(p=>{
@@ -478,10 +478,10 @@ export default function HoldemPage(){
       }).sort((a,b)=> compareTuple(b.score,a.score));
       const best = ranked[0].score;
       const winners = ranked.filter(r=> compareTuple(r.score,best)===0).map(r=>r.p);
-      const share = Math.floor(pot / winners.length);
+      const share = Math.floor(prizePool / winners.length);
       for(const w of winners){ await supabase.from("casino_players").update({ chips:(w.chips||0)+share }).eq("id",w.id); }
       await supabase.from("casino_players").update({ current_bet:0, hand_invested:0 }).eq("game_id",gNow.id);
-      await supabase.from("casino_games").update({ pot:0, current_bet:0, status:GAME_STATUS.FINISHED, community_visible:5 }).eq("id",gNow.id);
+      await supabase.from("casino_games").update({ prizePool:0, current_bet:0, status:GAME_STATUS.FINISHED, community_visible:5 }).eq("id",gNow.id);
       setTimeout(()=>startNextHand(), 3000);
     }
   }
@@ -529,11 +529,11 @@ export default function HoldemPage(){
     }).eq("id",bb.id);
 
     const { data:ps2 } = await supabase.from("casino_players").select("*").eq("game_id",g.id);
-    const pot = (ps2||[]).reduce((s,p)=>s+(p.current_bet||0),0);
+    const prizePool = (ps2||[]).reduce((s,p)=>s+(p.current_bet||0),0);
     const currentBet = Math.max(...(ps2||[]).map(p=>p.current_bet||0),0);
 
     await supabase.from("casino_games").update({
-      status:GAME_STATUS.PLAYING, deck, pot, current_bet: currentBet, last_raise_to: currentBet,
+      status:GAME_STATUS.PLAYING, deck, prizePool, current_bet: currentBet, last_raise_to: currentBet,
       round:"preflop", community_cards:[], community_visible:0, dealer_index:dealerSeat,
       last_raiser_index: bigBlindIdx, current_player_index: firstToActIdx,
       turn_deadline: new Date(Date.now()+BETTING_TIME_LIMIT).toISOString()
@@ -651,7 +651,7 @@ export default function HoldemPage(){
           <div className="flex items-center justify-between mb-3">
             <div>
               <div className="text-white text-2xl font-extrabold">🃏 {selectedTable?.name}</div>
-              <div className="text-white/70 text-sm">Round: {game?.round} • Pot: {fmt(game?.pot||0)} MLEO</div>
+              <div className="text-white/70 text-sm">Round: {game?.round} • Prize Pool: {fmt(game?.prizePool||0)} MLEO</div>
             </div>
             <button onClick={leaveTable} className="px-4 py-2 rounded-lg bg-red-600 text-white font-bold">Leave Table</button>
           </div>
@@ -675,7 +675,7 @@ export default function HoldemPage(){
                   <div key={p.id} className={`p-3 rounded-lg border-2 ${cur?'border-yellow-400 bg-yellow-400/20': isMe?'border-purple-400 bg-purple-400/20':'border-white/20 bg-white/5'}`}>
                     <div className="text-white text-sm font-bold">{p.player_name}{isMe?' (You)':''}{cur?' 👑':''}</div>
                     <div className="text-emerald-300 text-xs">{fmt(p.chips)} chips</div>
-                    {p.current_bet>0 && <div className="text-amber-300 text-xs">Bet: {fmt(p.current_bet)}</div>}
+                    {p.current_bet>0 && <div className="text-amber-300 text-xs">Play: {fmt(p.current_bet)}</div>}
                     {isMe && p.hole_cards && <div className="flex gap-1 mt-1 justify-center">{p.hole_cards.map((c,i)=><Card key={i} card={c}/>)}</div>}
                     {p.status===PLAYER_STATUS.FOLDED && <div className="text-red-400 text-xs mt-1">FOLDED</div>}
                     {p.status===PLAYER_STATUS.ALL_IN && <div className="text-orange-400 text-xs mt-1">ALL IN</div>}

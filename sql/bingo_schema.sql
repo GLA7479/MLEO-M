@@ -119,7 +119,7 @@ for insert with check (true);
 -- ---------- Claim function (atomic, prevents double-claim per prize) ----------
 -- Prize distribution (bps):
 --   row1..row5 = 1200 bps each (12%) => 6000 bps
---   full       = 3000 bps (30%)      => 9000 bps total payouts
+--   full       = 3000 bps (30%)      => 9000 bps total prizes
 create or replace function public.bingo_claim_prize(
   p_session_id bigint,
   p_round_id uuid,

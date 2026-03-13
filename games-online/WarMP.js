@@ -370,7 +370,7 @@ export default function WarMP({
         return;
       }
       if (vaultBalance < entryCost) {
-        setMsg(`Minimum buy-in is ${fmt(entryCost)}`);
+        setMsg(`Minimum entry fee is ${fmt(entryCost)}`);
         return;
       }
       let session = ses;
@@ -664,7 +664,7 @@ export default function WarMP({
             "__result__": {
               winner: winnerSeat,
               multiplier,
-              payout: payoutAmount,
+              prize: payoutAmount,
               timestamp,
             },
           },
@@ -958,9 +958,9 @@ export default function WarMP({
     if (mySeat === null) return;
     if (mySeat !== result.winner) return;
     const currentBalance = syncVault();
-    const payout =
-      result.payout ?? (ses?.current?.__entry__ ?? entryCost) * 2 * (result.multiplier || 1);
-    writeVault(currentBalance + payout);
+    const prize =
+      result.prize ?? (ses?.current?.__entry__ ?? entryCost) * 2 * (result.multiplier || 1);
+    writeVault(currentBalance + prize);
     syncVault();
   }, [entryCost, ses?.current?.__entry__, ses?.current?.__result__, ses?.id, mySeat, syncVault]);
 
@@ -1277,8 +1277,8 @@ export default function WarMP({
         <div className="flex items-center gap-3 text-sm text-white/70">
           <span>Stage: {status}</span>
           <span>Vault: {fmt(vaultBalance)}</span>
-          <span>Min buy-in: {fmt(minRequired)}</span>
-          <span>Stake: x{stakeMultiplier}</span>
+          <span>Min entry fee: {fmt(minRequired)}</span>
+          <span>Entry: x{stakeMultiplier}</span>
           <span>
             Cube:{" "}
             {currentDouble.owner == null

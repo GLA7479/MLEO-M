@@ -31,8 +31,8 @@ create table if not exists poker_players (
   player_name text not null,
   seat_index int not null, -- 0-5
   stack_live bigint not null default 2000, -- current chips
-  bet_street bigint not null default 0, -- bet this street
-  total_bet bigint not null default 0, -- total bet this hand
+  bet_street bigint not null default 0, -- play this street
+  total_bet bigint not null default 0, -- total play this hand
   hole_cards jsonb default '[]'::jsonb, -- ["As","Kh"]
   folded boolean not null default false,
   all_in boolean not null default false,
@@ -48,7 +48,7 @@ create table if not exists poker_pots (
   id uuid primary key default gen_random_uuid(),
   session_id uuid references poker_sessions(id) on delete cascade,
   total bigint not null default 0,
-  eligible jsonb default '[]'::jsonb, -- seat indices eligible for this pot
+  eligible jsonb default '[]'::jsonb, -- seat indices eligible for this prizePool
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -58,7 +58,7 @@ create table if not exists poker_actions (
   id bigserial primary key,
   session_id uuid references poker_sessions(id) on delete cascade,
   seat_index int not null,
-  action text not null, -- 'fold'|'check'|'call'|'bet'|'raise'|'allin'|'post_sb'|'post_bb'|'ante'
+  action text not null, -- 'fold'|'check'|'call'|'play'|'raise'|'allin'|'post_sb'|'post_bb'|'ante'
   amount bigint default 0,
   created_at timestamptz default now()
 );

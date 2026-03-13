@@ -20,16 +20,16 @@ ADD COLUMN IF NOT EXISTS last_raise_to integer DEFAULT 0,
 ADD COLUMN IF NOT EXISTS last_raise_size integer DEFAULT 0;
 
 COMMENT ON COLUMN poker.poker_hands.last_raise_to IS 
-'Total bet amount of the last raise in current street';
+'Total play amount of the last raise in current street';
 COMMENT ON COLUMN poker.poker_hands.last_raise_size IS 
 'Size of the last raise delta for min-raise calculation';
 
--- Add contrib_total to poker_hand_players for side-pot calculation
+-- Add contrib_total to poker_hand_players for side-prizePool calculation
 ALTER TABLE poker.poker_hand_players
 ADD COLUMN IF NOT EXISTS contrib_total integer DEFAULT 0;
 
 COMMENT ON COLUMN poker.poker_hand_players.contrib_total IS 
-'Total contribution to pot across all streets (for side-pot calculation)';
+'Total contribution to prizePool across all streets (for side-prizePool calculation)';
 
 -- Add win_amount to track winnings
 ALTER TABLE poker.poker_hand_players
@@ -38,7 +38,7 @@ ADD COLUMN IF NOT EXISTS win_amount integer DEFAULT 0;
 COMMENT ON COLUMN poker.poker_hand_players.win_amount IS 
 'Amount won by this player in this hand (from all pots)';
 
--- Create poker_pots table for side-pot tracking
+-- Create poker_pots table for side-prizePool tracking
 CREATE TABLE IF NOT EXISTS poker.poker_pots (
   id bigserial PRIMARY KEY,
   hand_id bigint NOT NULL REFERENCES poker.poker_hands(id) ON DELETE CASCADE,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS poker.poker_pots (
 );
 
 COMMENT ON TABLE poker.poker_pots IS 
-'Side pots for all-in scenarios - each pot has eligible members';
+'Side pots for all-in scenarios - each prizePool has eligible members';
 
 -- Create poker_pot_members table
 CREATE TABLE IF NOT EXISTS poker.poker_pot_members (
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS poker.poker_pot_members (
 );
 
 COMMENT ON TABLE poker.poker_pot_members IS 
-'Members eligible for each pot - used for side-pot distribution';
+'Members eligible for each prizePool - used for side-prizePool distribution';
 
 -- Create index for faster lookups
 CREATE INDEX IF NOT EXISTS idx_poker_pots_hand_id ON poker.poker_pots(hand_id);

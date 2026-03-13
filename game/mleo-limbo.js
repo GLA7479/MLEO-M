@@ -47,8 +47,8 @@ function useIOSViewportFix() {
 // CONFIG
 // ============================================================================
 const LS_KEY = "mleo_limbo_v2";
-const MIN_BET = 1000;
-const HOUSE_EDGE = 0.01; // House edge 1% - RTP 99%
+const MIN_PLAY = 1000;
+const GAME_BALANCE = 0.01; // Game balance 1% - RTP 99%
 
 // On-chain Claim Config
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
@@ -109,7 +109,7 @@ function fmt(n) {
   return Math.floor(n).toString();
 }
 
-function formatBetDisplay(n) {
+function formatPlayDisplay(n) {
   const num = Number(n) || 0;
   if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M";
   if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K";
@@ -123,13 +123,13 @@ function shortAddr(addr) {
 
 // Calculate win chance based on target multiplier
 function calculateWinChance(targetMultiplier) {
-  return ((1 - HOUSE_EDGE) / targetMultiplier) * 100;
+  return ((1 - GAME_BALANCE) / targetMultiplier) * 100;
 }
 
 // Generate random result
 function generateResult() {
   const random = Math.random();
-  const result = (1 - HOUSE_EDGE) / random;
+  const result = (1 - GAME_BALANCE) / random;
   return Math.min(result, 1000); // Cap at 1000x
 }
 
@@ -158,8 +158,8 @@ export default function LimboPage() {
   // State
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
-  const [betAmount, setBetAmount] = useState("1000");
-  const [isEditingBet, setIsEditingBet] = useState(false);
+  const [playAmount, setPlayAmount] = useState("1000");
+  const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [targetMultiplier, setTargetMultiplier] = useState(2);
   const [rolling, setRolling] = useState(false);
   const [result, setResult] = useState(null);
@@ -189,11 +189,11 @@ export default function LimboPage() {
       totalGames: 0,
       wins: 0,
       losses: 0,
-      totalBet: 0,
+      totalPlay: 0,
       totalWon: 0,
       biggestWin: 0,
       highestMultiplier: 0,
-      lastBet: MIN_BET
+      lastPlay: MIN_PLAY
     })
   );
 
@@ -217,9 +217,9 @@ export default function LimboPage() {
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
 
-    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
-    if (savedStats.lastBet) {
-      setBetAmount(String(savedStats.lastBet));
+    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
+    if (savedStats.lastPlay) {
+      setPlayAmount(String(savedStats.lastPlay));
     }
 
     const interval = setInterval(() => {
@@ -375,12 +375,12 @@ export default function LimboPage() {
     playSfx(clickSound.current);
 
     const currentVault = getVault();
-    let bet = Number(betAmount) || MIN_BET;
+    let play = Number(playAmount) || MIN_PLAY;
 
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
       if (result.success) {
-        bet = result.amount;
+        play = result.amount;
         setIsFreePlay(false);
         router.replace('/limbo', undefined, { shallow: true });
       } else {
@@ -389,17 +389,17 @@ export default function LimboPage() {
         return;
       }
     } else {
-      if (bet < MIN_BET) {
-        alert(`Minimum bet is ${MIN_BET} MLEO`);
+      if (play < MIN_PLAY) {
+        alert(`Minimum play is ${MIN_PLAY} MLEO`);
         return;
       }
-      if (currentVault < bet) {
+      if (currentVault < play) {
         alert('Insufficient MLEO in vault');
         return;
       }
 
-      setVault(currentVault - bet);
-      setVaultState(currentVault - bet);
+      setVault(currentVault - play);
+      setVaultState(currentVault - play);
     }
 
     setRolling(true);
@@ -417,14 +417,14 @@ export default function LimboPage() {
         const finalResult = generateResult();
         setResult(finalResult.toFixed(2));
         setRolling(false);
-        checkWin(finalResult, bet);
+        checkWin(finalResult, play);
       }
     }, 50);
   };
 
-  const checkWin = (finalResult, bet) => {
+  const checkWin = (finalResult, play) => {
     const won = finalResult >= targetMultiplier;
-    const prize = won ? Math.floor(bet * targetMultiplier) : 0;
+    const prize = won ? Math.floor(play * targetMultiplier) : 0;
 
     if (won && prize > 0) {
       const newVault = getVault() + prize;
@@ -438,7 +438,7 @@ export default function LimboPage() {
       result: finalResult,
       target: targetMultiplier,
       prize: prize,
-      profit: won ? prize - bet : -bet
+      profit: won ? prize - play : -play
     };
 
     setGameResult(resultData);
@@ -448,11 +448,11 @@ export default function LimboPage() {
       totalGames: stats.totalGames + 1,
       wins: won ? stats.wins + 1 : stats.wins,
       losses: won ? stats.losses : stats.losses + 1,
-      totalBet: stats.totalBet + bet,
+      totalPlay: stats.totalPlay + play,
       totalWon: won ? stats.totalWon + prize : stats.totalWon,
       biggestWin: Math.max(stats.biggestWin, won ? prize : 0),
       highestMultiplier: Math.max(stats.highestMultiplier, finalResult),
-      lastBet: bet
+      lastPlay: play
     };
     setStats(newStats);
   };
@@ -471,7 +471,7 @@ export default function LimboPage() {
   }
 
   const winChance = calculateWinChance(targetMultiplier);
-  const potentialWin = Math.floor(Number(betAmount) * targetMultiplier);
+  const potentialWin = Math.floor(Number(playAmount) * targetMultiplier);
 
   return (
     <Layout>
@@ -577,9 +577,9 @@ export default function LimboPage() {
               </div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
-              <div className="text-[10px] text-white/60">Bet</div>
+              <div className="text-[10px] text-white/60">Play</div>
               <div className="text-sm font-bold text-amber-400">
-                {fmt(Number(betAmount))}
+                {fmt(Number(playAmount))}
               </div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
@@ -634,7 +634,7 @@ export default function LimboPage() {
             </div>
               <div className="grid grid-cols-2 gap-2 text-xs text-white/60 bg-black/20 rounded-lg p-2">
                 <div>Win Chance: {winChance.toFixed(2)}%</div>
-                <div className="text-right">Payout: ×{targetMultiplier.toFixed(2)}</div>
+                <div className="text-right">Prize: ×{targetMultiplier.toFixed(2)}</div>
               </div>
             </div>
           </div>
@@ -642,9 +642,9 @@ export default function LimboPage() {
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
             <button
               onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                const newBet = current === MIN_BET ? Math.min(vault, 1000) : Math.min(vault, current + 1000);
-                setBetAmount(String(newBet));
+                const current = Number(playAmount) || MIN_PLAY;
+                const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000);
+                setPlayAmount(String(newBet));
                 playSfx(clickSound.current);
               }}
               disabled={rolling}
@@ -654,9 +654,9 @@ export default function LimboPage() {
             </button>
             <button
               onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                const newBet = current === MIN_BET ? Math.min(vault, 10000) : Math.min(vault, current + 10000);
-                setBetAmount(String(newBet));
+                const current = Number(playAmount) || MIN_PLAY;
+                const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000);
+                setPlayAmount(String(newBet));
                 playSfx(clickSound.current);
               }}
               disabled={rolling}
@@ -666,9 +666,9 @@ export default function LimboPage() {
             </button>
             <button
               onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                const newBet = current === MIN_BET ? Math.min(vault, 100000) : Math.min(vault, current + 100000);
-                setBetAmount(String(newBet));
+                const current = Number(playAmount) || MIN_PLAY;
+                const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000);
+                setPlayAmount(String(newBet));
                 playSfx(clickSound.current);
               }}
               disabled={rolling}
@@ -678,9 +678,9 @@ export default function LimboPage() {
             </button>
             <button
               onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                const newBet = current === MIN_BET ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000);
-                setBetAmount(String(newBet));
+                const current = Number(playAmount) || MIN_PLAY;
+                const newBet = current === MIN_PLAY ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000);
+                setPlayAmount(String(newBet));
                 playSfx(clickSound.current);
               }}
               disabled={rolling}
@@ -690,9 +690,9 @@ export default function LimboPage() {
             </button>
             <button
               onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
-                const newBet = Math.max(MIN_BET, current - 1000);
-                setBetAmount(String(newBet));
+                const current = Number(playAmount) || MIN_PLAY;
+                const newBet = Math.max(MIN_PLAY, current - 1000);
+                setPlayAmount(String(newBet));
                 playSfx(clickSound.current);
               }}
               disabled={rolling}
@@ -703,37 +703,37 @@ export default function LimboPage() {
             <div className="relative">
               <input
                 type="text"
-                value={isEditingBet ? betAmount : formatBetDisplay(betAmount)}
-                onFocus={() => setIsEditingBet(true)}
+                value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)}
+                onFocus={() => setIsEditingPlay(true)}
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^0-9]/g, '');
-                  setBetAmount(val || '0');
+                  setPlayAmount(val || '0');
                 }}
                 onBlur={() => {
-                  setIsEditingBet(false);
-                  const current = Number(betAmount) || MIN_BET;
-                  setBetAmount(String(Math.max(MIN_BET, current)));
+                  setIsEditingPlay(false);
+                  const current = Number(playAmount) || MIN_PLAY;
+                  setPlayAmount(String(Math.max(MIN_PLAY, current)));
                 }}
                 disabled={rolling}
                 className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6"
               />
               <button
                 onClick={() => {
-                  setBetAmount(String(MIN_BET));
+                  setPlayAmount(String(MIN_PLAY));
                   playSfx(clickSound.current);
                 }}
                 disabled={rolling}
                 className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center"
-                title="Reset to minimum bet"
+                title="Reset to minimum play"
               >
                 ↺
               </button>
             </div>
             <button
               onClick={() => {
-                const current = Number(betAmount) || MIN_BET;
+                const current = Number(playAmount) || MIN_PLAY;
                 const newBet = Math.min(vault, current + 1000);
-                setBetAmount(String(newBet));
+                setPlayAmount(String(newBet));
                 playSfx(clickSound.current);
               }}
               disabled={rolling}
@@ -907,9 +907,9 @@ export default function LimboPage() {
               <h2 className="text-2xl font-extrabold mb-4">🔥 How to Play</h2>
               <div className="space-y-3 text-sm">
                 <p><strong>1. Set Target Multiplier:</strong> Choose your target from ×1.01 to ×100</p>
-                <p><strong>2. Set Bet:</strong> Minimum bet is {MIN_BET} MLEO. Use +/- to adjust.</p>
+                <p><strong>2. Set Play:</strong> Minimum play is {MIN_PLAY} MLEO. Use +/- to adjust.</p>
                 <p><strong>3. Roll:</strong> Click "ROLL" to generate a random multiplier</p>
-                <p><strong>4. Win:</strong> If the result is ≥ your target, you win your bet × target multiplier!</p>
+                <p><strong>4. Win:</strong> If the result is ≥ your target, you win your play × target multiplier!</p>
                 <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-lg p-3 mt-4">
                   <p className="text-indigo-300 font-semibold">💰 Prize Range</p>
                   <p className="text-xs text-white/80 mt-1">• <strong>Minimum:</strong> ×1.01</p>
@@ -948,8 +948,8 @@ export default function LimboPage() {
                     </div>
                   </div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
-                    <div className="text-xs text-white/60">Total Bet</div>
-                    <div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div>
+                    <div className="text-xs text-white/60">Total Play</div>
+                    <div className="text-lg font-bold text-amber-400">{fmt(stats.totalPlay)}</div>
                   </div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
                     <div className="text-xs text-white/60">Total Won</div>
@@ -961,8 +961,8 @@ export default function LimboPage() {
                   </div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
                     <div className="text-xs text-white/60">Net Profit</div>
-                    <div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {fmt(stats.totalWon - stats.totalBet)}
+                    <div className={`text-lg font-bold ${stats.totalWon - stats.totalPlay >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {fmt(stats.totalWon - stats.totalPlay)}
                     </div>
                   </div>
                 </div>

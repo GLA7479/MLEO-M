@@ -8,8 +8,8 @@ create table if not exists roulette_sessions (
   id uuid primary key default gen_random_uuid(),
   room_id uuid references arcade_rooms(id) on delete cascade,
   spin_number int not null default 0,
-  stage text not null default 'lobby', -- lobby|betting|spinning|results|finished
-  betting_deadline timestamptz, -- when betting closes
+  stage text not null default 'lobby', -- lobby|playing|spinning|results|finished
+  betting_deadline timestamptz, -- when playing closes
   spin_result int, -- 0-36 (null if not spun yet)
   spin_color text, -- 'red'|'black'|'green' (for 0)
   total_bets bigint not null default 0,
@@ -25,7 +25,7 @@ create table if not exists roulette_players (
   player_name text not null,
   client_id uuid not null,
   balance bigint not null default 0, -- current balance in this session
-  total_bet bigint not null default 0, -- total bet this round
+  total_bet bigint not null default 0, -- total play this round
   total_won bigint not null default 0, -- total won this round
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
@@ -33,7 +33,7 @@ create table if not exists roulette_players (
   unique(session_id, player_name)
 );
 
--- === Roulette Bets Table ===
+-- === Roulette Plays Table ===
 create table if not exists roulette_bets (
   id uuid primary key default gen_random_uuid(),
   session_id uuid references roulette_sessions(id) on delete cascade,
@@ -41,9 +41,9 @@ create table if not exists roulette_bets (
   bet_type text not null, -- 'number'|'red'|'black'|'even'|'odd'|'low'|'high'|'dozen'|'column'
   bet_value text not null, -- e.g., '17' for number, '1' for first dozen, etc.
   amount bigint not null default 0,
-  payout_multiplier numeric(5,2) not null default 1.0, -- e.g., 35 for single number, 2 for red/black
+  prize_multiplier numeric(5,2) not null default 1.0, -- e.g., 35 for single number, 2 for red/black
   is_winner boolean, -- null = not resolved, true = won, false = lost
-  payout_amount bigint, -- calculated payout
+  prize_amount bigint, -- calculated prize
   created_at timestamptz default now()
 );
 

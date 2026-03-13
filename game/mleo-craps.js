@@ -1,6 +1,6 @@
 // ============================================================================
 // MLEO Craps - Full-Screen Game Template
-// Classic dice game with multiple betting options
+// Classic dice game with multiple playing options
 // ============================================================================
 
 import { useEffect, useRef, useState } from "react";
@@ -40,7 +40,7 @@ function useIOSViewportFix() {
 }
 
 const LS_KEY = "mleo_craps_v2";
-const MIN_BET = 1000;
+const MIN_PLAY = 1000;
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -65,7 +65,7 @@ function fmt(n) {
   if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
   return Math.floor(n).toString();
 }
-function formatBetDisplay(n) {
+function formatPlayDisplay(n) {
   const num = Number(n) || 0;
   if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M";
   if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K";
@@ -76,11 +76,11 @@ function shortAddr(addr) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
-const BET_TYPES = {
-  pass: { name: "Pass Line", payout: 2 },
-  dont_pass: { name: "Don't Pass", payout: 2 },
-  seven: { name: "Any 7", payout: 5 },
-  craps: { name: "Any Craps", payout: 8 },
+const PLAY_TYPES = {
+  pass: { name: "Pass Line", prize: 2 },
+  dont_pass: { name: "Don't Pass", prize: 2 },
+  seven: { name: "Any 7", prize: 5 },
+  craps: { name: "Any Craps", prize: 8 },
 };
 
 export default function CrapsPage() {
@@ -102,9 +102,9 @@ export default function CrapsPage() {
 
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
-  const [betAmount, setBetAmount] = useState("1000");
-  const [isEditingBet, setIsEditingBet] = useState(false);
-  const [selectedBet, setSelectedBet] = useState("pass");
+  const [playAmount, setPlayAmount] = useState("1000");
+  const [isEditingPlay, setIsEditingPlay] = useState(false);
+  const [selectedPlay, setSelectedPlay] = useState("pass");
   const [rolling, setRolling] = useState(false);
   const [dice, setDice] = useState([1, 1]);
   const [gameResult, setGameResult] = useState(null);
@@ -124,7 +124,7 @@ export default function CrapsPage() {
   const winSound = useRef(null);
 
   const [stats, setStats] = useState(() =>
-    safeRead(LS_KEY, { totalGames: 0, wins: 0, losses: 0, totalBet: 0, totalWon: 0, biggestWin: 0, sevens: 0, lastBet: MIN_BET })
+    safeRead(LS_KEY, { totalGames: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, sevens: 0, lastPlay: MIN_PLAY })
   );
 
   const playSfx = (sound) => {
@@ -139,8 +139,8 @@ export default function CrapsPage() {
     setIsFreePlay(isFree);
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
-    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
-    if (savedStats.lastBet) setBetAmount(String(savedStats.lastBet));
+    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
+    if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
     const interval = setInterval(() => {
       const status = getFreePlayStatus();
       setFreePlayTokens(status.tokens);
@@ -206,11 +206,11 @@ export default function CrapsPage() {
     if (rolling) return;
     playSfx(clickSound.current);
     const currentVault = getVault();
-    let bet = Number(betAmount) || MIN_BET;
+    let play = Number(playAmount) || MIN_PLAY;
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
       if (result.success) {
-        bet = result.amount;
+        play = result.amount;
         setIsFreePlay(false);
         router.replace('/craps', undefined, { shallow: true });
       } else {
@@ -219,12 +219,12 @@ export default function CrapsPage() {
         return;
       }
     } else {
-      if (bet < MIN_BET) { alert(`Minimum bet is ${MIN_BET} MLEO`); return; }
-      if (currentVault < bet) { alert('Insufficient MLEO in vault'); return; }
-      setVault(currentVault - bet);
-      setVaultState(currentVault - bet);
+      if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
+      if (currentVault < play) { alert('Insufficient MLEO in vault'); return; }
+      setVault(currentVault - play);
+      setVaultState(currentVault - play);
     }
-    setBetAmount(String(bet));
+    setPlayAmount(String(play));
     setRolling(true);
     setGameResult(null);
     let rollCount = 0;
@@ -236,21 +236,21 @@ export default function CrapsPage() {
         const finalDice = [Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1];
         setDice(finalDice);
         setRolling(false);
-        checkResult(finalDice, bet);
+        checkResult(finalDice, play);
       }
     }, 100);
   };
 
-  const checkResult = (finalDice, bet) => {
+  const checkResult = (finalDice, play) => {
     const sum = finalDice[0] + finalDice[1];
-    const betType = BET_TYPES[selectedBet];
+    const playType = PLAY_TYPES[selectedPlay];
     let win = false;
-    if (selectedBet === 'pass') win = [7, 11].includes(sum);
-    else if (selectedBet === 'dont_pass') win = [2, 3, 12].includes(sum);
-    else if (selectedBet === 'seven') win = sum === 7;
-    else if (selectedBet === 'craps') win = [2, 3, 12].includes(sum);
+    if (selectedPlay === 'pass') win = [7, 11].includes(sum);
+    else if (selectedPlay === 'dont_pass') win = [2, 3, 12].includes(sum);
+    else if (selectedPlay === 'seven') win = sum === 7;
+    else if (selectedPlay === 'craps') win = [2, 3, 12].includes(sum);
 
-    const prize = win ? bet * betType.payout : 0;
+    const prize = win ? play * playType.prize : 0;
     if (win && prize > 0) {
       const newVault = getVault() + prize;
       setVault(newVault);
@@ -259,17 +259,17 @@ export default function CrapsPage() {
     }
 
     const resultData = {
-      win, dice: finalDice, sum, betType: betType.name, payout: betType.payout,
-      prize, profit: win ? prize - bet : -bet, seven: sum === 7
+      win, dice: finalDice, sum, playType: playType.name, prizeMultiplier: playType.prize,
+      prize, profit: win ? prize - play : -play, seven: sum === 7
     };
     setGameResult(resultData);
 
     const newStats = {
       ...stats, totalGames: stats.totalGames + 1, wins: win ? stats.wins + 1 : stats.wins,
-      losses: win ? stats.losses : stats.losses + 1, totalBet: stats.totalBet + bet,
+      losses: win ? stats.losses : stats.losses + 1, totalPlay: stats.totalPlay + play,
       totalWon: win ? stats.totalWon + prize : stats.totalWon,
       biggestWin: Math.max(stats.biggestWin, win ? prize : 0),
-      sevens: sum === 7 ? stats.sevens + 1 : stats.sevens, lastBet: bet
+      sevens: sum === 7 ? stats.sevens + 1 : stats.sevens, lastPlay: play
     };
     setStats(newStats);
   };
@@ -280,7 +280,7 @@ export default function CrapsPage() {
     return <div className="min-h-screen bg-gradient-to-br from-green-900 via-black to-green-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
   }
 
-  const potentialWin = Math.floor(Number(betAmount) * BET_TYPES[selectedBet].payout);
+  const potentialWin = Math.floor(Number(playAmount) * PLAY_TYPES[selectedPlay].prize);
 
   return (
     <Layout>
@@ -307,7 +307,7 @@ export default function CrapsPage() {
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">🎲 Craps</h1>
-            <p className="text-white/70 text-xs">Classic dice game • Multiple betting options!</p>
+            <p className="text-white/70 text-xs">Classic dice game • Multiple playing options!</p>
           </div>
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
@@ -315,8 +315,8 @@ export default function CrapsPage() {
               <div className="text-sm font-bold text-emerald-400">{fmt(vault)}</div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
-              <div className="text-[10px] text-white/60">Bet</div>
-              <div className="text-sm font-bold text-amber-400">{fmt(Number(betAmount))}</div>
+              <div className="text-[10px] text-white/60">Play</div>
+              <div className="text-sm font-bold text-amber-400">{fmt(Number(playAmount))}</div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">Win</div>
@@ -333,26 +333,26 @@ export default function CrapsPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-2 mt-4 w-full">
-            {Object.entries(BET_TYPES).map(([key, bet]) => (
-              <button key={key} onClick={() => { setSelectedBet(key); playSfx(clickSound.current); }} disabled={rolling}
-                className={`p-2 rounded-lg font-bold text-xs transition-all ${selectedBet === key ? 'bg-gradient-to-r from-green-600 to-green-500 text-white ring-2 ring-green-300' : 'bg-white/10 text-white hover:bg-white/20'} disabled:opacity-50`}>
-                <div>{bet.name}</div><div className="text-yellow-400">×{bet.payout}</div>
+            {Object.entries(PLAY_TYPES).map(([key, play]) => (
+              <button key={key} onClick={() => { setSelectedPlay(key); playSfx(clickSound.current); }} disabled={rolling}
+                className={`p-2 rounded-lg font-bold text-xs transition-all ${selectedPlay === key ? 'bg-gradient-to-r from-green-600 to-green-500 text-white ring-2 ring-green-300' : 'bg-white/10 text-white hover:bg-white/20'} disabled:opacity-50`}>
+                <div>{play.name}</div><div className="text-yellow-400">×{play.prize}</div>
               </button>
             ))}
             </div>
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = Math.max(MIN_PLAY, current - 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={rolling} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
             <div className="relative">
-              <input type="text" value={isEditingBet ? betAmount : formatBetDisplay(betAmount)} onFocus={() => setIsEditingBet(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setBetAmount(val || '0'); }} onBlur={() => { setIsEditingBet(false); const current = Number(betAmount) || MIN_BET; setBetAmount(String(Math.max(MIN_BET, current))); }} disabled={rolling} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
-              <button onClick={() => { setBetAmount(String(MIN_BET)); playSfx(clickSound.current); }} disabled={rolling} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum bet">↺</button>
+              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={rolling} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
+              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); playSfx(clickSound.current); }} disabled={rolling} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
             </div>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = Math.min(vault, current + 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={rolling} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
@@ -371,7 +371,7 @@ export default function CrapsPage() {
               <div className="text-4xl mb-2">{gameResult.seven ? '7️⃣' : gameResult.win ? '🎉' : '😔'}</div>
               <div className="text-2xl font-bold mb-1">{gameResult.win ? 'YOU WIN!' : 'YOU LOSE'}</div>
               <div className="text-lg">{gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div>
-              <div className="text-sm opacity-80 mt-2">{gameResult.betType} • Sum: {gameResult.sum}</div>
+              <div className="text-sm opacity-80 mt-2">{gameResult.playType} • Sum: {gameResult.sum}</div>
             </div>
           </div>
         )}
@@ -392,11 +392,11 @@ export default function CrapsPage() {
             <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
               <h2 className="text-2xl font-extrabold mb-4">🎲 How to Play</h2>
               <div className="space-y-3 text-sm">
-                <p><strong>1. Select Bet:</strong> Choose Pass, Don't Pass, 7, or Craps</p>
-                <p><strong>2. Set Amount:</strong> Min {MIN_BET} MLEO</p>
+                <p><strong>1. Select Play:</strong> Choose Pass, Don't Pass, 7, or Craps</p>
+                <p><strong>2. Set Amount:</strong> Min {MIN_PLAY} MLEO</p>
                 <p><strong>3. Roll:</strong> Click ROLL DICE</p>
                 <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
-                  <p className="text-green-300 font-semibold">Bet Types:</p>
+                  <p className="text-green-300 font-semibold">Play Types:</p>
                   <div className="text-xs text-white/80 mt-2 space-y-1">
                     <p>• Pass Line (7,11): ×2</p>
                     <p>• Don't Pass (2,3,12): ×2</p>
@@ -418,10 +418,10 @@ export default function CrapsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Games</div><div className="text-xl font-bold">{stats.totalGames}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalGames > 0 ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : 0}%</div></div>
-                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Bet</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Play</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalPlay)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div>
-                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalBet)}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalPlay >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalPlay)}</div></div>
                 </div>
                 <div className="bg-gradient-to-r from-green-500/10 to-green-600/10 border border-green-500/30 rounded-lg p-4"><div className="text-sm font-semibold mb-2">7️⃣ Lucky Sevens</div><div className="text-center"><div className="text-3xl font-bold text-green-300">{stats.sevens}</div><div className="text-xs text-white/60 mt-1">Total 7s Rolled</div></div></div>
               </div>

@@ -1,6 +1,6 @@
 // ============================================================================
-// MLEO Ultimate Texas Hold'em - Casino-Style Poker
-// Play against the dealer with strategic raising decisions!
+// MLEO Ultimate Texas Hold'em - Arcade-Style Poker
+// Play against the opponent with strategic raising decisions!
 // ============================================================================
 
 import { useEffect, useRef, useState } from "react";
@@ -37,16 +37,16 @@ function useIOSViewportFix() {
 }
 
 const LS_KEY = "mleo_ultimate_poker_v1";
-const MIN_BET = 1000;
+const MIN_PLAY = 1000;
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 
-// Blind Bonus Payouts (standard Ultimate Texas Hold'em)
+// Blind Bonus Prizes (standard Ultimate Texas Hold'em)
 const BLIND_BONUS = {
   "Royal Flush": 500,
   "Straight Flush": 50,
   "Four of a Kind": 10,
-  "Full House": 3,
+  "Full Platform": 3,
   "Flush": 1.5,
   "Straight": 1
 };
@@ -59,7 +59,7 @@ function safeWrite(key, val) { if (typeof window === "undefined") return; try { 
 function getVault() { const rushData = safeRead("mleo_rush_core_v4", {}); return rushData.vault || 0; }
 function setVault(amount) { const rushData = safeRead("mleo_rush_core_v4", {}); rushData.vault = amount; safeWrite("mleo_rush_core_v4", rushData); }
 function fmt(n) { if (n >= 1e9) return (n / 1e9).toFixed(2) + "B"; if (n >= 1e6) return (n / 1e6).toFixed(2) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(2) + "K"; return Math.floor(n).toString(); }
-function formatBetDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
+function formatPlayDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
 function shortAddr(addr) { if (!addr || addr.length < 10) return addr || ""; return `${addr.slice(0, 6)}...${addr.slice(-4)}`; }
 
 function createDeck() {
@@ -117,11 +117,11 @@ function evaluateHand(cards) {
     return { hand: "Four of a Kind", rank: 8, highCards };
   }
   if (counts[0] === 3 && counts[1] === 2) {
-    // Full House: [trips_value, pair_value]
+    // Full Platform: [trips_value, pair_value]
     const trips = Object.keys(valueCounts).find(v => valueCounts[v] === 3);
     const pair = Object.keys(valueCounts).find(v => valueCounts[v] === 2);
     highCards = [parseInt(trips), parseInt(pair)];
-    return { hand: "Full House", rank: 7, highCards };
+    return { hand: "Full Platform", rank: 7, highCards };
   }
   if (isFlush) {
     highCards = [...values];
@@ -218,11 +218,11 @@ export default function UltimatePokerPage() {
   
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
-  const [betAmount, setBetAmount] = useState("1000");
-  const [isEditingBet, setIsEditingBet] = useState(false);
+  const [playAmount, setPlayAmount] = useState("1000");
+  const [isEditingPlay, setIsEditingPlay] = useState(false);
   
   // Game state
-  const [gameState, setGameState] = useState("betting"); // betting, preflop, flop, river, showdown, finished
+  const [gameState, setGameState] = useState("playing"); // playing, preflop, flop, river, showdown, finished
   const [playerCards, setPlayerCards] = useState([]);
   const [dealerCards, setDealerCards] = useState([]);
   const [communityCards, setCommunityCards] = useState([]);
@@ -230,7 +230,7 @@ export default function UltimatePokerPage() {
   const [dealerHand, setDealerHand] = useState(null);
   const [gameResult, setGameResult] = useState(null);
   
-  // Betting
+  // Playing
   const [anteBet, setAnteBet] = useState(0);
   const [blindBet, setBlindBet] = useState(0);
   const [playBet, setPlayBet] = useState(0);
@@ -254,7 +254,7 @@ export default function UltimatePokerPage() {
   
   // Stats
   const [stats, setStats] = useState(() => safeRead(LS_KEY, { 
-    totalHands: 0, wins: 0, losses: 0, ties: 0, totalBet: 0, totalWon: 0, 
+    totalHands: 0, wins: 0, losses: 0, ties: 0, totalPlay: 0, totalWon: 0, 
     biggestWin: 0, royalFlushes: 0, raise4x: 0, raise2x: 0, raise1x: 0, folds: 0
   }));
 
@@ -287,18 +287,18 @@ export default function UltimatePokerPage() {
   const dealHand = (isFreePlayParam = false) => {
     playSfx(clickSound.current);
     const currentVault = getVault();
-    let bet = Number(betAmount) || MIN_BET;
+    let play = Number(playAmount) || MIN_PLAY;
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
-      if (result.success) { bet = result.amount; setIsFreePlay(false); router.replace('/ultimate-poker', undefined, { shallow: true }); }
+      if (result.success) { play = result.amount; setIsFreePlay(false); router.replace('/ultimate-poker', undefined, { shallow: true }); }
       else { alert('No free play tokens available!'); setIsFreePlay(false); return; }
     } else {
-      if (bet < MIN_BET) { alert(`Minimum bet is ${MIN_BET} MLEO`); return; }
-      if (currentVault < bet * 2) { alert('Insufficient MLEO in vault (need 2x bet for Ante + Blind)'); return; }
-      setVault(currentVault - bet); setVaultState(currentVault - bet);
+      if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
+      if (currentVault < play * 2) { alert('Insufficient MLEO in vault (need 2x play for Ante + Blind)'); return; }
+      setVault(currentVault - play); setVaultState(currentVault - play);
     }
     
-    setAnteBet(bet);
+    setAnteBet(play);
     setBlindBet(0);
     setPlayBet(0);
     setGameResult(null);
@@ -401,7 +401,7 @@ export default function UltimatePokerPage() {
       totalHands: stats.totalHands + 1,
       losses: stats.losses + 1,
       folds: stats.folds + 1,
-      totalBet: stats.totalBet + anteBet + playBet
+      totalPlay: stats.totalPlay + anteBet + playBet
     };
     setStats(newStats);
     setGameResult({ 
@@ -505,9 +505,9 @@ export default function UltimatePokerPage() {
               totalPrize = (anteBet + playBet) * 2;
               win = true;
             } else if (dealerWins) {
-              // Dealer wins on high card comparison - no prize
+              // Opponent wins on high card comparison - no prize
             } else {
-              // Complete tie - all bets push
+              // Complete tie - all plays push
               totalPrize = anteBet + playBet;
               tie = true;
             }
@@ -531,7 +531,7 @@ export default function UltimatePokerPage() {
           wins: win ? stats.wins + 1 : stats.wins,
           losses: (!win && !tie) ? stats.losses + 1 : stats.losses,
           ties: tie ? stats.ties + 1 : stats.ties,
-          totalBet: stats.totalBet + anteBet + blindBet + playBet,
+          totalPlay: stats.totalPlay + anteBet + blindBet + playBet,
           totalWon: stats.totalWon + totalPrize,
           biggestWin: Math.max(stats.biggestWin, profit),
           royalFlushes: playerBest.hand === "Royal Flush" ? stats.royalFlushes + 1 : stats.royalFlushes
@@ -547,7 +547,7 @@ export default function UltimatePokerPage() {
           playerHand: playerBest.hand,
           dealerHand: dealerBest.hand,
           dealerQualifies,
-          message: tie ? "TIE - PUSH" : win ? "YOU WIN!" : "DEALER WINS"
+          message: tie ? "TIE - PUSH" : win ? "YOU WIN!" : "OPPONENT WINS"
         });
         
         setGameState("finished");
@@ -556,7 +556,7 @@ export default function UltimatePokerPage() {
   };
 
   const newHand = () => {
-    setGameState("betting");
+    setGameState("playing");
     setPlayerCards([]);
     setDealerCards([]);
     setCommunityCards([]);
@@ -597,7 +597,7 @@ export default function UltimatePokerPage() {
           <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
             <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
               <button onClick={backSafe} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">BACK</button>
-              {freePlayTokens > 0 && (<button onClick={() => dealHand(true)} disabled={gameState !== "betting"} className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50" title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}><span className="text-base">🎁</span><span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">{freePlayTokens}</span></button>)}
+              {freePlayTokens > 0 && (<button onClick={() => dealHand(true)} disabled={gameState !== "playing"} className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50" title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}><span className="text-base">🎁</span><span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">{freePlayTokens}</span></button>)}
             </div>
             <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
               <button onClick={() => { playSfx(clickSound.current); const el = wrapRef.current || document.documentElement; if (!document.fullscreenElement) { el.requestFullscreen?.().catch(() => {}); } else { document.exitFullscreen?.().catch(() => {}); } }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFullscreen ? "EXIT" : "FULL"}</button>
@@ -609,7 +609,7 @@ export default function UltimatePokerPage() {
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">🃏 Ultimate Texas Hold'em</h1>
-            <p className="text-white/70 text-xs">Strategic poker against the dealer!</p>
+            <p className="text-white/70 text-xs">Strategic poker against the opponent!</p>
           </div>
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
@@ -617,13 +617,13 @@ export default function UltimatePokerPage() {
               <div className="text-sm font-bold text-emerald-400">{fmt(vault)}</div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
-              <div className="text-[10px] text-white/60">Bet</div>
+              <div className="text-[10px] text-white/60">Play</div>
           <div className="text-sm font-bold text-amber-400">
-            {gameState !== "betting" && totalBetAmount > 0 ? fmt(totalBetAmount) : "0"}
+            {gameState !== "playing" && totalBetAmount > 0 ? fmt(totalBetAmount) : "0"}
           </div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
-              <div className="text-[10px] text-white/60">Pot Win</div>
+              <div className="text-[10px] text-white/60">Prize Pool Win</div>
               <div className="text-sm font-bold text-green-400">{fmt(potentialWin)}</div>
             </div>
           </div>
@@ -665,20 +665,20 @@ export default function UltimatePokerPage() {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "betting"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "betting"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "betting"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "betting"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "betting"} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "playing"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "playing"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "playing"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "playing"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.max(MIN_PLAY, current - 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "playing"} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
             <div className="relative">
-              <input type="text" value={isEditingBet ? betAmount : formatBetDisplay(betAmount)} onFocus={() => setIsEditingBet(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setBetAmount(val || '0'); }} onBlur={() => { setIsEditingBet(false); const current = Number(betAmount) || MIN_BET; setBetAmount(String(Math.max(MIN_BET, current))); }} disabled={gameState !== "betting"} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-xs disabled:opacity-50 pr-6" />
-              <button onClick={() => { setBetAmount(String(MIN_BET)); playSfx(clickSound.current); }} disabled={gameState !== "betting"} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum bet">↺</button>
+              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={gameState !== "playing"} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-xs disabled:opacity-50 pr-6" />
+              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); playSfx(clickSound.current); }} disabled={gameState !== "playing"} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
             </div>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "betting"} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "playing"} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            {gameState === "betting" ? (
+            {gameState === "playing" ? (
               <button onClick={() => dealHand(false)} className="w-full h-12 rounded-lg font-bold text-base bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg hover:brightness-110">DEAL</button>
             ) : gameState === "preflop" ? (
               <div className="w-full flex gap-1">
@@ -721,8 +721,8 @@ export default function UltimatePokerPage() {
             <div className={`${gameResult.win ? 'bg-green-500' : gameResult.tie ? 'bg-yellow-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
               <div className="text-4xl mb-2">{gameResult.win ? '🎉' : gameResult.tie ? '🤝' : '😔'}</div>
               <div className="text-2xl font-bold mb-1">{gameResult.message}</div>
-              {!gameResult.fold && <div className="text-lg">{gameResult.win ? `+${fmt(gameResult.profit)} MLEO` : gameResult.tie ? 'All Bets Pushed' : `${fmt(gameResult.profit)} MLEO`}</div>}
-              {!gameResult.fold && <div className="text-sm opacity-80 mt-2">You: {gameResult.playerHand} • Dealer: {gameResult.dealerHand}</div>}
+              {!gameResult.fold && <div className="text-lg">{gameResult.win ? `+${fmt(gameResult.profit)} MLEO` : gameResult.tie ? 'All Plays Pushed' : `${fmt(gameResult.profit)} MLEO`}</div>}
+              {!gameResult.fold && <div className="text-sm opacity-80 mt-2">You: {gameResult.playerHand} • Opponent: {gameResult.dealerHand}</div>}
             </div>
           </div>
         )}
@@ -744,19 +744,19 @@ export default function UltimatePokerPage() {
               <h2 className="text-2xl font-extrabold mb-4">🃏 How to Play</h2>
               <div className="space-y-3 text-sm">
                 <p><strong>Game Flow:</strong></p>
-                <p>1. <strong>Ante + Blind:</strong> Place equal bets (2x total)</p>
-                <p>2. <strong>Get 2 cards</strong>, dealer gets 2 cards (hidden)</p>
+                <p>1. <strong>Ante + Blind:</strong> Place equal plays (2x total)</p>
+                <p>2. <strong>Get 2 cards</strong>, opponent gets 2 cards (hidden)</p>
                 <p>3. <strong>Pre-Flop:</strong> RAISE 4X or CHECK</p>
                 <p>4. <strong>Flop (3 cards):</strong> RAISE 2X or CHECK</p>
                 <p>5. <strong>River (5 cards):</strong> RAISE 1X or FOLD</p>
                 <p>6. <strong>Showdown:</strong> Best 5-card hand wins!</p>
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mt-3">
-                  <p className="text-blue-300 font-semibold mb-2">Blind Bonus Payouts:</p>
+                  <p className="text-blue-300 font-semibold mb-2">Blind Bonus Prizes:</p>
                   <div className="text-xs text-white/80 space-y-1">
                     <p>• Royal Flush: 500:1</p>
                     <p>• Straight Flush: 50:1</p>
                     <p>• Four of a Kind: 10:1</p>
-                    <p>• Full House: 3:1</p>
+                    <p>• Full Platform: 3:1</p>
                     <p>• Flush: 1.5:1</p>
                     <p>• Straight: 1:1</p>
                   </div>
@@ -776,7 +776,7 @@ export default function UltimatePokerPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Hands</div><div className="text-xl font-bold">{stats.totalHands}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalHands > 0 ? ((stats.wins / stats.totalHands) * 100).toFixed(1) : 0}%</div></div>
-                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Bet</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Play</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalPlay)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Royal Flushes</div><div className="text-lg font-bold text-purple-400">{stats.royalFlushes}</div></div>

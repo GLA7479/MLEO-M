@@ -1,6 +1,6 @@
 // ============================================================================
 // MLEO Sic Bo - Full-Screen Game Template
-// Ancient Chinese Dice Game - Bet on dice combinations!
+// Ancient Chinese Dice Game - Play on dice combinations!
 // ============================================================================
 
 import { useEffect, useRef, useState } from "react";
@@ -47,14 +47,14 @@ function useIOSViewportFix() {
 // CONFIG
 // ============================================================================
 const LS_KEY = "mleo_sicbo_v2";
-const MIN_BET = 1000;
+const MIN_PLAY = 1000;
 
-// Bet types and their payouts
-const BET_TYPES = {
-  small: { name: "Small (4-10)", payout: 2, check: (sum) => sum >= 4 && sum <= 10 },
-  big: { name: "Big (11-17)", payout: 2, check: (sum) => sum >= 11 && sum <= 17 },
-  triple: { name: "Any Triple", payout: 30, check: (dice) => dice[0] === dice[1] && dice[1] === dice[2] },
-  specific_triple_6: { name: "Triple 6s", payout: 50, check: (dice) => dice.every(d => d === 6) },
+// Play types and their prizes
+const PLAY_TYPES = {
+  small: { name: "Small (4-10)", prize: 2, check: (sum) => sum >= 4 && sum <= 10 },
+  big: { name: "Big (11-17)", prize: 2, check: (sum) => sum >= 11 && sum <= 17 },
+  triple: { name: "Any Triple", prize: 30, check: (dice) => dice[0] === dice[1] && dice[1] === dice[2] },
+  specific_triple_6: { name: "Triple 6s", prize: 50, check: (dice) => dice.every(d => d === 6) },
 };
 
 // On-chain Claim Config
@@ -116,7 +116,7 @@ function fmt(n) {
   return Math.floor(n).toString();
 }
 
-function formatBetDisplay(n) {
+function formatPlayDisplay(n) {
   const num = Number(n) || 0;
   if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M";
   if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K";
@@ -153,9 +153,9 @@ export default function SicBoPage() {
   // State
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
-  const [betAmount, setBetAmount] = useState("1000");
-  const [isEditingBet, setIsEditingBet] = useState(false);
-  const [selectedBet, setSelectedBet] = useState(null);
+  const [playAmount, setPlayAmount] = useState("1000");
+  const [isEditingPlay, setIsEditingPlay] = useState(false);
+  const [selectedPlay, setSelectedPlay] = useState(null);
   const [rolling, setRolling] = useState(false);
   const [dice, setDice] = useState([1, 1, 1]);
   const [gameResult, setGameResult] = useState(null);
@@ -184,11 +184,11 @@ export default function SicBoPage() {
       totalGames: 0,
       wins: 0,
       losses: 0,
-      totalBet: 0,
+      totalPlay: 0,
       totalWon: 0,
       biggestWin: 0,
       triples: 0,
-      lastBet: MIN_BET
+      lastPlay: MIN_PLAY
     })
   );
 
@@ -212,9 +212,9 @@ export default function SicBoPage() {
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
 
-    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
-    if (savedStats.lastBet) {
-      setBetAmount(String(savedStats.lastBet));
+    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
+    if (savedStats.lastPlay) {
+      setPlayAmount(String(savedStats.lastPlay));
     }
 
     const interval = setInterval(() => {
@@ -353,8 +353,8 @@ export default function SicBoPage() {
 
   // Game logic
   const rollDice = (isFreePlayParam = false) => {
-    if (!selectedBet) {
-      alert('Please select a bet type first!');
+    if (!selectedPlay) {
+      alert('Please select a play type first!');
       return;
     }
 
@@ -362,12 +362,12 @@ export default function SicBoPage() {
     playSfx(clickSound.current);
 
     const currentVault = getVault();
-    let bet = Number(betAmount) || MIN_BET;
+    let play = Number(playAmount) || MIN_PLAY;
 
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
       if (result.success) {
-        bet = result.amount;
+        play = result.amount;
         setIsFreePlay(false);
         router.replace('/sicbo', undefined, { shallow: true });
       } else {
@@ -376,20 +376,20 @@ export default function SicBoPage() {
         return;
       }
     } else {
-      if (bet < MIN_BET) {
-        alert(`Minimum bet is ${MIN_BET} MLEO`);
+      if (play < MIN_PLAY) {
+        alert(`Minimum play is ${MIN_PLAY} MLEO`);
         return;
       }
-      if (currentVault < bet) {
+      if (currentVault < play) {
         alert('Insufficient MLEO in vault');
         return;
       }
 
-      setVault(currentVault - bet);
-      setVaultState(currentVault - bet);
+      setVault(currentVault - play);
+      setVaultState(currentVault - play);
     }
 
-    setBetAmount(String(bet));
+    setPlayAmount(String(play));
     setRolling(true);
     setGameResult(null);
 
@@ -412,23 +412,23 @@ export default function SicBoPage() {
         ];
         setDice(finalDice);
         setRolling(false);
-        checkResult(finalDice, bet);
+        checkResult(finalDice, play);
       }
     }, 100);
   };
 
-  const checkResult = (finalDice, bet) => {
+  const checkResult = (finalDice, play) => {
     const sum = finalDice.reduce((a, b) => a + b, 0);
-    const betType = BET_TYPES[selectedBet];
+    const playType = PLAY_TYPES[selectedPlay];
 
     let win = false;
-    if (selectedBet === 'triple' || selectedBet === 'specific_triple_6') {
-      win = betType.check(finalDice);
+    if (selectedPlay === 'triple' || selectedPlay === 'specific_triple_6') {
+      win = playType.check(finalDice);
     } else {
-      win = betType.check(sum);
+      win = playType.check(sum);
     }
 
-    const prize = win ? bet * betType.payout : 0;
+    const prize = win ? play * playType.prize : 0;
 
     if (win && prize > 0) {
       const newVault = getVault() + prize;
@@ -443,10 +443,10 @@ export default function SicBoPage() {
       win: win,
       dice: finalDice,
       sum: sum,
-      betType: betType.name,
-      payout: betType.payout,
+      playType: playType.name,
+      prize: playType.prize,
       prize: prize,
-      profit: win ? prize - bet : -bet,
+      profit: win ? prize - play : -play,
       triple: isTriple
     };
 
@@ -457,11 +457,11 @@ export default function SicBoPage() {
       totalGames: stats.totalGames + 1,
       wins: win ? stats.wins + 1 : stats.wins,
       losses: win ? stats.losses : stats.losses + 1,
-      totalBet: stats.totalBet + bet,
+      totalPlay: stats.totalPlay + play,
       totalWon: win ? stats.totalWon + prize : stats.totalWon,
       biggestWin: Math.max(stats.biggestWin, win ? prize : 0),
       triples: isTriple ? stats.triples + 1 : stats.triples,
-      lastBet: bet
+      lastPlay: play
     };
     setStats(newStats);
   };
@@ -469,7 +469,7 @@ export default function SicBoPage() {
   const resetGame = () => {
     setGameResult(null);
     setShowResultPopup(false);
-    setSelectedBet(null);
+    setSelectedPlay(null);
     setRolling(false);
     setDice([1, 1, 1]);
   };
@@ -487,7 +487,7 @@ export default function SicBoPage() {
     );
   }
 
-  const potentialWin = selectedBet ? Math.floor(Number(betAmount) * BET_TYPES[selectedBet].payout) : 0;
+  const potentialWin = selectedPlay ? Math.floor(Number(playAmount) * PLAY_TYPES[selectedPlay].prize) : 0;
 
   return (
     <Layout>
@@ -568,7 +568,7 @@ export default function SicBoPage() {
             <h1 className="text-2xl font-extrabold text-white mb-0.5">
               🀄 Sic Bo
             </h1>
-            <p className="text-white/70 text-xs">Ancient Chinese dice • Multiple betting options!</p>
+            <p className="text-white/70 text-xs">Ancient Chinese dice • Multiple playing options!</p>
           </div>
 
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
@@ -577,8 +577,8 @@ export default function SicBoPage() {
               <div className="text-sm font-bold text-emerald-400">{fmt(vault)}</div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
-              <div className="text-[10px] text-white/60">Bet</div>
-              <div className="text-sm font-bold text-amber-400">{fmt(Number(betAmount))}</div>
+              <div className="text-[10px] text-white/60">Play</div>
+              <div className="text-sm font-bold text-amber-400">{fmt(Number(playAmount))}</div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">Win</div>
@@ -602,43 +602,43 @@ export default function SicBoPage() {
               </div>
             </div>
 
-            {/* Bet Type Selection */}
+            {/* Play Type Selection */}
             <div className="grid grid-cols-2 gap-2 mt-4 w-full">
-            {Object.entries(BET_TYPES).map(([key, bet]) => (
+            {Object.entries(PLAY_TYPES).map(([key, play]) => (
               <button
                 key={key}
-                onClick={() => { setSelectedBet(key); playSfx(clickSound.current); }}
+                onClick={() => { setSelectedPlay(key); playSfx(clickSound.current); }}
                 disabled={rolling}
                 className={`p-2 rounded-lg font-bold text-xs transition-all ${
-                  selectedBet === key
+                  selectedPlay === key
                     ? 'bg-gradient-to-r from-red-600 to-red-500 text-white ring-2 ring-red-300'
                     : 'bg-white/10 text-white hover:bg-white/20'
                 } disabled:opacity-50`}
               >
-                <div>{bet.name}</div>
-                <div className="text-yellow-400">×{bet.payout}</div>
+                <div>{play.name}</div>
+                <div className="text-yellow-400">×{play.prize}</div>
               </button>
             ))}
             </div>
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.max(MIN_PLAY, current - 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
             <div className="relative">
-              <input type="text" value={isEditingBet ? betAmount : formatBetDisplay(betAmount)} onFocus={() => setIsEditingBet(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setBetAmount(val || '0'); }} onBlur={() => { setIsEditingBet(false); const current = Number(betAmount) || MIN_BET; setBetAmount(String(Math.max(MIN_BET, current))); }} disabled={rolling} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
-              <button onClick={() => { setBetAmount(String(MIN_BET)); playSfx(clickSound.current); }} disabled={rolling} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum bet">↺</button>
+              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={rolling} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
+              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); playSfx(clickSound.current); }} disabled={rolling} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
             </div>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
             <button
               onClick={() => rollDice(false)}
-              disabled={rolling || !selectedBet}
+              disabled={rolling || !selectedPlay}
               className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
             >
               {rolling ? "Rolling..." : "ROLL DICE"}
@@ -679,7 +679,7 @@ export default function SicBoPage() {
                 {gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}
               </div>
               <div className="text-sm opacity-80 mt-2">
-                {gameResult.betType} • Sum: {gameResult.sum}
+                {gameResult.playType} • Sum: {gameResult.sum}
               </div>
             </div>
           </div>
@@ -776,12 +776,12 @@ export default function SicBoPage() {
             <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
               <h2 className="text-2xl font-extrabold mb-4">🀄 How to Play</h2>
               <div className="space-y-3 text-sm">
-                <p><strong>1. Select Bet Type:</strong> Choose from Small, Big, Triple, etc.</p>
-                <p><strong>2. Set Bet:</strong> Minimum {MIN_BET} MLEO. Use +/- to adjust.</p>
+                <p><strong>1. Select Play Type:</strong> Choose from Small, Big, Triple, etc.</p>
+                <p><strong>2. Set Play:</strong> Minimum {MIN_PLAY} MLEO. Use +/- to adjust.</p>
                 <p><strong>3. Roll:</strong> Click "ROLL DICE" to roll 3 dice</p>
-                <p><strong>4. Win:</strong> If your bet wins, you get paid according to the payout!</p>
+                <p><strong>4. Win:</strong> If your play wins, you get paid according to the prize!</p>
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mt-4">
-                  <p className="text-red-300 font-semibold">🎲 Bet Types</p>
+                  <p className="text-red-300 font-semibold">🎲 Play Types</p>
                   <div className="text-xs text-white/80 mt-2 space-y-1">
                     <p>• Small (4-10): ×2</p>
                     <p>• Big (11-17): ×2</p>
@@ -818,8 +818,8 @@ export default function SicBoPage() {
                     </div>
                   </div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
-                    <div className="text-xs text-white/60">Total Bet</div>
-                    <div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div>
+                    <div className="text-xs text-white/60">Total Play</div>
+                    <div className="text-lg font-bold text-amber-400">{fmt(stats.totalPlay)}</div>
                   </div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
                     <div className="text-xs text-white/60">Total Won</div>
@@ -831,8 +831,8 @@ export default function SicBoPage() {
                   </div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
                     <div className="text-xs text-white/60">Net Profit</div>
-                    <div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {fmt(stats.totalWon - stats.totalBet)}
+                    <div className={`text-lg font-bold ${stats.totalWon - stats.totalPlay >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {fmt(stats.totalWon - stats.totalPlay)}
                     </div>
                   </div>
                 </div>

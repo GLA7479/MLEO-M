@@ -77,7 +77,7 @@ export default function CheckersMP({ roomId, playerName, vault, setVaultBoth, ti
   const name = playerName || "Guest";
   const clientId = useMemo(() => getClientId(), []);
   const minRequired = MIN_BUYIN_OPTIONS[tierCode] ?? 0;
-  const BUYIN_PER_MATCH = minRequired > 0 ? minRequired : MATCH_BUYIN;
+  const ENTRY_PER_MATCH = minRequired > 0 ? minRequired : MATCH_BUYIN;
 
   const [ses, setSes] = useState(null);
   const [players, setPlayers] = useState([]);
@@ -181,7 +181,7 @@ export default function CheckersMP({ roomId, playerName, vault, setVaultBoth, ti
 
   async function takeSeat(seatIndex) {
     if (!clientId) { setMsg("Client not recognized"); return; }
-    if (readVault() < minRequired) { setMsg(`Minimum buy-in is ${fmt(minRequired)}`); return; }
+    if (readVault() < minRequired) { setMsg(`Minimum entry fee is ${fmt(minRequired)}`); return; }
 
     let session = ses;
     if (!session || !session.id) {
@@ -215,30 +215,30 @@ export default function CheckersMP({ roomId, playerName, vault, setVaultBoth, ti
     const { data: mine } = await supabase
       .from("ck_players").select("id,seat_index,client_id").eq("session_id", session.id).eq("client_id", clientId).maybeSingle();
 
-    // If changing seats, refund previous buy-in first
+    // If changing seats, refund previous entry fee first
     if (mine && mine.seat_index !== null && mine.seat_index !== seatIndex) {
       const v = readVault();
-      writeVault(v + BUYIN_PER_MATCH); // refund previous buy-in
+      writeVault(v + ENTRY_PER_MATCH); // refund previous entry fee
       await supabase.from("ck_players").update({ seat_index: seatIndex }).eq("id", mine.id);
       // Now charge for new seat
       const v2 = readVault();
-      if (v2 < BUYIN_PER_MATCH) {
-        setMsg(`Need ${fmt(BUYIN_PER_MATCH)} to take seat`);
+      if (v2 < ENTRY_PER_MATCH) {
+        setMsg(`Need ${fmt(ENTRY_PER_MATCH)} to take seat`);
         return;
       }
-      writeVault(v2 - BUYIN_PER_MATCH);
+      writeVault(v2 - ENTRY_PER_MATCH);
       setMsg("");
       return;
     }
 
     if (!mine) {
-      // Charge buy-in when taking a seat
+      // Charge entry fee when taking a seat
       const v = readVault();
-      if (v < BUYIN_PER_MATCH) {
-        setMsg(`Need ${fmt(BUYIN_PER_MATCH)} to take seat`);
+      if (v < ENTRY_PER_MATCH) {
+        setMsg(`Need ${fmt(ENTRY_PER_MATCH)} to take seat`);
         return;
       }
-      writeVault(v - BUYIN_PER_MATCH);
+      writeVault(v - ENTRY_PER_MATCH);
 
       const { data: inserted, error: upErr } = await supabase.from("ck_players").upsert({
         session_id: session.id,
@@ -250,9 +250,9 @@ export default function CheckersMP({ roomId, playerName, vault, setVaultBoth, ti
 
       if (upErr) {
         console.error("ck_players upsert failed:", upErr);
-        // If insert failed, refund the buy-in
+        // If insert failed, refund the entry fee
         const v2 = readVault();
-        writeVault(v2 + BUYIN_PER_MATCH);
+        writeVault(v2 + ENTRY_PER_MATCH);
         const errMsg = upErr.message || upErr.code || "Unknown error";
         setMsg(upErr.message?.includes("duplicate") || upErr.code === "23505" ? "Seat taken" : `Failed to join seat: ${errMsg}. Check RLS/Auth.`);
         return;
@@ -262,7 +262,7 @@ export default function CheckersMP({ roomId, playerName, vault, setVaultBoth, ti
         // Upsert succeeded but no data returned (shouldn't happen, but handle it)
         console.warn("ck_players upsert succeeded but no data returned");
         const v2 = readVault();
-        writeVault(v2 + BUYIN_PER_MATCH);
+        writeVault(v2 + ENTRY_PER_MATCH);
         setMsg("Failed to register seat (no data returned)");
         return;
       }
@@ -274,11 +274,11 @@ export default function CheckersMP({ roomId, playerName, vault, setVaultBoth, ti
   async function leaveSeat() {
     if (!myRow) return;
     
-    // Refund buy-in if game hasn't started yet
+    // Refund entry fee if game hasn't started yet
     const session = await fetchSession();
     if (session && session.stage === "lobby") {
       const v = readVault();
-      writeVault(v + BUYIN_PER_MATCH); // refund buy-in
+      writeVault(v + ENTRY_PER_MATCH); // refund entry fee
     }
     
     await supabase.from("ck_players").delete().eq("id", myRow.id);
@@ -340,12 +340,12 @@ export default function CheckersMP({ roomId, playerName, vault, setVaultBoth, ti
 
     if (!error && data) setSes(data);
 
-    // Winner gets all coins (2x buy-in since both players paid)
-    if (w && BUYIN_PER_MATCH > 0) {
+    // Winner gets all coins (2x entry fee since both players paid)
+    if (w && ENTRY_PER_MATCH > 0) {
       const winnerSeat = w === "A" ? 0 : 1;
       if (mySeat === winnerSeat) {
         const cur = readVault();
-        writeVault(cur + (BUYIN_PER_MATCH * 2)); // winner gets both players' buy-ins
+        writeVault(cur + (ENTRY_PER_MATCH * 2)); // winner gets both players' buy-ins
       }
     }
   }

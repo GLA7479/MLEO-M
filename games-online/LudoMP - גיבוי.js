@@ -602,7 +602,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         return;
       }
       if (currentVaultBalance(vault) < minRequired) {
-        setMsg(`Minimum buy-in is ${fmt(minRequired)}`);
+        setMsg(`Minimum entry fee is ${fmt(minRequired)}`);
         return;
       }
       let session = ses;
@@ -843,17 +843,17 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     const entry = current.__entry__ ?? (MIN_BUYIN_OPTIONS[tierCode] ?? 0);
     const activeSeats = b.activeSeats || [];
     const multiplier = doubleState.value || 1;
-    const pot = entry * activeSeats.length * multiplier;
+    const prizePool = entry * activeSeats.length * multiplier;
 
     if (mySeat === winnerSeat) {
       const cur = readVault();
-      writeVault(cur + pot);
+      writeVault(cur + prizePool);
     }
 
     const result = {
       winner: winnerSeat,
       multiplier,
-      payout: pot,
+      prize: prizePool,
       timestamp: Date.now(),
     };
 
@@ -1291,7 +1291,7 @@ function LudoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
           {roomId && (
             <span className="text-white/60">Room: {roomId.slice(0, 8)}…</span>
           )}
-          <span className="text-white/60">Pot: {fmt(currentPot)} </span>
+          <span className="text-white/60">Prize Pool: {fmt(currentPot)} </span>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-white/70 text-xs">Vault: {fmt(vault)}</span>

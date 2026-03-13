@@ -202,7 +202,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
   const stage = ses?.stage || "lobby";
   const roundId = ses?.round_id || null;
   const potTotal = Number(ses?.pot_total || 0);
-  const houseCut = Math.floor((potTotal * HOUSE_BPS) / 10000);
+  const platformCut = Math.floor((potTotal * HOUSE_BPS) / 10000);
   const payoutCap = Math.floor((potTotal * PAYOUT_CAP_BPS) / 10000);
 
   const called = Array.isArray(ses?.called) ? ses.called : [];
@@ -465,7 +465,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
     const newSeed = `bingo:${Date.now()}:${Math.random().toString(16).slice(2)}`;
 
     const deck = buildDeck(`${newSeed}::${newRoundId}`);
-    const pot = entryFee * activeSeats.length;
+    const prizePool = entryFee * activeSeats.length;
 
     const { data, error } = await supabase
       .from("bingo_sessions")
@@ -474,7 +474,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
         round_id: newRoundId,
         seed: newSeed,
         active_seats: activeSeats,
-        pot_total: pot,
+        pot_total: prizePool,
         deck,
         deck_pos: 0,
         called: [],
@@ -1191,7 +1191,7 @@ function BingoOnline({ roomId, playerName, vault, tierCode, onBackToMode }) {
       <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-1 flex-shrink-0 text-xs text-white/70">
         <div className="text-sm font-semibold text-white">Details</div>
         <div>Stage: {stage} • Last: {ses?.last_number ?? "-"}</div>
-        <div>Entry: {fmt(entryFee)} • Pot: {fmt(potTotal)} • House: {fmt(houseCut)}</div>
+        <div>Entry: {fmt(entryFee)} • Prize Pool: {fmt(potTotal)} • Platform: {fmt(platformCut)}</div>
         <div>Row: {fmt(rowPrize)} • Full: {fmt(fullPrize)} • Cap: {fmt(payoutCap)}</div>
         <div>Room: {roomId}</div>
       </div>
@@ -1219,7 +1219,7 @@ function BingoLocal({ vault, onBackToMode }) {
   const entryFee = 10_000;
 
   const potTotal = entryFee * playerCount;
-  const houseCut = Math.floor((potTotal * HOUSE_BPS) / 10000);
+  const platformCut = Math.floor((potTotal * HOUSE_BPS) / 10000);
   const rowPrize = Math.floor((potTotal * ROW_BPS) / 10000);
   const fullPrize = Math.floor((potTotal * FULL_BPS) / 10000);
 
@@ -1323,7 +1323,7 @@ function BingoLocal({ vault, onBackToMode }) {
           <div className="text-sm font-semibold">Bingo Local</div>
           <div className="text-xs text-white/60">Stage: {stage}</div>
           <div className="text-xs text-white/60">
-            Entry: {fmt(entryFee)} • Pot: {fmt(potTotal)} • House: {fmt(houseCut)} • Last: {last ?? "-"}
+            Entry: {fmt(entryFee)} • Prize Pool: {fmt(potTotal)} • Platform: {fmt(platformCut)} • Last: {last ?? "-"}
           </div>
         </div>
 
@@ -1390,7 +1390,7 @@ function BingoLocal({ vault, onBackToMode }) {
       {stage !== "setup" && (
         <div className="bg-black/30 rounded-xl p-3 flex flex-col gap-2 flex-shrink-0">
           <div className="text-xs text-white/70">
-            Row prize: {fmt(rowPrize)} • Full prize: {fmt(fullPrize)} • Payout cap (90%): {fmt(Math.floor((potTotal * PAYOUT_CAP_BPS) / 10000))}
+            Row prize: {fmt(rowPrize)} • Full prize: {fmt(fullPrize)} • Prize cap (90%): {fmt(Math.floor((potTotal * PAYOUT_CAP_BPS) / 10000))}
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {["row1","row2","row3","row4","row5"].map((k, i) => {

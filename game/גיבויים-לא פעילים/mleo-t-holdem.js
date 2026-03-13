@@ -3,10 +3,10 @@
 // MLEO Texas Hold'em (client-first demo, English-only)
 // - Works with your Layout and local Vault
 // - Private rooms via ?room=CODE
-// - Table min stake via ?stake=MIN (default 1000)
+// - Table min entry via ?entry=MIN (default 1000)
 // - 2–9 players, 30s turn timer, next hand ~10s
-// - Actions: Fold / Check / Call / Bet / Raise / All-in
-// - Basic pot awarding for demo (server should implement full side pots & kickers)
+// - Actions: Fold / Check / Call / Play / Raise / All-in
+// - Basic prizePool awarding for demo (server should implement full side pots & kickers)
 // ============================================================================
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -115,7 +115,7 @@ function evaluateHand(cards7) {
     return { rank: 9, name: royal ? "Royal Flush" : "Straight Flush" };
   }
   if (byCount[0][1]===4) return { rank: 8, name: "Four of a Kind" };
-  if (byCount[0][1]===3 && byCount[1]?.[1]===2) return { rank: 7, name: "Full House" };
+  if (byCount[0][1]===3 && byCount[1]?.[1]===2) return { rank: 7, name: "Full Platform" };
   if (flushSuit) return { rank: 6, name: "Flush" };
   if (straightTop!==null) return { rank: 5, name: "Straight" };
   if (byCount[0][1]===3) return { rank: 4, name: "Three of a Kind" };
@@ -131,9 +131,9 @@ export default function HoldemPage() {
   const router = useRouter();
   const roomCode = router.query.room ? String(router.query.room) : "public";
   const tableMin = useMemo(() => {
-    const q = Number(router.query.stake || TABLE_MIN_DEFAULT);
+    const q = Number(router.query.entry || TABLE_MIN_DEFAULT);
     return isNaN(q)||q<1 ? TABLE_MIN_DEFAULT : Math.floor(q);
-  }, [router.query.stake]);
+  }, [router.query.entry]);
 
   const wrapRef = useRef(null);
   const headerRef = useRef(null);
@@ -151,7 +151,7 @@ export default function HoldemPage() {
   const [state, setState] = useState({}); // server state snapshot
   const [myHole, setMyHole] = useState(null); // my hole cards from server
 
-  // Vault & buy-in
+  // Vault & entry fee
   const [vault, setVaultState] = useState(0);
   const [buyIn, setBuyIn] = useState(tableMin);
 
@@ -164,8 +164,8 @@ export default function HoldemPage() {
   const [deck, setDeck] = useState([]);
   const [community, setCommunity] = useState([]);
   const [holeCards, setHoleCards] = useState({}); // seat -> [c1,c2]
-  const [pot, setPot] = useState(0);
-  const [bets, setBets] = useState({}); // seat -> bet this street
+  const [prizePool, setPot] = useState(0);
+  const [plays, setBets] = useState({}); // seat -> play this street
   const [stacks, setStacks] = useState({}); // seat -> current stack
   const [toCall, setToCall] = useState(0);
   const [acted, setActed] = useState({});
@@ -327,13 +327,13 @@ export default function HoldemPage() {
     }
   }
 
-  async function apiSit(seatIdx, name, buyin) {
+  async function apiSit(seatIdx, name, entryFee) {
     try {
-      console.log("apiSit called:", { table_id: tableId, seat_index: seatIdx, player_name: name, buyin });
+      console.log("apiSit called:", { table_id: tableId, seat_index: seatIdx, player_name: name, entryFee });
       const response = await fetch(`/api/poker/sit`, { 
         method: "POST", 
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ table_id: tableId, seat_index: seatIdx, player_name: name, buyin })
+        body: JSON.stringify({ table_id: tableId, seat_index: seatIdx, player_name: name, entryFee })
       });
       
       const data = await response.json();
@@ -526,7 +526,7 @@ export default function HoldemPage() {
           const board = (state.hand && state.hand.board) || state.board || [];
           setCommunity(Array.isArray(board) ? board : []);
           
-          // Update toCall from players/bets only (ignore server to_call map)
+          // Update toCall from players/plays only (ignore server to_call map)
           if (state.players && Array.isArray(state.players)) {
             const me = (serverSeats || []).find(s => s && s.player_name === displayName);
             if (me) {
@@ -541,7 +541,7 @@ export default function HoldemPage() {
           const actions = Array.isArray(state.actions) ? state.actions : [];
           console.log("State updated:", {
             stage: state.hand.stage,
-            pot: state.hand.pot_total,
+            prizePool: state.hand.pot_total,
             players: state.players.length,
             actions: actions.length,
             current_turn: state.hand.current_turn
@@ -628,7 +628,7 @@ export default function HoldemPage() {
   // Sit / Leave
   const sitDown = async (seatIdx) => {
     if (!displayName.trim()) { alert("Set a display name first."); return; }
-    if (buyIn < tableMin) { alert(`Minimum buy-in: ${fmt(tableMin)}`); return; }
+    if (buyIn < tableMin) { alert(`Minimum entry fee: ${fmt(tableMin)}`); return; }
     const v = getVault();
     if (v < buyIn) { alert("Insufficient Vault balance."); return; }
     if (!tableId) { alert("Table not loaded yet."); return; }
@@ -730,7 +730,7 @@ export default function HoldemPage() {
   
   function everyoneDone(state) {
     const seats = state?.seats || serverSeats || [];
-    const betsData = state?.bets || {};
+    const betsData = state?.plays || {};
     const alive = seats
       .map((s,i)=>({s,i}))
       .filter(x => x.s?.player_name && !x.s?.sat_out && (x.s?.stack_live ?? x.s?.stack ?? 0) > 0);
@@ -770,7 +770,7 @@ export default function HoldemPage() {
       if (!actionResult || actionResult.error) {
         console.warn('Action failed:', actionResult);
         setHandMsg(actionResult?.error === 'cannot_check_facing_bet' 
-          ? `Cannot check - must call ${actionResult.toCall || 'bet'}`
+          ? `Cannot check - must call ${actionResult.toCall || 'play'}`
           : `Action failed: ${actionResult?.error || 'unknown'}`);
         
         // Always refresh state after error to reset UI
@@ -804,7 +804,7 @@ export default function HoldemPage() {
         const board = (state.hand && state.hand.board) || state.board || [];
         setCommunity(Array.isArray(board) ? board : []);
         
-        // Update pot
+        // Update prizePool
         if (state.hand?.pot_total) {
           setPot(Number(state.hand.pot_total));
         }
@@ -829,7 +829,7 @@ export default function HoldemPage() {
           setAllIn(newAllIn);
         }
         
-        // Update toCall from players/bets only (ignore server to_call map)
+        // Update toCall from players/plays only (ignore server to_call map)
         if (state.players && Array.isArray(state.players)) {
           const me = (serverSeats || []).find(s => s && s.player_name === displayName);
           if (me) {
@@ -943,7 +943,7 @@ export default function HoldemPage() {
       setTurnLeftSec(t=>{
         if (t<=1) {
           clearInterval(iv);
-          const myBet = bets[turnSeat]||0;
+          const myBet = plays[turnSeat]||0;
           const need = toCall - myBet;
           if (need>0) timeoutFold(turnSeat); else timeoutCheck(turnSeat);
         }
@@ -951,9 +951,9 @@ export default function HoldemPage() {
       });
     }, 1000);
     return ()=>clearInterval(iv);
-  }, [turnSeat, stage, toCall, bets]);
+  }, [turnSeat, stage, toCall, plays]);
 
-  const sumBets = () => Object.values(bets).reduce((a,b)=>a+(b||0),0);
+  const sumBets = () => Object.values(plays).reduce((a,b)=>a+(b||0),0);
 
   const nextActor = (from) => {
     let j=(from+1)%SEATS;
@@ -968,7 +968,7 @@ export default function HoldemPage() {
   const everyoneMatched = () => {
     for (let i=0;i<SEATS;i++){
       const p=seats[i]; if (!p || folded[i] || allIn[i]) continue;
-      const b=bets[i]||0; if (b<toCall) return false;
+      const b=plays[i]||0; if (b<toCall) return false;
     }
     return true;
   };
@@ -1044,7 +1044,7 @@ export default function HoldemPage() {
     }).sort((a,b)=>b.score.rank - a.score.rank);
     const top = scored[0].score.rank;
     const winners = scored.filter(s=>s.score.rank===top).map(s=>s.i);
-    const total = pot + sumBets();
+    const total = prizePool + sumBets();
     const share = Math.floor(total / Math.max(1, winners.length));
     setSeats(prev=>{
       const cp = prev.map(p=>p?{...p}:p);
@@ -1108,9 +1108,9 @@ export default function HoldemPage() {
   }, [meIdx, serverTurn, effectiveTurn, myTurn, stage, currentHandId, displayName, mySeat]);
 
   const passTurn = (fromIdx, raised) => {
-    const alive = seats.map((p,i)=>({p,i})).filter(x=>x.p && !folded[x.i] && (!allIn[x.i] || (bets[x.i]||0)>0));
+    const alive = seats.map((p,i)=>({p,i})).filter(x=>x.p && !folded[x.i] && (!allIn[x.i] || (plays[x.i]||0)>0));
     if (alive.length===1) {
-      const total = pot + sumBets();
+      const total = prizePool + sumBets();
       setSeats(prev=>{
         const cp = prev.map(p=>p?{...p}:p);
         const w = alive[0].i;
@@ -1137,14 +1137,14 @@ export default function HoldemPage() {
   };
   const doCheck = () => {
     if (!myTurn || meIdx === -1) return;
-    // Server validates - only allow check if no bet to call
+    // Server validates - only allow check if no play to call
     playerAction('check', 0);
   };
   const doCall = () => {
     if (!myTurn || meIdx === -1) return;
-    // Base call amount on latest bets snapshot from server
-    const maxBet = Math.max(0, ...Object.values(bets));
-    const myBetNow = bets[meIdx] || 0;
+    // Base call amount on latest plays snapshot from server
+    const maxBet = Math.max(0, ...Object.values(plays));
+    const myBetNow = plays[meIdx] || 0;
     const need = Math.max(0, maxBet - myBetNow);
     const have = myChips;
     const pay = Math.min(need, have);
@@ -1159,16 +1159,16 @@ export default function HoldemPage() {
     // amount from the input
     amt = Math.max(0, Math.floor(Number(amt) || 0));
 
-    // Base needToCall on current bets snapshot (more reliable than cached toCall)
-    const maxBet = Math.max(0, ...Object.values(bets));
-    const myBetNow = bets[meIdx] || 0;
+    // Base needToCall on current plays snapshot (more reliable than cached toCall)
+    const maxBet = Math.max(0, ...Object.values(plays));
+    const myBetNow = plays[meIdx] || 0;
     const needToCall = Math.max(0, maxBet - myBetNow);
 
     // total chips we will put in this action = call + raise amount
     const totalToPut = needToCall + amt;
 
-    // choose action label (server anyway normalizes bet→raise if there's an open bet)
-    const actionType = needToCall > 0 ? 'raise' : 'bet';
+    // choose action label (server anyway normalizes play→raise if there's an open play)
+    const actionType = needToCall > 0 ? 'raise' : 'play';
 
     // guard: nothing to send
     if (totalToPut <= 0 || myChips <= 0) return;
@@ -1211,7 +1211,7 @@ export default function HoldemPage() {
             <div className="text-lg font-extrabold">♠️ Texas Hold&apos;em</div>
             <div className="ml-auto flex items-center gap-2 text-xs">
               <span className="opacity-70">Room:</span><span className="font-bold">{roomCode}</span>
-              <span className="opacity-70">Stake ≥</span><span className="font-bold">{fmt(tableMin)}</span>
+              <span className="opacity-70">Entry ≥</span><span className="font-bold">{fmt(tableMin)}</span>
               <span className="opacity-70">SB/BB:</span><span className="font-bold">{fmt(smallBlind)}/{fmt(bigBlind)}</span>
             </div>
           </div>
@@ -1248,8 +1248,8 @@ export default function HoldemPage() {
           {/* Table */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-3">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-sm opacity-80">Pot</div>
-              <div className="font-bold">{fmt(pot + sumBets())}</div>
+              <div className="text-sm opacity-80">Prize Pool</div>
+              <div className="font-bold">{fmt(prizePool + sumBets())}</div>
             </div>
 
             {/* Board */}
@@ -1288,7 +1288,7 @@ export default function HoldemPage() {
                       </div>
                       <div className="mt-1 flex items-center justify-between text-xs">
                         <div className={`${folded[i]?'text-rose-400':'opacity-70'}`}>
-                          {folded[i] ? "Folded" : (allIn[i] ? "ALL-IN" : (bets[i]? `Bet ${fmt(bets[i])}`: "Idle"))}
+                          {folded[i] ? "Folded" : (allIn[i] ? "ALL-IN" : (plays[i]? `Play ${fmt(plays[i])}`: "Idle"))}
                         </div>
                         <div className="opacity-70">Hole:</div>
                       </div>
@@ -1340,7 +1340,7 @@ export default function HoldemPage() {
                   inHandFallback,
                   toCall,
                   toCallType: typeof toCall,
-                  myBet: bets[meIdx] || 0,
+                  myBet: plays[meIdx] || 0,
                   myChips
                 });
               }
@@ -1349,7 +1349,7 @@ export default function HoldemPage() {
             })() && (
               <ActionBar
                 toCall={toCall || 0}
-                myBet={bets[meIdx]||0}
+                myBet={plays[meIdx]||0}
                 myChips={myChips}
                 onFold={doFold}
                 onCheck={doCheck}
@@ -1383,14 +1383,14 @@ export default function HoldemPage() {
               <div className="font-bold mb-2">Rules (quick):</div>
               <ul className="list-disc pl-5 space-y-1 opacity-90">
                 <li>2–9 players. Each gets 2 private hole cards.</li>
-                <li>Betting rounds: Preflop → Flop → Turn → River → Showdown.</li>
-                <li>Turn timer: 30 seconds. No action → Fold if facing a bet, otherwise Check.</li>
-                <li>Next hand auto-starts ~10 seconds after payouts.</li>
+                <li>Playing rounds: Preflop → Flop → Turn → River → Showdown.</li>
+                <li>Turn timer: 30 seconds. No action → Fold if facing a play, otherwise Check.</li>
+                <li>Next hand auto-starts ~10 seconds after prizes.</li>
                 <li>Chips remain on table until you leave; leaving returns chips to Vault.</li>
-                <li>Private room via `?room=CODE`. Minimum stake via `?stake=1000` etc.</li>
+                <li>Private room via `?room=CODE`. Minimum entry via `?entry=1000` etc.</li>
               </ul>
               <div className="mt-2 opacity-80">
-                <b>Note:</b> Demo awards the pot to top category only. Server should implement precise side pots, full kickers comparison, and rake.
+                <b>Note:</b> Demo awards the prizePool to top category only. Server should implement precise side pots, full kickers comparison, and rake.
               </div>
             </div>
           </div>
@@ -1414,7 +1414,7 @@ function ActionBar({ toCall, myBet, myChips, onFold, onCheck, onCall, onBet, onA
 
   useEffect(()=>{ setAmt(bigBlind*2); }, [bigBlind]);
 
-  // Calculate if there's an open bet (including BB in preflop)
+  // Calculate if there's an open play (including BB in preflop)
   const hasOpenBet = toCall > 0;
   const canCheck = toCall === 0;
   const canCall = toCall > 0 && myChips >= toCall;
@@ -1444,7 +1444,7 @@ function ActionBar({ toCall, myBet, myChips, onFold, onCheck, onCall, onBet, onA
           </button>
         )}
 
-        {/* Bet/Raise */}
+        {/* Play/Raise */}
         <div className="ml-auto flex items-center gap-2">
           {presets.map(p=>(
             <button key={p.label} onClick={()=>setAmt(Math.min(myChips, p.val))}
@@ -1458,7 +1458,7 @@ function ActionBar({ toCall, myBet, myChips, onFold, onCheck, onCall, onBet, onA
           <button onClick={()=>onBet(amt)}
                   disabled={!canBetOrRaise}
                   className="px-3 py-2 rounded bg-amber-500/80 hover:bg-amber-500 font-bold text-sm disabled:opacity-50">
-            {hasOpenBet ? "Raise" : "Bet"}
+            {hasOpenBet ? "Raise" : "Play"}
           </button>
           <button onClick={onAllIn} disabled={myChips<=0}
                   className="px-3 py-2 rounded bg-purple-600 hover:bg-purple-500 font-bold text-sm disabled:opacity-50">

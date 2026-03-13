@@ -12,7 +12,7 @@ import {
 // ===== Config =====
 const TURN_SECONDS = Number(process.env.NEXT_PUBLIC_BG_TURN_SECONDS || 35);
 const MIN_PLAYERS_TO_START = 2;
-const BUYIN_PER_MATCH = Number(process.env.NEXT_PUBLIC_BG_BUYIN || 1000); // Vault points per match (optional)
+const ENTRY_PER_MATCH = Number(process.env.NEXT_PUBLIC_BG_BUYIN || 1000); // Vault points per match (optional)
 
 const MIN_BUYIN_OPTIONS = {
   '1K': 1_000,
@@ -207,7 +207,7 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
   async function takeSeat(seatIndex){
     if (!clientId) { setMsg("Client not recognized"); return; }
     if (readVault() < minRequired) {
-      setMsg(`Minimum buy-in is ${fmt(minRequired)}`);
+      setMsg(`Minimum entry fee is ${fmt(minRequired)}`);
       return;
     }
     let session = ses;
@@ -260,8 +260,8 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
 
     const board = initialBoardState();
     const v = readVault();
-    if (mySeat!==null && v >= BUYIN_PER_MATCH) {
-      writeVault(v - BUYIN_PER_MATCH);
+    if (mySeat!==null && v >= ENTRY_PER_MATCH) {
+      writeVault(v - ENTRY_PER_MATCH);
     }
     
     const { data, error } = await supabase.from("bg_sessions").update({
@@ -531,13 +531,13 @@ export default function BackgammonMP({ roomId, playerName, vault, setVaultBoth, 
   async function endTurn(b, steps){
     // finished?
     if (isFinished(b)) {
-      // winner/multiplier → payout vault locally (optional)
+      // winner/multiplier → prize vault locally (optional)
       const res = winnerAndMultiplier(b);
-      if (res?.winner && BUYIN_PER_MATCH>0){
-        const pot = BUYIN_PER_MATCH * (b.doubling?.value || 1) * (res.mult || 1);
+      if (res?.winner && ENTRY_PER_MATCH>0){
+        const prizePool = ENTRY_PER_MATCH * (b.doubling?.value || 1) * (res.mult || 1);
         // NOTE: בדיפולט כאן נזקף לזוכה לוקאלית; בחדרים ציבוריים נזהר מכפילויות
         const cur = readVault();
-        const add = pot; // אפשר להחמיר: לתת פיצוי נטו אחרי שנגרע תחילת משחק
+        const add = prizePool; // אפשר להחמיר: לתת פיצוי נטו אחרי שנגרע תחילת משחק
         writeVault(cur + add);
       }
 

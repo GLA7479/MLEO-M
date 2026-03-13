@@ -1,9 +1,9 @@
 // ============================================================================
 // pages/mleo-crash.js
 // MLEO Crash — full single-file Next.js page
-// - 30s betting phase
+// - 30s playing phase
 // - Live multiplier chart (SVG)
-// - Cash Out before crash to win bet * multiplier
+// - Cash Out before crash to win play * multiplier
 // - Provably-fair demo: serverSeedHash shown before round; serverSeed revealed after
 // Design: TailwindCSS (assumed present), no external libs
 // Hooks-safe (no conditional hooks), mobile-friendly
@@ -17,7 +17,7 @@ import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
 
 // ------------------------------- Storage -------------------------------------
 const LS_KEY = "mleo_crash_v1";
-const MIN_BET = 1000;
+const MIN_PLAY = 1000;
 
 function safeRead(key, fallback = {}) {
   if (typeof window === "undefined") return fallback;
@@ -55,8 +55,8 @@ function fmt(n) {
 
 // ------------------------------- Config -------------------------------------
 const ROUND = {
-  bettingSeconds: 30,           // time for all players to bet
-  intermissionMs: 4000,         // pause after round ends before next betting opens
+  bettingSeconds: 30,           // time for all players to play
+  intermissionMs: 4000,         // pause after round ends before next playing opens
   fps: 60,                      // animation FPS
   decimals: 2,                  // display precision
   minCrash: 1.1,                // min crash multiplier inclusive
@@ -116,13 +116,13 @@ export default function MLEOCrash() {
   const [mounted, setMounted] = useState(false);
   
   // Game state
-  const [phase, setPhase] = useState("betting"); // betting | running | crashed | revealing | intermission
+  const [phase, setPhase] = useState("playing"); // playing | running | crashed | revealing | intermission
   const [countdown, setCountdown] = useState(ROUND.bettingSeconds);
-  const [betAmount, setBetAmount] = useState("1000");
+  const [playAmount, setPlayAmount] = useState("1000");
   const [playerBet, setPlayerBet] = useState(null); // { amount:number, accepted:boolean }
   const [canCashOut, setCanCashOut] = useState(false);
   const [cashedOutAt, setCashedOutAt] = useState(null); // multiplier at cashout
-  const [payout, setPayout] = useState(null);
+  const [prize, setPayout] = useState(null);
 
   // Provably-fair data (client demo)
   const [serverSeed, setServerSeed] = useState("");        // revealed after round
@@ -143,7 +143,7 @@ export default function MLEOCrash() {
   const [freePlayTokens, setFreePlayTokens] = useState(0);
   const [showResultPopup, setShowResultPopup] = useState(false);
   const [stats, setStats] = useState(() => 
-    safeRead(LS_KEY, { totalGames: 0, totalBet: 0, totalWon: 0, biggestWin: 0, wins: 0, lastBet: MIN_BET })
+    safeRead(LS_KEY, { totalGames: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, wins: 0, lastPlay: MIN_PLAY })
   );
 
   // ----------------------- Init -------------------
@@ -157,9 +157,9 @@ export default function MLEOCrash() {
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
     
-    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
-    if (savedStats.lastBet) {
-      setBetAmount(String(savedStats.lastBet));
+    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
+    if (savedStats.lastPlay) {
+      setPlayAmount(String(savedStats.lastPlay));
     }
     
     const interval = setInterval(() => {
@@ -171,20 +171,20 @@ export default function MLEOCrash() {
   }, [router.query]);
 
   useEffect(() => {
-    if (payout) {
+    if (prize) {
       setShowResultPopup(true);
       const timer = setTimeout(() => {
         setShowResultPopup(false);
       }, 4000);
       return () => clearTimeout(timer);
     }
-  }, [payout]);
+  }, [prize]);
 
   const refreshVault = () => {
     setVaultState(getVault());
   };
 
-  // ----------------------- Lifecycle: start betting window -------------------
+  // ----------------------- Lifecycle: start playing window -------------------
   useEffect(() => {
     // Fresh seeds for the upcoming round
     // serverSeed kept secret until reveal; we show only its hash now.
@@ -204,7 +204,7 @@ export default function MLEOCrash() {
     })();
 
     // 30s countdown
-    setPhase("betting");
+    setPhase("playing");
     setCountdown(ROUND.bettingSeconds);
     const id = setInterval(() => {
       setCountdown((c) => {
@@ -217,11 +217,11 @@ export default function MLEOCrash() {
     return () => clearInterval(id);
   }, []); // run once on mount
 
-  // When betting ends -> lock bets and takeoff
+  // When playing ends -> lock plays and takeoff
   useEffect(() => {
-    if (phase !== "betting") return;
+    if (phase !== "playing") return;
     if (countdown <= 0) {
-      // Lock bet (accept if placed)
+      // Lock play (accept if placed)
       if (playerBet && !playerBet.accepted) {
         setPlayerBet({ ...playerBet, accepted: true });
       }
@@ -262,22 +262,22 @@ export default function MLEOCrash() {
         cancelAnimationFrame(rafRef.current);
         // Resolve loss if not cashed out
         if (!cashedOutAt && playerBet?.accepted) {
-          // no payout
+          // no prize
           setPayout({ win: false, amount: 0, at: crashPoint });
           
           // Update stats for loss
           const newStats = {
             ...stats,
             totalGames: stats.totalGames + 1,
-            totalBet: stats.totalBet + playerBet.amount,
-            lastBet: playerBet.amount
+            totalPlay: stats.totalPlay + playerBet.amount,
+            lastPlay: playerBet.amount
           };
           setStats(newStats);
           safeWrite(LS_KEY, newStats);
         }
         // Reveal seeds a moment later
         setTimeout(() => setPhase("revealing"), 600);
-        // After short intermission → next betting window
+        // After short intermission → next playing window
         setTimeout(() => startNextRound(), 600 + ROUND.intermissionMs);
         return;
       }
@@ -288,7 +288,7 @@ export default function MLEOCrash() {
   };
 
   const startNextRound = async () => {
-    // Reveal already occurred; now reset to new betting window
+    // Reveal already occurred; now reset to new playing window
     // New seeds:
     const newServerSeed = crypto.getRandomValues(new Uint32Array(8)).join("-");
     const hash = await sha256Hex(newServerSeed);
@@ -304,7 +304,7 @@ export default function MLEOCrash() {
     setPlayerBet(null);
     setCanCashOut(false);
 
-    setPhase("betting");
+    setPhase("playing");
     setCountdown(ROUND.bettingSeconds);
     const id = setInterval(() => {
       setCountdown((c) => {
@@ -316,9 +316,9 @@ export default function MLEOCrash() {
 
   // ------------------------------- Actions ----------------------------------
   const placeBet = (isFreePlayParam = false) => {
-    let amt = Number(betAmount) || MIN_BET;
-    if (!Number.isFinite(amt) || amt < MIN_BET) return;
-    if (phase !== "betting") return;
+    let amt = Number(playAmount) || MIN_PLAY;
+    if (!Number.isFinite(amt) || amt < MIN_PLAY) return;
+    if (phase !== "playing") return;
     
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
@@ -365,11 +365,11 @@ export default function MLEOCrash() {
     const newStats = {
       ...stats,
       totalGames: stats.totalGames + 1,
-      totalBet: stats.totalBet + playerBet.amount,
+      totalPlay: stats.totalPlay + playerBet.amount,
       wins: stats.wins + 1,
       totalWon: stats.totalWon + winAmount,
       biggestWin: Math.max(stats.biggestWin, winAmount),
-      lastBet: playerBet.amount
+      lastPlay: playerBet.amount
     };
     setStats(newStats);
     safeWrite(LS_KEY, newStats);
@@ -380,19 +380,19 @@ export default function MLEOCrash() {
 
   // Auto-hide result popup
   useEffect(() => {
-    if (payout) {
+    if (prize) {
       setShowResultPopup(true);
       const timer = setTimeout(() => {
         setShowResultPopup(false);
       }, 4000);
       return () => clearTimeout(timer);
     }
-  }, [payout]);
+  }, [prize]);
 
   const resetToSetup = () => {
     setPayout(null);
     setShowResultPopup(false);
-    setPhase("betting");
+    setPhase("playing");
     setCountdown(ROUND.bettingSeconds);
     setMultiplier(1.0);
     setCrashPoint(null);
@@ -476,7 +476,7 @@ export default function MLEOCrash() {
             <div className="w-16"></div>
           </header>
 
-        {/* Betting Panel */}
+        {/* Playing Panel */}
         <section className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2 rounded-2xl bg-zinc-900/70 p-4 md:p-6 shadow-lg">
             {/* Top row: seeds + multiplier */}
@@ -486,7 +486,7 @@ export default function MLEOCrash() {
                   <span className="text-zinc-500">serverSeedHash:</span>{" "}
                   <span className="font-mono">{serverSeedHash.slice(0, 16)}…</span>
                 </div>
-                {phase !== "betting" && (phase === "revealing" || phase === "crashed") ? (
+                {phase !== "playing" && (phase === "revealing" || phase === "crashed") ? (
                   <div className="mt-1">
                     <span className="text-zinc-500">serverSeed:</span>{" "}
                     <span className="font-mono break-all">{serverSeed}</span>
@@ -545,7 +545,7 @@ export default function MLEOCrash() {
                   ) : null}
 
                   {/* crash marker */}
-                  {phase !== "betting" && crashPoint && chart.xCrash != null ? (
+                  {phase !== "playing" && crashPoint && chart.xCrash != null ? (
                     <g>
                       <circle cx={chart.xCrash} cy={chart.yCrash} r="5" fill="#ef4444" />
                       <text x={chart.xCrash + 6} y={chart.yCrash - 6} fontSize="11" fill="#ef4444">
@@ -560,8 +560,8 @@ export default function MLEOCrash() {
             {/* Run controls */}
             <div className="mt-4 flex items-center justify-between">
               <div className="text-sm text-zinc-400">
-                {phase === "betting" ? (
-                  <span>🔒 Bets lock in <span className="text-white font-semibold">{countdown}s</span></span>
+                {phase === "playing" ? (
+                  <span>🔒 Plays lock in <span className="text-white font-semibold">{countdown}s</span></span>
                 ) : phase === "running" ? (
                   <span>🚀 Round running… click <span className="text-white font-semibold">CASH OUT</span> before it crashes.</span>
                 ) : phase === "crashed" ? (
@@ -590,27 +590,27 @@ export default function MLEOCrash() {
             </div>
           </div>
 
-          {/* Bet sidebar */}
+          {/* Play sidebar */}
           <div className="rounded-2xl bg-zinc-900/70 p-4 md:p-5 shadow-lg">
-            <h3 className="text-lg font-semibold">Place Your Bet</h3>
+            <h3 className="text-lg font-semibold">Place Your Play</h3>
             <div className="mt-3">
               <label className="block text-sm text-zinc-400 mb-1">Amount (MLEO)</label>
               <input
                 type="number"
                 min="0"
                 step="0.01"
-                value={betAmount}
-                onChange={(e) => setBetAmount(e.target.value)}
+                value={playAmount}
+                onChange={(e) => setPlayAmount(e.target.value)}
                 className="w-full rounded-lg bg-zinc-950/70 border border-zinc-800 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 placeholder="e.g. 100"
-                disabled={phase !== "betting"}
+                disabled={phase !== "playing"}
               />
               <div className="flex gap-2 mt-2">
                 {[100, 250, 500, 1000].map((v) => (
                   <button
                     key={v}
-                    onClick={() => setBetAmount(String(v))}
-                    disabled={phase !== "betting"}
+                    onClick={() => setPlayAmount(String(v))}
+                    disabled={phase !== "playing"}
                     className="rounded-lg bg-zinc-800 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
                   >
                     {v}
@@ -619,7 +619,7 @@ export default function MLEOCrash() {
               </div>
             </div>
 
-            {freePlayTokens > 0 && phase === "betting" && (
+            {freePlayTokens > 0 && phase === "playing" && (
               <button
                 onClick={() => placeBet(true)}
                 className="mt-4 w-full rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 px-4 py-2.5 font-semibold text-white shadow hover:from-amber-400 hover:via-orange-400 hover:to-yellow-400"
@@ -630,7 +630,7 @@ export default function MLEOCrash() {
             
             <button
               onClick={() => placeBet(false)}
-              disabled={phase !== "betting" || !betAmount || Number(betAmount) <= 0 || Number(betAmount) > vault}
+              disabled={phase !== "playing" || !playAmount || Number(playAmount) <= 0 || Number(playAmount) > vault}
               className="mt-4 w-full rounded-xl bg-emerald-500 px-4 py-2.5 font-semibold text-black shadow hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Join Round
@@ -638,7 +638,7 @@ export default function MLEOCrash() {
 
             <div className="mt-4 space-y-2 text-sm">
               <div className="flex items-center justify-between">
-                <span className="text-zinc-400">Your bet</span>
+                <span className="text-zinc-400">Your play</span>
                 <span className="font-medium">
                   {playerBet ? `${playerBet.amount} MLEO ${playerBet.accepted ? "(locked)" : "(pending)"}` : "-"}
                 </span>
@@ -649,11 +649,11 @@ export default function MLEOCrash() {
                   {playerBet?.accepted ? `${(playerBet.amount * multiplier).toFixed(2)} MLEO` : "-"}
                 </span>
               </div>
-              {payout ? (
-                <div className={`mt-2 rounded-lg px-3 py-2 ${payout.win ? "bg-emerald-500/10 text-emerald-300" : "bg-red-500/10 text-red-300"}`}>
-                  {payout.win
-                    ? `✅ Won ${payout.amount} MLEO at ${payout.at?.toFixed(2)}×`
-                    : `❌ Lost — crashed at ${payout.at?.toFixed(2)}×`}
+              {prize ? (
+                <div className={`mt-2 rounded-lg px-3 py-2 ${prize.win ? "bg-emerald-500/10 text-emerald-300" : "bg-red-500/10 text-red-300"}`}>
+                  {prize.win
+                    ? `✅ Won ${prize.amount} MLEO at ${prize.at?.toFixed(2)}×`
+                    : `❌ Lost — crashed at ${prize.at?.toFixed(2)}×`}
                 </div>
               ) : null}
             </div>
@@ -665,31 +665,31 @@ export default function MLEOCrash() {
         </section>
 
         {/* FLOATING RESULT POPUP */}
-        {payout && showResultPopup && (
+        {prize && showResultPopup && (
           <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
             <div 
               className={`text-center p-4 rounded-xl border-2 transition-all duration-500 transform pointer-events-auto max-w-sm mx-4 ${
                 showResultPopup ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
               } ${
-                payout.win
+                prize.win
                   ? "bg-gradient-to-br from-green-600 to-emerald-700 border-green-300 shadow-2xl shadow-green-500/70"
                   : "bg-gradient-to-br from-red-600 to-rose-700 border-red-300 shadow-2xl shadow-red-500/70"
               }`}
             >
               <div className="text-2xl font-black mb-2 animate-pulse text-white drop-shadow-lg">
-                {payout.win ? "📈 Cashed Out! 📈" : "💥 Crashed! 💥"}
+                {prize.win ? "📈 Cashed Out! 📈" : "💥 Crashed! 💥"}
               </div>
               <div className="text-base mb-2 text-white/90 font-semibold">
-                At: ×{payout.at?.toFixed(2)}
+                At: ×{prize.at?.toFixed(2)}
               </div>
-              {payout.win && (
+              {prize.win && (
                 <div className="space-y-1">
                   <div className="text-3xl font-black text-white animate-bounce drop-shadow-2xl">
-                    +{fmt(payout.amount)} MLEO
+                    +{fmt(prize.amount)} MLEO
                   </div>
                 </div>
               )}
-              {!payout.win && (
+              {!prize.win && (
                 <div className="text-lg font-bold text-white">
                   Better luck next time!
                 </div>
@@ -709,11 +709,11 @@ export default function MLEOCrash() {
 // ---------------------- Notes for on-chain integration -----------------------
 /*
 1) Replace local balance and stubs:
-   - On bet:
+   - On play:
        await presaleOrGameContract.placeBet({ value: ..., args: ... })
-       // Or approve & transferFrom for ERC20 wagering
+       // Or approve & transferFrom for ERC20 playing
    - On cash out:
-       await gameContract.cashOut(roundId) -> returns payout
+       await gameContract.cashOut(roundId) -> returns prize
    Ensure the multiplier is computed *off-chain server-side* or on-chain VRF,
    and that the client displays the authoritative round state via websockets.
 

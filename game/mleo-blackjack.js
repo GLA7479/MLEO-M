@@ -37,7 +37,7 @@ function useIOSViewportFix() {
 }
 
 const LS_KEY = "mleo_blackjack_v3";
-const MIN_BET = 1000;
+const MIN_PLAY = 1000;
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
@@ -53,7 +53,7 @@ function safeWrite(key, val) { if (typeof window === "undefined") return; try { 
 function getVault() { const rushData = safeRead("mleo_rush_core_v4", {}); return rushData.vault || 0; }
 function setVault(amount) { const rushData = safeRead("mleo_rush_core_v4", {}); rushData.vault = amount; safeWrite("mleo_rush_core_v4", rushData); }
 function fmt(n) { if (n >= 1e9) return (n / 1e9).toFixed(2) + "B"; if (n >= 1e6) return (n / 1e6).toFixed(2) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(2) + "K"; return Math.floor(n).toString(); }
-function formatBetDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
+function formatPlayDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
 function shortAddr(addr) { if (!addr || addr.length < 10) return addr || ""; return `${addr.slice(0, 6)}...${addr.slice(-4)}`; }
 
 function createDeck() {
@@ -158,12 +158,12 @@ export default function BlackjackPage() {
 
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
-  const [betAmount, setBetAmount] = useState("1000");
-  const [isEditingBet, setIsEditingBet] = useState(false);
+  const [playAmount, setPlayAmount] = useState("1000");
+  const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [deck, setDeck] = useState([]);
   const [playerHand, setPlayerHand] = useState([]);
   const [dealerHand, setDealerHand] = useState([]);
-  const [gameState, setGameState] = useState("betting");
+  const [gameState, setGameState] = useState("playing");
   const [gameResult, setGameResult] = useState(null);
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
@@ -193,9 +193,9 @@ export default function BlackjackPage() {
   const [isSplitGame, setIsSplitGame] = useState(false);
 
   const [stats, setStats] = useState(() => safeRead(LS_KEY, { 
-    totalHands: 0, wins: 0, losses: 0, pushes: 0, totalBet: 0, totalWon: 0, 
+    totalHands: 0, wins: 0, losses: 0, pushes: 0, totalPlay: 0, totalWon: 0, 
     biggestWin: 0, blackjacks: 0, doubles: 0, splits: 0, surrenders: 0, 
-    insuranceWins: 0, insuranceLosses: 0, lastBet: MIN_BET 
+    insuranceWins: 0, insuranceLosses: 0, lastPlay: MIN_PLAY 
   }));
 
   const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
@@ -207,8 +207,8 @@ export default function BlackjackPage() {
     setIsFreePlay(isFree);
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
-    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
-    if (savedStats.lastBet) setBetAmount(String(savedStats.lastBet));
+    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
+    if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
     const interval = setInterval(() => { const status = getFreePlayStatus(); setFreePlayTokens(status.tokens); setVaultState(getVault()); }, 2000);
     if (typeof Audio !== "undefined") {
       try { clickSound.current = new Audio(S_CLICK); winSound.current = new Audio(S_WIN); } catch {}
@@ -242,23 +242,23 @@ export default function BlackjackPage() {
     } catch (err) { console.error(err); alert("Claim failed or rejected"); } finally { setClaiming(false); }
   };
 
-  const checkDealerBlackjack = (dealer, player, bet) => {
+  const checkDealerBlackjack = (dealer, player, play) => {
     const dealerVal = calculateHandValue(dealer);
     if (dealerVal === 21) {
       const playerVal = calculateHandValue(player);
       if (playerVal === 21) {
         // Both have blackjack - push
-        const newVault = getVault() + bet;
+        const newVault = getVault() + play;
         setVault(newVault); setVaultState(newVault);
-        setGameResult({ win: false, push: true, playerValue: 21, dealerValue: 21, prize: bet, profit: 0, blackjack: false });
-        const newStats = { ...stats, totalHands: stats.totalHands + 1, pushes: stats.pushes + 1, totalBet: stats.totalBet + bet, totalWon: stats.totalWon + bet, lastBet: bet };
+        setGameResult({ win: false, push: true, playerValue: 21, dealerValue: 21, prize: play, profit: 0, blackjack: false });
+        const newStats = { ...stats, totalHands: stats.totalHands + 1, pushes: stats.pushes + 1, totalPlay: stats.totalPlay + play, totalWon: stats.totalWon + play, lastPlay: play };
         setStats(newStats);
         setGameState("finished");
         return true;
       } else {
-        // Dealer has blackjack, player doesn't - dealer wins
-        setGameResult({ win: false, push: false, playerValue: playerVal, dealerValue: 21, prize: 0, profit: -bet, blackjack: false });
-        const newStats = { ...stats, totalHands: stats.totalHands + 1, losses: stats.losses + 1, totalBet: stats.totalBet + bet, lastBet: bet };
+        // Opponent has blackjack, player doesn't - opponent wins
+        setGameResult({ win: false, push: false, playerValue: playerVal, dealerValue: 21, prize: 0, profit: -play, blackjack: false });
+        const newStats = { ...stats, totalHands: stats.totalHands + 1, losses: stats.losses + 1, totalPlay: stats.totalPlay + play, lastPlay: play };
         setStats(newStats);
         setGameState("finished");
         return true;
@@ -268,23 +268,23 @@ export default function BlackjackPage() {
   };
 
   const dealCards = (isFreePlayParam = false) => {
-    if (gameState !== "betting") return;
+    if (gameState !== "playing") return;
     playSfx(clickSound.current);
     const currentVault = getVault();
-    let bet = Number(betAmount) || MIN_BET;
+    let play = Number(playAmount) || MIN_PLAY;
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
       if (result.success) { 
-        bet = result.amount;
+        play = result.amount;
         setIsFreePlay(false);
       }
       else { alert('No free play tokens available!'); setIsFreePlay(false); return; }
     } else {
-      if (bet < MIN_BET) { alert(`Minimum bet is ${MIN_BET} MLEO`); return; }
-      if (currentVault < bet) { alert('Insufficient MLEO in vault'); return; }
-      setVault(currentVault - bet); setVaultState(currentVault - bet);
+      if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
+      if (currentVault < play) { alert('Insufficient MLEO in vault'); return; }
+      setVault(currentVault - play); setVaultState(currentVault - play);
     }
-    setBetAmount(String(bet));
+    setPlayAmount(String(play));
 
     // Reset all states
     setHasDoubled(false);
@@ -324,17 +324,17 @@ export default function BlackjackPage() {
         if (playerValue === 21) {
           // Player has blackjack - check if dealer also has it
           setTimeout(() => {
-            if (checkDealerBlackjack(dealer, player, bet)) {
+            if (checkDealerBlackjack(dealer, player, play)) {
               return;
             }
             // Player blackjack wins
-            const prize = Math.floor(bet * 2.5);
+            const prize = Math.floor(play * 2.5);
             const newVault = getVault() + prize;
             setVault(newVault); 
             setVaultState(newVault);
             playSfx(winSound.current);
-            setGameResult({ win: true, push: false, playerValue: 21, dealerValue: calculateHandValue(dealer), prize, profit: prize - bet, blackjack: true });
-            const newStats = { ...stats, totalHands: stats.totalHands + 1, wins: stats.wins + 1, totalBet: stats.totalBet + bet, totalWon: stats.totalWon + prize, biggestWin: Math.max(stats.biggestWin, prize), blackjacks: stats.blackjacks + 1, lastBet: bet };
+            setGameResult({ win: true, push: false, playerValue: 21, dealerValue: calculateHandValue(dealer), prize, profit: prize - play, blackjack: true });
+            const newStats = { ...stats, totalHands: stats.totalHands + 1, wins: stats.wins + 1, totalPlay: stats.totalPlay + play, totalWon: stats.totalWon + prize, biggestWin: Math.max(stats.biggestWin, prize), blackjacks: stats.blackjacks + 1, lastPlay: play };
             setStats(newStats);
             setGameState("finished");
           }, 700);
@@ -357,8 +357,8 @@ export default function BlackjackPage() {
 
   const takeInsurance = () => {
     playSfx(clickSound.current);
-    const bet = Number(betAmount);
-    const insuranceAmount = Math.floor(bet / 2);
+    const play = Number(playAmount);
+    const insuranceAmount = Math.floor(play / 2);
     const currentVault = getVault();
     
     if (currentVault < insuranceAmount) {
@@ -380,11 +380,11 @@ export default function BlackjackPage() {
     const dealerVal = calculateHandValue(dealerHand);
     if (dealerVal === 21) {
       // Insurance pays 2:1
-      const insurancePayout = insuranceAmount * 3; // bet + 2x win
+      const insurancePayout = insuranceAmount * 3; // play + 2x win
       const newVault = getVault() + insurancePayout;
       setVault(newVault); setVaultState(newVault);
       
-      // Player loses main bet but wins insurance
+      // Player loses main play but wins insurance
       const playerVal = calculateHandValue(playerHand);
       setGameResult({ 
         win: false, 
@@ -392,11 +392,11 @@ export default function BlackjackPage() {
         playerValue: playerVal, 
         dealerValue: 21, 
         prize: insurancePayout, 
-        profit: insuranceAmount - bet, // Insurance win - main bet loss
+        profit: insuranceAmount - play, // Insurance win - main play loss
         blackjack: false,
         insurance: true
       });
-      const newStats = { ...stats, totalHands: stats.totalHands + 1, losses: stats.losses + 1, totalBet: stats.totalBet + bet + insuranceAmount, totalWon: stats.totalWon + insurancePayout, insuranceWins: stats.insuranceWins + 1, lastBet: bet };
+      const newStats = { ...stats, totalHands: stats.totalHands + 1, losses: stats.losses + 1, totalPlay: stats.totalPlay + play + insuranceAmount, totalWon: stats.totalWon + insurancePayout, insuranceWins: stats.insuranceWins + 1, lastPlay: play };
       setStats(newStats);
       setGameState("finished");
       return;
@@ -417,7 +417,7 @@ export default function BlackjackPage() {
     setShowInsurance(false);
     
     // Check for dealer blackjack anyway
-    if (checkDealerBlackjack(dealerHand, playerHand, Number(betAmount))) {
+    if (checkDealerBlackjack(dealerHand, playerHand, Number(playAmount))) {
       return;
     }
 
@@ -431,17 +431,17 @@ export default function BlackjackPage() {
     if (!canDouble || gameState !== "playing") return;
     playSfx(clickSound.current);
 
-    const bet = Number(betAmount);
+    const play = Number(playAmount);
     const currentVault = getVault();
     
-    if (currentVault < bet) {
+    if (currentVault < play) {
       alert('Insufficient MLEO to double down!');
       return;
     }
 
-    setVault(currentVault - bet);
-    setVaultState(currentVault - bet);
-    setBetAmount(String(bet * 2));
+    setVault(currentVault - play);
+    setVaultState(currentVault - play);
+    setPlayAmount(String(play * 2));
     setHasDoubled(true);
     setCanDouble(false);
     setCanSplit(false);
@@ -458,10 +458,10 @@ export default function BlackjackPage() {
       const value = calculateHandValue(newHand);
       if (value > 21) {
         setGameState("finished");
-        setTimeout(() => finishGame(newHand, dealerHand, bet * 2, false), 800);
+        setTimeout(() => finishGame(newHand, dealerHand, play * 2, false), 800);
       } else {
         // Automatically stand after double down
-        stand(newHand, bet * 2);
+        stand(newHand, play * 2);
       }
     }, 600);
 
@@ -473,16 +473,16 @@ export default function BlackjackPage() {
     if (!canSplit || gameState !== "playing") return;
     playSfx(clickSound.current);
 
-    const bet = Number(betAmount);
+    const play = Number(playAmount);
     const currentVault = getVault();
     
-    if (currentVault < bet) {
+    if (currentVault < play) {
       alert('Insufficient MLEO to split!');
       return;
     }
 
-    setVault(currentVault - bet);
-    setVaultState(currentVault - bet);
+    setVault(currentVault - play);
+    setVaultState(currentVault - play);
     setCanDouble(false);
     setCanSplit(false);
     setCanSurrender(false);
@@ -498,8 +498,8 @@ export default function BlackjackPage() {
     const hand2 = [card2, newCard2];
     
     setSplitHands([
-      { cards: hand1, bet: bet, finished: false, result: null },
-      { cards: hand2, bet: bet, finished: false, result: null }
+      { cards: hand1, play: play, finished: false, result: null },
+      { cards: hand2, play: play, finished: false, result: null }
     ]);
     setCurrentSplitIndex(0);
     setPlayerHand(hand1);
@@ -509,9 +509,9 @@ export default function BlackjackPage() {
     if (card1.value === "A") {
       // Split aces get only one card each - finish both hands
       setTimeout(() => finishSplitHands([
-        { cards: hand1, bet: bet, finished: true, result: null },
-        { cards: hand2, bet: bet, finished: true, result: null }
-      ], bet), 500);
+        { cards: hand1, play: play, finished: true, result: null },
+        { cards: hand2, play: play, finished: true, result: null }
+      ], play), 500);
     }
 
     const newStats = { ...stats, splits: stats.splits + 1 };
@@ -597,8 +597,8 @@ export default function BlackjackPage() {
       if (wins > 0) playSfx(winSound.current);
     }
 
-    const totalBet = individualBet * 2;
-    const profit = totalPrize - totalBet;
+    const totalPlay = individualBet * 2;
+    const profit = totalPrize - totalPlay;
 
     setGameResult({ 
       win: wins > losses, 
@@ -617,10 +617,10 @@ export default function BlackjackPage() {
       wins: stats.wins + wins,
       losses: stats.losses + losses,
       pushes: stats.pushes + pushes,
-      totalBet: stats.totalBet + totalBet,
+      totalPlay: stats.totalPlay + totalPlay,
       totalWon: stats.totalWon + totalPrize,
       biggestWin: Math.max(stats.biggestWin, totalPrize),
-      lastBet: individualBet
+      lastPlay: individualBet
     };
     setStats(newStats);
     setGameState("finished");
@@ -630,10 +630,10 @@ export default function BlackjackPage() {
     if (!canSurrender || gameState !== "playing") return;
     playSfx(clickSound.current);
     
-    const bet = Number(betAmount);
-    const refund = Math.floor(bet / 2);
+    const play = Number(playAmount);
+    const refund = Math.floor(play / 2);
     
-    // Refund half the bet
+    // Refund half the play
     const newVault = getVault() + refund;
     setVault(newVault); setVaultState(newVault);
     
@@ -648,7 +648,7 @@ export default function BlackjackPage() {
       playerValue: calculateHandValue(playerHand), 
       dealerValue: 0, 
       prize: refund, 
-      profit: -Math.floor(bet / 2),
+      profit: -Math.floor(play / 2),
       surrender: true
     });
 
@@ -657,9 +657,9 @@ export default function BlackjackPage() {
       totalHands: stats.totalHands + 1,
       losses: stats.losses + 1,
       surrenders: stats.surrenders + 1,
-      totalBet: stats.totalBet + bet,
+      totalPlay: stats.totalPlay + play,
       totalWon: stats.totalWon + refund,
-      lastBet: bet
+      lastPlay: play
     };
     setStats(newStats);
     setGameState("finished");
@@ -696,7 +696,7 @@ export default function BlackjackPage() {
               setPlayerHand(splitHands[nextIndex].cards);
             } else {
               // All hands finished
-              finishSplitHands(newHands, splitHands[0].bet);
+              finishSplitHands(newHands, splitHands[0].play);
             }
           }, 800);
         } else if (value === 21) {
@@ -715,7 +715,7 @@ export default function BlackjackPage() {
         const value = calculateHandValue(newHand);
         if (value > 21) {
           setGameState("finished");
-          setTimeout(() => finishGame(newHand, dealerHand, Number(betAmount), false), 800);
+          setTimeout(() => finishGame(newHand, dealerHand, Number(playAmount), false), 800);
         } else if (value === 21) {
           stand(newHand);
         }
@@ -734,7 +734,7 @@ export default function BlackjackPage() {
       setPlayerHand(splitHands[nextIndex].cards);
     } else {
       // All hands finished
-      finishSplitHands(newHands, splitHands[0].bet);
+      finishSplitHands(newHands, splitHands[0].play);
     }
   };
 
@@ -753,7 +753,7 @@ export default function BlackjackPage() {
     setCanSurrender(false);
 
     const currentPlayerHand = hand || playerHand;
-    const bet = customBet || Number(betAmount);
+    const play = customBet || Number(playAmount);
     let currentDealerHand = [...dealerHand];
     let currentDeck = [...deck];
 
@@ -766,7 +766,7 @@ export default function BlackjackPage() {
           setDealerHand([...currentDealerHand]);
           setDeck(currentDeck);
           setGameState("finished");
-          setTimeout(() => finishGame(currentPlayerHand, currentDealerHand, bet, false), 1200);
+          setTimeout(() => finishGame(currentPlayerHand, currentDealerHand, play, false), 1200);
           return;
         }
         
@@ -787,7 +787,7 @@ export default function BlackjackPage() {
     setTimeout(dealerPlay, 500);
   };
 
-  const finishGame = (player, dealer, bet, isBlackjack) => {
+  const finishGame = (player, dealer, play, isBlackjack) => {
     const playerValue = calculateHandValue(player);
     const dealerValue = calculateHandValue(dealer);
     let win = false;
@@ -796,18 +796,18 @@ export default function BlackjackPage() {
 
     if (isBlackjack) {
       win = true;
-      prize = Math.floor(bet * 2.5);
+      prize = Math.floor(play * 2.5);
     } else if (playerValue > 21) {
       win = false;
     } else if (dealerValue > 21) {
       win = true;
-      prize = bet * 2;
+      prize = play * 2;
     } else if (playerValue > dealerValue) {
       win = true;
-      prize = bet * 2;
+      prize = play * 2;
     } else if (playerValue === dealerValue) {
       push = true;
-      prize = bet;
+      prize = play;
     }
 
     if (win || push) {
@@ -816,15 +816,15 @@ export default function BlackjackPage() {
       if (win) playSfx(winSound.current);
     }
 
-    const resultData = { win, push, playerValue, dealerValue, prize, profit: win ? prize - bet : push ? 0 : -bet, blackjack: isBlackjack };
+    const resultData = { win, push, playerValue, dealerValue, prize, profit: win ? prize - play : push ? 0 : -play, blackjack: isBlackjack };
     setGameResult(resultData);
 
-    const newStats = { ...stats, totalHands: stats.totalHands + 1, wins: win ? stats.wins + 1 : stats.wins, losses: (!win && !push) ? stats.losses + 1 : stats.losses, pushes: push ? stats.pushes + 1 : stats.pushes, totalBet: stats.totalBet + bet, totalWon: (win || push) ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), blackjacks: isBlackjack ? stats.blackjacks + 1 : stats.blackjacks, lastBet: bet };
+    const newStats = { ...stats, totalHands: stats.totalHands + 1, wins: win ? stats.wins + 1 : stats.wins, losses: (!win && !push) ? stats.losses + 1 : stats.losses, pushes: push ? stats.pushes + 1 : stats.pushes, totalPlay: stats.totalPlay + play, totalWon: (win || push) ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), blackjacks: isBlackjack ? stats.blackjacks + 1 : stats.blackjacks, lastPlay: play };
     setStats(newStats);
   };
 
   const newHand = () => { 
-    setGameState("betting"); 
+    setGameState("playing"); 
     setPlayerHand([]);
     setDealerHand([]);
     setGameResult(null); 
@@ -847,7 +847,7 @@ export default function BlackjackPage() {
 
   const playerValue = calculateHandValue(playerHand);
   const dealerValue = calculateHandValue(dealerHand);
-  const potentialWin = Math.floor(Number(betAmount) * 2);
+  const potentialWin = Math.floor(Number(playAmount) * 2);
 
   return (
     <Layout>
@@ -869,7 +869,7 @@ export default function BlackjackPage() {
           <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
             <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
               <button onClick={backSafe} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">BACK</button>
-              {freePlayTokens > 0 && (<button onClick={() => dealCards(true)} disabled={gameState !== "betting"} className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50" title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}><span className="text-base">🎁</span><span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">{freePlayTokens}</span></button>)}
+              {freePlayTokens > 0 && (<button onClick={() => dealCards(true)} disabled={gameState !== "playing"} className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50" title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}><span className="text-base">🎁</span><span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">{freePlayTokens}</span></button>)}
             </div>
             <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
               <button onClick={() => { playSfx(clickSound.current); const el = wrapRef.current || document.documentElement; if (!document.fullscreenElement) { el.requestFullscreen?.().catch(() => {}); } else { document.exitFullscreen?.().catch(() => {}); } }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFullscreen ? "EXIT" : "FULL"}</button>
@@ -889,8 +889,8 @@ export default function BlackjackPage() {
               <div className="text-sm font-bold text-emerald-400">{fmt(vault)}</div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
-              <div className="text-[10px] text-white/60">Bet</div>
-              <div className="text-sm font-bold text-amber-400">{fmt(Number(betAmount))}</div>
+              <div className="text-[10px] text-white/60">Play</div>
+              <div className="text-sm font-bold text-amber-400">{fmt(Number(playAmount))}</div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">Win</div>
@@ -900,7 +900,7 @@ export default function BlackjackPage() {
 
           <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
             <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2" style={{ minHeight: '110px' }}>
-              <div className="text-xs text-white/60 mb-1">Dealer {gameState === "finished" && `(${dealerValue})`}</div>
+              <div className="text-xs text-white/60 mb-1">Opponent {gameState === "finished" && `(${dealerValue})`}</div>
               <div className="flex gap-1 flex-wrap min-h-[80px]">
                 {dealerHand.map((card, i) => (
                   <PlayingCard key={i} card={card} hidden={(gameState === "playing" || gameState === "insurance" || gameState === "dealing") && i === 1} delay={i * 200} />
@@ -908,7 +908,7 @@ export default function BlackjackPage() {
               </div>
             </div>
             <div className="bg-black/20 border border-white/10 rounded-lg p-3" style={{ minHeight: '110px' }}>
-              <div className="text-xs text-white/60 mb-1">You {gameState !== "betting" && gameState !== "insurance" && gameState !== "dealing" && `(${playerValue})`} {isSplitGame && `- Hand ${currentSplitIndex + 1}/2`}</div>
+              <div className="text-xs text-white/60 mb-1">You {gameState !== "playing" && gameState !== "insurance" && gameState !== "dealing" && `(${playerValue})`} {isSplitGame && `- Hand ${currentSplitIndex + 1}/2`}</div>
               <div className="flex gap-1 flex-wrap min-h-[80px]">
                 {playerHand.map((card, i) => (
                   <PlayingCard key={i} card={card} delay={i * 200} />
@@ -923,23 +923,23 @@ export default function BlackjackPage() {
                   gameResult.blackjack ? 'BLACKJACK!' : 
                   gameResult.push ? 'PUSH' : 
                   gameResult.win ? 'YOU WIN!' : 
-                  'DEALER WINS'
+                  'OPPONENT WINS'
                 ) : 'waiting'}
               </div>
             </div>
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap" style={{ minHeight: '48px' }}>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "betting"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "betting"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "betting"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "betting"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "betting"} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "playing"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "playing"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "playing"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "playing"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.max(MIN_PLAY, current - 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "playing"} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
             <div className="relative">
-              <input type="text" value={isEditingBet ? betAmount : formatBetDisplay(betAmount)} onFocus={() => setIsEditingBet(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setBetAmount(val || '0'); }} onBlur={() => { setIsEditingBet(false); const current = Number(betAmount) || MIN_BET; setBetAmount(String(Math.max(MIN_BET, current))); }} disabled={gameState !== "betting"} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-xs disabled:opacity-50 pr-6" />
-              <button onClick={() => { setBetAmount(String(MIN_BET)); playSfx(clickSound.current); }} disabled={gameState !== "betting"} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum bet">↺</button>
+              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={gameState !== "playing"} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-xs disabled:opacity-50 pr-6" />
+              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); playSfx(clickSound.current); }} disabled={gameState !== "playing"} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
             </div>
-            <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "betting"} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState !== "playing"} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: "140px" }}>
@@ -952,7 +952,7 @@ export default function BlackjackPage() {
                 <button onClick={surrender} disabled={!canSurrender} className="flex-1 h-12 rounded-lg font-bold text-[10px] bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed">SURR</button>
               </div>
             ) : (
-              <button onClick={gameState === "betting" ? () => dealCards(false) : newHand} disabled={gameState === "dealer"} className="w-full h-12 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
+              <button onClick={gameState === "playing" ? () => dealCards(false) : newHand} disabled={gameState === "dealer"} className="w-full h-12 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
                 {gameState === "dealer" ? "Dealing..." : gameState === "finished" ? "NEW HAND" : "DEAL"}
               </button>
             )}
@@ -971,13 +971,13 @@ export default function BlackjackPage() {
                 {gameResult.blackjack ? '💎' : gameResult.surrender ? '🏳️' : gameResult.split ? '✂️' : gameResult.win ? '🎉' : gameResult.push ? '🤝' : '😔'}
               </div>
               <div className="text-2xl font-bold mb-1">
-                {gameResult.surrender ? 'SURRENDERED' : gameResult.split ? `SPLIT: ${gameResult.splitWins}W ${gameResult.splitLosses}L` : gameResult.blackjack ? 'BLACKJACK!' : gameResult.win ? 'YOU WIN!' : gameResult.push ? 'PUSH' : 'DEALER WINS'}
+                {gameResult.surrender ? 'SURRENDERED' : gameResult.split ? `SPLIT: ${gameResult.splitWins}W ${gameResult.splitLosses}L` : gameResult.blackjack ? 'BLACKJACK!' : gameResult.win ? 'YOU WIN!' : gameResult.push ? 'PUSH' : 'OPPONENT WINS'}
               </div>
               <div className="text-lg">
                 {gameResult.win || gameResult.push ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}
               </div>
               {!gameResult.surrender && !gameResult.split && (
-                <div className="text-sm opacity-80 mt-2">You: {gameResult.playerValue} • Dealer: {gameResult.dealerValue}</div>
+                <div className="text-sm opacity-80 mt-2">You: {gameResult.playerValue} • Opponent: {gameResult.dealerValue}</div>
               )}
               {gameResult.insurance && <div className="text-sm opacity-80 mt-1">🛡️ Insurance Paid!</div>}
             </div>
@@ -1027,22 +1027,22 @@ export default function BlackjackPage() {
               <h2 className="text-2xl font-extrabold mb-4">♠️ How to Play</h2>
               <div className="space-y-3 text-sm">
                 <p><strong>Basic Rules:</strong></p>
-                <p>• Get closer to 21 than dealer without busting</p>
-                <p>• Dealer hits until 17+</p>
+                <p>• Get closer to 21 than opponent without busting</p>
+                <p>• Opponent hits until 17+</p>
                 <p><strong>Actions:</strong></p>
                 <p>• <strong>HIT:</strong> Take another card</p>
                 <p>• <strong>STAND:</strong> Keep your hand</p>
-                <p>• <strong>DOUBLE:</strong> Double bet, get 1 card</p>
+                <p>• <strong>DOUBLE:</strong> Double play, get 1 card</p>
                 <p>• <strong>SPLIT:</strong> Split pairs into 2 hands</p>
-                <p>• <strong>SURRENDER:</strong> Forfeit & get ½ bet back</p>
-                <p>• <strong>INSURANCE:</strong> Protect vs dealer Ace</p>
+                <p>• <strong>SURRENDER:</strong> Forfeit & get ½ play back</p>
+                <p>• <strong>INSURANCE:</strong> Protect vs opponent Ace</p>
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
                   <p className="text-red-300 font-semibold">Payouts:</p>
                   <div className="text-xs text-white/80 mt-2 space-y-1">
                     <p>• Blackjack: ×2.5 💎</p>
                     <p>• Win: ×2</p>
                     <p>• Push: Money back</p>
-                    <p>• Insurance: ×2 (if dealer BJ)</p>
+                    <p>• Insurance: ×2 (if opponent BJ)</p>
                   </div>
                 </div>
               </div>
@@ -1084,8 +1084,8 @@ export default function BlackjackPage() {
                     <div className="text-lg font-bold text-gray-400">{stats.surrenders}</div>
                   </div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
-                    <div className="text-xs text-white/60">Total Bet</div>
-                    <div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div>
+                    <div className="text-xs text-white/60">Total Play</div>
+                    <div className="text-lg font-bold text-amber-400">{fmt(stats.totalPlay)}</div>
                   </div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
                     <div className="text-xs text-white/60">Total Won</div>
@@ -1097,8 +1097,8 @@ export default function BlackjackPage() {
                   </div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
                     <div className="text-xs text-white/60">Net Profit</div>
-                    <div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {fmt(stats.totalWon - stats.totalBet)}
+                    <div className={`text-lg font-bold ${stats.totalWon - stats.totalPlay >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {fmt(stats.totalWon - stats.totalPlay)}
                     </div>
                   </div>
                 </div>
@@ -1106,7 +1106,7 @@ export default function BlackjackPage() {
                   <div className="text-sm font-semibold mb-2">🛡️ Insurance</div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-blue-300">{stats.insuranceWins}W / {stats.insuranceLosses}L</div>
-                    <div className="text-xs text-white/60 mt-1">Insurance Bets</div>
+                    <div className="text-xs text-white/60 mt-1">Insurance Plays</div>
                   </div>
                 </div>
               </div>
@@ -1150,10 +1150,10 @@ export default function BlackjackPage() {
             <div className="bg-yellow-500/20 border-2 border-yellow-500/50 rounded-xl p-6 text-center max-w-md w-full shadow-2xl animate-pulse">
               <div className="text-2xl font-bold text-yellow-300 mb-3">🛡️ Insurance?</div>
               <div className="text-base text-white/90 mb-3">
-                Dealer has Ace. Protect against Blackjack?
+                Opponent has Ace. Protect against Blackjack?
               </div>
               <div className="text-sm text-white/70 mb-4">
-                Cost: {fmt(Math.floor(Number(betAmount) / 2))} MLEO
+                Cost: {fmt(Math.floor(Number(playAmount) / 2))} MLEO
               </div>
               <div className="flex gap-3">
                 <button onClick={takeInsurance} className="flex-1 py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold">

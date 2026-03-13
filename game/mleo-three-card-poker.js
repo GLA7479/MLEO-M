@@ -1,6 +1,6 @@
 // ============================================================================
 // MLEO Three Card Poker - Full-Screen Game Template
-// Classic 3-card poker! Beat the dealer!
+// Classic 3-card poker! Beat the opponent!
 // ============================================================================
 
 import { useEffect, useRef, useState } from "react";
@@ -37,10 +37,10 @@ function useIOSViewportFix() {
 }
 
 const LS_KEY = "mleo_three_card_poker_v2";
-const MIN_BET = 1000;
+const MIN_PLAY = 1000;
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
-const PAYOUTS = { "Straight Flush": 100, "Three of a Kind": 30, "Straight": 6, "Flush": 3, "Pair": 1, "High Card": 0 };
+const PRIZES = { "Straight Flush": 100, "Three of a Kind": 30, "Straight": 6, "Flush": 3, "Pair": 1, "High Card": 0 };
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -54,7 +54,7 @@ function safeWrite(key, val) { if (typeof window === "undefined") return; try { 
 function getVault() { const rushData = safeRead("mleo_rush_core_v4", {}); return rushData.vault || 0; }
 function setVault(amount) { const rushData = safeRead("mleo_rush_core_v4", {}); rushData.vault = amount; safeWrite("mleo_rush_core_v4", rushData); }
 function fmt(n) { if (n >= 1e9) return (n / 1e9).toFixed(2) + "B"; if (n >= 1e6) return (n / 1e6).toFixed(2) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(2) + "K"; return Math.floor(n).toString(); }
-function formatBetDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
+function formatPlayDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
 function shortAddr(addr) { if (!addr || addr.length < 10) return addr || ""; return `${addr.slice(0, 6)}...${addr.slice(-4)}`; }
 
 function createDeck() {
@@ -148,11 +148,11 @@ export default function ThreeCardPokerPage() {
 
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
-  const [betAmount, setBetAmount] = useState("1000");
-  const [isEditingBet, setIsEditingBet] = useState(false);
+  const [playAmount, setPlayAmount] = useState("1000");
+  const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [playerCards, setPlayerCards] = useState([]);
   const [dealerCards, setDealerCards] = useState([]);
-  const [gameState, setGameState] = useState("betting");
+  const [gameState, setGameState] = useState("playing");
   const [playerHand, setPlayerHand] = useState(null);
   const [dealerHand, setDealerHand] = useState(null);
   const [gameResult, setGameResult] = useState(null);
@@ -171,7 +171,7 @@ export default function ThreeCardPokerPage() {
   const clickSound = useRef(null);
   const winSound = useRef(null);
 
-  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalHands: 0, wins: 0, losses: 0, ties: 0, totalBet: 0, totalWon: 0, biggestWin: 0, lastBet: MIN_BET }));
+  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalHands: 0, wins: 0, losses: 0, ties: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, lastPlay: MIN_PLAY }));
 
   const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
 
@@ -182,8 +182,8 @@ export default function ThreeCardPokerPage() {
     setIsFreePlay(isFree);
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
-    const savedStats = safeRead(LS_KEY, { lastBet: MIN_BET });
-    if (savedStats.lastBet) setBetAmount(String(savedStats.lastBet));
+    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
+    if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
     const interval = setInterval(() => { const status = getFreePlayStatus(); setFreePlayTokens(status.tokens); setVaultState(getVault()); }, 2000);
     if (typeof Audio !== "undefined") {
       try { clickSound.current = new Audio(S_CLICK); winSound.current = new Audio(S_WIN); } catch {}
@@ -218,20 +218,20 @@ export default function ThreeCardPokerPage() {
   };
 
   const dealCards = (isFreePlayParam = false) => {
-    if (gameState !== "betting") return;
+    if (gameState !== "playing") return;
     playSfx(clickSound.current);
     const currentVault = getVault();
-    let bet = Number(betAmount) || MIN_BET;
+    let play = Number(playAmount) || MIN_PLAY;
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
-      if (result.success) { bet = result.amount; setIsFreePlay(false); router.replace('/three-card-poker', undefined, { shallow: true }); }
+      if (result.success) { play = result.amount; setIsFreePlay(false); router.replace('/three-card-poker', undefined, { shallow: true }); }
       else { alert('No free play tokens available!'); setIsFreePlay(false); return; }
     } else {
-      if (bet < MIN_BET) { alert(`Minimum bet is ${MIN_BET} MLEO`); return; }
-      if (currentVault < bet) { alert('Insufficient MLEO in vault'); return; }
-      setVault(currentVault - bet); setVaultState(currentVault - bet);
+      if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
+      if (currentVault < play) { alert('Insufficient MLEO in vault'); return; }
+      setVault(currentVault - play); setVaultState(currentVault - play);
     }
-    setBetAmount(String(bet));
+    setPlayAmount(String(play));
 
     const deck = shuffleDeck(createDeck());
     const player = [deck[0], deck[2], deck[4]];
@@ -260,22 +260,22 @@ export default function ThreeCardPokerPage() {
         setPlayerHand(playerEval);
         setDealerHand(dealerEval);
         
-        setTimeout(() => finishGame(playerEval, dealerEval, bet), 800);
+        setTimeout(() => finishGame(playerEval, dealerEval, play), 800);
       }, 1400);
     }, 2400);
   };
 
-  const finishGame = (playerEval, dealerEval, bet) => {
+  const finishGame = (playerEval, dealerEval, play) => {
     const result = compareHands(playerEval, dealerEval);
     let win = result === "player";
     let tie = result === "tie";
     let prize = 0;
 
     if (tie) {
-      prize = bet;
+      prize = play;
     } else if (win) {
-      const multiplier = PAYOUTS[playerEval.hand] || 1;
-      prize = bet + (bet * multiplier);
+      const multiplier = PRIZES[playerEval.hand] || 1;
+      prize = play + (play * multiplier);
     }
 
     if (win || tie) {
@@ -284,20 +284,20 @@ export default function ThreeCardPokerPage() {
       if (win) playSfx(winSound.current);
     }
 
-    const resultData = { win, tie, playerHand: playerEval.hand, dealerHand: dealerEval.hand, prize, profit: win ? prize - bet : tie ? 0 : -bet };
+    const resultData = { win, tie, playerHand: playerEval.hand, dealerHand: dealerEval.hand, prize, profit: win ? prize - play : tie ? 0 : -play };
     setGameResult(resultData);
     setGameState("finished");
 
-    const newStats = { ...stats, totalHands: stats.totalHands + 1, wins: win ? stats.wins + 1 : stats.wins, losses: (!win && !tie) ? stats.losses + 1 : stats.losses, ties: tie ? stats.ties + 1 : stats.ties, totalBet: stats.totalBet + bet, totalWon: (win || tie) ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), lastBet: bet };
+    const newStats = { ...stats, totalHands: stats.totalHands + 1, wins: win ? stats.wins + 1 : stats.wins, losses: (!win && !tie) ? stats.losses + 1 : stats.losses, ties: tie ? stats.ties + 1 : stats.ties, totalPlay: stats.totalPlay + play, totalWon: (win || tie) ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), lastPlay: play };
     setStats(newStats);
   };
 
-  const newHand = () => { setGameState("betting"); setPlayerCards([]); setDealerCards([]); setPlayerHand(null); setDealerHand(null); setGameResult(null); setShowResultPopup(false); };
+  const newHand = () => { setGameState("playing"); setPlayerCards([]); setDealerCards([]); setPlayerHand(null); setDealerHand(null); setGameResult(null); setShowResultPopup(false); };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-pink-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
 
-  const potentialWin = Math.floor(Number(betAmount) * 2);
+  const potentialWin = Math.floor(Number(playAmount) * 2);
 
   return (
     <Layout>
@@ -319,7 +319,7 @@ export default function ThreeCardPokerPage() {
           <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
             <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
               <button onClick={backSafe} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">BACK</button>
-              {freePlayTokens > 0 && (<button onClick={() => dealCards(true)} disabled={gameState !== "betting"} className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50" title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}><span className="text-base">🎁</span><span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">{freePlayTokens}</span></button>)}
+              {freePlayTokens > 0 && (<button onClick={() => dealCards(true)} disabled={gameState !== "playing"} className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50" title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}><span className="text-base">🎁</span><span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">{freePlayTokens}</span></button>)}
             </div>
             <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
               <button onClick={() => { playSfx(clickSound.current); const el = wrapRef.current || document.documentElement; if (!document.fullscreenElement) { el.requestFullscreen?.().catch(() => {}); } else { document.exitFullscreen?.().catch(() => {}); } }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFullscreen ? "EXIT" : "FULL"}</button>
@@ -331,7 +331,7 @@ export default function ThreeCardPokerPage() {
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">🃏 3-Card Poker</h1>
-            <p className="text-white/70 text-xs">Beat the dealer with 3 cards!</p>
+            <p className="text-white/70 text-xs">Beat the opponent with 3 cards!</p>
           </div>
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
@@ -339,8 +339,8 @@ export default function ThreeCardPokerPage() {
               <div className="text-sm font-bold text-emerald-400">{fmt(vault)}</div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
-              <div className="text-[10px] text-white/60">Bet</div>
-              <div className="text-sm font-bold text-amber-400">{fmt(Number(betAmount))}</div>
+              <div className="text-[10px] text-white/60">Play</div>
+              <div className="text-sm font-bold text-amber-400">{fmt(Number(playAmount))}</div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">Win</div>
@@ -350,7 +350,7 @@ export default function ThreeCardPokerPage() {
 
           <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
             <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2" style={{ minHeight: '110px' }}>
-              <div className="text-xs text-white/60 mb-1">Dealer {dealerHand && `(${dealerHand.hand})`}</div>
+              <div className="text-xs text-white/60 mb-1">Opponent {dealerHand && `(${dealerHand.hand})`}</div>
               <div className="flex gap-1 flex-wrap min-h-[80px]">
                 {dealerCards.map((card, i) => (
                   <PlayingCard key={i} card={card} delay={i * 200} />
@@ -367,30 +367,30 @@ export default function ThreeCardPokerPage() {
             </div>
             <div className="text-center mt-2" style={{ height: '28px' }}>
               <div className={`text-base font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : gameResult?.tie ? 'text-yellow-400' : 'text-red-400'}`}>
-                {gameResult ? (gameResult.tie ? 'TIE' : gameResult.win ? 'YOU WIN!' : 'DEALER WINS') : 'waiting'}
+                {gameResult ? (gameResult.tie ? 'TIE' : gameResult.win ? 'YOU WIN!' : 'OPPONENT WINS') : 'waiting'}
               </div>
             </div>
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap" style={{ minHeight: '48px' }}>
-            {gameState === "betting" && (
+            {gameState === "playing" && (
               <>
-                <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs">1K</button>
-                <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs">10K</button>
-                <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs">100K</button>
-                <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = current === MIN_BET ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs">1M</button>
-                <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.max(MIN_BET, current - 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm">−</button>
+                <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs">1K</button>
+                <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs">10K</button>
+                <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs">100K</button>
+                <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs">1M</button>
+                <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.max(MIN_PLAY, current - 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm">−</button>
                 <div className="relative">
-                  <input type="text" value={isEditingBet ? betAmount : formatBetDisplay(betAmount)} onFocus={() => setIsEditingBet(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setBetAmount(val || '0'); }} onBlur={() => { setIsEditingBet(false); const current = Number(betAmount) || MIN_BET; setBetAmount(String(Math.max(MIN_BET, current))); }} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-xs pr-6" />
-                  <button onClick={() => { setBetAmount(String(MIN_BET)); playSfx(clickSound.current); }} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs flex items-center justify-center" title="Reset to minimum bet">↺</button>
+                  <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-xs pr-6" />
+                  <button onClick={() => { setPlayAmount(String(MIN_PLAY)); playSfx(clickSound.current); }} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs flex items-center justify-center" title="Reset to minimum play">↺</button>
                 </div>
-                <button onClick={() => { const current = Number(betAmount) || MIN_BET; const newBet = Math.min(vault, current + 1000); setBetAmount(String(newBet)); playSfx(clickSound.current); }} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm">+</button>
+                <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm">+</button>
               </>
             )}
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            <button onClick={gameState === "betting" ? () => dealCards(false) : newHand} disabled={gameState === "showdown"} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
+            <button onClick={gameState === "playing" ? () => dealCards(false) : newHand} disabled={gameState === "showdown"} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
               {gameState === "showdown" ? "Dealing..." : gameState === "finished" ? "NEW HAND" : "DEAL"}
             </button>
             <div className="flex gap-2">
@@ -405,9 +405,9 @@ export default function ThreeCardPokerPage() {
           <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
             <div className={`${gameResult.win ? 'bg-green-500' : gameResult.tie ? 'bg-yellow-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
               <div className="text-4xl mb-2">{gameResult.win ? '🎉' : gameResult.tie ? '🤝' : '😔'}</div>
-              <div className="text-2xl font-bold mb-1">{gameResult.tie ? 'TIE!' : gameResult.win ? 'YOU WIN!' : 'DEALER WINS'}</div>
+              <div className="text-2xl font-bold mb-1">{gameResult.tie ? 'TIE!' : gameResult.win ? 'YOU WIN!' : 'OPPONENT WINS'}</div>
               <div className="text-lg">{gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : gameResult.tie ? 'Money Back' : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div>
-              <div className="text-sm opacity-80 mt-2">You: {gameResult.playerHand} • Dealer: {gameResult.dealerHand}</div>
+              <div className="text-sm opacity-80 mt-2">You: {gameResult.playerHand} • Opponent: {gameResult.dealerHand}</div>
             </div>
           </div>
         )}
@@ -428,8 +428,8 @@ export default function ThreeCardPokerPage() {
             <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
               <h2 className="text-2xl font-extrabold mb-4">🃏 How to Play</h2>
               <div className="space-y-3 text-sm">
-                <p><strong>1. Place Bet:</strong> Min {MIN_BET} MLEO</p>
-                <p><strong>2. Get 3 Cards:</strong> You and dealer get 3 cards each</p>
+                <p><strong>1. Place Play:</strong> Min {MIN_PLAY} MLEO</p>
+                <p><strong>2. Get 3 Cards:</strong> You and opponent get 3 cards each</p>
                 <p><strong>3. Best Hand Wins:</strong> Higher poker hand wins!</p>
                 <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
                   <p className="text-purple-300 font-semibold">Hand Rankings:</p>
@@ -455,10 +455,10 @@ export default function ThreeCardPokerPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Hands</div><div className="text-xl font-bold">{stats.totalHands}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalHands > 0 ? ((stats.wins / stats.totalHands) * 100).toFixed(1) : 0}%</div></div>
-                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Bet</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalBet)}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Play</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalPlay)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div>
-                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalBet >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalBet)}</div></div>
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalPlay >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalPlay)}</div></div>
                 </div>
               </div>
               <button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button>

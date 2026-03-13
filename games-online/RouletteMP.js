@@ -96,12 +96,12 @@ function getColor(num) {
   return entry?.color || 'green';
 }
 
-// Check if bet wins
-function checkBetWin(betType, betValue, result) {
+// Check if play wins
+function checkBetWin(playType, betValue, result) {
   const resultColor = getColor(result);
   const value = parseInt(betValue, 10);
 
-  switch (betType) {
+  switch (playType) {
     case 'number':
       return parseInt(betValue, 10) === result;
     case 'red':
@@ -133,9 +133,9 @@ function checkBetWin(betType, betValue, result) {
   }
 }
 
-// Get payout multiplier
-function getPayoutMultiplier(betType) {
-  switch (betType) {
+// Get prize multiplier
+function getPayoutMultiplier(playType) {
+  switch (playType) {
     case 'number':
       return 35;
     case 'red':
@@ -166,15 +166,15 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
   const minRequired = MIN_BUYIN_OPTIONS[tierCode] ?? 0;
   const [session, setSession] = useState(null);
   const [players, setPlayers] = useState([]);
-  const [bets, setBets] = useState([]);
+  const [plays, setBets] = useState([]);
   const [spinHistory, setSpinHistory] = useState([]);
   const [roomMembers, setRoomMembers] = useState([]);
   const [msg, setMsg] = useState("");
-  const [selectedBet, setSelectedBet] = useState(null);
-  const [betAmount, setBetAmount] = useState(minRequired);
+  const [selectedPlay, setSelectedPlay] = useState(null);
+  const [playAmount, setPlayAmount] = useState(minRequired);
 
   useEffect(() => {
-    setBetAmount(minRequired);
+    setPlayAmount(minRequired);
   }, [minRequired]);
   const [spinAngle, setSpinAngle] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -189,7 +189,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
   const [isSlowingDown, setIsSlowingDown] = useState(false);
   const slowingDownStartRef = useRef(null);
   const bettingStartTimeRef = useRef(null);
-  const bettingStartAngleRef = useRef(null); // Store the initial angle when betting phase starts
+  const bettingStartAngleRef = useRef(null); // Store the initial angle when playing phase starts
   const animationRunningRef = useRef(false); // Prevent multiple animations
 
   const openBetPanel = () => {
@@ -220,14 +220,14 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Sync spinAngle with ref when it changes externally (but not during betting animation)
+  // Sync spinAngle with ref when it changes externally (but not during playing animation)
   useEffect(() => {
-    if (session?.stage !== "betting") {
+    if (session?.stage !== "playing") {
       currentSpinAngleRef.current = spinAngle;
     }
   }, [spinAngle, session?.stage]);
 
-  // Helper function to calculate current velocity at a given time in betting phase
+  // Helper function to calculate current velocity at a given time in playing phase
   // During 30 seconds: starts fast and gradually slows down
   const calculateCurrentVelocity = (elapsed, totalDuration) => {
     const initialVelocity = 360 / 0.5; // degrees per second - very fast at start (full rotation every 0.5 seconds)
@@ -244,35 +244,35 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     return ROULETTE_NUMBERS[idx]?.num ?? 0;
   };
 
-  // Continuous spin animation during betting stage (30 seconds) + 5 seconds slowdown
+  // Continuous spin animation during playing stage (30 seconds) + 5 seconds slowdown
   useEffect(() => {
     let animationFrameId = null;
     const BETTING_DURATION = BETTING_SECONDS;
     const FINAL_SLOWDOWN_DURATION = 10; // seconds
     
-    // Initialize betting start time when betting stage starts
-    if (session?.stage === "betting" && bettingTimeLeft > 0) {
+    // Initialize playing start time when playing stage starts
+    if (session?.stage === "playing" && bettingTimeLeft > 0) {
       if (!bettingStartTimeRef.current) {
-        // Calculate when betting actually started based on deadline
+        // Calculate when playing actually started based on deadline
         if (session?.betting_deadline) {
           const deadline = new Date(session.betting_deadline).getTime();
           bettingStartTimeRef.current = deadline - (BETTING_SECONDS * 1000);
         } else {
           bettingStartTimeRef.current = Date.now();
         }
-        // Store the initial angle when betting phase starts - this stays constant for the entire animation
+        // Store the initial angle when playing phase starts - this stays constant for the entire animation
         bettingStartAngleRef.current = currentSpinAngleRef.current || lastSpinAngleRef.current || 0;
         currentSpinAngleRef.current = bettingStartAngleRef.current;
         setSpinAngle(bettingStartAngleRef.current);
       }
     }
     
-    // Start final slowdown when betting time reaches 0
+    // Start final slowdown when playing time reaches 0
     // Ensure smooth transition - use the exact final velocity from 30-second phase
-    if (session?.stage === "betting" && bettingTimeLeft === 0 && !isSlowingDown && currentSpinAngleRef.current !== null && bettingStartTimeRef.current) {
+    if (session?.stage === "playing" && bettingTimeLeft === 0 && !isSlowingDown && currentSpinAngleRef.current !== null && bettingStartTimeRef.current) {
       // Use the final velocity that matches the end of the 30-second phase
       // This ensures perfect continuity - no jumps
-      const finalVelocityAt30s = 360 / 3; // degrees per second - matches finalVelocity in betting phase
+      const finalVelocityAt30s = 360 / 3; // degrees per second - matches finalVelocity in playing phase
       
       // Get the current angle - preserve it for smooth transition
       const currentAngle = currentSpinAngleRef.current || 0;
@@ -285,8 +285,8 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       };
     }
     
-    if (session?.stage === "betting" && bettingTimeLeft > 0 && bettingStartTimeRef.current && bettingStartAngleRef.current !== null && !animationRunningRef.current) {
-      // Reset slowing down state if betting restarted
+    if (session?.stage === "playing" && bettingTimeLeft > 0 && bettingStartTimeRef.current && bettingStartAngleRef.current !== null && !animationRunningRef.current) {
+      // Reset slowing down state if playing restarted
       if (isSlowingDown) {
         setIsSlowingDown(false);
         slowingDownStartRef.current = null;
@@ -295,7 +295,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       // Mark animation as running to prevent multiple instances
       animationRunningRef.current = true;
       
-      // Gradual slowdown during 30 seconds of betting - starts fast, ends slower
+      // Gradual slowdown during 30 seconds of playing - starts fast, ends slower
       const startTime = bettingStartTimeRef.current;
       const startAngle = bettingStartAngleRef.current; // Use the fixed start angle - never changes during animation
       const initialVelocity = 360 / 0.5; // degrees per second - very fast at start
@@ -304,12 +304,12 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       // Use requestAnimationFrame for smooth animation
       const animate = () => {
         // Check if we should continue animating
-        if (session?.stage !== "betting" || bettingTimeLeft <= 0 || !bettingStartTimeRef.current || bettingStartAngleRef.current === null) {
+        if (session?.stage !== "playing" || bettingTimeLeft <= 0 || !bettingStartTimeRef.current || bettingStartAngleRef.current === null) {
           animationRunningRef.current = false;
           return;
         }
         
-        const elapsed = (Date.now() - startTime) / 1000; // seconds since betting started
+        const elapsed = (Date.now() - startTime) / 1000; // seconds since playing started
         const timeProgress = Math.min(elapsed / BETTING_DURATION, 1); // 0 to 1
         
         // Calculate distance using integration of velocity curve
@@ -336,13 +336,13 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       
       animationFrameId = requestAnimationFrame(animate);
       
-    } else if (session?.stage === "betting" && isSlowingDown && slowingDownStartRef.current) {
+    } else if (session?.stage === "playing" && isSlowingDown && slowingDownStartRef.current) {
       // Final slowdown phase - 5 seconds of gradual slowdown to complete stop
       // This continues smoothly from where the 30-second phase ended
       const startData = slowingDownStartRef.current;
       const startTime = startData.time;
       const startAngle = startData.angle;
-      const initialVelocity = startData.velocity; // degrees per second at start of final slowdown (should match finalVelocity from betting phase)
+      const initialVelocity = startData.velocity; // degrees per second at start of final slowdown (should match finalVelocity from playing phase)
       
       // Use requestAnimationFrame for smooth slowdown animation
       const animate = () => {
@@ -381,7 +381,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       
       animationFrameId = requestAnimationFrame(animate);
       
-    } else if (session?.stage !== "betting") {
+    } else if (session?.stage !== "playing") {
       // Reset when stage changes
       animationRunningRef.current = false;
       if (isSlowingDown) {
@@ -419,11 +419,11 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     return map;
   }, [players]);
 
-  const describeBet = useCallback((bet) => {
-    if (!bet) return "";
-    switch (bet.bet_type) {
+  const describeBet = useCallback((play) => {
+    if (!play) return "";
+    switch (play.bet_type) {
       case "number":
-        return `#${bet.bet_value}`;
+        return `#${play.bet_value}`;
       case "red":
         return "RED";
       case "black":
@@ -437,34 +437,34 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       case "high":
         return "19-36";
       case "dozen":
-        if (bet.bet_value === "1") return "1st 12";
-        if (bet.bet_value === "2") return "2nd 12";
-        if (bet.bet_value === "3") return "3rd 12";
+        if (play.bet_value === "1") return "1st 12";
+        if (play.bet_value === "2") return "2nd 12";
+        if (play.bet_value === "3") return "3rd 12";
         return "Dozen";
       case "column":
-        if (bet.bet_value === "1") return "Col 1";
-        if (bet.bet_value === "2") return "Col 2";
-        if (bet.bet_value === "3") return "Col 3";
+        if (play.bet_value === "1") return "Col 1";
+        if (play.bet_value === "2") return "Col 2";
+        if (play.bet_value === "3") return "Col 3";
         return "Column";
       default:
-        return bet.bet_type;
+        return play.bet_type;
     }
   }, []);
 
   const allBetsThisRound = useMemo(() => {
-    if (!bets?.length) return [];
-    return bets.map((bet) => {
-      const name = playerNameById.get(bet.player_id) || "Unknown";
-      const label = describeBet(bet);
-      const isWinner = bet.is_winner === true;
-      const isLoser = bet.is_winner === false;
+    if (!plays?.length) return [];
+    return plays.map((play) => {
+      const name = playerNameById.get(play.player_id) || "Unknown";
+      const label = describeBet(play);
+      const isWinner = play.is_winner === true;
+      const isLoser = play.is_winner === false;
       return {
-        id: bet.id,
+        id: play.id,
         player: name,
         label,
-        amount: fmt(bet.amount),
-        status: bet.is_winner,
-        payout: isWinner && bet.payout_amount ? fmt(bet.payout_amount) : null,
+        amount: fmt(play.amount),
+        status: play.is_winner,
+        prize: isWinner && play.prize_amount ? fmt(play.prize_amount) : null,
         className: isWinner
           ? "bg-green-600/80 border-green-400 text-green-100"
           : isLoser
@@ -472,36 +472,36 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
           : "bg-white/10 border-white/20 text-white",
       };
     });
-  }, [bets, playerNameById, describeBet]);
+  }, [plays, playerNameById, describeBet]);
 
   const groupedAllBets = useMemo(() => {
     if (!allBetsThisRound.length) return [];
     const map = new Map();
-    allBetsThisRound.forEach((bet) => {
-      if (!map.has(bet.player)) {
-        map.set(bet.player, []);
+    allBetsThisRound.forEach((play) => {
+      if (!map.has(play.player)) {
+        map.set(play.player, []);
       }
-      map.get(bet.player).push(bet);
+      map.get(play.player).push(play);
     });
-    return Array.from(map.entries()).map(([player, bets]) => ({
+    return Array.from(map.entries()).map(([player, plays]) => ({
       player,
-      bets,
+      plays,
     }));
   }, [allBetsThisRound]);
 
-  // My bets - sorted and memoized
-  // Show bets from current spin, or keep previous spin bets until new betting starts
+  // My plays - sorted and memoized
+  // Show plays from current spin, or keep previous spin plays until new playing starts
   const myBets = useMemo(() => {
     if (!myRow?.id) return [];
     
-    // Get bets for current player
-    const arr = bets.filter(b => b.player_id === myRow.id) || [];
+    // Get plays for current player
+    const arr = plays.filter(b => b.player_id === myRow.id) || [];
     
-    // If in betting stage, only show unresolved bets (active bets)
-    // Otherwise, show all bets (to show results from previous spin)
-    const filteredBets = session?.stage === "betting" 
+    // If in playing stage, only show unresolved plays (active plays)
+    // Otherwise, show all plays (to show results from previous spin)
+    const filteredBets = session?.stage === "playing" 
       ? arr.filter(b => b.is_winner === null)
-      : arr; // Keep all bets during results/spinning/lobby to show winners/losers
+      : arr; // Keep all plays during results/spinning/lobby to show winners/losers
     
     filteredBets.sort((a, b) => {
       // Sort by: unresolved first, then by type
@@ -511,11 +511,11 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     });
     
     return filteredBets;
-  }, [bets, myRow?.id, session?.stage]);
+  }, [plays, myRow?.id, session?.stage]);
 
-  // Auto-open bet panel when betting stage starts
+  // Auto-open play panel when playing stage starts
   useEffect(() => {
-    if (session?.stage === "betting" && bettingTimeLeft > 0) {
+    if (session?.stage === "playing" && bettingTimeLeft > 0) {
       if (panelDismissed) {
         if (showBetPanel) setShowBetPanel(false);
       } else if (!showBetPanel) {
@@ -600,7 +600,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     return () => ch.unsubscribe();
   }, [session?.id]);
 
-  // ===== Channel: Bets per session =====
+  // ===== Channel: Plays per session =====
   useEffect(() => {
     if (!session?.id) return;
 
@@ -612,8 +612,8 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
         table: "roulette_bets",
         filter: `session_id=eq.${session.id}`,
       }, async () => {
-        // Get bets for current spin only (same spin_number as session)
-        // Keep bets from previous spin until new betting starts
+        // Get plays for current spin only (same spin_number as session)
+        // Keep plays from previous spin until new playing starts
         const { data } = await supabase
           .from("roulette_bets")
           .select("*")
@@ -716,7 +716,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       }
 
       if (readVault() < minRequired) {
-        setMsg(`Minimum buy-in is ${fmt(minRequired)}`);
+        setMsg(`Minimum entry fee is ${fmt(minRequired)}`);
         return;
       }
 
@@ -763,14 +763,14 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
 
     const deadline = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
 
-    // Clear old resolved bets before starting new round
+    // Clear old resolved plays before starting new round
     await supabase
       .from("roulette_bets")
       .delete()
       .eq("session_id", session.id)
       .not("is_winner", "is", null);
 
-    // Reset player bets first
+    // Reset player plays first
     await supabase
       .from("roulette_players")
       .update({ total_bet: 0, total_won: 0 })
@@ -779,7 +779,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     const { data, error } = await supabase
       .from("roulette_sessions")
       .update({
-        stage: "betting",
+        stage: "playing",
         betting_deadline: deadline,
         spin_result: null,
         spin_color: null,
@@ -804,14 +804,14 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       const timer = setTimeout(async () => {
         const deadline = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
 
-        // Clear any old resolved bets before starting
+        // Clear any old resolved plays before starting
         await supabase
           .from("roulette_bets")
           .delete()
           .eq("session_id", session.id)
           .not("is_winner", "is", null);
 
-        // Reset player bets first
+        // Reset player plays first
         await supabase
           .from("roulette_players")
           .update({ total_bet: 0, total_won: 0 })
@@ -820,7 +820,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
         const { data, error } = await supabase
           .from("roulette_sessions")
           .update({
-            stage: "betting",
+            stage: "playing",
             betting_deadline: deadline,
             spin_result: null,
             spin_color: null,
@@ -840,8 +840,8 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     }
   }, [session?.id, session?.stage, session?.spin_number, isLeader]);
 
-  // ===== Place bet =====
-  async function placeBet(betType, betValue) {
+  // ===== Place play =====
+  async function placeBet(playType, betValue) {
     // Ensure session exists
     let sess = session;
     if (!sess || !sess.id) {
@@ -876,19 +876,19 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       return;
     }
 
-    if (sess.stage !== "betting") {
-      setMsg("Betting is closed");
+    if (sess.stage !== "playing") {
+      setMsg("Playing is closed");
       return;
     }
 
     if (readVault() < minRequired) {
-      setMsg(`Minimum buy-in is ${fmt(minRequired)}`);
+      setMsg(`Minimum entry fee is ${fmt(minRequired)}`);
       return;
     }
 
-    const amount = Math.floor(Number(betAmount));
+    const amount = Math.floor(Number(playAmount));
     if (amount < minRequired) {
-      setMsg(`Minimum bet is ${fmt(minRequired)}`);
+      setMsg(`Minimum play is ${fmt(minRequired)}`);
       return;
     }
 
@@ -897,19 +897,19 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       return;
     }
 
-    const multiplier = getPayoutMultiplier(betType);
+    const multiplier = getPayoutMultiplier(playType);
 
     const currentPlayerId = currentPlayer.id;
 
     const { error } = await supabase.from("roulette_bets").insert({
       session_id: sess.id,
       player_id: currentPlayerId,
-      bet_type: betType,
+      bet_type: playType,
       bet_value: String(betValue),
       amount: amount,
-      payout_multiplier: multiplier,
+      prize_multiplier: multiplier,
       is_winner: null,
-      payout_amount: null,
+      prize_amount: null,
     });
 
     if (error) {
@@ -925,7 +925,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       .select()
       .single();
 
-    // Update session total bets (with select to ensure return representation)
+    // Update session total plays (with select to ensure return representation)
     await supabase
       .from("roulette_sessions")
       .update({ total_bets: (sess.total_bets || 0) + amount })
@@ -947,7 +947,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
   
   async function declareWinner(winningNumber) {
     if (!isLeader) return;
-    if (session && !["betting", "spinning"].includes(session.stage)) return;
+    if (session && !["playing", "spinning"].includes(session.stage)) return;
     
     // Guard against concurrent declarations
     if (spinningRef.current) return;
@@ -976,7 +976,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
 
       setSession(updatedSession);
 
-      // Calculate payouts
+      // Calculate prizes
       await calculatePayouts(winningNumber, color, updatedSession.id);
 
       // Save spin to history
@@ -989,29 +989,29 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
         total_payouts: updatedSession.total_payouts || 0,
       });
 
-      // After results display, immediately start next betting round
+      // After results display, immediately start next playing round
       setTimeout(async () => {
         if (isLeader) {
           const deadline = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
           
-          // Clear old resolved bets before starting new round
+          // Clear old resolved plays before starting new round
           await supabase
             .from("roulette_bets")
             .delete()
             .eq("session_id", updatedSession.id)
             .not("is_winner", "is", null);
           
-          // Reset player bets
+          // Reset player plays
           await supabase
             .from("roulette_players")
             .update({ total_bet: 0, total_won: 0 })
             .eq("session_id", updatedSession.id);
           
-          // Start betting stage immediately
+          // Start playing stage immediately
           const { data: newSession } = await supabase
             .from("roulette_sessions")
             .update({
-              stage: "betting",
+              stage: "playing",
               betting_deadline: deadline,
               spin_result: null,
               spin_color: null,
@@ -1025,7 +1025,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
           
           if (newSession) {
             setSession(newSession);
-            // Reset betting start time for new round
+            // Reset playing start time for new round
             bettingStartTimeRef.current = null;
           }
         }
@@ -1041,14 +1041,14 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
   // Legacy function - no longer used but kept for compatibility
   async function spinWheel() {
     if (!isLeader) return;
-    if (session?.stage !== "betting") return;
+    if (session?.stage !== "playing") return;
     
     // Guard against concurrent spins
     if (spinningRef.current) return;
     spinningRef.current = true;
     
     try {
-      // Close betting
+      // Close playing
       await supabase
         .from("roulette_sessions")
         .update({ stage: "spinning", betting_deadline: null })
@@ -1088,7 +1088,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
 
       setSession(updatedSession);
 
-      // Calculate payouts
+      // Calculate prizes
       await calculatePayouts(result, color, updatedSession.id);
 
       // Save spin to history
@@ -1103,28 +1103,28 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
 
       // Move to results stage, then immediately start countdown for next round
       setTimeout(async () => {
-        // After results display, immediately start next betting round
+        // After results display, immediately start next playing round
         if (isLeader) {
           const deadline = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
           
-          // Clear old resolved bets before starting new round (keep bets visible during results)
+          // Clear old resolved plays before starting new round (keep plays visible during results)
           await supabase
             .from("roulette_bets")
             .delete()
             .eq("session_id", updatedSession.id)
-            .not("is_winner", "is", null); // Delete only resolved bets
+            .not("is_winner", "is", null); // Delete only resolved plays
           
-          // Reset player bets
+          // Reset player plays
           await supabase
             .from("roulette_players")
             .update({ total_bet: 0, total_won: 0 })
             .eq("session_id", updatedSession.id);
           
-          // Start betting stage immediately (with 30 second countdown)
+          // Start playing stage immediately (with 30 second countdown)
           const { data: newSession } = await supabase
             .from("roulette_sessions")
             .update({
-              stage: "betting",
+              stage: "playing",
               betting_deadline: deadline,
               spin_result: null,
               spin_color: null,
@@ -1138,13 +1138,13 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
           
           if (newSession) {
             setSession(newSession);
-            // Don't clear bets list - let the channel refresh it
+            // Don't clear plays list - let the channel refresh it
           }
         } else {
-          // For non-leaders, just update stage (bets will be cleared when leader starts new round)
+          // For non-leaders, just update stage (plays will be cleared when leader starts new round)
           await supabase
             .from("roulette_sessions")
-            .update({ stage: "betting", spin_result: null, spin_color: null })
+            .update({ stage: "playing", spin_result: null, spin_color: null })
             .eq("id", updatedSession.id);
         }
         
@@ -1159,9 +1159,9 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     }
   }
 
-  // ===== Calculate payouts =====
+  // ===== Calculate prizes =====
   async function calculatePayouts(result, color, sessionId) {
-    // Get all active bets
+    // Get all active plays
     const { data: activeBets } = await supabase
       .from("roulette_bets")
       .select("*")
@@ -1172,44 +1172,44 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
 
     let totalPayouts = 0;
 
-    for (const bet of activeBets) {
-      const isWinner = checkBetWin(bet.bet_type, bet.bet_value, result);
-      const payout = isWinner ? Math.floor(bet.amount * bet.payout_multiplier) : 0;
+    for (const play of activeBets) {
+      const isWinner = checkBetWin(play.bet_type, play.bet_value, result);
+      const prize = isWinner ? Math.floor(play.amount * play.prize_multiplier) : 0;
 
       await supabase
         .from("roulette_bets")
         .update({
           is_winner: isWinner,
-          payout_amount: payout,
+          prize_amount: prize,
         })
-        .eq("id", bet.id);
+        .eq("id", play.id);
 
-      if (isWinner && payout > 0) {
+      if (isWinner && prize > 0) {
         // Update player balance
         const { data: player } = await supabase
           .from("roulette_players")
           .select("balance, total_won, client_id")
-          .eq("id", bet.player_id)
+          .eq("id", play.player_id)
           .single();
 
         if (player) {
-          const newBalance = (player.balance || 0) + payout;
+          const newBalance = (player.balance || 0) + prize;
           await supabase
             .from("roulette_players")
             .update({
               balance: newBalance,
-              total_won: (player.total_won || 0) + payout,
+              total_won: (player.total_won || 0) + prize,
             })
-            .eq("id", bet.player_id);
+            .eq("id", play.player_id);
 
           // Add to vault if it's the current player
           if (player.client_id === clientId) {
             const v = readVault();
-            writeVault(v + payout);
+            writeVault(v + prize);
           }
         }
 
-        totalPayouts += payout;
+        totalPayouts += prize;
       }
     }
 
@@ -1233,7 +1233,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       setSession(updatedSession);
     }
 
-    // Refresh bets list - keep all bets (including resolved) to show results
+    // Refresh plays list - keep all plays (including resolved) to show results
     const { data: refreshedBets } = await supabase
       .from("roulette_bets")
       .select("*")
@@ -1254,7 +1254,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     if (timerRef.current) clearInterval(timerRef.current);
     
     // Update timer immediately
-    if (session?.betting_deadline && session.stage === "betting") {
+    if (session?.betting_deadline && session.stage === "playing") {
       const updateTimer = async () => {
         const now = Date.now();
         const deadline = new Date(session.betting_deadline).getTime();
@@ -1293,7 +1293,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
       </div>
     );
 
-  const isBetting = session?.stage === "betting";
+  const isBetting = session?.stage === "playing";
   const isSpinningStage = session?.stage === "spinning";
   const isResults = session?.stage === "results";
   const canBet = isBetting && myRow && bettingTimeLeft > 0;
@@ -1333,7 +1333,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                         : 'bg-blue-600/80 hover:bg-blue-600'
                     }`}
                   >
-                    {showBetPanel ? 'HIDE BETS' : 'SHOW BETS'}
+                    {showBetPanel ? 'HIDE PLAYS' : 'SHOW PLAYS'}
                   </button>
                 )}
                 <div className="flex items-center justify-center gap-4">
@@ -1448,7 +1448,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                             <div className="text-3xl font-bold text-white tabular-nums">{bettingTimeLeft}</div>
                           </>
                         ) : (
-                          <div className="text-white/40 text-sm uppercase tracking-wide">No More Bet</div>
+                          <div className="text-white/40 text-sm uppercase tracking-wide">No More Play</div>
                         )}
                       </div>
                     </div>
@@ -1471,21 +1471,21 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                 ) : null}
               </div>
 
-              {/* My Bets - Always visible */}
+              {/* My Plays - Always visible */}
               <div className="bg-white/5 rounded-xl p-3 border border-white/10">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-white font-bold text-sm">My Bets</div>
+                  <div className="text-white font-bold text-sm">My Plays</div>
                   <button
                     onClick={() => setShowAllBetsPanel((prev) => !prev)}
                     className="px-2.5 py-1 rounded-lg bg-amber-600/80 hover:bg-amber-600 text-white font-semibold text-xs shadow"
                   >
-                    {showAllBetsPanel ? 'Hide All' : 'All Bets'}
+                    {showAllBetsPanel ? 'Hide All' : 'All Plays'}
                   </button>
                 </div>
                 {showAllBetsPanel && (
                   <div className="mb-3 p-2 rounded-lg border border-white/15 bg-black/60 max-h-52 overflow-y-auto">
                     <div className="text-white/70 font-semibold text-[10px] mb-1 text-center uppercase tracking-wide">
-                      All Bets (Current Round)
+                      All Plays (Current Round)
                     </div>
                     {groupedAllBets.length > 0 ? (
                       <div className="flex flex-col gap-1.5">
@@ -1496,18 +1496,18 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                           >
                             <div className="flex items-center justify-between text-[11px] text-white/85 mb-1">
                               <span className="font-semibold truncate pr-2">{group.player}</span>
-                              <span className="text-white/50 text-[10px]">{group.bets.length} bets</span>
+                              <span className="text-white/50 text-[10px]">{group.plays.length} plays</span>
                             </div>
                             <div className="flex flex-wrap gap-1">
-                              {group.bets.map((bet) => (
+                              {group.plays.map((play) => (
                                 <div
-                                  key={bet.id}
-                                  className={`px-2 py-0.5 rounded-full border text-[10px] leading-tight ${bet.className}`}
+                                  key={play.id}
+                                  className={`px-2 py-0.5 rounded-full border text-[10px] leading-tight ${play.className}`}
                                 >
-                                  <span>{bet.label}</span>
-                                  <span className="ml-1 text-white/85">{bet.amount}</span>
-                                  {bet.payout && (
-                                    <span className="ml-1 text-green-100">+{bet.payout}</span>
+                                  <span>{play.label}</span>
+                                  <span className="ml-1 text-white/85">{play.amount}</span>
+                                  {play.prize && (
+                                    <span className="ml-1 text-green-100">+{play.prize}</span>
                                   )}
                                 </div>
                               ))}
@@ -1517,18 +1517,18 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                       </div>
                     ) : (
                       <div className="text-white/40 text-xs text-center py-2">
-                        No bets placed yet
+                        No plays placed yet
                       </div>
                     )}
                   </div>
                 )}
                 {myBets.length > 0 ? (
                   <div className="flex flex-wrap gap-2 justify-center">
-                    {myBets.map((bet) => {
-                      // Determine if bet is winner, loser, or pending
-                      const isWinner = bet.is_winner === true;
-                      const isLoser = bet.is_winner === false;
-                      const isPending = bet.is_winner === null;
+                    {myBets.map((play) => {
+                      // Determine if play is winner, loser, or pending
+                      const isWinner = play.is_winner === true;
+                      const isLoser = play.is_winner === false;
+                      const isPending = play.is_winner === null;
                       
                       // Color based on result
                       const bgColor = isWinner 
@@ -1545,37 +1545,37 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                       
                       return (
                         <div
-                          key={bet.id}
+                          key={play.id}
                           className={`px-3 py-1.5 rounded ${bgColor} ${textColor} text-xs sm:text-sm border`}
                         >
                           <span className="font-semibold">
-                            {bet.bet_type === 'number' ? `#${bet.bet_value}` : 
-                             bet.bet_type === 'red' ? 'RED' :
-                             bet.bet_type === 'black' ? 'BLACK' :
-                             bet.bet_type === 'even' ? 'EVEN' :
-                             bet.bet_type === 'odd' ? 'ODD' :
-                             bet.bet_type === 'low' ? '1-18' :
-                             bet.bet_type === 'high' ? '19-36' :
-                             (bet.bet_type === 'dozen' && bet.bet_value === '1') ? '1st 12' :
-                             (bet.bet_type === 'dozen' && bet.bet_value === '2') ? '2nd 12' :
-                             (bet.bet_type === 'dozen' && bet.bet_value === '3') ? '3rd 12' :
-                             (bet.bet_type === 'column' && bet.bet_value === '1') ? 'Col 1' :
-                             (bet.bet_type === 'column' && bet.bet_value === '2') ? 'Col 2' :
-                             (bet.bet_type === 'column' && bet.bet_value === '3') ? 'Col 3' :
-                             bet.bet_type}
+                            {play.bet_type === 'number' ? `#${play.bet_value}` : 
+                             play.bet_type === 'red' ? 'RED' :
+                             play.bet_type === 'black' ? 'BLACK' :
+                             play.bet_type === 'even' ? 'EVEN' :
+                             play.bet_type === 'odd' ? 'ODD' :
+                             play.bet_type === 'low' ? '1-18' :
+                             play.bet_type === 'high' ? '19-36' :
+                             (play.bet_type === 'dozen' && play.bet_value === '1') ? '1st 12' :
+                             (play.bet_type === 'dozen' && play.bet_value === '2') ? '2nd 12' :
+                             (play.bet_type === 'dozen' && play.bet_value === '3') ? '3rd 12' :
+                             (play.bet_type === 'column' && play.bet_value === '1') ? 'Col 1' :
+                             (play.bet_type === 'column' && play.bet_value === '2') ? 'Col 2' :
+                             (play.bet_type === 'column' && play.bet_value === '3') ? 'Col 3' :
+                             play.bet_type}
                           </span>
                           <span className={`ml-1 ${isPending ? 'text-yellow-400' : isWinner ? 'text-green-100' : 'text-red-100'}`}>
-                            {fmt(bet.amount)}
+                            {fmt(play.amount)}
                           </span>
-                          {isWinner && bet.payout_amount > 0 && (
-                            <span className="ml-1 text-green-200">+{fmt(bet.payout_amount)}</span>
+                          {isWinner && play.prize_amount > 0 && (
+                            <span className="ml-1 text-green-200">+{fmt(play.prize_amount)}</span>
                           )}
                         </div>
                       );
                     })}
                   </div>
                 ) : (
-                  <div className="text-white/40 text-xs text-center py-2">No bets placed</div>
+                  <div className="text-white/40 text-xs text-center py-2">No plays placed</div>
                 )}
               </div>
 
@@ -1617,7 +1617,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
         )}
       </div>
 
-      {/* Floating Bet Panel - Bottom Sheet */}
+      {/* Floating Play Panel - Bottom Sheet */}
       {showBetPanel && (
         <>
           {/* Backdrop - Only on mobile */}
@@ -1626,7 +1626,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
             onClick={closeBetPanel}
           />
           
-          {/* Bet Panel */}
+          {/* Play Panel */}
           <div
             className="fixed bottom-0 bg-gradient-to-t from-zinc-900 via-zinc-800 to-zinc-900 border-t-2 border-white/20 rounded-t-2xl shadow-2xl z-50 transition-transform duration-300"
             style={{
@@ -1655,7 +1655,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
 
             {/* Panel Header */}
             <div className="flex items-center justify-between p-3 border-b border-white/10">
-              <div className="text-white font-bold text-lg">Place Your Bet</div>
+              <div className="text-white font-bold text-lg">Place Your Play</div>
               {isBetting && bettingTimeLeft > 0 && (
                 <div className="flex items-center gap-2">
                   <div className="text-white/60 text-sm">Time:</div>
@@ -1672,10 +1672,10 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
 
             {/* Panel Content - Scrollable */}
             <div className="overflow-y-auto p-3 md:p-4" style={{ maxHeight: 'calc(80vh - 80px)' }}>
-              {/* Bet Amount Controls */}
+              {/* Play Amount Controls */}
               <div className="flex items-center gap-1 md:gap-2 mb-4 flex-nowrap overflow-x-auto" style={{ width: '100%' }}>
                 <button
-                  onClick={() => setBetAmount(a => Math.max(minRequired, Math.floor((a || minRequired) - minRequired)))}
+                  onClick={() => setPlayAmount(a => Math.max(minRequired, Math.floor((a || minRequired) - minRequired)))}
                   disabled={!canBet}
                   className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
@@ -1686,14 +1686,14 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                   type="number"
                   min={minRequired}
                   step={minRequired}
-                  value={betAmount}
-                  onChange={(e) => setBetAmount(Math.max(minRequired, parseInt(e.target.value) || minRequired))}
+                  value={playAmount}
+                  onChange={(e) => setPlayAmount(Math.max(minRequired, parseInt(e.target.value) || minRequired))}
                   disabled={!canBet}
                   className="flex-1 min-w-[60px] md:min-w-[80px] max-w-[100px] md:max-w-[120px] px-2 md:px-3 py-2 rounded bg-white/10 text-white border border-white/20 text-center text-xs md:text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 />
                 
                 <button
-                  onClick={() => setBetAmount(a => Math.max(minRequired, Math.floor((a || minRequired) + minRequired)))}
+                  onClick={() => setPlayAmount(a => Math.max(minRequired, Math.floor((a || minRequired) + minRequired)))}
                   disabled={!canBet}
                   className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
@@ -1701,28 +1701,28 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                 </button>
                 
                 <button 
-                  onClick={() => setBetAmount(minRequired)} 
+                  onClick={() => setPlayAmount(minRequired)} 
                   disabled={!canBet}
                   className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
                   Min
                 </button>
                 <button 
-                  onClick={() => setBetAmount(Math.max(minRequired, Math.floor(readVault() / 20)))} 
+                  onClick={() => setPlayAmount(Math.max(minRequired, Math.floor(readVault() / 20)))} 
                   disabled={!canBet}
                   className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
                   5%
                 </button>
                 <button 
-                  onClick={() => setBetAmount(Math.max(minRequired, Math.floor(readVault() / 10)))} 
+                  onClick={() => setPlayAmount(Math.max(minRequired, Math.floor(readVault() / 10)))} 
                   disabled={!canBet}
                   className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
                   10%
                 </button>
                 <button 
-                  onClick={() => setBetAmount(Math.max(minRequired, Math.floor(readVault() / 4)))} 
+                  onClick={() => setPlayAmount(Math.max(minRequired, Math.floor(readVault() / 4)))} 
                   disabled={!canBet}
                   className="px-2 md:px-3 py-2 rounded bg-white/10 text-white text-xs md:text-sm border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
@@ -1732,13 +1732,13 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
 
               {!canBet && (
                 <div className="text-white/60 text-sm mb-3 text-center">
-                  {!myRow ? "Join the game to bet." :
-                    session?.stage !== "betting" ? "Waiting for betting stage..." :
-                    "Betting closed."}
+                  {!myRow ? "Join the game to play." :
+                    session?.stage !== "playing" ? "Waiting for playing stage..." :
+                    "Playing closed."}
                 </div>
               )}
 
-              {/* Outside Bets */}
+              {/* Outside Plays */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mb-4">
                   <button
                     onClick={() => placeBet('red', 'red')}
@@ -1858,35 +1858,35 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                   })}
                 </div>
 
-                {/* My Bets - In Panel */}
+                {/* My Plays - In Panel */}
                 {myBets.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-white/10">
-                    <div className="text-white font-bold mb-2 text-sm">My Bets</div>
+                    <div className="text-white font-bold mb-2 text-sm">My Plays</div>
                     <div className="flex flex-wrap gap-2">
-                      {myBets.map((bet) => {
-                        let label = bet.bet_type.toUpperCase();
-                        if (bet.bet_type === 'number') label = `#${bet.bet_value}`;
-                        else if (bet.bet_type === 'red') label = 'RED';
-                        else if (bet.bet_type === 'black') label = 'BLACK';
-                        else if (bet.bet_type === 'even') label = 'EVEN';
-                        else if (bet.bet_type === 'odd') label = 'ODD';
-                        else if (bet.bet_type === 'low') label = '1-18';
-                        else if (bet.bet_type === 'high') label = '19-36';
-                        else if (bet.bet_type === 'dozen') {
-                          if (bet.bet_value === '1') label = '1st 12';
-                          else if (bet.bet_value === '2') label = '2nd 12';
-                          else if (bet.bet_value === '3') label = '3rd 12';
-                        } else if (bet.bet_type === 'column') {
-                          if (bet.bet_value === '1') label = 'Col 1';
-                          else if (bet.bet_value === '2') label = 'Col 2';
-                          else if (bet.bet_value === '3') label = 'Col 3';
+                      {myBets.map((play) => {
+                        let label = play.bet_type.toUpperCase();
+                        if (play.bet_type === 'number') label = `#${play.bet_value}`;
+                        else if (play.bet_type === 'red') label = 'RED';
+                        else if (play.bet_type === 'black') label = 'BLACK';
+                        else if (play.bet_type === 'even') label = 'EVEN';
+                        else if (play.bet_type === 'odd') label = 'ODD';
+                        else if (play.bet_type === 'low') label = '1-18';
+                        else if (play.bet_type === 'high') label = '19-36';
+                        else if (play.bet_type === 'dozen') {
+                          if (play.bet_value === '1') label = '1st 12';
+                          else if (play.bet_value === '2') label = '2nd 12';
+                          else if (play.bet_value === '3') label = '3rd 12';
+                        } else if (play.bet_type === 'column') {
+                          if (play.bet_value === '1') label = 'Col 1';
+                          else if (play.bet_value === '2') label = 'Col 2';
+                          else if (play.bet_value === '3') label = 'Col 3';
                         }
                         return (
                           <div
-                            key={bet.id}
+                            key={play.id}
                             className="px-3 py-1 rounded bg-white/10 text-white text-xs sm:text-sm"
                           >
-                            {label}: {fmt(bet.amount)}
+                            {label}: {fmt(play.amount)}
                           </div>
                         );
                       })}

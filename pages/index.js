@@ -562,12 +562,12 @@ pt: {
     modal: {
       title: "Cum se acumulează MLEO",
       sections: [
-        { t: "1) Ce câștigi de fapt", p: "MLEO este un token utilitar câștigat prin joc. Rezultatele eligibile se pot converti în MLEO. Ratele sunt variabile pentru echitate și stabilitate." },
-        { t: "2) Conversie (nivel înalt)", p: "Numai anumite acțiuni se califică. Formulele exacte nu sunt publice și pot fi schimbate." },
+        { t: "1) Ce câștigi de fapt", p: "MLEO este un token utilitar câștigat prin joc. Rezultatele eligibile se prizePool converti în MLEO. Ratele sunt variabile pentru echitate și stabilitate." },
+        { t: "2) Conversie (nivel înalt)", p: "Numai anumite acțiuni se califică. Formulele exacte nu sunt publice și prizePool fi schimbate." },
         { t: "3) Plajă zilnică & echitate", p: "Pe măsură ce te apropii de plaja ta zilnică, acumularea scade treptat pentru a preveni abuzurile." },
-        { t: "4) Vault & CLAIM", p: "Poți CREA (CLAIM) soldul în Vault-ul din aplicație. Dacă se deschide claim on-chain, pot exista ferestre de deblocare și verificări." },
+        { t: "4) Vault & CLAIM", p: "Poți CREA (CLAIM) soldul în Vault-ul din aplicație. Dacă se deschide claim on-chain, prizePool exista ferestre de deblocare și verificări." },
         { t: "5) Când ești plecat", p: "Progres offline limitat la o eficiență redusă." },
-        { t: "6) Note importante", p: "Disponibilitatea, ratele și plafoanele se pot schimba/opri/reseta. Nu este sfat financiar; valoarea MLEO nu este garantată." },
+        { t: "6) Note importante", p: "Disponibilitatea, ratele și plafoanele se prizePool schimba/opri/reseta. Nu este sfat financiar; valoarea MLEO nu este garantată." },
       ],
       cta: "ÎNCEPE ACUM",
       close: "Închide",

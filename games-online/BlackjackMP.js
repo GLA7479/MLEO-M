@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
 import { queueDelta, getBalance, flushDelta } from "../lib/vaultAdapter";
 
-const MIN_BET = 1000;
+const MIN_PLAY = 1000;
 const SEATS = 6;
 
 const MIN_BUYIN_OPTIONS = {
@@ -134,7 +134,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
   const [session, setSession] = useState(null);
   const [players, setPlayers] = useState([]);
   const [roomMembers, setRoomMembers] = useState([]);
-  const [bet, setBet] = useState(MIN_BET);
+  const [play, setBet] = useState(MIN_PLAY);
   const [displayValue, setDisplayValue] = useState('');
   const [msg, setMsg] = useState("");
   
@@ -178,9 +178,9 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     };
   }
 
-  // נקה snapshot רק כשנכנסים לסיבוב חדש (betting / lobby / dealing)
+  // נקה snapshot רק כשנכנסים לסיבוב חדש (playing / lobby / dealing)
   useEffect(() => {
-    if (session?.state === 'betting' || session?.state === 'lobby' || session?.state === 'dealing') {
+    if (session?.state === 'playing' || session?.state === 'lobby' || session?.state === 'dealing') {
       setEndedSnapshot(null);
     }
   }, [session?.state]);
@@ -238,7 +238,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
 
   const clampBet = (n) => {
     const v = Math.floor(Number(n || 0));
-    if (!Number.isFinite(v) || v < MIN_BET) return MIN_BET;
+    if (!Number.isFinite(v) || v < MIN_PLAY) return MIN_PLAY;
     return Math.min(v, getVault());
   };
   // 4) שאר הנגזרות משתמשות ב-canActNow / myTurn
@@ -248,8 +248,8 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
   const canSurrender = canDouble;
 
   // Button availability helpers
-  const canPlaceBet = !!myRow && ['lobby','betting'].includes(session?.state);
-  const canDeal = session?.state === 'betting';
+  const canPlaceBet = !!myRow && ['lobby','playing'].includes(session?.state);
+  const canDeal = session?.state === 'playing';
   const canSettle = session?.state === 'acting'; // האוטופיילוט יעשה לבד, זה רק fallback ידני
 
   // tap guard למניעת לחיצה כפולה
@@ -282,7 +282,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
           shoe: freshShoe(4),
           dealer_hand: [],
           seat_count: SEATS,
-          min_bet: MIN_BET
+          min_bet: MIN_PLAY
         };
 
         const { data: upserted, error: upErr } = await supabase
@@ -349,7 +349,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     // השהייה זעירה למנוע רצף פעולות כפול בזמן realtime
     const t = setTimeout(() => { autopilot(session); }, 150);
     return () => clearTimeout(t);
-  }, [session?.id, session?.state, players.length, players.map?.(p=>p.status + ':' + p.bet).join('|'), isLeader]);
+  }, [session?.id, session?.state, players.length, players.map?.(p=>p.status + ':' + p.play).join('|'), isLeader]);
 
   // Timer tick for UI updates
   useEffect(() => {
@@ -365,7 +365,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     if (
       session?.state === 'acting' &&
       session?.dealer_hand?.[0]?.startsWith('A') &&
-      !myRow?.insurance_bet &&
+      !myRow?.insurance_play &&
       !session?.insuranceOffered // דגל חדש שמונע כפילויות
     ) {
       setShowInsuranceModal(true);
@@ -381,7 +381,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     const tick = setInterval(() => {
       // אם יש חלון הימורים, תור שחקן, או טיימר לסיבוב הבא — תריץ אוטומציה
       if (
-        (session.state === 'betting' && session.bet_deadline) ||
+        (session.state === 'playing' && session.bet_deadline) ||
         (session.state === 'acting'  && session.turn_deadline) ||
         (session.state === 'ended'   && session.next_round_at)
       ) {
@@ -392,12 +392,12 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     return () => clearInterval(tick);
   }, [isLeader, session?.id, session?.state, session?.bet_deadline, session?.turn_deadline, session?.next_round_at]);
 
-  // "דחיפה" לפתיחת BETTING אם נשארים ב-lobby יותר מכמה שניות
+  // "דחיפה" לפתיחת PLAYING אם נשארים ב-lobby יותר מכמה שניות
   useEffect(() => {
     if (!session?.id || !isLeader) return;
     if (session.state === 'lobby') {
       const deadline = new Date(Date.now() + 15000).toISOString();
-      supabase.from('bj_sessions').update({ state:'betting', bet_deadline: deadline, dealer_hand:[], dealer_hidden:true }).eq('id', session.id);
+      supabase.from('bj_sessions').update({ state:'playing', bet_deadline: deadline, dealer_hand:[], dealer_hidden:true }).eq('id', session.id);
     }
   }, [isLeader, session?.id, session?.state]);
 
@@ -442,7 +442,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
   async function ensureSeated() {
     if (!session?.id || !name) return null;
     if (getVault() < minRequired) {
-      setMsg(`Minimum buy-in is ${fmt(minRequired)}`);
+      setMsg(`Minimum entry fee is ${fmt(minRequired)}`);
       return null;
     }
     const client_id = clientId;
@@ -474,7 +474,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       player_name: name,
       seat: free,
       stack: Math.min(getVault(), Math.max(10000, minRequired)),
-      bet: 0,
+      play: 0,
       hand: [],
       status: "seated",
       acted: false,
@@ -498,22 +498,22 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
   async function placeBet() {
     let row = myRow;
     if (!row) row = await ensureSeated();
-    const effectiveMinBet = Math.max(MIN_BET, minRequired);
+    const effectiveMinBet = Math.max(MIN_PLAY, minRequired);
     if (!row || !row.id) return;
-    if (bet < effectiveMinBet) {
-      setMsg(`Minimum bet is ${fmt(effectiveMinBet)}`);
+    if (play < effectiveMinBet) {
+      setMsg(`Minimum play is ${fmt(effectiveMinBet)}`);
       return;
     }
 
     // בדוק שיש מספיק כסף ב-vault
     const currentVault = getVault();
-    if (currentVault < bet) {
+    if (currentVault < play) {
       setMsg("Insufficient vault balance");
       return;
     }
 
     // הוצא כסף מה-vault
-    const newVault = currentVault - bet;
+    const newVault = currentVault - play;
     setVault(newVault);
     // עדכן גם את ה-state בדף הראשי
     if (setVaultBoth) {
@@ -521,8 +521,8 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     }
 
     const { error } = await supabase.from("bj_players").update({
-      bet: bet,
-      status: 'betting'
+      play: play,
+      status: 'playing'
       // acted: true  <-- removed, so player can act in 'acting' phase
     }).eq("id", row.id);
 
@@ -530,7 +530,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       console.warn('PATCH bj_players error:', {
         code: error.code, message: error.message, details: error.details, hint: error.hint
       });
-      setMsg("Failed to place bet");
+      setMsg("Failed to place play");
       // החזר כסף ל-vault אם ההימור נכשל
       setVault(currentVault);
     } else {
@@ -543,7 +543,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     const deadline = new Date(Date.now() + 15000).toISOString(); // 15 שניות הימור
     const { error } = await supabase
       .from('bj_sessions')
-      .update({ state: 'betting', bet_deadline: deadline, insuranceOffered: false })
+      .update({ state: 'playing', bet_deadline: deadline, insuranceOffered: false })
       .eq('id', session.id);
     if (error) console.error('[openBetting] error:', error);
   }
@@ -552,7 +552,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
   function buildActionQueue(players = []) {
     // סדר: seat עולה, ואז hand_idx (0 לפני 1)
     const alive = players
-      .filter(p => ['acting','betting','seated','blackjack','stood','busted','surrendered','settled'].includes(p.status))
+      .filter(p => ['acting','playing','seated','blackjack','stood','busted','surrendered','settled'].includes(p.status))
       .sort((a,b) => (a.seat - b.seat) || (a.hand_idx - b.hand_idx));
 
     // מי בפועל צריך לפעול (acting בלבד)
@@ -567,7 +567,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       .select('*').eq('session_id', sessionId).order('seat,hand_idx');
 
     // רק משתתפים של הסיבוב (מי שהימרו)
-    const actables = (ps || []).filter(p => (p.bet || 0) > 0 && p.status === 'acting');
+    const actables = (ps || []).filter(p => (p.play || 0) > 0 && p.status === 'acting');
     if (!actables.length) {
       // כולם BJ/סטוד/באסט ⇒ סגור יד
       await dealerAndSettle();
@@ -633,16 +633,16 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     const s = sessionSnap || session;
     if (!s?.id) return;
 
-    // 0) אם המצב לא חוקי (acting אבל אין current_player_id או אין ידיים) – חזור ל-BETTING
+    // 0) אם המצב לא חוקי (acting אבל אין current_player_id או אין ידיים) – חזור ל-PLAYING
     if (s.state === 'acting') {
-      const { data: ps } = await supabase.from('bj_players').select('id,hand,bet,status').eq('session_id', s.id);
+      const { data: ps } = await supabase.from('bj_players').select('id,hand,play,status').eq('session_id', s.id);
       const anyHands = (ps || []).some(p => (p.hand?.length || 0) > 0);
       const someoneActing = (ps || []).some(p => p.status === 'acting');
       if (!anyHands || (!someoneActing && !s.current_player_id)) {
         const deadline = new Date(Date.now() + 15000).toISOString();
-        await supabase.from('bj_players').update({ hand: [], status: 'seated', acted: false, bet: 0 }).eq('session_id', s.id);
+        await supabase.from('bj_players').update({ hand: [], status: 'seated', acted: false, play: 0 }).eq('session_id', s.id);
         await supabase.from('bj_sessions').update({
-          state: 'betting', dealer_hand: [], dealer_hidden: true,
+          state: 'playing', dealer_hand: [], dealer_hidden: true,
           bet_deadline: deadline, current_player_id: null, turn_deadline: null, next_round_at: null
         }).eq('id', s.id);
         return;
@@ -654,16 +654,16 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       .from('bj_players').select('*')
       .eq('session_id', s.id).order('seat,hand_idx');
 
-    const participants = (ps || []).filter(p => (p.bet || 0) > 0 && p.status !== 'left');
+    const participants = (ps || []).filter(p => (p.play || 0) > 0 && p.status !== 'left');
     const hasBets      = participants.length > 0;
     const everyoneDone = hasBets && participants.every(p => ['stood','busted','blackjack','settled'].includes(p.status));
 
-    // 1) LOBBY / ENDED -> BETTING (אוטומטי)
+    // 1) LOBBY / ENDED -> PLAYING (אוטומטי)
     if (s.state === 'lobby' || (s.state === 'ended' && s.next_round_at && new Date() > new Date(s.next_round_at))) {
       // אפס לכולם את היד הקודמת אם צריך (ב-ENDED)
       if (s.state === 'ended') {
         await supabase.from('bj_players').update({
-          hand: [], bet: 0, result: null, acted: false
+          hand: [], play: 0, result: null, acted: false
           // השאר את status ו-name כדי לא לאבד נראות
         }).eq('session_id', s.id);
       }
@@ -671,7 +671,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       // פתח חלון הימורים חדש ל־15 שניות
       const deadline = new Date(Date.now() + 15000).toISOString();
       await supabase.from('bj_sessions').update({
-        state: 'betting',
+        state: 'playing',
         dealer_hand: [],
         dealer_hidden: true,
         current_player_id: null,
@@ -682,8 +682,8 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       return;
     }
 
-    // 2) BETTING -> DEAL (כשעבר הדדליין ויש לפחות משתתף אחד)
-    if (s.state === 'betting') {
+    // 2) PLAYING -> DEAL (כשעבר הדדליין ויש לפחות משתתף אחד)
+    if (s.state === 'playing') {
       const dlPassed = s.bet_deadline && new Date() > new Date(s.bet_deadline);
       if (dlPassed && hasBets) {
         await deal();           // יתחיל ACTING וינעל את ה-Dealer hidden
@@ -738,7 +738,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       .order("seat");
 
     // משתתפים אמיתיים בלבד
-    const participants = (ps || []).filter(p => (p.bet || 0) >= (session.min_bet || MIN_BET) && p.status !== 'left');
+    const participants = (ps || []).filter(p => (p.play || 0) >= (session.min_bet || MIN_PLAY) && p.status !== 'left');
     if (participants.length === 0) return; // סתם בטחון
 
     let shoe = session.shoe?.length ? [...session.shoe] : freshShoe(4);
@@ -813,7 +813,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
   async function double() {
     if (!session || !myTurn) return;
     if (!Array.isArray(myRow?.hand) || myRow.hand.length !== 2) return;
-    if (getVault() < (myRow?.bet || 0)) { setMsg("Insufficient vault balance to double"); return; }
+    if (getVault() < (myRow?.play || 0)) { setMsg("Insufficient vault balance to double"); return; }
 
     // משוך שורה עדכנית מה-DB (ולא מ-state) כדי לא לטעות עם lag
     const row = await withFreshMyRow();
@@ -824,7 +824,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
 
     // כסף ב-vault
     const currentVault = getVault();
-    const additionalBet = row.bet;
+    const additionalBet = row.play;
     if (currentVault < additionalBet) {
       setMsg("Insufficient vault balance to double");
       return;
@@ -839,12 +839,12 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     let shoe = [...(session.shoe || [])];
     const card = shoe.pop();
     const hand = [...row.hand, card];
-    const newBet = row.bet * 2;
+    const newBet = row.play * 2;
 
     // בדוק אם יש שינוי לפני PATCH
-    const updates = { bet: newBet, hand, status: 'stood', acted: true };
+    const updates = { play: newBet, hand, status: 'stood', acted: true };
     const nothingChanged =
-      newBet === row.bet &&
+      newBet === row.play &&
       JSON.stringify(hand) === JSON.stringify(row.hand) &&
       row.status === 'stood' && row.acted === true;
     
@@ -906,7 +906,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     
     // בדוק שיש מספיק כסף ב-vault
     const currentVault = getVault();
-    const newBet = row.bet;
+    const newBet = row.play;
     if (currentVault < newBet) {
       setMsg("Insufficient vault balance for split");
       return;
@@ -945,7 +945,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
         seat: row.seat,
         player_name: row.player_name,
         client_id: row.client_id,
-        bet: newBet,
+        play: newBet,
         hand: [h[1], newCard2],
         status: 'acting',
         split_from: row.id,
@@ -987,19 +987,19 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     // בדוק שהדילר מראה Ace
     const dealerFirstCard = session.dealer_hand?.[0];
     if (!dealerFirstCard || !dealerFirstCard.startsWith('A')) {
-      setMsg("Insurance only available when dealer shows Ace");
+      setMsg("Insurance only available when opponent shows Ace");
       return;
     }
     
     // בדוק שלא קנה כבר ביטוח
-    if (myRow.insurance_bet > 0) {
+    if (myRow.insurance_play > 0) {
       setMsg("Insurance already purchased");
       return;
     }
     
     // בדוק שיש מספיק כסף
     const currentVault = getVault();
-    const insuranceAmount = Math.floor(myRow.bet / 2);
+    const insuranceAmount = Math.floor(myRow.play / 2);
     if (currentVault < insuranceAmount) {
       setMsg("Insufficient vault balance for insurance");
       return;
@@ -1015,7 +1015,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     
     // עדכן את הביטוח במסד הנתונים
     await supabase.from("bj_players").update({
-      insurance_bet: insuranceAmount
+      insurance_play: insuranceAmount
     }).eq("id", myRow.id);
     
     setMsg(`Insurance purchased: ${fmt(insuranceAmount)} MLEO`);
@@ -1028,7 +1028,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     
     // החזר חצי מההימור ל-vault
     const currentVault = getVault();
-    const refund = Math.floor(myRow.bet / 2);
+    const refund = Math.floor(myRow.play / 2);
     const newVault = currentVault + refund;
     setVault(newVault);
     // עדכן גם את ה-state בדף הראשי
@@ -1050,7 +1050,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     const { data: ps } = await supabase.from("bj_players")
       .select("*").eq("session_id", session.id).order('seat,hand_idx');
 
-    const participants = (ps || []).filter(p => (p.bet || 0) > 0 && p.status !== 'left');
+    const participants = (ps || []).filter(p => (p.play || 0) > 0 && p.status !== 'left');
     const done = participants.every(p => ['stood','busted','blackjack','settled'].includes(p.status));
     if (!done) { setMsg("Players still acting"); return; }
 
@@ -1101,7 +1101,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
           ? 'push' // גם הוא וגם הדילר ב-21
           : 'lose';
         await supabase.from('bj_players')
-          .update({ result, status: 'settled', bet: 0 })
+          .update({ result, status: 'settled', play: 0 })
           .eq('id', p.id);
       }
 
@@ -1118,22 +1118,22 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     let myResult = null; // רק לשחקן המקומי
     for (const p of participants) {
       const s = handValue(Array.isArray(p.hand) ? p.hand : []);
-      let result='lose', payout=0;
+      let result='lose', prize=0;
 
-      if (p.status==='blackjack') { result='blackjack'; payout=Math.floor(p.bet*3/2); }
-      else if (dealerBust && s<=21) { result='win'; payout=p.bet; }
+      if (p.status==='blackjack') { result='blackjack'; prize=Math.floor(p.play*3/2); }
+      else if (dealerBust && s<=21) { result='win'; prize=p.play; }
       else if (s>21) { result='lose'; }
-      else if (s>dealerScore) { result='win'; payout=p.bet; }
-      else if (s===dealerScore) { result='push'; payout=p.bet; }
+      else if (s>dealerScore) { result='win'; prize=p.play; }
+      else if (s===dealerScore) { result='push'; prize=p.play; }
       else { result='lose'; }
 
-      let delta = payout; // רק הזכייה - ההימור כבר ירד בהתחלה
+      let delta = prize; // רק הזכייה - ההימור כבר ירד בהתחלה
 
       // חישוב ביטוח
-      if (p.insurance_bet > 0) {
+      if (p.insurance_play > 0) {
         if (dealerBlackjack) {
           // זכייה בביטוח - 2:1
-          const insuranceWin = p.insurance_bet * 2;
+          const insuranceWin = p.insurance_play * 2;
           delta += insuranceWin;
         }
         // אם הדילר לא עשה 21, הביטוח נפסד (כבר ירד מה-vault)
@@ -1149,11 +1149,11 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
           setVaultBoth(newVault);
         }
         // שמור את התוצאה שלי להודעה מקומית
-        myResult = { result, delta, dealerBust, dealerScore, originalBet: p.bet, insuranceWin: p.insurance_bet > 0 && dealerBlackjack ? p.insurance_bet * 2 : 0 };
+        myResult = { result, delta, dealerBust, dealerScore, originalBet: p.play, insuranceWin: p.insurance_play > 0 && dealerBlackjack ? p.insurance_play * 2 : 0 };
       }
 
       await supabase.from('bj_players').update({
-        result, status:'settled', bet:0, insurance_bet:0
+        result, status:'settled', play:0, insurance_play:0
       }).eq('id', p.id);
 
       const tag = result==='win' ? '+'
@@ -1169,7 +1169,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       player_name: p.player_name,
       hand: Array.isArray(p.hand) ? [...p.hand] : [],
       total: handValue(Array.isArray(p.hand) ? p.hand : []),
-      bet: p.bet ?? 0,
+      play: p.play ?? 0,
       result: p.result ?? null
     }));
     setEndedSnapshot({
@@ -1190,7 +1190,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     if (myResult) {
       const { result, delta, dealerBust, dealerScore, originalBet, insuranceWin } = myResult;
       const lines = [
-        `Dealer: ${dealerBust ? 'BUST' : dealerScore}`,
+        `Opponent: ${dealerBust ? 'BUST' : dealerScore}`,
         result === 'win' || result === 'blackjack' ? `+${fmt(originalBet + delta)} MLEO` :
         result === 'push' ? 'No change' : `Lost ${fmt(originalBet)} MLEO`
       ];
@@ -1212,7 +1212,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
   async function resetRound() {
     if (!session) return;
     await supabase.from("bj_players").update({
-      hand: [], bet: 0, result: null, status: 'seated', acted: false, insurance_bet: 0
+      hand: [], play: 0, result: null, status: 'seated', acted: false, insurance_play: 0
     }).eq("session_id", session.id);
     await supabase.from("bj_sessions").update({
       state: 'lobby', dealer_hand: [], dealer_hidden: true
@@ -1244,7 +1244,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
           <div className="text-center h-full flex flex-col justify-center">
             {/* Hide text during dealing/acting for more card space */}
             {!(session?.state === 'dealing' || session?.state === 'acting') && (
-              <div className="text-white font-bold text-xs mb-0.5">Dealer</div>
+              <div className="text-white font-bold text-xs mb-0.5">Opponent</div>
             )}
             <div className="flex items-center justify-center overflow-x-auto whitespace-nowrap py-0.5 gap-0.5">
               {(() => {
@@ -1267,7 +1267,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
             
             {/* Timers in dealer window - bottom left */}
             <div className="absolute bottom-2 left-2 text-sm">
-              {session?.state === 'betting' && session?.bet_deadline && (
+              {session?.state === 'playing' && session?.bet_deadline && (
                 <div className="text-amber-400 font-bold text-lg">
                   🕒 {timerTick >= 0 && Math.max(0, Math.ceil((new Date(session.bet_deadline).getTime() - Date.now()) / 1000))}s
                 </div>
@@ -1296,7 +1296,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
           {Array.from({length: SEATS}).map((_,i)=>{
             let occupant = players.find(p=>p.seat===i);
             let nameToShow = occupant?.player_name;
-            let betToShow = occupant?.bet || 0;
+            let betToShow = occupant?.play || 0;
             let handToShow = occupant?.hand;
 
             const useSnap = (session?.state === 'settling' || session?.state === 'ended') && endedSnapshot;
@@ -1305,7 +1305,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
               if (snap) {
                 // בזמן settling/ended – תמיד snapshot!
                 nameToShow = snap.player_name;
-                betToShow = snap.bet || 0;
+                betToShow = snap.play || 0;
                 handToShow = snap.hand;
               } else {
                 // אין snapshot (למשל כיסא ריק) – הצג ריק
@@ -1328,7 +1328,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
                   {nameToShow ? (
                     <div className="space-y-0.5 md:space-y-1">
                       <div className="text-white font-bold text-xs md:text-sm truncate">{nameToShow}</div>
-                      <div className="text-emerald-300 text-xs font-semibold">Bet: {fmt(betToShow)}</div>
+                      <div className="text-emerald-300 text-xs font-semibold">Play: {fmt(betToShow)}</div>
                       <HandView hand={handToShow} size="small" isDealing={session?.state === 'dealing' || session?.state === 'acting'}/>
                       <div className="text-white/80 text-xs">
                         Total: {hv??"—"}
@@ -1354,11 +1354,11 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       {/* Controls - Fixed Layout */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-2 h-32 md:h-36">
         <div className="bg-white/5 rounded-lg p-1 md:p-2 border border-white/10 h-full">
-          <div className="text-white/80 text-xs mb-1 font-semibold">Place Bet</div>
+          <div className="text-white/80 text-xs mb-1 font-semibold">Place Play</div>
           <div className="flex gap-1 mb-1">
             <input 
               type="text" 
-              value={displayValue || (bet >= 1000 ? fmt(bet) : bet.toString())} 
+              value={displayValue || (play >= 1000 ? fmt(play) : play.toString())} 
               placeholder="Amount"
               onChange={(e) => {
                 const input = e.target.value;
@@ -1512,9 +1512,9 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
             <div className="text-center">
               <div className="text-yellow-400 font-bold text-lg mb-2">🛡️ Insurance Available</div>
               <div className="text-white/80 text-sm mb-4">
-                Dealer shows Ace!<br/>
-                Insurance: {fmt(Math.floor((myRow?.bet || 0) / 2))} MLEO<br/>
-                Payout: 2:1 if dealer has 21
+                Opponent shows Ace!<br/>
+                Insurance: {fmt(Math.floor((myRow?.play || 0) / 2))} MLEO<br/>
+                Prize: 2:1 if opponent has 21
               </div>
               <div className="flex gap-3 justify-center">
                 <button 

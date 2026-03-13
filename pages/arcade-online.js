@@ -87,7 +87,7 @@ const GAME_REGISTRY = [
     id: "blackjack",
     title: "Blackjack",
     emoji: "🃏",
-    description: "Beat the dealer to 21! Multiplayer blackjack with friends.",
+    description: "Beat the opponent to 21! Multiplayer blackjack with friends.",
     color: "#10B981",
     isMultiplayer: true,
     loader: () => import("../games-online/BlackjackMP").then(m => m.default)
@@ -159,7 +159,7 @@ const GAME_REGISTRY = [
     id: "poker-tables",
     title: "Poker Tables",
     emoji: "🎰",
-    description: "Texas Hold'em vs Dealer! Strategic betting rounds - PRE-FLOP, FLOP, TURN, RIVER. Best hand wins the pot!",
+    description: "Texas Hold'em vs Opponent! Strategic play rounds - PRE-FLOP, FLOP, TURN, RIVER. Best hand wins the prize pool!",
     color: "#10B981",
     isMultiplayer: false,
     isExternal: true,
