@@ -47,6 +47,11 @@ const MINING_CLAIM_ABI = [{ type: "function", name: "claim", stateMutability: "n
 const S_CLICK = "/sounds/click.mp3";
 const S_WIN = "/sounds/gift.mp3";
 
+// Bot timing constants
+const BOT_TURN_START_DELAY = 1800; // Delay before bot starts its turn
+const BOT_MOVE_DELAY = 1100; // Delay between bot moves
+const AUTO_PASS_DELAY = 1400; // Delay when auto-passing turn
+
 function safeRead(key, fallback = {}) { if (typeof window === "undefined") return fallback; try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
 function safeWrite(key, val) { if (typeof window === "undefined") return; try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
 function getVault() { const rushData = safeRead("mleo_rush_core_v4", {}); return rushData.vault || 0; }
@@ -82,21 +87,69 @@ function initBoard() {
   return board;
 }
 
+function getBarEntryPoint(playerType, dieValue) {
+  // Player enters from bar moving right to left (points 1-6)
+  // Bot enters from bar moving left to right (points 19-24)
+  return playerType === 1
+    ? dieValue - 1   // Player: dieValue 1 -> point 0, dieValue 6 -> point 5
+    : 24 - dieValue; // Bot: dieValue 1 -> point 23, dieValue 6 -> point 18
+}
+
 function allCheckersInHome(board, bar, playerType) {
+  // Must have no checkers on bar
+  if (playerType === 1 && bar.player > 0) return false;
+  if (playerType === -1 && bar.bot > 0) return false;
+  
+  // Check all points - player's checkers must be only in home board
+  for (let i = 0; i < 24; i++) {
+    const val = board[i];
+    if (playerType === 1) {
+      // Player home is 0-5 (points 1-6)
+      if (val > 0 && i >= 6) return false;
+    } else {
+      // Bot home is 18-23 (points 19-24)
+      if (val < 0 && i < 18) return false;
+    }
+  }
+  
+  return true;
+}
+
+function canBearOff(board, bar, from, dieValue, playerType) {
+  if (!allCheckersInHome(board, bar, playerType)) return false;
+  
   if (playerType === 1) {
-    if (bar.player > 0) return false;
-    // Player home is 0-5 (points 1-6)
-    for (let i = 6; i < 24; i++) {
-      if (board[i] > 0) return false;
+    // Player bears off from home (0-5)
+    const target = from - dieValue;
+    
+    // Exact bear off
+    if (target === -1) return true;
+    
+    // Overshoot - only if no checkers behind
+    if (target < -1) {
+      for (let i = from + 1; i <= 5; i++) {
+        if (board[i] > 0) return false;
+      }
+      return true;
     }
-    return true;
+    
+    return false;
   } else {
-    if (bar.bot > 0) return false;
-    // Bot home is 18-23 (points 19-24)
-    for (let i = 0; i < 18; i++) {
-      if (board[i] < 0) return false;
+    // Bot bears off from home (18-23)
+    const target = from + dieValue;
+    
+    // Exact bear off
+    if (target === 24) return true;
+    
+    // Overshoot - only if no checkers behind
+    if (target > 24) {
+      for (let i = from - 1; i >= 18; i--) {
+        if (board[i] < 0) return false;
+      }
+      return true;
     }
-    return true;
+    
+    return false;
   }
 }
 
@@ -108,59 +161,37 @@ function canMove(board, bar, borneOff, source, dieValue, playerType) {
   if (playerType === 1 && bar.player > 0 && sourceType !== 'bar') return false;
   if (playerType === -1 && bar.bot > 0 && sourceType !== 'bar') return false;
   
-  // Entry from bar
+  // Entry from bar - only one entry point per die value
   if (sourceType === 'bar') {
-    if (playerType === 1) {
-      if (bar.player === 0) return false;
-      // Player enters from bar to point (dieValue - 1), moving right to left
-      const entryPoint = dieValue - 1;
-      if (entryPoint < 0 || entryPoint > 23) return false;
-      if (board[entryPoint] === 0) return true;
-      if (board[entryPoint] > 0) return true;
-      return Math.abs(board[entryPoint]) === 1;
-    } else {
-      if (bar.bot === 0) return false;
-      // Bot enters from bar to point (24 - dieValue), moving left to right
-      const entryPoint = 24 - dieValue;
-      if (entryPoint < 0 || entryPoint > 23) return false;
-      if (board[entryPoint] === 0) return true;
-      if (board[entryPoint] < 0) return true;
-      return Math.abs(board[entryPoint]) === 1;
-    }
+    if (playerType === 1 && bar.player === 0) return false;
+    if (playerType === -1 && bar.bot === 0) return false;
+    
+    const entryPoint = getBarEntryPoint(playerType, dieValue);
+    if (entryPoint < 0 || entryPoint > 23) return false;
+    
+    // Can enter if empty, own checker, or single opponent checker (hit)
+    if (board[entryPoint] === 0) return true;
+    if (Math.sign(board[entryPoint]) === playerType) return true;
+    return Math.abs(board[entryPoint]) === 1;
   }
   
   // Regular move from point
   if (from === null || board[from] === 0 || Math.sign(board[from]) !== playerType) return false;
   
-  // Player moves right to left (decreasing), Bot moves left to right (increasing)
+  // Calculate destination
   const to = playerType === 1 ? from - dieValue : from + dieValue;
   
-  // Bearing off
+  // Bearing off - must use canBearOff function
   if (to < 0 || to > 23) {
-    if (!allCheckersInHome(board, bar, playerType)) return false;
-    if (playerType === 1) {
-      // Player bears off from home (0-5)
-      if (from - dieValue === -1) return true;
-      if (from - dieValue < -1) {
-        for (let i = from + 1; i <= 5; i++) {
-          if (board[i] > 0) return false;
-        }
-        return true;
-      }
-    } else {
-      // Bot bears off from home (18-23)
-      if (from + dieValue === 24) return true;
-      if (from + dieValue > 24) {
-        for (let i = from - 1; i >= 18; i--) {
-          if (board[i] < 0) return false;
-        }
-        return true;
-      }
-    }
-    return false;
+    return canBearOff(board, bar, from, dieValue, playerType);
   }
   
-  // Regular move
+  // Regular move within board
+  // Cannot move backward
+  if (playerType === 1 && to > from) return false;
+  if (playerType === -1 && to < from) return false;
+  
+  // Can move if empty, own checker, or single opponent checker (hit)
   if (board[to] === 0) return true;
   if (Math.sign(board[to]) === playerType) return true;
   return Math.abs(board[to]) === 1;
@@ -173,38 +204,55 @@ function makeMove(board, bar, borneOff, move, playerType) {
   
   const sourceType = move.sourceType;
   const from = move.from;
-  const dieValue = move.steps;
-  let to = null;
-  let hit = false;
-  let bearOff = false;
+  const bearOff = move.bearOff || false;
   
   // Entry from bar
   if (sourceType === 'bar') {
     if (playerType === 1) {
       newBar.player -= 1;
-      to = dieValue - 1; // Player enters from bar moving right to left
     } else {
       newBar.bot -= 1;
-      to = 24 - dieValue; // Bot enters from bar moving left to right
     }
-  } else {
-    // Regular move from point
+    
+    // Bar entry destination is already calculated in move.to
+    const to = move.to;
+    if (to === null || to < 0 || to > 23) {
+      // Invalid move
+      return { board: newBoard, bar: newBar, borneOff: newBorneOff };
+    }
+    
+    // Check for hit
+    if (newBoard[to] !== 0 && Math.sign(newBoard[to]) !== playerType) {
+      if (playerType === 1) {
+        newBar.bot += 1;
+      } else {
+        newBar.player += 1;
+      }
+      newBoard[to] = 0;
+    }
+    
+    // Place checker
+    newBoard[to] = (newBoard[to] || 0) + playerType;
+  } else if (bearOff) {
+    // Bearing off - remove from source, add to borneOff
     newBoard[from] -= playerType;
-    to = playerType === 1 ? from - dieValue : from + dieValue; // Player moves right to left, Bot moves left to right
-  }
-  
-  // Bearing off
-  if (to < 0 || to > 23) {
-    bearOff = true;
     if (playerType === 1) {
       newBorneOff.player += 1;
     } else {
       newBorneOff.bot += 1;
     }
   } else {
+    // Regular move from point
+    newBoard[from] -= playerType;
+    const to = move.to;
+    
+    if (to === null || to < 0 || to > 23) {
+      // Invalid move
+      return { board: newBoard, bar: newBar, borneOff: newBorneOff };
+    }
+    
     // Check for hit
     if (newBoard[to] !== 0 && Math.sign(newBoard[to]) !== playerType) {
-      hit = true;
       if (playerType === 1) {
         newBar.bot += 1;
       } else {
@@ -230,24 +278,47 @@ function getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice
   
   for (const dieIndex of availableIndexes) {
     const dieValue = turnDice[dieIndex];
-    if (canMove(board, bar, borneOff, source, dieValue, playerType)) {
-      const to = source.type === 'bar' 
-        ? (playerType === 1 ? dieValue - 1 : 24 - dieValue)
-        : (playerType === 1 ? source.index - dieValue : source.index + dieValue);
-      
-      const hit = to >= 0 && to <= 23 && board[to] !== 0 && Math.sign(board[to]) !== playerType && Math.abs(board[to]) === 1;
-      const bearOff = to < 0 || to > 23;
-      
-      moves.push({
-        sourceType: source.type,
-        from: source.index,
-        to: bearOff ? null : to,
-        steps: dieValue,
-        dieIndex,
-        hit,
-        bearOff
-      });
+    
+    if (!canMove(board, bar, borneOff, source, dieValue, playerType)) {
+      continue;
     }
+    
+    let to = null;
+    let bearOff = false;
+    
+    if (source.type === 'bar') {
+      // Bar entry - only one destination per die value
+      to = getBarEntryPoint(playerType, dieValue);
+      if (to < 0 || to > 23) continue; // Invalid entry point
+    } else {
+      // Regular move or bear off
+      to = playerType === 1 ? source.index - dieValue : source.index + dieValue;
+      
+      if (to < 0 || to > 23) {
+        // Bearing off - verify it's legal
+        if (!canBearOff(board, bar, source.index, dieValue, playerType)) {
+          continue; // Not a legal bear off
+        }
+        bearOff = true;
+        to = null;
+      }
+    }
+    
+    // Check for hit (only if not bearing off)
+    const hit = !bearOff && to !== null && to >= 0 && to <= 23 && 
+                board[to] !== 0 && 
+                Math.sign(board[to]) !== playerType && 
+                Math.abs(board[to]) === 1;
+    
+    moves.push({
+      sourceType: source.type,
+      from: source.index,
+      to: bearOff ? null : to,
+      steps: dieValue,
+      dieIndex,
+      hit,
+      bearOff
+    });
   }
   
   return moves;
@@ -432,11 +503,11 @@ export default function BackgammonPage() {
           setBorneOff(currentBorneOff);
           setUsedDice(currentUsedDice);
           executeMoves(index + 1);
-        }, 500);
+        }, BOT_MOVE_DELAY);
       };
       
       executeMoves(0);
-    }, 1000);
+    }, BOT_TURN_START_DELAY);
     
     return () => clearTimeout(timeout);
   }, [gameActive, currentPlayer, board, bar, borneOff, turnDice, usedDice, gameResult]);
@@ -477,7 +548,7 @@ export default function BackgammonPage() {
       // No moves available, pass turn
       setTimeout(() => {
         endTurn(player === 'player' ? 'bot' : 'player');
-      }, 500);
+      }, AUTO_PASS_DELAY);
     }
   };
 
@@ -523,45 +594,45 @@ export default function BackgammonPage() {
   function handlePointClick(pointIndex) {
     if (!gameActive || currentPlayer !== 'player' || gameResult) return;
     
-    // Must enter from bar first
+    // Must enter from bar first - if bar has checkers, only allow bar entry
     if (bar.player > 0) {
-      const availableIndexes = getAvailableDieIndexes(turnDice, usedDice);
-      for (const dieIndex of availableIndexes) {
-        const dieValue = turnDice[dieIndex];
-        const entryPoint = dieValue - 1; // Player enters from bar moving right to left
-        if (pointIndex === entryPoint) {
-          const source = { type: 'bar', index: null };
-          if (canMove(board, bar, borneOff, source, dieValue, 1)) {
-            const to = entryPoint;
-            const hit = board[to] !== 0 && Math.sign(board[to]) !== 1 && Math.abs(board[to]) === 1;
-            const bearOff = false;
-            const move = { sourceType: 'bar', from: null, to, steps: dieValue, dieIndex, hit, bearOff };
-            const result = makeMove(board, bar, borneOff, move, 1);
-            setBoard(result.board);
-            setBar(result.bar);
-            setBorneOff(result.borneOff);
-            setUsedDice([...usedDice, move.dieIndex]);
-            setSelectedSource(null);
-            setLegalTargets([]);
-            playSfx(clickSound.current);
-            
-            const winner = checkGameOver(result.borneOff);
-            if (winner) {
-              endGame(winner === 'player');
-            } else {
-              const remainingSequences = getLegalMoveSequences(result.board, result.bar, result.borneOff, turnDice, [...usedDice, move.dieIndex], 1);
-              if (remainingSequences.length === 0 || remainingSequences[0].length === 0) {
-                endTurn('bot');
-              }
-            }
-            return;
+      const source = { type: 'bar', index: null };
+      const moves = getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, 1);
+      const move = moves.find(m => m.to === pointIndex);
+      
+      if (move) {
+        const result = makeMove(board, bar, borneOff, move, 1);
+        setBoard(result.board);
+        setBar(result.bar);
+        setBorneOff(result.borneOff);
+        setUsedDice([...usedDice, move.dieIndex]);
+        setSelectedSource(null);
+        setLegalTargets([]);
+        playSfx(clickSound.current);
+        
+        const winner = checkGameOver(result.borneOff);
+        if (winner) {
+          endGame(winner === 'player');
+        } else {
+          const remainingSequences = getLegalMoveSequences(
+            result.board,
+            result.bar,
+            result.borneOff,
+            turnDice,
+            [...usedDice, move.dieIndex],
+            1
+          );
+          
+          if (remainingSequences.length === 0 || remainingSequences[0].length === 0) {
+            endTurn('bot');
           }
         }
       }
+      
       return;
     }
     
-    // Regular point selection
+    // Regular point selection - only if no checkers on bar
     if (selectedSource === null) {
       if (board[pointIndex] > 0) {
         const source = { type: 'point', index: pointIndex };
