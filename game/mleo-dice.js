@@ -48,7 +48,7 @@ function useIOSViewportFix() {
 // ============================================================================
 const LS_KEY = "mleo_dice_v2";
 const MIN_PLAY = 1000;
-const GAME_BALANCE = 0.01; // Game balance 1% - RTP 99%
+const GAME_BALANCE = 0.04; // Game balance 4% - RTP 96%
 
 // On-chain Claim Config
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);

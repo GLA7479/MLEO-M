@@ -220,7 +220,7 @@ export default function HiLoPage() {
     const win = (choice === "higher" && next.value > currentCard.value) || (choice === "lower" && next.value < currentCard.value);
     if (win) {
       const newStreak = streak + 1;
-      const multiplier = 1 + (newStreak * 0.18); // Reduced from 0.2 to 0.18 for RTP ~99%
+      const multiplier = 1 + (newStreak * 0.206); // Adjusted for RTP ~96.5%
       const roundPrize = Math.floor(Number(playAmount) * multiplier);
       setStreak(newStreak);
       setTotalPrize(roundPrize);
@@ -260,7 +260,7 @@ export default function HiLoPage() {
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-blue-900 via-black to-purple-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
 
-  const currentMultiplier = gameActive ? 1 + (streak * 0.2) : 1;
+  const currentMultiplier = gameActive ? 1 + (streak * 0.206) : 1;
   const potentialWin = gameActive ? Math.floor(Number(playAmount) * currentMultiplier) : Math.floor(Number(playAmount) * 2);
 
     return (
@@ -378,15 +378,15 @@ export default function HiLoPage() {
               <div className="space-y-3 text-sm">
                 <p><strong>1. Place Play:</strong> Min {MIN_PLAY} MLEO</p>
                 <p><strong>2. Guess:</strong> Will next card be Higher or Lower?</p>
-                <p><strong>3. Build Streak:</strong> Each correct guess increases multiplier by ×0.2!</p>
+                <p><strong>3. Build Streak:</strong> Each correct guess increases multiplier by ×0.206!</p>
                 <p><strong>4. Cash Out:</strong> Take your prize anytime or risk it!</p>
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                  <p className="text-blue-300 font-semibold">💰 Streak Prizes (+×0.2 each):</p>
+                  <p className="text-blue-300 font-semibold">💰 Streak Prizes (+×0.206 each):</p>
                   <div className="text-xs text-white/80 mt-2 space-y-1">
-                    <p>• Streak 1: ×1.2</p>
-                    <p>• Streak 5: ×2.0</p>
-                    <p>• Streak 10: ×3.0</p>
-                    <p>• Streak 20: ×5.0</p>
+                    <p>• Streak 1: ×1.206</p>
+                    <p>• Streak 5: ×2.03</p>
+                    <p>• Streak 10: ×3.06</p>
+                    <p>• Streak 20: ×5.12</p>
                     <p>• <strong>Unlimited potential!</strong> 🚀</p>
                   </div>
                 </div>

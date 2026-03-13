@@ -67,12 +67,12 @@ const ROULETTE_NUMBERS = [
   { number: 36, color: "red" }
 ];
 const PLAY_TYPES = {
-  red: { name: "Red", prize: 2, check: (num) => { const found = ROULETTE_NUMBERS.find(n => n.number === num); return found && found.color === 'red'; } },
-  black: { name: "Black", prize: 2, check: (num) => { const found = ROULETTE_NUMBERS.find(n => n.number === num); return found && found.color === 'black'; } },
-  even: { name: "Even", prize: 2, check: (num) => num !== 0 && num % 2 === 0 },
-  odd: { name: "Odd", prize: 2, check: (num) => num !== 0 && num % 2 === 1 },
-  low: { name: "1-18", prize: 2, check: (num) => num >= 1 && num <= 18 },
-  high: { name: "19-36", prize: 2, check: (num) => num >= 19 && num <= 36 }
+  red: { name: "Red", prize: 1.97, check: (num) => { const found = ROULETTE_NUMBERS.find(n => n.number === num); return found && found.color === 'red'; } },
+  black: { name: "Black", prize: 1.97, check: (num) => { const found = ROULETTE_NUMBERS.find(n => n.number === num); return found && found.color === 'black'; } },
+  even: { name: "Even", prize: 1.97, check: (num) => num !== 0 && num % 2 === 0 },
+  odd: { name: "Odd", prize: 1.97, check: (num) => num !== 0 && num % 2 === 1 },
+  low: { name: "1-18", prize: 1.97, check: (num) => num >= 1 && num <= 18 },
+  high: { name: "19-36", prize: 1.97, check: (num) => num >= 19 && num <= 36 }
 };
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
@@ -793,7 +793,7 @@ export default function ColorWheelPage() {
                   <strong>4. Win:</strong> Match your play type to win!
                 </p>
                 <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
-                  <p className="text-green-300 font-semibold mb-2">💰 All Plays Pay ×2:</p>
+                  <p className="text-green-300 font-semibold mb-2">💰 All Plays Pay ×1.97:</p>
                   <div className="text-xs text-white/80 space-y-1">
                     <p>• 🔴 Red / ⚫ Black</p>
                     <p>• ➕ Even / ➖ Odd</p>

@@ -39,7 +39,7 @@ function useIOSViewportFix() {
 const LS_KEY = "mleo_slots_v2";
 const MIN_PLAY = 1000;
 const SYMBOLS = ['💎', '⭐', '🍒', '🍋', '🍊', '🍉', '🎰', '7️⃣', '🔔'];
-const PRIZES = { '💎': { 5: 500, 4: 100, 3: 20 }, '7️⃣': { 5: 200, 4: 50, 3: 15 }, '⭐': { 5: 100, 4: 30, 3: 10 }, '🔔': { 5: 80, 4: 20, 3: 8 }, '🎰': { 5: 60, 4: 15, 3: 6 }, '🍒': { 5: 40, 4: 10, 3: 5 }, '🍉': { 5: 30, 4: 8, 3: 4 }, '🍊': { 5: 20, 4: 6, 3: 3 }, '🍋': { 5: 15, 4: 5, 3: 2 } };
+const PRIZES = { '💎': { 5: 492.5, 4: 98.5, 3: 19.7 }, '7️⃣': { 5: 197, 4: 49.25, 3: 14.775 }, '⭐': { 5: 98.5, 4: 29.55, 3: 9.85 }, '🔔': { 5: 78.8, 4: 19.7, 3: 7.88 }, '🎰': { 5: 59.1, 4: 14.775, 3: 5.91 }, '🍒': { 5: 39.4, 4: 9.85, 3: 4.925 }, '🍉': { 5: 29.55, 4: 7.88, 3: 3.94 }, '🍊': { 5: 19.7, 4: 5.91, 3: 2.955 }, '🍋': { 5: 14.775, 4: 4.925, 3: 1.97 } };
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);

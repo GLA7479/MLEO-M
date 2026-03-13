@@ -392,7 +392,7 @@ useEffect(() => {
     if (!gameActive) return;
     playSfx(clickSound.current);
     const chance = Math.random();
-    const successRate = 0.5 - currentStep * 0.045; // Starts at 50%, decreases by 4.5% per step for RTP ~99%
+    const successRate = 0.86 - currentStep * 0.018; // Adjusted for RTP ~96.5%
     
     if (chance < successRate) {
       const newStep = currentStep + 1;

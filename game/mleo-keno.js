@@ -50,9 +50,9 @@ const S_CLICK = "/sounds/click.mp3";
 const S_WIN = "/sounds/gift.mp3";
 
 const PRIZES = {
-  10: { 10: 1000, 9: 200, 8: 50, 7: 15, 6: 5 },
-  5: { 5: 20, 4: 5, 3: 2 },
-  1: { 1: 3 }
+  10: { 10: 188, 9: 38, 8: 9, 7: 3, 6: 1 },
+  5: { 5: 9.5, 4: 2.8, 3: 0.95 },
+  1: { 1: 1.91 }
 };
 
 function safeRead(key, fallback = {}) { if (typeof window === "undefined") return fallback; try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }

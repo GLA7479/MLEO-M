@@ -52,12 +52,12 @@ function useIOSViewportFix() {
 const LS_KEY = "mleo_goldrush_v2";
 const MIN_PLAY = 1000;
 const GRID_SIZE = 25;
-// Adjusted for RTP ~99%
+// Adjusted for RTP ~96%
 const PRIZES = {
-  small_gem: { emoji: '💎', multiplier: 0.65, count: 8 },
-  medium_gem: { emoji: '💍', multiplier: 1.0, count: 6 },
-  large_treasure: { emoji: '👑', multiplier: 1.5, count: 3 },
-  grandPrize: { emoji: '🌟', multiplier: 2.5, count: 2 },
+  small_gem: { emoji: '💎', multiplier: 0.44, count: 8 },
+  medium_gem: { emoji: '💍', multiplier: 0.67, count: 6 },
+  large_treasure: { emoji: '👑', multiplier: 1.0, count: 3 },
+  grandPrize: { emoji: '🌟', multiplier: 1.67, count: 2 },
   skull: { emoji: '💀', multiplier: -1, count: 6 }
 };
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
@@ -809,10 +809,10 @@ useEffect(() => {
                     💰 Treasure Prizes:
                   </p>
                   <div className="text-xs text-white/80 space-y-1">
-                    <p>💎 <strong>Small Gem:</strong> ×0.5</p>
-                    <p>💍 <strong>Medium Gem:</strong> ×0.8</p>
-                    <p>👑 <strong>Large Treasure:</strong> ×1.2</p>
-                    <p>🌟 <strong>GRAND_PRIZE:</strong> ×2</p>
+                    <p>💎 <strong>Small Gem:</strong> ×0.44</p>
+                    <p>💍 <strong>Medium Gem:</strong> ×0.67</p>
+                    <p>👑 <strong>Large Treasure:</strong> ×1.0</p>
+                    <p>🌟 <strong>GRAND_PRIZE:</strong> ×1.67</p>
                     <p>💀 <strong>Skull:</strong> Lose all!</p>
                   </div>
                 </div>

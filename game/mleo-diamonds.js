@@ -425,7 +425,7 @@ useEffect(() => {
         cumulativeProb *= safeLeft / totalLeft;
       }
       // Fair multiplier calculation
-      const multiplier = (1 / cumulativeProb) * 1.05;
+      const multiplier = (1 / cumulativeProb) * 0.96;
       const prize = Math.floor(Number(playAmount) * multiplier);
       setCurrentPrize(prize);
     }

@@ -214,10 +214,10 @@ export default function HorseRacePage() {
     // positions[0] = 1st, positions[1] = 2nd, positions[2] = 3rd, positions[3] = 4th
     const myPosition = positions.indexOf(selectedHorse);
     
-    // Prize multipliers based on finish position - Adjusted for RTP ~99%
+    // Prize multipliers based on finish position - Adjusted for RTP ~96%
     let multiplier = 0;
     let place = '';
-    if (myPosition === 0) { multiplier = 3.2; place = '1st 🥇'; }
+    if (myPosition === 0) { multiplier = 3.25; place = '1st 🥇'; }
     else if (myPosition === 1) { multiplier = 0.9; place = '2nd 🥈'; }
     else if (myPosition === 2) { multiplier = 0.5; place = '3rd 🥉'; }
     else if (myPosition === 3) { multiplier = 0.15; place = '4th'; }
@@ -259,7 +259,7 @@ export default function HorseRacePage() {
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-green-900 via-black to-emerald-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
 
-  const potentialWin = Math.floor(Number(playAmount) * 3.6);
+  const potentialWin = Math.floor(Number(playAmount) * 3.25);
 
   return (
     <Layout>
@@ -281,7 +281,7 @@ export default function HorseRacePage() {
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">🏇 Speed Track</h1>
-            <p className="text-white/70 text-xs">Play on your horse • Win ×3.6!</p>
+            <p className="text-white/70 text-xs">Play on your horse • Win ×3.25!</p>
           </div>
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
@@ -404,12 +404,12 @@ export default function HorseRacePage() {
                 <p><strong>4. Win Prizes:</strong> Top 4 positions get paid!</p>
                 <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
                   <p className="text-green-300 font-semibold mb-2">🏆 Finish Prizes:</p>
-                    <div className="text-xs text-white/80 space-y-1">
-                      <p>🥇 <strong>1st Place:</strong> ×3.6</p>
-                      <p>🥈 <strong>2nd Place:</strong> ×1 (break even)</p>
-                      <p>🥉 <strong>3rd Place:</strong> ×0.6</p>
-                      <p>• <strong>4th Place:</strong> ×0.2</p>
-                      <p>• <strong>5th Place:</strong> ×0</p>
+                  <div className="text-xs text-white/80 space-y-1">
+                    <p>🥇 <strong>1st Place:</strong> ×3.25</p>
+                    <p>🥈 <strong>2nd Place:</strong> ×0.9</p>
+                    <p>🥉 <strong>3rd Place:</strong> ×0.5</p>
+                    <p>• <strong>4th Place:</strong> ×0.15</p>
+                    <p>• <strong>5th Place:</strong> ×0</p>
                   </div>
                 </div>
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mt-2">

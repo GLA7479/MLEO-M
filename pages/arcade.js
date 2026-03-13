@@ -460,6 +460,24 @@ export default function ArcadeHub() {
       href: "/roulette",
       color: "#7C3AED",
     },
+    // 19. Checkers - NEW!
+    {
+      title: "Checkers",
+      emoji: "♟️",
+      description: "Classic checkers vs bot! Capture all pieces to win!",
+      reward: "×1.92",
+      href: "/checkers",
+      color: "#DC2626",
+    },
+    // 20. Backgammon - NEW!
+    {
+      title: "Backgammon",
+      emoji: "🎲",
+      description: "Classic backgammon vs bot! Bear off all pieces first to win!",
+      reward: "×1.92",
+      href: "/backgammon",
+      color: "#D97706",
+    },
     // Additional upgraded games
     {
       title: "Dragon Tower",
