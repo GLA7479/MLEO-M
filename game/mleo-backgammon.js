@@ -85,13 +85,15 @@ function initBoard() {
 function allCheckersInHome(board, bar, playerType) {
   if (playerType === 1) {
     if (bar.player > 0) return false;
-    for (let i = 0; i < 18; i++) {
+    // Player home is 0-5 (points 1-6)
+    for (let i = 6; i < 24; i++) {
       if (board[i] > 0) return false;
     }
     return true;
   } else {
     if (bar.bot > 0) return false;
-    for (let i = 6; i < 24; i++) {
+    // Bot home is 18-23 (points 19-24)
+    for (let i = 0; i < 18; i++) {
       if (board[i] < 0) return false;
     }
     return true;
@@ -110,14 +112,16 @@ function canMove(board, bar, borneOff, source, dieValue, playerType) {
   if (sourceType === 'bar') {
     if (playerType === 1) {
       if (bar.player === 0) return false;
-      const entryPoint = 24 - dieValue;
+      // Player enters from bar to point (dieValue - 1), moving right to left
+      const entryPoint = dieValue - 1;
       if (entryPoint < 0 || entryPoint > 23) return false;
       if (board[entryPoint] === 0) return true;
       if (board[entryPoint] > 0) return true;
       return Math.abs(board[entryPoint]) === 1;
     } else {
       if (bar.bot === 0) return false;
-      const entryPoint = dieValue - 1;
+      // Bot enters from bar to point (24 - dieValue), moving left to right
+      const entryPoint = 24 - dieValue;
       if (entryPoint < 0 || entryPoint > 23) return false;
       if (board[entryPoint] === 0) return true;
       if (board[entryPoint] < 0) return true;
@@ -128,23 +132,26 @@ function canMove(board, bar, borneOff, source, dieValue, playerType) {
   // Regular move from point
   if (from === null || board[from] === 0 || Math.sign(board[from]) !== playerType) return false;
   
-  const to = playerType === 1 ? from + dieValue : from - dieValue;
+  // Player moves right to left (decreasing), Bot moves left to right (increasing)
+  const to = playerType === 1 ? from - dieValue : from + dieValue;
   
   // Bearing off
   if (to < 0 || to > 23) {
     if (!allCheckersInHome(board, bar, playerType)) return false;
     if (playerType === 1) {
-      if (from + dieValue === 24) return true;
-      if (from + dieValue > 24) {
-        for (let i = from - 1; i >= 18; i--) {
+      // Player bears off from home (0-5)
+      if (from - dieValue === -1) return true;
+      if (from - dieValue < -1) {
+        for (let i = from + 1; i <= 5; i++) {
           if (board[i] > 0) return false;
         }
         return true;
       }
     } else {
-      if (from - dieValue === -1) return true;
-      if (from - dieValue < -1) {
-        for (let i = from + 1; i <= 5; i++) {
+      // Bot bears off from home (18-23)
+      if (from + dieValue === 24) return true;
+      if (from + dieValue > 24) {
+        for (let i = from - 1; i >= 18; i--) {
           if (board[i] < 0) return false;
         }
         return true;
@@ -175,15 +182,15 @@ function makeMove(board, bar, borneOff, move, playerType) {
   if (sourceType === 'bar') {
     if (playerType === 1) {
       newBar.player -= 1;
-      to = 24 - dieValue;
+      to = dieValue - 1; // Player enters from bar moving right to left
     } else {
       newBar.bot -= 1;
-      to = dieValue - 1;
+      to = 24 - dieValue; // Bot enters from bar moving left to right
     }
   } else {
     // Regular move from point
     newBoard[from] -= playerType;
-    to = playerType === 1 ? from + dieValue : from - dieValue;
+    to = playerType === 1 ? from - dieValue : from + dieValue; // Player moves right to left, Bot moves left to right
   }
   
   // Bearing off
@@ -225,8 +232,8 @@ function getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice
     const dieValue = turnDice[dieIndex];
     if (canMove(board, bar, borneOff, source, dieValue, playerType)) {
       const to = source.type === 'bar' 
-        ? (playerType === 1 ? 24 - dieValue : dieValue - 1)
-        : (playerType === 1 ? source.index + dieValue : source.index - dieValue);
+        ? (playerType === 1 ? dieValue - 1 : 24 - dieValue)
+        : (playerType === 1 ? source.index - dieValue : source.index + dieValue);
       
       const hit = to >= 0 && to <= 23 && board[to] !== 0 && Math.sign(board[to]) !== playerType && Math.abs(board[to]) === 1;
       const bearOff = to < 0 || to > 23;
@@ -348,6 +355,7 @@ export default function BackgammonPage() {
   const winSound = useRef(null);
   const [selectedSource, setSelectedSource] = useState(null);
   const [usedDice, setUsedDice] = useState([]);
+  const [legalTargets, setLegalTargets] = useState([]);
 
   const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalGames: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, lastPlay: MIN_PLAY }));
 
@@ -460,6 +468,7 @@ export default function BackgammonPage() {
     setTurnDice(roll.expanded);
     setUsedDice([]);
     setSelectedSource(null);
+    setLegalTargets([]);
     setCurrentPlayer(player);
     
     // Check if player has any legal moves
@@ -475,6 +484,7 @@ export default function BackgammonPage() {
   const endTurn = (nextPlayer) => {
     setSelectedSource(null);
     setUsedDice([]);
+    setLegalTargets([]);
     
     const winner = checkGameOver(borneOff);
     if (winner) {
@@ -504,6 +514,7 @@ export default function BackgammonPage() {
     setBorneOff({ player: 0, bot: 0 });
     setSelectedSource(null);
     setUsedDice([]);
+    setLegalTargets([]);
     setGameActive(true);
     setGameResult(null);
     startTurn('player');
@@ -517,8 +528,8 @@ export default function BackgammonPage() {
       const availableIndexes = getAvailableDieIndexes(turnDice, usedDice);
       for (const dieIndex of availableIndexes) {
         const dieValue = turnDice[dieIndex];
-        const entryPoint = 24 - dieValue;
-        if (pointIndex === entryPoint - 1) {
+        const entryPoint = dieValue - 1; // Player enters from bar moving right to left
+        if (pointIndex === entryPoint) {
           const source = { type: 'bar', index: null };
           if (canMove(board, bar, borneOff, source, dieValue, 1)) {
             const to = entryPoint;
@@ -531,6 +542,7 @@ export default function BackgammonPage() {
             setBorneOff(result.borneOff);
             setUsedDice([...usedDice, move.dieIndex]);
             setSelectedSource(null);
+            setLegalTargets([]);
             playSfx(clickSound.current);
             
             const winner = checkGameOver(result.borneOff);
@@ -556,6 +568,7 @@ export default function BackgammonPage() {
         const moves = getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, 1);
         if (moves.length > 0) {
           setSelectedSource(source);
+          setLegalTargets(moves);
           playSfx(clickSound.current);
         }
       }
@@ -564,7 +577,8 @@ export default function BackgammonPage() {
       const moves = getLegalMovesForSource(board, bar, borneOff, selectedSource, turnDice, usedDice, 1);
       const move = moves.find(m => {
         if (m.bearOff) {
-          return pointIndex >= 18;
+          // For bearing off, allow click on any point in home board (0-5)
+          return pointIndex <= 5;
         }
         return m.to === pointIndex;
       });
@@ -576,6 +590,7 @@ export default function BackgammonPage() {
         setBorneOff(result.borneOff);
         setUsedDice([...usedDice, move.dieIndex]);
         setSelectedSource(null);
+        setLegalTargets([]);
         playSfx(clickSound.current);
         
         const winner = checkGameOver(result.borneOff);
@@ -594,12 +609,15 @@ export default function BackgammonPage() {
           const moves = getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, 1);
           if (moves.length > 0) {
             setSelectedSource(source);
+            setLegalTargets(moves);
             playSfx(clickSound.current);
           } else {
             setSelectedSource(null);
+            setLegalTargets([]);
           }
         } else {
           setSelectedSource(null);
+          setLegalTargets([]);
         }
       }
     }
@@ -635,6 +653,7 @@ export default function BackgammonPage() {
     setTurnDice([]);
     setSelectedSource(null);
     setUsedDice([]);
+    setLegalTargets([]);
     setCurrentPlayer('player');
     setGameActive(false);
   };
@@ -684,161 +703,228 @@ export default function BackgammonPage() {
           <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 350px)" }}>
             <div className="w-full max-w-md bg-gradient-to-b from-amber-900 to-amber-700 rounded-lg p-2 border-4 border-amber-600" style={{ aspectRatio: "1/1", maxHeight: "calc(100% - 32px)" }}>
               {/* Backgammon board with triangular points */}
-              <div className="relative h-full w-full">
+              <div className="relative h-full w-full bg-amber-800/30">
                 {/* Top half - Outer board and Home board (points 13-24) */}
-                <div className="absolute top-0 left-0 right-0 h-1/2 flex">
-                  {/* Right side - points 19-24 (Home board) */}
-                  <div className="w-1/2 flex">
-                    {[19, 20, 21, 22, 23, 24].reverse().map((pointIdx) => {
-                      const count = board[pointIdx - 1];
-                      const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
-                      const pieces = Math.abs(count);
-                      const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
-                      const isDark = pointIdx % 2 === 1;
-                      
-                      return (
-                        <button
-                          key={`top-right-${pointIdx}`}
-                          onClick={() => handlePointClick(pointIdx - 1)}
-                          disabled={!gameActive || gameResult || currentPlayer !== 'player'}
-                          className={`relative flex-1 ${isDark ? 'bg-amber-800' : 'bg-amber-100'} border-r border-amber-600 transition-all ${
-                            isSelected ? 'ring-2 ring-blue-400' : ''
-                          } hover:brightness-110 disabled:opacity-50`}
-                          style={{
-                            clipPath: 'polygon(0 0, 100% 0, 50% 100%)',
-                          }}
-                        >
-                          {pieces > 0 && (
-                            <div className="absolute top-1 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-0.5">
-                              {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
-                                <div key={i} className={`w-2.5 h-2.5 rounded-full border ${playerType === 'player' ? 'bg-red-600 border-red-800' : 'bg-blue-600 border-blue-800'}`} />
-                              ))}
-                              {pieces > 5 && <span className="text-[7px] text-white font-bold">+{pieces - 5}</span>}
-                            </div>
-                          )}
-                          <span className="absolute bottom-0 left-1/2 transform -translate-x-1/2 text-[8px] text-white/60">{pointIdx}</span>
-                        </button>
-                      );
-                    })}
+                <div className="absolute top-0 left-0 right-0 h-1/2 grid" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr)) 28px repeat(6, minmax(0, 1fr))' }}>
+                  {/* Left side - points 13-18 (Outer board) */}
+                  {[13, 14, 15, 16, 17, 18].map((pointIdx) => {
+                    const count = board[pointIdx - 1];
+                    const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
+                    const isLegalTarget = legalTargets.some(m => m.to === pointIdx - 1);
+                    const pieces = Math.abs(count);
+                    const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
+                    const isDark = pointIdx % 2 === 1;
+                    
+                    return (
+                      <button
+                        key={`top-left-${pointIdx}`}
+                        onClick={() => handlePointClick(pointIdx - 1)}
+                        disabled={!gameActive || gameResult || currentPlayer !== 'player'}
+                        className={`relative h-full w-full transition-all ${
+                          isSelected ? 'ring-2 ring-blue-400 z-20' : ''
+                        } ${
+                          isLegalTarget ? 'ring-2 ring-cyan-300 bg-cyan-400/10' : ''
+                        } hover:brightness-110 disabled:opacity-50`}
+                      >
+                        <div className="absolute inset-0 pointer-events-none">
+                          <div
+                            className={`${isDark ? 'bg-gray-900' : 'bg-amber-100'} absolute inset-x-[10%] top-0 bottom-0`}
+                            style={{ clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }}
+                          />
+                        </div>
+                        {pieces > 0 && (
+                          <div className="absolute inset-x-0 top-1 flex flex-col items-center gap-[2px]">
+                            {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={`w-3 h-3 rounded-full border-[1px] ${
+                                  playerType === 'player'
+                                    ? 'bg-red-600 border-red-800'
+                                    : 'bg-blue-600 border-blue-800'
+                                }`}
+                              />
+                            ))}
+                            {pieces > 5 && <span className="text-[8px] text-white font-bold">+{pieces - 5}</span>}
+                          </div>
+                        )}
+                        {isLegalTarget && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-3 h-3 rounded-full bg-cyan-400/80 ring-2 ring-white/60" />
+                          </div>
+                        )}
+                        <span className="absolute bottom-0 inset-x-0 text-center text-[8px] text-white/60">{pointIdx}</span>
+                      </button>
+                    );
+                  })}
+                  
+                  {/* Center bar spacer */}
+                  <div className="col-start-7 col-end-8 bg-amber-950/40 border-x border-amber-700 flex flex-col items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-xs text-white/90 font-semibold">Dice: {dice[0]} {dice[1]}</div>
+                      {usedDice.length > 0 && <div className="text-[10px] text-white/60">Used: {usedDice.length}/{turnDice.length}</div>}
+                      {bar.player > 0 && <div className="text-[10px] text-red-300 mt-0.5">Bar: {bar.player}</div>}
+                      {bar.bot > 0 && <div className="text-[10px] text-blue-300 mt-0.5">Bot Bar: {bar.bot}</div>}
+                    </div>
                   </div>
                   
-                  {/* Left side - points 13-18 (Outer board) */}
-                  <div className="w-1/2 flex">
-                    {[13, 14, 15, 16, 17, 18].map((pointIdx) => {
-                      const count = board[pointIdx - 1];
-                      const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
-                      const pieces = Math.abs(count);
-                      const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
-                      const isDark = pointIdx % 2 === 0;
-                      
-                      return (
-                        <button
-                          key={`top-left-${pointIdx}`}
-                          onClick={() => handlePointClick(pointIdx - 1)}
-                          disabled={!gameActive || gameResult || currentPlayer !== 'player'}
-                          className={`relative flex-1 ${isDark ? 'bg-amber-800' : 'bg-amber-100'} border-l border-amber-600 transition-all ${
-                            isSelected ? 'ring-2 ring-blue-400' : ''
-                          } hover:brightness-110 disabled:opacity-50`}
-                          style={{
-                            clipPath: 'polygon(0 0, 100% 0, 50% 100%)',
-                          }}
-                        >
-                          {pieces > 0 && (
-                            <div className="absolute top-1 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-0.5">
-                              {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
-                                <div key={i} className={`w-2.5 h-2.5 rounded-full border ${playerType === 'player' ? 'bg-red-600 border-red-800' : 'bg-blue-600 border-blue-800'}`} />
-                              ))}
-                              {pieces > 5 && <span className="text-[7px] text-white font-bold">+{pieces - 5}</span>}
-                            </div>
-                          )}
-                          <span className="absolute bottom-0 left-1/2 transform -translate-x-1/2 text-[8px] text-white/60">{pointIdx}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                
-                {/* Center bar - Dice display */}
-                <div className="absolute top-1/2 left-0 right-0 h-8 -translate-y-1/2 bg-amber-600/90 border-y-2 border-amber-800 flex items-center justify-center z-10">
-                  <div className="text-center">
-                    <div className="text-xs text-white/90 font-semibold">Dice: {dice[0]} {dice[1]}</div>
-                    {usedDice.length > 0 && <div className="text-[10px] text-white/60">Used: {usedDice.length}/{turnDice.length}</div>}
-                    {bar.player > 0 && <div className="text-[10px] text-red-300 mt-0.5">Bar: {bar.player}</div>}
-                    {bar.bot > 0 && <div className="text-[10px] text-blue-300 mt-0.5">Bot Bar: {bar.bot}</div>}
-                  </div>
+                  {/* Right side - points 19-24 (Home board) */}
+                  {[19, 20, 21, 22, 23, 24].map((pointIdx) => {
+                    const count = board[pointIdx - 1];
+                    const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
+                    const isLegalTarget = legalTargets.some(m => m.to === pointIdx - 1);
+                    const pieces = Math.abs(count);
+                    const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
+                    const isDark = pointIdx % 2 === 1;
+                    
+                    return (
+                      <button
+                        key={`top-right-${pointIdx}`}
+                        onClick={() => handlePointClick(pointIdx - 1)}
+                        disabled={!gameActive || gameResult || currentPlayer !== 'player'}
+                        className={`relative h-full w-full transition-all ${
+                          isSelected ? 'ring-2 ring-blue-400 z-20' : ''
+                        } ${
+                          isLegalTarget ? 'ring-2 ring-cyan-300 bg-cyan-400/10' : ''
+                        } hover:brightness-110 disabled:opacity-50`}
+                      >
+                        <div className="absolute inset-0 pointer-events-none">
+                          <div
+                            className={`${isDark ? 'bg-gray-900' : 'bg-amber-100'} absolute inset-x-[10%] top-0 bottom-0`}
+                            style={{ clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }}
+                          />
+                        </div>
+                        {pieces > 0 && (
+                          <div className="absolute inset-x-0 top-1 flex flex-col items-center gap-[2px]">
+                            {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={`w-3 h-3 rounded-full border-[1px] ${
+                                  playerType === 'player'
+                                    ? 'bg-red-600 border-red-800'
+                                    : 'bg-blue-600 border-blue-800'
+                                }`}
+                              />
+                            ))}
+                            {pieces > 5 && <span className="text-[8px] text-white font-bold">+{pieces - 5}</span>}
+                          </div>
+                        )}
+                        {isLegalTarget && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-3 h-3 rounded-full bg-cyan-400/80 ring-2 ring-white/60" />
+                          </div>
+                        )}
+                        <span className="absolute bottom-0 inset-x-0 text-center text-[8px] text-white/60">{pointIdx}</span>
+                      </button>
+                    );
+                  })}
                 </div>
                 
                 {/* Bottom half - Home board and Outer board (points 1-12) */}
-                <div className="absolute bottom-0 left-0 right-0 h-1/2 flex">
+                <div className="absolute bottom-0 left-0 right-0 h-1/2 grid" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr)) 28px repeat(6, minmax(0, 1fr))' }}>
                   {/* Left side - points 7-12 (Outer board) */}
-                  <div className="w-1/2 flex">
-                    {[7, 8, 9, 10, 11, 12].map((pointIdx) => {
-                      const count = board[pointIdx - 1];
-                      const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
-                      const pieces = Math.abs(count);
-                      const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
-                      const isDark = pointIdx % 2 === 0;
-                      
-                      return (
-                        <button
-                          key={`bottom-left-${pointIdx}`}
-                          onClick={() => handlePointClick(pointIdx - 1)}
-                          disabled={!gameActive || gameResult || currentPlayer !== 'player'}
-                          className={`relative flex-1 ${isDark ? 'bg-amber-800' : 'bg-amber-100'} border-r border-amber-600 transition-all ${
-                            isSelected ? 'ring-2 ring-blue-400' : ''
-                          } hover:brightness-110 disabled:opacity-50`}
-                          style={{
-                            clipPath: 'polygon(0 100%, 100% 100%, 50% 0)',
-                          }}
-                        >
-                          {pieces > 0 && (
-                            <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex flex-col-reverse items-center gap-0.5">
-                              {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
-                                <div key={i} className={`w-2.5 h-2.5 rounded-full border ${playerType === 'player' ? 'bg-red-600 border-red-800' : 'bg-blue-600 border-blue-800'}`} />
-                              ))}
-                              {pieces > 5 && <span className="text-[7px] text-white font-bold">+{pieces - 5}</span>}
-                            </div>
-                          )}
-                          <span className="absolute top-0 left-1/2 transform -translate-x-1/2 text-[8px] text-white/60">{pointIdx}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {[12, 11, 10, 9, 8, 7].map((pointIdx) => {
+                    const count = board[pointIdx - 1];
+                    const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
+                    const isLegalTarget = legalTargets.some(m => m.to === pointIdx - 1 || (m.bearOff && pointIdx <= 5));
+                    const pieces = Math.abs(count);
+                    const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
+                    const isDark = pointIdx % 2 === 1;
+                    
+                    return (
+                      <button
+                        key={`bottom-left-${pointIdx}`}
+                        onClick={() => handlePointClick(pointIdx - 1)}
+                        disabled={!gameActive || gameResult || currentPlayer !== 'player'}
+                        className={`relative h-full w-full transition-all ${
+                          isSelected ? 'ring-2 ring-blue-400 z-20' : ''
+                        } ${
+                          isLegalTarget ? 'ring-2 ring-cyan-300 bg-cyan-400/10' : ''
+                        } hover:brightness-110 disabled:opacity-50`}
+                      >
+                        <div className="absolute inset-0 pointer-events-none">
+                          <div
+                            className={`${isDark ? 'bg-gray-900' : 'bg-amber-100'} absolute inset-x-[10%] top-0 bottom-0`}
+                            style={{ clipPath: 'polygon(0 100%, 100% 100%, 50% 0)' }}
+                          />
+                        </div>
+                        {pieces > 0 && (
+                          <div className="absolute inset-x-0 bottom-1 flex flex-col-reverse items-center gap-[2px]">
+                            {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={`w-3 h-3 rounded-full border-[1px] ${
+                                  playerType === 'player'
+                                    ? 'bg-red-600 border-red-800'
+                                    : 'bg-blue-600 border-blue-800'
+                                }`}
+                              />
+                            ))}
+                            {pieces > 5 && <span className="text-[8px] text-white font-bold">+{pieces - 5}</span>}
+                          </div>
+                        )}
+                        {isLegalTarget && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-3 h-3 rounded-full bg-cyan-400/80 ring-2 ring-white/60" />
+                          </div>
+                        )}
+                        <span className="absolute top-0 inset-x-0 text-center text-[8px] text-white/60">{pointIdx}</span>
+                      </button>
+                    );
+                  })}
+                  
+                  {/* Center bar spacer */}
+                  <div className="col-start-7 col-end-8 bg-amber-950/40 border-x border-amber-700" />
                   
                   {/* Right side - points 1-6 (Home board) */}
-                  <div className="w-1/2 flex">
-                    {[1, 2, 3, 4, 5, 6].reverse().map((pointIdx) => {
-                      const count = board[pointIdx - 1];
-                      const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
-                      const pieces = Math.abs(count);
-                      const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
-                      const isDark = pointIdx % 2 === 1;
-                      
-                      return (
-                        <button
-                          key={`bottom-right-${pointIdx}`}
-                          onClick={() => handlePointClick(pointIdx - 1)}
-                          disabled={!gameActive || gameResult || currentPlayer !== 'player'}
-                          className={`relative flex-1 ${isDark ? 'bg-amber-800' : 'bg-amber-100'} border-l border-amber-600 transition-all ${
-                            isSelected ? 'ring-2 ring-blue-400' : ''
-                          } hover:brightness-110 disabled:opacity-50`}
-                          style={{
-                            clipPath: 'polygon(0 100%, 100% 100%, 50% 0)',
-                          }}
-                        >
-                          {pieces > 0 && (
-                            <div className="absolute bottom-1 right-1/2 transform translate-x-1/2 flex flex-col-reverse items-center gap-0.5">
-                              {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
-                                <div key={i} className={`w-2.5 h-2.5 rounded-full border ${playerType === 'player' ? 'bg-red-600 border-red-800' : 'bg-blue-600 border-blue-800'}`} />
-                              ))}
-                              {pieces > 5 && <span className="text-[7px] text-white font-bold">+{pieces - 5}</span>}
-                            </div>
-                          )}
-                          <span className="absolute top-0 right-1/2 transform translate-x-1/2 text-[8px] text-white/60">{pointIdx}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {[1, 2, 3, 4, 5, 6].reverse().map((pointIdx) => {
+                    const count = board[pointIdx - 1];
+                    const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
+                    const isLegalTarget = legalTargets.some(m => m.to === pointIdx - 1 || (m.bearOff && pointIdx <= 5));
+                    const pieces = Math.abs(count);
+                    const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
+                    const isDark = pointIdx % 2 === 1;
+                    
+                    return (
+                      <button
+                        key={`bottom-right-${pointIdx}`}
+                        onClick={() => handlePointClick(pointIdx - 1)}
+                        disabled={!gameActive || gameResult || currentPlayer !== 'player'}
+                        className={`relative h-full w-full transition-all ${
+                          isSelected ? 'ring-2 ring-blue-400 z-20' : ''
+                        } ${
+                          isLegalTarget ? 'ring-2 ring-cyan-300 bg-cyan-400/10' : ''
+                        } hover:brightness-110 disabled:opacity-50`}
+                      >
+                        <div className="absolute inset-0 pointer-events-none">
+                          <div
+                            className={`${isDark ? 'bg-gray-900' : 'bg-amber-100'} absolute inset-x-[10%] top-0 bottom-0`}
+                            style={{ clipPath: 'polygon(0 100%, 100% 100%, 50% 0)' }}
+                          />
+                        </div>
+                        {pieces > 0 && (
+                          <div className="absolute inset-x-0 bottom-1 flex flex-col-reverse items-center gap-[2px]">
+                            {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={`w-3 h-3 rounded-full border-[1px] ${
+                                  playerType === 'player'
+                                    ? 'bg-red-600 border-red-800'
+                                    : 'bg-blue-600 border-blue-800'
+                                }`}
+                              />
+                            ))}
+                            {pieces > 5 && <span className="text-[8px] text-white font-bold">+{pieces - 5}</span>}
+                          </div>
+                        )}
+                        {isLegalTarget && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-3 h-3 rounded-full bg-cyan-400/80 ring-2 ring-white/60" />
+                          </div>
+                        )}
+                        <span className="absolute top-0 inset-x-0 text-center text-[8px] text-white/60">{pointIdx}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
