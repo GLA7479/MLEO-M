@@ -8,6 +8,7 @@ import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
  import { parseUnits } from "viem";
 import { useRouter } from "next/router";
+import { queueDelta, flushDelta, getBalance, initVaultAdapter, setLocalVault } from "../lib/vaultAdapter";
 
 
 // --- iOS 100vh fix (sets --app-100vh = window.innerHeight) ---
@@ -464,6 +465,16 @@ function loadMiningState(){
 }
 function saveMiningState(st){
   try { localStorage.setItem(MINING_LS_KEY, JSON.stringify(st)); } catch {}
+  // סנכרן עם vaultAdapter - חשוב לעדכן גם את ה-vaultAdapter
+  if (typeof window !== "undefined") {
+    try {
+      const vaultAmount = Number(st?.vault || 0);
+      if (Number.isFinite(vaultAmount)) {
+        // עדכן את ה-local vault ב-vaultAdapter
+        setLocalVault(vaultAmount);
+      }
+    } catch {}
+  }
 }
 
 // ——— Terms helpers ———
@@ -806,6 +817,21 @@ const { disconnect } = useDisconnect();
     } catch {}
   }, []);
 
+  // אתחל vaultAdapter וטען vault מהשרת
+  useEffect(() => {
+    initVaultAdapter();
+    // טען את ה-vault מהשרת בהתחלה
+    getBalance().then((serverVault) => {
+      const localState = loadMiningState();
+      // אם ה-vault מהשרת שונה מה-local, עדכן את ה-local
+      if (Math.abs((localState.vault || 0) - serverVault) > 0.01) {
+        localState.vault = serverVault;
+        saveMiningState(localState);
+        setMining(localState);
+      }
+    }).catch(() => {});
+  }, []);
+
   // טוען/מרענן סטטוס ה־Mining
   useEffect(() => {
     if (!mounted) return;
@@ -829,8 +855,32 @@ const { disconnect } = useDisconnect();
     st.history.unshift({ ts: Date.now(), amt, type: "to_vault" });
     st.balance = 0;
 
-    saveMiningState(st);
+    // עדכן את ה-local vault ב-vaultAdapter לפני הסנכרון
+    setLocalVault(st.vault);
+    
+    // שמור את ה-state המקומי
+    try { localStorage.setItem(MINING_LS_KEY, JSON.stringify(st)); } catch {}
     setMining(st);
+    
+    // סנכרן עם השרת - חשוב לעשות את זה אחרי עדכון ה-local
+    try {
+      queueDelta(amt, { syncLocal: false }); // syncLocal: false כי כבר עדכנו את ה-local
+      flushDelta("mleo-miners-balance-to-vault").then((result) => {
+        // אחרי הסנכרון, עדכן את ה-local vault עם הערך מהשרת
+        if (result?.ok) {
+          getBalance().then((serverVault) => {
+            if (Math.abs(serverVault - st.vault) > 0.01) {
+              st.vault = serverVault;
+              try { localStorage.setItem(MINING_LS_KEY, JSON.stringify(st)); } catch {}
+              setMining(st);
+            }
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    } catch (err) {
+      console.warn("[mleo-miners] Failed to sync vault delta:", err);
+    }
+    
     setGiftToastWithTTL(`Moved ${formatMleoShort(amt)} MLEO to Vault`);
   }
 
@@ -885,8 +935,21 @@ async function onClaimMined() {
       st0.history      = Array.isArray(st0.history) ? st0.history : [];
       st0.history.unshift({ ts: Date.now(), amt: bal, type: "to_vault" });
       st0.balance = 0;
-      saveMiningState(st0);
+      
+      // עדכן את ה-local vault ב-vaultAdapter
+      setLocalVault(st0.vault);
+      
+      // שמור את ה-state המקומי
+      try { localStorage.setItem(MINING_LS_KEY, JSON.stringify(st0)); } catch {}
       setMining(st0);
+      
+      // סנכרן עם השרת
+      try {
+        queueDelta(bal, { syncLocal: false });
+        flushDelta("mleo-miners-balance-merge").catch(() => {});
+      } catch (err) {
+        console.warn("[mleo-miners] Failed to sync vault delta:", err);
+      }
     }
   } catch {}
 
@@ -944,12 +1007,36 @@ async function onClaimMined() {
     // 5) עדכון לוקאלי
     const after = loadMiningState();
     const delta = Number(toClaim);
+    const oldVault = Number((after.vault || 0).toFixed(2));
     after.vault           = Math.max(0, Number(((after.vault || 0) - delta).toFixed(2)));
     after.claimedToWallet = Number(((after.claimedToWallet || 0) + delta).toFixed(2));
     after.history = Array.isArray(after.history) ? after.history : [];
     after.history.unshift({ t: Date.now(), kind: "claim_wallet_all", amount: delta, tx: String(hash) });
-    saveMiningState(after);
+    
+    // עדכן את ה-local vault ב-vaultAdapter לפני הסנכרון
+    setLocalVault(after.vault);
+    
+    // שמור את ה-state המקומי
+    try { localStorage.setItem(MINING_LS_KEY, JSON.stringify(after)); } catch {}
     setMining(after);
+    
+    // סנכרן עם השרת - חשוב לעשות את זה אחרי עדכון ה-local
+    try {
+      queueDelta(-delta, { syncLocal: false }); // syncLocal: false כי כבר עדכנו את ה-local
+      const result = await flushDelta("mleo-miners-claim");
+      // אחרי הסנכרון, עדכן את ה-local vault עם הערך מהשרת
+      if (result.ok) {
+        const serverVault = await getBalance();
+        if (Math.abs(serverVault - after.vault) > 0.01) {
+          after.vault = serverVault;
+          try { localStorage.setItem(MINING_LS_KEY, JSON.stringify(after)); } catch {}
+          setMining(after);
+        }
+      }
+    } catch (err) {
+      console.warn("[mleo-miners] Failed to sync vault delta:", err);
+    }
+    
     setCenterPopup?.({ text: `✅ Sent ${formatMleoShort(delta)} MLEO to wallet`, id: Math.random() });
     setClaimAmount(""); // Reset claim amount after successful claim
   } catch (err) {
@@ -1016,8 +1103,30 @@ async function onClaimMinedToWallet() {
     after.claimedToWallet = Number(((after.claimedToWallet || 0) + delta).toFixed(2));
     after.history = Array.isArray(after.history) ? after.history : [];
     after.history.unshift({ t: Date.now(), kind: "claim_wallet", amount: delta, tx: String(hash) });
-    saveMiningState(after);
+    
+    // עדכן את ה-local vault ב-vaultAdapter לפני הסנכרון
+    setLocalVault(after.vault);
+    
+    // שמור את ה-state המקומי
+    try { localStorage.setItem(MINING_LS_KEY, JSON.stringify(after)); } catch {}
     setMining(after);
+
+    // סנכרן עם השרת - חשוב לעשות את זה אחרי עדכון ה-local
+    try {
+      queueDelta(-delta, { syncLocal: false }); // syncLocal: false כי כבר עדכנו את ה-local
+      const result = await flushDelta("mleo-miners-claim-wallet");
+      // אחרי הסנכרון, עדכן את ה-local vault עם הערך מהשרת
+      if (result.ok) {
+        const serverVault = await getBalance();
+        if (Math.abs(serverVault - after.vault) > 0.01) {
+          after.vault = serverVault;
+          try { localStorage.setItem(MINING_LS_KEY, JSON.stringify(after)); } catch {}
+          setMining(after);
+        }
+      }
+    } catch (err) {
+      console.warn("[mleo-miners] Failed to sync vault delta:", err);
+    }
 
     setCenterPopup?.({ text: `✅ Sent ${formatMleoShort(delta)} MLEO to wallet`, id: Math.random() });
   } catch (err) {
