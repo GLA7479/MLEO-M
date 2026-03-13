@@ -56,75 +56,250 @@ function formatPlayDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) retu
 function shortAddr(addr) { if (!addr || addr.length < 10) return addr || ""; return `${addr.slice(0, 6)}...${addr.slice(-4)}`; }
 
 function rollDice() {
-  return [Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1];
+  const d1 = Math.floor(Math.random() * 6) + 1;
+  const d2 = Math.floor(Math.random() * 6) + 1;
+  if (d1 === d2) {
+    return { pair: [d1, d2], expanded: [d1, d1, d1, d1] };
+  }
+  return { pair: [d1, d2], expanded: [d1, d2] };
 }
 
 function initBoard() {
   const board = Array(24).fill(0);
-  board[0] = -2;   // Bot pieces
-  board[5] = 5;    // Player pieces
-  board[7] = 3;    // Player pieces
-  board[11] = -5;  // Bot pieces
-  board[12] = 5;   // Player pieces
-  board[16] = -3;  // Bot pieces
-  board[18] = -5;  // Bot pieces
-  board[23] = 2;   // Player pieces
+  // Backgammon starting position (standard setup)
+  // Player (red, positive): points 24, 13, 8, 6
+  board[23] = 2;   // Point 24: 2 checkers
+  board[12] = 5;   // Point 13: 5 checkers
+  board[7] = 3;    // Point 8: 3 checkers
+  board[5] = 5;    // Point 6: 5 checkers
+  
+  // Bot (blue, negative): points 1, 12, 17, 19
+  board[0] = -2;   // Point 1: 2 checkers
+  board[11] = -5;  // Point 12: 5 checkers
+  board[16] = -3;  // Point 17: 3 checkers
+  board[18] = -5;  // Point 19: 5 checkers
+  
   return board;
 }
 
-function canMove(board, from, steps, playerType) {
-  if (board[from] === 0 || Math.sign(board[from]) !== playerType) return false;
-  const to = playerType === 1 ? from + steps : from - steps;
-  if (to < 0 || to > 23) {
+function allCheckersInHome(board, bar, playerType) {
+  if (playerType === 1) {
+    if (bar.player > 0) return false;
+    for (let i = 0; i < 18; i++) {
+      if (board[i] > 0) return false;
+    }
+    return true;
+  } else {
+    if (bar.bot > 0) return false;
+    for (let i = 6; i < 24; i++) {
+      if (board[i] < 0) return false;
+    }
+    return true;
+  }
+}
+
+function canMove(board, bar, borneOff, source, dieValue, playerType) {
+  const sourceType = source.type;
+  const from = source.index;
+  
+  // Must enter from bar first
+  if (playerType === 1 && bar.player > 0 && sourceType !== 'bar') return false;
+  if (playerType === -1 && bar.bot > 0 && sourceType !== 'bar') return false;
+  
+  // Entry from bar
+  if (sourceType === 'bar') {
     if (playerType === 1) {
-      return from >= 18 && board.slice(18, 24).some((v, i) => v > 0 && 18 + i + steps >= 24);
+      if (bar.player === 0) return false;
+      const entryPoint = 24 - dieValue;
+      if (entryPoint < 0 || entryPoint > 23) return false;
+      if (board[entryPoint] === 0) return true;
+      if (board[entryPoint] > 0) return true;
+      return Math.abs(board[entryPoint]) === 1;
     } else {
-      return from <= 5 && board.slice(0, 6).some((v, i) => v < 0 && i - steps < 0);
+      if (bar.bot === 0) return false;
+      const entryPoint = dieValue - 1;
+      if (entryPoint < 0 || entryPoint > 23) return false;
+      if (board[entryPoint] === 0) return true;
+      if (board[entryPoint] < 0) return true;
+      return Math.abs(board[entryPoint]) === 1;
     }
   }
-  if (to < 0 || to > 23) return false;
+  
+  // Regular move from point
+  if (from === null || board[from] === 0 || Math.sign(board[from]) !== playerType) return false;
+  
+  const to = playerType === 1 ? from + dieValue : from - dieValue;
+  
+  // Bearing off
+  if (to < 0 || to > 23) {
+    if (!allCheckersInHome(board, bar, playerType)) return false;
+    if (playerType === 1) {
+      if (from + dieValue === 24) return true;
+      if (from + dieValue > 24) {
+        for (let i = from - 1; i >= 18; i--) {
+          if (board[i] > 0) return false;
+        }
+        return true;
+      }
+    } else {
+      if (from - dieValue === -1) return true;
+      if (from - dieValue < -1) {
+        for (let i = from + 1; i <= 5; i++) {
+          if (board[i] < 0) return false;
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  // Regular move
   if (board[to] === 0) return true;
   if (Math.sign(board[to]) === playerType) return true;
   return Math.abs(board[to]) === 1;
 }
 
-function makeMove(board, from, steps, playerType) {
+function makeMove(board, bar, borneOff, move, playerType) {
   const newBoard = [...board];
-  const to = playerType === 1 ? from + steps : from - steps;
+  const newBar = { ...bar };
+  const newBorneOff = { ...borneOff };
   
-  if (to < 0 || to > 23) {
+  const sourceType = move.sourceType;
+  const from = move.from;
+  const dieValue = move.steps;
+  let to = null;
+  let hit = false;
+  let bearOff = false;
+  
+  // Entry from bar
+  if (sourceType === 'bar') {
+    if (playerType === 1) {
+      newBar.player -= 1;
+      to = 24 - dieValue;
+    } else {
+      newBar.bot -= 1;
+      to = dieValue - 1;
+    }
+  } else {
+    // Regular move from point
     newBoard[from] -= playerType;
-    return newBoard;
+    to = playerType === 1 ? from + dieValue : from - dieValue;
   }
   
-  if (newBoard[to] !== 0 && Math.sign(newBoard[to]) !== playerType) {
-    newBoard[to] = 0;
+  // Bearing off
+  if (to < 0 || to > 23) {
+    bearOff = true;
+    if (playerType === 1) {
+      newBorneOff.player += 1;
+    } else {
+      newBorneOff.bot += 1;
+    }
+  } else {
+    // Check for hit
+    if (newBoard[to] !== 0 && Math.sign(newBoard[to]) !== playerType) {
+      hit = true;
+      if (playerType === 1) {
+        newBar.bot += 1;
+      } else {
+        newBar.player += 1;
+      }
+      newBoard[to] = 0;
+    }
+    
+    // Place checker
+    newBoard[to] = (newBoard[to] || 0) + playerType;
   }
   
-  newBoard[from] -= playerType;
-  newBoard[to] = (newBoard[to] || 0) + playerType;
-  
-  return newBoard;
+  return { board: newBoard, bar: newBar, borneOff: newBorneOff };
 }
 
-function getValidMoves(board, dice, playerType) {
+function getAvailableDieIndexes(turnDice, usedDice) {
+  return turnDice.map((_, idx) => idx).filter(idx => !usedDice.includes(idx));
+}
+
+function getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, playerType) {
   const moves = [];
-  for (let i = 0; i < 24; i++) {
-    if (canMove(board, i, dice[0], playerType)) {
-      moves.push({ from: i, steps: dice[0] });
-    }
-    if (dice[0] !== dice[1] && canMove(board, i, dice[1], playerType)) {
-      moves.push({ from: i, steps: dice[1] });
+  const availableIndexes = getAvailableDieIndexes(turnDice, usedDice);
+  
+  for (const dieIndex of availableIndexes) {
+    const dieValue = turnDice[dieIndex];
+    if (canMove(board, bar, borneOff, source, dieValue, playerType)) {
+      const to = source.type === 'bar' 
+        ? (playerType === 1 ? 24 - dieValue : dieValue - 1)
+        : (playerType === 1 ? source.index + dieValue : source.index - dieValue);
+      
+      const hit = to >= 0 && to <= 23 && board[to] !== 0 && Math.sign(board[to]) !== playerType && Math.abs(board[to]) === 1;
+      const bearOff = to < 0 || to > 23;
+      
+      moves.push({
+        sourceType: source.type,
+        from: source.index,
+        to: bearOff ? null : to,
+        steps: dieValue,
+        dieIndex,
+        hit,
+        bearOff
+      });
     }
   }
+  
   return moves;
 }
 
-function checkGameOver(board) {
-  const playerPieces = board.slice(18, 24).reduce((sum, v) => sum + (v > 0 ? v : 0), 0);
-  const botPieces = board.slice(0, 6).reduce((sum, v) => sum + (v < 0 ? Math.abs(v) : 0), 0);
-  if (playerPieces === 15) return 'player';
-  if (botPieces === 15) return 'bot';
+function getLegalMoveSequences(board, bar, borneOff, turnDice, usedDice, playerType) {
+  const sequences = [];
+  
+  function findSequences(currentBoard, currentBar, currentBorneOff, currentUsedDice, sequence) {
+    const availableIndexes = getAvailableDieIndexes(turnDice, currentUsedDice);
+    if (availableIndexes.length === 0) {
+      sequences.push([...sequence]);
+      return;
+    }
+    
+    let hasMove = false;
+    
+    // Check bar first
+    if ((playerType === 1 && currentBar.player > 0) || (playerType === -1 && currentBar.bot > 0)) {
+      const barSource = { type: 'bar', index: null };
+      const moves = getLegalMovesForSource(currentBoard, currentBar, currentBorneOff, barSource, turnDice, currentUsedDice, playerType);
+      
+      for (const move of moves) {
+        hasMove = true;
+        const result = makeMove(currentBoard, currentBar, currentBorneOff, move, playerType);
+        findSequences(result.board, result.bar, result.borneOff, [...currentUsedDice, move.dieIndex], [...sequence, move]);
+      }
+    } else {
+      // Check all points
+      for (let i = 0; i < 24; i++) {
+        if ((playerType === 1 && currentBoard[i] > 0) || (playerType === -1 && currentBoard[i] < 0)) {
+          const pointSource = { type: 'point', index: i };
+          const moves = getLegalMovesForSource(currentBoard, currentBar, currentBorneOff, pointSource, turnDice, currentUsedDice, playerType);
+          
+          for (const move of moves) {
+            hasMove = true;
+            const result = makeMove(currentBoard, currentBar, currentBorneOff, move, playerType);
+            findSequences(result.board, result.bar, result.borneOff, [...currentUsedDice, move.dieIndex], [...sequence, move]);
+          }
+        }
+      }
+    }
+    
+    if (!hasMove) {
+      sequences.push([...sequence]);
+    }
+  }
+  
+  findSequences(board, bar, borneOff, usedDice, []);
+  
+  // Filter to only longest sequences
+  if (sequences.length === 0) return [];
+  const maxLength = Math.max(...sequences.map(s => s.length));
+  return sequences.filter(s => s.length === maxLength);
+}
+
+function checkGameOver(borneOff) {
+  if (borneOff.player === 15) return 'player';
+  if (borneOff.bot === 15) return 'bot';
   return null;
 }
 
@@ -150,7 +325,10 @@ export default function BackgammonPage() {
   const [playAmount, setPlayAmount] = useState("1000");
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [board, setBoard] = useState(() => initBoard());
+  const [bar, setBar] = useState({ player: 0, bot: 0 });
+  const [borneOff, setBorneOff] = useState({ player: 0, bot: 0 });
   const [dice, setDice] = useState([1, 1]);
+  const [turnDice, setTurnDice] = useState([]);
   const [currentPlayer, setCurrentPlayer] = useState('player');
   const [gameActive, setGameActive] = useState(false);
   const [gameResult, setGameResult] = useState(null);
@@ -168,7 +346,7 @@ export default function BackgammonPage() {
   const [sfxMuted, setSfxMuted] = useState(false);
   const clickSound = useRef(null);
   const winSound = useRef(null);
-  const [selectedPoint, setSelectedPoint] = useState(null);
+  const [selectedSource, setSelectedSource] = useState(null);
   const [usedDice, setUsedDice] = useState([]);
 
   const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalGames: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, lastPlay: MIN_PLAY }));
@@ -198,34 +376,62 @@ export default function BackgammonPage() {
   useEffect(() => { if (gameResult) { setShowResultPopup(true); const timer = setTimeout(() => setShowResultPopup(false), 4000); return () => clearTimeout(timer); } }, [gameResult]);
 
   useEffect(() => {
-    if (!gameActive || currentPlayer !== 'bot' || gameResult || usedDice.length === 2) return;
-    const botDice = rollDice();
-    setDice(botDice);
+    if (!gameActive || currentPlayer !== 'bot' || gameResult || turnDice.length === 0) return;
     
     const timeout = setTimeout(() => {
-      const moves = getValidMoves(board, botDice, -1);
-      if (moves.length > 0) {
-        const randomMove = moves[Math.floor(Math.random() * moves.length)];
-        const newBoard = makeMove(board, randomMove.from, randomMove.steps, -1);
-        setBoard(newBoard);
-        setUsedDice([...usedDice, randomMove.steps]);
-        
-        const winner = checkGameOver(newBoard);
-        if (winner) {
-          endGame(winner === 'player');
-        } else if (usedDice.length + 1 === 2) {
-          setCurrentPlayer('player');
-          setUsedDice([]);
-          setDice(rollDice());
-        }
-      } else {
-        setCurrentPlayer('player');
-        setUsedDice([]);
-        setDice(rollDice());
+      const sequences = getLegalMoveSequences(board, bar, borneOff, turnDice, usedDice, -1);
+      
+      if (sequences.length === 0 || sequences[0].length === 0) {
+        endTurn('player');
+        return;
       }
+      
+      // Choose random sequence
+      const chosenSequence = sequences[Math.floor(Math.random() * sequences.length)];
+      
+      // Execute moves one by one
+      let currentBoard = board;
+      let currentBar = bar;
+      let currentBorneOff = borneOff;
+      let currentUsedDice = [...usedDice];
+      
+      const executeMoves = (index) => {
+        if (index >= chosenSequence.length) {
+          setBoard(currentBoard);
+          setBar(currentBar);
+          setBorneOff(currentBorneOff);
+          setUsedDice(currentUsedDice);
+          
+          const winner = checkGameOver(currentBorneOff);
+          if (winner) {
+            endGame(winner === 'player');
+          } else {
+            endTurn('player');
+          }
+          return;
+        }
+        
+        const move = chosenSequence[index];
+        const result = makeMove(currentBoard, currentBar, currentBorneOff, move, -1);
+        currentBoard = result.board;
+        currentBar = result.bar;
+        currentBorneOff = result.borneOff;
+        currentUsedDice.push(move.dieIndex);
+        
+        setTimeout(() => {
+          setBoard(currentBoard);
+          setBar(currentBar);
+          setBorneOff(currentBorneOff);
+          setUsedDice(currentUsedDice);
+          executeMoves(index + 1);
+        }, 500);
+      };
+      
+      executeMoves(0);
     }, 1000);
+    
     return () => clearTimeout(timeout);
-  }, [gameActive, currentPlayer, board, gameResult, usedDice]);
+  }, [gameActive, currentPlayer, board, bar, borneOff, turnDice, usedDice, gameResult]);
 
   const openWalletModalUnified = () => isConnected ? openAccountModal?.() : openConnectModal?.();
   const hardDisconnect = () => { disconnect?.(); setMenuOpen(false); };
@@ -247,6 +453,37 @@ export default function BackgammonPage() {
     } catch (err) { console.error(err); alert("Claim failed or rejected"); } finally { setClaiming(false); }
   };
 
+  const startTurn = (player) => {
+    const playerType = player === 'player' ? 1 : -1;
+    const roll = rollDice();
+    setDice(roll.pair);
+    setTurnDice(roll.expanded);
+    setUsedDice([]);
+    setSelectedSource(null);
+    setCurrentPlayer(player);
+    
+    // Check if player has any legal moves
+    const sequences = getLegalMoveSequences(board, bar, borneOff, roll.expanded, [], playerType);
+    if (sequences.length === 0 || sequences[0].length === 0) {
+      // No moves available, pass turn
+      setTimeout(() => {
+        endTurn(player === 'player' ? 'bot' : 'player');
+      }, 500);
+    }
+  };
+
+  const endTurn = (nextPlayer) => {
+    setSelectedSource(null);
+    setUsedDice([]);
+    
+    const winner = checkGameOver(borneOff);
+    if (winner) {
+      endGame(winner === 'player');
+    } else {
+      startTurn(nextPlayer);
+    }
+  };
+
   const startGame = (isFreePlayParam = false) => {
     if (gameActive) return;
     playSfx(clickSound.current);
@@ -263,47 +500,108 @@ export default function BackgammonPage() {
     }
     setPlayAmount(String(play));
     setBoard(initBoard());
-    setDice(rollDice());
-    setSelectedPoint(null);
+    setBar({ player: 0, bot: 0 });
+    setBorneOff({ player: 0, bot: 0 });
+    setSelectedSource(null);
     setUsedDice([]);
-    setCurrentPlayer('player');
     setGameActive(true);
     setGameResult(null);
+    startTurn('player');
   };
 
   function handlePointClick(pointIndex) {
     if (!gameActive || currentPlayer !== 'player' || gameResult) return;
     
-    if (selectedPoint === null) {
-      if (board[pointIndex] > 0) {
-        setSelectedPoint(pointIndex);
-        playSfx(clickSound.current);
-      }
-    } else {
-      const availableSteps = dice.filter((d, i) => !usedDice.includes(i));
-      for (const step of availableSteps) {
-        if (canMove(board, selectedPoint, step, 1)) {
-          const to = selectedPoint + step;
-          if (to === pointIndex || (to >= 24 && pointIndex >= 18)) {
-            const newBoard = makeMove(board, selectedPoint, step, 1);
-            setBoard(newBoard);
-            setUsedDice([...usedDice, step]);
-            setSelectedPoint(null);
+    // Must enter from bar first
+    if (bar.player > 0) {
+      const availableIndexes = getAvailableDieIndexes(turnDice, usedDice);
+      for (const dieIndex of availableIndexes) {
+        const dieValue = turnDice[dieIndex];
+        const entryPoint = 24 - dieValue;
+        if (pointIndex === entryPoint - 1) {
+          const source = { type: 'bar', index: null };
+          if (canMove(board, bar, borneOff, source, dieValue, 1)) {
+            const to = entryPoint;
+            const hit = board[to] !== 0 && Math.sign(board[to]) !== 1 && Math.abs(board[to]) === 1;
+            const bearOff = false;
+            const move = { sourceType: 'bar', from: null, to, steps: dieValue, dieIndex, hit, bearOff };
+            const result = makeMove(board, bar, borneOff, move, 1);
+            setBoard(result.board);
+            setBar(result.bar);
+            setBorneOff(result.borneOff);
+            setUsedDice([...usedDice, move.dieIndex]);
+            setSelectedSource(null);
             playSfx(clickSound.current);
             
-            const winner = checkGameOver(newBoard);
+            const winner = checkGameOver(result.borneOff);
             if (winner) {
               endGame(winner === 'player');
-            } else if (usedDice.length + 1 === 2) {
-              setCurrentPlayer('bot');
-              setUsedDice([]);
-              setDice(rollDice());
+            } else {
+              const remainingSequences = getLegalMoveSequences(result.board, result.bar, result.borneOff, turnDice, [...usedDice, move.dieIndex], 1);
+              if (remainingSequences.length === 0 || remainingSequences[0].length === 0) {
+                endTurn('bot');
+              }
             }
             return;
           }
         }
       }
-      setSelectedPoint(null);
+      return;
+    }
+    
+    // Regular point selection
+    if (selectedSource === null) {
+      if (board[pointIndex] > 0) {
+        const source = { type: 'point', index: pointIndex };
+        const moves = getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, 1);
+        if (moves.length > 0) {
+          setSelectedSource(source);
+          playSfx(clickSound.current);
+        }
+      }
+    } else {
+      // Try to make a move
+      const moves = getLegalMovesForSource(board, bar, borneOff, selectedSource, turnDice, usedDice, 1);
+      const move = moves.find(m => {
+        if (m.bearOff) {
+          return pointIndex >= 18;
+        }
+        return m.to === pointIndex;
+      });
+      
+      if (move) {
+        const result = makeMove(board, bar, borneOff, move, 1);
+        setBoard(result.board);
+        setBar(result.bar);
+        setBorneOff(result.borneOff);
+        setUsedDice([...usedDice, move.dieIndex]);
+        setSelectedSource(null);
+        playSfx(clickSound.current);
+        
+        const winner = checkGameOver(result.borneOff);
+        if (winner) {
+          endGame(winner === 'player');
+        } else {
+          const remainingSequences = getLegalMoveSequences(result.board, result.bar, result.borneOff, turnDice, [...usedDice, move.dieIndex], 1);
+          if (remainingSequences.length === 0 || remainingSequences[0].length === 0) {
+            endTurn('bot');
+          }
+        }
+      } else {
+        // Try to select different source
+        if (board[pointIndex] > 0) {
+          const source = { type: 'point', index: pointIndex };
+          const moves = getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, 1);
+          if (moves.length > 0) {
+            setSelectedSource(source);
+            playSfx(clickSound.current);
+          } else {
+            setSelectedSource(null);
+          }
+        } else {
+          setSelectedSource(null);
+        }
+      }
     }
   }
 
@@ -327,7 +625,19 @@ export default function BackgammonPage() {
     setStats(newStats);
   }
 
-  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setBoard(initBoard()); setDice([1, 1]); setSelectedPoint(null); setUsedDice([]); setCurrentPlayer('player'); setGameActive(false); };
+  const resetGame = () => {
+    setGameResult(null);
+    setShowResultPopup(false);
+    setBoard(initBoard());
+    setBar({ player: 0, bot: 0 });
+    setBorneOff({ player: 0, bot: 0 });
+    setDice([1, 1]);
+    setTurnDice([]);
+    setSelectedSource(null);
+    setUsedDice([]);
+    setCurrentPlayer('player');
+    setGameActive(false);
+  };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-amber-900 via-black to-yellow-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -381,7 +691,7 @@ export default function BackgammonPage() {
                   <div className="w-1/2 flex">
                     {[19, 20, 21, 22, 23, 24].reverse().map((pointIdx) => {
                       const count = board[pointIdx - 1];
-                      const isSelected = selectedPoint === pointIdx - 1;
+                      const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
                       const pieces = Math.abs(count);
                       const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
                       const isDark = pointIdx % 2 === 1;
@@ -415,8 +725,8 @@ export default function BackgammonPage() {
                   {/* Left side - points 13-18 (Outer board) */}
                   <div className="w-1/2 flex">
                     {[13, 14, 15, 16, 17, 18].map((pointIdx) => {
-                      const count = board[pointIdx];
-                      const isSelected = selectedPoint === pointIdx;
+                      const count = board[pointIdx - 1];
+                      const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
                       const pieces = Math.abs(count);
                       const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
                       const isDark = pointIdx % 2 === 0;
@@ -424,7 +734,7 @@ export default function BackgammonPage() {
                       return (
                         <button
                           key={`top-left-${pointIdx}`}
-                          onClick={() => handlePointClick(pointIdx)}
+                          onClick={() => handlePointClick(pointIdx - 1)}
                           disabled={!gameActive || gameResult || currentPlayer !== 'player'}
                           className={`relative flex-1 ${isDark ? 'bg-amber-800' : 'bg-amber-100'} border-l border-amber-600 transition-all ${
                             isSelected ? 'ring-2 ring-blue-400' : ''
@@ -441,7 +751,7 @@ export default function BackgammonPage() {
                               {pieces > 5 && <span className="text-[7px] text-white font-bold">+{pieces - 5}</span>}
                             </div>
                           )}
-                          <span className="absolute bottom-0 left-1/2 transform -translate-x-1/2 text-[8px] text-white/60">{pointIdx + 1}</span>
+                          <span className="absolute bottom-0 left-1/2 transform -translate-x-1/2 text-[8px] text-white/60">{pointIdx}</span>
                         </button>
                       );
                     })}
@@ -452,7 +762,9 @@ export default function BackgammonPage() {
                 <div className="absolute top-1/2 left-0 right-0 h-8 -translate-y-1/2 bg-amber-600/90 border-y-2 border-amber-800 flex items-center justify-center z-10">
                   <div className="text-center">
                     <div className="text-xs text-white/90 font-semibold">Dice: {dice[0]} {dice[1]}</div>
-                    {usedDice.length > 0 && <div className="text-[10px] text-white/60">Used: {usedDice.join(', ')}</div>}
+                    {usedDice.length > 0 && <div className="text-[10px] text-white/60">Used: {usedDice.length}/{turnDice.length}</div>}
+                    {bar.player > 0 && <div className="text-[10px] text-red-300 mt-0.5">Bar: {bar.player}</div>}
+                    {bar.bot > 0 && <div className="text-[10px] text-blue-300 mt-0.5">Bot Bar: {bar.bot}</div>}
                   </div>
                 </div>
                 
@@ -461,8 +773,8 @@ export default function BackgammonPage() {
                   {/* Left side - points 7-12 (Outer board) */}
                   <div className="w-1/2 flex">
                     {[7, 8, 9, 10, 11, 12].map((pointIdx) => {
-                      const count = board[pointIdx];
-                      const isSelected = selectedPoint === pointIdx;
+                      const count = board[pointIdx - 1];
+                      const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
                       const pieces = Math.abs(count);
                       const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
                       const isDark = pointIdx % 2 === 0;
@@ -470,7 +782,7 @@ export default function BackgammonPage() {
                       return (
                         <button
                           key={`bottom-left-${pointIdx}`}
-                          onClick={() => handlePointClick(pointIdx)}
+                          onClick={() => handlePointClick(pointIdx - 1)}
                           disabled={!gameActive || gameResult || currentPlayer !== 'player'}
                           className={`relative flex-1 ${isDark ? 'bg-amber-800' : 'bg-amber-100'} border-r border-amber-600 transition-all ${
                             isSelected ? 'ring-2 ring-blue-400' : ''
@@ -487,7 +799,7 @@ export default function BackgammonPage() {
                               {pieces > 5 && <span className="text-[7px] text-white font-bold">+{pieces - 5}</span>}
                             </div>
                           )}
-                          <span className="absolute top-0 left-1/2 transform -translate-x-1/2 text-[8px] text-white/60">{pointIdx + 1}</span>
+                          <span className="absolute top-0 left-1/2 transform -translate-x-1/2 text-[8px] text-white/60">{pointIdx}</span>
                         </button>
                       );
                     })}
@@ -497,7 +809,7 @@ export default function BackgammonPage() {
                   <div className="w-1/2 flex">
                     {[1, 2, 3, 4, 5, 6].reverse().map((pointIdx) => {
                       const count = board[pointIdx - 1];
-                      const isSelected = selectedPoint === pointIdx - 1;
+                      const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
                       const pieces = Math.abs(count);
                       const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
                       const isDark = pointIdx % 2 === 1;

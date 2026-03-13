@@ -75,93 +75,178 @@ function initBoard() {
   return board;
 }
 
-function getValidMoves(board, row, col, playerType) {
+function inBounds(row, col) {
+  return row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE;
+}
+
+function getMoveDirections(piece, playerType) {
+  if (piece.king) return [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+  return playerType === 'player'
+    ? [[-1, -1], [-1, 1]]
+    : [[1, -1], [1, 1]];
+}
+
+function getPieceSimpleMoves(board, row, col, playerType) {
   const moves = [];
   const piece = board[row][col];
   if (!piece || piece.type !== playerType) return moves;
-  
-  const directions = piece.king 
-    ? [[-1, -1], [-1, 1], [1, -1], [1, 1]]
-    : playerType === 'player' ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
-  
-  // For kings, check multiple steps in each direction
-  if (piece.king) {
-    for (const [dr, dc] of directions) {
-      for (let steps = 1; steps < BOARD_SIZE; steps++) {
-        const newRow = row + (dr * steps);
-        const newCol = col + (dc * steps);
-        
-        if (newRow < 0 || newRow >= BOARD_SIZE || newCol < 0 || newCol >= BOARD_SIZE) break;
-        
-        if (!board[newRow][newCol]) {
-          moves.push({ row: newRow, col: newCol, jump: false });
-        } else if (board[newRow][newCol].type !== playerType) {
-          // Can jump over enemy piece
-          const jumpRow = newRow + dr;
-          const jumpCol = newCol + dc;
-          if (jumpRow >= 0 && jumpRow < BOARD_SIZE && jumpCol >= 0 && jumpCol < BOARD_SIZE && !board[jumpRow][jumpCol]) {
-            moves.push({ row: jumpRow, col: jumpCol, jump: true, captureRow: newRow, captureCol: newCol });
-          }
-          break; // Can't move past a piece
-        } else {
-          break; // Can't move past own piece
-        }
-      }
-    }
-  } else {
-    // Regular pieces - one step or jump
-    for (const [dr, dc] of directions) {
-      const newRow = row + dr;
-      const newCol = col + dc;
-      
-      if (newRow >= 0 && newRow < BOARD_SIZE && newCol >= 0 && newCol < BOARD_SIZE) {
-        if (!board[newRow][newCol]) {
-          moves.push({ row: newRow, col: newCol, jump: false });
-        } else if (board[newRow][newCol].type !== playerType) {
-          const jumpRow = newRow + dr;
-          const jumpCol = newCol + dc;
-          if (jumpRow >= 0 && jumpRow < BOARD_SIZE && jumpCol >= 0 && jumpCol < BOARD_SIZE && !board[jumpRow][jumpCol]) {
-            moves.push({ row: jumpRow, col: jumpCol, jump: true, captureRow: newRow, captureCol: newCol });
-          }
-        }
-      }
-    }
-  }
-  
-  return moves;
-}
 
-function getAllValidMoves(board, playerType) {
-  const allMoves = [];
-  for (let row = 0; row < BOARD_SIZE; row++) {
-    for (let col = 0; col < BOARD_SIZE; col++) {
-      const moves = getValidMoves(board, row, col, playerType);
-      moves.forEach(move => {
-        allMoves.push({ from: { row, col }, to: move });
+  const directions = getMoveDirections(piece, playerType);
+
+  for (const [dr, dc] of directions) {
+    const newRow = row + dr;
+    const newCol = col + dc;
+
+    if (inBounds(newRow, newCol) && !board[newRow][newCol]) {
+      moves.push({
+        row: newRow,
+        col: newCol,
+        jump: false,
       });
     }
   }
+
+  return moves;
+}
+
+function getPieceCaptureMoves(board, row, col, playerType) {
+  const moves = [];
+  const piece = board[row][col];
+  if (!piece || piece.type !== playerType) return moves;
+
+  const directions = getMoveDirections(piece, playerType);
+
+  for (const [dr, dc] of directions) {
+    const midRow = row + dr;
+    const midCol = col + dc;
+    const landRow = row + dr * 2;
+    const landCol = col + dc * 2;
+
+    if (!inBounds(midRow, midCol) || !inBounds(landRow, landCol)) continue;
+
+    const middlePiece = board[midRow][midCol];
+    const landingCell = board[landRow][landCol];
+
+    if (
+      middlePiece &&
+      middlePiece.type !== playerType &&
+      !landingCell
+    ) {
+      moves.push({
+        row: landRow,
+        col: landCol,
+        jump: true,
+        captureRow: midRow,
+        captureCol: midCol,
+      });
+    }
+  }
+
+  return moves;
+}
+
+function getAllCaptureMoves(board, playerType) {
+  const allMoves = [];
+
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      if (board[row][col]?.type !== playerType) continue;
+
+      const moves = getPieceCaptureMoves(board, row, col, playerType);
+      moves.forEach((move) => {
+        allMoves.push({
+          from: { row, col },
+          to: move,
+        });
+      });
+    }
+  }
+
   return allMoves;
 }
 
+function getAllSimpleMoves(board, playerType) {
+  const allMoves = [];
+
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      if (board[row][col]?.type !== playerType) continue;
+
+      const moves = getPieceSimpleMoves(board, row, col, playerType);
+      moves.forEach((move) => {
+        allMoves.push({
+          from: { row, col },
+          to: move,
+        });
+      });
+    }
+  }
+
+  return allMoves;
+}
+
+function getValidMoves(board, row, col, playerType, forcedFrom = null) {
+  const piece = board[row][col];
+  if (!piece || piece.type !== playerType) return [];
+
+  if (forcedFrom) {
+    if (forcedFrom.row !== row || forcedFrom.col !== col) return [];
+    return getPieceCaptureMoves(board, row, col, playerType);
+  }
+
+  const allCaptures = getAllCaptureMoves(board, playerType);
+  if (allCaptures.length > 0) {
+    return getPieceCaptureMoves(board, row, col, playerType);
+  }
+
+  return getPieceSimpleMoves(board, row, col, playerType);
+}
+
+function getAllLegalMoves(board, playerType, forcedFrom = null) {
+  if (forcedFrom) {
+    const moves = getValidMoves(board, forcedFrom.row, forcedFrom.col, playerType, forcedFrom);
+    return moves.map((move) => ({
+      from: { row: forcedFrom.row, col: forcedFrom.col },
+      to: move,
+    }));
+  }
+
+  const captures = getAllCaptureMoves(board, playerType);
+  if (captures.length > 0) return captures;
+
+  return getAllSimpleMoves(board, playerType);
+}
+
 function makeMove(board, from, to) {
-  const newBoard = board.map(row => row.map(cell => cell ? { ...cell } : null));
-  const piece = newBoard[from.row][from.col];
-  
-  newBoard[to.row][to.col] = piece;
+  const newBoard = board.map((row) => row.map((cell) => (cell ? { ...cell } : null)));
+  const piece = { ...newBoard[from.row][from.col] };
+
   newBoard[from.row][from.col] = null;
-  
+
+  let wasCapture = false;
+  let becameKing = false;
+
   if (to.jump) {
     newBoard[to.captureRow][to.captureCol] = null;
+    wasCapture = true;
   }
-  
-  if (piece.type === 'player' && to.row === 0) {
+
+  if (piece.type === 'player' && to.row === 0 && !piece.king) {
     piece.king = true;
-  } else if (piece.type === 'bot' && to.row === BOARD_SIZE - 1) {
+    becameKing = true;
+  } else if (piece.type === 'bot' && to.row === BOARD_SIZE - 1 && !piece.king) {
     piece.king = true;
+    becameKing = true;
   }
-  
-  return newBoard;
+
+  newBoard[to.row][to.col] = piece;
+
+  return {
+    board: newBoard,
+    wasCapture,
+    becameKing,
+    landedAt: { row: to.row, col: to.col },
+  };
 }
 
 function countPieces(board, playerType) {
@@ -177,9 +262,9 @@ function countPieces(board, playerType) {
 function checkGameOver(board) {
   const playerPieces = countPieces(board, 'player');
   const botPieces = countPieces(board, 'bot');
-  const playerMoves = getAllValidMoves(board, 'player');
-  const botMoves = getAllValidMoves(board, 'bot');
-  
+  const playerMoves = getAllLegalMoves(board, 'player');
+  const botMoves = getAllLegalMoves(board, 'bot');
+
   if (playerPieces === 0 || playerMoves.length === 0) return 'bot';
   if (botPieces === 0 || botMoves.length === 0) return 'player';
   return null;
@@ -226,6 +311,7 @@ export default function CheckersPage() {
   const clickSound = useRef(null);
   const winSound = useRef(null);
   const [validMoves, setValidMoves] = useState([]);
+  const [mustContinueCapture, setMustContinueCapture] = useState(null);
 
   const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalGames: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, lastPlay: MIN_PLAY }));
 
@@ -255,15 +341,29 @@ export default function CheckersPage() {
 
   useEffect(() => {
     if (!gameActive || currentPlayer !== 'bot' || gameResult) return;
-    const botMoves = getAllValidMoves(board, 'bot');
-    if (botMoves.length === 0) return;
-    
+
     const timeout = setTimeout(() => {
+      const botMoves = getAllLegalMoves(board, 'bot', mustContinueCapture);
+
+      if (botMoves.length === 0) {
+        const winner = checkGameOver(board);
+        if (winner) {
+          endGame(winner === 'player');
+        } else {
+          setCurrentPlayer('player');
+          setSelected(null);
+          setValidMoves([]);
+          setMustContinueCapture(null);
+        }
+        return;
+      }
+
       const randomMove = botMoves[Math.floor(Math.random() * botMoves.length)];
       handleMove(randomMove.from, randomMove.to, true);
-    }, 800);
+    }, mustContinueCapture ? 500 : 800);
+
     return () => clearTimeout(timeout);
-  }, [gameActive, currentPlayer, board, gameResult]);
+  }, [gameActive, currentPlayer, board, gameResult, mustContinueCapture]);
 
   const openWalletModalUnified = () => isConnected ? openAccountModal?.() : openConnectModal?.();
   const hardDisconnect = () => { disconnect?.(); setMenuOpen(false); };
@@ -303,6 +403,7 @@ export default function CheckersPage() {
     setBoard(initBoard());
     setSelected(null);
     setValidMoves([]);
+    setMustContinueCapture(null);
     setCurrentPlayer('player');
     setGameActive(true);
     setGameResult(null);
@@ -310,25 +411,61 @@ export default function CheckersPage() {
 
   function handleCellClick(row, col) {
     if (!gameActive || currentPlayer !== 'player' || gameResult) return;
-    
+
     const piece = board[row][col];
-    
+
+    if (mustContinueCapture) {
+      if (
+        piece &&
+        piece.type === 'player' &&
+        row === mustContinueCapture.row &&
+        col === mustContinueCapture.col
+      ) {
+        setSelected({ row, col });
+        setValidMoves(
+          getValidMoves(board, row, col, 'player', mustContinueCapture)
+        );
+        return;
+      }
+
+      const forcedMoves = getValidMoves(
+        board,
+        mustContinueCapture.row,
+        mustContinueCapture.col,
+        'player',
+        mustContinueCapture
+      );
+
+      const move = forcedMoves.find((m) => m.row === row && m.col === col);
+      if (move) {
+        handleMove(mustContinueCapture, move);
+      }
+      return;
+    }
+
     if (selected && selected.row === row && selected.col === col) {
       setSelected(null);
       setValidMoves([]);
       return;
     }
-    
+
     if (piece && piece.type === 'player') {
-      const moves = getValidMoves(board, row, col, 'player');
+      const moves = getValidMoves(board, row, col, 'player', null);
+
+      if (moves.length === 0) {
+        setSelected(null);
+        setValidMoves([]);
+        return;
+      }
+
       setSelected({ row, col });
       setValidMoves(moves);
       playSfx(clickSound.current);
       return;
     }
-    
+
     if (selected) {
-      const move = validMoves.find(m => m.row === row && m.col === col);
+      const move = validMoves.find((m) => m.row === row && m.col === col);
       if (move) {
         handleMove(selected, move);
       }
@@ -336,12 +473,37 @@ export default function CheckersPage() {
   }
 
   function handleMove(from, to, isBot = false) {
-    const newBoard = makeMove(board, from, to);
+    const result = makeMove(board, from, to);
+    const newBoard = result.board;
+
     setBoard(newBoard);
+
+    if (!isBot) {
+      playSfx(clickSound.current);
+    }
+
+    const movedPieceType = isBot ? 'bot' : 'player';
+
+    if (result.wasCapture && !result.becameKing) {
+      const nextCaptures = getPieceCaptureMoves(
+        newBoard,
+        result.landedAt.row,
+        result.landedAt.col,
+        movedPieceType
+      );
+
+      if (nextCaptures.length > 0) {
+        setSelected(result.landedAt);
+        setValidMoves(nextCaptures);
+        setMustContinueCapture(result.landedAt);
+        return;
+      }
+    }
+
     setSelected(null);
     setValidMoves([]);
-    if (!isBot) playSfx(clickSound.current);
-    
+    setMustContinueCapture(null);
+
     const winner = checkGameOver(newBoard);
     if (winner) {
       endGame(winner === 'player');
@@ -370,7 +532,16 @@ export default function CheckersPage() {
     setStats(newStats);
   }
 
-  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setBoard(initBoard()); setSelected(null); setValidMoves([]); setCurrentPlayer('player'); setGameActive(false); };
+  const resetGame = () => {
+    setGameResult(null);
+    setShowResultPopup(false);
+    setBoard(initBoard());
+    setSelected(null);
+    setValidMoves([]);
+    setMustContinueCapture(null);
+    setCurrentPlayer('player');
+    setGameActive(false);
+  };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-red-900 via-black to-orange-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -486,7 +657,7 @@ export default function CheckersPage() {
 
         {menuOpen && (<div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}><div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div><div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div><div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div><div className="mt-4 text-xs opacity-70"><p>Checkers v2.0</p></div></div></div>)}
 
-        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">♟️ How to Play</h2><div className="space-y-3 text-sm"><p><strong>1. Place Play:</strong> Min {MIN_PLAY} MLEO</p><p><strong>2. Start Game:</strong> Click "START GAME" to begin</p><p><strong>3. Move Pieces:</strong> Click your piece, then click a valid move</p><p><strong>4. Win:</strong> Capture all bot pieces or block all moves!</p><div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3"><p className="text-red-300 font-semibold mb-2">💰 Win Rewards:</p><div className="text-xs text-white/80 space-y-1"><p>• Win the game: ×{WIN_MULTIPLIER}</p><p>• Lose: Lose your play amount</p><p>• King pieces can move multiple steps in any direction!</p></div></div><div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2 mt-2"><p className="text-blue-300 font-semibold text-xs">💡 Tip: Jump over enemy pieces to capture them!</p></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">♟️ How to Play</h2><div className="space-y-3 text-sm"><p><strong>1. Place Play:</strong> Min {MIN_PLAY} MLEO</p><p><strong>2. Start Game:</strong> Click "START GAME" to begin</p><p><strong>3. Move Pieces:</strong> Click your piece, then click a valid move</p><p><strong>4. Win:</strong> Capture all bot pieces or block all moves!</p><div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3"><p className="text-red-300 font-semibold mb-2">💰 Win Rewards:</p><div className="text-xs text-white/80 space-y-1"><p>• Win the game: ×{WIN_MULTIPLIER}</p><p>• Lose: Lose your play amount</p><p>• King pieces can move one step in any diagonal direction!</p></div></div><div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2 mt-2"><p className="text-blue-300 font-semibold text-xs">💡 Tip: Jump over enemy pieces to capture them!</p></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
 
         {showStats && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2><div className="space-y-3"><div className="grid grid-cols-2 gap-3"><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Games</div><div className="text-xl font-bold">{stats.totalGames}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalGames > 0 ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : 0}%</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Play</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalPlay)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalPlay >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalPlay)}</div></div></div></div><button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
 
