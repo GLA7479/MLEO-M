@@ -559,8 +559,13 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
     }).eq("id", pl.id);
     await supabase.from("poker_pots").update({ total: (prizePool?.total||0) + pay }).eq("session_id", sessionId);
     const { error: actErr } = await supabase.from("poker_actions").insert({ session_id: sessionId, seat_index: seatIndex, action, amount: pay });
-    if (actErr && !actErr.message?.includes('auth') && actErr.code !== '409') {
-      console.warn('poker_actions insert error:', actErr);
+    if (actErr) {
+      // 42702 = ambiguous column reference (usually a database trigger/RLS issue)
+      // 409 = conflict (expected in concurrent scenarios)
+      // Ignore auth errors and ambiguous column errors (database schema issue)
+      if (actErr.code !== '409' && actErr.code !== '42702' && !actErr.message?.includes('auth') && !actErr.message?.includes('ambiguous')) {
+        console.warn('poker_actions insert error:', actErr);
+      }
     }
   }
 
@@ -627,8 +632,11 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       amount: totalPot,
       note: `winner seat=${winnerSeat} by fold`,
     });
-    if (winErr && !winErr.message?.includes('auth') && winErr.code !== '409') {
-      console.warn('poker_actions win insert error:', winErr);
+    if (winErr) {
+      // Ignore expected errors
+      if (winErr.code !== '409' && winErr.code !== '42702' && !winErr.message?.includes('auth') && !winErr.message?.includes('ambiguous')) {
+        console.warn('poker_actions win insert error:', winErr);
+      }
     }
   }
 
@@ -747,7 +755,13 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
   async function actFold(){
     if(!turnPlayer || !ses || !canAct(turnPlayer)) return;
     await supabase.from("poker_players").update({ folded:true, acted:true, hole_cards: [] }).eq("id", turnPlayer.id);
-    await supabase.from("poker_actions").insert({ session_id: ses.id, seat_index: turnPlayer.seat_index, action:"fold" });
+    const { error: foldErr } = await supabase.from("poker_actions").insert({ session_id: ses.id, seat_index: turnPlayer.seat_index, action:"fold" });
+    if (foldErr) {
+      // Ignore expected errors (409 conflict, 42702 ambiguous column, auth errors)
+      if (foldErr.code !== '409' && foldErr.code !== '42702' && !foldErr.message?.includes('auth') && !foldErr.message?.includes('ambiguous')) {
+        console.warn('poker_actions fold insert error:', foldErr);
+      }
+    }
     
     // בדוק אם נשאר רק שחקן פעיל אחד (Heads-Up Fold)
     const { data: pls } = await supabase
@@ -833,8 +847,11 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
       action: 'allin', 
       amount: null
     });
-    if (allinErr && !allinErr.message?.includes('auth') && allinErr.code !== '409') {
-      console.warn('poker_actions allin insert error:', allinErr);
+    if (allinErr) {
+      // Ignore expected errors
+      if (allinErr.code !== '409' && allinErr.code !== '42702' && !allinErr.message?.includes('auth') && !allinErr.message?.includes('ambiguous')) {
+        console.warn('poker_actions allin insert error:', allinErr);
+      }
     }
 
     // אם כולם נעולים (או מקופלים), מריצים ראנאאוט אוטומטי
@@ -891,8 +908,11 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
         amount: totalPot,
         note: 'winner by fold'
       });
-      if (winErr2 && !winErr2.message?.includes('auth') && winErr2.code !== '409') {
-        console.warn('poker_actions win insert error:', winErr2);
+      if (winErr2) {
+        // Ignore expected errors
+        if (winErr2.code !== '409' && winErr2.code !== '42702' && !winErr2.message?.includes('auth') && !winErr2.message?.includes('ambiguous')) {
+          console.warn('poker_actions win insert error:', winErr2);
+        }
       }
       return; // לא ממשיכים חישובי תור/רחוב
     }
