@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Blackjack - Full Professional Blackjack
+// MLEO 21 Challenge - Full Professional Blackjack
 // Complete with Double Down, Split, Insurance, Surrender
 // ============================================================================
 

@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Craps - Full-Screen Game Template
+// MLEO Dice Arena - Full-Screen Game Template
 // Classic dice game with multiple playing options
 // ============================================================================
 
@@ -80,10 +80,10 @@ const PLAY_TYPES = {
   pass: { name: "Pass Line", prize: 2 },
   dont_pass: { name: "Don't Pass", prize: 2 },
   seven: { name: "Any 7", prize: 5 },
-  craps: { name: "Any Craps", prize: 8 },
+  craps: { name: "Any Dice Arena", prize: 8 },
 };
 
-export default function CrapsPage() {
+export default function Dice ArenaPage() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);
@@ -306,7 +306,7 @@ export default function CrapsPage() {
 
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
-            <h1 className="text-2xl font-extrabold text-white mb-0.5">🎲 Craps</h1>
+            <h1 className="text-2xl font-extrabold text-white mb-0.5">🎲 Dice Arena</h1>
             <p className="text-white/70 text-xs">Classic dice game • Multiple playing options!</p>
           </div>
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
@@ -382,7 +382,7 @@ export default function CrapsPage() {
               <div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div>
               <div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div>
               <div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div>
-              <div className="mt-4 text-xs opacity-70"><p>Craps v2.0</p></div>
+              <div className="mt-4 text-xs opacity-70"><p>Dice Arena v2.0</p></div>
             </div>
           </div>
         )}
@@ -392,7 +392,7 @@ export default function CrapsPage() {
             <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
               <h2 className="text-2xl font-extrabold mb-4">🎲 How to Play</h2>
               <div className="space-y-3 text-sm">
-                <p><strong>1. Select Play:</strong> Choose Pass, Don't Pass, 7, or Craps</p>
+                <p><strong>1. Select Play:</strong> Choose Pass, Don't Pass, 7, or Dice Arena</p>
                 <p><strong>2. Set Amount:</strong> Min {MIN_PLAY} MLEO</p>
                 <p><strong>3. Roll:</strong> Click ROLL DICE</p>
                 <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
@@ -401,7 +401,7 @@ export default function CrapsPage() {
                     <p>• Pass Line (7,11): ×2</p>
                     <p>• Don't Pass (2,3,12): ×2</p>
                     <p>• Any 7: ×5</p>
-                    <p>• Any Craps (2,3,12): ×8</p>
+                    <p>• Any Dice Arena (2,3,12): ×8</p>
                   </div>
                 </div>
               </div>

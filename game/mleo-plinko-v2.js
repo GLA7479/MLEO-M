@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Plinko2 - Full-Screen Professional Plinko Game (No-Scroll Auto-Scale)
+// MLEO Drop Run X - Full-Screen Professional Plinko Game (No-Scroll Auto-Scale)
 // Live physics simulation • Multi-ball drop • Responsive canvas!
 // ============================================================================
 

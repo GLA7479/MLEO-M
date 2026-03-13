@@ -1302,7 +1302,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     <div className="w-full h-full flex flex-col p-2 gap-2">
       {/* Header */}
       <div className="flex items-center justify-between bg-white/5 rounded-xl p-2 border border-white/10">
-        <div className="text-white font-bold text-lg">🎰 Roulette</div>
+        <div className="text-white font-bold text-lg">🎰 Color Wheel</div>
         <div className="flex items-center gap-2 text-white/80 text-sm">
           <span>Min: {fmt(minRequired)}</span>
           <span>💰 {fmt(readVault())}</span>

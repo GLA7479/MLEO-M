@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Plinko — Continuous Physics (Canvas Edition)
+// MLEO Drop Run — Continuous Physics (Canvas Edition)
 // Cost: 1000 MLEO per drop
 // Requirements: Tailwind present, /sounds optional
 // ============================================================================
@@ -773,7 +773,7 @@ function buildBoardGeometry(w, h) {
       <Layout>
         <main className="min-h-[100svh] bg-gradient-to-b from-zinc-950 to-black text-zinc-100">
           <div className="max-w-4xl mx-auto p-4">
-            <h1 className="text-2xl font-bold">MLEO Plinko</h1>
+            <h1 className="text-2xl font-bold">MLEO Drop Run</h1>
             <div className="opacity-60 text-sm">Loading…</div>
           </div>
         </main>
@@ -809,11 +809,11 @@ function buildBoardGeometry(w, h) {
                 <span className="text-5xl">🎯</span>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-teal-400 bg-clip-text text-transparent">
                   {isFreePlay && <span className="text-amber-400">🎁 </span>}
-                  MLEO Plinko2
+                  MLEO Drop Run X
                 </h1>
               </div>
               <div className="text-sm opacity-70 mt-1">
-                {isFreePlay ? "Playing with a free token - good luck!" : "Real physics • Watch the ball dance on pegs"}
+                {isFreePlay ? "Playing with a free token - enjoy the challenge!" : "Real physics • Watch the ball dance on pegs"}
                 <span className={`ml-2 px-2 py-1 rounded text-xs ${isWideScreen ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'}`}>
                   {isWideScreen ? '🖥️ Wide' : '📱 Narrow'}
                 </span>

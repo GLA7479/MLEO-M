@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Three Card Poker - Full-Screen Game Template
+// MLEO Triple Cards - Full-Screen Game Template
 // Classic 3-card poker! Beat the opponent!
 // ============================================================================
 

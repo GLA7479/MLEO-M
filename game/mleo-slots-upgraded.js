@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Slots Upgraded - Full-Screen Game Template
+// MLEO Symbol Match - Full-Screen Game Template
 // Classic 5-reel slots! Massive wins!
 // ============================================================================
 

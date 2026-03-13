@@ -1230,7 +1230,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     <div className="w-full h-full flex flex-col p-1 md:p-2 gap-1 md:gap-2 -mt-1">
 
       <div className="flex items-center justify-between bg-white/5 rounded-lg p-2 border border-white/10">
-        <div className="text-white font-bold text-base md:text-lg">Blackjack</div>
+        <div className="text-white font-bold text-base md:text-lg">21 Challenge</div>
         <div className="flex items-center gap-2 text-white/70 text-xs md:text-sm">
           <span>Min: {fmt(minRequired)}</span>
           <span>💰 {fmt(currentVault)}</span>

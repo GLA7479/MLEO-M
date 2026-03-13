@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Dice Over/Under - Full-Screen Game Template
+// MLEO Dice Pick - Full-Screen Game Template
 // Combining all game features + MINERS-style UI
 // ============================================================================
 
@@ -54,7 +54,7 @@ const GAME_BALANCE = 0.01; // Game balance 1% - RTP 99%
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
-const GAME_ID = 17; // Dice Over/Under game ID
+const GAME_ID = 17; // Dice Pick game ID
 
 const MINING_CLAIM_ABI = [{
   type: "function",
@@ -569,7 +569,7 @@ export default function DicePage() {
         >
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">
-              ⚄ Dice Over/Under
+              ⚄ Dice Pick
             </h1>
             <p className="text-white/70 text-xs">
               Set your target • Over or Under • Win up to ×99!
@@ -933,7 +933,7 @@ export default function DicePage() {
               </div>
 
               <div className="mt-4 text-xs opacity-70">
-                <p>Dice Over/Under v2.0</p>
+                <p>Dice Pick v2.0</p>
               </div>
             </div>
           </div>

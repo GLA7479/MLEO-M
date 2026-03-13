@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Crash2 - Full-Screen Professional Crash Game (No-Scroll Auto-Scale)
+// MLEO Sky Run X - Full-Screen Professional Crash Game (No-Scroll Auto-Scale)
 // Live multiplier chart • Provably Fair • Cash out before crash!
 // ============================================================================
 

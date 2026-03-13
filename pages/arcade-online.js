@@ -85,27 +85,27 @@ const GAME_REGISTRY = [
   },
   {
     id: "blackjack",
-    title: "Blackjack",
+    title: "21 Challenge",
     emoji: "🃏",
-    description: "Beat the opponent to 21! Multiplayer blackjack with friends.",
+    description: "A live multiplayer 21 card challenge with room-based play.",
     color: "#10B981",
     isMultiplayer: true,
     loader: () => import("../games-online/BlackjackMP").then(m => m.default)
   },
   {
     id: "poker",
-    title: "Texas Hold'em",
+    title: "Card Arena",
     emoji: "♠️",
-    description: "Texas Hold'em poker! Multiplayer poker with friends.",
+    description: "A live multiplayer card room built around hand strategy and table play.",
     color: "#8B5CF6",
     isMultiplayer: true,
     loader: () => import("../games-online/PokerMP").then(m => m.default)
   },
   {
     id: "roulette",
-    title: "Roulette",
+    title: "Color Wheel",
     emoji: "🎰",
-    description: "European Roulette! Spin the wheel and win big!",
+    description: "European Roulette! Spin the wheel and unlock bigger rewards!",
     color: "#EF4444",
     isMultiplayer: true,
     loader: () => import("../games-online/RouletteMP").then(m => m.default)
@@ -132,7 +132,7 @@ const GAME_REGISTRY = [
     id: "bingo",
     title: "Bingo",
     emoji: "🎯",
-    description: "Bingo like Ludo! Online multiplayer (2-8 players) or local play. Win prizes for rows and full board!",
+    description: "Bingo like Ludo! Online multiplayer (2-8 players) or local play. Earn rewards for rows and full board!",
     color: "#EC4899",
     isMultiplayer: true,
     loader: () => import("../games-online/BingoMP").then(m => m.default)
@@ -157,9 +157,9 @@ const GAME_REGISTRY = [
   },
   {
     id: "poker-tables",
-    title: "Poker Tables",
+    title: "Card Strategy Tables",
     emoji: "🎰",
-    description: "Texas Hold'em vs Opponent! Strategic play rounds - PRE-FLOP, FLOP, TURN, RIVER. Best hand wins the prize pool!",
+    description: "Card Strategy vs Opponent! Strategic play rounds - PRE-FLOP, FLOP, TURN, RIVER. Best hand wins the prize pool!",
     color: "#10B981",
     isMultiplayer: false,
     isExternal: true,

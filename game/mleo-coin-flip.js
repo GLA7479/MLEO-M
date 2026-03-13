@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Coin Flip - Full-Screen Game Template
+// MLEO Quick Flip - Full-Screen Game Template
 // The ultimate template combining all game features + MINERS-style UI
 // ============================================================================
 
@@ -54,7 +54,7 @@ const WIN_MULTIPLIER = 2.0; // 50% win chance = RTP 100%
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
-const GAME_ID = 25; // Coin Flip game ID
+const GAME_ID = 25; // Quick Flip game ID
 
 const MINING_CLAIM_ABI = [{
   type: "function",
@@ -555,7 +555,7 @@ export default function CoinFlipPage() {
         >
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">
-              🪙 Coin Flip
+              🪙 Quick Flip
             </h1>
             <p className="text-white/70 text-xs">
               Choose Heads or Tails • Win Big!
@@ -881,7 +881,7 @@ export default function CoinFlipPage() {
               </div>
 
               <div className="mt-4 text-xs opacity-70">
-                <p>Coin Flip v1.0</p>
+                <p>Quick Flip v1.0</p>
               </div>
             </div>
           </div>

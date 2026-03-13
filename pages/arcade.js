@@ -31,7 +31,7 @@ const ALLOW_TESTNET_WALLET_FLAG =
   (process.env.NEXT_PUBLIC_ALLOW_TESTNET_WALLET || "").toLowerCase() === "1" ||
   (process.env.NEXT_PUBLIC_ALLOW_TESTNET_WALLET || "").toLowerCase() === "true";
 
-function GameCard({ title, emoji, description, prize, href, color, freePlayStatus }) {
+function GameCard({ title, emoji, description, reward, href, color, freePlayStatus }) {
   const [showInfo, setShowInfo] = useState(false);
   
   return (
@@ -96,17 +96,17 @@ function GameCard({ title, emoji, description, prize, href, color, freePlayStatu
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-4 text-center">
-                <div className="text-sm opacity-70 mb-1">Cost per Round</div>
+                <div className="text-sm opacity-70 mb-1">Session Cost</div>
                 <div className="text-xl font-bold text-amber-400">1,000+ MLEO</div>
               </div>
               <div className="rounded-lg bg-green-500/10 border border-green-500/30 p-4 text-center">
-                <div className="text-sm opacity-70 mb-1">Max Win</div>
-                <div className="text-xl font-bold text-green-400">{prize}</div>
+                <div className="text-sm opacity-70 mb-1">Top Reward Tier</div>
+                <div className="text-xl font-bold text-green-400">{reward}</div>
               </div>
             </div>
             <div>
               <h3 className="font-bold text-lg mb-2">How to Play</h3>
-              <p className="text-zinc-300">Click "PLAY NOW" to start the game. Each round costs 1,000 MLEO or more depending on your play amount. Win multipliers and prizes based on the game outcome!</p>
+              <p className="text-zinc-300">Click "PLAY NOW" to start the game. Each session uses 1,000 MLEO or more depending on the selected mode. Complete runs, reach milestones, and collect reward boosts based on your results.</p>
             </div>
           </div>
         </Modal>
@@ -276,25 +276,25 @@ export default function ArcadeHub() {
       title: "Local Party Arcade",
       emoji: "📴",
       description: "Offline-ready collection (TicTacToe, Tap Battle, Memory, more) that runs fully on-device.",
-      prize: "Offline",
+      reward: "Offline",
       href: "/local-arcade",
       color: "#F97316",
     },
     // 1. Plinko
     {
-      title: "Plinko",
+      title: "Drop Run",
       emoji: "🎯",
-      description: "Drop the ball through pegs! Land on high multipliers for massive wins!",
-      prize: "×4.3",
+      description: "Drop the ball through pegs and aim for high-value reward zones.",
+      reward: "×4.3",
       href: "/plinko",
       color: "#3B82F6",
     },
     // 2. Crash
     {
-      title: "Crash",
+      title: "Sky Run",
       emoji: "📈",
-      description: "Watch the multiplier grow! Cash out before it crashes to win big!",
-      prize: "Unlimited",
+      description: "Track the live boost curve and lock in your result before the run ends.",
+      reward: "Unlimited",
       href: "/crash",
       color: "#DC2626",
     },
@@ -303,25 +303,25 @@ export default function ArcadeHub() {
       title: "Diamonds",
       emoji: "💎",
       description: "Find diamonds, avoid bombs! 4 difficulty levels from Easy to Expert!",
-      prize: "×1000+",
+      reward: "×1000+",
       href: "/diamonds",
       color: "#0EA5E9",
     },
     // 4. Blackjack
     {
-      title: "Blackjack",
+      title: "21 Challenge",
       emoji: "♠️",
-      description: "Beat the opponent to 21! Classic card game with emoji cards.",
-      prize: "×2",
+      description: "Reach 21 with smart card decisions in this fast card challenge.",
+      reward: "×2",
       href: "/blackjack",
       color: "#10B981",
     },
     // 5. Poker
     {
-      title: "Poker",
+      title: "Card Arena",
       emoji: "🎴",
-      description: "Texas Hold'em poker! Use your 2 cards + 5 community cards to make the best hand.",
-      prize: "×1000",
+      description: "Build the strongest hand using your cards and the shared board.",
+      reward: "×1000",
       href: "/poker",
       color: "#8B5CF6",
     },
@@ -330,34 +330,34 @@ export default function ArcadeHub() {
       title: "Hi-Lo Cards",
       emoji: "📊",
       description: "Guess if the next card is higher or lower. Build streaks for huge multipliers!",
-      prize: "Unlimited",
+      reward: "Unlimited",
       href: "/hilo",
       color: "#059669",
     },
     // 7. Three Card Poker
     {
-      title: "Three Card Poker",
+      title: "Triple Cards",
       emoji: "♦️",
-      description: "Fast poker! 3 cards vs opponent - best hand wins with instant results.",
-      prize: "×100",
+      description: "Fast three-card challenge with quick round results.",
+      reward: "×100",
       href: "/three-card-poker",
       color: "#EC4899",
     },
     // 8. Ultimate Texas Hold'em - NEW!
     {
-      title: "Ultimate Poker",
+      title: "Ultimate Cards",
       emoji: "🃏",
-      description: "Texas Hold'em strategy! Raise 4X, 2X, or 1X at different stages. Beat the opponent!",
-      prize: "×500",
+      description: "A strategy-focused card mode with staged decisions and stronger reward tiers.",
+      reward: "×500",
       href: "/ultimate-poker",
       color: "#6366F1",
     },
     // 8.8. Texas Hold'em Rooms
     {
-      title: "Texas Hold'em Rooms",
+      title: "Card Rooms",
       emoji: "🎰🎴",
-      description: "Join permanent poker tables! Drop-in/drop-out multiplayer with real stakes. Play anytime!",
-      prize: "Social",
+      description: "Join live multiplayer card tables with drop-in/drop-out play and session-based progression.",
+      reward: "Social",
       href: "/tournament",
       color: "#7C3AED",
     },
@@ -365,8 +365,8 @@ export default function ArcadeHub() {
     {
       title: "Ladder",
       emoji: "🪜",
-      description: "Climb the ladder! Choose left or right to climb higher - cash out before you fall!",
-      prize: "×20",
+      description: "Climb the ladder! Choose left or right to climb higher - lock in result before you fall!",
+      reward: "×20",
       href: "/ladder",
       color: "#9333EA",
     },
@@ -375,7 +375,7 @@ export default function ArcadeHub() {
       title: "Bomb Squad",
       emoji: "💣",
       description: "Defuse the bomb! Cut the correct wire at each level - wrong wire = BOOM!",
-      prize: "×20",
+      reward: "×20",
       href: "/bomb",
       color: "#DC2626",
     },
@@ -383,26 +383,26 @@ export default function ArcadeHub() {
     {
       title: "Mystery Box",
       emoji: "🎁",
-      description: "Choose 1 box from 10! Find the grand prize or walk away empty!",
-      prize: "×4",
+      description: "Choose 1 box from 10! Find the grand reward or walk away empty!",
+      reward: "×4",
       href: "/mystery",
       color: "#F59E0B",
     },
     // 12. Lucky Chamber - NEW!
     {
-      title: "Lucky Chamber",
+      title: "Mystery Chamber",
       emoji: "🔫",
-      description: "6 chambers, 1 danger! Pick wisely and cash out before it's too late!",
-      prize: "×7.5",
+      description: "Choose your path through 6 chambers and secure your progress before the danger appears.",
+      reward: "×7.5",
       href: "/chamber",
       color: "#64748B",
     },
     // 13. Horse Racing - NEW!
     {
-      title: "Horse Racing",
+      title: "Speed Track",
       emoji: "🏇",
-      description: "Choose your favorite horse! Watch them race and win big!",
-      prize: "×3.6",
+      description: "Pick your racer and follow the track to see how your choice performs.",
+      reward: "×3.6",
       href: "/horse",
       color: "#16A34A",
     },
@@ -411,16 +411,16 @@ export default function ArcadeHub() {
       title: "Target Shooter",
       emoji: "🏹",
       description: "Hit all targets in 20 seconds! Fast clicks = big wins!",
-      prize: "×15",
+      reward: "×15",
       href: "/shooter",
       color: "#EA580C",
     },
     // 15. Sic Bo - NEW!
     {
-      title: "Sic Bo",
+      title: "Triple Dice",
       emoji: "🀄",
-      description: "Ancient Chinese dice game! Choose totals, triples, and more!",
-      prize: "×50",
+      description: "A fast dice challenge based on totals, patterns, and bonus outcomes.",
+      reward: "×50",
       href: "/sicbo",
       color: "#B91C1C",
     },
@@ -428,35 +428,35 @@ export default function ArcadeHub() {
     {
       title: "Gold Rush Digger",
       emoji: "⛏️",
-      description: "Dig a 5×5 treasure map! Find gems and grand prizes - avoid 6 skulls!",
-      prize: "×61",
+      description: "Dig a 5×5 treasure map! Find gems and grand rewards - avoid 6 skulls!",
+      reward: "×61",
       href: "/goldrush",
       color: "#D97706",
     },
     // 17. Limbo - NEW!
     {
-      title: "Limbo",
+      title: "Limit Run",
       emoji: "🔥",
-      description: "Set your target multiplier and roll! Higher risk = bigger rewards!",
-      prize: "Unlimited",
+      description: "Set your target boost and see whether your run reaches it.",
+      reward: "Unlimited",
       href: "/limbo",
       color: "#6366F1",
     },
     // 18. Dice Over/Under - NEW!
     {
-      title: "Dice Over/Under",
+      title: "Dice Pick",
       emoji: "⚄",
-      description: "Over or Under! Slide your target and roll - ultimate control!",
-      prize: "Unlimited",
+      description: "Choose your target range and roll for a result-based reward tier.",
+      reward: "Unlimited",
       href: "/dice-over-under",
       color: "#14B8A6",
     },
     // 18. Roulette
     {
-      title: "Roulette",
+      title: "Color Wheel",
       emoji: "🔴",
-      description: "Spin the wheel and win big! Classic wheel game with multiple play options.",
-      prize: "×36",
+      description: "Spin the wheel and land on color-based reward zones with different outcomes.",
+      reward: "×36",
       href: "/roulette",
       color: "#7C3AED",
     },
@@ -465,74 +465,74 @@ export default function ArcadeHub() {
       title: "Dragon Tower",
       emoji: "🐉",
       description: "Climb 10 floors through the dragon's lair! 3 difficulty modes!",
-      prize: "×150",
+      reward: "×150",
       href: "/dragon-tower",
       color: "#DC2626",
     },
     {
-      title: "Slots Upgraded",
+      title: "Symbol Match",
       emoji: "💰",
-      description: "5-reel mega slots! Match symbols for huge wins - 💎×500 grand prize!",
-      prize: "×500",
+      description: "Match symbols across 5 reels to unlock bonus reward patterns.",
+      reward: "×500",
       href: "/slots-upgraded",
       color: "#FBBF24",
     },
     {
-      title: "Mega Wheel",
+      title: "Mega Spin Board",
       emoji: "🎡",
-      description: "40 segments of fortune! Spin for prizes up to ×8 grand prize!",
-      prize: "×8",
+      description: "Spin across 40 segments and land on different reward tiers and bonus events.",
+      reward: "×8",
       href: "/mega-wheel",
       color: "#A855F7",
     },
     {
-      title: "Keno",
+      title: "Number Hunt",
       emoji: "🎱",
-      description: "Classic lottery! Pick 1-10 numbers - match them all for ×1000!",
-      prize: "×1000",
+      description: "Choose your numbers and track how many matches you hit in each round.",
+      reward: "×1000",
       href: "/keno",
       color: "#6366F1",
     },
     {
-      title: "Craps",
+      title: "Dice Arena",
       emoji: "🎲",
-      description: "Roll the dice and win big! Classic dice game with multiple play options.",
-      prize: "×31",
+      description: "Roll the dice through different outcome zones and unlock score-based rewards.",
+      reward: "×31",
       href: "/craps",
       color: "#16A34A",
     },
     {
-      title: "Baccarat",
+      title: "Card Duel",
       emoji: "♥️",
-      description: "Choose Player, Banker, or Tie! Classic card game with simple rules.",
-      prize: "×8",
+      description: "Choose between card sides and follow the result in a fast head-to-head round.",
+      reward: "×8",
       href: "/baccarat",
       color: "#9333EA",
     },
     // 25. Coin Flip - TEMPLATE GAME
     {
-      title: "Coin Flip",
+      title: "Quick Flip",
       emoji: "🪙",
-      description: "Choose Heads or Tails! Simple 50/50 chance with instant results and big wins!",
-      prize: "×1.95",
+      description: "Choose a side and reveal the result in a quick one-tap challenge.",
+      reward: "×1.95",
       href: "/coin-flip",
       color: "#F59E0B",
     },
     // 26. Crash2 - NEW WITH LIVE CHART!
     {
-      title: "Crash2",
+      title: "Sky Run X",
       emoji: "📈",
-      description: "Watch the multiplier grow! Cash out before it crashes to win your play amount times the multiplier!",
-      prize: "×10",
+      description: "Track the live boost curve and lock in your result before the run ends.",
+      reward: "×10",
       href: "/crash2",
       color: "#EF4444",
     },
     // 27. Plinko2 - OPTIMIZED VERSION!
     {
-      title: "Plinko2",
+      title: "Drop Run X",
       emoji: "🎲",
-      description: "Enhanced Plinko with 17 rows, wall penalty, and maximized play area!",
-      prize: "×10",
+      description: "Enhanced Drop Run with 17 rows, wall penalty, and maximized play area!",
+      reward: "×10",
       href: "/plinko2",
       color: "#8B5CF6",
     },
@@ -585,8 +585,8 @@ export default function ArcadeHub() {
             </h1>
             
             <p className="text-lg text-white/90 max-w-2xl mx-auto">
-              Play mini-games and win MLEO tokens! Each game costs 1,000 MLEO per round.
-              Win prizes, free spins, and multipliers up to 10x!
+              Play mini-games, collect in-app MLEO rewards, and unlock extra challenges. 
+              Each session uses 1,000 MLEO from your in-app vault or a free play token when available.
             </p>
             
             {/* Vault and Free Play Status */}
@@ -637,13 +637,13 @@ export default function ArcadeHub() {
               <div>
                 <h3 className="text-xl font-bold text-yellow-300 mb-2">Important Information</h3>
                 <ul className="text-sm text-white/90 space-y-2">
-                  <li>• <strong>🎁 Free Play:</strong> Earn 1 free play token every hour (max 5 tokens). Use tokens on any game without spending MLEO!</li>
-                  <li>• <strong>Minimum Play:</strong> Each game has a minimum play amount of 1,000 MLEO (some games allow higher play amounts)</li>
-                  <li>• <strong>Source:</strong> MLEO is deducted from your vault when you play (not for free plays)</li>
-                  <li>• <strong>Prizes:</strong> All winnings are automatically added back to your vault (including free play wins!)</li>
-                  <li>• <strong>Game Info:</strong> Click the ℹ️ button on each game card to learn how to play and see prize details</li>
-                  <li>• <strong>Fair Play:</strong> All games use random number generation for fair outcomes</li>
-                  <li>• <strong>Statistics:</strong> Each game tracks your personal stats (total plays, wins, biggest win, etc.)</li>
+                  <li>• <strong>🎁 Free Play:</strong> Receive 1 free play token every hour (up to 5 stored). Use tokens on any game without using vault MLEO!</li>
+                  <li>• <strong>Session Cost:</strong> Each game session uses at least 1,000 MLEO from your in-app vault. Some modes may use a different session cost.</li>
+                  <li>• <strong>Vault Usage:</strong> MLEO is taken from your in-app vault when you start a session (free play sessions do not use vault MLEO).</li>
+                  <li>• <strong>Rewards:</strong> Session rewards are added automatically to your vault, including rewards earned from free play sessions.</li>
+                  <li>• <strong>Game Info:</strong> Click the ℹ️ button on each game card to view the rules, controls, and reward structure.</li>
+                  <li>• <strong>Game Logic:</strong> Some games use randomized events, while others focus on timing, reaction, memory, or decision-making.</li>
+                  <li>• <strong>Statistics:</strong> Each game tracks your activity, completed sessions, best score, streaks, and progress milestones.</li>
                 </ul>
               </div>
             </div>
@@ -653,9 +653,9 @@ export default function ArcadeHub() {
           <div className="max-w-4xl mx-auto rounded-2xl bg-black/30 border border-white/10 p-8 text-center">
             <h3 className="text-2xl font-bold mb-4">🏆 Play Responsibly</h3>
             <p className="text-white/80 max-w-2xl mx-auto">
-              These are mini-games for entertainment. The game balance is set to provide fair gameplay.
-              Remember: you're using in-game MLEO tokens that you've earned from the main games.
-              Have fun and good luck!
+              These arcade mini-games are designed for entertainment, progression, and in-app rewards. 
+              MLEO used here is earned inside the platform and stored in your in-app vault. 
+              Focus on fun, strategy, timing, and progression as you explore different game modes.
             </p>
           </div>
 
@@ -709,22 +709,22 @@ export default function ArcadeHub() {
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">🏆</span>
                   <div>
-                    <div className="font-semibold text-white">Win Arcade Games</div>
-                    <div>All winnings from arcade games are automatically added to your vault.</div>
+                    <div className="font-semibold text-white">Arcade Rewards</div>
+                    <div>All rewards earned in arcade sessions are automatically added to your vault.</div>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">🎁</span>
                   <div>
-                    <div className="font-semibold text-white">Free Play Wins</div>
-                    <div>Even free play games can win MLEO tokens that go to your vault!</div>
+                    <div className="font-semibold text-white">Free Play Rewards</div>
+                    <div>Free play sessions can also add MLEO rewards to your vault.</div>
                   </div>
                 </div>
               </div>
             </div>
             <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 p-4">
               <div className="text-sm text-blue-300">
-                <strong>💡 Tip:</strong> Your vault is the same across all MLEO games. Play RUSH to earn more tokens for arcade games!
+                <strong>💡 Tip:</strong> Your vault is shared across all MLEO games. Play RUSH to build more balance for arcade sessions!
               </div>
             </div>
           </div>
@@ -757,7 +757,7 @@ export default function ArcadeHub() {
                   <span className="text-2xl">⏰</span>
                   <div>
                     <div className="font-semibold text-white">Token Regeneration</div>
-                    <div>Earn 1 free play token every hour automatically. No need to be online!</div>
+                    <div>Receive 1 free play token every hour automatically. No need to stay online.</div>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -771,21 +771,21 @@ export default function ArcadeHub() {
                   <span className="text-2xl">🎯</span>
                   <div>
                     <div className="font-semibold text-white">Token Value</div>
-                    <div>Each free play token is worth 1,000 MLEO and can be used on any arcade game.</div>
+                    <div>Each free play token can be used to start one arcade session without using vault MLEO.</div>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">🏆</span>
                   <div>
-                    <div className="font-semibold text-white">Winnings</div>
-                    <div>Free play wins are added to your vault just like regular game wins!</div>
+                    <div className="font-semibold text-white">Rewards</div>
+                    <div>Rewards from free play sessions are added to your vault just like standard session rewards.</div>
                   </div>
                 </div>
               </div>
             </div>
             <div className="rounded-lg bg-green-500/10 border border-green-500/30 p-4">
               <div className="text-sm text-green-300">
-                <strong>💡 Pro Tip:</strong> Use free play tokens to try new games risk-free and build your vault!
+                <strong>💡 Pro Tip:</strong> Use free play tokens to explore new games and build your vault through regular play.
               </div>
             </div>
           </div>

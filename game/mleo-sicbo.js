@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Sic Bo - Full-Screen Game Template
+// MLEO Triple Dice - Full-Screen Game Template
 // Ancient Chinese Dice Game - Play on dice combinations!
 // ============================================================================
 
@@ -61,7 +61,7 @@ const PLAY_TYPES = {
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
-const GAME_ID = 14; // Sic Bo game ID
+const GAME_ID = 14; // Triple Dice game ID
 
 const MINING_CLAIM_ABI = [{
   type: "function",
@@ -566,7 +566,7 @@ export default function SicBoPage() {
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">
-              🀄 Sic Bo
+              🀄 Triple Dice
             </h1>
             <p className="text-white/70 text-xs">Ancient Chinese dice • Multiple playing options!</p>
           </div>
@@ -764,7 +764,7 @@ export default function SicBoPage() {
               </div>
 
               <div className="mt-4 text-xs opacity-70">
-                <p>Sic Bo v2.0</p>
+                <p>Triple Dice v2.0</p>
               </div>
             </div>
           </div>

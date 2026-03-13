@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Keno - Full-Screen Game Template  
+// MLEO Number Hunt - Full-Screen Game Template  
 // Classic lottery! Pick numbers and win big!
 // ============================================================================
 
@@ -63,7 +63,7 @@ function fmt(n) { if (n >= 1e9) return (n / 1e9).toFixed(2) + "B"; if (n >= 1e6)
 function formatPlayDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
 function shortAddr(addr) { if (!addr || addr.length < 10) return addr || ""; return `${addr.slice(0, 6)}...${addr.slice(-4)}`; }
 
-export default function KenoPage() {
+export default function Number HuntPage() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);
@@ -159,7 +159,7 @@ export default function KenoPage() {
     }
   };
 
-  const playKeno = (isFreePlayParam = false) => {
+  const playNumber Hunt = (isFreePlayParam = false) => {
     if (selected.length === 0) { alert('Please select at least 1 number!'); return; }
     if (drawing) return;
     playSfx(clickSound.current);
@@ -233,7 +233,7 @@ export default function KenoPage() {
           <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
             <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
               <button onClick={backSafe} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">BACK</button>
-              {freePlayTokens > 0 && (<button onClick={() => playKeno(true)} disabled={drawing} className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50" title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}><span className="text-base">🎁</span><span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">{freePlayTokens}</span></button>)}
+              {freePlayTokens > 0 && (<button onClick={() => playNumber Hunt(true)} disabled={drawing} className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50" title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}><span className="text-base">🎁</span><span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">{freePlayTokens}</span></button>)}
             </div>
             <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
               <button onClick={() => { playSfx(clickSound.current); const el = wrapRef.current || document.documentElement; if (!document.fullscreenElement) { el.requestFullscreen?.().catch(() => {}); } else { document.exitFullscreen?.().catch(() => {}); } }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFullscreen ? "EXIT" : "FULL"}</button>
@@ -244,7 +244,7 @@ export default function KenoPage() {
 
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
-            <h1 className="text-2xl font-extrabold text-white mb-0.5">🎱 Keno</h1>
+            <h1 className="text-2xl font-extrabold text-white mb-0.5">🎱 Number Hunt</h1>
             <p className="text-white/70 text-xs">Pick numbers • Match them • Win big!</p>
           </div>
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
@@ -294,7 +294,7 @@ export default function KenoPage() {
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            <button onClick={gameResult ? resetGame : () => playKeno(false)} disabled={drawing || (!gameResult && selected.length === 0)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
+            <button onClick={gameResult ? resetGame : () => playNumber Hunt(false)} disabled={drawing || (!gameResult && selected.length === 0)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
               {drawing ? "Drawing..." : gameResult ? "PLAY AGAIN" : "DRAW"}
             </button>
             <div className="flex gap-2">
@@ -322,7 +322,7 @@ export default function KenoPage() {
               <div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div>
               <div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div>
               <div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div>
-              <div className="mt-4 text-xs opacity-70"><p>Keno v2.0</p></div>
+              <div className="mt-4 text-xs opacity-70"><p>Number Hunt v2.0</p></div>
             </div>
           </div>
         )}

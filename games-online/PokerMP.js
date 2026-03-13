@@ -1042,7 +1042,7 @@ export default function PokerMP({ roomId, playerName, vault, setVaultBoth, tierC
         {/* Header Bar */}
         <div className="flex-shrink-0 bg-black/40 backdrop-blur-sm px-2 py-2 md:px-4 md:py-3 border-b border-white/10">
           <div className="flex items-center justify-between gap-2">
-            <div className="text-white font-bold text-xs md:text-base">🃏 MLEO Poker</div>
+            <div className="text-white font-bold text-xs md:text-base">🃏 MLEO Card Arena</div>
             <div className="flex items-center gap-1 md:gap-2 text-white/90 text-[10px] md:text-xs">
               <span className="bg-green-800/50 px-2 py-0.5 rounded">Hand #{ses?.hand_no||"-"}</span>
               <span className="bg-green-800/50 px-2 py-0.5 rounded capitalize">{ses?.stage||"lobby"}</span>

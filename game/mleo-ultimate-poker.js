@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Ultimate Texas Hold'em - Arcade-Style Poker
+// MLEO Ultimate Cards - Arcade-Style Poker
 // Play against the opponent with strategic raising decisions!
 // ============================================================================
 
@@ -41,7 +41,7 @@ const MIN_PLAY = 1000;
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 
-// Blind Bonus Prizes (standard Ultimate Texas Hold'em)
+// Blind Bonus Prizes (standard Ultimate Cards)
 const BLIND_BONUS = {
   "Royal Flush": 500,
   "Straight Flush": 50,
@@ -608,8 +608,8 @@ export default function UltimatePokerPage() {
 
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
-            <h1 className="text-2xl font-extrabold text-white mb-0.5">🃏 Ultimate Texas Hold'em</h1>
-            <p className="text-white/70 text-xs">Strategic poker against the opponent!</p>
+            <h1 className="text-2xl font-extrabold text-white mb-0.5">🃏 Ultimate Cards</h1>
+            <p className="text-white/70 text-xs">A strategy-focused card mode with staged decisions and stronger reward tiers.</p>
           </div>
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
@@ -733,7 +733,7 @@ export default function UltimatePokerPage() {
               <div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div>
               <div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div>
               <div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div>
-              <div className="mt-4 text-xs opacity-70"><p>Ultimate Texas Hold'em v1.0</p></div>
+              <div className="mt-4 text-xs opacity-70"><p>Ultimate Cards v1.0</p></div>
             </div>
           </div>
         )}

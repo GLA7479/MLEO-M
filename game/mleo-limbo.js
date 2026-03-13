@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Limbo - Full-Screen Game Template
+// MLEO Limit Run - Full-Screen Game Template
 // How High Can You Go? Set multiplier and roll!
 // ============================================================================
 
@@ -54,7 +54,7 @@ const GAME_BALANCE = 0.01; // Game balance 1% - RTP 99%
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
-const GAME_ID = 16; // Limbo game ID
+const GAME_ID = 16; // Limit Run game ID
 
 const MINING_CLAIM_ABI = [{
   type: "function",
@@ -136,7 +136,7 @@ function generateResult() {
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
-export default function LimboPage() {
+export default function Limit RunPage() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);
@@ -370,7 +370,7 @@ export default function LimboPage() {
   };
 
   // Game logic
-  const playLimbo = (isFreePlayParam = false) => {
+  const playLimit Run = (isFreePlayParam = false) => {
     if (rolling) return;
     playSfx(clickSound.current);
 
@@ -507,7 +507,7 @@ export default function LimboPage() {
               {/* Free Play Indicator */}
               {freePlayTokens > 0 && (
                 <button
-                  onClick={() => playLimbo(true)}
+                  onClick={() => playLimit Run(true)}
                   disabled={rolling}
                   className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50"
                   title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}
@@ -559,7 +559,7 @@ export default function LimboPage() {
         >
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">
-              🔥 Limbo
+              🔥 Limit Run
             </h1>
             <p className="text-white/70 text-xs">
               Set your multiplier • Higher risk, higher reward!
@@ -767,7 +767,7 @@ export default function LimboPage() {
             style={{ minHeight: "140px" }}
           >
             <button
-              onClick={() => playLimbo(false)}
+              onClick={() => playLimit Run(false)}
               disabled={rolling}
               className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
             >
@@ -894,7 +894,7 @@ export default function LimboPage() {
               </div>
 
               <div className="mt-4 text-xs opacity-70">
-                <p>Limbo v2.0</p>
+                <p>Limit Run v2.0</p>
               </div>
             </div>
           </div>

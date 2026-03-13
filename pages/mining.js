@@ -100,27 +100,27 @@ const TEXT = {
       "Connect your wallet to claim MLEO tokens on-chain when available."
     ],
     arcadeWhat: "What is MLEO Arcade?",
-    arcadeWhatDesc: "MLEO Arcade is a collection of 24 exciting mini-games where you can win MLEO tokens! Each game has unique mechanics and multipliers.",
+    arcadeWhatDesc: "MLEO Arcade is a collection of 24 exciting mini-games where you can collect in-app MLEO rewards! Each game has unique mechanics and multipliers.",
     arcadeHowToPlay: "How to Play",
     arcadeSteps: [
       "Choose any game from the arcade",
-      "Each game costs 1,000 MLEO per round (deducted from your vault)",
+      "Each session uses at least 1,000 MLEO from your in-app vault. Some modes may use a different session cost",
       "Follow the game-specific instructions",
-      "Win prizes and multipliers up to 10,000 MLEO!",
-      "All winnings are automatically added to your vault"
+      "Complete runs, reach milestones, and collect reward boosts based on your results",
+      "Session rewards are added automatically to your vault, including rewards earned from free play sessions"
     ],
     arcadeFreePlay: "Free Play Tokens",
     arcadeFreePlayList: [
-      "Earn 1 free play token every hour (max 5 tokens)",
-      "Use tokens to play any game without spending MLEO",
-      "Free play wins are still added to your vault!"
+      "Receive 1 free play token every hour (up to 5 stored)",
+      "Use tokens to start one arcade session without using vault MLEO",
+      "Rewards from free play sessions are added to your vault just like standard session rewards"
     ],
     arcadeGoodToKnow: "Good to Know",
     arcadeGoodToKnowList: [
       "Your vault is shared between all MLEO games",
-      "Each game tracks your personal statistics",
-      "All games use fair random number generation",
-      "Click the ℹ️ button on each game for specific rules"
+      "Each game tracks your activity, completed sessions, best score, streaks, and progress milestones",
+      "Some games use randomized events, while others focus on timing, reaction, memory, or decision-making",
+      "Click the ℹ️ button on each game card to view the rules, controls, and reward structure"
     ]
   },
   ar: {
@@ -483,7 +483,7 @@ const TEXT = {
     ],
     arcadeFreePlay: "Tokens de jeu gratuit",
     arcadeFreePlayList: [
-      "Gagnez 1 token de jeu gratuit chaque heure (max 5 tokens)",
+      "Gagnez 1 token de jeu gratuit chaque heure (up to 5 stored)",
       "Utilisez les tokens pour jouer à n'importe quel jeu sans dépenser de MLEO",
       "Les gains de jeu gratuit sont toujours ajoutés à votre coffre!"
     ],
@@ -571,7 +571,7 @@ const TEXT = {
       "Wählen Sie ein beliebiges Spiel aus der Arcade",
       "Jedes Spiel kostet 1.000 MLEO pro Runde (von Ihrer Tresor abgezogen)",
       "Folgen Sie den spielspezifischen Anweisungen",
-      "Gewinnen Sie Preise und Multiplikatoren bis zu 10.000 MLEO!",
+      "Sammeln Sie Belohnungen und Multiplikatoren bis zu 10.000 MLEO!",
       "Alle Gewinne werden automatisch zu Ihrem Tresor hinzugefügt"
     ],
     arcadeFreePlay: "Kostenlose Spiel-Token",
@@ -1034,7 +1034,7 @@ const TEXT = {
     arcadeHowToPlay: "Come giocare",
     arcadeSteps: [
       "Scegli qualsiasi gioco dall'arcade",
-      "Ogni gioco costa 1.000 MLEO per round (dedotto dalla tua cassaforte)",
+      "Ogni gioco costa 1.000 MLEO per session (dedotto dalla tua cassaforte)",
       "Segui le istruzioni specifiche del gioco",
       "Vinci premi e moltiplicatori fino a 10.000 MLEO!",
       "Tutte le vincite vengono automaticamente aggiunte alla tua cassaforte"
@@ -1279,7 +1279,7 @@ const TEXT = {
       "Sistem guild: Alătură-te guild-urilor de mining pentru multiplicatori bonus",
       "Pod: Transferă MLEO din jocul Mineri în seiful Rush"
     ],
-    goalDesc: "Fuzionează câini (mineri), sparge pietre și câștigă monede. Monedele sunt o resursă în joc folosită pentru upgrade-uri și cumpărarea mai multor mineri. Unele activități în joc prizePool de asemenea acumula MLEO (vezi \"Mining și Token-uri\" mai jos).",
+    goalDesc: "Fuzionează câini (mineri), sparge pietre și câștigă monede. Monedele sunt o resursă în joc folosită pentru upgrade-uri și cumpărarea mai multor mineri. Unele activități în joc rewardPool de asemenea acumula MLEO (vezi \"Mining și Token-uri\" mai jos).",
     boardMerging: "Board și Fuzionare",
     boardSteps: [
       "Atinge ADD pe un slot gol pentru a plasa un câine. Costul crește în timp.",
@@ -1290,22 +1290,22 @@ const TEXT = {
     upgradesList: [
       "Upgrade-urile DPS fac pietrele să se spargă mai repede.",
       "Upgrade-urile GOLD cresc monedele pe care le primești de la fiecare piatră cu 10% per upgrade.",
-      "Cadourile, câinii automat și alte bonusuri prizePool apărea din când în când. Timpii exacți, tipurile de drop și valorile de balans sunt dinamice și prizePool schimba fără notificare.",
-      "Diamantele prizePool fi colectate și cheltuite pentru recompense speciale. Disponibilitatea și recompensele nu sunt garantate."
+      "Cadourile, câinii automat și alte bonusuri rewardPool apărea din când în când. Timpii exacți, tipurile de drop și valorile de balans sunt dinamice și rewardPool schimba fără notificare.",
+      "Diamantele rewardPool fi colectate și cheltuite pentru recompense speciale. Disponibilitatea și recompensele nu sunt garantate."
     ],
     miningTokens: "Mining și Token-uri (MLEO)",
     miningList: [
       "Cum se acumulează MLEO: Doar spargerea pietrelor poate genera MLEO. O porțiune din monedele pe care le câștigi spargând pietre se poate converti în MLEO la o rată variabilă supusă balansului jocului, limitelor zilnice și protecțiilor anti-abuz.",
-      "Limite zilnice și atenuare: Pentru a menține echitatea, acumularea zilnică se poate atenua când te apropii de limita ta personală zilnică. Limitele și calculele sunt interne și se prizePool schimba.",
-      "Progres offline: Progresul offline limitat este simulat cu eficiență redusă comparat cu jocul activ. Valorile exacte sunt interne și se prizePool schimba.",
-      "CLAIM: MLEO-ul tău acumulat apare ca balans. Cererea îl mută în seiful tău în joc. Dacă/când cererile on-chain devin disponibile, se prizePool aplica ferestre de deblocare suplimentare și restricții.",
+      "Limite zilnice și atenuare: Pentru a menține echitatea, acumularea zilnică se poate atenua când te apropii de limita ta personală zilnică. Limitele și calculele sunt interne și se rewardPool schimba.",
+      "Progres offline: Progresul offline limitat este simulat cu eficiență redusă comparat cu jocul activ. Valorile exacte sunt interne și se rewardPool schimba.",
+      "CLAIM: MLEO-ul tău acumulat apare ca balans. Cererea îl mută în seiful tău în joc. Dacă/când cererile on-chain devin disponibile, se rewardPool aplica ferestre de deblocare suplimentare și restricții.",
       "Fără promisiune de valoare: MLEO în acest joc este un token utilitar pentru divertisment. Nu are valoare monetară intrinsecă sau garantată. Nimic aici nu este ofertă, solicitare sau promisiune de valoare viitoare."
     ],
     goodToKnow: "Bun de știut",
     goodToKnowList: [
-      "Balansul jocului, ratele de drop, limitele și programele sunt dinamice și prizePool fi schimbate, puse în pauză sau resetate oricând pentru stabilitate, echitate sau întreținere.",
+      "Balansul jocului, ratele de drop, limitele și programele sunt dinamice și rewardPool fi schimbate, puse în pauză sau resetate oricând pentru stabilitate, echitate sau întreținere.",
       "Progresul poate fi ajustat pentru a aborda bug-uri, exploit-uri sau abuz.",
-      "Aceasta este o versiune testnet. Datele prizePool fi șterse sau resetate în timpul dezvoltării.",
+      "Aceasta este o versiune testnet. Datele rewardPool fi șterse sau resetate în timpul dezvoltării.",
       "Conectează-ți portofelul pentru a cere token-uri MLEO on-chain când sunt disponibile."
     ],
     arcadeWhat: "Ce este MLEO Arcade?",
@@ -1501,12 +1501,12 @@ const TEXT = {
       "Kies een willekeurig spel uit de arcade",
       "Elk spel kost 1,000 MLEO per ronde (afgetrokken van je kluis)",
       "Volg de spelspecifieke instructies",
-      "Win prijzen en vermenigvuldigers tot 10,000 MLEO!",
+      "Verzamel beloningen en vermenigvuldigers tot 10,000 MLEO!",
       "Alle winsten worden automatisch toegevoegd aan je kluis"
     ],
     arcadeFreePlay: "Gratis speel tokens",
     arcadeFreePlayList: [
-      "Verdien 1 gratis speel token elk uur (max 5 tokens)",
+      "Verdien 1 gratis speel token elk uur (up to 5 stored)",
       "Gebruik tokens om elk spel te spelen zonder MLEO uit te geven",
       "Gratis speel winsten worden nog steeds toegevoegd aan je kluis!"
     ],
@@ -1599,7 +1599,7 @@ const TEXT = {
     ],
     arcadeFreePlay: "Δωρεάν παιχνίδι tokens",
     arcadeFreePlayList: [
-      "Κερδίστε 1 δωρεάν παιχνίδι token κάθε ώρα (max 5 tokens)",
+      "Κερδίστε 1 δωρεάν παιχνίδι token κάθε ώρα (up to 5 stored)",
       "Χρησιμοποιήστε tokens για να παίξετε οποιοδήποτε παιχνίδι χωρίς να ξοδέψετε MLEO",
       "Τα κέρδη από δωρεάν παιχνίδι προστίθενται ακόμα στο θησαυροφυλάκιό σας!"
     ],
@@ -2656,7 +2656,7 @@ export default function GamesHub() {
                   <div>
                     <h2 className="text-[20px] sm:text-2xl font-extrabold">🎮 MLEO Arcade</h2>
                     <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
-                      Mini-games arcade! Play Slots, Dice, Wheel & Scratch cards. 1,000 MLEO per play with prizes up to 10,000 MLEO!
+                      Mini-games arcade! Play Slots, Dice, Wheel & Scratch cards. 1,000 MLEO per session with rewards up to 10,000 MLEO!
         </p>
                   </div>
                   <span className="rounded-full px-2.5 py-1 text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 whitespace-nowrap">
@@ -3084,8 +3084,8 @@ export default function GamesHub() {
               <ul className="space-y-0.5 list-disc list-inside">
                 <li>Your vault is shared between all MLEO games</li>
                 <li>Play games to earn more MLEO tokens</li>
-                <li>All winnings are automatically added to your vault</li>
-                <li>Use free play tokens to play without spending MLEO</li>
+                <li>All rewards are automatically added to your vault</li>
+                <li>Use free play tokens to play without using vault MLEO</li>
                 <li>Connect your wallet and claim MLEO tokens on-chain</li>
               </ul>
             </div>

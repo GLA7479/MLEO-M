@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Poker (Texas Hold'em) - Full-Screen Game Template
+// MLEO Card Arena (Card Arena) - Full-Screen Game Template
 // Classic poker! Best 5-card hand wins!
 // ============================================================================
 
@@ -322,7 +322,7 @@ export default function PokerPage() {
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">🃏 Poker</h1>
-            <p className="text-white/70 text-xs">Texas Hold'em • Best hand wins!</p>
+            <p className="text-white/70 text-xs">Card Arena • Best hand wins!</p>
           </div>
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">

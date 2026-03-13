@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Roulette - Full-Screen Game Template (No-Scroll Auto-Scale)
+// MLEO Color Wheel - Full-Screen Game Template (No-Scroll Auto-Scale)
 // Spin the wheel, place your plays!
 // ============================================================================
 
@@ -134,7 +134,7 @@ function shortAddr(addr) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
-export default function RoulettePage() {
+export default function Color WheelPage() {
   useIOSViewportFix();
   const router = useRouter();
 
@@ -521,7 +521,7 @@ export default function RoulettePage() {
 
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">
-              🎰 Roulette
+              🎰 Color Wheel
             </h1>
             <p className="text-white/70 text-xs">Place your play • Spin to win!</p>
           </div>
@@ -769,7 +769,7 @@ export default function RoulettePage() {
                 </button>
               </div>
               <div className="mt-4 text-xs opacity-70">
-                <p>Roulette v2.0</p>
+                <p>Color Wheel v2.0</p>
               </div>
             </div>
           </div>

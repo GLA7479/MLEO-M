@@ -1,6 +1,6 @@
 // ============================================================================
 // pages/mleo-crash.js
-// MLEO Crash — full single-file Next.js page
+// MLEO Sky Run — full single-file Next.js page
 // - 30s playing phase
 // - Live multiplier chart (SVG)
 // - Cash Out before crash to win play * multiplier
@@ -453,7 +453,7 @@ export default function MLEOCrash() {
   }
 
   return (
-    <Layout title="MLEO Crash">
+    <Layout title="MLEO Sky Run">
       <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-zinc-900 to-black text-white">
         <div className="mx-auto max-w-5xl px-4 py-6 pb-20">
           <header className="flex items-center justify-between mb-6">

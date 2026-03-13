@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO Baccarat - Full-Screen Game Template
+// MLEO Card Duel - Full-Screen Game Template
 // Classic card game - Choose Player, Banker, or Tie!
 // ============================================================================
 
@@ -60,7 +60,7 @@ const PLAY_TYPES = {
   tie: { name: "Tie", prize: 8 }
 };
 
-export default function BaccaratPage() {
+export default function Card DuelPage() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);
@@ -223,7 +223,7 @@ export default function BaccaratPage() {
 
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
-            <h1 className="text-2xl font-extrabold text-white mb-0.5">♥️ Baccarat</h1>
+            <h1 className="text-2xl font-extrabold text-white mb-0.5">♥️ Card Duel</h1>
             <p className="text-white/70 text-xs">Player, Banker, or Tie • Classic card game!</p>
           </div>
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
@@ -299,7 +299,7 @@ export default function BaccaratPage() {
               <div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div>
               <div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div>
               <div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div>
-              <div className="mt-4 text-xs opacity-70"><p>Baccarat v2.0</p></div>
+              <div className="mt-4 text-xs opacity-70"><p>Card Duel v2.0</p></div>
             </div>
           </div>
         )}
