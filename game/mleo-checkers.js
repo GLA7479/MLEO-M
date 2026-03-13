@@ -84,18 +84,45 @@ function getValidMoves(board, row, col, playerType) {
     ? [[-1, -1], [-1, 1], [1, -1], [1, 1]]
     : playerType === 'player' ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
   
-  for (const [dr, dc] of directions) {
-    const newRow = row + dr;
-    const newCol = col + dc;
-    
-    if (newRow >= 0 && newRow < BOARD_SIZE && newCol >= 0 && newCol < BOARD_SIZE) {
-      if (!board[newRow][newCol]) {
-        moves.push({ row: newRow, col: newCol, jump: false });
-      } else if (board[newRow][newCol].type !== playerType) {
-        const jumpRow = newRow + dr;
-        const jumpCol = newCol + dc;
-        if (jumpRow >= 0 && jumpRow < BOARD_SIZE && jumpCol >= 0 && jumpCol < BOARD_SIZE && !board[jumpRow][jumpCol]) {
-          moves.push({ row: jumpRow, col: jumpCol, jump: true, captureRow: newRow, captureCol: newCol });
+  // For kings, check multiple steps in each direction
+  if (piece.king) {
+    for (const [dr, dc] of directions) {
+      for (let steps = 1; steps < BOARD_SIZE; steps++) {
+        const newRow = row + (dr * steps);
+        const newCol = col + (dc * steps);
+        
+        if (newRow < 0 || newRow >= BOARD_SIZE || newCol < 0 || newCol >= BOARD_SIZE) break;
+        
+        if (!board[newRow][newCol]) {
+          moves.push({ row: newRow, col: newCol, jump: false });
+        } else if (board[newRow][newCol].type !== playerType) {
+          // Can jump over enemy piece
+          const jumpRow = newRow + dr;
+          const jumpCol = newCol + dc;
+          if (jumpRow >= 0 && jumpRow < BOARD_SIZE && jumpCol >= 0 && jumpCol < BOARD_SIZE && !board[jumpRow][jumpCol]) {
+            moves.push({ row: jumpRow, col: jumpCol, jump: true, captureRow: newRow, captureCol: newCol });
+          }
+          break; // Can't move past a piece
+        } else {
+          break; // Can't move past own piece
+        }
+      }
+    }
+  } else {
+    // Regular pieces - one step or jump
+    for (const [dr, dc] of directions) {
+      const newRow = row + dr;
+      const newCol = col + dc;
+      
+      if (newRow >= 0 && newRow < BOARD_SIZE && newCol >= 0 && newCol < BOARD_SIZE) {
+        if (!board[newRow][newCol]) {
+          moves.push({ row: newRow, col: newCol, jump: false });
+        } else if (board[newRow][newCol].type !== playerType) {
+          const jumpRow = newRow + dr;
+          const jumpCol = newCol + dc;
+          if (jumpRow >= 0 && jumpRow < BOARD_SIZE && jumpCol >= 0 && jumpCol < BOARD_SIZE && !board[jumpRow][jumpCol]) {
+            moves.push({ row: jumpRow, col: jumpCol, jump: true, captureRow: newRow, captureCol: newCol });
+          }
         }
       }
     }
@@ -368,11 +395,11 @@ export default function CheckersPage() {
         </div>
 
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
-          <div className="text-center mb-1">
+          <div className="text-center mb-2 mt-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">♟️ Checkers</h1>
             <p className="text-white/70 text-xs">Classic Checkers • Win ×{WIN_MULTIPLIER}!</p>
           </div>
-          <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
+          <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-2 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">Vault</div>
               <div className="text-sm font-bold text-emerald-400">{fmt(vault)}</div>
@@ -387,8 +414,8 @@ export default function CheckersPage() {
             </div>
           </div>
 
-          <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
-            <div className="w-full max-w-md bg-gradient-to-b from-amber-900 to-amber-700 rounded-lg p-2 border-4 border-amber-600" style={{ aspectRatio: "1/1", maxHeight: "100%" }}>
+          <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 350px)" }}>
+            <div className="w-full max-w-md bg-gradient-to-b from-amber-900 to-amber-700 rounded-lg p-2 border-4 border-amber-600" style={{ aspectRatio: "1/1", maxHeight: "calc(100% - 32px)" }}>
               <div className="grid grid-cols-8 gap-0 h-full w-full">
                 {board.map((row, rowIdx) =>
                   row.map((cell, colIdx) => {
@@ -459,7 +486,7 @@ export default function CheckersPage() {
 
         {menuOpen && (<div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}><div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div><div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div><div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div><div className="mt-4 text-xs opacity-70"><p>Checkers v2.0</p></div></div></div>)}
 
-        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">♟️ How to Play</h2><div className="space-y-3 text-sm"><p><strong>1. Place Play:</strong> Min {MIN_PLAY} MLEO</p><p><strong>2. Start Game:</strong> Click "START GAME" to begin</p><p><strong>3. Move Pieces:</strong> Click your piece, then click a valid move</p><p><strong>4. Win:</strong> Capture all bot pieces or block all moves!</p><div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3"><p className="text-red-300 font-semibold mb-2">💰 Win Rewards:</p><div className="text-xs text-white/80 space-y-1"><p>• Win the game: ×{WIN_MULTIPLIER}</p><p>• Lose: Lose your play amount</p><p>• King pieces can move in all directions!</p></div></div><div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2 mt-2"><p className="text-blue-300 font-semibold text-xs">💡 Tip: Jump over enemy pieces to capture them!</p></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">♟️ How to Play</h2><div className="space-y-3 text-sm"><p><strong>1. Place Play:</strong> Min {MIN_PLAY} MLEO</p><p><strong>2. Start Game:</strong> Click "START GAME" to begin</p><p><strong>3. Move Pieces:</strong> Click your piece, then click a valid move</p><p><strong>4. Win:</strong> Capture all bot pieces or block all moves!</p><div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3"><p className="text-red-300 font-semibold mb-2">💰 Win Rewards:</p><div className="text-xs text-white/80 space-y-1"><p>• Win the game: ×{WIN_MULTIPLIER}</p><p>• Lose: Lose your play amount</p><p>• King pieces can move multiple steps in any direction!</p></div></div><div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2 mt-2"><p className="text-blue-300 font-semibold text-xs">💡 Tip: Jump over enemy pieces to capture them!</p></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
 
         {showStats && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2><div className="space-y-3"><div className="grid grid-cols-2 gap-3"><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Games</div><div className="text-xl font-bold">{stats.totalGames}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalGames > 0 ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : 0}%</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Play</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalPlay)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalPlay >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalPlay)}</div></div></div></div><button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
 

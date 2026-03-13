@@ -371,44 +371,163 @@ export default function BackgammonPage() {
             </div>
           </div>
 
-          <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 300px)" }}>
-            <div className="w-full max-w-md bg-gradient-to-b from-amber-900 to-amber-700 rounded-lg p-3 border-4 border-amber-600">
-              <div className="grid grid-cols-12 gap-1 mb-2">
-                {board.map((count, idx) => {
-                  const isTop = idx < 12;
-                  const isSelected = selectedPoint === idx;
-                  const pieces = Math.abs(count);
-                  const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
+          <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 350px)" }}>
+            <div className="w-full max-w-md bg-gradient-to-b from-amber-900 to-amber-700 rounded-lg p-2 border-4 border-amber-600" style={{ aspectRatio: "1/1", maxHeight: "calc(100% - 32px)" }}>
+              {/* Backgammon board with triangular points */}
+              <div className="relative h-full w-full">
+                {/* Top half - Outer board and Home board (points 13-24) */}
+                <div className="absolute top-0 left-0 right-0 h-1/2 flex">
+                  {/* Right side - points 19-24 (Home board) */}
+                  <div className="w-1/2 flex">
+                    {[19, 20, 21, 22, 23, 24].reverse().map((pointIdx) => {
+                      const count = board[pointIdx - 1];
+                      const isSelected = selectedPoint === pointIdx - 1;
+                      const pieces = Math.abs(count);
+                      const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
+                      const isDark = pointIdx % 2 === 1;
+                      
+                      return (
+                        <button
+                          key={`top-right-${pointIdx}`}
+                          onClick={() => handlePointClick(pointIdx - 1)}
+                          disabled={!gameActive || gameResult || currentPlayer !== 'player'}
+                          className={`relative flex-1 ${isDark ? 'bg-amber-800' : 'bg-amber-100'} border-r border-amber-600 transition-all ${
+                            isSelected ? 'ring-2 ring-blue-400' : ''
+                          } hover:brightness-110 disabled:opacity-50`}
+                          style={{
+                            clipPath: 'polygon(0 0, 100% 0, 50% 100%)',
+                          }}
+                        >
+                          {pieces > 0 && (
+                            <div className="absolute top-1 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-0.5">
+                              {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
+                                <div key={i} className={`w-2.5 h-2.5 rounded-full border ${playerType === 'player' ? 'bg-red-600 border-red-800' : 'bg-blue-600 border-blue-800'}`} />
+                              ))}
+                              {pieces > 5 && <span className="text-[7px] text-white font-bold">+{pieces - 5}</span>}
+                            </div>
+                          )}
+                          <span className="absolute bottom-0 left-1/2 transform -translate-x-1/2 text-[8px] text-white/60">{pointIdx}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                   
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => handlePointClick(idx)}
-                      disabled={!gameActive || gameResult || currentPlayer !== 'player'}
-                      className={`relative h-12 rounded border-2 ${
-                        isSelected ? 'ring-4 ring-blue-400' : 'border-amber-800'
-                      } ${
-                        playerType === 'player' ? 'bg-red-600' : 
-                        playerType === 'bot' ? 'bg-blue-600' : 
-                        'bg-amber-800/50'
-                      } flex flex-col items-center justify-center transition-all hover:brightness-110 disabled:opacity-50`}
-                    >
-                      {pieces > 0 && (
-                        <>
-                          <div className={`w-4 h-4 rounded-full border ${
-                            playerType === 'player' ? 'bg-red-700 border-red-900' : 'bg-blue-700 border-blue-900'
-                          }`} />
-                          {pieces > 1 && <span className="text-[8px] text-white font-bold">{pieces}</span>}
-                        </>
-                      )}
-                      <span className="text-[8px] text-white/60 absolute bottom-0">{idx + 1}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="text-center">
-                <div className="text-sm text-white/80 font-semibold mb-1">Dice: {dice[0]} {dice[1]}</div>
-                {usedDice.length > 0 && <div className="text-xs text-white/60">Used: {usedDice.join(', ')}</div>}
+                  {/* Left side - points 13-18 (Outer board) */}
+                  <div className="w-1/2 flex">
+                    {[13, 14, 15, 16, 17, 18].map((pointIdx) => {
+                      const count = board[pointIdx];
+                      const isSelected = selectedPoint === pointIdx;
+                      const pieces = Math.abs(count);
+                      const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
+                      const isDark = pointIdx % 2 === 0;
+                      
+                      return (
+                        <button
+                          key={`top-left-${pointIdx}`}
+                          onClick={() => handlePointClick(pointIdx)}
+                          disabled={!gameActive || gameResult || currentPlayer !== 'player'}
+                          className={`relative flex-1 ${isDark ? 'bg-amber-800' : 'bg-amber-100'} border-l border-amber-600 transition-all ${
+                            isSelected ? 'ring-2 ring-blue-400' : ''
+                          } hover:brightness-110 disabled:opacity-50`}
+                          style={{
+                            clipPath: 'polygon(0 0, 100% 0, 50% 100%)',
+                          }}
+                        >
+                          {pieces > 0 && (
+                            <div className="absolute top-1 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-0.5">
+                              {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
+                                <div key={i} className={`w-2.5 h-2.5 rounded-full border ${playerType === 'player' ? 'bg-red-600 border-red-800' : 'bg-blue-600 border-blue-800'}`} />
+                              ))}
+                              {pieces > 5 && <span className="text-[7px] text-white font-bold">+{pieces - 5}</span>}
+                            </div>
+                          )}
+                          <span className="absolute bottom-0 left-1/2 transform -translate-x-1/2 text-[8px] text-white/60">{pointIdx + 1}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                {/* Center bar - Dice display */}
+                <div className="absolute top-1/2 left-0 right-0 h-8 -translate-y-1/2 bg-amber-600/90 border-y-2 border-amber-800 flex items-center justify-center z-10">
+                  <div className="text-center">
+                    <div className="text-xs text-white/90 font-semibold">Dice: {dice[0]} {dice[1]}</div>
+                    {usedDice.length > 0 && <div className="text-[10px] text-white/60">Used: {usedDice.join(', ')}</div>}
+                  </div>
+                </div>
+                
+                {/* Bottom half - Home board and Outer board (points 1-12) */}
+                <div className="absolute bottom-0 left-0 right-0 h-1/2 flex">
+                  {/* Left side - points 7-12 (Outer board) */}
+                  <div className="w-1/2 flex">
+                    {[7, 8, 9, 10, 11, 12].map((pointIdx) => {
+                      const count = board[pointIdx];
+                      const isSelected = selectedPoint === pointIdx;
+                      const pieces = Math.abs(count);
+                      const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
+                      const isDark = pointIdx % 2 === 0;
+                      
+                      return (
+                        <button
+                          key={`bottom-left-${pointIdx}`}
+                          onClick={() => handlePointClick(pointIdx)}
+                          disabled={!gameActive || gameResult || currentPlayer !== 'player'}
+                          className={`relative flex-1 ${isDark ? 'bg-amber-800' : 'bg-amber-100'} border-r border-amber-600 transition-all ${
+                            isSelected ? 'ring-2 ring-blue-400' : ''
+                          } hover:brightness-110 disabled:opacity-50`}
+                          style={{
+                            clipPath: 'polygon(0 100%, 100% 100%, 50% 0)',
+                          }}
+                        >
+                          {pieces > 0 && (
+                            <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex flex-col-reverse items-center gap-0.5">
+                              {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
+                                <div key={i} className={`w-2.5 h-2.5 rounded-full border ${playerType === 'player' ? 'bg-red-600 border-red-800' : 'bg-blue-600 border-blue-800'}`} />
+                              ))}
+                              {pieces > 5 && <span className="text-[7px] text-white font-bold">+{pieces - 5}</span>}
+                            </div>
+                          )}
+                          <span className="absolute top-0 left-1/2 transform -translate-x-1/2 text-[8px] text-white/60">{pointIdx + 1}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Right side - points 1-6 (Home board) */}
+                  <div className="w-1/2 flex">
+                    {[1, 2, 3, 4, 5, 6].reverse().map((pointIdx) => {
+                      const count = board[pointIdx - 1];
+                      const isSelected = selectedPoint === pointIdx - 1;
+                      const pieces = Math.abs(count);
+                      const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
+                      const isDark = pointIdx % 2 === 1;
+                      
+                      return (
+                        <button
+                          key={`bottom-right-${pointIdx}`}
+                          onClick={() => handlePointClick(pointIdx - 1)}
+                          disabled={!gameActive || gameResult || currentPlayer !== 'player'}
+                          className={`relative flex-1 ${isDark ? 'bg-amber-800' : 'bg-amber-100'} border-l border-amber-600 transition-all ${
+                            isSelected ? 'ring-2 ring-blue-400' : ''
+                          } hover:brightness-110 disabled:opacity-50`}
+                          style={{
+                            clipPath: 'polygon(0 100%, 100% 100%, 50% 0)',
+                          }}
+                        >
+                          {pieces > 0 && (
+                            <div className="absolute bottom-1 right-1/2 transform translate-x-1/2 flex flex-col-reverse items-center gap-0.5">
+                              {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
+                                <div key={i} className={`w-2.5 h-2.5 rounded-full border ${playerType === 'player' ? 'bg-red-600 border-red-800' : 'bg-blue-600 border-blue-800'}`} />
+                              ))}
+                              {pieces > 5 && <span className="text-[7px] text-white font-bold">+{pieces - 5}</span>}
+                            </div>
+                          )}
+                          <span className="absolute top-0 right-1/2 transform translate-x-1/2 text-[8px] text-white/60">{pointIdx}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
             <div className="text-center mt-2" style={{ height: '28px' }}>
