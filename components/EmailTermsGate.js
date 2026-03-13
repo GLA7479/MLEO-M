@@ -347,14 +347,14 @@ export default function EmailTermsGate({ onPassed, onClose }) {
 
               <div className="h-40 overflow-auto border border-black/10 rounded-xl p-3 text-sm leading-6">
                 <p className="mb-2">
-                  By clicking “I accept & continue”, you agree to MLEO’s Terms of Use and Privacy Policy, including:
+                  By clicking "I accept & continue", you agree to MLEO's Terms of Use and Privacy Policy, including:
                 </p>
                 <ul className="list-disc ps-5 space-y-1">
-                  <li>This is an entertainment game platform - NOT a casino or gambling site.</li>
-                  <li>Gameplay may accrue an MLEO balance for entertainment purposes only.</li>
-                  <li>NO deposits: You cannot and will never be able to deposit real money or purchase game tokens.</li>
-                  <li>No guaranteed monetary value; not financial advice. Fairness controls and availability changes may apply.</li>
-                  <li>Privacy: minimal data required for authentication and security, subject to law.</li>
+                  <li><strong>Entertainment Platform Only:</strong> This is an entertainment game platform - NOT a casino, NOT a gambling site, and has NO connection to gambling or casino activities.</li>
+                  <li><strong>NO Deposits - Now or Ever:</strong> You cannot and will never be able to deposit real money, cryptocurrency, or any assets to purchase game tokens or for any gaming purpose.</li>
+                  <li><strong>NO Purchase of Game Tokens:</strong> You cannot and will never be able to purchase, buy, or acquire game tokens (MLEO) with real money or cryptocurrency. All game tokens are earned through gameplay only.</li>
+                  <li><strong>No Guaranteed Value:</strong> Gameplay may accrue an MLEO balance for entertainment purposes only. No guaranteed monetary value; not financial advice. Fairness controls and availability changes may apply.</li>
+                  <li><strong>Privacy:</strong> Minimal data required for authentication and security, subject to law.</li>
                 </ul>
                 <p className="mt-2 text-xs text-gray-500">
                   Current localStorage key: <code>{TERMS_KEY}</code>

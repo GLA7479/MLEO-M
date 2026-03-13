@@ -8,6 +8,7 @@ import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicC
 import { parseUnits } from "viem";
 import GamePoolStats from "../components/GamePoolStats";
 import { supabaseMP } from "../lib/supabaseClients";
+import PolicyModal from "../components/PolicyModal";
 
 const BG_URL = "/images/games-hero.jpg";
 
@@ -1848,205 +1849,428 @@ function HowToPlay({ lang, onClose, gameType = "miners" }) {
 // ===== Terms Component =====
 function Terms({ onAccept, onDecline }) {
   return (
-    <div>
+    <div className="max-h-[80vh] overflow-y-auto">
       <h2 className="text-2xl font-bold mb-4">Terms & Conditions</h2>
+      <p className="text-xs text-gray-500 mb-4">Last Updated: [Insert Date]</p>
       
       <div className="space-y-4 text-sm">
+        <section>
+          <p className="mb-4">Welcome to the MLEO game platform (the "<strong>Platform</strong>", "<strong>we</strong>", "<strong>us</strong>", or "<strong>our</strong>"). These Terms & Conditions ("<strong>Terms</strong>") govern your access to and use of the Platform, including our websites, games, applications, features, wallet-related integrations, testnet functionality, community features, promotional campaigns, and any related services.</p>
+          <p className="mb-4">By accessing or using the Platform, you confirm that you have read, understood, and agreed to these Terms. If you do not agree, do not access or use the Platform.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">1. Eligibility</h3>
+          <p className="mb-2">You may use the Platform only if:</p>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>you are at least <strong>18 years old</strong>, or the age of legal majority in your jurisdiction, whichever is higher;</li>
+            <li>you have the legal capacity to enter into a binding agreement;</li>
+            <li>your use of the Platform is not prohibited by applicable law in your location; and</li>
+            <li>you are not accessing the Platform from a jurisdiction where the Platform, digital assets, online games, or related services are restricted or prohibited.</li>
+          </ul>
+          <p className="mt-2">You are solely responsible for ensuring that your use of the Platform is lawful in your jurisdiction.</p>
+        </section>
+
         <section className="bg-yellow-50 border-2 border-yellow-400 p-4 rounded-lg">
-          <h3 className="font-bold text-black mb-2 text-lg">⚠️ IMPORTANT: Entertainment Games Only - NO Casino, NO Gambling, NO Real Money</h3>
-          <ul className="list-disc ml-5 space-y-2 text-black">
-            <li><strong>THIS IS A FREE ENTERTAINMENT GAME PLATFORM:</strong> All games on this platform are designed purely for entertainment, fun, and skill-based gameplay. This is NOT a casino, NOT a gambling platform, and has NO connection to gambling or casino activities.</li>
-            <li><strong>NO REAL MONEY GAMBLING:</strong> This platform does NOT support, facilitate, or allow gambling with real money, cryptocurrencies, or any assets of monetary value. We are completely against gambling and casino activities.</li>
-            <li><strong>NO DEPOSITS - NOW OR EVER:</strong> You CANNOT and will NEVER be able to deposit real money, cryptocurrency, or any assets to purchase game tokens or for any gaming purpose on this platform. There is NO deposit feature, and there will NEVER be a deposit feature.</li>
-            <li><strong>NO PURCHASING GAME TOKENS:</strong> You CANNOT and will NEVER be able to purchase, buy, or acquire game tokens (MLEO) with real money or cryptocurrency. All game tokens are earned through gameplay only.</li>
-            <li><strong>NO REAL MONEY WITHDRAWALS:</strong> You CANNOT and will NEVER be able to withdraw real money or convert in-game tokens to real money or cryptocurrency for monetary gain.</li>
-            <li><strong>MLEO TOKENS ARE FOR ENTERTAINMENT ONLY:</strong> MLEO tokens earned in-game are virtual utility tokens for gameplay mechanics only. They have NO monetary value, cannot be sold, traded, or exchanged for real money or cryptocurrency. They exist solely for entertainment and gameplay purposes.</li>
-            <li><strong>FUTURE POLICY - NO DEPOSITS EVER:</strong> This platform will NEVER introduce real money deposits, purchases, or gambling features. Any future cryptocurrency integration will be strictly limited to non-gaming use cases (e.g., rewards, collectibles, or utility) and will NEVER involve deposits, purchases, or gambling with cryptocurrency.</li>
-            <li><strong>NOT A CASINO:</strong> This platform has NO connection to casinos, gambling sites, or betting platforms. We are an entertainment game platform focused on fun, skill, and enjoyment - NOT gambling or casino activities.</li>
+          <h3 className="font-bold text-black mb-2">2. Entertainment Platform Only</h3>
+          <p className="mb-2">The Platform is designed for <strong>entertainment, gameplay, community participation, and digital interactive experiences</strong>.</p>
+          <p className="mb-2">The Platform is <strong>not</strong> intended to operate as:</p>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>a casino;</li>
+            <li>a gambling or betting service;</li>
+            <li>a real-money gaming platform;</li>
+            <li>a financial service;</li>
+            <li>an exchange, broker, investment platform, or securities offering; or</li>
+            <li>a provider of legal, tax, accounting, or investment advice.</li>
+          </ul>
+          <p className="mt-2">Nothing on the Platform should be interpreted as an invitation to gamble, place bets, make financial decisions, or expect profits.</p>
+        </section>
+
+        <section className="bg-red-50 border-2 border-red-400 p-4 rounded-lg">
+          <h3 className="font-bold text-black mb-2">3. No Deposits, No Purchase of In-Game Balances</h3>
+          <p className="mb-2"><strong>At this time</strong>, the Platform does <strong>not</strong> allow users to deposit fiat currency, cryptocurrency, or any other asset in order to participate in gameplay or obtain in-game balances for gameplay purposes.</p>
+          <p className="mb-2"><strong>At this time</strong>, users cannot purchase in-game game balances with money or cryptocurrency for gameplay use on the Platform.</p>
+          <p>Any balances, points, rewards, vault amounts, or gameplay progress shown inside the Platform are subject to the rules of the Platform and may exist solely as part of the entertainment experience, test environment, reward mechanics, or technical platform functionality.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">4. Testnet, Wallet, and Blockchain Features</h3>
+          <p className="mb-2">Some Platform features may reference:</p>
+          <ul className="list-disc ml-5 space-y-1 mb-2">
+            <li>wallet connections;</li>
+            <li>blockchain addresses;</li>
+            <li>smart contracts;</li>
+            <li>testnet environments;</li>
+            <li>on-chain claim functions;</li>
+            <li>token identifiers; or</li>
+            <li>public ledger activity.</li>
+          </ul>
+          <p className="mb-2">Unless explicitly stated otherwise in a separate written notice published by us, any such feature currently made available through the Platform is provided on a <strong>testnet, experimental, beta, development, or limited-access basis</strong>.</p>
+          <div className="bg-orange-50 border border-orange-300 p-3 rounded mt-2">
+            <h4 className="font-bold mb-1">Important testnet notice</h4>
+            <p className="mb-2">Where a feature is labeled <strong>testnet</strong>, <strong>beta</strong>, <strong>demo</strong>, <strong>development</strong>, or similar:</p>
+            <ul className="list-disc ml-5 space-y-1">
+              <li>it may have <strong>no monetary value</strong>;</li>
+              <li>it may be reset, wiped, disabled, delayed, or discontinued at any time;</li>
+              <li>it may not correspond to any live or mainnet asset;</li>
+              <li>it may not be transferable, redeemable, or exchangeable;</li>
+              <li>it may contain bugs, inaccuracies, interruptions, or security vulnerabilities.</li>
+            </ul>
+            <p className="mt-2">Displaying a wallet address, contract address, pool size, claim status, or other blockchain-related information does <strong>not</strong> mean that any asset has present or future market value, liquidity, redemption rights, or exchangeability.</p>
+          </div>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">5. No Guarantee of Value</h3>
+          <p className="mb-2">We make <strong>no representation, warranty, or promise</strong> that any digital item, point, reward, balance, vault amount, token label, testnet claim, leaderboard prize, collectible, or any other feature on the Platform has:</p>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>present value;</li>
+            <li>future value;</li>
+            <li>resale value;</li>
+            <li>utility outside the Platform;</li>
+            <li>market liquidity;</li>
+            <li>exchangeability;</li>
+            <li>transferability; or</li>
+            <li>legal classification favorable to the user.</li>
+          </ul>
+          <p className="mt-2">You acknowledge that any gameplay-related reward, digital balance, or blockchain-linked item may have <strong>no value at all</strong> and may be modified or discontinued at any time.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">6. Future Features</h3>
+          <p className="mb-2">We may, in our sole discretion, introduce, modify, limit, suspend, or discontinue features in the future, including features involving digital collectibles, utility features, wallet-based integrations, or blockchain-based mechanics.</p>
+          <p className="mb-2">If we introduce any materially different feature in the future, including any feature that changes the legal or operational nature of the Platform, we may publish supplemental rules, special terms, campaign rules, token notices, claim rules, participation criteria, or other policy documents that will apply in addition to these Terms.</p>
+          <p>Nothing in these Terms obligates us to launch or maintain any future feature.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">7. Gameplay, Balancing, and Progress</h3>
+          <p className="mb-2">The Platform may include games, progression systems, vault systems, idle systems, multipliers, achievements, upgrades, caps, schedules, leaderboards, streaks, bonuses, prestige systems, and promotional mechanics.</p>
+          <p className="mb-2">All gameplay systems are subject to change at any time, including:</p>
+          <ul className="list-disc ml-5 space-y-1 mb-2">
+            <li>reward rates;</li>
+            <li>balancing formulas;</li>
+            <li>session limits;</li>
+            <li>daily or lifetime caps;</li>
+            <li>claim windows;</li>
+            <li>drop tables;</li>
+            <li>scoring models;</li>
+            <li>progression speed;</li>
+            <li>offline accrual rules;</li>
+            <li>eligibility criteria; and</li>
+            <li>feature availability.</li>
+          </ul>
+          <p className="mb-2">We may, at any time and for any reason:</p>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>rebalance the Platform;</li>
+            <li>reset or adjust progress;</li>
+            <li>revoke rewards;</li>
+            <li>correct errors;</li>
+            <li>suspend gameplay features;</li>
+            <li>roll back balances;</li>
+            <li>remove results affected by bugs, exploits, abuse, or irregular activity.</li>
+          </ul>
+          <p className="mt-2">You do not acquire ownership rights in gameplay progress merely because it appears in the interface.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">8. Vault, Rewards, and Claims</h3>
+          <p className="mb-2">The Platform may display a Vault, accrued amount, claimable amount, session reward, or similar reward indicator.</p>
+          <p className="mb-2">Such indicators may reflect internal gameplay logic, testnet logic, promotional logic, or provisional calculations only. They do not constitute a bank balance, stored value account, deposit, wage, salary, property right, or guaranteed entitlement.</p>
+          <p className="mb-2">If the Platform offers a "CLAIM" feature:</p>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>claim availability may be limited, delayed, paused, or disabled;</li>
+            <li>claims may be subject to eligibility checks, anti-abuse rules, smart contract controls, cooldowns, rate limits, and technical restrictions;</li>
+            <li>claims may fail due to wallet issues, smart contract issues, network issues, user error, gas issues, front-end issues, or third-party service interruptions;</li>
+            <li>claims may be revoked, reversed off-platform where permitted, or denied where abuse, error, ineligibility, or legal risk is identified.</li>
+          </ul>
+          <p className="mt-2">We reserve the right to determine eligibility for rewards, vaulting, testnet claiming, campaigns, or any similar feature in our sole discretion.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">9. Optional Wallet Connection</h3>
+          <p className="mb-2">Some features may require or allow connection to a third-party wallet. Wallet connection is optional unless explicitly required for a particular feature.</p>
+          <p className="mb-2">You understand and agree that:</p>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>wallets are provided by third parties outside our control;</li>
+            <li>you are solely responsible for your wallet, device security, seed phrase, passwords, keys, backups, and approvals;</li>
+            <li>blockchain transactions may be irreversible;</li>
+            <li>network fees may apply;</li>
+            <li>we are not responsible for phishing, wallet compromise, malware, lost keys, user mistakes, incorrect addresses, approval abuse, network congestion, failed transactions, or blockchain forks.</li>
+          </ul>
+          <p className="mt-2">We do not custody user funds unless explicitly stated otherwise in a separate service agreement.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">10. Prohibited Conduct</h3>
+          <p className="mb-2">You agree not to:</p>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>use bots, scripts, macros, automation, emulators, or auto-clickers where prohibited;</li>
+            <li>exploit bugs, vulnerabilities, timing errors, or reward logic;</li>
+            <li>manipulate leaderboards, sessions, rewards, vault balances, or claim calculations;</li>
+            <li>create multiple accounts to abuse campaigns or limits;</li>
+            <li>impersonate another person or entity;</li>
+            <li>interfere with the Platform, servers, APIs, databases, or smart contract operations;</li>
+            <li>reverse engineer, decompile, scrape, copy, or extract source code, proprietary logic, or protected content except as permitted by law;</li>
+            <li>use the Platform for unlawful, deceptive, abusive, fraudulent, or harmful purposes;</li>
+            <li>upload malicious code, spam, or harmful content;</li>
+            <li>attempt unauthorized access to accounts, wallets, data, infrastructure, or admin functions.</li>
+          </ul>
+          <p className="mt-2">We may investigate violations and take any action we consider appropriate, including suspension, resets, removals, permanent bans, denial of claims, revocation of rewards, reporting to authorities, and legal action.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">11. Promotions, Events, Airdrops, and Campaigns</h3>
+          <p className="mb-2">From time to time, we may run promotions, events, community campaigns, leaderboard prizes, whitelists, reward periods, giveaways, or airdrop-style activities.</p>
+          <p className="mb-2">Unless expressly stated otherwise in official rules published by us:</p>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>all such programs are discretionary;</li>
+            <li>participation does not guarantee selection, receipt, value, or continued eligibility;</li>
+            <li>we may cancel, modify, delay, or terminate any campaign at any time;</li>
+            <li>additional eligibility requirements may apply;</li>
+            <li>abuse, suspicious activity, duplicate participation, or technical manipulation may result in disqualification.</li>
+          </ul>
+          <p className="mt-2">Official campaign rules, if published, are incorporated into these Terms by reference.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">12. No Financial, Legal, Tax, or Investment Advice</h3>
+          <p className="mb-2">All information provided on the Platform is for general informational and entertainment purposes only.</p>
+          <p className="mb-2">We do not provide:</p>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>financial advice;</li>
+            <li>investment advice;</li>
+            <li>legal advice;</li>
+            <li>tax advice;</li>
+            <li>accounting advice; or</li>
+            <li>professional advisory services.</li>
+          </ul>
+          <p className="mt-2">You are solely responsible for your own decisions and for obtaining independent professional advice where appropriate.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">13. Third-Party Services</h3>
+          <p className="mb-2">The Platform may integrate with or link to third-party services, including:</p>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>wallet providers;</li>
+            <li>blockchain networks;</li>
+            <li>RPC services;</li>
+            <li>hosting providers;</li>
+            <li>analytics providers;</li>
+            <li>cloud services;</li>
+            <li>community platforms;</li>
+            <li>app providers;</li>
+            <li>social platforms.</li>
+          </ul>
+          <p className="mt-2">We do not control and are not responsible for third-party services, their uptime, policies, security, or conduct. Your use of third-party services is governed by their own terms and policies.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">14. Privacy</h3>
+          <p>Your use of the Platform is also subject to our <strong>Privacy Policy</strong>, which explains how we collect, use, store, and disclose personal data.</p>
+          <p className="mt-2">By using the Platform, you acknowledge that we may process certain data necessary to provide the Platform, such as wallet identifiers, gameplay activity, technical logs, device/browser data, account identifiers, and support communications, in accordance with our Privacy Policy and applicable law.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">15. Cookies and Similar Technologies</h3>
+          <p className="mb-2">We may use cookies, local storage, session storage, SDKs, pixels, and similar technologies for functionality, security, authentication, performance, analytics, and user experience.</p>
+          <p className="mb-2">Where required by applicable law, we will request consent before using non-essential cookies or similar technologies.</p>
+          <p>You may be able to manage certain preferences through your browser or device settings, but disabling some technologies may affect functionality.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">16. Intellectual Property</h3>
+          <p className="mb-2">All content, software, design, interfaces, visual elements, text, logos, artwork, sound, video, code, game systems, trademarks, trade dress, and other materials made available through the Platform are owned by us or our licensors and are protected by applicable intellectual property laws.</p>
+          <p className="mb-2">Subject to these Terms, we grant you a limited, revocable, non-exclusive, non-transferable, non-sublicensable license to access and use the Platform for personal, lawful, non-commercial use only.</p>
+          <p className="mb-2">You may not, without our prior written consent:</p>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>reproduce, distribute, modify, publish, transmit, perform, display, sell, license, or exploit Platform content;</li>
+            <li>create derivative works;</li>
+            <li>remove proprietary notices;</li>
+            <li>use our marks, brand elements, or materials in a misleading way.</li>
           </ul>
         </section>
-        
+
+        <section>
+          <h3 className="font-bold text-black mb-2">17. User Content and Feedback</h3>
+          <p>If you submit content, feedback, suggestions, bug reports, ideas, or other materials to us, you grant us a worldwide, non-exclusive, royalty-free, perpetual, irrevocable, sublicensable license to use, reproduce, modify, adapt, publish, translate, distribute, and otherwise exploit such materials for the operation, improvement, marketing, and development of the Platform, subject to applicable law and our Privacy Policy.</p>
+          <p className="mt-2">You represent that you have the necessary rights to submit such materials.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">18. Suspension and Termination</h3>
+          <p className="mb-2">We may, in our sole discretion and with or without notice:</p>
+          <ul className="list-disc ml-5 space-y-1 mb-2">
+            <li>suspend or restrict your access;</li>
+            <li>terminate your access;</li>
+            <li>disable wallet-related features for your account;</li>
+            <li>revoke rewards or balances;</li>
+            <li>remove data or content;</li>
+            <li>block claims or gameplay participation.</li>
+          </ul>
+          <p className="mb-2">We may do so for any reason, including legal risk, security concerns, technical abuse, inactivity, policy violations, fraud prevention, or operational needs.</p>
+          <p>Upon termination, your right to use the Platform ends immediately.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">19. Availability and Technical Risks</h3>
+          <p className="mb-2">The Platform is provided on an <strong>"AS IS"</strong> and <strong>"AS AVAILABLE"</strong> basis.</p>
+          <p className="mb-2">We do not guarantee that the Platform will be:</p>
+          <ul className="list-disc ml-5 space-y-1 mb-2">
+            <li>uninterrupted;</li>
+            <li>secure;</li>
+            <li>error-free;</li>
+            <li>accurate;</li>
+            <li>complete;</li>
+            <li>compatible with your device;</li>
+            <li>free of bugs, malware, or vulnerabilities;</li>
+            <li>continuously available.</li>
+          </ul>
+          <p>The Platform may be affected by maintenance, outages, software defects, smart contract issues, infrastructure failures, cyberattacks, wallet issues, blockchain congestion, RPC failures, forks, reorgs, validator issues, data corruption, or force majeure events.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">20. Disclaimer of Warranties</h3>
+          <p className="mb-2">To the maximum extent permitted by law, we disclaim all warranties of any kind, whether express, implied, statutory, or otherwise, including warranties of:</p>
+          <ul className="list-disc ml-5 space-y-1 mb-2">
+            <li>merchantability;</li>
+            <li>fitness for a particular purpose;</li>
+            <li>title;</li>
+            <li>non-infringement;</li>
+            <li>uninterrupted access;</li>
+            <li>accuracy;</li>
+            <li>reliability;</li>
+            <li>availability.</li>
+          </ul>
+          <p>We do not warrant that any reward, token label, testnet functionality, digital item, or blockchain-related feature will have any value, utility, legality, or future existence.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">21. Limitation of Liability</h3>
+          <p className="mb-2">To the maximum extent permitted by law, neither we nor our affiliates, owners, directors, officers, employees, contractors, licensors, service providers, or agents shall be liable for any indirect, incidental, special, consequential, punitive, or exemplary damages, including damages for:</p>
+          <ul className="list-disc ml-5 space-y-1 mb-2">
+            <li>lost profits;</li>
+            <li>lost revenue;</li>
+            <li>lost opportunity;</li>
+            <li>loss of data;</li>
+            <li>loss of goodwill;</li>
+            <li>business interruption;</li>
+            <li>device damage;</li>
+            <li>digital asset loss;</li>
+            <li>transaction failure;</li>
+            <li>smart contract failure;</li>
+            <li>claim failure;</li>
+            <li>platform downtime;</li>
+            <li>security breach;</li>
+            <li>emotional distress.</li>
+          </ul>
+          <p className="mb-2">To the maximum extent permitted by law, our total aggregate liability arising out of or relating to the Platform or these Terms shall not exceed the greater of:</p>
+          <ul className="list-disc ml-5 space-y-1 mb-2">
+            <li><strong>USD $100</strong>, or</li>
+            <li>the amount, if any, that you paid directly to us for use of the Platform in the <strong>12 months</strong> preceding the event giving rise to the claim.</li>
+          </ul>
+          <p>Some jurisdictions do not allow certain limitations, so parts of this section may not apply to you.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">22. Indemnification</h3>
+          <p className="mb-2">You agree to defend, indemnify, and hold harmless us and our affiliates, owners, officers, directors, employees, contractors, licensors, and service providers from and against any claims, liabilities, damages, judgments, awards, losses, costs, and expenses, including reasonable legal fees, arising out of or related to:</p>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>your use or misuse of the Platform;</li>
+            <li>your violation of these Terms;</li>
+            <li>your violation of applicable law;</li>
+            <li>your violation of any third-party rights;</li>
+            <li>your fraud, abuse, or misconduct;</li>
+            <li>your content, submissions, or communications;</li>
+            <li>disputes between you and another user.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">23. Compliance with Laws and Sanctions</h3>
+          <p className="mb-2">You represent and warrant that:</p>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>you are not subject to sanctions or trade restrictions that prohibit your use of the Platform;</li>
+            <li>you will comply with all laws applicable to your use of the Platform;</li>
+            <li>you will not use the Platform in connection with unlawful conduct, fraud, money laundering, sanctions evasion, or prohibited activity.</li>
+          </ul>
+          <p className="mt-2">We may restrict access where necessary for legal or compliance reasons.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">24. Changes to the Platform and These Terms</h3>
+          <p className="mb-2">We may update these Terms from time to time.</p>
+          <p className="mb-2">If we make material changes, we may post the updated Terms on the Platform and update the "Last Updated" date. Your continued use of the Platform after the updated Terms become effective constitutes your acceptance of the revised Terms.</p>
+          <p>We may also modify, suspend, or discontinue any part of the Platform at any time.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">25. Governing Law</h3>
+          <p>These Terms and any dispute arising out of or relating to them or the Platform shall be governed by the laws of <strong>[Insert Jurisdiction]</strong>, without regard to conflict of law principles.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">26. Dispute Resolution</h3>
+          <p className="mb-2">Any dispute, claim, or controversy arising out of or relating to these Terms or the Platform shall be resolved as follows:</p>
+          <ul className="list-disc ml-5 space-y-1 mb-2">
+            <li>first, the parties will attempt in good faith to resolve the dispute informally;</li>
+            <li>if informal resolution is unsuccessful, the dispute shall be resolved by <strong>binding arbitration</strong> in <strong>[Insert Location]</strong> under the rules of <strong>[Insert Arbitration Rules]</strong>, unless applicable law requires otherwise;</li>
+            <li>if arbitration is unenforceable or unavailable, the dispute shall be brought exclusively in the courts located in <strong>[Insert Jurisdiction / Venue]</strong>.</li>
+          </ul>
+          <p>To the extent permitted by law, you agree that disputes will be resolved only on an individual basis and not as part of any class, consolidated, or representative action.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">27. International Use</h3>
+          <p>The Platform may not be appropriate, available, or lawful for use in all locations. We make no representation that the Platform is lawful in any specific jurisdiction. Users who access the Platform do so at their own initiative and are responsible for compliance with local laws.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">28. Severability</h3>
+          <p>If any provision of these Terms is held invalid, illegal, or unenforceable, the remaining provisions will remain in full force and effect to the maximum extent permitted by law.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">29. No Waiver</h3>
+          <p>Our failure to enforce any provision of these Terms shall not constitute a waiver of that provision or any other provision.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">30. Entire Agreement</h3>
+          <p>These Terms, together with our Privacy Policy, Cookie Notice, and any supplemental rules or campaign terms that we publish, constitute the entire agreement between you and us regarding the Platform and supersede prior understandings relating to the same subject matter.</p>
+        </section>
+
+        <section>
+          <h3 className="font-bold text-black mb-2">31. Contact</h3>
+          <p className="mb-2">For legal notices, support, privacy requests, copyright complaints, or questions about these Terms, contact us at:</p>
+          <ul className="list-none ml-5 space-y-1">
+            <li><strong>Email:</strong> [Insert Contact Email]</li>
+            <li><strong>Company / Brand Name:</strong> [Insert Name]</li>
+            <li><strong>Address:</strong> [Insert Address, if applicable]</li>
+          </ul>
+        </section>
+
         <section className="bg-blue-50 border-2 border-blue-400 p-4 rounded-lg">
-          <h3 className="font-bold text-black mb-2 text-lg">🔞 Age Requirement & Legal Compliance</h3>
-          <ul className="list-disc ml-5 space-y-2 text-black">
-            <li><strong>MINIMUM AGE:</strong> You must be at least 18 years old to use this platform. In certain jurisdictions, the minimum age may be 21 years or higher as required by local law.</li>
-            <li><strong>AGE VERIFICATION:</strong> By using this platform, you represent and warrant that you meet the minimum age requirement in your jurisdiction.</li>
-            <li><strong>PARENTAL RESPONSIBILITY:</strong> If you are a parent or guardian and become aware that your child has accessed this platform without meeting the age requirement, please contact us immediately.</li>
-            <li><strong>LOCAL LAW COMPLIANCE:</strong> You are solely responsible for ensuring that your use of this platform complies with all applicable laws, regulations, and restrictions in your jurisdiction, including age restrictions, gaming laws, and cryptocurrency regulations.</li>
-            <li><strong>PROHIBITED JURISDICTIONS:</strong> If online gaming, cryptocurrency usage, or any feature of this platform is restricted or prohibited in your jurisdiction, you are prohibited from accessing or using this platform.</li>
-            <li><strong>NO LIABILITY FOR VIOLATIONS:</strong> We are not responsible for any violations of local laws by users. You agree to indemnify us against any claims arising from your violation of applicable laws.</li>
-          </ul>
-        </section>
-        
-        <section className="bg-green-50 border-2 border-green-400 p-4 rounded-lg">
-          <h3 className="font-bold text-black mb-2 text-lg">🔒 Privacy, Data Protection & Third-Party Disclosure</h3>
-          <ul className="list-disc ml-5 space-y-2 text-black">
-            <li><strong>DATA COLLECTION:</strong> We may collect limited personal information such as wallet addresses, gameplay statistics, and device information solely for the purpose of providing and improving our services.</li>
-            <li><strong>NO THIRD-PARTY SALES:</strong> We do NOT sell, rent, lease, or transfer your personal information to third parties for commercial purposes.</li>
-            <li><strong>NO MARKETING DISCLOSURES:</strong> Your data will NOT be shared with third parties for marketing, advertising, or promotional purposes without your explicit consent.</li>
-            <li><strong>LIMITED DISCLOSURES:</strong> We may only disclose your information: (a) to service providers who assist in operating the platform under strict confidentiality agreements, (b) when required by law, legal process, or government authorities, (c) to protect our rights, safety, or property, or (d) in connection with a business transfer or acquisition.</li>
-            <li><strong>DATA SECURITY:</strong> We implement reasonable security measures to protect your data. However, no method of transmission or storage is 100% secure, and we cannot guarantee absolute security.</li>
-            <li><strong>DATA RETENTION:</strong> We retain your data only as long as necessary to provide services or as required by law. You may request deletion of your data subject to legal and operational requirements.</li>
-            <li><strong>COOKIES & TRACKING:</strong> We may use cookies and similar technologies for functionality and analytics. You can control cookie settings through your browser, but disabling cookies may affect functionality.</li>
-            <li><strong>YOUR RIGHTS:</strong> Depending on your jurisdiction, you may have rights to access, correct, delete, or export your personal data. Contact us to exercise these rights.</li>
-          </ul>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">1) Acceptance</h3>
-          <p>By playing, you agree to these terms. If you disagree, please do not play.</p>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">2) No Financial Advice</h3>
-          <p>Nothing here is investment, legal, accounting or tax advice. You are solely responsible for your decisions.</p>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">3) Gameplay, Balancing & Progress</h3>
-          <ul className="list-disc ml-5 space-y-1">
-            <li>Rates/limits/drop tables/schedules/offline behavior are internal and may change, pause or reset at any time.</li>
-            <li>We may adjust/rollback progress to address bugs, exploits or irregular activity.</li>
-            <li>Feature availability may depend on time, region, device or account status.</li>
-          </ul>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">4) Mining, Vault & Claims</h3>
-          <ul className="list-disc ml-5 space-y-1">
-            <li>Only certain actions (e.g., breaking rocks) may accrue MLEO under variable, capped rules.</li>
-            <li>"CLAIM" moves accrued MLEO to your in-app <b>Vault</b>. If on-chain claims open later, they may be subject to unlock windows, rate limits, eligibility checks and other restrictions.</li>
-            <li>We may change, delay or discontinue vaulting and/or on-chain claiming at any time.</li>
-          </ul>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">5) Wallets & Third-Party Services</h3>
-          <ul className="list-disc ml-5 space-y-1">
-            <li>Wallet connection is optional and via third parties outside our control. Keep your devices, keys and wallets secure.</li>
-            <li>Blockchain transactions are irreversible and may incur network fees. We are not responsible for losses due to user error, phishing, gas volatility, forks/reorgs, downtime or smart-contract risks.</li>
-          </ul>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">6) Fair Play & Prohibited Conduct</h3>
-          <ul className="list-disc ml-5 space-y-1">
-            <li>No bots, automation, multi-account abuse, exploits, reverse engineering or service interference.</li>
-            <li>We may suspend, reset or terminate access and remove balances obtained through prohibited behavior.</li>
-          </ul>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">7) Availability, Data & Updates</h3>
-          <ul className="list-disc ml-5 space-y-1">
-            <li>Service may be unavailable, interrupted or updated at any time.</li>
-            <li>We may modify/discontinue features, wipe test data or migrate saves.</li>
-          </ul>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">8) Airdrops, Promotions & Rewards</h3>
-          <p>Any events or rewards are discretionary, may change, and can have eligibility requirements. Participation does not guarantee receipt or value.</p>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">9) Taxes</h3>
-          <p>You are solely responsible for any taxes related to your use of the game and any rewards you may receive.</p>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">10) Limitation of Liability & Disclaimers</h3>
-          <ul className="list-disc ml-5 space-y-1">
-            <li><strong>NO WARRANTIES:</strong> This platform and all services are provided "AS IS" and "AS AVAILABLE" without warranties of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, title, or non-infringement.</li>
-            <li><strong>NO GUARANTEE OF AVAILABILITY:</strong> We do not guarantee that the platform will be uninterrupted, timely, secure, error-free, or free from viruses or other harmful components.</li>
-            <li><strong>NO GUARANTEE OF VALUE:</strong> We make no representations or warranties that MLEO tokens, rewards, or any in-game assets will have any present or future value, utility, or transferability.</li>
-            <li><strong>LIMITATION OF LIABILITY:</strong> To the maximum extent permitted by law, we and our affiliates, officers, directors, employees, agents, and licensors shall NOT be liable for any indirect, incidental, special, consequential, punitive, or exemplary damages, including but not limited to: loss of profits, revenue, data, goodwill, or other intangible losses; cost of substitute services; business interruption; personal injury; emotional distress; or any damages arising from your use or inability to use the platform.</li>
-            <li><strong>MAXIMUM LIABILITY CAP:</strong> In no event shall our total aggregate liability exceed the greater of (a) $100 USD or (b) the amount you paid to us (if any) in the 12 months preceding the claim.</li>
-            <li><strong>THIRD-PARTY SERVICES:</strong> We are not responsible for any losses, damages, or issues arising from third-party services, wallets, blockchain networks, smart contracts, or external websites linked from this platform.</li>
-            <li><strong>USER RESPONSIBILITY:</strong> You acknowledge that your use of this platform is at your sole risk, and you are solely responsible for any damage to your device, loss of data, or any other consequences of your use.</li>
-          </ul>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">11) Indemnification</h3>
-          <ul className="list-disc ml-5 space-y-1">
-            <li>You agree to indemnify, defend, and hold harmless the platform, its owners, operators, affiliates, officers, directors, employees, agents, licensors, and service providers from and against any and all claims, liabilities, damages, losses, costs, expenses, fees (including reasonable attorneys' fees) arising from or relating to:</li>
-            <li>(a) Your use or misuse of the platform;</li>
-            <li>(b) Your violation of these Terms or any applicable law;</li>
-            <li>(c) Your violation of any rights of any third party;</li>
-            <li>(d) Any content or information you submit or transmit through the platform;</li>
-            <li>(e) Your representations that you meet age requirements and comply with local laws;</li>
-            <li>(f) Any dispute you have with another user;</li>
-            <li>(g) Your negligence, willful misconduct, or fraud.</li>
-          </ul>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">12) Representations & Warranties by User</h3>
-          <p>By using this platform, you represent and warrant that:</p>
-          <ul className="list-disc ml-5 space-y-1">
-            <li>You meet the minimum age requirement (18 years or as required by your jurisdiction);</li>
-            <li>You have the legal capacity to enter into these Terms;</li>
-            <li>Your use of the platform does not violate any applicable laws, regulations, or restrictions in your jurisdiction;</li>
-            <li>You are not located in, residing in, or a citizen of any jurisdiction where access to this platform is prohibited;</li>
-            <li>You will not use the platform for any illegal, fraudulent, or unauthorized purpose;</li>
-            <li>All information you provide is accurate, current, and complete;</li>
-            <li>You acknowledge that MLEO tokens have no monetary value and are for entertainment purposes only;</li>
-            <li>You understand that this is NOT a gambling platform, NOT a casino, and no real money gambling occurs on this platform;</li>
-            <li>You acknowledge that you CANNOT and will NEVER be able to deposit real money or purchase game tokens;</li>
-            <li>You understand that all game tokens are earned through gameplay only and cannot be purchased or deposited.</li>
-          </ul>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">13) Intellectual Property</h3>
-          <ul className="list-disc ml-5 space-y-1">
-            <li>All content, features, functionality, trademarks, logos, designs, text, graphics, software, and other materials on this platform are owned by us or our licensors and are protected by copyright, trademark, and other intellectual property laws.</li>
-            <li>You are granted a limited, non-exclusive, non-transferable, revocable license to access and use the platform for personal, non-commercial entertainment purposes only.</li>
-            <li>You may NOT copy, reproduce, distribute, modify, create derivative works, reverse engineer, decompile, or attempt to extract source code from any part of the platform without our express written permission.</li>
-          </ul>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">14) Modification & Termination</h3>
-          <ul className="list-disc ml-5 space-y-1">
-            <li><strong>MODIFICATIONS:</strong> We reserve the right to modify, suspend, or discontinue any aspect of the platform, including these Terms, at any time without prior notice. Continued use after modifications constitutes acceptance of the modified Terms.</li>
-            <li><strong>ACCOUNT TERMINATION:</strong> We may suspend, restrict, or terminate your access to the platform at any time, with or without cause, with or without notice, for any reason including but not limited to violation of these Terms, suspicious activity, or legal compliance.</li>
-            <li><strong>EFFECT OF TERMINATION:</strong> Upon termination, your right to use the platform ceases immediately. We may delete your account, data, and any in-game assets without liability to you.</li>
-          </ul>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">15) Severability & Entire Agreement</h3>
-          <ul className="list-disc ml-5 space-y-1">
-            <li><strong>SEVERABILITY:</strong> If any provision of these Terms is found to be invalid, illegal, or unenforceable, the remaining provisions shall continue in full force and effect.</li>
-            <li><strong>ENTIRE AGREEMENT:</strong> These Terms constitute the entire agreement between you and us regarding the use of this platform and supersede all prior agreements, understandings, and communications.</li>
-            <li><strong>NO WAIVER:</strong> Our failure to enforce any provision of these Terms shall not constitute a waiver of that provision or our right to enforce it in the future.</li>
-          </ul>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">16) Force Majeure</h3>
-          <p>We shall not be liable for any failure or delay in performance due to causes beyond our reasonable control, including but not limited to acts of God, natural disasters, war, terrorism, riots, embargoes, government actions, labor disputes, network outages, blockchain network failures, or any other force majeure event.</p>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">17) Governing Law & Dispute Resolution</h3>
-          <ul className="list-disc ml-5 space-y-1">
-            <li><strong>GOVERNING LAW:</strong> These Terms are governed by and construed in accordance with the laws of <b>[insert jurisdiction]</b>, without regard to its conflict of law provisions.</li>
-            <li><strong>DISPUTE RESOLUTION:</strong> Any dispute arising from these Terms or your use of the platform shall be resolved through binding arbitration in accordance with <b>[insert arbitration rules]</b>, except where prohibited by law.</li>
-            <li><strong>CLASS ACTION WAIVER:</strong> You agree to resolve disputes on an individual basis only and waive any right to participate in a class action lawsuit or class-wide arbitration.</li>
-            <li><strong>VENUE:</strong> If arbitration is not permitted, disputes shall be resolved exclusively in the courts of <b>[insert jurisdiction]</b>.</li>
-          </ul>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">18) Contact & Reporting</h3>
-          <p>For questions, concerns, copyright claims, privacy requests, or to report violations of these Terms, please contact us at: <b>[insert contact email]</b>.</p>
-        </section>
-        <section>
-          <h3 className="font-bold text-black mb-1">19) Acknowledgment</h3>
+          <h3 className="font-bold text-black mb-2">32. Acknowledgment</h3>
           <p className="font-bold">BY CLICKING "ACCEPT" OR BY USING THIS PLATFORM, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND AGREE TO BE BOUND BY THESE TERMS & CONDITIONS IN THEIR ENTIRETY.</p>
         </section>
-          </div>
+      </div>
       
       <div className="flex gap-3 mt-6">
-                <button
-                  onClick={onAccept}
+        <button
+          onClick={onAccept}
           className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold"
-                >
+        >
           Accept
-                </button>
-              <button
+        </button>
+        <button
           onClick={onDecline}
           className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold"
-              >
+        >
           Decline
-              </button>
-          </div>
-        </div>
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -2149,6 +2373,7 @@ function LanguageSelector({ currentLang, onLanguageChange }) {
 export default function GamesHub() {
   const router = useRouter();
   const [modal, setModal] = useState(null);
+  const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'cookies', 'risk', or null
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [lang, setLang] = useState("en");
@@ -2672,6 +2897,20 @@ export default function GamesHub() {
               <GamePoolStats />
             </div>
 
+            {/* Footer */}
+            <footer className="mt-8 pt-6 border-t border-white/10 text-xs text-white/50">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 justify-between">
+                <div>© {new Date().getFullYear()} MLEO. All rights reserved.</div>
+                <div className="flex flex-wrap gap-4">
+                  <Link href="/" className="hover:text-white/80">Home</Link>
+                  <button onClick={() => setPolicyModal('terms')} className="hover:text-white/80">{text.terms}</button>
+                  <button onClick={() => setPolicyModal('privacy')} className="hover:text-white/80">Privacy</button>
+                  <button onClick={() => setPolicyModal('cookies')} className="hover:text-white/80">Cookies</button>
+                  <button onClick={() => setPolicyModal('risk')} className="hover:text-white/80">Risk</button>
+                </div>
+              </div>
+            </footer>
+
           </div>
         </div>
       </div>
@@ -3063,6 +3302,1127 @@ export default function GamesHub() {
           </div>
         </div>
       </Modal>
+
+      {/* Policy Modals */}
+      {policyModal === 'terms' && (
+        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title="Terms & Conditions">
+          <div className="prose prose-invert max-w-none">
+            <p className="text-xs text-gray-400 mb-4">Last Updated: [Insert Date]</p>
+            <div className="bg-white text-black rounded-lg p-6 md:p-8 space-y-4 text-sm">
+              <section>
+                <p className="mb-4">Welcome to the MLEO game platform (the "<strong>Platform</strong>", "<strong>we</strong>", "<strong>us</strong>", or "<strong>our</strong>"). These Terms & Conditions ("<strong>Terms</strong>") govern your access to and use of the Platform, including our websites, games, applications, features, wallet-related integrations, testnet functionality, community features, promotional campaigns, and any related services.</p>
+                <p className="mb-4">By accessing or using the Platform, you confirm that you have read, understood, and agreed to these Terms. If you do not agree, do not access or use the Platform.</p>
+              </section>
+              <section>
+                <h3 className="font-bold text-black mb-2">1. Eligibility</h3>
+                <p className="mb-2">You may use the Platform only if:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li>you are at least <strong>18 years old</strong>, or the age of legal majority in your jurisdiction, whichever is higher;</li>
+                  <li>you have the legal capacity to enter into a binding agreement;</li>
+                  <li>your use of the Platform is not prohibited by applicable law in your location; and</li>
+                  <li>you are not accessing the Platform from a jurisdiction where the Platform, digital assets, online games, or related services are restricted or prohibited.</li>
+                </ul>
+                <p className="mt-2">You are solely responsible for ensuring that your use of the Platform is lawful in your jurisdiction.</p>
+              </section>
+
+              <section className="bg-yellow-50 border-2 border-yellow-400 p-4 rounded-lg">
+                <h3 className="font-bold text-black mb-2">2. Entertainment Platform Only</h3>
+                <p className="mb-2">The Platform is designed for <strong>entertainment, gameplay, community participation, and digital interactive experiences</strong>.</p>
+                <p className="mb-2">The Platform is <strong>not</strong> intended to operate as:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li>a casino;</li>
+                  <li>a gambling or betting service;</li>
+                  <li>a real-money gaming platform;</li>
+                  <li>a financial service;</li>
+                  <li>an exchange, broker, investment platform, or securities offering; or</li>
+                  <li>a provider of legal, tax, accounting, or investment advice.</li>
+                </ul>
+                <p className="mt-2">Nothing on the Platform should be interpreted as an invitation to gamble, place bets, make financial decisions, or expect profits.</p>
+              </section>
+
+              <section className="bg-red-50 border-2 border-red-400 p-4 rounded-lg">
+                <h3 className="font-bold text-black mb-2">3. No Deposits, No Purchase of In-Game Balances</h3>
+                <p className="mb-2"><strong>At this time</strong>, the Platform does <strong>not</strong> allow users to deposit fiat currency, cryptocurrency, or any other asset in order to participate in gameplay or obtain in-game balances for gameplay purposes.</p>
+                <p className="mb-2"><strong>At this time</strong>, users cannot purchase in-game game balances with money or cryptocurrency for gameplay use on the Platform.</p>
+                <p>Any balances, points, rewards, vault amounts, or gameplay progress shown inside the Platform are subject to the rules of the Platform and may exist solely as part of the entertainment experience, test environment, reward mechanics, or technical platform functionality.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">4. Testnet, Wallet, and Blockchain Features</h3>
+                <p className="mb-2">Some Platform features may reference:</p>
+                <ul className="list-disc ml-5 space-y-1 mb-2">
+                  <li>wallet connections;</li>
+                  <li>blockchain addresses;</li>
+                  <li>smart contracts;</li>
+                  <li>testnet environments;</li>
+                  <li>on-chain claim functions;</li>
+                  <li>token identifiers; or</li>
+                  <li>public ledger activity.</li>
+                </ul>
+                <p className="mb-2">Unless explicitly stated otherwise in a separate written notice published by us, any such feature currently made available through the Platform is provided on a <strong>testnet, experimental, beta, development, or limited-access basis</strong>.</p>
+                <div className="bg-orange-50 border border-orange-300 p-3 rounded mt-2">
+                  <h4 className="font-bold mb-1">Important testnet notice</h4>
+                  <p className="mb-2">Where a feature is labeled <strong>testnet</strong>, <strong>beta</strong>, <strong>demo</strong>, <strong>development</strong>, or similar:</p>
+                  <ul className="list-disc ml-5 space-y-1">
+                    <li>it may have <strong>no monetary value</strong>;</li>
+                    <li>it may be reset, wiped, disabled, delayed, or discontinued at any time;</li>
+                    <li>it may not correspond to any live or mainnet asset;</li>
+                    <li>it may not be transferable, redeemable, or exchangeable;</li>
+                    <li>it may contain bugs, inaccuracies, interruptions, or security vulnerabilities.</li>
+                  </ul>
+                  <p className="mt-2">Displaying a wallet address, contract address, pool size, claim status, or other blockchain-related information does <strong>not</strong> mean that any asset has present or future market value, liquidity, redemption rights, or exchangeability.</p>
+                </div>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">5. No Guarantee of Value</h3>
+                <p className="mb-2">We make <strong>no representation, warranty, or promise</strong> that any digital item, point, reward, balance, vault amount, token label, testnet claim, leaderboard prize, collectible, or any other feature on the Platform has:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li>present value;</li>
+                  <li>future value;</li>
+                  <li>resale value;</li>
+                  <li>utility outside the Platform;</li>
+                  <li>market liquidity;</li>
+                  <li>exchangeability;</li>
+                  <li>transferability; or</li>
+                  <li>legal classification favorable to the user.</li>
+                </ul>
+                <p className="mt-2">You acknowledge that any gameplay-related reward, digital balance, or blockchain-linked item may have <strong>no value at all</strong> and may be modified or discontinued at any time.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">6. Future Features</h3>
+                <p className="mb-2">We may, in our sole discretion, introduce, modify, limit, suspend, or discontinue features in the future, including features involving digital collectibles, utility features, wallet-based integrations, or blockchain-based mechanics.</p>
+                <p className="mb-2">If we introduce any materially different feature in the future, including any feature that changes the legal or operational nature of the Platform, we may publish supplemental rules, special terms, campaign rules, token notices, claim rules, participation criteria, or other policy documents that will apply in addition to these Terms.</p>
+                <p>Nothing in these Terms obligates us to launch or maintain any future feature.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">7. Gameplay, Balancing, and Progress</h3>
+                <p className="mb-2">The Platform may include games, progression systems, vault systems, idle systems, multipliers, achievements, upgrades, caps, schedules, leaderboards, streaks, bonuses, prestige systems, and promotional mechanics.</p>
+                <p className="mb-2">All gameplay systems are subject to change at any time, including:</p>
+                <ul className="list-disc ml-5 space-y-1 mb-2">
+                  <li>reward rates;</li>
+                  <li>balancing formulas;</li>
+                  <li>session limits;</li>
+                  <li>daily or lifetime caps;</li>
+                  <li>claim windows;</li>
+                  <li>drop tables;</li>
+                  <li>scoring models;</li>
+                  <li>progression speed;</li>
+                  <li>offline accrual rules;</li>
+                  <li>eligibility criteria; and</li>
+                  <li>feature availability.</li>
+                </ul>
+                <p className="mb-2">We may, at any time and for any reason:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li>rebalance the Platform;</li>
+                  <li>reset or adjust progress;</li>
+                  <li>revoke rewards;</li>
+                  <li>correct errors;</li>
+                  <li>suspend gameplay features;</li>
+                  <li>roll back balances;</li>
+                  <li>remove results affected by bugs, exploits, abuse, or irregular activity.</li>
+                </ul>
+                <p className="mt-2">You do not acquire ownership rights in gameplay progress merely because it appears in the interface.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">8. Vault, Rewards, and Claims</h3>
+                <p className="mb-2">The Platform may display a Vault, accrued amount, claimable amount, session reward, or similar reward indicator.</p>
+                <p className="mb-2">Such indicators may reflect internal gameplay logic, testnet logic, promotional logic, or provisional calculations only. They do not constitute a bank balance, stored value account, deposit, wage, salary, property right, or guaranteed entitlement.</p>
+                <p className="mb-2">If the Platform offers a "CLAIM" feature:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li>claim availability may be limited, delayed, paused, or disabled;</li>
+                  <li>claims may be subject to eligibility checks, anti-abuse rules, smart contract controls, cooldowns, rate limits, and technical restrictions;</li>
+                  <li>claims may fail due to wallet issues, smart contract issues, network issues, user error, gas issues, front-end issues, or third-party service interruptions;</li>
+                  <li>claims may be revoked, reversed off-platform where permitted, or denied where abuse, error, ineligibility, or legal risk is identified.</li>
+                </ul>
+                <p className="mt-2">We reserve the right to determine eligibility for rewards, vaulting, testnet claiming, campaigns, or any similar feature in our sole discretion.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">9. Optional Wallet Connection</h3>
+                <p className="mb-2">Some features may require or allow connection to a third-party wallet. Wallet connection is optional unless explicitly required for a particular feature.</p>
+                <p className="mb-2">You understand and agree that:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li>wallets are provided by third parties outside our control;</li>
+                  <li>you are solely responsible for your wallet, device security, seed phrase, passwords, keys, backups, and approvals;</li>
+                  <li>blockchain transactions may be irreversible;</li>
+                  <li>network fees may apply;</li>
+                  <li>we are not responsible for phishing, wallet compromise, malware, lost keys, user mistakes, incorrect addresses, approval abuse, network congestion, failed transactions, or blockchain forks.</li>
+                </ul>
+                <p className="mt-2">We do not custody user funds unless explicitly stated otherwise in a separate service agreement.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">10. Prohibited Conduct</h3>
+                <p className="mb-2">You agree not to:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li>use bots, scripts, macros, automation, emulators, or auto-clickers where prohibited;</li>
+                  <li>exploit bugs, vulnerabilities, timing errors, or reward logic;</li>
+                  <li>manipulate leaderboards, sessions, rewards, vault balances, or claim calculations;</li>
+                  <li>create multiple accounts to abuse campaigns or limits;</li>
+                  <li>impersonate another person or entity;</li>
+                  <li>interfere with the Platform, servers, APIs, databases, or smart contract operations;</li>
+                  <li>reverse engineer, decompile, scrape, copy, or extract source code, proprietary logic, or protected content except as permitted by law;</li>
+                  <li>use the Platform for unlawful, deceptive, abusive, fraudulent, or harmful purposes;</li>
+                  <li>upload malicious code, spam, or harmful content;</li>
+                  <li>attempt unauthorized access to accounts, wallets, data, infrastructure, or admin functions.</li>
+                </ul>
+                <p className="mt-2">We may investigate violations and take any action we consider appropriate, including suspension, resets, removals, permanent bans, denial of claims, revocation of rewards, reporting to authorities, and legal action.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">11. Promotions, Events, Airdrops, and Campaigns</h3>
+                <p className="mb-2">From time to time, we may run promotions, events, community campaigns, leaderboard prizes, whitelists, reward periods, giveaways, or airdrop-style activities.</p>
+                <p className="mb-2">Unless expressly stated otherwise in official rules published by us:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li>all such programs are discretionary;</li>
+                  <li>participation does not guarantee selection, receipt, value, or continued eligibility;</li>
+                  <li>we may cancel, modify, delay, or terminate any campaign at any time;</li>
+                  <li>additional eligibility requirements may apply;</li>
+                  <li>abuse, suspicious activity, duplicate participation, or technical manipulation may result in disqualification.</li>
+                </ul>
+                <p className="mt-2">Official campaign rules, if published, are incorporated into these Terms by reference.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">12. No Financial, Legal, Tax, or Investment Advice</h3>
+                <p className="mb-2">All information provided on the Platform is for general informational and entertainment purposes only.</p>
+                <p className="mb-2">We do not provide:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li>financial advice;</li>
+                  <li>investment advice;</li>
+                  <li>legal advice;</li>
+                  <li>tax advice;</li>
+                  <li>accounting advice; or</li>
+                  <li>professional advisory services.</li>
+                </ul>
+                <p className="mt-2">You are solely responsible for your own decisions and for obtaining independent professional advice where appropriate.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">13. Third-Party Services</h3>
+                <p className="mb-2">The Platform may integrate with or link to third-party services, including:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li>wallet providers;</li>
+                  <li>blockchain networks;</li>
+                  <li>RPC services;</li>
+                  <li>hosting providers;</li>
+                  <li>analytics providers;</li>
+                  <li>cloud services;</li>
+                  <li>community platforms;</li>
+                  <li>app providers;</li>
+                  <li>social platforms.</li>
+                </ul>
+                <p className="mt-2">We do not control and are not responsible for third-party services, their uptime, policies, security, or conduct. Your use of third-party services is governed by their own terms and policies.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">14. Privacy</h3>
+                <p>Your use of the Platform is also subject to our <strong>Privacy Policy</strong>, which explains how we collect, use, store, and disclose personal data.</p>
+                <p className="mt-2">By using the Platform, you acknowledge that we may process certain data necessary to provide the Platform, such as wallet identifiers, gameplay activity, technical logs, device/browser data, account identifiers, and support communications, in accordance with our Privacy Policy and applicable law.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">15. Cookies and Similar Technologies</h3>
+                <p className="mb-2">We may use cookies, local storage, session storage, SDKs, pixels, and similar technologies for functionality, security, authentication, performance, analytics, and user experience.</p>
+                <p className="mb-2">Where required by applicable law, we will request consent before using non-essential cookies or similar technologies.</p>
+                <p>You may be able to manage certain preferences through your browser or device settings, but disabling some technologies may affect functionality.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">16. Intellectual Property</h3>
+                <p className="mb-2">All content, software, design, interfaces, visual elements, text, logos, artwork, sound, video, code, game systems, trademarks, trade dress, and other materials made available through the Platform are owned by us or our licensors and are protected by applicable intellectual property laws.</p>
+                <p className="mb-2">Subject to these Terms, we grant you a limited, revocable, non-exclusive, non-transferable, non-sublicensable license to access and use the Platform for personal, lawful, non-commercial use only.</p>
+                <p className="mb-2">You may not, without our prior written consent:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li>reproduce, distribute, modify, publish, transmit, perform, display, sell, license, or exploit Platform content;</li>
+                  <li>create derivative works;</li>
+                  <li>remove proprietary notices;</li>
+                  <li>use our marks, brand elements, or materials in a misleading way.</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">17. User Content and Feedback</h3>
+                <p>If you submit content, feedback, suggestions, bug reports, ideas, or other materials to us, you grant us a worldwide, non-exclusive, royalty-free, perpetual, irrevocable, sublicensable license to use, reproduce, modify, adapt, publish, translate, distribute, and otherwise exploit such materials for the operation, improvement, marketing, and development of the Platform, subject to applicable law and our Privacy Policy.</p>
+                <p className="mt-2">You represent that you have the necessary rights to submit such materials.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">18. Suspension and Termination</h3>
+                <p className="mb-2">We may, in our sole discretion and with or without notice:</p>
+                <ul className="list-disc ml-5 space-y-1 mb-2">
+                  <li>suspend or restrict your access;</li>
+                  <li>terminate your access;</li>
+                  <li>disable wallet-related features for your account;</li>
+                  <li>revoke rewards or balances;</li>
+                  <li>remove data or content;</li>
+                  <li>block claims or gameplay participation.</li>
+                </ul>
+                <p className="mb-2">We may do so for any reason, including legal risk, security concerns, technical abuse, inactivity, policy violations, fraud prevention, or operational needs.</p>
+                <p>Upon termination, your right to use the Platform ends immediately.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">19. Availability and Technical Risks</h3>
+                <p className="mb-2">The Platform is provided on an <strong>"AS IS"</strong> and <strong>"AS AVAILABLE"</strong> basis.</p>
+                <p className="mb-2">We do not guarantee that the Platform will be:</p>
+                <ul className="list-disc ml-5 space-y-1 mb-2">
+                  <li>uninterrupted;</li>
+                  <li>secure;</li>
+                  <li>error-free;</li>
+                  <li>accurate;</li>
+                  <li>complete;</li>
+                  <li>compatible with your device;</li>
+                  <li>free of bugs, malware, or vulnerabilities;</li>
+                  <li>continuously available.</li>
+                </ul>
+                <p>The Platform may be affected by maintenance, outages, software defects, smart contract issues, infrastructure failures, cyberattacks, wallet issues, blockchain congestion, RPC failures, forks, reorgs, validator issues, data corruption, or force majeure events.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">20. Disclaimer of Warranties</h3>
+                <p className="mb-2">To the maximum extent permitted by law, we disclaim all warranties of any kind, whether express, implied, statutory, or otherwise, including warranties of:</p>
+                <ul className="list-disc ml-5 space-y-1 mb-2">
+                  <li>merchantability;</li>
+                  <li>fitness for a particular purpose;</li>
+                  <li>title;</li>
+                  <li>non-infringement;</li>
+                  <li>uninterrupted access;</li>
+                  <li>accuracy;</li>
+                  <li>reliability;</li>
+                  <li>availability.</li>
+                </ul>
+                <p>We do not warrant that any reward, token label, testnet functionality, digital item, or blockchain-related feature will have any value, utility, legality, or future existence.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">21. Limitation of Liability</h3>
+                <p className="mb-2">To the maximum extent permitted by law, neither we nor our affiliates, owners, directors, officers, employees, contractors, licensors, service providers, or agents shall be liable for any indirect, incidental, special, consequential, punitive, or exemplary damages, including damages for:</p>
+                <ul className="list-disc ml-5 space-y-1 mb-2">
+                  <li>lost profits;</li>
+                  <li>lost revenue;</li>
+                  <li>lost opportunity;</li>
+                  <li>loss of data;</li>
+                  <li>loss of goodwill;</li>
+                  <li>business interruption;</li>
+                  <li>device damage;</li>
+                  <li>digital asset loss;</li>
+                  <li>transaction failure;</li>
+                  <li>smart contract failure;</li>
+                  <li>claim failure;</li>
+                  <li>platform downtime;</li>
+                  <li>security breach;</li>
+                  <li>emotional distress.</li>
+                </ul>
+                <p className="mb-2">To the maximum extent permitted by law, our total aggregate liability arising out of or relating to the Platform or these Terms shall not exceed the greater of:</p>
+                <ul className="list-disc ml-5 space-y-1 mb-2">
+                  <li><strong>USD $100</strong>, or</li>
+                  <li>the amount, if any, that you paid directly to us for use of the Platform in the <strong>12 months</strong> preceding the event giving rise to the claim.</li>
+                </ul>
+                <p>Some jurisdictions do not allow certain limitations, so parts of this section may not apply to you.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">22. Indemnification</h3>
+                <p className="mb-2">You agree to defend, indemnify, and hold harmless us and our affiliates, owners, officers, directors, employees, contractors, licensors, and service providers from and against any claims, liabilities, damages, judgments, awards, losses, costs, and expenses, including reasonable legal fees, arising out of or related to:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li>your use or misuse of the Platform;</li>
+                  <li>your violation of these Terms;</li>
+                  <li>your violation of applicable law;</li>
+                  <li>your violation of any third-party rights;</li>
+                  <li>your fraud, abuse, or misconduct;</li>
+                  <li>your content, submissions, or communications;</li>
+                  <li>disputes between you and another user.</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">23. Compliance with Laws and Sanctions</h3>
+                <p className="mb-2">You represent and warrant that:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li>you are not subject to sanctions or trade restrictions that prohibit your use of the Platform;</li>
+                  <li>you will comply with all laws applicable to your use of the Platform;</li>
+                  <li>you will not use the Platform in connection with unlawful conduct, fraud, money laundering, sanctions evasion, or prohibited activity.</li>
+                </ul>
+                <p className="mt-2">We may restrict access where necessary for legal or compliance reasons.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">24. Changes to the Platform and These Terms</h3>
+                <p className="mb-2">We may update these Terms from time to time.</p>
+                <p className="mb-2">If we make material changes, we may post the updated Terms on the Platform and update the "Last Updated" date. Your continued use of the Platform after the updated Terms become effective constitutes your acceptance of the revised Terms.</p>
+                <p>We may also modify, suspend, or discontinue any part of the Platform at any time.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">25. Governing Law</h3>
+                <p>These Terms and any dispute arising out of or relating to them or the Platform shall be governed by the laws of <strong>[Insert Jurisdiction]</strong>, without regard to conflict of law principles.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">26. Dispute Resolution</h3>
+                <p className="mb-2">Any dispute, claim, or controversy arising out of or relating to these Terms or the Platform shall be resolved as follows:</p>
+                <ul className="list-disc ml-5 space-y-1 mb-2">
+                  <li>first, the parties will attempt in good faith to resolve the dispute informally;</li>
+                  <li>if informal resolution is unsuccessful, the dispute shall be resolved by <strong>binding arbitration</strong> in <strong>[Insert Location]</strong> under the rules of <strong>[Insert Arbitration Rules]</strong>, unless applicable law requires otherwise;</li>
+                  <li>if arbitration is unenforceable or unavailable, the dispute shall be brought exclusively in the courts located in <strong>[Insert Jurisdiction / Venue]</strong>.</li>
+                </ul>
+                <p>To the extent permitted by law, you agree that disputes will be resolved only on an individual basis and not as part of any class, consolidated, or representative action.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">27. International Use</h3>
+                <p>The Platform may not be appropriate, available, or lawful for use in all locations. We make no representation that the Platform is lawful in any specific jurisdiction. Users who access the Platform do so at their own initiative and are responsible for compliance with local laws.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">28. Severability</h3>
+                <p>If any provision of these Terms is held invalid, illegal, or unenforceable, the remaining provisions will remain in full force and effect to the maximum extent permitted by law.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">29. No Waiver</h3>
+                <p>Our failure to enforce any provision of these Terms shall not constitute a waiver of that provision or any other provision.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">30. Entire Agreement</h3>
+                <p>These Terms, together with our Privacy Policy, Cookie Notice, and any supplemental rules or campaign terms that we publish, constitute the entire agreement between you and us regarding the Platform and supersede prior understandings relating to the same subject matter.</p>
+              </section>
+
+              <section>
+                <h3 className="font-bold text-black mb-2">31. Contact</h3>
+                <p className="mb-2">For legal notices, support, privacy requests, copyright complaints, or questions about these Terms, contact us at:</p>
+                <ul className="list-none ml-5 space-y-1">
+                  <li><strong>Email:</strong> [Insert Contact Email]</li>
+                  <li><strong>Company / Brand Name:</strong> [Insert Name]</li>
+                  <li><strong>Address:</strong> [Insert Address, if applicable]</li>
+                </ul>
+              </section>
+
+              <section className="bg-blue-50 border-2 border-blue-400 p-4 rounded-lg">
+                <h3 className="font-bold text-black mb-2">32. Acknowledgment</h3>
+                <p className="font-bold">BY CLICKING "ACCEPT" OR BY USING THIS PLATFORM, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND AGREE TO BE BOUND BY THESE TERMS & CONDITIONS IN THEIR ENTIRETY.</p>
+              </section>
+            </div>
+          </div>
+        </PolicyModal>
+      )}
+
+      {policyModal === 'privacy' && (
+        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title="Privacy Policy">
+          <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
+            <p className="text-xs text-gray-400 mb-4">Last Updated: [Insert Date]</p>
+            <section>
+              <p>This Privacy Policy ("<strong>Policy</strong>") explains how MLEO and/or the operator of the MLEO Platform ("<strong>we</strong>", "<strong>us</strong>", or "<strong>our</strong>") collects, uses, stores, shares, and protects personal data when you access or use our websites, games, applications, wallet-related features, testnet features, support channels, community tools, and related services (collectively, the "<strong>Platform</strong>").</p>
+              <p>By accessing or using the Platform, you acknowledge that you have read and understood this Policy.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">1. Scope of This Policy</h2>
+              <p className="mb-2">This Policy applies to personal data we collect when you:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>visit or use the Platform;</li>
+                <li>play games or use gameplay-related features;</li>
+                <li>connect a wallet;</li>
+                <li>interact with testnet or blockchain-related features;</li>
+                <li>contact support;</li>
+                <li>participate in campaigns, promotions, community activities, or surveys;</li>
+                <li>interact with us through forms, emails, or social channels linked from the Platform.</li>
+              </ul>
+              <p className="mt-2">This Policy does not apply to third-party websites, wallets, apps, exchanges, blockchain explorers, analytics tools, social networks, or other services that we do not own or control.</p>
+            </section>
+
+            <section className="bg-yellow-900/20 border border-yellow-700/30 p-4 rounded-lg">
+              <h2 className="text-xl font-bold mt-8 mb-4">2. Important Notice About Blockchain Features</h2>
+              <p className="mb-2">Some features of the Platform may involve public blockchain networks, wallet addresses, smart contracts, or testnet environments.</p>
+              <p className="mb-2">Please note:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>blockchain networks are public by design;</li>
+                <li>wallet addresses and on-chain transactions may be visible to others;</li>
+                <li>public blockchain data is generally not deletable;</li>
+                <li>we do not control third-party blockchains or public ledgers.</li>
+              </ul>
+              <p className="mt-2">If you connect a wallet or interact with blockchain-related features, certain information may become publicly available independently of our systems.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">3. Categories of Data We Collect</h2>
+              <p className="mb-4">Depending on how you use the Platform, we may collect the following categories of information.</p>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">A. Information You Provide Directly</h3>
+              <p className="mb-2">You may provide us with:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>your name or username;</li>
+                <li>email address;</li>
+                <li>support messages and correspondence;</li>
+                <li>information you submit in forms, surveys, bug reports, promotions, or community activities;</li>
+                <li>content you voluntarily send to us.</li>
+              </ul>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">B. Wallet and Blockchain-Related Information</h3>
+              <p className="mb-2">If you use wallet or blockchain-related features, we may collect:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>wallet address;</li>
+                <li>network or chain information;</li>
+                <li>public transaction identifiers;</li>
+                <li>public smart contract interaction data;</li>
+                <li>claim attempts, eligibility checks, or testnet participation records;</li>
+                <li>associated timestamps and technical metadata.</li>
+              </ul>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">C. Gameplay and Platform Activity Information</h3>
+              <p className="mb-2">We may collect gameplay and usage information such as:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>game sessions;</li>
+                <li>scores, rankings, progression, achievements, rewards, and vault-related activity;</li>
+                <li>feature usage;</li>
+                <li>login or session events;</li>
+                <li>preferences and settings;</li>
+                <li>interactions with gameplay mechanics, promotions, and user interface elements;</li>
+                <li>anti-abuse and fraud-prevention signals.</li>
+              </ul>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">D. Device, Browser, and Technical Information</h3>
+              <p className="mb-2">We may collect technical information such as:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>IP address;</li>
+                <li>browser type and version;</li>
+                <li>device type;</li>
+                <li>operating system;</li>
+                <li>language settings;</li>
+                <li>referring URLs;</li>
+                <li>pages visited;</li>
+                <li>timestamps;</li>
+                <li>crash logs;</li>
+                <li>error logs;</li>
+                <li>approximate geolocation derived from IP;</li>
+                <li>performance and diagnostic data.</li>
+              </ul>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">E. Cookies, Local Storage, and Similar Technologies</h3>
+              <p className="mb-2">We may collect information through:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>cookies;</li>
+                <li>local storage;</li>
+                <li>session storage;</li>
+                <li>software development kits (SDKs);</li>
+                <li>pixels;</li>
+                <li>log files;</li>
+                <li>similar technologies.</li>
+              </ul>
+              <p className="mt-2">These technologies may store identifiers, preferences, session data, technical flags, gameplay state, and analytics-related information.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">4. How We Use Personal Data</h2>
+              <p className="mb-4">We may use personal data for the following purposes:</p>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">A. To Provide and Operate the Platform</h3>
+              <p className="mb-2">Including to:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>make the Platform available;</li>
+                <li>provide games, features, rewards logic, support tools, and wallet-related interactions;</li>
+                <li>maintain accounts, sessions, gameplay state, and platform functionality;</li>
+                <li>process testnet or blockchain-related interactions where applicable.</li>
+              </ul>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">B. To Improve and Develop the Platform</h3>
+              <p className="mb-2">Including to:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>analyze performance and usage;</li>
+                <li>understand player behavior and product engagement;</li>
+                <li>improve game balance, user experience, navigation, and technical stability;</li>
+                <li>test new features and content.</li>
+              </ul>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">C. To Secure the Platform</h3>
+              <p className="mb-2">Including to:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>detect fraud, abuse, bots, multi-accounting, exploitation, and suspicious activity;</li>
+                <li>investigate bugs, incidents, or security threats;</li>
+                <li>enforce our Terms, rules, and policies;</li>
+                <li>protect the rights, safety, and property of users, us, and third parties.</li>
+              </ul>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">D. To Communicate With You</h3>
+              <p className="mb-2">Including to:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>respond to support requests;</li>
+                <li>send service-related notices;</li>
+                <li>provide policy updates, gameplay notices, maintenance alerts, and security communications;</li>
+                <li>administer promotions, surveys, or campaigns where permitted.</li>
+              </ul>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">E. To Comply With Legal Obligations</h3>
+              <p className="mb-2">Including to:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>comply with applicable laws, regulations, legal process, and governmental requests;</li>
+                <li>maintain records where required;</li>
+                <li>establish, exercise, or defend legal claims.</li>
+              </ul>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">F. To Prevent Misuse and Preserve Fairness</h3>
+              <p className="mb-2">Including to:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>validate participation rules;</li>
+                <li>manage reward eligibility;</li>
+                <li>detect manipulation of claims, leaderboards, sessions, or vault systems;</li>
+                <li>apply technical or gameplay restrictions as needed.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">5. Legal Bases for Processing</h2>
+              <p className="mb-2">Where applicable data protection law requires a legal basis, we may rely on one or more of the following:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>performance of a contract, including providing the Platform and requested features;</li>
+                <li>legitimate interests, such as operating, securing, improving, and protecting the Platform;</li>
+                <li>compliance with legal obligations;</li>
+                <li>consent, where required by law, including for certain cookies or optional communications.</li>
+              </ul>
+              <p className="mt-2">Where we rely on legitimate interests, we consider and balance the potential impact on users and apply safeguards where appropriate.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">6. Cookies and Similar Technologies</h2>
+              <p className="mb-2">We may use cookies and similar technologies for:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>essential site functionality;</li>
+                <li>security and fraud prevention;</li>
+                <li>authentication and session continuity;</li>
+                <li>remembering settings and preferences;</li>
+                <li>analytics and performance measurement;</li>
+                <li>feature testing and platform improvement.</li>
+              </ul>
+              <p className="mt-2">Where required by applicable law, we will request your consent before placing non-essential cookies or using similar non-essential tracking technologies.</p>
+              <p className="mt-2">You may be able to manage cookie preferences through your browser settings or our cookie controls, where available. Disabling certain technologies may affect functionality.</p>
+              <p className="mt-2">For more information, please see our Cookie Notice.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">7. When We Share Personal Data</h2>
+              <p className="mb-4 font-semibold">We do not sell your personal data for money.</p>
+              <p className="mb-4">We may share personal data only in the circumstances described below.</p>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">A. Service Providers and Infrastructure Partners</h3>
+              <p className="mb-2">We may share data with service providers who help us operate the Platform, such as providers of:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>hosting;</li>
+                <li>analytics;</li>
+                <li>cloud storage;</li>
+                <li>customer support tools;</li>
+                <li>infrastructure monitoring;</li>
+                <li>security services;</li>
+                <li>communication tools;</li>
+                <li>wallet or blockchain infrastructure integrations.</li>
+              </ul>
+              <p className="mt-2">These providers may access personal data only as needed to perform services for us and subject to appropriate obligations.</p>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">B. Legal and Compliance Reasons</h3>
+              <p className="mb-2">We may disclose information where we believe disclosure is necessary to:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>comply with applicable law, regulation, court order, subpoena, or legal process;</li>
+                <li>respond to lawful requests by public authorities;</li>
+                <li>enforce our agreements and policies;</li>
+                <li>investigate fraud, abuse, security incidents, or unlawful activity;</li>
+                <li>protect rights, safety, property, or operations.</li>
+              </ul>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">C. Business Transfers</h3>
+              <p className="mb-2">If we are involved in a merger, acquisition, restructuring, financing, asset sale, or similar transaction, personal data may be transferred as part of that process, subject to applicable safeguards.</p>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">D. With Your Direction or Consent</h3>
+              <p className="mb-2">We may share information where you instruct us to do so or where you explicitly consent.</p>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">E. Public Blockchain Data</h3>
+              <p className="mb-2">If you interact with public blockchain features, certain data may be visible publicly by design and may be accessible through third-party explorers, nodes, or analytics services independently of us.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">8. International Data Transfers</h2>
+              <p className="mb-2">Your personal data may be processed in countries other than your own, including countries that may have different data protection laws.</p>
+              <p>Where required by law, we take appropriate steps to protect personal data transferred internationally, including contractual safeguards or other lawful transfer mechanisms.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">9. Data Retention</h2>
+              <p className="mb-2">We retain personal data only for as long as reasonably necessary for the purposes described in this Policy, including to:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>provide and operate the Platform;</li>
+                <li>maintain records;</li>
+                <li>resolve disputes;</li>
+                <li>enforce agreements;</li>
+                <li>comply with legal obligations;</li>
+                <li>investigate security or abuse issues.</li>
+              </ul>
+              <p className="mt-2">Retention periods may vary depending on the type of data, legal requirements, operational needs, and security considerations.</p>
+              <p className="mt-2">We may retain aggregated, anonymized, or de-identified information for longer where permitted by law.</p>
+              <p className="mt-2 font-semibold">Please note that public blockchain data is generally permanent and cannot be deleted by us.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">10. Data Security</h2>
+              <p className="mb-2">We implement reasonable technical, administrative, and organizational measures designed to protect personal data against unauthorized access, loss, misuse, alteration, or disclosure.</p>
+              <p className="mb-2">However, no system, network, storage method, wallet environment, or transmission over the internet is completely secure. We cannot guarantee absolute security.</p>
+              <p>You are also responsible for protecting your own devices, wallets, seed phrases, passwords, and access credentials.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">11. Children's Privacy</h2>
+              <p className="mb-2">The Platform is not intended for children.</p>
+              <p>We do not knowingly collect personal data from individuals under the age required to use the Platform under our Terms. If you believe a child has provided personal data in violation of this Policy, contact us so we can take appropriate action.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">12. Your Privacy Rights</h2>
+              <p className="mb-2">Depending on your jurisdiction, you may have certain rights regarding your personal data, such as the right to:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>access personal data we hold about you;</li>
+                <li>request correction of inaccurate data;</li>
+                <li>request deletion of personal data;</li>
+                <li>request restriction of processing;</li>
+                <li>object to certain processing;</li>
+                <li>request portability of certain data;</li>
+                <li>withdraw consent where processing is based on consent;</li>
+                <li>lodge a complaint with a supervisory authority.</li>
+              </ul>
+              <p className="mt-2">These rights are not absolute and may be subject to legal, technical, contractual, or security limitations.</p>
+              <p className="mt-2">To exercise your rights, contact us using the details below. We may request information necessary to verify your identity before responding.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">13. Account, Wallet, and Public Data Limitations</h2>
+              <p className="mb-2">Please understand the limits of privacy in blockchain and platform environments:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>wallet addresses may be public;</li>
+                <li>public blockchain activity is visible to others;</li>
+                <li>some gameplay, ranking, or community data may be visible within the Platform;</li>
+                <li>if you voluntarily post or share information publicly, it may be copied or redistributed by others;</li>
+                <li>we may not be able to delete data that has already been published to a blockchain or public network.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">14. Third-Party Services</h2>
+              <p className="mb-2">The Platform may contain links to or integrations with third-party services, including wallets, social platforms, explorers, RPC providers, or analytics tools.</p>
+              <p>We are not responsible for the privacy, security, or content practices of third parties. Your use of those services is governed by their own terms and privacy policies.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">15. Automated Monitoring and Anti-Abuse Measures</h2>
+              <p className="mb-2">To protect the Platform, users, and reward systems, we may use automated tools or rule-based systems to detect suspicious activity, including:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>bot-like behavior;</li>
+                <li>abnormal session patterns;</li>
+                <li>exploitation attempts;</li>
+                <li>duplicate participation;</li>
+                <li>fraudulent claim activity;</li>
+                <li>service interference.</li>
+              </ul>
+              <p className="mt-2">These tools may affect eligibility, access, rewards, claims, or account status. We may review relevant signals manually or automatically where appropriate.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">16. Communications</h2>
+              <p className="mb-2">We may send transactional or service-related communications, such as:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>account or session notices;</li>
+                <li>support replies;</li>
+                <li>maintenance alerts;</li>
+                <li>security notices;</li>
+                <li>policy updates;</li>
+                <li>claim or feature status notices.</li>
+              </ul>
+              <p className="mt-2">Where required by law, we will obtain consent before sending marketing communications. You may opt out of non-essential promotional messages where applicable.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">17. Do Not Track</h2>
+              <p className="mb-2">Some browsers offer a "Do Not Track" setting. Because there is not yet a universally accepted standard for responding to such signals, the Platform may not respond to all Do Not Track requests unless required by applicable law.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">18. Region-Specific Disclosures</h2>
+              <p className="mb-2">Depending on your location, additional disclosures or rights may apply under laws such as the GDPR, UK GDPR, or other applicable privacy laws.</p>
+              <p>Where required, we may provide supplemental regional privacy notices.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">19. Changes to This Policy</h2>
+              <p className="mb-2">We may update this Policy from time to time.</p>
+              <p>If we make material changes, we may post the updated version on the Platform and revise the "Last Updated" date. Your continued use of the Platform after the effective date of the updated Policy constitutes your acknowledgment of the revised Policy, to the extent permitted by law.</p>
+            </section>
+
+            <section className="bg-blue-900/20 border border-blue-700/30 p-4 rounded-lg">
+              <h2 className="text-xl font-bold mt-8 mb-4">20. Contact Us</h2>
+              <p className="mb-2">If you have questions, requests, or concerns about this Policy or our privacy practices, contact us at:</p>
+              <ul className="list-none space-y-1">
+                <li><strong>Email:</strong> [Insert Contact Email]</li>
+                <li><strong>Company / Brand Name:</strong> [Insert Name]</li>
+                <li><strong>Address:</strong> [Insert Address, if applicable]</li>
+              </ul>
+              <p className="mt-4">If required by applicable law, you may also include the contact details of your privacy representative or data protection contact here.</p>
+            </section>
+          </div>
+        </PolicyModal>
+      )}
+
+      {policyModal === 'cookies' && (
+        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title="Cookie Notice">
+          <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
+            <p className="text-xs text-gray-400 mb-4">Last Updated: [Insert Date]</p>
+            <section>
+              <p>This Cookie Notice explains how MLEO and/or the operator of the MLEO Platform ("<strong>we</strong>", "<strong>us</strong>", or "<strong>our</strong>") uses cookies, local storage, session storage, pixels, SDKs, and similar technologies ("<strong>Cookies</strong>") when you access or use our websites, games, apps, wallet-related features, and related services (collectively, the "<strong>Platform</strong>").</p>
+              <p>This Cookie Notice should be read together with our Privacy Policy and Terms & Conditions.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">1. What Are Cookies and Similar Technologies</h2>
+              <p className="mb-2">Cookies are small text files placed on your browser or device when you visit a website or use an application. Similar technologies may include:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>local storage;</li>
+                <li>session storage;</li>
+                <li>tags;</li>
+                <li>pixels;</li>
+                <li>scripts;</li>
+                <li>SDKs;</li>
+                <li>device identifiers;</li>
+                <li>log-based tracking tools.</li>
+              </ul>
+              <p className="mt-2">These technologies help websites and apps function properly, remember preferences, improve performance, analyze usage, and support security and fraud prevention.</p>
+              <p className="mt-2">For simplicity, we refer to all of these technologies as "Cookies" in this Notice, unless otherwise stated.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">2. Why We Use Cookies</h2>
+              <p className="mb-4">We may use Cookies for the following purposes:</p>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">A. Strictly Necessary Cookies</h3>
+              <p className="mb-2">These Cookies are necessary for the Platform to function properly and securely. They may be used to:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>enable core site functionality;</li>
+                <li>maintain sessions;</li>
+                <li>remember basic user settings;</li>
+                <li>provide security features;</li>
+                <li>protect against abuse, fraud, and malicious activity;</li>
+                <li>support load balancing or infrastructure stability;</li>
+                <li>maintain wallet-related connection state where applicable.</li>
+              </ul>
+              <p className="mt-2">These Cookies do not usually require consent where permitted by law because they are necessary for the operation of the Platform.</p>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">B. Functional Cookies</h3>
+              <p className="mb-2">These Cookies help us remember preferences and improve your experience, such as:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>language preferences;</li>
+                <li>display settings;</li>
+                <li>game settings;</li>
+                <li>gameplay-related state;</li>
+                <li>basic user interface customizations;</li>
+                <li>saved preferences across visits.</li>
+              </ul>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">C. Analytics and Performance Cookies</h3>
+              <p className="mb-2">These Cookies help us understand how users interact with the Platform so we can improve design, performance, and gameplay experience. They may be used to collect information such as:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>pages visited;</li>
+                <li>features used;</li>
+                <li>clicks and interactions;</li>
+                <li>session length;</li>
+                <li>performance issues;</li>
+                <li>crash data;</li>
+                <li>browser and device type;</li>
+                <li>general usage trends.</li>
+              </ul>
+              <p className="mt-2">Where required by law, we will obtain consent before using non-essential analytics Cookies.</p>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">D. Security and Anti-Abuse Technologies</h3>
+              <p className="mb-2">We may use Cookies and related technologies to detect and prevent:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>bot activity;</li>
+                <li>session abuse;</li>
+                <li>automated exploitation;</li>
+                <li>suspicious or repeated claim activity;</li>
+                <li>manipulation of gameplay or platform features;</li>
+                <li>unauthorized access attempts.</li>
+              </ul>
+              <p className="mt-2">These protections may be necessary to protect the Platform, users, and reward systems.</p>
+
+              <h3 className="text-lg font-semibold mt-6 mb-2">E. Testing and Improvement Tools</h3>
+              <p className="mb-2">We may use certain technologies to:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>test new features;</li>
+                <li>evaluate interface improvements;</li>
+                <li>measure feature reliability;</li>
+                <li>understand how updates affect performance or usability.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">3. Types of Information Collected Through Cookies</h2>
+              <p className="mb-2">Depending on the technology used, Cookies may collect or store information such as:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>IP address;</li>
+                <li>browser type and version;</li>
+                <li>operating system;</li>
+                <li>device identifiers;</li>
+                <li>preferred language;</li>
+                <li>session identifiers;</li>
+                <li>site navigation data;</li>
+                <li>pages or screens viewed;</li>
+                <li>interaction events;</li>
+                <li>timestamps;</li>
+                <li>approximate location derived from IP;</li>
+                <li>technical diagnostics;</li>
+                <li>locally stored gameplay or preference data.</li>
+              </ul>
+              <p className="mt-2">Some Cookies may assign or store unique identifiers.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">4. Local Storage and Game-Related Functionality</h2>
+              <p className="mb-2">Because the Platform may include browser-based games, game progress systems, or wallet-related UI logic, we may use local storage or session storage to support:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>game state persistence;</li>
+                <li>session continuity;</li>
+                <li>user preferences;</li>
+                <li>temporary gameplay progress;</li>
+                <li>UI settings;</li>
+                <li>feature flags;</li>
+                <li>locally stored technical states.</li>
+              </ul>
+              <p className="mt-2 font-semibold">Please note that locally stored browser data may be lost, reset, modified, blocked by your browser, or unavailable across devices. We do not guarantee that browser-stored data will always persist.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">5. Third-Party Cookies and Technologies</h2>
+              <p className="mb-2">We may allow trusted third-party providers to place or access Cookies or similar technologies for purposes such as:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>analytics;</li>
+                <li>performance monitoring;</li>
+                <li>hosting or infrastructure support;</li>
+                <li>security services;</li>
+                <li>wallet integration support;</li>
+                <li>embedded content functionality.</li>
+              </ul>
+              <p className="mt-2">These third parties may collect information according to their own privacy notices and policies. We do not control all third-party technologies once enabled through their services.</p>
+              <p className="mt-2">Examples may include providers related to hosting, analytics, monitoring, wallet connection infrastructure, embedded media, or technical support tools.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">6. Consent and Lawful Use</h2>
+              <p className="mb-2">Where required by applicable law, we will ask for your consent before using non-essential Cookies or similar technologies.</p>
+              <p className="mb-2">Where permitted, strictly necessary Cookies may be used without consent because they are required for the functioning, security, or integrity of the Platform.</p>
+              <p>If you give consent, you may later withdraw it through available cookie settings, consent tools, or relevant browser controls, subject to technical limitations.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">7. How to Manage Cookies</h2>
+              <p className="mb-2">You may be able to control or disable Cookies through:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>your browser settings;</li>
+                <li>device settings;</li>
+                <li>cookie banners or consent tools on the Platform, where available;</li>
+                <li>privacy tools or extensions.</li>
+              </ul>
+              <p className="mt-2 font-semibold">Please note that blocking or disabling certain Cookies may affect the functionality, availability, security, or performance of the Platform, including gameplay features, stored preferences, wallet-related UI behavior, and session continuity.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">8. Browser-Based Storage Limitations</h2>
+              <p className="mb-2">Some Platform features may rely on local or session storage rather than traditional browser cookies. If you clear your browser data, change devices, use private browsing, install blockers, or disable storage permissions, some gameplay state or saved settings may no longer be available.</p>
+              <p>We are not responsible for data loss caused by browser clearing, device changes, extension interference, privacy settings, or user-configured deletion of stored local data.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">9. Changes to This Cookie Notice</h2>
+              <p className="mb-2">We may update this Cookie Notice from time to time. If we do, we may post the updated version on the Platform and revise the "Last Updated" date.</p>
+              <p>Your continued use of the Platform after the updated Cookie Notice becomes effective constitutes your acknowledgment of the revised notice, to the extent permitted by applicable law.</p>
+            </section>
+
+            <section className="bg-blue-900/20 border border-blue-700/30 p-4 rounded-lg">
+              <h2 className="text-xl font-bold mt-8 mb-4">10. Contact Us</h2>
+              <p className="mb-2">If you have questions about this Cookie Notice or our use of Cookies, contact us at:</p>
+              <ul className="list-none space-y-1">
+                <li><strong>Email:</strong> [Insert Contact Email]</li>
+                <li><strong>Company / Brand Name:</strong> [Insert Name]</li>
+                <li><strong>Address:</strong> [Insert Address, if applicable]</li>
+              </ul>
+            </section>
+          </div>
+        </PolicyModal>
+      )}
+
+      {policyModal === 'risk' && (
+        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title="Risk / Testnet Disclaimer">
+          <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
+            <p className="text-xs text-gray-400 mb-4">Last Updated: [Insert Date]</p>
+            <div className="bg-red-900/30 border-2 border-red-700/50 p-4 rounded-lg mb-6">
+              <p className="font-bold text-lg mb-2">⚠️ Important Warning</p>
+              <p>This Risk / Testnet Disclaimer explains important risks, limitations, and warnings relating to the use of the MLEO Platform, including any wallet-related, reward-related, blockchain-related, or testnet-related features.</p>
+              <p className="mt-2 font-semibold">By accessing or using the Platform, you acknowledge and accept the risks described below.</p>
+            </div>
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">1. Entertainment and Experimental Platform</h2>
+              <p className="mb-2">The Platform is provided for entertainment, gameplay, experimental, community, and development purposes. Certain features may be in test, beta, demo, limited-access, or experimental form.</p>
+              <p>The Platform is not a casino, gambling service, exchange, brokerage, financial institution, or investment platform.</p>
+            </section>
+
+            <section className="bg-yellow-900/20 border border-yellow-700/30 p-4 rounded-lg">
+              <h2 className="text-xl font-bold mt-8 mb-4">2. Testnet Features May Have No Value</h2>
+              <p className="mb-2">Any feature identified as <strong>testnet</strong>, <strong>beta</strong>, <strong>demo</strong>, <strong>development</strong>, <strong>experimental</strong>, or similar may:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>have no monetary value;</li>
+                <li>be non-transferable;</li>
+                <li>be non-redeemable;</li>
+                <li>be subject to resets or deletion;</li>
+                <li>be changed, paused, or discontinued at any time;</li>
+                <li>not correspond to any live or future mainnet asset.</li>
+              </ul>
+              <p className="mt-2 font-semibold">Displaying a wallet address, token label, contract address, pool amount, claim status, or blockchain data does not mean that any asset has real-world value, liquidity, or redemption rights.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">3. No Promise of Future Launch, Listing, or Utility</h2>
+              <p className="mb-2">Nothing on the Platform should be interpreted as a promise, guarantee, or representation that any token, reward, balance, vault amount, or digital item will:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>launch on mainnet;</li>
+                <li>become transferable;</li>
+                <li>become redeemable;</li>
+                <li>be listed anywhere;</li>
+                <li>retain value;</li>
+                <li>gain utility;</li>
+                <li>be exchangeable for money, crypto, or anything else.</li>
+              </ul>
+              <p className="mt-2">Any future feature, if introduced at all, may be subject to separate rules, eligibility requirements, technical limitations, and legal restrictions.</p>
+            </section>
+
+            <section className="bg-red-900/20 border border-red-700/30 p-4 rounded-lg">
+              <h2 className="text-xl font-bold mt-8 mb-4">4. Wallet Use Is at Your Own Risk</h2>
+              <p className="mb-2">If you connect a wallet or interact with blockchain-related features, you do so at your own risk.</p>
+              <p className="mb-2">You are solely responsible for:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>wallet security;</li>
+                <li>device security;</li>
+                <li>seed phrases and private keys;</li>
+                <li>transaction approvals;</li>
+                <li>address accuracy;</li>
+                <li>gas fees;</li>
+                <li>understanding the network you are using;</li>
+                <li>reviewing any transaction before confirming it.</li>
+              </ul>
+              <p className="mt-2">We are not responsible for losses caused by user error, phishing, malicious extensions, compromised wallets, incorrect approvals, fake interfaces, network congestion, chain instability, or third-party wallet failures.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">5. Smart Contract and Blockchain Risks</h2>
+              <p className="mb-2">Blockchain-related features may involve substantial technical risk, including:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>bugs or vulnerabilities;</li>
+                <li>failed transactions;</li>
+                <li>incorrect reads or writes;</li>
+                <li>RPC failures;</li>
+                <li>indexing delays;</li>
+                <li>network congestion;</li>
+                <li>forks or reorgs;</li>
+                <li>front-end mismatches;</li>
+                <li>inaccurate balances or claim indicators;</li>
+                <li>contract pauses or admin interventions;</li>
+                <li>incompatibility with certain wallets or devices.</li>
+              </ul>
+              <p className="mt-2">Even where a smart contract is deployed, available, or visible, interactions may fail or behave unexpectedly.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">6. Claims, Rewards, and Vault Balances Are Not Guaranteed</h2>
+              <p className="mb-2">Any Vault amount, reward display, accrued total, claimable amount, leaderboard result, or session reward shown on the Platform may be provisional, delayed, approximate, or subject to verification.</p>
+              <p className="mb-2">Claims or rewards may be:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>rate-limited;</li>
+                <li>paused;</li>
+                <li>denied;</li>
+                <li>recalculated;</li>
+                <li>revoked;</li>
+                <li>delayed;</li>
+                <li>subject to anti-abuse review;</li>
+                <li>affected by technical or legal restrictions.</li>
+              </ul>
+              <p className="mt-2 font-semibold">A visible balance or claim button does not guarantee successful receipt of any item or asset.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">7. No Financial, Legal, or Tax Advice</h2>
+              <p className="mb-2">Nothing on the Platform constitutes financial, investment, legal, accounting, regulatory, or tax advice.</p>
+              <p>You are solely responsible for evaluating the risks of using the Platform and for obtaining independent professional advice where appropriate.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">8. Availability and Service Changes</h2>
+              <p className="mb-2">The Platform may be unavailable, interrupted, modified, or discontinued at any time.</p>
+              <p className="mb-2">We may:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>change reward formulas;</li>
+                <li>rebalance gameplay;</li>
+                <li>reset test data;</li>
+                <li>modify vault logic;</li>
+                <li>disable claims;</li>
+                <li>migrate systems;</li>
+                <li>remove features;</li>
+                <li>wipe local progress;</li>
+                <li>restrict access by region, wallet, or device.</li>
+              </ul>
+              <p className="mt-2">We have no obligation to maintain any particular feature or experience.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">9. No Reliance</h2>
+              <p className="mb-2">You must not rely on the Platform, its interfaces, token labels, pool displays, reward screens, whitepaper text, roadmap references, or technical indicators as guarantees of future functionality, value, rights, or asset ownership.</p>
+              <p>All features are subject to change and should be treated with caution.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">10. Regulatory and Legal Uncertainty</h2>
+              <p className="mb-2">Digital assets, blockchain applications, wallet integrations, and online reward systems may be subject to changing laws, regulations, interpretations, and enforcement approaches across jurisdictions.</p>
+              <p>We do not guarantee that any feature is appropriate, lawful, or available in every jurisdiction. You are solely responsible for understanding and complying with the laws that apply to you.</p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold mt-8 mb-4">11. Third-Party Dependencies</h2>
+              <p className="mb-2">The Platform may depend on third-party services, including wallets, hosting providers, RPC providers, infrastructure partners, analytics tools, cloud services, and public blockchain networks.</p>
+              <p>These services may fail, change, suspend access, introduce delays, or create security issues beyond our control. We are not responsible for third-party failures or interruptions.</p>
+            </section>
+
+            <section className="bg-orange-900/20 border border-orange-700/30 p-4 rounded-lg">
+              <h2 className="text-xl font-bold mt-8 mb-4">12. Limitation of Expectations</h2>
+              <p className="mb-2">You acknowledge that:</p>
+              <ul className="list-disc ml-6 space-y-1">
+                <li>gameplay systems may change;</li>
+                <li>balances may be adjusted;</li>
+                <li>claims may fail;</li>
+                <li>testnet states may be wiped;</li>
+                <li>digital items may never become live assets;</li>
+                <li>visible numbers may be informational only;</li>
+                <li>experimental systems may break or be removed entirely.</li>
+              </ul>
+              <p className="mt-2 font-semibold">You use the Platform with these limitations fully understood.</p>
+            </section>
+
+            <section className="bg-blue-900/20 border border-blue-700/30 p-4 rounded-lg">
+              <h2 className="text-xl font-bold mt-8 mb-4">13. Contact</h2>
+              <p className="mb-2">If you have questions about this Risk / Testnet Disclaimer, contact us at:</p>
+              <ul className="list-none space-y-1">
+                <li><strong>Email:</strong> [Insert Contact Email]</li>
+                <li><strong>Company / Brand Name:</strong> [Insert Name]</li>
+                <li><strong>Address:</strong> [Insert Address, if applicable]</li>
+              </ul>
+            </section>
+          </div>
+        </PolicyModal>
+      )}
     </Layout>
   );
 }
