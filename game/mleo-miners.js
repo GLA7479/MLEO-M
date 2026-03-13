@@ -3572,9 +3572,15 @@ MLEO
     <p>By accessing or using the game, you agree to these Terms &amp; Conditions (“Terms”). We may update them in-app; continued use is acceptance.</p>
   </section>
 
-  <section>
-    <h3 className="font-bold text-slate-900 mb-1">2) Entertainment-Only; No Monetary Value</h3>
-    <p>Coins and “MLEO” are utility features for gameplay. They are not money, securities, or financial instruments, and carry no promise of price, liquidity, profit or future value.</p>
+  <section className="bg-yellow-50 border-2 border-yellow-400 p-3 rounded-lg">
+    <h3 className="font-bold text-slate-900 mb-2">⚠️ 2) Entertainment Games Only - NO Casino, NO Gambling, NO Deposits</h3>
+    <ul className="list-disc ml-5 space-y-1 text-slate-800">
+      <li><strong>THIS IS AN ENTERTAINMENT GAME PLATFORM:</strong> This is NOT a casino, NOT a gambling platform, and has NO connection to gambling or casino activities.</li>
+      <li><strong>NO DEPOSITS - NOW OR EVER:</strong> You CANNOT and will NEVER be able to deposit real money, cryptocurrency, or any assets to purchase game tokens. There is NO deposit feature, and there will NEVER be a deposit feature.</li>
+      <li><strong>NO PURCHASING GAME TOKENS:</strong> You CANNOT and will NEVER be able to purchase, buy, or acquire game tokens (MLEO) with real money or cryptocurrency. All game tokens are earned through gameplay only.</li>
+      <li><strong>Coins and "MLEO" are utility features for gameplay only.</strong> They are not money, securities, or financial instruments, and carry no promise of price, liquidity, profit or future value.</li>
+      <li><strong>NOT A CASINO:</strong> This platform has NO connection to casinos, gambling sites, or betting platforms. We are an entertainment game platform focused on fun, skill, and enjoyment - NOT gambling or casino activities.</li>
+    </ul>
   </section>
 
   <section>

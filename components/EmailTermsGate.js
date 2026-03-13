@@ -350,8 +350,9 @@ export default function EmailTermsGate({ onPassed, onClose }) {
                   By clicking “I accept & continue”, you agree to MLEO’s Terms of Use and Privacy Policy, including:
                 </p>
                 <ul className="list-disc ps-5 space-y-1">
+                  <li>This is an entertainment game platform - NOT a casino or gambling site.</li>
                   <li>Gameplay may accrue an MLEO balance for entertainment purposes only.</li>
-                  <li>Conversion rates/daily ranges may change or pause.</li>
+                  <li>NO deposits: You cannot and will never be able to deposit real money or purchase game tokens.</li>
                   <li>No guaranteed monetary value; not financial advice. Fairness controls and availability changes may apply.</li>
                   <li>Privacy: minimal data required for authentication and security, subject to law.</li>
                 </ul>

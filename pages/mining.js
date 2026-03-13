@@ -193,59 +193,27 @@ const TEXT = {
       "اتصل بمحفظتك للمطالبة برموز MLEO على السلسلة عند التوفر."
     ],
     arcadeWhat: "ما هو MLEO Arcade؟",
-    arcadeWhatDesc: "MLEO Arcade هي مجموعة من 24 لعبة صغيرة مثيرة حيث يمكنك الفوز برموز MLEO! كل لعبة لها آليات ومضاعفات فريدة.",
+    arcadeWhatDesc: "MLEO Arcade هي مجموعة من 24 لعبة صغيرة مثيرة حيث يمكنك جمع مكافآت MLEO داخل التطبيق! كل لعبة لها آليات ومضاعفات فريدة.",
     arcadeHowToPlay: "كيف تلعب",
     arcadeSteps: [
       "اختر أي لعبة من الأركيد",
-      "كل لعبة تكلف 1,000 MLEO لكل جولة (يُخصم من خزنتك)",
+      "كل جلسة تستخدم على الأقل 1,000 MLEO من خزنتك داخل التطبيق. قد تستخدم بعض الأوضاع تكلفة جلسة مختلفة",
       "اتبع تعليمات اللعبة المحددة",
-      "اربح جوائز ومضاعفات تصل إلى 10,000 MLEO!",
-      "جميع الأرباح تُضاف تلقائيًا إلى خزنتك"
+      "أكمل الجولات، وصل إلى المعالم، وجمع معززات المكافآت بناءً على نتائجك",
+      "مكافآت الجلسة تُضاف تلقائيًا إلى خزنتك، بما في ذلك المكافآت المكتسبة من جلسات اللعب المجاني"
     ],
     arcadeFreePlay: "رموز اللعب المجاني",
     arcadeFreePlayList: [
-      "احصل على رمز لعب مجاني واحد كل ساعة (بحد أقصى 5 رموز)",
-      "استخدم الرموز للعب أي لعبة دون إنفاق MLEO",
-      "أرباح اللعب المجاني لا تزال تُضاف إلى خزنتك!"
+      "احصل على رمز لعب مجاني واحد كل ساعة (حتى 5 مخزنة)",
+      "استخدم الرموز لبدء جلسة أركيد واحدة دون استخدام MLEO من الخزنة",
+      "المكافآت من جلسات اللعب المجاني تُضاف إلى خزنتك تمامًا مثل مكافآت الجلسة القياسية"
     ],
     arcadeGoodToKnow: "جيد أن تعرف",
     arcadeGoodToKnowList: [
       "خزنتك مشتركة بين جميع ألعاب MLEO",
-      "كل لعبة تتبع إحصائياتك الشخصية",
-      "جميع الألعاب تستخدم توليد أرقام عشوائية عادلة",
-      "انقر على زر ℹ️ في كل لعبة للقواعد المحددة"
-    ]
-  },
-  ru: {
-    name: "Русский", dir: "ltr", code: "ru",
-    back: "← Назад",
-    logout: "Выйти",
-    liveTestnet: "Живая тестовая сеть • Зарабатывайте MLEO в игре",
-    chooseGame: "Выберите свою игру",
-    chooseGameDesc: "Два режима, одно хранилище. Играйте активно с улучшениями (Майнеры) или позвольте пассивному накоплению работать (Токен Раш). Вы можете переключаться в любое время.",
-    miners: "MLEO — Майнеры",
-    minersDesc: "Простой геймплей и улучшения с подарками по клику и бустами. Интеграция с хранилищем + ЗАБРАТЬ на блокчейне для стабильного, ручного прогресса.",
-    active: "Активный",
-    howToPlay: "КАК ИГРАТЬ",
-    terms: "УСЛОВИЯ",
-    playMiners: "Играть Майнеры",
-    acceptTermsToPlay: "🔒 Принять условия для игры",
-    rush: "MLEO — Раш",
-    rushDesc: "Продвинутый майнинг с системой Prestige! Майните MLEO пассивно, улучшайте оборудование, получайте достижения и сбрасывайте для постоянных бонусов.",
-    passive: "Пассивный",
-    playTokenRush: "Играть Токен Раш",
-    howToPlayTitle: "Как играть",
-    goal: "Цель",
-    rushGoal: "Цель Раша",
-    rushGoalDesc: "Майните токены MLEO пассивно и стройте свою империю! Используйте намайненный MLEO для улучшения оборудования, получения достижений и prestige для постоянных бонусов. Чем больше играете, тем сильнее становитесь.",
-    rushGameplay: "Геймплей",
-    rushGameplaySteps: [
-      "Майните MLEO пассивно - ваше оборудование работает автоматически",
-      "Кликайте BOOST чтобы временно увеличить скорость майнинга (+2% за клик)",
-      "Собирайте намайненный MLEO в ваше хранилище для улучшений и забора",
-      "Покупайте улучшения: Auto-Drill, Helmet, Cart и Leo Bot для более быстрого майнинга",
-      "Получайте достижения, достигая вех для бонусных наград",
-      "Prestige на 10M MLEO чтобы сбросить прогресс для постоянных бонусов"
+      "كل لعبة تتبع نشاطك، الجلسات المكتملة، أفضل نتيجة، السلاسل، ومعالم التقدم",
+      "بعض الألعاب تستخدم أحداث عشوائية، بينما تركز أخرى على التوقيت، رد الفعل، الذاكرة، أو اتخاذ القرار",
+      "انقر على زر ℹ️ في كل بطاقة لعبة لعرض القواعد، التحكم، وهيكل المكافآت"
     ],
     rushFeatures: "Ключевые особенности",
     rushFeaturesList: [
@@ -286,27 +254,27 @@ const TEXT = {
       "Подключите свой кошелек, чтобы забрать токены MLEO в блокчейне, когда они станут доступны."
     ],
     arcadeWhat: "Что такое MLEO Arcade?",
-    arcadeWhatDesc: "MLEO Arcade - это коллекция из 24 увлекательных мини-игр, в которых вы можете выиграть токены MLEO! Каждая игра имеет уникальную механику и множители.",
+    arcadeWhatDesc: "MLEO Arcade - это коллекция из 24 увлекательных мини-игр, где вы можете собирать внутриигровые награды MLEO! Каждая игра имеет уникальную механику и множители.",
     arcadeHowToPlay: "Как играть",
     arcadeSteps: [
       "Выберите любую игру из аркады",
-      "Каждая игра стоит 1,000 MLEO за раунд (вычитается из вашего хранилища)",
+      "Каждая сессия использует минимум 1,000 MLEO из вашего внутриигрового хранилища. Некоторые режимы могут использовать другую стоимость сессии",
       "Следуйте инструкциям для конкретной игры",
-      "Выигрывайте призы и множители до 10,000 MLEO!",
-      "Все выигрыши автоматически добавляются в ваше хранилище"
+      "Завершайте раунды, достигайте вех и собирайте бонусы наград на основе ваших результатов",
+      "Награды сессии автоматически добавляются в ваше хранилище, включая награды, заработанные в бесплатных сессиях"
     ],
     arcadeFreePlay: "Токены бесплатной игры",
     arcadeFreePlayList: [
-      "Получайте 1 токен бесплатной игры каждый час (максимум 5 токенов)",
-      "Используйте токены для игры в любую игру без траты MLEO",
-      "Выигрыши в бесплатной игре все равно добавляются в ваше хранилище!"
+      "Получайте 1 токен бесплатной игры каждый час (до 5 хранимых)",
+      "Используйте токены для запуска одной аркадной сессии без использования MLEO из хранилища",
+      "Награды из бесплатных сессий добавляются в ваше хранилище так же, как и стандартные награды сессии"
     ],
     arcadeGoodToKnow: "Хорошо знать",
     arcadeGoodToKnowList: [
       "Ваше хранилище общее для всех игр MLEO",
-      "Каждая игра отслеживает вашу личную статистику",
-      "Все игры используют справедливую генерацию случайных чисел",
-      "Нажмите кнопку ℹ️ в каждой игре для конкретных правил"
+      "Каждая игра отслеживает вашу активность, завершенные сессии, лучший результат, серии и вехи прогресса",
+      "Некоторые игры используют случайные события, в то время как другие фокусируются на времени, реакции, памяти или принятии решений",
+      "Нажмите кнопку ℹ️ на каждой карточке игры, чтобы просмотреть правила, управление и структуру наград"
     ],
   },
   es: {
@@ -379,28 +347,28 @@ const TEXT = {
       "Conecta tu wallet para reclamar tokens MLEO on-chain cuando estén disponibles."
     ],
     arcadeWhat: "¿Qué es MLEO Arcade?",
-    arcadeWhatDesc: "MLEO Arcade es una colección de 24 emocionantes minijuegos donde puedes ganar tokens MLEO! Cada juego tiene mecánicas y multiplicadores únicos.",
+    arcadeWhatDesc: "MLEO Arcade es una colección de 24 emocionantes minijuegos donde puedes recolectar recompensas MLEO dentro de la aplicación! Cada juego tiene mecánicas y multiplicadores únicos.",
     arcadeHowToPlay: "Cómo jugar",
     arcadeSteps: [
       "Elige cualquier juego del arcade",
-      "Cada juego cuesta 1,000 MLEO por ronda (deducido de tu bóveda)",
+      "Cada sesión usa al menos 1,000 MLEO de tu bóveda dentro de la aplicación. Algunos modos pueden usar un costo de sesión diferente",
       "Sigue las instrucciones específicas del juego",
-      "¡Gana premios y multiplicadores de hasta 10,000 MLEO!",
-      "Todas las ganancias se agregan automáticamente a tu bóveda"
+      "Completa rondas, alcanza hitos y recolecta impulsos de recompensa basados en tus resultados",
+      "Las recompensas de sesión se agregan automáticamente a tu bóveda, incluyendo recompensas ganadas en sesiones de juego gratis"
     ],
     arcadeFreePlay: "Tokens de juego gratis",
     arcadeFreePlayList: [
-      "Gana 1 token de juego gratis cada hora (máx 5 tokens)",
-      "Usa tokens para jugar cualquier juego sin gastar MLEO",
-      "¡Las ganancias de juego gratis aún se agregan a tu bóveda!"
+      "Recibe 1 token de juego gratis cada hora (hasta 5 almacenados)",
+      "Usa tokens para iniciar una sesión de arcade sin usar MLEO de la bóveda",
+      "Las recompensas de sesiones de juego gratis se agregan a tu bóveda igual que las recompensas de sesión estándar"
     ],
     arcadeGoodToKnow: "Bueno saber",
     arcadeGoodToKnowList: [
       "Tu bóveda se comparte entre todos los juegos MLEO",
-      "Cada juego rastrea tus estadísticas personales",
-      "Todos los juegos usan generación de números aleatorios justos",
-      "Haz clic en el botón ℹ️ en cada juego para reglas específicas"
-    ],
+      "Cada juego rastrea tu actividad, sesiones completadas, mejor puntuación, rachas y hitos de progreso",
+      "Algunos juegos usan eventos aleatorios, mientras que otros se enfocan en tiempo, reacción, memoria o toma de decisiones",
+      "Haz clic en el botón ℹ️ en cada tarjeta de juego para ver las reglas, controles y estructura de recompensas"
+    ]
   },
   fr: {
     name: "Français", dir: "ltr", code: "fr",
@@ -472,28 +440,28 @@ const TEXT = {
       "Connectez votre wallet pour réclamer tokens MLEO on-chain quand disponibles."
     ],
     arcadeWhat: "Qu'est-ce que MLEO Arcade?",
-    arcadeWhatDesc: "MLEO Arcade est une collection de 24 mini-jeux excitants où vous pouvez gagner des tokens MLEO! Chaque jeu a des mécaniques et multiplicateurs uniques.",
+    arcadeWhatDesc: "MLEO Arcade est une collection de 24 mini-jeux passionnants où vous pouvez collecter des récompenses MLEO dans l'application! Chaque jeu a des mécaniques et multiplicateurs uniques.",
     arcadeHowToPlay: "Comment jouer",
     arcadeSteps: [
       "Choisissez n'importe quel jeu de l'arcade",
-      "Chaque jeu coûte 1,000 MLEO par partie (déduit de votre coffre)",
+      "Chaque session utilise au moins 1,000 MLEO de votre coffre dans l'application. Certains modes peuvent utiliser un coût de session différent",
       "Suivez les instructions spécifiques du jeu",
-      "Gagnez des prix et multiplicateurs jusqu'à 10,000 MLEO!",
-      "Tous les gains sont automatiquement ajoutés à votre coffre"
+      "Terminez les manches, atteignez les jalons et collectez les boosts de récompense basés sur vos résultats",
+      "Les récompenses de session sont automatiquement ajoutées à votre coffre, y compris les récompenses gagnées dans les sessions de jeu gratuit"
     ],
     arcadeFreePlay: "Tokens de jeu gratuit",
     arcadeFreePlayList: [
-      "Gagnez 1 token de jeu gratuit chaque heure (up to 5 stored)",
-      "Utilisez les tokens pour jouer à n'importe quel jeu sans dépenser de MLEO",
-      "Les gains de jeu gratuit sont toujours ajoutés à votre coffre!"
+      "Recevez 1 token de jeu gratuit chaque heure (jusqu'à 5 stockés)",
+      "Utilisez les tokens pour démarrer une session d'arcade sans utiliser MLEO du coffre",
+      "Les récompenses des sessions de jeu gratuit sont ajoutées à votre coffre comme les récompenses de session standard"
     ],
     arcadeGoodToKnow: "Bon à savoir",
     arcadeGoodToKnowList: [
       "Votre coffre est partagé entre tous les jeux MLEO",
-      "Chaque jeu suit vos statistiques personnelles",
-      "Tous les jeux utilisent une génération de nombres aléatoires équitable",
-      "Cliquez sur le bouton ℹ️ sur chaque jeu pour les règles spécifiques"
-    ],
+      "Chaque jeu suit votre activité, sessions complétées, meilleur score, séries et jalons de progression",
+      "Certains jeux utilisent des événements aléatoires, tandis que d'autres se concentrent sur le timing, la réaction, la mémoire ou la prise de décision",
+      "Cliquez sur le bouton ℹ️ sur chaque carte de jeu pour voir les règles, contrôles et structure de récompenses"
+    ]
   },
   de: {
     name: "Deutsch", dir: "ltr", code: "de",
@@ -565,28 +533,28 @@ const TEXT = {
       "Verbinde deine Wallet um MLEO-Token on-chain zu claimen wenn verfügbar."
     ],
     arcadeWhat: "Was ist MLEO Arcade?",
-    arcadeWhatDesc: "MLEO Arcade ist eine Sammlung von 24 spannenden Mini-Spielen, bei denen Sie MLEO-Token gewinnen können! Jedes Spiel hat einzigartige Mechaniken und Multiplikatoren.",
+    arcadeWhatDesc: "MLEO Arcade ist eine Sammlung von 24 spannenden Mini-Spielen, bei denen Sie MLEO-Belohnungen in der App sammeln können! Jedes Spiel hat einzigartige Mechaniken und Multiplikatoren.",
     arcadeHowToPlay: "Wie man spielt",
     arcadeSteps: [
       "Wählen Sie ein beliebiges Spiel aus der Arcade",
-      "Jedes Spiel kostet 1.000 MLEO pro Runde (von Ihrer Tresor abgezogen)",
+      "Jede Sitzung verwendet mindestens 1.000 MLEO aus Ihrem Tresor in der App. Einige Modi können unterschiedliche Sitzungskosten verwenden",
       "Folgen Sie den spielspezifischen Anweisungen",
-      "Sammeln Sie Belohnungen und Multiplikatoren bis zu 10.000 MLEO!",
-      "Alle Gewinne werden automatisch zu Ihrem Tresor hinzugefügt"
+      "Vervollständigen Sie Läufe, erreichen Sie Meilensteine und sammeln Sie Belohnungs-Boosts basierend auf Ihren Ergebnissen",
+      "Sitzungsbelohnungen werden automatisch zu Ihrem Tresor hinzugefügt, einschließlich Belohnungen aus kostenlosen Spielsitzungen"
     ],
     arcadeFreePlay: "Kostenlose Spiel-Token",
     arcadeFreePlayList: [
-      "Verdienen Sie 1 kostenloses Spiel-Token jede Stunde (max 5 Token)",
-      "Verwenden Sie Token, um jedes Spiel zu spielen, ohne MLEO auszugeben",
-      "Kostenlose Spielgewinne werden trotzdem zu Ihrem Tresor hinzugefügt!"
+      "Erhalten Sie jede Stunde 1 kostenloses Spiel-Token (bis zu 5 gespeichert)",
+      "Verwenden Sie Token, um eine Arcade-Sitzung zu starten, ohne MLEO aus dem Tresor zu verwenden",
+      "Belohnungen aus kostenlosen Spielsitzungen werden zu Ihrem Tresor hinzugefügt, genau wie Standard-Sitzungsbelohnungen"
     ],
     arcadeGoodToKnow: "Gut zu wissen",
     arcadeGoodToKnowList: [
       "Ihr Tresor wird von allen MLEO-Spielen geteilt",
-      "Jedes Spiel verfolgt Ihre persönlichen Statistiken",
-      "Alle Spiele verwenden faire Zufallszahlengenerierung",
-      "Klicken Sie auf die ℹ️-Schaltfläche bei jedem Spiel für spezifische Regeln"
-    ],
+      "Jedes Spiel verfolgt Ihre Aktivität, abgeschlossene Sitzungen, beste Punktzahl, Serien und Fortschrittsmeilensteine",
+      "Einige Spiele verwenden zufällige Ereignisse, während andere sich auf Timing, Reaktion, Gedächtnis oder Entscheidungsfindung konzentrieren",
+      "Klicken Sie auf die ℹ️-Schaltfläche auf jeder Spielkarte, um die Regeln, Steuerungen und Belohnungsstruktur anzuzeigen"
+    ]
   },
   zh: {
     name: "中文", dir: "ltr", code: "zh",
@@ -658,28 +626,28 @@ const TEXT = {
       "连接你的钱包以在可用时链上提取MLEO代币。"
     ],
     arcadeWhat: "MLEO街机是什么？",
-    arcadeWhatDesc: "MLEO街机是24款激动人心的迷你游戏合集，您可以赢取MLEO代币！每款游戏都有独特的机制和倍数。",
+    arcadeWhatDesc: "MLEO街机是24款激动人心的迷你游戏合集，您可以收集应用内MLEO奖励！每款游戏都有独特的机制和倍数。",
     arcadeHowToPlay: "如何游玩",
     arcadeSteps: [
       "从街机中选择任何游戏",
-      "每款游戏每轮花费1,000 MLEO（从您的金库中扣除）",
+      "每场会话至少使用1,000 MLEO从您的应用内金库。某些模式可能使用不同的会话成本",
       "遵循游戏特定的说明",
-      "赢取最高10,000 MLEO的奖品和倍数！",
-      "所有奖金自动添加到您的金库"
+      "完成回合，达到里程碑，并根据您的结果收集奖励提升",
+      "会话奖励自动添加到您的金库，包括从免费游戏会话中获得的奖励"
     ],
     arcadeFreePlay: "免费游玩代币",
     arcadeFreePlayList: [
       "每小时获得1个免费游玩代币（最多5个代币）",
-      "使用代币玩任何游戏而无需花费MLEO",
-      "免费游玩的奖金仍然添加到您的金库！"
+      "使用代币启动一次街机会话，而无需使用金库MLEO",
+      "免费游戏会话的奖励会添加到您的金库，就像标准会话奖励一样"
     ],
     arcadeGoodToKnow: "须知",
     arcadeGoodToKnowList: [
       "您的金库在所有MLEO游戏中共享",
-      "每款游戏跟踪您的个人统计",
-      "所有游戏使用公平的随机数生成",
-      "点击每款游戏的ℹ️按钮查看具体规则"
-    ],
+      "每款游戏跟踪您的活动、完成的会话、最佳分数、连胜和进度里程碑",
+      "一些游戏使用随机事件，而其他游戏则专注于时间、反应、记忆或决策",
+      "点击每款游戏卡上的ℹ️按钮查看规则、控制和奖励结构"
+    ]
   },
   ja: {
     name: "日本語", dir: "ltr", code: "ja",
@@ -751,28 +719,28 @@ const TEXT = {
       "利用可能時にオンチェーンでMLEOトークンをクレームするためウォレット接続。"
     ],
     arcadeWhat: "MLEO Arcadeとは？",
-    arcadeWhatDesc: "MLEO Arcadeは、MLEOトークンを獲得できる24種類のエキサイティングなミニゲームのコレクションです！各ゲームはユニークなメカニクスとマルチプライヤーがあります。",
+    arcadeWhatDesc: "MLEO Arcadeは、アプリ内MLEO報酬を集めることができる24種類のエキサイティングなミニゲームのコレクションです！各ゲームはユニークなメカニクスとマルチプライヤーがあります。",
     arcadeHowToPlay: "プレイ方法",
     arcadeSteps: [
       "アーケードから任意のゲームを選択",
-      "各ゲームは1ラウンド1,000 MLEOかかります（ボールトから差し引かれます）",
+      "各セッションはアプリ内ボルトから少なくとも1,000 MLEOを使用します。一部のモードは異なるセッションコストを使用する場合があります",
       "ゲーム固有の指示に従う",
-      "最大10,000 MLEOの賞品とマルチプライヤーを獲得！",
-      "すべての賞金は自動的にボールトに追加されます"
+      "ラウンドを完了し、マイルストーンに到達し、結果に基づいて報酬ブーストを収集",
+      "セッション報酬は、無料プレイセッションで獲得した報酬を含めて、自動的にボルトに追加されます"
     ],
     arcadeFreePlay: "無料プレイトークン",
     arcadeFreePlayList: [
-      "1時間ごとに1つの無料プレイトークンを獲得（最大5トークン）",
-      "トークンを使用してMLEOを使わずに任意のゲームをプレイ",
-      "無料プレイの賞金もボールトに追加されます！"
+      "毎時1つの無料プレイトークンを受け取る（最大5つ保存）",
+      "トークンを使用してボルトMLEOを使用せずにアーケードセッションを開始",
+      "無料プレイセッションからの報酬は、標準セッション報酬と同様にボルトに追加されます"
     ],
     arcadeGoodToKnow: "知っておくと良いこと",
     arcadeGoodToKnowList: [
-      "ボールトはすべてのMLEOゲーム間で共有されます",
-      "各ゲームは個人統計を追跡します",
-      "すべてのゲームは公平な乱数生成を使用",
-      "各ゲームのℹ️ボタンをクリックして特定のルールを確認"
-    ],
+      "ボルトはすべてのMLEOゲーム間で共有されます",
+      "各ゲームは、アクティビティ、完了したセッション、ベストスコア、連勝、進捗マイルストーンを追跡します",
+      "一部のゲームはランダムイベントを使用し、他のゲームはタイミング、反応、記憶、または意思決定に焦点を当てています",
+      "各ゲームカードのℹ️ボタンをクリックして、ルール、コントロール、報酬構造を表示"
+    ]
   },
   ko: {
     name: "한국어", dir: "ltr", code: "ko",
@@ -844,28 +812,28 @@ const TEXT = {
       "사용 가능할 때 온체인에서 MLEO 토큰을 청구하려면 지갑을 연결하세요."
     ],
     arcadeWhat: "MLEO Arcade란?",
-    arcadeWhatDesc: "MLEO Arcade는 MLEO 토큰을 획득할 수 있는 24개의 흥미진진한 미니 게임 모음입니다! 각 게임은 고유한 메커니즘과 배수를 가지고 있습니다.",
+    arcadeWhatDesc: "MLEO Arcade는 앱 내 MLEO 보상을 수집할 수 있는 24개의 흥미진진한 미니 게임 컬렉션입니다! 각 게임은 고유한 메커니즘과 배수를 가지고 있습니다.",
     arcadeHowToPlay: "플레이 방법",
     arcadeSteps: [
-      "아케이드에서 원하는 게임 선택",
-      "각 게임은 라운드당 1,000 MLEO가 소요됩니다(금고에서 차감)",
-      "게임별 지침 따르기",
-      "최대 10,000 MLEO의 상금과 배수 획득!",
-      "모든 상금은 자동으로 금고에 추가됩니다"
+      "아케이드에서 아무 게임이나 선택",
+      "각 세션은 앱 내 금고에서 최소 1,000 MLEO를 사용합니다. 일부 모드는 다른 세션 비용을 사용할 수 있습니다",
+      "게임별 지침을 따르세요",
+      "라운드를 완료하고 마일스톤에 도달하며 결과에 따라 보상 부스트 수집",
+      "세션 보상은 무료 플레이 세션에서 획득한 보상을 포함하여 자동으로 금고에 추가됩니다"
     ],
     arcadeFreePlay: "무료 플레이 토큰",
     arcadeFreePlayList: [
-      "매시간 1개의 무료 플레이 토큰 획득(최대 5개 토큰)",
-      "토큰을 사용하여 MLEO를 소비하지 않고 모든 게임 플레이",
-      "무료 플레이 상금도 금고에 추가됩니다!"
+      "매시간 1개의 무료 플레이 토큰 받기 (최대 5개 저장)",
+      "토큰을 사용하여 금고 MLEO를 사용하지 않고 아케이드 세션 시작",
+      "무료 플레이 세션의 보상은 표준 세션 보상과 마찬가지로 금고에 추가됩니다"
     ],
     arcadeGoodToKnow: "알아두면 좋은 정보",
     arcadeGoodToKnowList: [
-      "금고는 모든 MLEO 게임에서 공유됩니다",
-      "각 게임은 개인 통계를 추적합니다",
-      "모든 게임은 공정한 난수 생성 사용",
-      "특정 규칙은 각 게임의 ℹ️ 버튼 클릭"
-    ],
+      "금고는 모든 MLEO 게임 간에 공유됩니다",
+      "각 게임은 활동, 완료된 세션, 최고 점수, 연승 및 진행 마일스톤을 추적합니다",
+      "일부 게임은 무작위 이벤트를 사용하고 다른 게임은 타이밍, 반응, 기억 또는 의사 결정에 중점을 둡니다",
+      "각 게임 카드의 ℹ️ 버튼을 클릭하여 규칙, 컨트롤 및 보상 구조 보기"
+    ]
   },
   tr: {
     name: "Türkçe", dir: "ltr", code: "tr",
@@ -937,28 +905,28 @@ const TEXT = {
       "MLEO tokenlerini zincir üzerinde talep etmek için cüzdanınızı bağlayın."
     ],
     arcadeWhat: "MLEO Arcade nedir?",
-    arcadeWhatDesc: "MLEO Arcade, MLEO tokenleri kazanabileceğiniz 24 heyecan verici mini oyun koleksiyonudur! Her oyunun benzersiz mekanikleri ve çarpanları vardır.",
+    arcadeWhatDesc: "MLEO Arcade, uygulama içi MLEO ödüllerini toplayabileceğiniz 24 heyecan verici mini oyun koleksiyonudur! Her oyunun benzersiz mekanikleri ve çarpanları vardır.",
     arcadeHowToPlay: "Nasıl oynanır",
     arcadeSteps: [
-      "Arcade'dan herhangi bir oyun seçin",
-      "Her oyun tur başına 1,000 MLEO maliyetlidir (kasanızdan düşülür)",
-      "Oyuna özel talimatları izleyin",
-      "10,000 MLEO'ya kadar ödüller ve çarpanlar kazanın!",
-      "Tüm kazançlar otomatik olarak kasanıza eklenir"
+      "Arcade'den herhangi bir oyun seçin",
+      "Her oturum uygulama içi kasasından en az 1,000 MLEO kullanır. Bazı modlar farklı oturum maliyeti kullanabilir",
+      "Oyun özel talimatlarını takip edin",
+      "Turları tamamlayın, kilometre taşlarına ulaşın ve sonuçlarınıza göre ödül artışları toplayın",
+      "Oturum ödülleri, ücretsiz oyun oturumlarında kazanılan ödüller dahil olmak üzere otomatik olarak kasasına eklenir"
     ],
     arcadeFreePlay: "Ücretsiz oyun tokenleri",
     arcadeFreePlayList: [
-      "Her saat 1 ücretsiz oyun tokeni kazanın (maksimum 5 token)",
-      "MLEO harcamadan herhangi bir oyunu oynamak için token kullanın",
-      "Ücretsiz oyun kazançları yine de kasanıza eklenir!"
+      "Her saat 1 ücretsiz oyun jetonu alın (en fazla 5 saklanır)",
+      "Kasası MLEO kullanmadan bir arcade oturumu başlatmak için jetonları kullanın",
+      "Ücretsiz oyun oturumlarından gelen ödüller, standart oturum ödülleri gibi kasasına eklenir"
     ],
     arcadeGoodToKnow: "Bilmekte fayda var",
     arcadeGoodToKnowList: [
-      "Kasanız tüm MLEO oyunları arasında paylaşılır",
-      "Her oyun kişisel istatistiklerinizi izler",
-      "Tüm oyunlar adil rastgele sayı üretimi kullanır",
-      "Özel kurallar için her oyundaki ℹ️ düğmesine tıklayın"
-    ],
+      "Kasası tüm MLEO oyunları arasında paylaşılır",
+      "Her oyun aktivitenizi, tamamlanan oturumları, en iyi skoru, serileri ve ilerleme kilometre taşlarını takip eder",
+      "Bazı oyunlar rastgele olaylar kullanırken, diğerleri zamanlama, tepki, hafıza veya karar vermeye odaklanır",
+      "Kuralları, kontrolleri ve ödül yapısını görüntülemek için her oyun kartındaki ℹ️ düğmesine tıklayın"
+    ]
   },
   it: {
     name: "Italiano", dir: "ltr", code: "it",
@@ -1030,28 +998,28 @@ const TEXT = {
       "Connetti il tuo wallet per richiedere token MLEO on-chain quando disponibili."
     ],
     arcadeWhat: "Cos'è MLEO Arcade?",
-    arcadeWhatDesc: "MLEO Arcade è una collezione di 24 entusiasmanti mini-giochi dove puoi vincere token MLEO! Ogni gioco ha meccaniche e moltiplicatori unici.",
+    arcadeWhatDesc: "MLEO Arcade è una collezione di 24 mini-giochi entusiasmanti dove puoi raccogliere ricompense MLEO nell'app! Ogni gioco ha meccaniche e moltiplicatori unici.",
     arcadeHowToPlay: "Come giocare",
     arcadeSteps: [
       "Scegli qualsiasi gioco dall'arcade",
-      "Ogni gioco costa 1.000 MLEO per session (dedotto dalla tua cassaforte)",
+      "Ogni sessione utilizza almeno 1,000 MLEO dal tuo caveau nell'app. Alcune modalità possono utilizzare un costo di sessione diverso",
       "Segui le istruzioni specifiche del gioco",
-      "Vinci premi e moltiplicatori fino a 10.000 MLEO!",
-      "Tutte le vincite vengono automaticamente aggiunte alla tua cassaforte"
+      "Completa i round, raggiungi i traguardi e raccogli i potenziamenti delle ricompense in base ai tuoi risultati",
+      "Le ricompense della sessione vengono aggiunte automaticamente al tuo caveau, incluse le ricompense ottenute nelle sessioni di gioco gratuito"
     ],
     arcadeFreePlay: "Token gioco gratuito",
     arcadeFreePlayList: [
-      "Guadagna 1 token gioco gratuito ogni ora (massimo 5 token)",
-      "Usa i token per giocare a qualsiasi gioco senza spendere MLEO",
-      "Le vincite di gioco gratuito vengono comunque aggiunte alla tua cassaforte!"
+      "Ricevi 1 token di gioco gratuito ogni ora (fino a 5 memorizzati)",
+      "Usa i token per avviare una sessione arcade senza usare MLEO dal caveau",
+      "Le ricompense delle sessioni di gioco gratuito vengono aggiunte al tuo caveau proprio come le ricompense di sessione standard"
     ],
     arcadeGoodToKnow: "Buono a sapersi",
     arcadeGoodToKnowList: [
-      "La tua cassaforte è condivisa tra tutti i giochi MLEO",
-      "Ogni gioco tiene traccia delle tue statistiche personali",
-      "Tutti i giochi utilizzano generazione di numeri casuali equa",
-      "Fai clic sul pulsante ℹ️ su ogni gioco per le regole specifiche"
-    ],
+      "Il tuo caveau è condiviso tra tutti i giochi MLEO",
+      "Ogni gioco traccia la tua attività, sessioni completate, miglior punteggio, serie e traguardi di progresso",
+      "Alcuni giochi utilizzano eventi casuali, mentre altri si concentrano su tempismo, reazione, memoria o decision making",
+      "Clicca il pulsante ℹ️ su ogni scheda del gioco per visualizzare regole, controlli e struttura delle ricompense"
+    ]
   },
   ka: {
     name: "ქართული", dir: "ltr", code: "ka",
@@ -1123,28 +1091,28 @@ const TEXT = {
       "დაუკავშირდი შენს საფულეს MLEO ტოკენების ონჩეინ მოთხოვნისთვის, როცა ხელმისაწვდომი იქნება."
     ],
     arcadeWhat: "რა არის MLEO Arcade?",
-    arcadeWhatDesc: "MLEO Arcade არის 24 საინტერესო მინი-თამაშის კოლექცია, სადაც შეგიძლია მოიგო MLEO ტოკენები! თითოეულ თამაშს აქვს უნიკალური მექანიზმები და მულტიპლიკატორები.",
+    arcadeWhatDesc: "MLEO Arcade არის 24 საინტერესო მინი-თამაშების კოლექცია, სადაც შეგიძლიათ შეაგროვოთ აპლიკაციაში MLEO ჯილდოები! თითოეულ თამაშს აქვს უნიკალური მექანიკა და მულტიპლიკატორები.",
     arcadeHowToPlay: "როგორ ვითამაშოთ",
     arcadeSteps: [
-      "აირჩიე ნებისმიერი თამაში არკადიდან",
-      "თითოეული თამაში ჯდება 1,000 MLEO რაუნდზე (გაიქვითება შენი საცავიდან)",
-      "მიჰყევი თამაშის სპეციფიურ ინსტრუქციებს",
-      "მოიგე პრიზები და მულტიპლიკატორები 10,000 MLEO-მდე!",
-      "ყველა მოგება ავტომატურად ემატება შენს საცავს"
+      "აირჩიეთ ნებისმიერი თამაში არკადიდან",
+      "თითოეული სესია იყენებს მინიმუმ 1,000 MLEO თქვენი აპლიკაციაში ვოლტიდან. ზოგიერთ რეჟიმს შეიძლება გამოიყენოს სხვა სესიის ღირებულება",
+      "მიჰყევით თამაშის სპეციფიკურ ინსტრუქციებს",
+      "დაასრულეთ რაუნდები, მიაღწიეთ მილიენისტონებს და შეაგროვეთ ჯილდოს ბუსტები თქვენი შედეგების მიხედვით",
+      "სესიის ჯილდოები ავტომატურად ემატება თქვენს ვოლტს, მათ შორის უფასო თამაშის სესიებში მოპოვებული ჯილდოები"
     ],
     arcadeFreePlay: "უფასო თამაშის ტოკენები",
     arcadeFreePlayList: [
-      "მიიღე 1 უფასო თამაშის ტოკენი ყოველ საათში (მაქს 5 ტოკენი)",
-      "გამოიყენე ტოკენები ნებისმიერი თამაშის სათამაშოდ MLEO-ს დახარჯვის გარეშე",
-      "უფასო თამაშის მოგებები მაინც ემატება შენს საცავს!"
+      "მიიღეთ 1 უფასო თამაშის ტოკენი ყოველ საათში (მაქსიმუმ 5 შენახული)",
+      "გამოიყენეთ ტოკენები არკადის სესიის დასაწყებად ვოლტის MLEO-ს გამოყენების გარეშე",
+      "უფასო თამაშის სესიებიდან ჯილდოები ემატება თქვენს ვოლტს, ისევე როგორც სტანდარტული სესიის ჯილდოები"
     ],
     arcadeGoodToKnow: "კარგი იცოდე",
     arcadeGoodToKnowList: [
-      "შენი საცავი გაზიარებულია ყველა MLEO თამაშს შორის",
-      "თითოეული თამაში ადევნებს შენ პირად სტატისტიკას",
-      "ყველა თამაში იყენებს სამართლიან შემთხვევითი რიცხვების გენერირებას",
-      "დააწკაპუნე ℹ️ ღილაკზე თითოეულ თამაშზე სპეციფიური წესებისთვის"
-    ],
+      "თქვენი ვოლტი იზიარება ყველა MLEO თამაშს შორის",
+      "თითოეული თამაში ადევნებს თვალს თქვენს აქტივობას, დასრულებულ სესიებს, საუკეთესო ქულას, სერიებსა და პროგრესის მილიენისტონებს",
+      "ზოგიერთი თამაში იყენებს შემთხვევით მოვლენებს, ხოლო სხვები ფოკუსირდება დროზე, რეაქციაზე, მეხსენებაზე ან გადაწყვეტილების მიღებაზე",
+      "დააწკაპუნეთ ℹ️ ღილაკზე თითოეულ თამაშის ბარათზე წესების, კონტროლებისა და ჯილდოს სტრუქტურის სანახავად"
+    ]
   },
   pl: {
     name: "Polski", dir: "ltr", code: "pl",
@@ -1216,28 +1184,28 @@ const TEXT = {
       "Połącz swój portfel aby rościć tokeny MLEO on-chain gdy będą dostępne."
     ],
     arcadeWhat: "Co to jest MLEO Arcade?",
-    arcadeWhatDesc: "MLEO Arcade to kolekcja 24 ekscytujących mini-gier, w których możesz wygrać tokeny MLEO! Każda gra ma unikalne mechaniki i multiplikatory.",
+    arcadeWhatDesc: "MLEO Arcade to kolekcja 24 ekscytujących mini-gier, w których możesz zbierać nagrody MLEO w aplikacji! Każda gra ma unikalną mechanikę i mnożniki.",
     arcadeHowToPlay: "Jak grać",
     arcadeSteps: [
-      "Wybierz dowolną grę z arcade",
-      "Każda gra kosztuje 1,000 MLEO za rundę (odliczone od twojego skarbca)",
+      "Wybierz dowolną grę z salonu gier",
+      "Każda sesja używa co najmniej 1,000 MLEO z twojego skarbca w aplikacji. Niektóre tryby mogą używać innego kosztu sesji",
       "Postępuj zgodnie z instrukcjami specyficznymi dla gry",
-      "Wygrywaj nagrody i multiplikatory do 10,000 MLEO!",
-      "Wszystkie wygrane są automatycznie dodawane do twojego skarbca"
+      "Ukończ rundy, osiągnij kamienie milowe i zbieraj wzmocnienia nagród na podstawie swoich wyników",
+      "Nagrody sesji są automatycznie dodawane do twojego skarbca, w tym nagrody zdobyte w darmowych sesjach gry"
     ],
     arcadeFreePlay: "Tokeny darmowej gry",
     arcadeFreePlayList: [
-      "Zdobądź 1 token darmowej gry co godzinę (maksimum 5 tokenów)",
-      "Użyj tokenów do grania w dowolną grę bez wydawania MLEO",
-      "Wygrane z darmowej gry nadal są dodawane do twojego skarbca!"
+      "Otrzymuj 1 token darmowej gry co godzinę (do 5 przechowywanych)",
+      "Używaj tokenów do rozpoczęcia sesji salonu gier bez używania MLEO ze skarbca",
+      "Nagrody z darmowych sesji gry są dodawane do twojego skarbca tak samo jak standardowe nagrody sesji"
     ],
     arcadeGoodToKnow: "Dobrze wiedzieć",
     arcadeGoodToKnowList: [
-      "Twój skarbiec jest wspólny dla wszystkich gier MLEO",
-      "Każda gra śledzi twoje osobiste statystyki",
-      "Wszystkie gry używają uczciwej generacji liczb losowych",
-      "Kliknij przycisk ℹ️ w każdej grze, aby zobaczyć konkretne zasady"
-    ],
+      "Twój skarbiec jest współdzielony między wszystkimi grami MLEO",
+      "Każda gra śledzi twoją aktywność, ukończone sesje, najlepszy wynik, serie i kamienie milowe postępu",
+      "Niektóre gry używają losowych wydarzeń, podczas gdy inne skupiają się na czasie, reakcji, pamięci lub podejmowaniu decyzji",
+      "Kliknij przycisk ℹ️ na każdej karcie gry, aby wyświetlić zasady, kontrolki i strukturę nagród"
+    ]
   },
   ro: {
     name: "Română", dir: "ltr", code: "ro",
@@ -1309,28 +1277,28 @@ const TEXT = {
       "Conectează-ți portofelul pentru a cere token-uri MLEO on-chain când sunt disponibile."
     ],
     arcadeWhat: "Ce este MLEO Arcade?",
-    arcadeWhatDesc: "MLEO Arcade este o colecție de 24 mini-jocuri interesante unde poți câștiga token-uri MLEO! Fiecare joc are mecanici și multiplicatori unici.",
+    arcadeWhatDesc: "MLEO Arcade este o colecție de 24 mini-jocuri captivante unde poți colecta recompense MLEO în aplicație! Fiecare joc are mecanici și multiplicatori unici.",
     arcadeHowToPlay: "Cum să joci",
     arcadeSteps: [
       "Alege orice joc din arcade",
-      "Fiecare joc costă 1,000 MLEO pe rundă (dedus din seiful tău)",
+      "Fiecare sesiune folosește cel puțin 1,000 MLEO din seiful tău în aplicație. Unele moduri pot folosi un cost de sesiune diferit",
       "Urmează instrucțiunile specifice jocului",
-      "Câștigă premii și multiplicatori până la 10,000 MLEO!",
-      "Toate câștigurile sunt adăugate automat în seiful tău"
+      "Finalizează runde, atinge obiectivele și colectează impulsuri de recompensă bazate pe rezultatele tale",
+      "Recompensele sesiunii sunt adăugate automat în seiful tău, inclusiv recompensele câștigate în sesiunile de joc gratuit"
     ],
     arcadeFreePlay: "Token-uri joc gratuit",
     arcadeFreePlayList: [
-      "Câștigă 1 token joc gratuit în fiecare oră (maximum 5 token-uri)",
-      "Folosește token-uri pentru a juca orice joc fără a cheltui MLEO",
-      "Câștigurile de joc gratuit sunt tot adăugate în seiful tău!"
+      "Primește 1 token de joc gratuit la fiecare oră (până la 5 stocate)",
+      "Folosește tokenurile pentru a începe o sesiune arcade fără a folosi MLEO din seif",
+      "Recompensele din sesiunile de joc gratuit sunt adăugate în seiful tău la fel ca recompensele standard de sesiune"
     ],
     arcadeGoodToKnow: "Bine de știut",
     arcadeGoodToKnowList: [
       "Seiful tău este partajat între toate jocurile MLEO",
-      "Fiecare joc urmărește statisticile tale personale",
-      "Toate jocurile folosesc generare echitabilă de numere aleatoare",
-      "Apasă butonul ℹ️ pe fiecare joc pentru reguli specifice"
-    ],
+      "Fiecare joc urmărește activitatea ta, sesiunile finalizate, cel mai bun scor, seriile și obiectivele de progres",
+      "Unele jocuri folosesc evenimente aleatoare, în timp ce altele se concentrează pe sincronizare, reacție, memorie sau luarea deciziilor",
+      "Apasă butonul ℹ️ pe fiecare carte de joc pentru a vedea regulile, controalele și structura recompenselor"
+    ]
   },
   cs: {
     name: "Čeština", dir: "ltr", code: "cs",
@@ -1402,28 +1370,28 @@ const TEXT = {
       "Připojte svou peněženku pro nárok na MLEO tokeny on-chain, když budou dostupné."
     ],
     arcadeWhat: "Co je MLEO Arcade?",
-    arcadeWhatDesc: "MLEO Arcade je kolekce 24 vzrušujících mini-her, kde můžete vyhrát MLEO tokeny! Každá hra má unikátní mechaniky a multiplikátory.",
+    arcadeWhatDesc: "MLEO Arcade je sbírka 24 vzrušujících miniher, kde můžete sbírat odměny MLEO v aplikaci! Každá hra má jedinečné mechaniky a multiplikátory.",
     arcadeHowToPlay: "Jak hrát",
     arcadeSteps: [
-      "Vyberte jakoukoliv hru z arkády",
-      "Každá hra stojí 1,000 MLEO za kolo (odečte se z vašeho trezoru)",
-      "Postupujte podle specifických pokynů hry",
-      "Vyhrávejte ceny a multiplikátory až do 10,000 MLEO!",
-      "Všechny výhry se automaticky přidají do vašeho trezoru"
+      "Vyberte libovolnou hru z arkád",
+      "Každá relace používá alespoň 1,000 MLEO z vašeho trezoru v aplikaci. Některé režimy mohou používat jiné náklady na relaci",
+      "Postupujte podle pokynů specifických pro hru",
+      "Dokončete kola, dosáhněte milníků a sbírejte posílení odměn na základě vašich výsledků",
+      "Odměny relace jsou automaticky přidávány do vašeho trezoru, včetně odměn získaných v bezplatných herních relacích"
     ],
     arcadeFreePlay: "Tokeny zdarma",
     arcadeFreePlayList: [
-      "Získejte 1 token zdarma každou hodinu (maximum 5 tokenů)",
-      "Použijte tokeny k hraní jakékoliv hry bez utrácení MLEO",
-      "Výhry zdarma se stále přidávají do vašeho trezoru!"
+      "Získejte 1 token bezplatné hry každou hodinu (až 5 uložených)",
+      "Použijte tokeny k zahájení arkádové relace bez použití MLEO z trezoru",
+      "Odměny z bezplatných herních relací jsou přidávány do vašeho trezoru stejně jako standardní odměny relace"
     ],
     arcadeGoodToKnow: "Dobré vědět",
     arcadeGoodToKnowList: [
-      "Váš trezor je sdílen mezi všemi MLEO hrami",
-      "Každá hra sleduje vaše osobní statistiky",
-      "Všechny hry používají spravedlivou generaci náhodných čísel",
-      "Klikněte na tlačítko ℹ️ u každé hry pro specifická pravidla"
-    ],
+      "Váš trezor je sdílen mezi všemi hrami MLEO",
+      "Každá hra sleduje vaši aktivitu, dokončené relace, nejlepší skóre, série a milníky pokroku",
+      "Některé hry používají náhodné události, zatímco jiné se zaměřují na načasování, reakci, paměť nebo rozhodování",
+      "Klikněte na tlačítko ℹ️ na každé herní kartě pro zobrazení pravidel, ovládacích prvků a struktury odměn"
+    ]
   },
   nl: {
     name: "Nederlands", dir: "ltr", code: "nl",
@@ -1495,28 +1463,28 @@ const TEXT = {
       "Verbind je wallet om MLEO tokens on-chain te claimen wanneer beschikbaar."
     ],
     arcadeWhat: "Wat is MLEO Arcade?",
-    arcadeWhatDesc: "MLEO Arcade is een collectie van 24 spannende mini-games waar je MLEO tokens kunt winnen! Elk spel heeft unieke mechanica en vermenigvuldigers.",
+    arcadeWhatDesc: "MLEO Arcade is een verzameling van 24 spannende mini-games waar je MLEO-beloningen in de app kunt verzamelen! Elke game heeft unieke mechanica en vermenigvuldigers.",
     arcadeHowToPlay: "Hoe te spelen",
     arcadeSteps: [
-      "Kies een willekeurig spel uit de arcade",
-      "Elk spel kost 1,000 MLEO per ronde (afgetrokken van je kluis)",
-      "Volg de spelspecifieke instructies",
-      "Verzamel beloningen en vermenigvuldigers tot 10,000 MLEO!",
-      "Alle winsten worden automatisch toegevoegd aan je kluis"
+      "Kies een willekeurige game uit de arcade",
+      "Elke sessie gebruikt minimaal 1,000 MLEO uit je kluis in de app. Sommige modi kunnen verschillende sessiekosten gebruiken",
+      "Volg de gamespecifieke instructies",
+      "Voltooi rondes, bereik mijlpalen en verzamel beloningsboosts op basis van je resultaten",
+      "Sessiebeloningen worden automatisch toegevoegd aan je kluis, inclusief beloningen verdiend in gratis spelsessies"
     ],
     arcadeFreePlay: "Gratis speel tokens",
     arcadeFreePlayList: [
-      "Verdien 1 gratis speel token elk uur (up to 5 stored)",
-      "Gebruik tokens om elk spel te spelen zonder MLEO uit te geven",
-      "Gratis speel winsten worden nog steeds toegevoegd aan je kluis!"
+      "Ontvang elk uur 1 gratis speeltoken (tot 5 opgeslagen)",
+      "Gebruik tokens om een arcade-sessie te starten zonder kluis MLEO te gebruiken",
+      "Beloningen van gratis spelsessies worden toegevoegd aan je kluis, net als standaard sessiebeloningen"
     ],
     arcadeGoodToKnow: "Goed om te weten",
     arcadeGoodToKnowList: [
-      "Je kluis wordt gedeeld tussen alle MLEO spellen",
-      "Elk spel volgt je persoonlijke statistieken",
-      "Alle spellen gebruiken eerlijke willekeurige getalsgeneratie",
-      "Klik op de ℹ️ knop bij elk spel voor specifieke regels"
-    ],
+      "Je kluis wordt gedeeld tussen alle MLEO-games",
+      "Elke game volgt je activiteit, voltooide sessies, beste score, reeksen en voortgangsmijlpalen",
+      "Sommige games gebruiken willekeurige gebeurtenissen, terwijl andere zich richten op timing, reactie, geheugen of besluitvorming",
+      "Klik op de ℹ️-knop op elke gamekaart om de regels, bedieningselementen en beloningsstructuur te bekijken"
+    ]
   },
   el: {
     name: "Ελληνικά", dir: "ltr", code: "el",
@@ -1588,28 +1556,28 @@ const TEXT = {
       "Συνδέσε το πορτοφόλι σου για να αξιώσεις MLEO tokens on-chain όταν είναι διαθέσιμα."
     ],
     arcadeWhat: "Τι είναι το MLEO Arcade;",
-    arcadeWhatDesc: "Το MLEO Arcade είναι μια συλλογή από 24 συναρπαστικά mini-games όπου μπορείτε να κερδίσετε MLEO tokens! Κάθε παιχνίδι έχει μοναδικούς μηχανισμούς και πολλαπλασιαστές.",
+    arcadeWhatDesc: "Το MLEO Arcade είναι μια συλλογή 24 συναρπαστικών μίνι παιχνιδιών όπου μπορείτε να συλλέξετε ανταμοιβές MLEO στην εφαρμογή! Κάθε παιχνίδι έχει μοναδικές μηχανικές και πολλαπλασιαστές.",
     arcadeHowToPlay: "Πώς να παίξετε",
     arcadeSteps: [
       "Επιλέξτε οποιοδήποτε παιχνίδι από το arcade",
-      "Κάθε παιχνίδι κοστίζει 1,000 MLEO ανά γύρο (αφαιρείται από το θησαυροφυλάκιό σας)",
-      "Ακολουθήστε τις οδηγίες του παιχνιδιού",
-      "Κερδίστε βραβεία και πολλαπλασιαστές έως 10,000 MLEO!",
-      "Όλα τα κέρδη προστίθενται αυτόματα στο θησαυροφυλάκιό σας"
+      "Κάθε συνεδρία χρησιμοποιεί τουλάχιστον 1,000 MLEO από το χρηματοκιβώτιό σας στην εφαρμογή. Ορισμένες λειτουργίες μπορεί να χρησιμοποιούν διαφορετικό κόστος συνεδρίας",
+      "Ακολουθήστε τις οδηγίες ειδικές για το παιχνίδι",
+      "Ολοκληρώστε γύρους, φτάστε στα ορόσημα και συλλέξτε ενισχύσεις ανταμοιβών με βάση τα αποτελέσματά σας",
+      "Οι ανταμοιβές συνεδρίας προστίθενται αυτόματα στο χρηματοκιβώτιό σας, συμπεριλαμβανομένων των ανταμοιβών που κερδίζονται σε δωρεάν συνεδρίες παιχνιδιού"
     ],
     arcadeFreePlay: "Δωρεάν παιχνίδι tokens",
     arcadeFreePlayList: [
-      "Κερδίστε 1 δωρεάν παιχνίδι token κάθε ώρα (up to 5 stored)",
-      "Χρησιμοποιήστε tokens για να παίξετε οποιοδήποτε παιχνίδι χωρίς να ξοδέψετε MLEO",
-      "Τα κέρδη από δωρεάν παιχνίδι προστίθενται ακόμα στο θησαυροφυλάκιό σας!"
+      "Λάβετε 1 δωρεάν token παιχνιδιού κάθε ώρα (έως 5 αποθηκευμένα)",
+      "Χρησιμοποιήστε tokens για να ξεκινήσετε μια συνεδρία arcade χωρίς να χρησιμοποιήσετε MLEO από το χρηματοκιβώτιο",
+      "Οι ανταμοιβές από δωρεάν συνεδρίες παιχνιδιού προστίθενται στο χρηματοκιβώτιό σας όπως οι τυπικές ανταμοιβές συνεδρίας"
     ],
     arcadeGoodToKnow: "Καλό να ξέρετε",
     arcadeGoodToKnowList: [
-      "Το θησαυροφυλάκιό σας είναι κοινό σε όλα τα MLEO παιχνίδια",
-      "Κάθε παιχνίδι παρακολουθεί τα προσωπικά σας στατιστικά",
-      "Όλα τα παιχνίδια χρησιμοποιούν δίκαιη γέννηση τυχαίων αριθμών",
-      "Κάντε κλικ στο κουμπί ℹ️ σε κάθε παιχνίδι για συγκεκριμένους κανόνες"
-    ],
+      "Το χρηματοκιβώτιό σας μοιράζεται μεταξύ όλων των παιχνιδιών MLEO",
+      "Κάθε παιχνίδι παρακολουθεί τη δραστηριότητά σας, τις ολοκληρωμένες συνεδρίες, την καλύτερη βαθμολογία, τις σειρές και τα ορόσημα προόδου",
+      "Ορισμένα παιχνίδια χρησιμοποιούν τυχαία γεγονότα, ενώ άλλα εστιάζουν στον συγχρονισμό, την αντίδραση, τη μνήμη ή τη λήψη αποφάσεων",
+      "Κάντε κλικ στο κουμπί ℹ️ σε κάθε κάρτα παιχνιδιού για να δείτε τους κανόνες, τα στοιχεία ελέγχου και τη δομή ανταμοιβών"
+    ]
   },
   he: {
     name: "עברית", dir: "rtl", code: "he",
@@ -1681,28 +1649,28 @@ const TEXT = {
       "חבר את הארנק שלך לתביעת מטבעות MLEO על השרשרת כשהם זמינים."
     ],
     arcadeWhat: "מה זה MLEO Arcade?",
-    arcadeWhatDesc: "MLEO Arcade הוא אוסף של 24 משחקוני מיני מרגשים שבהם אפשר לזכות בטוקנים של MLEO! לכל משחק יש מכניקות ומכפילים ייחודיים.",
+    arcadeWhatDesc: "MLEO Arcade הוא אוסף של 24 מיני-משחקים מרגשים שבהם תוכלו לאסוף פרסי MLEO בתוך האפליקציה! לכל משחק יש מכניקות ומכפילים ייחודיים.",
     arcadeHowToPlay: "איך משחקים",
     arcadeSteps: [
-      "בחר כל משחק מהארקייד",
-      "כל משחק עולה 1,000 MLEO לסיבוב (מנוכה מהכספת שלך)",
-      "עקוב אחר הוראות המשחק הספציפיות",
-      "זכה בפרסים ומכפילים עד 10,000 MLEO!",
-      "כל הזכיות מתווספות אוטומטית לכספת שלך"
+      "בחרו כל משחק מהארקייד",
+      "כל סשן משתמש בלפחות 1,000 MLEO מהכספת שלכם באפליקציה. חלק מהמצבים עשויים להשתמש בעלות סשן שונה",
+      "עקבו אחר ההוראות הספציפיות למשחק",
+      "השלימו סבבים, הגיעו לאבני דרך ואספו הגברות פרסים בהתבסס על התוצאות שלכם",
+      "פרסי הסשן מתווספים אוטומטית לכספת שלכם, כולל פרסים שהושגו בסשני משחק חינמיים"
     ],
     arcadeFreePlay: "טוקנים של משחק חינם",
     arcadeFreePlayList: [
-      "קבל טוקן משחק חינם אחד כל שעה (מקסימום 5 טוקנים)",
-      "השתמש בטוקנים כדי לשחק בכל משחק מבלי להוציא MLEO",
-      "זכיות במשחק חינם עדיין מתווספות לכספת שלך!"
+      "קבלו 1 אסימון משחק חינמי בכל שעה (עד 5 מאוחסנים)",
+      "השתמשו באסימונים כדי להתחיל סשן ארקייד אחד ללא שימוש ב-MLEO מהכספת",
+      "פרסים מסשני משחק חינמיים מתווספים לכספת שלכם בדיוק כמו פרסי סשן סטנדרטיים"
     ],
     arcadeGoodToKnow: "טוב לדעת",
     arcadeGoodToKnowList: [
-      "הכספת שלך משותפת בין כל משחקי MLEO",
-      "כל משחק עוקב אחר הסטטיסטיקות האישיות שלך",
-      "כל המשחקים משתמשים ביצירת מספרים אקראיים הוגנת",
-      "לחץ על כפתור ℹ️ בכל משחק לכללים ספציפיים"
-    ],
+      "הכספת שלכם משותפת בין כל משחקי MLEO",
+      "כל משחק עוקב אחר הפעילות שלכם, סשנים שהושלמו, הציון הטוב ביותר, רצפים ואבני דרך התקדמות",
+      "חלק מהמשחקים משתמשים באירועים אקראיים, בעוד שאחרים מתמקדים בתזמון, תגובה, זיכרון או קבלת החלטות",
+      "לחצו על כפתור ℹ️ בכל כרטיס משחק כדי לראות את הכללים, הבקרות ומבנה הפרסים"
+    ]
   }
 };
 
@@ -1885,15 +1853,16 @@ function Terms({ onAccept, onDecline }) {
       
       <div className="space-y-4 text-sm">
         <section className="bg-yellow-50 border-2 border-yellow-400 p-4 rounded-lg">
-          <h3 className="font-bold text-black mb-2 text-lg">⚠️ IMPORTANT: Entertainment Only - NO Real Money Gaming</h3>
+          <h3 className="font-bold text-black mb-2 text-lg">⚠️ IMPORTANT: Entertainment Games Only - NO Casino, NO Gambling, NO Real Money</h3>
           <ul className="list-disc ml-5 space-y-2 text-black">
-            <li><strong>This is a FREE entertainment game platform.</strong> All games use in-game tokens (MLEO) for gameplay purposes only.</li>
-            <li><strong>NO REAL MONEY GAMING:</strong> This platform does NOT support, facilitate, or allow gaming with real money, cryptocurrencies, or any assets of monetary value.</li>
-            <li><strong>NO REAL MONEY DEPOSITS:</strong> You cannot and will never be able to deposit real money, cryptocurrency, or any assets for the purpose of gaming on this platform.</li>
-            <li><strong>NO REAL MONEY WITHDRAWALS:</strong> You cannot and will never be able to withdraw real money or convert in-game tokens to real money or cryptocurrency for monetary gain.</li>
-            <li><strong>WE ARE AGAINST GAMING:</strong> This platform is designed purely for entertainment and skill-based gaming. We do not support, endorse, or facilitate any form of real money gaming, playing, or gaming.</li>
-            <li><strong>MLEO TOKENS:</strong> MLEO tokens earned in-game are virtual utility tokens for gameplay mechanics only. They have NO monetary value, cannot be sold, traded, or exchanged for real money or cryptocurrency.</li>
-            <li><strong>FUTURE POLICY:</strong> This platform will NEVER introduce real money gaming features. Any future cryptocurrency integration will be strictly limited to non-gaming use cases (e.g., rewards, collectibles, or utility) and will never involve playing, gaming, or gaming with cryptocurrency.</li>
+            <li><strong>THIS IS A FREE ENTERTAINMENT GAME PLATFORM:</strong> All games on this platform are designed purely for entertainment, fun, and skill-based gameplay. This is NOT a casino, NOT a gambling platform, and has NO connection to gambling or casino activities.</li>
+            <li><strong>NO REAL MONEY GAMBLING:</strong> This platform does NOT support, facilitate, or allow gambling with real money, cryptocurrencies, or any assets of monetary value. We are completely against gambling and casino activities.</li>
+            <li><strong>NO DEPOSITS - NOW OR EVER:</strong> You CANNOT and will NEVER be able to deposit real money, cryptocurrency, or any assets to purchase game tokens or for any gaming purpose on this platform. There is NO deposit feature, and there will NEVER be a deposit feature.</li>
+            <li><strong>NO PURCHASING GAME TOKENS:</strong> You CANNOT and will NEVER be able to purchase, buy, or acquire game tokens (MLEO) with real money or cryptocurrency. All game tokens are earned through gameplay only.</li>
+            <li><strong>NO REAL MONEY WITHDRAWALS:</strong> You CANNOT and will NEVER be able to withdraw real money or convert in-game tokens to real money or cryptocurrency for monetary gain.</li>
+            <li><strong>MLEO TOKENS ARE FOR ENTERTAINMENT ONLY:</strong> MLEO tokens earned in-game are virtual utility tokens for gameplay mechanics only. They have NO monetary value, cannot be sold, traded, or exchanged for real money or cryptocurrency. They exist solely for entertainment and gameplay purposes.</li>
+            <li><strong>FUTURE POLICY - NO DEPOSITS EVER:</strong> This platform will NEVER introduce real money deposits, purchases, or gambling features. Any future cryptocurrency integration will be strictly limited to non-gaming use cases (e.g., rewards, collectibles, or utility) and will NEVER involve deposits, purchases, or gambling with cryptocurrency.</li>
+            <li><strong>NOT A CASINO:</strong> This platform has NO connection to casinos, gambling sites, or betting platforms. We are an entertainment game platform focused on fun, skill, and enjoyment - NOT gambling or casino activities.</li>
           </ul>
         </section>
         
@@ -2011,7 +1980,9 @@ function Terms({ onAccept, onDecline }) {
             <li>You will not use the platform for any illegal, fraudulent, or unauthorized purpose;</li>
             <li>All information you provide is accurate, current, and complete;</li>
             <li>You acknowledge that MLEO tokens have no monetary value and are for entertainment purposes only;</li>
-            <li>You understand that this is NOT a gaming platform and no real money gaming occurs on this platform.</li>
+            <li>You understand that this is NOT a gambling platform, NOT a casino, and no real money gambling occurs on this platform;</li>
+            <li>You acknowledge that you CANNOT and will NEVER be able to deposit real money or purchase game tokens;</li>
+            <li>You understand that all game tokens are earned through gameplay only and cannot be purchased or deposited.</li>
           </ul>
         </section>
         <section>
