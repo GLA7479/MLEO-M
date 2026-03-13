@@ -1,4 +1,4 @@
-// Roulette Multiplayer - European Roulette (0-36)
+// Color Wheel Multiplayer - European Color Wheel (0-36)
 // Aligned with PokerMP/BlackjackMP patterns
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -18,7 +18,7 @@ const MIN_BUYIN_OPTIONS = {
   '100M': 100_000_000,
 };
 
-// European Roulette numbers (0-36)
+// European Color Wheel numbers (0-36)
 const ROULETTE_NUMBERS = [
   { num: 0, color: 'green', row: 0 },
   { num: 32, color: 'red', row: 0 }, { num: 15, color: 'black', row: 0 }, { num: 19, color: 'red', row: 0 },
@@ -1302,7 +1302,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
     <div className="w-full h-full flex flex-col p-2 gap-2">
       {/* Header */}
       <div className="flex items-center justify-between bg-white/5 rounded-xl p-2 border border-white/10">
-        <div className="text-white font-bold text-lg">🎰 Color Wheel</div>
+        <div className="text-white font-bold text-lg">🔴 Color Wheel</div>
         <div className="flex items-center gap-2 text-white/80 text-sm">
           <span>Min: {fmt(minRequired)}</span>
           <span>💰 {fmt(readVault())}</span>

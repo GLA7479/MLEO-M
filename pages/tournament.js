@@ -1,4 +1,4 @@
-import TexasHoldemCasinoPage from "../game/mleo-texas-holdem-arcade";
+import TexasHoldemCasinoPage from "../game/mleo-texas-holdem-casino";
 
 export default function Tournament() {
   return <TexasHoldemCasinoPage />;

@@ -60,7 +60,7 @@ const PLAY_TYPES = {
   tie: { name: "Tie", prize: 8 }
 };
 
-export default function Card DuelPage() {
+export default function CardDuelPage() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);

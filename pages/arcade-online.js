@@ -104,8 +104,8 @@ const GAME_REGISTRY = [
   {
     id: "roulette",
     title: "Color Wheel",
-    emoji: "🎰",
-    description: "European Roulette! Spin the wheel and unlock bigger rewards!",
+    emoji: "🔴",
+      description: "Color Wheel! Spin the wheel and unlock bigger rewards!",
     color: "#EF4444",
     isMultiplayer: true,
     loader: () => import("../games-online/RouletteMP").then(m => m.default)
@@ -158,7 +158,7 @@ const GAME_REGISTRY = [
   {
     id: "poker-tables",
     title: "Card Strategy Tables",
-    emoji: "🎰",
+    emoji: "🔴",
     description: "Card Strategy vs Opponent! Strategic play rounds - PRE-FLOP, FLOP, TURN, RIVER. Best hand wins the prize pool!",
     color: "#10B981",
     isMultiplayer: false,

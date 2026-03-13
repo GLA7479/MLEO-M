@@ -1,6 +1,6 @@
 // ============================================================================
 // MLEO Symbol Match - Full-Screen Game Template
-// Classic 5-reel slots! Massive wins!
+// Classic 5-reel Symbol Match! Massive wins!
 // ============================================================================
 
 import { useEffect, useRef, useState } from "react";
@@ -228,7 +228,7 @@ export default function SlotsPage() {
 
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
-            <h1 className="text-2xl font-extrabold text-white mb-0.5">🎰 Slots</h1>
+            <h1 className="text-2xl font-extrabold text-white mb-0.5">💰 Symbol Match</h1>
             <p className="text-white/70 text-xs">5 Reels • Massive wins!</p>
           </div>
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">

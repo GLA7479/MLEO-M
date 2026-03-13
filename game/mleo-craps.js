@@ -83,7 +83,7 @@ const PLAY_TYPES = {
   craps: { name: "Any Dice Arena", prize: 8 },
 };
 
-export default function Dice ArenaPage() {
+export default function DiceArenaPage() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);

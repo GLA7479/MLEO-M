@@ -136,7 +136,7 @@ function generateResult() {
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
-export default function Limit RunPage() {
+export default function LimitRunPage() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);
@@ -370,7 +370,7 @@ export default function Limit RunPage() {
   };
 
   // Game logic
-  const playLimit Run = (isFreePlayParam = false) => {
+  const playLimitRun = (isFreePlayParam = false) => {
     if (rolling) return;
     playSfx(clickSound.current);
 
@@ -507,7 +507,7 @@ export default function Limit RunPage() {
               {/* Free Play Indicator */}
               {freePlayTokens > 0 && (
                 <button
-                  onClick={() => playLimit Run(true)}
+                  onClick={() => playLimitRun(true)}
                   disabled={rolling}
                   className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50"
                   title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}
@@ -767,7 +767,7 @@ export default function Limit RunPage() {
             style={{ minHeight: "140px" }}
           >
             <button
-              onClick={() => playLimit Run(false)}
+              onClick={() => playLimitRun(false)}
               disabled={rolling}
               className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
             >

@@ -1,5 +1,5 @@
 // ============================================================================
-// MLEO 21 Challenge - Full Professional Blackjack
+// MLEO 21 Challenge - Full Professional 21 Challenge
 // Complete with Double Down, Split, Insurance, Surrender
 // ============================================================================
 
@@ -180,7 +180,7 @@ export default function BlackjackPage() {
   const clickSound = useRef(null);
   const winSound = useRef(null);
 
-  // Professional Blackjack Features
+  // Professional 21 Challenge Features
   const [canDouble, setCanDouble] = useState(false);
   const [canSplit, setCanSplit] = useState(false);
   const [canSurrender, setCanSurrender] = useState(false);
@@ -247,7 +247,7 @@ export default function BlackjackPage() {
     if (dealerVal === 21) {
       const playerVal = calculateHandValue(player);
       if (playerVal === 21) {
-        // Both have blackjack - push
+        // Both have perfect 21 - push
         const newVault = getVault() + play;
         setVault(newVault); setVaultState(newVault);
         setGameResult({ win: false, push: true, playerValue: 21, dealerValue: 21, prize: play, profit: 0, blackjack: false });
@@ -256,7 +256,7 @@ export default function BlackjackPage() {
         setGameState("finished");
         return true;
       } else {
-        // Opponent has blackjack, player doesn't - opponent wins
+        // Opponent has perfect 21, player doesn't - opponent wins
         setGameResult({ win: false, push: false, playerValue: playerVal, dealerValue: 21, prize: 0, profit: -play, blackjack: false });
         const newStats = { ...stats, totalHands: stats.totalHands + 1, losses: stats.losses + 1, totalPlay: stats.totalPlay + play, lastPlay: play };
         setStats(newStats);
@@ -317,17 +317,17 @@ export default function BlackjackPage() {
       
       // Wait for last card animation (card delay 200ms + animation 400ms = 600ms) + extra pause to see cards (800ms)
       setTimeout(() => {
-        // Check for blackjack/insurance after all cards dealt AND animated AND visible
+        // Check for perfect 21/insurance after all cards dealt AND animated AND visible
         const playerValue = calculateHandValue(player);
         const dealerUpCard = dealer[0];
         
         if (playerValue === 21) {
-          // Player has blackjack - check if dealer also has it
+          // Player has perfect 21 - check if dealer also has it
           setTimeout(() => {
             if (checkDealerBlackjack(dealer, player, play)) {
               return;
             }
-            // Player blackjack wins
+            // Player perfect 21 wins
             const prize = Math.floor(play * 2.5);
             const newVault = getVault() + prize;
             setVault(newVault); 
@@ -376,7 +376,7 @@ export default function BlackjackPage() {
     setInsuranceBet(insuranceAmount);
     setShowInsurance(false);
 
-    // Check for dealer blackjack
+    // Check for dealer perfect 21
     const dealerVal = calculateHandValue(dealerHand);
     if (dealerVal === 21) {
       // Insurance pays 2:1
@@ -401,7 +401,7 @@ export default function BlackjackPage() {
       setGameState("finished");
       return;
     } else {
-      // No blackjack - insurance lost
+      // No perfect 21 - insurance lost
       const newStats = { ...stats, insuranceLosses: stats.insuranceLosses + 1 };
       setStats(newStats);
     }
@@ -416,7 +416,7 @@ export default function BlackjackPage() {
     playSfx(clickSound.current);
     setShowInsurance(false);
     
-    // Check for dealer blackjack anyway
+    // Check for dealer perfect 21 anyway
     if (checkDealerBlackjack(dealerHand, playerHand, Number(playAmount))) {
       return;
     }
@@ -880,8 +880,8 @@ export default function BlackjackPage() {
 
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
-            <h1 className="text-2xl font-extrabold text-white mb-0.5">♠️ Blackjack Pro</h1>
-            <p className="text-white/70 text-xs">Professional Blackjack • All Features!</p>
+            <h1 className="text-2xl font-extrabold text-white mb-0.5">♠️ 21 Challenge</h1>
+            <p className="text-white/70 text-xs">Professional 21 Challenge • All Features!</p>
           </div>
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
@@ -920,7 +920,7 @@ export default function BlackjackPage() {
                 {gameResult ? (
                   gameResult.surrender ? 'SURRENDERED' :
                   gameResult.split ? `${gameResult.splitWins}W ${gameResult.splitLosses}L ${gameResult.splitPushes}P` :
-                  gameResult.blackjack ? 'BLACKJACK!' : 
+                  gameResult.blackjack ? 'PERFECT 21!' : 
                   gameResult.push ? 'PUSH' : 
                   gameResult.win ? 'YOU WIN!' : 
                   'OPPONENT WINS'
@@ -971,7 +971,7 @@ export default function BlackjackPage() {
                 {gameResult.blackjack ? '💎' : gameResult.surrender ? '🏳️' : gameResult.split ? '✂️' : gameResult.win ? '🎉' : gameResult.push ? '🤝' : '😔'}
               </div>
               <div className="text-2xl font-bold mb-1">
-                {gameResult.surrender ? 'SURRENDERED' : gameResult.split ? `SPLIT: ${gameResult.splitWins}W ${gameResult.splitLosses}L` : gameResult.blackjack ? 'BLACKJACK!' : gameResult.win ? 'YOU WIN!' : gameResult.push ? 'PUSH' : 'OPPONENT WINS'}
+                {gameResult.surrender ? 'SURRENDERED' : gameResult.split ? `SPLIT: ${gameResult.splitWins}W ${gameResult.splitLosses}L` : gameResult.blackjack ? 'PERFECT 21!' : gameResult.win ? 'YOU WIN!' : gameResult.push ? 'PUSH' : 'OPPONENT WINS'}
               </div>
               <div className="text-lg">
                 {gameResult.win || gameResult.push ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}
@@ -1015,7 +1015,7 @@ export default function BlackjackPage() {
                 </button>
               </div>
               <div className="mt-4 text-xs opacity-70">
-                <p>Blackjack Pro v3.0</p>
+                <p>21 Challenge v3.0</p>
               </div>
             </div>
           </div>
@@ -1039,7 +1039,7 @@ export default function BlackjackPage() {
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
                   <p className="text-red-300 font-semibold">Payouts:</p>
                   <div className="text-xs text-white/80 mt-2 space-y-1">
-                    <p>• Blackjack: ×2.5 💎</p>
+                    <p>• Perfect 21: ×2.5 💎</p>
                     <p>• Win: ×2</p>
                     <p>• Push: Money back</p>
                     <p>• Insurance: ×2 (if opponent BJ)</p>
@@ -1068,7 +1068,7 @@ export default function BlackjackPage() {
                     </div>
                   </div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
-                    <div className="text-xs text-white/60">Blackjacks</div>
+                    <div className="text-xs text-white/60">Perfect 21s</div>
                     <div className="text-lg font-bold text-yellow-400">{stats.blackjacks} 💎</div>
                   </div>
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
@@ -1150,7 +1150,7 @@ export default function BlackjackPage() {
             <div className="bg-yellow-500/20 border-2 border-yellow-500/50 rounded-xl p-6 text-center max-w-md w-full shadow-2xl animate-pulse">
               <div className="text-2xl font-bold text-yellow-300 mb-3">🛡️ Insurance?</div>
               <div className="text-base text-white/90 mb-3">
-                Opponent has Ace. Protect against Blackjack?
+                Opponent has Ace. Protect against Perfect 21?
               </div>
               <div className="text-sm text-white/70 mb-4">
                 Cost: {fmt(Math.floor(Number(playAmount) / 2))} MLEO

@@ -2852,7 +2852,7 @@ export default function GamesHub() {
                   <div>
                     <h2 className="text-[20px] sm:text-2xl font-extrabold">🎮 MLEO Arcade</h2>
                     <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
-                      Mini-games arcade! Play Slots, Dice, Wheel & Scratch cards. 1,000 MLEO per session with rewards up to 10,000 MLEO!
+                      Mini-games arcade! Play Symbol Match, Dice, Wheel & Scratch cards. 1,000 MLEO per session with rewards up to 10,000 MLEO!
         </p>
                   </div>
                   <span className="rounded-full px-2.5 py-1 text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 whitespace-nowrap">

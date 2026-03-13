@@ -63,7 +63,7 @@ function fmt(n) { if (n >= 1e9) return (n / 1e9).toFixed(2) + "B"; if (n >= 1e6)
 function formatPlayDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
 function shortAddr(addr) { if (!addr || addr.length < 10) return addr || ""; return `${addr.slice(0, 6)}...${addr.slice(-4)}`; }
 
-export default function Number HuntPage() {
+export default function NumberHuntPage() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);
@@ -159,7 +159,7 @@ export default function Number HuntPage() {
     }
   };
 
-  const playNumber Hunt = (isFreePlayParam = false) => {
+  const playNumberHunt = (isFreePlayParam = false) => {
     if (selected.length === 0) { alert('Please select at least 1 number!'); return; }
     if (drawing) return;
     playSfx(clickSound.current);
@@ -233,7 +233,7 @@ export default function Number HuntPage() {
           <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
             <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
               <button onClick={backSafe} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">BACK</button>
-              {freePlayTokens > 0 && (<button onClick={() => playNumber Hunt(true)} disabled={drawing} className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50" title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}><span className="text-base">🎁</span><span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">{freePlayTokens}</span></button>)}
+              {freePlayTokens > 0 && (<button onClick={() => playNumberHunt(true)} disabled={drawing} className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50" title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}><span className="text-base">🎁</span><span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">{freePlayTokens}</span></button>)}
             </div>
             <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
               <button onClick={() => { playSfx(clickSound.current); const el = wrapRef.current || document.documentElement; if (!document.fullscreenElement) { el.requestFullscreen?.().catch(() => {}); } else { document.exitFullscreen?.().catch(() => {}); } }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFullscreen ? "EXIT" : "FULL"}</button>
@@ -294,7 +294,7 @@ export default function Number HuntPage() {
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            <button onClick={gameResult ? resetGame : () => playNumber Hunt(false)} disabled={drawing || (!gameResult && selected.length === 0)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
+            <button onClick={gameResult ? resetGame : () => playNumberHunt(false)} disabled={drawing || (!gameResult && selected.length === 0)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
               {drawing ? "Drawing..." : gameResult ? "PLAY AGAIN" : "DRAW"}
             </button>
             <div className="flex gap-2">

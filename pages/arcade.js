@@ -307,7 +307,7 @@ export default function ArcadeHub() {
       href: "/diamonds",
       color: "#0EA5E9",
     },
-    // 4. Blackjack
+    // 4. 21 Challenge
     {
       title: "21 Challenge",
       emoji: "♠️",
@@ -316,7 +316,7 @@ export default function ArcadeHub() {
       href: "/blackjack",
       color: "#10B981",
     },
-    // 5. Poker
+    // 5. Card Arena
     {
       title: "Card Arena",
       emoji: "🎴",
@@ -334,7 +334,7 @@ export default function ArcadeHub() {
       href: "/hilo",
       color: "#059669",
     },
-    // 7. Three Card Poker
+    // 7. Triple Cards
     {
       title: "Triple Cards",
       emoji: "♦️",
@@ -343,7 +343,7 @@ export default function ArcadeHub() {
       href: "/three-card-poker",
       color: "#EC4899",
     },
-    // 8. Ultimate Texas Hold'em - NEW!
+    // 8. Ultimate Cards - NEW!
     {
       title: "Ultimate Cards",
       emoji: "🃏",
@@ -352,7 +352,7 @@ export default function ArcadeHub() {
       href: "/ultimate-poker",
       color: "#6366F1",
     },
-    // 8.8. Texas Hold'em Rooms
+    // 8.8. Card Rooms
     {
       title: "Card Rooms",
       emoji: "🎰🎴",
@@ -451,7 +451,7 @@ export default function ArcadeHub() {
       href: "/dice-over-under",
       color: "#14B8A6",
     },
-    // 18. Roulette
+    // 18. Color Wheel
     {
       title: "Color Wheel",
       emoji: "🔴",

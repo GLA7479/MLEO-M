@@ -134,7 +134,7 @@ function shortAddr(addr) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
-export default function Color WheelPage() {
+export default function ColorWheelPage() {
   useIOSViewportFix();
   const router = useRouter();
 
@@ -521,7 +521,7 @@ export default function Color WheelPage() {
 
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">
-              🎰 Color Wheel
+              🔴 Color Wheel
             </h1>
             <p className="text-white/70 text-xs">Place your play • Spin to win!</p>
           </div>

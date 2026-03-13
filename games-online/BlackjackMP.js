@@ -1,4 +1,4 @@
-// Blackjack (MP) — Updated for new schema
+// 21 Challenge (MP) — Updated for new schema
 // Uses supabaseMP (new project) + local Vault
 
 import { useEffect, useMemo, useState } from "react";
@@ -22,7 +22,7 @@ function safeRead(key, fallback){ try { const raw = localStorage.getItem(key); r
 function safeWrite(key, val){ try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
 function fmt(n){ n=Math.floor(Number(n||0)); if(n>=1e9)return(n/1e9).toFixed(2)+"B"; if(n>=1e6)return(n/1e6).toFixed(2)+"M"; if(n>=1e3)return(n/1e3).toFixed(2)+"K"; return String(n); }
 
-// ---------- Blackjack Logic ----------
+// ---------- 21 Challenge Logic ----------
 function freshShoe(decks = 4) {
   const ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
   const suits = ['♠','♥','♦','♣'];
@@ -1086,7 +1086,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
     const dealerBust  = dealerScore > 21;
     const dealerBlackjack = dealer.length === 2 && dealerScore === 21;
 
-    // אם לדילר יש Blackjack - חושף מיד ומפסיק את היד
+    // אם לדילר יש Perfect 21 - חושף מיד ומפסיק את היד
     if (session?.dealer_hidden && dealerBlackjack) {
       // חושף מיד אם יש 21
       await supabase.from('bj_sessions').update({
@@ -1202,7 +1202,7 @@ export default function BlackjackMP({ roomId, playerName, vault, setVaultBoth, t
       
       setBanner({
         title: result === 'win' ? '🎉 YOU WIN!' : 
-               result === 'blackjack' ? '🎉 BLACKJACK!' :
+               result === 'blackjack' ? '🎉 PERFECT 21!' :
                result === 'push' ? '🤝 PUSH' : '💔 YOU LOSE',
         lines: lines
       });
