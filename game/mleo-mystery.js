@@ -10,6 +10,14 @@ import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
 import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import {
+  creditSharedVault,
+  debitSharedVault,
+  initSharedVault,
+  peekSharedVault,
+  readSharedVault,
+  subscribeSharedVault,
+} from "../lib/sharedVault";
 
 // ============================================================================
 // iOS 100vh FIX
@@ -95,17 +103,6 @@ function safeWrite(key, val) {
   } catch {}
 }
 
-function getVault() {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  return rushData.vault || 0;
-}
-
-function setVault(amount) {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  rushData.vault = amount;
-  safeWrite("mleo_rush_core_v4", rushData);
-}
-
 function fmt(n) {
   if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
   if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
@@ -123,6 +120,10 @@ function formatPlayDisplay(n) {
 function shortAddr(addr) {
   if (!addr || addr.length < 10) return addr || "";
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+}
+function normalizeWholeAmount(amount) {
+  const num = Number(amount);
+  return Math.floor(Number.isFinite(num) ? num : 0);
 }
 
 // ============================================================================
@@ -200,8 +201,16 @@ export default function MysteryBoxPage() {
 
   // Init
   useEffect(() => {
+    let cancelled = false;
     setMounted(true);
-    setVaultState(getVault());
+    initSharedVault();
+    readSharedVault()
+      .then(snapshot => {
+        if (!cancelled) setVaultState(snapshot.balance);
+      })
+      .catch(() => {
+        if (!cancelled) setVaultState(peekSharedVault().balance);
+      });
     
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
@@ -214,10 +223,13 @@ export default function MysteryBoxPage() {
       setPlayAmount(String(savedStats.lastPlay));
     }
     
+    const unsubscribeVault = subscribeSharedVault(snapshot => {
+      if (!cancelled) setVaultState(snapshot.balance);
+    });
+    
     const interval = setInterval(() => {
       const status = getFreePlayStatus();
       setFreePlayTokens(status.tokens);
-      setVaultState(getVault());
     }, 2000);
     
     if (typeof Audio !== "undefined") {
@@ -233,6 +245,8 @@ export default function MysteryBoxPage() {
     document.addEventListener("fullscreenchange", handleFullscreenChange);
 
     return () => {
+      cancelled = true;
+      unsubscribeVault();
       clearInterval(interval);
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
@@ -311,17 +325,15 @@ export default function MysteryBoxPage() {
       return;
     }
 
-    if (collectAmount <= 0 || collectAmount > vault) {
+    const wholeCollectAmount = normalizeWholeAmount(collectAmount);
+    if (wholeCollectAmount <= 0 || wholeCollectAmount > vault) {
       alert("Invalid amount!");
       return;
     }
 
     setClaiming(true);
     try {
-      const amountUnits = parseUnits(
-        Number(collectAmount).toFixed(Math.min(2, MLEO_DECIMALS)),
-        MLEO_DECIMALS
-      );
+      const amountUnits = parseUnits(String(wholeCollectAmount), MLEO_DECIMALS);
 
       const hash = await writeContractAsync({
         address: CLAIM_ADDRESS,
@@ -334,11 +346,14 @@ export default function MysteryBoxPage() {
 
       await publicClient.waitForTransactionReceipt({ hash });
 
-      const newVault = Math.max(0, vault - collectAmount);
-      setVault(newVault);
-      setVaultState(newVault);
+      const debitResult = await debitSharedVault(wholeCollectAmount, "mystery-claim");
+      if (!debitResult.ok) {
+        alert(debitResult.error || "Vault update failed");
+        return;
+      }
+      setVaultState(debitResult.balance);
 
-      alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
+      alert(`✅ Sent ${fmt(wholeCollectAmount)} MLEO to wallet!`);
       setShowVaultModal(false);
     } catch (err) {
       console.error(err);
@@ -349,11 +364,11 @@ export default function MysteryBoxPage() {
   };
 
   // Game logic
-  const startGame = (isFreePlayParam = false) => {
+  const startGame = async (isFreePlayParam = false) => {
     if (gameActive) return;
     playSfx(clickSound.current);
 
-    const currentVault = getVault();
+    const currentVault = peekSharedVault().balance;
     let play = Number(playAmount) || MIN_PLAY;
     
     if (isFreePlay || isFreePlayParam) {
@@ -372,13 +387,12 @@ export default function MysteryBoxPage() {
         alert(`Minimum play is ${MIN_PLAY} MLEO`);
         return;
       }
-      if (currentVault < play) {
-        alert('Insufficient MLEO in vault');
+      const debitResult = await debitSharedVault(play, "mystery");
+      if (!debitResult.ok) {
+        alert(debitResult.error || 'Insufficient MLEO in vault');
         return;
       }
-      
-      setVault(currentVault - play);
-      setVaultState(currentVault - play);
+      setVaultState(debitResult.balance);
     }
     
     setPlayAmount(String(play));
@@ -391,7 +405,7 @@ export default function MysteryBoxPage() {
     setBoxes(shuffledPrizes);
   };
 
-  const chooseBox = (index) => {
+  const chooseBox = async (index) => {
     if (!gameActive || gameResult || selectedBox !== null) return;
     playSfx(clickSound.current);
 
@@ -402,9 +416,8 @@ export default function MysteryBoxPage() {
     const win = multiplier > 0;
 
     if (win && prize > 0) {
-      const newVault = getVault() + prize;
-      setVault(newVault);
-      setVaultState(newVault);
+      const creditResult = await creditSharedVault(prize, "mystery");
+      setVaultState(creditResult.balance);
       playSfx(winSound.current);
     }
 
@@ -427,7 +440,7 @@ export default function MysteryBoxPage() {
       totalPlay: stats.totalPlay + play,
       totalWon: stats.totalWon + prize,
       biggestWin: Math.max(stats.biggestWin, prize),
-      grandPrizes: multiplier === 4 ? stats.grandPrizes + 1 : stats.grandPrizes,
+      grandPrizes: multiplier === Math.max(...PRIZES) ? stats.grandPrizes + 1 : stats.grandPrizes,
       lastPlay: play
     };
     setStats(newStats);
@@ -454,7 +467,7 @@ export default function MysteryBoxPage() {
     );
   }
 
-  const potentialWin = Math.floor(Number(playAmount) * 10); // Max win
+  const potentialWin = Math.floor(Number(playAmount) * Math.max(...PRIZES)); // Max win
 
   return (
     <Layout>
@@ -739,16 +752,19 @@ export default function MysteryBoxPage() {
                 <p><strong>1. Set Play:</strong> Minimum play is {MIN_PLAY} MLEO. Use +/- to adjust.</p>
                 <p><strong>2. Start Game:</strong> Click "START GAME" to shuffle the boxes</p>
                 <p><strong>3. Choose Box:</strong> Pick one of the 10 mystery boxes</p>
-                <p><strong>4. Win:</strong> Each box contains a hidden multiplier - find the grandPrize!</p>
+                <p><strong>4. Win:</strong> Each box contains a hidden multiplier - find the grand prize!</p>
                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mt-4">
-                  <p className="text-amber-300 font-semibold">🎁 Prize Options (10 boxes):</p>
+                  <p className="text-amber-300 font-semibold">🎁 Prize Table (10 boxes):</p>
                   <div className="text-xs text-white/80 mt-2 space-y-1">
-                    <p>• 💎 <strong>×4</strong> - GRAND_PRIZE!</p>
-                    <p>• 🎉 <strong>×3</strong> - Great win!</p>
-                    <p>• ✨ <strong>×1.5</strong> - Good prize</p>
-                    <p>• 🪙 <strong>×1</strong> - Break even</p>
-                    <p>• 📉 <strong>×0.5</strong> - Small loss</p>
-                    <p>• 💔 <strong>×0</strong> - Empty box</p>
+                    {[...new Set(PRIZES)].sort((a, b) => b - a).map((mult, i) => {
+                      const count = PRIZES.filter(p => p === mult).length;
+                      const isGrand = mult === Math.max(...PRIZES);
+                      return (
+                        <p key={i}>
+                          {isGrand ? '💎' : mult >= 1 ? '🎉' : mult > 0 ? '✨' : '💔'} <strong>×{mult.toFixed(2)}</strong> - {isGrand ? 'GRAND PRIZE!' : mult >= 1 ? 'Win!' : mult > 0 ? 'Small win' : 'Empty'} {count > 1 && `(${count}x)`}
+                        </p>
+                      );
+                    })}
                   </div>
                 </div>
             </div>
@@ -803,7 +819,7 @@ export default function MysteryBoxPage() {
                   <div className="text-sm font-semibold mb-2">💎 Big Wins Hit</div>
                   <div className="text-center">
                     <div className="text-3xl font-bold text-yellow-400">{stats.grandPrizes}</div>
-                    <div className="text-xs text-white/60 mt-1">×4 Multiplier Wins</div>
+                    <div className="text-xs text-white/60 mt-1">×{Math.max(...PRIZES).toFixed(2)} Multiplier Wins</div>
                   </div>
                 </div>
               </div>
@@ -835,9 +851,10 @@ export default function MysteryBoxPage() {
                     <input
                       type="number"
                       value={collectAmount}
-                      onChange={(e) => setCollectAmount(Number(e.target.value))}
+                      onChange={(e) => setCollectAmount(normalizeWholeAmount(e.target.value))}
                       className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white"
                       min="1"
+                      step="1"
                       max={vault}
                     />
                     <button

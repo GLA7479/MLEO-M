@@ -17,6 +17,14 @@ import {
 } from "wagmi";
 import { parseUnits } from "viem";
 import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import {
+  creditSharedVault,
+  debitSharedVault,
+  initSharedVault,
+  peekSharedVault,
+  readSharedVault,
+  subscribeSharedVault,
+} from "../lib/sharedVault";
 
 // ===== viewport fix (מוסיף גם --satb ל-safe-area) =====
 function useIOSViewportFix() {
@@ -94,15 +102,6 @@ function safeWrite(key, val) {
     localStorage.setItem(key, JSON.stringify(val));
   } catch {}
 }
-function getVault() {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  return rushData.vault || 0;
-}
-function setVault(amount) {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  rushData.vault = amount;
-  safeWrite("mleo_rush_core_v4", rushData);
-}
 function fmt(n) {
   if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
   if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
@@ -118,6 +117,10 @@ function formatPlayDisplay(n) {
 function shortAddr(addr) {
   if (!addr || addr.length < 10) return addr || "";
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+}
+function normalizeWholeAmount(amount) {
+  const num = Number(amount);
+  return Math.floor(Number.isFinite(num) ? num : 0);
 }
 
 function generateMap() {
@@ -198,18 +201,28 @@ export default function GoldRushPage() {
 
   // --- Mount/setup (כמו במקור) ---
   useEffect(() => {
+    let cancelled = false;
     setMounted(true);
-    setVaultState(getVault());
+    initSharedVault();
+    readSharedVault()
+      .then(snapshot => {
+        if (!cancelled) setVaultState(snapshot.balance);
+      })
+      .catch(() => {
+        if (!cancelled) setVaultState(peekSharedVault().balance);
+      });
     const isFree = router.query.freePlay === "true";
     setIsFreePlay(isFree);
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
     const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
     if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
+    const unsubscribeVault = subscribeSharedVault(snapshot => {
+      if (!cancelled) setVaultState(snapshot.balance);
+    });
     const interval = setInterval(() => {
       const status = getFreePlayStatus();
       setFreePlayTokens(status.tokens);
-      setVaultState(getVault());
     }, 2000);
     if (typeof Audio !== "undefined") {
       try {
@@ -221,6 +234,8 @@ export default function GoldRushPage() {
       setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => {
+      cancelled = true;
+      unsubscribeVault();
       clearInterval(interval);
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
@@ -320,16 +335,14 @@ useEffect(() => {
       alert("Missing CLAIM address");
       return;
     }
-    if (collectAmount <= 0 || collectAmount > vault) {
+    const wholeCollectAmount = normalizeWholeAmount(collectAmount);
+    if (wholeCollectAmount <= 0 || wholeCollectAmount > vault) {
       alert("Invalid amount!");
       return;
     }
     setClaiming(true);
     try {
-      const amountUnits = parseUnits(
-        Number(collectAmount).toFixed(Math.min(2, MLEO_DECIMALS)),
-        MLEO_DECIMALS
-      );
+      const amountUnits = parseUnits(String(wholeCollectAmount), MLEO_DECIMALS);
       const hash = await writeContractAsync({
         address: CLAIM_ADDRESS,
         abi: MINING_CLAIM_ABI,
@@ -339,10 +352,13 @@ useEffect(() => {
         account: address,
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      const newVault = Math.max(0, vault - collectAmount);
-      setVault(newVault);
-      setVaultState(newVault);
-      alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
+      const debitResult = await debitSharedVault(wholeCollectAmount, "goldrush-claim");
+      if (!debitResult.ok) {
+        alert(debitResult.error || "Vault update failed");
+        return;
+      }
+      setVaultState(debitResult.balance);
+      alert(`✅ Sent ${fmt(wholeCollectAmount)} MLEO to wallet!`);
       setShowVaultModal(false);
     } catch (err) {
       console.error(err);
@@ -352,9 +368,9 @@ useEffect(() => {
     }
   };
 
-  const startGame = (isFreePlayParam = false) => {
+  const startGame = async (isFreePlayParam = false) => {
     playSfx(clickSound.current);
-    const currentVault = getVault();
+    const currentVault = peekSharedVault().balance;
     let play = Number(playAmount) || MIN_PLAY;
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
@@ -372,12 +388,12 @@ useEffect(() => {
         alert(`Minimum play is ${MIN_PLAY} MLEO`);
         return;
       }
-      if (currentVault < play) {
-        alert("Insufficient MLEO in vault");
+      const debitResult = await debitSharedVault(play, "goldrush");
+      if (!debitResult.ok) {
+        alert(debitResult.error || 'Insufficient MLEO in vault');
         return;
       }
-      setVault(currentVault - play);
-      setVaultState(currentVault - play);
+      setVaultState(debitResult.balance);
     }
     setPlayAmount(String(play));
     setGameResult(null);
@@ -412,15 +428,14 @@ useEffect(() => {
     endGame(true, dug.length);
   };
 
-  const endGame = (cashout, treasures) => {
+  const endGame = async (cashout, treasures) => {
     const play = Number(playAmount);
     const prize = cashout ? totalPrize : 0;
     const win = prize > 0;
 
     if (win && prize > 0) {
-      const newVault = getVault() + prize;
-      setVault(newVault);
-      setVaultState(newVault);
+      const creditResult = await creditSharedVault(prize, "goldrush");
+      setVaultState(creditResult.balance);
       playSfx(winSound.current);
     }
 
@@ -904,10 +919,11 @@ useEffect(() => {
                       type="number"
                       value={collectAmount}
                       onChange={(e) =>
-                        setCollectAmount(Number(e.target.value))
+                        setCollectAmount(normalizeWholeAmount(e.target.value))
                       }
                       className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white"
                       min="1"
+                      step="1"
                       max={vault}
                     />
                     <button
