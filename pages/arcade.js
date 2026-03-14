@@ -31,13 +31,13 @@ const ALLOW_TESTNET_WALLET_FLAG =
   (process.env.NEXT_PUBLIC_ALLOW_TESTNET_WALLET || "").toLowerCase() === "1" ||
   (process.env.NEXT_PUBLIC_ALLOW_TESTNET_WALLET || "").toLowerCase() === "true";
 
-function GameCard({ title, emoji, description, reward, href, color, freePlayStatus }) {
+function GameCard({ title, emoji, description, reward, href, color, freePlayStatus, comingSoon = false }) {
   const [showInfo, setShowInfo] = useState(false);
   
   return (
     <>
       <article 
-        className="rounded-lg border border-white/10 backdrop-blur-md shadow-lg p-4 flex flex-col transition-all hover:scale-105 hover:border-white/30 relative overflow-hidden"
+        className={`rounded-lg border border-white/10 backdrop-blur-md shadow-lg p-4 flex flex-col transition-all hover:scale-105 hover:border-white/30 relative overflow-hidden ${comingSoon ? 'opacity-60' : ''}`}
         style={{
           background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)',
           height: '187px',
@@ -65,20 +65,36 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
             height: '45px'
           }}
         >
-          <h2 className="text-base font-bold line-clamp-2 leading-tight">{title}</h2>
+          {comingSoon ? (
+            <h2 className="text-base font-bold line-clamp-2 leading-tight text-amber-300">COMING SOON</h2>
+          ) : (
+            <h2 className="text-base font-bold line-clamp-2 leading-tight">{title}</h2>
+          )}
         </div>
 
         {/* Play button - fixed position bottom */}
         <div className="absolute left-4 right-4" style={{ bottom: '12px' }}>
-          <Link
-            href={href}
-            className="block w-full text-center px-4 py-2.5 rounded text-sm font-bold text-white shadow-lg transition-all hover:scale-105"
-            style={{
-              background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
-            }}
-          >
-            PLAY
-          </Link>
+          {comingSoon ? (
+            <button
+              disabled
+              className="block w-full text-center px-4 py-2.5 rounded text-sm font-bold text-white/50 shadow-lg cursor-not-allowed opacity-50"
+              style={{
+                background: `linear-gradient(135deg, ${color}40 0%, ${color}30 100%)`,
+              }}
+            >
+              PLAY
+            </button>
+          ) : (
+            <Link
+              href={href}
+              className="block w-full text-center px-4 py-2.5 rounded text-sm font-bold text-white shadow-lg transition-all hover:scale-105"
+              style={{
+                background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
+              }}
+            >
+              PLAY
+            </Link>
+          )}
         </div>
       </article>
       
@@ -536,7 +552,7 @@ export default function ArcadeHub() {
       href: "/coin-flip",
       color: "#F59E0B",
     },
-    // 26. Crash2 - NEW WITH LIVE CHART!
+    // 26. Crash2 - COMING SOON
     {
       title: "Sky Run X",
       emoji: "📈",
@@ -544,8 +560,9 @@ export default function ArcadeHub() {
       reward: "×10",
       href: "/crash2",
       color: "#EF4444",
+      comingSoon: true,
     },
-    // 27. Plinko2 - OPTIMIZED VERSION!
+    // 27. Plinko2 - COMING SOON
     {
       title: "Drop Run X",
       emoji: "🎲",
@@ -553,6 +570,7 @@ export default function ArcadeHub() {
       reward: "×10",
       href: "/plinko2",
       color: "#8B5CF6",
+      comingSoon: true,
     },
   ];
 
@@ -637,7 +655,7 @@ export default function ArcadeHub() {
           {/* Games Grid */}
           <section className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 mb-8">
             {games.map((game, idx) => (
-              <GameCard key={idx} {...game} freePlayStatus={freePlayStatus} />
+              <GameCard key={idx} {...game} freePlayStatus={freePlayStatus} comingSoon={game.comingSoon} />
             ))}
           </section>
           
