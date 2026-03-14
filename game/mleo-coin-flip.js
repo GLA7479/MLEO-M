@@ -118,6 +118,10 @@ function shortAddr(addr) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
+function normalizeWholeAmount(value) {
+  return Math.max(0, Math.floor(Number(value) || 0));
+}
+
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -331,7 +335,8 @@ export default function CoinFlipPage() {
       return;
     }
 
-    if (collectAmount <= 0 || collectAmount > vault) {
+    const wholeCollectAmount = normalizeWholeAmount(collectAmount);
+    if (wholeCollectAmount <= 0 || wholeCollectAmount > vault) {
       alert("Invalid amount!");
       return;
     }
@@ -339,7 +344,7 @@ export default function CoinFlipPage() {
     setClaiming(true);
     try {
       const amountUnits = parseUnits(
-        Number(collectAmount).toFixed(Math.min(2, MLEO_DECIMALS)),
+        String(wholeCollectAmount),
         MLEO_DECIMALS
       );
 
@@ -354,14 +359,15 @@ export default function CoinFlipPage() {
 
       await publicClient.waitForTransactionReceipt({ hash });
 
-      const debitResult = await debitSharedVault(collectAmount, "coinflip-claim");
+      const debitResult = await debitSharedVault(wholeCollectAmount, "coinflip-claim");
       if (!debitResult.ok) {
         alert(debitResult.error || "Vault update failed");
         return;
       }
       setVaultState(debitResult.balance);
 
-      alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
+      setCollectAmount(wholeCollectAmount);
+      alert(`✅ Sent ${fmt(wholeCollectAmount)} MLEO to wallet!`);
       setShowVaultModal(false);
     } catch (err) {
       console.error(err);
@@ -906,14 +912,14 @@ export default function CoinFlipPage() {
                 <p><strong>1. Choose Your Side:</strong> Select Heads (👑) or Tails (⚡)</p>
                 <p><strong>2. Set Your Play:</strong> Minimum play is {MIN_PLAY} MLEO. Use +/- to adjust.</p>
                 <p><strong>3. Flip:</strong> Click "FLIP COIN" to start the game</p>
-                <p><strong>4. Win:</strong> If your choice matches, you win <strong className="text-yellow-300">×2.16</strong> your play!</p>
+                <p><strong>4. Win:</strong> If your choice matches, you win <strong className="text-yellow-300">×1.92</strong> your play!</p>
                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mt-4">
                   <p className="text-amber-300 font-semibold">💰 Prizes</p>
-                  <p className="text-xs text-white/80 mt-1">• <strong>Correct guess:</strong> Win ×2.16</p>
+                  <p className="text-xs text-white/80 mt-1">• <strong>Correct guess:</strong> Win ×1.92</p>
                   <p className="text-xs text-white/80">• <strong>Wrong guess:</strong> Lose play</p>
                 </div>
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2 mt-2">
-                  <p className="text-blue-300 text-xs">💡 Each flip uses cryptographically secure random generation for fair results.</p>
+                  <p className="text-blue-300 text-xs">💡 Each flip is resolved instantly with in-browser random generation.</p>
                 </div>
               </div>
               <button
@@ -1007,9 +1013,10 @@ export default function CoinFlipPage() {
                     <input
                       type="number"
                       value={collectAmount}
-                      onChange={(e) => setCollectAmount(Number(e.target.value))}
+                      onChange={(e) => setCollectAmount(normalizeWholeAmount(e.target.value))}
                       className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white"
                       min="1"
+                      step="1"
                       max={vault}
                     />
                     <button

@@ -1,6 +1,6 @@
 // ============================================================================
 // MLEO Mega Spin Board - Full-Screen Game Template
-// Spin the big wheel! Win up to ×50!
+// Spin the big wheel! Win up to ×2.12!
 // ============================================================================
 
 import { useEffect, useRef, useState } from "react";
@@ -218,7 +218,7 @@ export default function MegaWheelPage() {
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-yellow-900 via-black to-orange-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
 
-  const potentialWin = Math.floor(Number(playAmount) * 50);
+  const potentialWin = Math.floor(Number(playAmount) * Math.max(...WHEEL_SEGMENTS));
 
   return (
     <Layout>
@@ -240,7 +240,7 @@ export default function MegaWheelPage() {
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
             <h1 className="text-2xl font-extrabold text-white mb-0.5">🎡 Mega Spin Board</h1>
-            <p className="text-white/70 text-xs">Spin the wheel • Win up to ×8!</p>
+            <p className="text-white/70 text-xs">Spin the wheel • Win up to ×2.12!</p>
           </div>
           <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
@@ -355,14 +355,14 @@ export default function MegaWheelPage() {
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
                   <p className="text-yellow-300 font-semibold mb-2">🎨 Color Prizes (8 segments):</p>
                   <div className="text-xs text-white/80 space-y-1">
-                    <p>🔴 <strong>Red:</strong> ×0.5</p>
-                    <p>🔵 <strong>Blue:</strong> ×0.5</p>
-                    <p>🟢 <strong>Green:</strong> ×0.8</p>
-                    <p>🟣 <strong>Purple:</strong> ×0.8</p>
-                    <p>🟠 <strong>Orange:</strong> ×1.0</p>
-                    <p>🟡 <strong>Yellow:</strong> ×1.2</p>
-                    <p>⚪ <strong>Gray:</strong> ×1.5</p>
-                    <p>💗 <strong>Pink:</strong> ×2.5 🏆</p>
+                    <p>🔴 <strong>Red:</strong> ×0.44</p>
+                    <p>🔵 <strong>Blue:</strong> ×0.51</p>
+                    <p>🟢 <strong>Green:</strong> ×0.66</p>
+                    <p>🟣 <strong>Purple:</strong> ×0.73</p>
+                    <p>🟠 <strong>Orange:</strong> ×0.88</p>
+                    <p>🟡 <strong>Yellow:</strong> ×1.02</p>
+                    <p>⚪ <strong>Gray:</strong> ×1.32</p>
+                    <p>💗 <strong>Pink:</strong> ×2.12 🏆</p>
                   </div>
                 </div>
               </div>

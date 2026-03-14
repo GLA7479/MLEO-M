@@ -68,6 +68,7 @@ function safeWrite(key, val) { if (typeof window === "undefined") return; try { 
 function fmt(n) { if (n >= 1e9) return (n / 1e9).toFixed(2) + "B"; if (n >= 1e6) return (n / 1e6).toFixed(2) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(2) + "K"; return Math.floor(n).toString(); }
 function formatPlayDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
 function shortAddr(addr) { if (!addr || addr.length < 10) return addr || ""; return `${addr.slice(0, 6)}...${addr.slice(-4)}`; }
+function normalizeWholeAmount(value) { return Math.max(0, Math.floor(Number(value) || 0)); }
 
 export default function NumberHuntPage() {
   useIOSViewportFix();
@@ -153,16 +154,18 @@ export default function NumberHuntPage() {
     if (!isConnected) { openConnectModal?.(); return; }
     if (chainId !== CLAIM_CHAIN_ID) { try { await switchChain?.({ chainId: CLAIM_CHAIN_ID }); } catch { alert("Switch to BSC Testnet"); return; } }
     if (!CLAIM_ADDRESS) { alert("Missing CLAIM address"); return; }
-    if (collectAmount <= 0 || collectAmount > vault) { alert("Invalid amount!"); return; }
+    const wholeCollectAmount = normalizeWholeAmount(collectAmount);
+    if (wholeCollectAmount <= 0 || wholeCollectAmount > vault) { alert("Invalid amount!"); return; }
     setClaiming(true);
     try {
-      const amountUnits = parseUnits(Number(collectAmount).toFixed(Math.min(2, MLEO_DECIMALS)), MLEO_DECIMALS);
+      const amountUnits = parseUnits(String(wholeCollectAmount), MLEO_DECIMALS);
       const hash = await writeContractAsync({ address: CLAIM_ADDRESS, abi: MINING_CLAIM_ABI, functionName: "claim", args: [BigInt(GAME_ID), amountUnits], chainId: CLAIM_CHAIN_ID, account: address });
       await publicClient.waitForTransactionReceipt({ hash });
-      const debitResult = await debitSharedVault(collectAmount, "keno-claim");
+      const debitResult = await debitSharedVault(wholeCollectAmount, "keno-claim");
       if (!debitResult.ok) { alert(debitResult.error || "Vault update failed"); return; }
       setVaultState(debitResult.balance);
-      alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
+      setCollectAmount(wholeCollectAmount);
+      alert(`✅ Sent ${fmt(wholeCollectAmount)} MLEO to wallet!`);
       setShowVaultModal(false);
     } catch (err) { console.error(err); alert("Claim failed or rejected"); } finally { setClaiming(false); }
   };
@@ -357,9 +360,9 @@ export default function NumberHuntPage() {
                 <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-lg p-3">
                   <p className="text-indigo-300 font-semibold">💰 Prize Table:</p>
                   <div className="text-xs text-white/80 mt-2 space-y-1">
-                    <p><strong>Pick 10:</strong> ×5, ×15, ×50, ×200, ×1000</p>
-                    <p><strong>Pick 5:</strong> ×2, ×5, ×20</p>
-                    <p><strong>Pick 1:</strong> ×3</p>
+                    <p><strong>Pick 10:</strong> 6 hits ×1, 7 hits ×3, 8 hits ×9, 9 hits ×38, 10 hits ×188</p>
+                    <p><strong>Pick 5:</strong> 3 hits ×0.95, 4 hits ×2.8, 5 hits ×9.5</p>
+                    <p><strong>Pick 1:</strong> 1 hit ×1.91</p>
                   </div>
                 </div>
                 <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-2 mt-2">
@@ -400,7 +403,7 @@ export default function NumberHuntPage() {
                 <div>
                   <label className="text-sm text-white/70 mb-2 block">Collect to Wallet</label>
                   <div className="flex gap-2 mb-2">
-                    <input type="number" value={collectAmount} onChange={(e) => setCollectAmount(Number(e.target.value))} className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white" min="1" max={vault} />
+                    <input type="number" value={collectAmount} onChange={(e) => setCollectAmount(normalizeWholeAmount(e.target.value))} className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white" min="1" step="1" max={vault} />
                     <button onClick={() => setCollectAmount(vault)} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold">MAX</button>
                   </div>
                   <button onClick={collectToWallet} disabled={collectAmount <= 0 || collectAmount > vault || claiming} className="w-full py-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed">{claiming ? "Collecting..." : `Collect ${fmt(collectAmount)} MLEO`}</button>
