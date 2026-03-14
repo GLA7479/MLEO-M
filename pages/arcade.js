@@ -162,7 +162,7 @@ export default function ArcadeHub() {
   const publicClient = usePublicClient();
   const chainId = useChainId();
   
-  // Read vault from RUSH game
+  // Read the shared vault used by the main MLEO games
   function getVault() {
     if (typeof window === "undefined") return 0;
     try {
@@ -235,7 +235,7 @@ export default function ArcadeHub() {
       const newVault = Math.max(0, vault - collectAmount);
       setVault(newVault);
       
-      // Update RUSH game vault
+      // Update shared vault snapshot
       try {
         const rushData = localStorage.getItem("mleo_rush_core_v4");
         if (rushData) {
@@ -244,7 +244,7 @@ export default function ArcadeHub() {
           localStorage.setItem("mleo_rush_core_v4", JSON.stringify(data));
         }
       } catch (e) {
-        console.error("Failed to update RUSH vault:", e);
+        console.error("Failed to update shared vault:", e);
       }
 
       alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
@@ -720,8 +720,8 @@ export default function ArcadeHub() {
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">🎮</span>
                   <div>
-                    <div className="font-semibold text-white">Play RUSH Game</div>
-                    <div>Earn MLEO by playing the main RUSH game. Your vault is shared between RUSH and Arcade games.</div>
+                    <div className="font-semibold text-white">Play Miners or Quest Arcade</div>
+                    <div>Earn MLEO through the main Miners loop or by shipping refined rewards from Quest Arcade. The same vault is shared here.</div>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -742,7 +742,7 @@ export default function ArcadeHub() {
             </div>
             <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 p-4">
               <div className="text-sm text-blue-300">
-                <strong>💡 Tip:</strong> Your vault is shared across all MLEO games. Play RUSH to build more balance for arcade sessions!
+                <strong>💡 Tip:</strong> Your vault is shared across all MLEO games. Build balance in Miners or Quest Arcade, then spend it here.
               </div>
             </div>
           </div>

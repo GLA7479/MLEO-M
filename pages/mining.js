@@ -1726,30 +1726,67 @@ function Modal({ isOpen, onClose, children, maxWidth = "2xl", padding = "6" }) {
 // ===== How to Play Component =====
 function HowToPlay({ lang, onClose, gameType = "miners" }) {
   const text = TEXT[lang];
+  const questText = lang === "he"
+    ? {
+        title: "איך לשחק - Quest Arcade",
+        goal: "מטרת המשחק",
+        goalDesc: "בנה בסיס צדדי שתומך ב-Miners: הפק Ore, Scrap ו-Gold, זקק משלוחים ושלח MLEO ל-Vault המשותף בקצב נשלט.",
+        gameplay: "הלופ המרכזי",
+        gameplaySteps: [
+          "שדרג Districts כדי להפיק Ore, Gold ו-Scrap.",
+          "פתח Refinery כדי להמיר Ore + Scrap ל-MLEO מקומי מוכן למשלוח.",
+          "שלח את ה-MLEO ל-Vault המשותף דרך Ship to Shared Vault.",
+          "השתמש ב-Vault המשותף על Blueprint, Overclock ו-Energy Refill כדי ליצור sinks אמיתיים.",
+        ],
+        features: "מה חשוב לדעת",
+        featuresList: [
+          "המשחק משתמש באותו Vault משותף של שאר משחקי MLEO.",
+          "אין כאן הפקדה מבחוץ - זה משחק תומך, לא שער הזרמה חיצוני.",
+          "Expeditions, Crew, Modules ו-Research מוסיפים עומק בלי להתחרות ישירות ב-Miners.",
+        ],
+      }
+    : {
+        title: "How to Play - Quest Arcade",
+        goal: "Goal",
+        goalDesc: "Build a support base for Miners: produce Ore, Scrap and Gold, refine timed shipments, and feed measured MLEO back into the shared vault.",
+        gameplay: "Core Loop",
+        gameplaySteps: [
+          "Upgrade districts to produce Ore, Gold and Scrap.",
+          "Unlock the Refinery to turn Ore + Scrap into bankable MLEO.",
+          "Ship refined MLEO into the shared vault with the daily softcut system.",
+          "Spend shared-vault MLEO on Blueprints, Overclock and Refills to add real sinks.",
+        ],
+        features: "Good to Know",
+        featuresList: [
+          "Quest Arcade uses the same shared vault as the rest of the MLEO games.",
+          "There are no outside deposits here - this is a support loop, not an external on-ramp.",
+          "Expeditions, Crew, Modules and Research add depth without competing directly with Miners.",
+        ],
+      };
   
-  if (gameType === "rush") {
+  if (gameType === "quest") {
     return (
       <div>
-        <h2 className="text-2xl font-bold mb-4">{text.howToPlayTitle} - Rush</h2>
+        <h2 className="text-2xl font-bold mb-4">{questText.title}</h2>
         
         <section className="mb-6">
-          <h3 className="font-bold text-lg mb-2">{text.rushGoal}</h3>
-          <p className="text-gray-700">{text.rushGoalDesc}</p>
+          <h3 className="font-bold text-lg mb-2">{questText.goal}</h3>
+          <p className="text-gray-700">{questText.goalDesc}</p>
         </section>
         
         <section className="mb-6">
-          <h3 className="font-bold text-lg mb-2">{text.rushGameplay}</h3>
+          <h3 className="font-bold text-lg mb-2">{questText.gameplay}</h3>
           <ol className="list-decimal ml-5 space-y-2">
-            {text.rushGameplaySteps.map((step, index) => (
+            {questText.gameplaySteps.map((step, index) => (
               <li key={index} className="text-gray-700">{step}</li>
             ))}
           </ol>
         </section>
         
         <section className="mb-6">
-          <h3 className="font-bold text-lg mb-2">{text.rushFeatures}</h3>
+          <h3 className="font-bold text-lg mb-2">{questText.features}</h3>
           <ul className="list-disc ml-5 space-y-2">
-            {text.rushFeaturesList.map((item, index) => (
+            {questText.featuresList.map((item, index) => (
               <li key={index} className="text-gray-700">{item}</li>
             ))}
           </ul>
@@ -2675,6 +2712,21 @@ export default function GamesHub() {
 
   const text = useMemo(() => TEXT[lang] || TEXT.en, [lang]);
   const dir = text.dir || "ltr";
+  const questCard = lang === "he"
+    ? {
+        title: "MLEO — Quest Arcade",
+        desc: "משחק ניהול תומך עם Ore, Scrap, Refinery ומשלוחים ל-Vault המשותף. מוסיף עומק וסינקים בלי להתחרות ב-Miners.",
+        badge: "Support",
+        play: "שחק Quest Arcade",
+        hub: "שני מצבים, Vault אחד. שחק באופן פעיל ב-Miners, או בנה בסיס תומך ב-Quest Arcade שמזין את ה-Vault המשותף.",
+      }
+    : {
+        title: "MLEO — Quest Arcade",
+        desc: "A support management game with Ore, Scrap, Refinery and shared-vault shipments. Adds depth and sinks without competing with Miners.",
+        badge: "Support",
+        play: "Play Quest Arcade",
+        hub: "Two modes, one Vault. Play actively with Miners or run a support management loop in Quest Arcade that feeds the shared vault.",
+      };
 
   if (!mounted) {
   return (
@@ -2764,7 +2816,7 @@ export default function GamesHub() {
                 {text.chooseGame}
             </h1>
             <p className="text-zinc-300 mt-2 max-w-2xl mx-auto">
-                {text.chooseGameDesc}
+                {questCard.hub}
             </p>
           </header>
 
@@ -2808,24 +2860,24 @@ export default function GamesHub() {
     </div>
   </article>
 
-  {/* TOKEN RUSH */}
+  {/* QUEST ARCADE */}
               <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-6 flex flex-col w-full max-w-[350px] min-h-[320px]">
     <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
                   <div>
-                    <h2 className="text-[20px] sm:text-2xl font-extrabold">{text.rush}</h2>
+                    <h2 className="text-[20px] sm:text-2xl font-extrabold">{questCard.title}</h2>
                     <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
-                      {text.rushDesc}
+                      {questCard.desc}
         </p>
       </div>
                   <span className="rounded-full px-2 py-1 text-xs font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30">
-                    {text.passive}
+                    {questCard.badge}
       </span>
     </div>
 
     <div className="mt-auto">
       <div className="flex flex-wrap gap-2 mb-3 justify-center">
         <button
-          onClick={() => open("rush-how")}
+          onClick={() => open("quest-how")}
                       className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-4 py-2 rounded-lg text-sm font-bold border border-blue-500/30 transition-colors"
         >
                       {text.howToPlay}
@@ -2838,9 +2890,9 @@ export default function GamesHub() {
         </button>
       </div>
 
-                  <Link href="/rush">
+                  <Link href="/quest-arcade">
                     <button className="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors">
-                      {text.playTokenRush}
+                      {questCard.play}
           </button>
                   </Link>
     </div>
@@ -2920,8 +2972,8 @@ export default function GamesHub() {
         <HowToPlay lang={lang} onClose={close} />
         </Modal>
 
-      <Modal isOpen={modal === "rush-how"} onClose={close}>
-        <HowToPlay lang={lang} onClose={close} gameType="rush" />
+      <Modal isOpen={modal === "quest-how"} onClose={close}>
+        <HowToPlay lang={lang} onClose={close} gameType="quest" />
         </Modal>
 
       <Modal isOpen={modal === "arcade-how"} onClose={close}>

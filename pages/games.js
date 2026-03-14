@@ -92,8 +92,8 @@ export default function GamesHub() {
               Choose Your Game
             </h1>
             <p className="text-zinc-300 mt-2 max-w-2xl mx-auto">
-              Two modes, one Vault. Play actively with upgrades (Miners) or let
-              passive accrual run (Token Rush). You can switch anytime.
+              Two modes, one Vault. Play actively with upgrades in Miners or run
+              a support management loop in Quest Arcade. You can switch anytime.
             </p>
           </header>
 
@@ -141,25 +141,25 @@ export default function GamesHub() {
     </div>
   </article>
 
-  {/* TOKEN RUSH */}
+  {/* QUEST ARCADE */}
   <article className="rounded-2xl border border-white/5 bg-black/10 backdrop-blur-md shadow-xl p-5 flex flex-col w-full sm:max-w-[360px] min-h-[300px]">
     <div className="flex items-start justify-between">
       <div>
-        <h2 className="text-[20px] sm:text-2xl font-extrabold">MLEO — Rush</h2>
+        <h2 className="text-[20px] sm:text-2xl font-extrabold">MLEO — Quest Arcade</h2>
         <p className="text-[14px] sm:text-sm text-zinc-300 mt-1 leading-6 break-words hyphens-auto">
-          Passive online mining with automatic offline accrual (time-capped).
-          Same Vault + CLAIM flow for background gains.
+          A support management game with Ore, Scrap, Refinery and timed
+          shipments into the shared MLEO Vault.
         </p>
       </div>
       <span className="ml-3 mt-1 rounded-full px-2.5 py-1 text-xs font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">
-        Passive
+        Support
       </span>
     </div>
 
     <div className="mt-auto">
       <div className="flex flex-wrap gap-2 mb-3 justify-center">
         <button
-          onClick={() => open("rush-how")}
+          onClick={() => open("quest-how")}
           className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs sm:text-sm font-semibold"
         >
           HOW TO PLAY
@@ -174,10 +174,10 @@ export default function GamesHub() {
 
       <div className="border-t border-zinc-800/80 pt-3">
         <Link
-          href="/rush"
+          href="/quest-arcade"
           className="inline-flex w-full items-center justify-center px-5 py-3 rounded-xl bg-orange-500 hover:bg-orange-400 text-black font-extrabold shadow-lg"
         >
-          Play Token Rush
+          Play Quest Arcade
         </Link>
       </div>
     </div>
