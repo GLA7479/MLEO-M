@@ -10,6 +10,14 @@ import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
 import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import {
+  creditSharedVault,
+  debitSharedVault,
+  initSharedVault,
+  peekSharedVault,
+  readSharedVault,
+  subscribeSharedVault,
+} from "../lib/sharedVault";
 
 // ============================================================================
 // iOS 100vh FIX
@@ -98,15 +106,9 @@ function safeWrite(key, val) {
   } catch {}
 }
 
-function getVault() {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  return rushData.vault || 0;
-}
-
-function setVault(amount) {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  rushData.vault = amount;
-  safeWrite("mleo_rush_core_v4", rushData);
+function normalizeWholeAmount(value) {
+  const num = Number(value);
+  return Math.floor(Number.isFinite(num) ? num : 0);
 }
 
 function fmt(n) {
@@ -203,8 +205,16 @@ export default function SicBoPage() {
 
   // Init
   useEffect(() => {
+    let cancelled = false;
     setMounted(true);
-    setVaultState(getVault());
+    initSharedVault();
+    readSharedVault()
+      .then(snapshot => {
+        if (!cancelled) setVaultState(snapshot.balance);
+      })
+      .catch(() => {
+        if (!cancelled) setVaultState(peekSharedVault().balance);
+      });
 
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
@@ -217,10 +227,13 @@ export default function SicBoPage() {
       setPlayAmount(String(savedStats.lastPlay));
     }
 
+    const unsubscribeVault = subscribeSharedVault(snapshot => {
+      if (!cancelled) setVaultState(snapshot.balance);
+    });
+
     const interval = setInterval(() => {
       const status = getFreePlayStatus();
       setFreePlayTokens(status.tokens);
-      setVaultState(getVault());
     }, 2000);
 
     if (typeof Audio !== "undefined") {
@@ -236,6 +249,8 @@ export default function SicBoPage() {
     document.addEventListener("fullscreenchange", handleFullscreenChange);
 
     return () => {
+      cancelled = true;
+      unsubscribeVault();
       clearInterval(interval);
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
@@ -314,17 +329,15 @@ export default function SicBoPage() {
       return;
     }
 
-    if (collectAmount <= 0 || collectAmount > vault) {
+    const wholeAmount = normalizeWholeAmount(collectAmount);
+    if (wholeAmount <= 0 || wholeAmount > vault) {
       alert("Invalid amount!");
       return;
     }
 
     setClaiming(true);
     try {
-      const amountUnits = parseUnits(
-        Number(collectAmount).toFixed(Math.min(2, MLEO_DECIMALS)),
-        MLEO_DECIMALS
-      );
+      const amountUnits = parseUnits(String(wholeAmount), MLEO_DECIMALS);
 
       const hash = await writeContractAsync({
         address: CLAIM_ADDRESS,
@@ -337,11 +350,10 @@ export default function SicBoPage() {
 
       await publicClient.waitForTransactionReceipt({ hash });
 
-      const newVault = Math.max(0, vault - collectAmount);
-      setVault(newVault);
-      setVaultState(newVault);
+      const debitResult = await debitSharedVault(wholeAmount, "sicbo");
+      setVaultState(debitResult.balance);
 
-      alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
+      alert(`✅ Sent ${fmt(wholeAmount)} MLEO to wallet!`);
       setShowVaultModal(false);
     } catch (err) {
       console.error(err);
@@ -352,7 +364,7 @@ export default function SicBoPage() {
   };
 
   // Game logic
-  const rollDice = (isFreePlayParam = false) => {
+  const rollDice = async (isFreePlayParam = false) => {
     if (!selectedPlay) {
       alert('Please select a play type first!');
       return;
@@ -361,7 +373,6 @@ export default function SicBoPage() {
     if (rolling) return;
     playSfx(clickSound.current);
 
-    const currentVault = getVault();
     let play = Number(playAmount) || MIN_PLAY;
 
     if (isFreePlay || isFreePlayParam) {
@@ -380,13 +391,14 @@ export default function SicBoPage() {
         alert(`Minimum play is ${MIN_PLAY} MLEO`);
         return;
       }
+      const currentVault = peekSharedVault().balance;
       if (currentVault < play) {
         alert('Insufficient MLEO in vault');
         return;
       }
 
-      setVault(currentVault - play);
-      setVaultState(currentVault - play);
+      const debitResult = await debitSharedVault(play, "sicbo");
+      setVaultState(debitResult.balance);
     }
 
     setPlayAmount(String(play));
@@ -417,7 +429,7 @@ export default function SicBoPage() {
     }, 100);
   };
 
-  const checkResult = (finalDice, play) => {
+  const checkResult = async (finalDice, play) => {
     const sum = finalDice.reduce((a, b) => a + b, 0);
     const playType = PLAY_TYPES[selectedPlay];
 
@@ -428,12 +440,11 @@ export default function SicBoPage() {
       win = playType.check(sum);
     }
 
-    const prize = win ? play * playType.prize : 0;
+    const prize = win ? Math.floor(play * playType.prize) : 0;
 
     if (win && prize > 0) {
-      const newVault = getVault() + prize;
-      setVault(newVault);
-      setVaultState(newVault);
+      const creditResult = await creditSharedVault(prize, "sicbo");
+      setVaultState(creditResult.balance);
       playSfx(winSound.current);
     }
 
@@ -873,7 +884,7 @@ export default function SicBoPage() {
                     <input
                       type="number"
                       value={collectAmount}
-                      onChange={(e) => setCollectAmount(Number(e.target.value))}
+                      onChange={(e) => setCollectAmount(normalizeWholeAmount(e.target.value))}
                       className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white"
                       min="1"
                       max={vault}

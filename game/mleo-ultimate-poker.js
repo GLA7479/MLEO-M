@@ -10,6 +10,14 @@ import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
 import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import {
+  creditSharedVault,
+  debitSharedVault,
+  initSharedVault,
+  peekSharedVault,
+  readSharedVault,
+  subscribeSharedVault,
+} from "../lib/sharedVault";
 
 function useIOSViewportFix() {
   useEffect(() => {
@@ -56,11 +64,13 @@ const S_WIN = "/sounds/gift.mp3";
 
 function safeRead(key, fallback = {}) { if (typeof window === "undefined") return fallback; try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
 function safeWrite(key, val) { if (typeof window === "undefined") return; try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
-function getVault() { const rushData = safeRead("mleo_rush_core_v4", {}); return rushData.vault || 0; }
-function setVault(amount) { const rushData = safeRead("mleo_rush_core_v4", {}); rushData.vault = amount; safeWrite("mleo_rush_core_v4", rushData); }
 function fmt(n) { if (n >= 1e9) return (n / 1e9).toFixed(2) + "B"; if (n >= 1e6) return (n / 1e6).toFixed(2) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(2) + "K"; return Math.floor(n).toString(); }
 function formatPlayDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
 function shortAddr(addr) { if (!addr || addr.length < 10) return addr || ""; return `${addr.slice(0, 6)}...${addr.slice(-4)}`; }
+function normalizeWholeAmount(value) {
+  const num = Number(value);
+  return Math.floor(Number.isFinite(num) ? num : 0);
+}
 
 function createDeck() {
   const deck = [];
@@ -261,19 +271,42 @@ export default function UltimatePokerPage() {
   const playSfx = (audio) => { if (!sfxMuted && audio) { audio.currentTime = 0; audio.play().catch(() => {}); } };
 
   useEffect(() => {
+    let cancelled = false;
     setMounted(true);
-    setVaultState(getVault());
+    initSharedVault();
+    readSharedVault()
+      .then(snapshot => {
+        if (!cancelled) setVaultState(snapshot.balance);
+      })
+      .catch(() => {
+        if (!cancelled) setVaultState(peekSharedVault().balance);
+      });
+
     const isFree = router.query.freeplay === "true";
     setIsFreePlay(isFree);
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
-    const interval = setInterval(() => { const status = getFreePlayStatus(); setFreePlayTokens(status.tokens); setVaultState(getVault()); }, 2000);
+
+    const unsubscribeVault = subscribeSharedVault(snapshot => {
+      if (!cancelled) setVaultState(snapshot.balance);
+    });
+
+    const interval = setInterval(() => {
+      const status = getFreePlayStatus();
+      setFreePlayTokens(status.tokens);
+    }, 2000);
+
     if (typeof Audio !== "undefined") {
       try { clickSound.current = new Audio(S_CLICK); winSound.current = new Audio(S_WIN); } catch {}
     }
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => { clearInterval(interval); document.removeEventListener("fullscreenchange", handleFullscreenChange); };
+    return () => {
+      cancelled = true;
+      unsubscribeVault();
+      clearInterval(interval);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
   }, [router.query]);
 
   useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
@@ -284,9 +317,8 @@ export default function UltimatePokerPage() {
   const hardDisconnect = () => { disconnect?.(); setMenuOpen(false); };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
-  const dealHand = (isFreePlayParam = false) => {
+  const dealHand = async (isFreePlayParam = false) => {
     playSfx(clickSound.current);
-    const currentVault = getVault();
     let play = Number(playAmount) || MIN_PLAY;
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
@@ -294,8 +326,10 @@ export default function UltimatePokerPage() {
       else { alert('No free play tokens available!'); setIsFreePlay(false); return; }
     } else {
       if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
+      const currentVault = peekSharedVault().balance;
       if (currentVault < play * 2) { alert('Insufficient MLEO in vault (need 2x play for Ante + Blind)'); return; }
-      setVault(currentVault - play); setVaultState(currentVault - play);
+      const debitResult = await debitSharedVault(play, "ultimate-poker");
+      setVaultState(debitResult.balance);
     }
     
     setAnteBet(play);
@@ -328,12 +362,13 @@ export default function UltimatePokerPage() {
     }, 1200);
   };
 
-  const raise4x = () => {
+  const raise4x = async () => {
     playSfx(clickSound.current);
     const raiseBet = anteBet * 4;
-    const currentVault = getVault();
+    const currentVault = peekSharedVault().balance;
     if (currentVault < raiseBet) { alert('Insufficient MLEO in vault!'); return; }
-    setVault(currentVault - raiseBet); setVaultState(currentVault - raiseBet);
+    const debitResult = await debitSharedVault(raiseBet, "ultimate-poker");
+    setVaultState(debitResult.balance);
     setPlayBet(playBet + raiseBet);
     setCanRaise4x(false);
     setCanRaise2x(false);
@@ -354,12 +389,13 @@ export default function UltimatePokerPage() {
     }
   };
 
-  const raise2x = () => {
+  const raise2x = async () => {
     playSfx(clickSound.current);
     const raiseBet = anteBet * 2;
-    const currentVault = getVault();
+    const currentVault = peekSharedVault().balance;
     if (currentVault < raiseBet) { alert('Insufficient MLEO in vault!'); return; }
-    setVault(currentVault - raiseBet); setVaultState(currentVault - raiseBet);
+    const debitResult = await debitSharedVault(raiseBet, "ultimate-poker");
+    setVaultState(debitResult.balance);
     setPlayBet(playBet + raiseBet);
     setCanRaise4x(false);
     setCanRaise2x(false);
@@ -369,12 +405,13 @@ export default function UltimatePokerPage() {
     dealTurn();
   };
 
-  const raise1x = () => {
+  const raise1x = async () => {
     playSfx(clickSound.current);
     const raiseBet = anteBet;
-    const currentVault = getVault();
+    const currentVault = peekSharedVault().balance;
     if (currentVault < raiseBet) { alert('Insufficient MLEO in vault!'); return; }
-    setVault(currentVault - raiseBet); setVaultState(currentVault - raiseBet);
+    const debitResult = await debitSharedVault(raiseBet, "ultimate-poker");
+    setVaultState(debitResult.balance);
     setPlayBet(playBet + raiseBet);
     setCanRaise4x(false);
     setCanRaise2x(false);
@@ -519,10 +556,10 @@ export default function UltimatePokerPage() {
         const totalBetAmount = anteBet + playBet;
         
         if (totalPrize > 0) {
-          const newVault = getVault() + totalPrize;
-          setVault(newVault);
-          setVaultState(newVault);
-          if (win) playSfx(winSound.current);
+          creditSharedVault(Math.floor(totalPrize), "ultimate-poker").then(creditResult => {
+            setVaultState(creditResult.balance);
+            if (win) playSfx(winSound.current);
+          });
         }
         
         const newStats = {

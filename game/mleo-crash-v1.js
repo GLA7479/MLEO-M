@@ -14,6 +14,14 @@ import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
 import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import {
+  creditSharedVault,
+  debitSharedVault,
+  initSharedVault,
+  peekSharedVault,
+  readSharedVault,
+  subscribeSharedVault,
+} from "../lib/sharedVault";
 
 // ------------------------------- Storage -------------------------------------
 const LS_KEY = "mleo_crash_v1";
@@ -36,15 +44,9 @@ function safeWrite(key, val) {
   } catch {}
 }
 
-function getVault() {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  return rushData.vault || 0;
-}
-
-function setVault(amount) {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  rushData.vault = amount;
-  safeWrite("mleo_rush_core_v4", rushData);
+function normalizeWholeAmount(value) {
+  const num = Number(value);
+  return Math.floor(Number.isFinite(num) ? num : 0);
 }
 
 function fmt(n) {
@@ -148,8 +150,16 @@ export default function MLEOCrash() {
 
   // ----------------------- Init -------------------
   useEffect(() => {
+    let cancelled = false;
     setMounted(true);
-    setVaultState(getVault());
+    initSharedVault();
+    readSharedVault()
+      .then(snapshot => {
+        if (!cancelled) setVaultState(snapshot.balance);
+      })
+      .catch(() => {
+        if (!cancelled) setVaultState(peekSharedVault().balance);
+      });
     
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
@@ -162,12 +172,20 @@ export default function MLEOCrash() {
       setPlayAmount(String(savedStats.lastPlay));
     }
     
+    const unsubscribeVault = subscribeSharedVault(snapshot => {
+      if (!cancelled) setVaultState(snapshot.balance);
+    });
+    
     const interval = setInterval(() => {
       const status = getFreePlayStatus();
       setFreePlayTokens(status.tokens);
     }, 2000);
     
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      unsubscribeVault();
+      clearInterval(interval);
+    };
   }, [router.query]);
 
   useEffect(() => {
@@ -180,9 +198,6 @@ export default function MLEOCrash() {
     }
   }, [prize]);
 
-  const refreshVault = () => {
-    setVaultState(getVault());
-  };
 
   // ----------------------- Lifecycle: start playing window -------------------
   useEffect(() => {
@@ -315,7 +330,7 @@ export default function MLEOCrash() {
   };
 
   // ------------------------------- Actions ----------------------------------
-  const placeBet = (isFreePlayParam = false) => {
+  const placeBet = async (isFreePlayParam = false) => {
     let amt = Number(playAmount) || MIN_PLAY;
     if (!Number.isFinite(amt) || amt < MIN_PLAY) return;
     if (phase !== "playing") return;
@@ -333,33 +348,34 @@ export default function MLEOCrash() {
         return;
       }
     } else {
-      const currentVault = getVault();
+      const currentVault = peekSharedVault().balance;
       if (amt > currentVault) {
         alert('Insufficient MLEO in vault');
         return;
       }
 
       // Deduct from vault
-      setVault(currentVault - amt);
-      setVaultState(currentVault - amt);
+      const debitResult = await debitSharedVault(amt, "crash-v1");
+      setVaultState(debitResult.balance);
       setPlayerBet({ amount: amt, accepted: false });
     }
   };
 
-  const cashOut = () => {
+  const cashOut = async () => {
     if (!canCashOut || phase !== "running") return;
     if (!playerBet?.accepted) return; // only after takeoff
     setCanCashOut(false);
     setCashedOutAt(multiplier);
     cancelAnimationFrame(rafRef.current);
 
-    const winAmount = Math.round(playerBet.amount * multiplier * 100) / 100;
+    const winAmount = Math.floor(playerBet.amount * multiplier);
     setPayout({ win: true, amount: winAmount, at: multiplier });
 
     // Credit to vault
-    const newVault = getVault() + winAmount;
-    setVault(newVault);
-    setVaultState(newVault);
+    if (winAmount > 0) {
+      const creditResult = await creditSharedVault(winAmount, "crash-v1");
+      setVaultState(creditResult.balance);
+    }
     
     // Update stats
     const newStats = {

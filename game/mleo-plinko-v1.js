@@ -9,6 +9,14 @@ import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
 import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import {
+  creditSharedVault,
+  debitSharedVault,
+  initSharedVault,
+  peekSharedVault,
+  readSharedVault,
+  subscribeSharedVault,
+} from "../lib/sharedVault";
 
 // ============================================================================
 // CONFIG
@@ -114,15 +122,9 @@ function safeWrite(key, val) {
   } catch {}
 }
 
-// Reuse vault from your existing Rush storage
-function getVault() {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  return rushData.vault || 0;
-}
-function setVault(amount) {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  rushData.vault = amount;
-  safeWrite("mleo_rush_core_v4", rushData);
+function normalizeWholeAmount(value) {
+  const num = Number(value);
+  return Math.floor(Number.isFinite(num) ? num : 0);
 }
 
 // Formatting
@@ -217,8 +219,16 @@ export default function PlinkoPage() {
 
   // Init
   useEffect(() => {
+    let cancelled = false;
     setMounted(true);
-    setVaultState(getVault());
+    initSharedVault();
+    readSharedVault()
+      .then(snapshot => {
+        if (!cancelled) setVaultState(snapshot.balance);
+      })
+      .catch(() => {
+        if (!cancelled) setVaultState(peekSharedVault().balance);
+      });
 
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
@@ -231,6 +241,10 @@ export default function PlinkoPage() {
     if (savedStats.lastPlay) {
       setPlayAmount(String(savedStats.lastPlay));
     }
+    
+    const unsubscribeVault = subscribeSharedVault(snapshot => {
+      if (!cancelled) setVaultState(snapshot.balance);
+    });
     
     const interval = setInterval(() => {
       const status = getFreePlayStatus();
@@ -245,7 +259,11 @@ export default function PlinkoPage() {
       } catch {}
     }
     
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      unsubscribeVault();
+      clearInterval(interval);
+    };
   }, [router.query]);
 
   // Persist stats
@@ -528,7 +546,7 @@ function buildBoardGeometry(w, h) {
     ballsRef.current = ballsRef.current.filter(b => !b._landed);
   }
 
-  function landInBucket(idx, ball) {
+  async function landInBucket(idx, ball) {
     ball._landed = true;
 
     // Visual highlight
@@ -541,9 +559,8 @@ function buildBoardGeometry(w, h) {
     const mult = MULTIPLIERS[idx] ?? 0;
     const prize = Math.floor(ball.playAmount * mult);
     if (prize > 0) {
-      const newVault = getVault() + prize;
-      setVault(newVault);
-      setVaultState(newVault);
+      const creditResult = await creditSharedVault(prize, "plinko-v1");
+      setVaultState(creditResult.balance);
     }
 
       setStats(s => ({
@@ -695,7 +712,7 @@ function buildBoardGeometry(w, h) {
   };
 
   // Drop ball
-  function dropBall(isFreePlayParam = false) {
+  async function dropBall(isFreePlayParam = false) {
     let play = Number(playAmount) || MIN_PLAY;
     
     if (isFreePlay || isFreePlayParam) {
@@ -715,14 +732,14 @@ function buildBoardGeometry(w, h) {
         return;
       }
       
-      const currentVault = getVault();
+      const currentVault = peekSharedVault().balance;
       if (currentVault < play) {
         setResult({ error: true, message: `Need ${fmt(play)} MLEO!` });
         return;
       }
       // Deduct cost
-      setVault(currentVault - play);
-      setVaultState(currentVault - play);
+      const debitResult = await debitSharedVault(play, "plinko-v1");
+      setVaultState(debitResult.balance);
     }
 
     const board = boardRef.current;
@@ -748,8 +765,6 @@ function buildBoardGeometry(w, h) {
       } catch {}
     }
   }
-
-  const refreshVault = () => setVaultState(getVault());
 
   // Active balls count (render-only)
   const activeCount = useMemo(() => ballsRef.current.length, [ballsRef.current.length, result]);

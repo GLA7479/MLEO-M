@@ -9,6 +9,14 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect } from "wagmi";
 import { supabaseMP as supabase } from "../lib/supabaseClients";
+import {
+  creditSharedVault,
+  debitSharedVault,
+  initSharedVault,
+  peekSharedVault,
+  readSharedVault,
+  subscribeSharedVault,
+} from "../lib/sharedVault";
 
 // ============================================================================
 // VAULT SYSTEM
@@ -45,16 +53,6 @@ function clearPlayerIdentity(tableId) {
   try { localStorage.removeItem(`mleo_poker_player_${tableId}`); } catch {}
 }
 
-function getVault() {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  return rushData.vault || 0;
-}
-
-function setVault(amount) {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  rushData.vault = amount;
-  safeWrite("mleo_rush_core_v4", rushData);
-}
 
 function fmt(n) {
   if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
@@ -569,11 +567,28 @@ export default function CardRoomsPage() {
   };
 
   useEffect(() => {
+    let cancelled = false;
     setMounted(true);
-    setVaultAmount(getVault());
+    initSharedVault();
+    readSharedVault()
+      .then(snapshot => {
+        if (!cancelled) setVaultAmount(snapshot.balance);
+      })
+      .catch(() => {
+        if (!cancelled) setVaultAmount(peekSharedVault().balance);
+      });
+
+    const unsubscribeVault = subscribeSharedVault(snapshot => {
+      if (!cancelled) setVaultAmount(snapshot.balance);
+    });
     
     // Check if user is admin
     setIsAdmin(address === "0x39846ebBA723e440562a60f4B4a0147150442c7b");
+
+    return () => {
+      cancelled = true;
+      unsubscribeVault();
+    };
   }, [address]);
 
   // Restore player identity if lost (e.g., refresh)
@@ -784,11 +799,6 @@ export default function CardRoomsPage() {
     return () => clearInterval(cleanupInterval);
   }, []);
 
-  useEffect(() => {
-    if (mounted) {
-      setVaultAmount(getVault());
-    }
-  }, [mounted]);
 
   // Subscribe to tables
   useEffect(() => {
@@ -883,9 +893,8 @@ export default function CardRoomsPage() {
       }
       
       // Deduct from vault
-      const newVault = vaultAmount - table.min_entry_fee;
-      setVault(newVault);
-      setVaultAmount(newVault);
+      const debitResult = await debitSharedVault(table.min_entry_fee, "texas-holdem-casino");
+      setVaultAmount(debitResult.balance);
       
       // Add player to table
       const { data: newPlayer, error: playerError } = await supabase
@@ -932,9 +941,8 @@ export default function CardRoomsPage() {
       setError("");
 
       // הורד מה־Vault
-      const newVault = vaultAmount - toBuy;
-      setVault(newVault);
-      setVaultAmount(newVault);
+      const debitResult = await debitSharedVault(toBuy, "texas-holdem-casino");
+      setVaultAmount(debitResult.balance);
 
       // הוסף ל־stack של השחקן
       const { data: me } = await supabase
@@ -970,9 +978,8 @@ export default function CardRoomsPage() {
       
       if (player && player.chips > 0) {
         // Return chips to vault
-        const newVault = vaultAmount + player.chips;
-        setVault(newVault);
-        setVaultAmount(newVault);
+        const creditResult = await creditSharedVault(player.chips, "texas-holdem-casino");
+        setVaultAmount(creditResult.balance);
       }
       
       // Remove player from table

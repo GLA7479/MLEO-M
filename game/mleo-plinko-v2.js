@@ -17,6 +17,14 @@ import {
 } from "wagmi";
 import { parseUnits } from "viem";
 import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import {
+  creditSharedVault,
+  debitSharedVault,
+  initSharedVault,
+  peekSharedVault,
+  readSharedVault,
+  subscribeSharedVault,
+} from "../lib/sharedVault";
 
 // ===== viewport fix =====
 function useIOSViewportFix() {
@@ -112,14 +120,9 @@ function safeWrite(key, val) {
     localStorage.setItem(key, JSON.stringify(val));
   } catch {}
 }
-function getVault() {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  return rushData.vault || 0;
-}
-function setVault(amount) {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  rushData.vault = amount;
-  safeWrite("mleo_rush_core_v4", rushData);
+function normalizeWholeAmount(value) {
+  const num = Number(value);
+  return Math.floor(Number.isFinite(num) ? num : 0);
 }
 function fmt(n) {
   if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
@@ -212,19 +215,33 @@ export default function Plinko2Page() {
 
   // Init
   useEffect(() => {
+    let cancelled = false;
     setMounted(true);
-    setVaultState(getVault());
+    initSharedVault();
+    readSharedVault()
+      .then(snapshot => {
+        if (!cancelled) setVaultState(snapshot.balance);
+      })
+      .catch(() => {
+        if (!cancelled) setVaultState(peekSharedVault().balance);
+      });
+
     const isFree = router.query.freePlay === "true";
     setIsFreePlay(isFree);
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
     const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
     if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
+
+    const unsubscribeVault = subscribeSharedVault(snapshot => {
+      if (!cancelled) setVaultState(snapshot.balance);
+    });
+
     const interval = setInterval(() => {
       const status = getFreePlayStatus();
       setFreePlayTokens(status.tokens);
-      setVaultState(getVault());
     }, 2000);
+
     if (typeof Audio !== "undefined") {
       try {
         clickSound.current = new Audio(S_CLICK);
@@ -235,6 +252,8 @@ export default function Plinko2Page() {
       setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => {
+      cancelled = true;
+      unsubscribeVault();
       clearInterval(interval);
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
@@ -492,7 +511,7 @@ export default function Plinko2Page() {
     };
   }, [mounted]);
 
-  const landInBucket = (ball, bucket) => {
+  const landInBucket = async (ball, bucket) => {
     const play = ball.play;
     
     // Use the ACTUAL physical bucket the ball landed in!
@@ -502,9 +521,8 @@ export default function Plinko2Page() {
     const win = prize > 0;
 
     if (win && prize > 0) {
-      const newVault = getVault() + prize;
-      setVault(newVault);
-      setVaultState(newVault);
+      const creditResult = await creditSharedVault(prize, "plinko-v2");
+      setVaultState(creditResult.balance);
       playSfx(winSound.current);
     }
 
@@ -534,9 +552,8 @@ export default function Plinko2Page() {
     setStats(newStats);
   };
 
-  const dropBall = (isFreePlayParam = false) => {
+  const dropBall = async (isFreePlayParam = false) => {
     playSfx(clickSound.current);
-    const currentVault = getVault();
     let play = Number(playAmount) || MIN_PLAY;
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
@@ -554,12 +571,13 @@ export default function Plinko2Page() {
         alert(`Minimum play is ${MIN_PLAY} MLEO`);
         return;
       }
+      const currentVault = peekSharedVault().balance;
       if (currentVault < play) {
         alert("Insufficient MLEO in vault");
         return;
       }
-      setVault(currentVault - play);
-      setVaultState(currentVault - play);
+      const debitResult = await debitSharedVault(play, "plinko-v2");
+      setVaultState(debitResult.balance);
     }
     setPlayAmount(String(play));
 
@@ -607,16 +625,14 @@ export default function Plinko2Page() {
       alert("Missing CLAIM address");
       return;
     }
-    if (collectAmount <= 0 || collectAmount > vault) {
+    const wholeAmount = normalizeWholeAmount(collectAmount);
+    if (wholeAmount <= 0 || wholeAmount > vault) {
       alert("Invalid amount!");
       return;
     }
     setClaiming(true);
     try {
-      const amountUnits = parseUnits(
-        Number(collectAmount).toFixed(Math.min(2, MLEO_DECIMALS)),
-        MLEO_DECIMALS
-      );
+      const amountUnits = parseUnits(String(wholeAmount), MLEO_DECIMALS);
       const hash = await writeContractAsync({
         address: CLAIM_ADDRESS,
         abi: MINING_CLAIM_ABI,
@@ -626,10 +642,9 @@ export default function Plinko2Page() {
         account: address,
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      const newVault = Math.max(0, vault - collectAmount);
-      setVault(newVault);
-      setVaultState(newVault);
-      alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
+      const debitResult = await debitSharedVault(wholeAmount, "plinko-v2");
+      setVaultState(debitResult.balance);
+      alert(`✅ Sent ${fmt(wholeAmount)} MLEO to wallet!`);
       setShowVaultModal(false);
     } catch (err) {
       console.error(err);
@@ -1149,8 +1164,9 @@ export default function Plinko2Page() {
                   <div className="flex gap-2 mb-2">
                     <input
                       type="number"
+                      step="1"
                       value={collectAmount}
-                      onChange={(e) => setCollectAmount(Number(e.target.value))}
+                      onChange={(e) => setCollectAmount(normalizeWholeAmount(e.target.value))}
                       className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white"
                       min="1"
                       max={vault}
