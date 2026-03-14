@@ -10,6 +10,14 @@ import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
 import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import {
+  creditSharedVault,
+  debitSharedVault,
+  initSharedVault,
+  peekSharedVault,
+  readSharedVault,
+  subscribeSharedVault,
+} from "../lib/sharedVault";
 
 function useIOSViewportFix() {
   useEffect(() => {
@@ -50,11 +58,10 @@ const S_WIN = "/sounds/gift.mp3";
 
 function safeRead(key, fallback = {}) { if (typeof window === "undefined") return fallback; try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
 function safeWrite(key, val) { if (typeof window === "undefined") return; try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
-function getVault() { const rushData = safeRead("mleo_rush_core_v4", {}); return rushData.vault || 0; }
-function setVault(amount) { const rushData = safeRead("mleo_rush_core_v4", {}); rushData.vault = amount; safeWrite("mleo_rush_core_v4", rushData); }
 function fmt(n) { if (n >= 1e9) return (n / 1e9).toFixed(2) + "B"; if (n >= 1e6) return (n / 1e6).toFixed(2) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(2) + "K"; return Math.floor(n).toString(); }
 function formatPlayDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
 function shortAddr(addr) { if (!addr || addr.length < 10) return addr || ""; return `${addr.slice(0, 6)}...${addr.slice(-4)}`; }
+function normalizeWholeAmount(value) { return Math.max(0, Math.floor(Number(value) || 0)); }
 
 function initBoard() {
   const board = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
@@ -318,21 +325,32 @@ export default function CheckersPage() {
   const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
 
   useEffect(() => {
+    let cancelled = false;
     setMounted(true);
-    setVaultState(getVault());
+    initSharedVault();
+    readSharedVault()
+      .then(snapshot => {
+        if (!cancelled) setVaultState(snapshot.balance);
+      })
+      .catch(() => {
+        if (!cancelled) setVaultState(peekSharedVault().balance);
+      });
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
     const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
     if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
-    const interval = setInterval(() => { const status = getFreePlayStatus(); setFreePlayTokens(status.tokens); setVaultState(getVault()); }, 2000);
+    const unsubscribeVault = subscribeSharedVault(snapshot => {
+      if (!cancelled) setVaultState(snapshot.balance);
+    });
+    const interval = setInterval(() => { const status = getFreePlayStatus(); setFreePlayTokens(status.tokens); }, 2000);
     if (typeof Audio !== "undefined") {
       try { clickSound.current = new Audio(S_CLICK); winSound.current = new Audio(S_WIN); } catch {}
     }
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => { clearInterval(interval); document.removeEventListener("fullscreenchange", handleFullscreenChange); };
+    return () => { cancelled = true; unsubscribeVault(); clearInterval(interval); document.removeEventListener("fullscreenchange", handleFullscreenChange); };
   }, [router.query]);
 
   useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
@@ -372,23 +390,25 @@ export default function CheckersPage() {
     if (!isConnected) { openConnectModal?.(); return; }
     if (chainId !== CLAIM_CHAIN_ID) { try { await switchChain?.({ chainId: CLAIM_CHAIN_ID }); } catch { alert("Switch to BSC Testnet"); return; } }
     if (!CLAIM_ADDRESS) { alert("Missing CLAIM address"); return; }
-    if (collectAmount <= 0 || collectAmount > vault) { alert("Invalid amount!"); return; }
+    const wholeCollectAmount = normalizeWholeAmount(collectAmount);
+    if (wholeCollectAmount <= 0 || wholeCollectAmount > vault) { alert("Invalid amount!"); return; }
     setClaiming(true);
     try {
-      const amountUnits = parseUnits(Number(collectAmount).toFixed(Math.min(2, MLEO_DECIMALS)), MLEO_DECIMALS);
+      const amountUnits = parseUnits(String(wholeCollectAmount), MLEO_DECIMALS);
       const hash = await writeContractAsync({ address: CLAIM_ADDRESS, abi: MINING_CLAIM_ABI, functionName: "claim", args: [BigInt(GAME_ID), amountUnits], chainId: CLAIM_CHAIN_ID, account: address });
       await publicClient.waitForTransactionReceipt({ hash });
-      const newVault = Math.max(0, vault - collectAmount);
-      setVault(newVault); setVaultState(newVault);
-      alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
+      const debitResult = await debitSharedVault(wholeCollectAmount, "checkers-claim");
+      if (!debitResult.ok) { alert(debitResult.error || "Vault update failed"); return; }
+      setVaultState(debitResult.balance);
+      setCollectAmount(wholeCollectAmount);
+      alert(`✅ Sent ${fmt(wholeCollectAmount)} MLEO to wallet!`);
       setShowVaultModal(false);
     } catch (err) { console.error(err); alert("Claim failed or rejected"); } finally { setClaiming(false); }
   };
 
-  const startGame = (isFreePlayParam = false) => {
+  const startGame = async (isFreePlayParam = false) => {
     if (gameActive) return;
     playSfx(clickSound.current);
-    const currentVault = getVault();
     let play = Number(playAmount) || MIN_PLAY;
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
@@ -396,8 +416,9 @@ export default function CheckersPage() {
       else { alert('No free play tokens available!'); setIsFreePlay(false); return; }
     } else {
       if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
-      if (currentVault < play) { alert('Insufficient MLEO in vault'); return; }
-      setVault(currentVault - play); setVaultState(currentVault - play);
+      const debitResult = await debitSharedVault(play, "checkers");
+      if (!debitResult.ok) { alert(debitResult.error || 'Insufficient MLEO in vault'); return; }
+      setVaultState(debitResult.balance);
     }
     setPlayAmount(String(play));
     setBoard(initBoard());
@@ -512,14 +533,14 @@ export default function CheckersPage() {
     }
   }
 
-  function endGame(playerWon) {
+  async function endGame(playerWon) {
     const play = Number(playAmount);
     const prize = playerWon ? Math.floor(play * WIN_MULTIPLIER) : 0;
     const win = playerWon;
 
     if (win && prize > 0) {
-      const newVault = getVault() + prize;
-      setVault(newVault); setVaultState(newVault);
+      const creditResult = await creditSharedVault(prize, "checkers");
+      setVaultState(creditResult.balance);
       playSfx(winSound.current);
     }
 
@@ -661,7 +682,7 @@ export default function CheckersPage() {
 
         {showStats && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2><div className="space-y-3"><div className="grid grid-cols-2 gap-3"><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Games</div><div className="text-xl font-bold">{stats.totalGames}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalGames > 0 ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : 0}%</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Play</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalPlay)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalPlay >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalPlay)}</div></div></div></div><button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
 
-        {showVaultModal && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">💰 MLEO Vault</h2><div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-6 text-center"><div className="text-sm text-white/60 mb-1">Current Balance</div><div className="text-3xl font-bold text-emerald-400">{fmt(vault)} MLEO</div></div><div className="space-y-4"><div><label className="text-sm text-white/70 mb-2 block">Collect to Wallet</label><div className="flex gap-2 mb-2"><input type="number" value={collectAmount} onChange={(e) => setCollectAmount(Number(e.target.value))} className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white" min="1" max={vault} /><button onClick={() => setCollectAmount(vault)} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold">MAX</button></div><button onClick={collectToWallet} disabled={collectAmount <= 0 || collectAmount > vault || claiming} className="w-full py-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed">{claiming ? "Collecting..." : `Collect ${fmt(collectAmount)} MLEO`}</button></div><div className="text-xs text-white/60"><p>• Your vault is shared across all MLEO games</p><p>• Collect earnings to your wallet anytime</p><p>• Network: BSC Testnet (TBNB)</p></div></div><button onClick={() => setShowVaultModal(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+        {showVaultModal && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">💰 MLEO Vault</h2><div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-6 text-center"><div className="text-sm text-white/60 mb-1">Current Balance</div><div className="text-3xl font-bold text-emerald-400">{fmt(vault)} MLEO</div></div><div className="space-y-4"><div><label className="text-sm text-white/70 mb-2 block">Collect to Wallet</label><div className="flex gap-2 mb-2"><input type="number" value={collectAmount} onChange={(e) => setCollectAmount(normalizeWholeAmount(e.target.value))} className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white" min="1" step="1" max={vault} /><button onClick={() => setCollectAmount(vault)} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold">MAX</button></div><button onClick={collectToWallet} disabled={collectAmount <= 0 || collectAmount > vault || claiming} className="w-full py-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed">{claiming ? "Collecting..." : `Collect ${fmt(collectAmount)} MLEO`}</button></div><div className="text-xs text-white/60"><p>• Your vault is shared across all MLEO games</p><p>• Collect earnings to your wallet anytime</p><p>• Network: BSC Testnet (TBNB)</p></div></div><button onClick={() => setShowVaultModal(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
       </div>
     </Layout>
   );
