@@ -55,7 +55,7 @@ function useIOSViewportFix() {
 // CONFIG
 // ============================================================================
 const LS_KEY = "mleo_limbo_v2";
-const MIN_PLAY = 1000;
+const MIN_PLAY = 100;
 const GAME_BALANCE = 0.04; // Game balance 4% - RTP 96%
 
 // On-chain Claim Config
@@ -159,7 +159,7 @@ export default function LimitRunPage() {
   // State
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
-  const [playAmount, setPlayAmount] = useState("1000");
+  const [playAmount, setPlayAmount] = useState("100");
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [targetMultiplier, setTargetMultiplier] = useState(2);
   const [rolling, setRolling] = useState(false);
@@ -171,7 +171,7 @@ export default function LimitRunPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
-  const [collectAmount, setCollectAmount] = useState(1000);
+  const [collectAmount, setCollectAmount] = useState(100);
 
   // Modals
   const [menuOpen, setMenuOpen] = useState(false);
@@ -223,8 +223,10 @@ export default function LimitRunPage() {
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
 
-    const freePlayStatus = getFreePlayStatus();
-    setFreePlayTokens(freePlayStatus.tokens);
+    const gameId = router.pathname.replace('/', '') || 'limbo';
+    getFreePlayStatus().then(status => {
+      if (!cancelled) setFreePlayTokens(status.tokens);
+    }).catch(err => console.error('Failed to get free play status:', err));
 
     const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
     if (savedStats.lastPlay) {
@@ -236,8 +238,9 @@ export default function LimitRunPage() {
     });
 
     const interval = setInterval(() => {
-      const status = getFreePlayStatus();
-      setFreePlayTokens(status.tokens);
+      getFreePlayStatus().then(status => {
+        if (!cancelled) setFreePlayTokens(status.tokens);
+      }).catch(err => console.error('Failed to get free play status:', err));
     }, 2000);
 
     if (typeof Audio !== "undefined") {
@@ -393,13 +396,21 @@ export default function LimitRunPage() {
     let play = Number(playAmount) || MIN_PLAY;
 
     if (isFreePlay || isFreePlayParam) {
-      const result = useFreePlayToken();
-      if (result.success) {
-        play = result.amount;
-        setIsFreePlay(false);
-        router.replace('/limbo', undefined, { shallow: true });
-      } else {
-        alert('No free play tokens available!');
+      const gameId = router.pathname.replace('/', '') || 'limbo';
+      try {
+        const result = await useFreePlayToken(gameId);
+        if (result.success) {
+          play = result.amount;
+          setIsFreePlay(false);
+          router.replace('/limbo', undefined, { shallow: true });
+        } else {
+          alert(result.message || 'No free play tokens available!');
+          setIsFreePlay(false);
+          return;
+        }
+      } catch (error) {
+        console.error('Free play error:', error);
+        alert('Failed to use free play token. Please try again.');
         setIsFreePlay(false);
         return;
       }
@@ -663,6 +674,18 @@ export default function LimitRunPage() {
               disabled={rolling}
               className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
             >
+              100
+            </button>
+            <button
+              onClick={() => {
+                const current = Number(playAmount) || MIN_PLAY;
+                const newPlay = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000);
+                setPlayAmount(String(newPlay));
+                playSfx(clickSound.current);
+              }}
+              disabled={rolling}
+              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+            >
               1K
             </button>
             <button
@@ -692,19 +715,7 @@ export default function LimitRunPage() {
             <button
               onClick={() => {
                 const current = Number(playAmount) || MIN_PLAY;
-                const newPlay = current === MIN_PLAY ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000);
-                setPlayAmount(String(newPlay));
-                playSfx(clickSound.current);
-              }}
-              disabled={rolling}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
-            >
-              1M
-            </button>
-            <button
-              onClick={() => {
-                const current = Number(playAmount) || MIN_PLAY;
-                const newPlay = Math.max(MIN_PLAY, current - 1000);
+                const newPlay = Math.max(MIN_PLAY, current - 100);
                 setPlayAmount(String(newPlay));
                 playSfx(clickSound.current);
               }}

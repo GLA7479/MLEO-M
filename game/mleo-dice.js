@@ -55,7 +55,7 @@ function useIOSViewportFix() {
 // CONFIG
 // ============================================================================
 const LS_KEY = "mleo_dice_v2";
-const MIN_PLAY = 1000;
+const MIN_PLAY = 100;
 const GAME_BALANCE = 0.04; // Game balance 4% - RTP 96%
 
 // On-chain Claim Config
@@ -160,7 +160,7 @@ export default function DicePage() {
   // State
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
-  const [playAmount, setPlayAmount] = useState("1000");
+  const [playAmount, setPlayAmount] = useState("100");
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [target, setTarget] = useState(50);
   const [isOver, setIsOver] = useState(true);
@@ -173,7 +173,7 @@ export default function DicePage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
-  const [collectAmount, setCollectAmount] = useState(1000);
+  const [collectAmount, setCollectAmount] = useState(100);
 
   // Modals
   const [menuOpen, setMenuOpen] = useState(false);
@@ -228,8 +228,10 @@ export default function DicePage() {
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
     
-    const freePlayStatus = getFreePlayStatus();
-    setFreePlayTokens(freePlayStatus.tokens);
+    const gameId = router.pathname.replace('/', '') || 'dice-over-under';
+    getFreePlayStatus().then(status => {
+      if (!cancelled) setFreePlayTokens(status.tokens);
+    }).catch(err => console.error('Failed to get free play status:', err));
     
     const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
     if (savedStats.lastPlay) {
@@ -241,8 +243,9 @@ export default function DicePage() {
     });
     
     const interval = setInterval(() => {
-      const status = getFreePlayStatus();
-      setFreePlayTokens(status.tokens);
+      getFreePlayStatus().then(status => {
+        if (!cancelled) setFreePlayTokens(status.tokens);
+      }).catch(err => console.error('Failed to get free play status:', err));
     }, 2000);
     
     if (typeof Audio !== "undefined") {
@@ -393,13 +396,21 @@ export default function DicePage() {
     let play = Number(playAmount) || MIN_PLAY;
     
     if (isFreePlay || isFreePlayParam) {
-      const result = useFreePlayToken();
-      if (result.success) {
-        play = result.amount;
-        setIsFreePlay(false);
-        router.replace('/dice-over-under', undefined, { shallow: true });
-      } else {
-        alert('No free play tokens available!');
+      const gameId = router.pathname.replace('/', '') || 'dice-over-under';
+      try {
+        const result = await useFreePlayToken(gameId);
+        if (result.success) {
+          play = result.amount;
+          setIsFreePlay(false);
+          router.replace('/dice-over-under', undefined, { shallow: true });
+        } else {
+          alert(result.message || 'No free play tokens available!');
+          setIsFreePlay(false);
+          return;
+        }
+      } catch (error) {
+        console.error('Free play error:', error);
+        alert('Failed to use free play token. Please try again.');
         setIsFreePlay(false);
         return;
       }
@@ -704,6 +715,20 @@ export default function DicePage() {
               onClick={() => {
                 const current = Number(playAmount) || MIN_PLAY;
                 const newBet = current === MIN_PLAY 
+                  ? Math.min(vault, 100)
+                  : Math.min(vault, current + 100);
+                setPlayAmount(String(newBet));
+                playSfx(clickSound.current);
+              }}
+              disabled={rolling}
+              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+            >
+              100
+            </button>
+            <button
+              onClick={() => {
+                const current = Number(playAmount) || MIN_PLAY;
+                const newBet = current === MIN_PLAY 
                   ? Math.min(vault, 1000)
                   : Math.min(vault, current + 1000);
                 setPlayAmount(String(newBet));
@@ -745,21 +770,7 @@ export default function DicePage() {
             <button
               onClick={() => {
                 const current = Number(playAmount) || MIN_PLAY;
-                const newBet = current === MIN_PLAY 
-                  ? Math.min(vault, 1000000)
-                  : Math.min(vault, current + 1000000);
-                setPlayAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              disabled={rolling}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
-            >
-              1M
-            </button>
-            <button
-              onClick={() => {
-                const current = Number(playAmount) || MIN_PLAY;
-                const newBet = Math.max(MIN_PLAY, current - 1000);
+                const newBet = Math.max(MIN_PLAY, current - 100);
                 setPlayAmount(String(newBet));
                 playSfx(clickSound.current);
               }}

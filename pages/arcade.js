@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ConnectButton, useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { getFreePlayStatus, formatTimeRemaining, debugAddTokens } from "../lib/free-play-system";
+import { getFreePlayStatus, formatTimeRemaining } from "../lib/free-play-system";
 
 const ARCADE_BG = "linear-gradient(135deg, #1a1a1a 0%, #3a2a0a 50%, #1a1a1a 100%)";
 
@@ -161,13 +161,20 @@ function Modal({ open, onClose, children }) {
 
 export default function ArcadeHub() {
   const [vault, setVault] = useState(0);
-  const [freePlayStatus, setFreePlayStatus] = useState({ tokens: 0, timeUntilNext: 0, hasTokens: false });
+  const [freePlayStatus, setFreePlayStatus] = useState({
+    tokens: 0,
+    maxTokens: 5,
+    hasTokens: false,
+    isFull: false,
+    timeUntilNext: 0,
+  });
+  const [freePlayCountdown, setFreePlayCountdown] = useState(0);
   const [showVaultModal, setShowVaultModal] = useState(false);
   const [showFreePlayModal, setShowFreePlayModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [musicEnabled, setMusicEnabled] = useState(true);
-  const [collectAmount, setCollectAmount] = useState(1000);
+  const [collectAmount, setCollectAmount] = useState(100);
   const [claiming, setClaiming] = useState(false);
 
   // Wagmi hooks
@@ -198,10 +205,37 @@ export default function ArcadeHub() {
   }
   
   // Update free play status
-  function updateFreePlayStatus() {
-    const status = getFreePlayStatus();
-    setFreePlayStatus(status);
+  async function updateFreePlayStatus() {
+    try {
+      const status = await getFreePlayStatus();
+      setFreePlayStatus(status);
+      setFreePlayCountdown(status.timeUntilNext || 0);
+    } catch (error) {
+      console.error("Failed to update free play status:", error);
+    }
   }
+
+  // Countdown timer - decrement every second
+  useEffect(() => {
+    const id = setInterval(() => {
+      setFreePlayCountdown((prev) => {
+        if (freePlayStatus.isFull || freePlayStatus.tokens > 0) return 0;
+        return Math.max(0, prev - 1000);
+      });
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, [freePlayStatus.isFull, freePlayStatus.tokens]);
+
+  // Auto-refresh when countdown reaches 0
+  useEffect(() => {
+    if (freePlayStatus.tokens === 0 && !freePlayStatus.isFull && freePlayCountdown === 0 && freePlayCountdown !== null) {
+      const timer = setTimeout(() => {
+        updateFreePlayStatus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [freePlayCountdown, freePlayStatus.tokens, freePlayStatus.isFull]);
 
   // Collect MLEO to wallet
   async function collectToWallet() {
@@ -273,17 +307,34 @@ export default function ArcadeHub() {
     }
   }
   
-  // Load vault and free play status on mount and refresh every 2 seconds
+  // Load vault and free play status on mount
   useEffect(() => {
     setVault(getVault());
     updateFreePlayStatus();
     
-    const interval = setInterval(() => {
+    // Refresh vault every 2 seconds (for real-time updates)
+    const vaultInterval = setInterval(() => {
       setVault(getVault());
-      updateFreePlayStatus();
     }, 2000);
     
-    return () => clearInterval(interval);
+    // Refresh free play status every 30 seconds (to correct drift)
+    const freePlayInterval = setInterval(() => {
+      updateFreePlayStatus();
+    }, 30000);
+    
+    // Refresh on visibility change / page focus
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        updateFreePlayStatus();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(vaultInterval);
+      clearInterval(freePlayInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const games = [
@@ -644,9 +695,9 @@ export default function ArcadeHub() {
                 <span className="text-amber-300">
                   {freePlayStatus.tokens}/{freePlayStatus.maxTokens} Free
                 </span>
-                {freePlayStatus.tokens < freePlayStatus.maxTokens && (
+                {freePlayStatus.tokens === 0 && !freePlayStatus.isFull && freePlayCountdown > 0 && (
                   <span className="text-xs text-amber-400/70">
-                    {formatTimeRemaining(freePlayStatus.timeUntilNext)}
+                    {formatTimeRemaining(freePlayCountdown)}
                   </span>
                 )}
               </button>
@@ -706,17 +757,6 @@ export default function ArcadeHub() {
               <span>Back to Main Games</span>
             </Link>
             
-            {/* DEBUG BUTTON - Remove in production */}
-            <button
-              onClick={() => {
-                debugAddTokens();
-                updateFreePlayStatus();
-              }}
-              className="px-4 py-3 rounded-xl bg-red-600/20 border border-red-500/30 text-red-300 text-sm font-bold hover:bg-red-600/30"
-              title="Debug: Add 5 tokens"
-            >
-              🔧 DEBUG +5
-            </button>
           </div>
         </div>
       </main>
@@ -781,9 +821,9 @@ export default function ArcadeHub() {
                   {freePlayStatus.tokens}/{freePlayStatus.maxTokens} Free
                 </span>
               </div>
-              {freePlayStatus.tokens < freePlayStatus.maxTokens && (
+              {freePlayStatus.tokens === 0 && !freePlayStatus.isFull && freePlayCountdown > 0 && (
                 <div className="text-xs text-amber-300 mt-2">
-                  Next token in: {formatTimeRemaining(freePlayStatus.timeUntilNext)}
+                  Next token in: {formatTimeRemaining(freePlayCountdown)}
                 </div>
               )}
             </div>

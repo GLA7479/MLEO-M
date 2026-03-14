@@ -22,7 +22,7 @@ import {
 // CONFIG
 // ============================================================================
 const LS_KEY = "mleo_plinko_v2_physics";
-const MIN_PLAY = 1000; // Minimum play amount
+const MIN_PLAY = 100; // Minimum play amount
 
 // 15 buckets (13 original + 2 zero buckets at edges)
 // Adjusted for RTP ~99% - High multipliers at edges for big wins!
@@ -166,7 +166,7 @@ export default function PlinkoPage() {
 
   const [result, setResult] = useState(null);
   const [finalBuckets, setFinalBuckets] = useState([]); // recent landings visual
-  const [playAmount, setPlayAmount] = useState("1000"); // Default play amount
+  const [playAmount, setPlayAmount] = useState("100"); // Default play amount
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
   const [showResultPopup, setShowResultPopup] = useState(false);
@@ -233,8 +233,10 @@ export default function PlinkoPage() {
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
     
-    const freePlayStatus = getFreePlayStatus();
-    setFreePlayTokens(freePlayStatus.tokens);
+    const gameId = router.pathname.replace('/', '') || 'plinko';
+    getFreePlayStatus().then(status => {
+      if (!cancelled) setFreePlayTokens(status.tokens);
+    }).catch(err => console.error('Failed to get free play status:', err));
 
     // Load last play amount
     const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
@@ -247,8 +249,9 @@ export default function PlinkoPage() {
     });
     
     const interval = setInterval(() => {
-      const status = getFreePlayStatus();
-      setFreePlayTokens(status.tokens);
+      getFreePlayStatus().then(status => {
+        if (!cancelled) setFreePlayTokens(status.tokens);
+      }).catch(err => console.error('Failed to get free play status:', err));
     }, 2000);
 
     if (typeof Audio !== "undefined") {
@@ -716,13 +719,21 @@ function buildBoardGeometry(w, h) {
     let play = Number(playAmount) || MIN_PLAY;
     
     if (isFreePlay || isFreePlayParam) {
-      const result = useFreePlayToken();
-      if (result.success) {
-        play = result.amount;
-        setIsFreePlay(false);
-        router.replace('/plinko2', undefined, { shallow: true });
-      } else {
-        setResult({ error: true, message: 'No free play tokens available!' });
+      const gameId = router.pathname.replace('/', '') || 'plinko';
+      try {
+        const result = await useFreePlayToken(gameId);
+        if (result.success) {
+          play = result.amount;
+          setIsFreePlay(false);
+          router.replace('/plinko2', undefined, { shallow: true });
+        } else {
+          setResult({ error: true, message: result.message || 'No free play tokens available!' });
+          setIsFreePlay(false);
+          return;
+        }
+      } catch (error) {
+        console.error('Free play error:', error);
+        setResult({ error: true, message: 'Failed to use free play token. Please try again.' });
         setIsFreePlay(false);
         return;
       }

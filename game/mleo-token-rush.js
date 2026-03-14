@@ -565,7 +565,7 @@ function canClaimGift(core) {
 }
 
 function giftAmount(core, liveGiftMult = 1) {
-  const base = 200 + Math.floor(core.totalMined * 0.002);
+  const base = 100 + Math.floor(core.totalMined * 0.002);
   let amt = clamp(base, 100, 20000);
   amt = Math.floor(amt * liveGiftMult);
   return amt;
@@ -760,7 +760,7 @@ export default function MLEOTokenRushPage() {
 
   // Prestige System
   const canPrestige = () => core.vault >= CONFIG.PRESTIGE_MIN_VAULT;
-  const getPrestigePoints = () => Math.floor(core.vault / 1000000) * CONFIG.PRESTIGE_POINTS_PER_MILLION;
+  const getPrestigePoints = () => Math.floor(core.vault / 100) * CONFIG.PRESTIGE_POINTS_PER_MILLION;
   const getPrestigeMultiplier = () => 1 + (core.prestigePoints * CONFIG.PRESTIGE_MULT_PER_POINT);
 
   const performPrestige = () => {

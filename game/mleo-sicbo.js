@@ -55,7 +55,7 @@ function useIOSViewportFix() {
 // CONFIG
 // ============================================================================
 const LS_KEY = "mleo_sicbo_v2";
-const MIN_PLAY = 1000;
+const MIN_PLAY = 100;
 
 // Play types and their prizes
 const PLAY_TYPES = {
@@ -155,7 +155,7 @@ export default function SicBoPage() {
   // State
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
-  const [playAmount, setPlayAmount] = useState("1000");
+  const [playAmount, setPlayAmount] = useState("100");
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [selectedPlay, setSelectedPlay] = useState(null);
   const [rolling, setRolling] = useState(false);
@@ -167,7 +167,7 @@ export default function SicBoPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
-  const [collectAmount, setCollectAmount] = useState(1000);
+  const [collectAmount, setCollectAmount] = useState(100);
 
   // Modals
   const [menuOpen, setMenuOpen] = useState(false);
@@ -219,8 +219,10 @@ export default function SicBoPage() {
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
 
-    const freePlayStatus = getFreePlayStatus();
-    setFreePlayTokens(freePlayStatus.tokens);
+    const gameId = router.pathname.replace('/', '') || 'sicbo';
+    getFreePlayStatus().then(status => {
+      if (!cancelled) setFreePlayTokens(status.tokens);
+    }).catch(err => console.error('Failed to get free play status:', err));
 
     const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
     if (savedStats.lastPlay) {
@@ -232,8 +234,9 @@ export default function SicBoPage() {
     });
 
     const interval = setInterval(() => {
-      const status = getFreePlayStatus();
-      setFreePlayTokens(status.tokens);
+      getFreePlayStatus().then(status => {
+        if (!cancelled) setFreePlayTokens(status.tokens);
+      }).catch(err => console.error('Failed to get free play status:', err));
     }, 2000);
 
     if (typeof Audio !== "undefined") {
@@ -376,13 +379,21 @@ export default function SicBoPage() {
     let play = Number(playAmount) || MIN_PLAY;
 
     if (isFreePlay || isFreePlayParam) {
-      const result = useFreePlayToken();
-      if (result.success) {
-        play = result.amount;
-        setIsFreePlay(false);
-        router.replace('/sicbo', undefined, { shallow: true });
-      } else {
-        alert('No free play tokens available!');
+      const gameId = router.pathname.replace('/', '') || 'sicbo';
+      try {
+        const result = await useFreePlayToken(gameId);
+        if (result.success) {
+          play = result.amount;
+          setIsFreePlay(false);
+          router.replace('/sicbo', undefined, { shallow: true });
+        } else {
+          alert(result.message || 'No free play tokens available!');
+          setIsFreePlay(false);
+          return;
+        }
+      } catch (error) {
+        console.error('Free play error:', error);
+        alert('Failed to use free play token. Please try again.');
         setIsFreePlay(false);
         return;
       }
@@ -634,11 +645,11 @@ export default function SicBoPage() {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.max(MIN_PLAY, current - 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.max(MIN_PLAY, current - 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
             <div className="relative">
               <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={rolling} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
               <button onClick={() => { setPlayAmount(String(MIN_PLAY)); playSfx(clickSound.current); }} disabled={rolling} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>

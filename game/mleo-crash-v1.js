@@ -25,7 +25,7 @@ import {
 
 // ------------------------------- Storage -------------------------------------
 const LS_KEY = "mleo_crash_v1";
-const MIN_PLAY = 1000;
+const MIN_PLAY = 100;
 
 function safeRead(key, fallback = {}) {
   if (typeof window === "undefined") return fallback;
@@ -120,7 +120,7 @@ export default function MLEOCrash() {
   // Game state
   const [phase, setPhase] = useState("playing"); // playing | running | crashed | revealing | intermission
   const [countdown, setCountdown] = useState(ROUND.bettingSeconds);
-  const [playAmount, setPlayAmount] = useState("1000");
+  const [playAmount, setPlayAmount] = useState("100");
   const [playerBet, setPlayerBet] = useState(null); // { amount:number, accepted:boolean }
   const [canCashOut, setCanCashOut] = useState(false);
   const [cashedOutAt, setCashedOutAt] = useState(null); // multiplier at cashout
@@ -164,8 +164,10 @@ export default function MLEOCrash() {
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
     
-    const freePlayStatus = getFreePlayStatus();
-    setFreePlayTokens(freePlayStatus.tokens);
+    const gameId = router.pathname.replace('/', '') || 'crash';
+    getFreePlayStatus().then(status => {
+      if (!cancelled) setFreePlayTokens(status.tokens);
+    }).catch(err => console.error('Failed to get free play status:', err));
     
     const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
     if (savedStats.lastPlay) {
@@ -177,8 +179,9 @@ export default function MLEOCrash() {
     });
     
     const interval = setInterval(() => {
-      const status = getFreePlayStatus();
-      setFreePlayTokens(status.tokens);
+      getFreePlayStatus().then(status => {
+        if (!cancelled) setFreePlayTokens(status.tokens);
+      }).catch(err => console.error('Failed to get free play status:', err));
     }, 2000);
     
     return () => {
@@ -336,14 +339,22 @@ export default function MLEOCrash() {
     if (phase !== "playing") return;
     
     if (isFreePlay || isFreePlayParam) {
-      const result = useFreePlayToken();
-      if (result.success) {
-        amt = result.amount;
-        setIsFreePlay(false);
-        router.replace('/crash2', undefined, { shallow: true });
-        setPlayerBet({ amount: amt, accepted: false });
-      } else {
-        alert('No free play tokens available!');
+      const gameId = router.pathname.replace('/', '') || 'crash';
+      try {
+        const result = await useFreePlayToken(gameId);
+        if (result.success) {
+          amt = result.amount;
+          setIsFreePlay(false);
+          router.replace('/crash2', undefined, { shallow: true });
+          setPlayerBet({ amount: amt, accepted: false });
+        } else {
+          alert(result.message || 'No free play tokens available!');
+          setIsFreePlay(false);
+          return;
+        }
+      } catch (error) {
+        console.error('Free play error:', error);
+        alert('Failed to use free play token. Please try again.');
         setIsFreePlay(false);
         return;
       }
@@ -622,7 +633,7 @@ export default function MLEOCrash() {
                 disabled={phase !== "playing"}
               />
               <div className="flex gap-2 mt-2">
-                {[100, 250, 500, 1000].map((v) => (
+                {[100, 1000, 10000, 100000].map((v) => (
                   <button
                     key={v}
                     onClick={() => setPlayAmount(String(v))}

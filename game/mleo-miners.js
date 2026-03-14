@@ -1437,7 +1437,7 @@ useEffect(() => {
 useEffect(() => {
   const id = setInterval(() => {
     uiPulseAccumRef.current += 0.2;
-    forceUiPulse(v => (v + 1) % 1000000);
+    forceUiPulse(v => (v + 1) % 100);
    }, 200);
   return () => clearInterval(id);
 }, []);

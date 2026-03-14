@@ -45,7 +45,7 @@ function useIOSViewportFix() {
 }
 
 const LS_KEY = "mleo_baccarat_v2";
-const MIN_PLAY = 1000;
+const MIN_PLAY = 100;
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -86,7 +86,7 @@ export default function CardDuelPage() {
 
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
-  const [playAmount, setPlayAmount] = useState("1000");
+  const [playAmount, setPlayAmount] = useState("100");
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [selectedPlay, setSelectedPlay] = useState("player");
   const [dealing, setDealing] = useState(false);
@@ -99,7 +99,7 @@ export default function CardDuelPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
-  const [collectAmount, setCollectAmount] = useState(1000);
+  const [collectAmount, setCollectAmount] = useState(100);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -125,14 +125,20 @@ export default function CardDuelPage() {
       });
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-    const freePlayStatus = getFreePlayStatus();
-    setFreePlayTokens(freePlayStatus.tokens);
+    const gameId = router.pathname.replace('/', '') || 'baccarat';
+    getFreePlayStatus().then(status => {
+      if (!cancelled) setFreePlayTokens(status.tokens);
+    }).catch(err => console.error('Failed to get free play status:', err));
     const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
     if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
     const unsubscribeVault = subscribeSharedVault(snapshot => {
       if (!cancelled) setVaultState(snapshot.balance);
     });
-    const interval = setInterval(() => { const status = getFreePlayStatus(); setFreePlayTokens(status.tokens); }, 2000);
+    const interval = setInterval(() => {
+      getFreePlayStatus().then(status => {
+        if (!cancelled) setFreePlayTokens(status.tokens);
+      }).catch(err => console.error('Failed to get free play status:', err));
+    }, 2000);
     if (typeof Audio !== "undefined") {
       try { clickSound.current = new Audio(S_CLICK); winSound.current = new Audio(S_WIN); } catch {}
     }
@@ -173,9 +179,17 @@ export default function CardDuelPage() {
     playSfx(clickSound.current);
     let play = Number(playAmount) || MIN_PLAY;
     if (isFreePlay || isFreePlayParam) {
-      const result = useFreePlayToken();
-      if (result.success) { play = result.amount; setIsFreePlay(false); router.replace('/baccarat', undefined, { shallow: true }); }
-      else { alert('No free play tokens available!'); setIsFreePlay(false); return; }
+      const gameId = router.pathname.replace('/', '') || 'baccarat';
+      try {
+        const result = await useFreePlayToken(gameId);
+        if (result.success) { play = result.amount; setIsFreePlay(false); router.replace('/baccarat', undefined, { shallow: true }); }
+        else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); return; }
+      } catch (error) {
+        console.error('Free play error:', error);
+        alert('Failed to use free play token. Please try again.');
+        setIsFreePlay(false);
+        return;
+      }
     } else {
       if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
       const debitResult = await debitSharedVault(play, "baccarat");
@@ -281,11 +295,11 @@ export default function CardDuelPage() {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={dealing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }}.*?className="w-12 h-8.*?">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={dealing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={dealing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={dealing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 1000000) : Math.min(vault, current + 1000000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={dealing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1M</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = Math.max(MIN_PLAY, current - 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={dealing} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={dealing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = Math.max(MIN_PLAY, current - 100); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={dealing} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
             <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={dealing} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs" />
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = Math.min(vault, current + 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={dealing} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
             <button onClick={() => { setPlayAmount(String(MIN_PLAY)); playSfx(clickSound.current); }} disabled={dealing} className="h-8 w-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50" title="Reset to minimum play">↺</button>

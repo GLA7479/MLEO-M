@@ -49,7 +49,7 @@ function useIOSViewportFix() {
 }
 
 const LS_KEY = "mleo_crash2_v1";
-const MIN_PLAY = 1000;
+const MIN_PLAY = 100;
 const ROUND = {
   bettingSeconds: 10,
   intermissionMs: 3000,
@@ -170,7 +170,7 @@ export default function Crash2Page() {
 
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
-  const [playAmount, setPlayAmount] = useState("1000");
+  const [playAmount, setPlayAmount] = useState("100");
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [autoCashOut, setAutoCashOut] = useState("2.00");
   const [enableAutoCashOut, setEnableAutoCashOut] = useState(false);
@@ -206,7 +206,7 @@ export default function Crash2Page() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
-  const [collectAmount, setCollectAmount] = useState(1000);
+  const [collectAmount, setCollectAmount] = useState(100);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -242,13 +242,16 @@ export default function Crash2Page() {
     setVaultState(getVault());
     const isFree = router.query.freePlay === "true";
     setIsFreePlay(isFree);
-    const freePlayStatus = getFreePlayStatus();
-    setFreePlayTokens(freePlayStatus.tokens);
+    const gameId = router.pathname.replace('/', '') || 'crash';
+    getFreePlayStatus().then(status => {
+      if (!cancelled) setFreePlayTokens(status.tokens);
+    }).catch(err => console.error('Failed to get free play status:', err));
     const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
     if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
     const interval = setInterval(() => {
-      const status = getFreePlayStatus();
-      setFreePlayTokens(status.tokens);
+      getFreePlayStatus().then(status => {
+        if (!cancelled) setFreePlayTokens(status.tokens);
+      }).catch(err => console.error('Failed to get free play status:', err));
       setVaultState(getVault());
     }, 2000);
     if (typeof Audio !== "undefined") {
@@ -384,13 +387,21 @@ export default function Crash2Page() {
     const currentVault = getVault();
     let play = Number(playAmount) || MIN_PLAY;
     if (isFreePlay || isFreePlayParam) {
-      const result = useFreePlayToken();
-      if (result.success) {
-        play = result.amount;
-        setIsFreePlay(false);
-        router.replace("/crash", undefined, { shallow: true });
-      } else {
-        alert("No free play tokens available!");
+      const gameId = router.pathname.replace('/', '') || 'crash';
+      try {
+        const result = await useFreePlayToken(gameId);
+        if (result.success) {
+          play = result.amount;
+          setIsFreePlay(false);
+          router.replace("/crash", undefined, { shallow: true });
+        } else {
+          alert(result.message || "No free play tokens available!");
+          setIsFreePlay(false);
+          return;
+        }
+      } catch (error) {
+        console.error('Free play error:', error);
+        alert('Failed to use free play token. Please try again.');
         setIsFreePlay(false);
         return;
       }
@@ -789,8 +800,8 @@ export default function Crash2Page() {
                 onClick={() => {
                   const current = Number(playAmount) || MIN_PLAY;
                   const newBet = current === MIN_PLAY 
-                    ? Math.min(vault, 1000000)
-                    : Math.min(vault, current + 1000000);
+                    ? Math.min(vault, 100)
+                    : Math.min(vault, current + 100);
                   setPlayAmount(String(newBet));
                   playSfx(clickSound.current);
                 }}
@@ -802,7 +813,7 @@ export default function Crash2Page() {
               <button
                 onClick={() => {
                   const current = Number(playAmount) || MIN_PLAY;
-                  const newBet = Math.max(MIN_PLAY, current - 1000);
+                  const newBet = Math.max(MIN_PLAY, current - 100);
                   setPlayAmount(String(newBet));
                   playSfx(clickSound.current);
                 }}

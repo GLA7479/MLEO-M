@@ -99,7 +99,7 @@ const TIERS = [
   { label: "1K",    min_entry_fee: 1_000 },
   { label: "10K",   min_entry_fee: 10_000 },
   { label: "100K",  min_entry_fee: 100_000 },
-  { label: "1M",    min_entry_fee: 1_000_000 },
+  { label: "100",   min_entry_fee: 100 },
   { label: "10M",   min_entry_fee: 10_000_000 },
   { label: "100M",  min_entry_fee: 100_000_000 },
 ];

@@ -105,7 +105,7 @@ const TEXT = {
     arcadeHowToPlay: "How to Play",
     arcadeSteps: [
       "Choose any game from the arcade",
-      "Each session uses at least 1,000 MLEO from your in-app vault. Some modes may use a different session cost",
+      "Each session uses at least 100 MLEO from your in-app vault. Some modes may use a different session cost",
       "Follow the game-specific instructions",
       "Complete runs, reach milestones, and collect reward boosts based on your results",
       "Session rewards are added automatically to your vault, including rewards earned from free play sessions"
@@ -198,7 +198,7 @@ const TEXT = {
     arcadeHowToPlay: "كيف تلعب",
     arcadeSteps: [
       "اختر أي لعبة من الأركيد",
-      "كل جلسة تستخدم على الأقل 1,000 MLEO من خزنتك داخل التطبيق. قد تستخدم بعض الأوضاع تكلفة جلسة مختلفة",
+      "كل جلسة تستخدم على الأقل 100 MLEO من خزنتك داخل التطبيق. قد تستخدم بعض الأوضاع تكلفة جلسة مختلفة",
       "اتبع تعليمات اللعبة المحددة",
       "أكمل الجولات، وصل إلى المعالم، وجمع معززات المكافآت بناءً على نتائجك",
       "مكافآت الجلسة تُضاف تلقائيًا إلى خزنتك، بما في ذلك المكافآت المكتسبة من جلسات اللعب المجاني"
@@ -259,7 +259,7 @@ const TEXT = {
     arcadeHowToPlay: "Как играть",
     arcadeSteps: [
       "Выберите любую игру из аркады",
-      "Каждая сессия использует минимум 1,000 MLEO из вашего внутриигрового хранилища. Некоторые режимы могут использовать другую стоимость сессии",
+      "Каждая сессия использует минимум 100 MLEO из вашего внутриигрового хранилища. Некоторые режимы могут использовать другую стоимость сессии",
       "Следуйте инструкциям для конкретной игры",
       "Завершайте раунды, достигайте вех и собирайте бонусы наград на основе ваших результатов",
       "Награды сессии автоматически добавляются в ваше хранилище, включая награды, заработанные в бесплатных сессиях"
@@ -352,7 +352,7 @@ const TEXT = {
     arcadeHowToPlay: "Cómo jugar",
     arcadeSteps: [
       "Elige cualquier juego del arcade",
-      "Cada sesión usa al menos 1,000 MLEO de tu bóveda dentro de la aplicación. Algunos modos pueden usar un costo de sesión diferente",
+      "Cada sesión usa al menos 100 MLEO de tu bóveda dentro de la aplicación. Algunos modos pueden usar un costo de sesión diferente",
       "Sigue las instrucciones específicas del juego",
       "Completa rondas, alcanza hitos y recolecta impulsos de recompensa basados en tus resultados",
       "Las recompensas de sesión se agregan automáticamente a tu bóveda, incluyendo recompensas ganadas en sesiones de juego gratis"
@@ -445,7 +445,7 @@ const TEXT = {
     arcadeHowToPlay: "Comment jouer",
     arcadeSteps: [
       "Choisissez n'importe quel jeu de l'arcade",
-      "Chaque session utilise au moins 1,000 MLEO de votre coffre dans l'application. Certains modes peuvent utiliser un coût de session différent",
+      "Chaque session utilise au moins 100 MLEO de votre coffre dans l'application. Certains modes peuvent utiliser un coût de session différent",
       "Suivez les instructions spécifiques du jeu",
       "Terminez les manches, atteignez les jalons et collectez les boosts de récompense basés sur vos résultats",
       "Les récompenses de session sont automatiquement ajoutées à votre coffre, y compris les récompenses gagnées dans les sessions de jeu gratuit"
@@ -631,7 +631,7 @@ const TEXT = {
     arcadeHowToPlay: "如何游玩",
     arcadeSteps: [
       "从街机中选择任何游戏",
-      "每场会话至少使用1,000 MLEO从您的应用内金库。某些模式可能使用不同的会话成本",
+      "每场会话至少使用100 MLEO从您的应用内金库。某些模式可能使用不同的会话成本",
       "遵循游戏特定的说明",
       "完成回合，达到里程碑，并根据您的结果收集奖励提升",
       "会话奖励自动添加到您的金库，包括从免费游戏会话中获得的奖励"
@@ -724,7 +724,7 @@ const TEXT = {
     arcadeHowToPlay: "プレイ方法",
     arcadeSteps: [
       "アーケードから任意のゲームを選択",
-      "各セッションはアプリ内ボルトから少なくとも1,000 MLEOを使用します。一部のモードは異なるセッションコストを使用する場合があります",
+      "各セッションはアプリ内ボルトから少なくとも100 MLEOを使用します。一部のモードは異なるセッションコストを使用する場合があります",
       "ゲーム固有の指示に従う",
       "ラウンドを完了し、マイルストーンに到達し、結果に基づいて報酬ブーストを収集",
       "セッション報酬は、無料プレイセッションで獲得した報酬を含めて、自動的にボルトに追加されます"
@@ -817,7 +817,7 @@ const TEXT = {
     arcadeHowToPlay: "플레이 방법",
     arcadeSteps: [
       "아케이드에서 아무 게임이나 선택",
-      "각 세션은 앱 내 금고에서 최소 1,000 MLEO를 사용합니다. 일부 모드는 다른 세션 비용을 사용할 수 있습니다",
+      "각 세션은 앱 내 금고에서 최소 100 MLEO를 사용합니다. 일부 모드는 다른 세션 비용을 사용할 수 있습니다",
       "게임별 지침을 따르세요",
       "라운드를 완료하고 마일스톤에 도달하며 결과에 따라 보상 부스트 수집",
       "세션 보상은 무료 플레이 세션에서 획득한 보상을 포함하여 자동으로 금고에 추가됩니다"
@@ -910,7 +910,7 @@ const TEXT = {
     arcadeHowToPlay: "Nasıl oynanır",
     arcadeSteps: [
       "Arcade'den herhangi bir oyun seçin",
-      "Her oturum uygulama içi kasasından en az 1,000 MLEO kullanır. Bazı modlar farklı oturum maliyeti kullanabilir",
+      "Her oturum uygulama içi kasasından en az 100 MLEO kullanır. Bazı modlar farklı oturum maliyeti kullanabilir",
       "Oyun özel talimatlarını takip edin",
       "Turları tamamlayın, kilometre taşlarına ulaşın ve sonuçlarınıza göre ödül artışları toplayın",
       "Oturum ödülleri, ücretsiz oyun oturumlarında kazanılan ödüller dahil olmak üzere otomatik olarak kasasına eklenir"
@@ -1003,7 +1003,7 @@ const TEXT = {
     arcadeHowToPlay: "Come giocare",
     arcadeSteps: [
       "Scegli qualsiasi gioco dall'arcade",
-      "Ogni sessione utilizza almeno 1,000 MLEO dal tuo caveau nell'app. Alcune modalità possono utilizzare un costo di sessione diverso",
+      "Ogni sessione utilizza almeno 100 MLEO dal tuo caveau nell'app. Alcune modalità possono utilizzare un costo di sessione diverso",
       "Segui le istruzioni specifiche del gioco",
       "Completa i round, raggiungi i traguardi e raccogli i potenziamenti delle ricompense in base ai tuoi risultati",
       "Le ricompense della sessione vengono aggiunte automaticamente al tuo caveau, incluse le ricompense ottenute nelle sessioni di gioco gratuito"
@@ -1096,7 +1096,7 @@ const TEXT = {
     arcadeHowToPlay: "როგორ ვითამაშოთ",
     arcadeSteps: [
       "აირჩიეთ ნებისმიერი თამაში არკადიდან",
-      "თითოეული სესია იყენებს მინიმუმ 1,000 MLEO თქვენი აპლიკაციაში ვოლტიდან. ზოგიერთ რეჟიმს შეიძლება გამოიყენოს სხვა სესიის ღირებულება",
+      "თითოეული სესია იყენებს მინიმუმ 100 MLEO თქვენი აპლიკაციაში ვოლტიდან. ზოგიერთ რეჟიმს შეიძლება გამოიყენოს სხვა სესიის ღირებულება",
       "მიჰყევით თამაშის სპეციფიკურ ინსტრუქციებს",
       "დაასრულეთ რაუნდები, მიაღწიეთ მილიენისტონებს და შეაგროვეთ ჯილდოს ბუსტები თქვენი შედეგების მიხედვით",
       "სესიის ჯილდოები ავტომატურად ემატება თქვენს ვოლტს, მათ შორის უფასო თამაშის სესიებში მოპოვებული ჯილდოები"
@@ -1189,7 +1189,7 @@ const TEXT = {
     arcadeHowToPlay: "Jak grać",
     arcadeSteps: [
       "Wybierz dowolną grę z salonu gier",
-      "Każda sesja używa co najmniej 1,000 MLEO z twojego skarbca w aplikacji. Niektóre tryby mogą używać innego kosztu sesji",
+      "Każda sesja używa co najmniej 100 MLEO z twojego skarbca w aplikacji. Niektóre tryby mogą używać innego kosztu sesji",
       "Postępuj zgodnie z instrukcjami specyficznymi dla gry",
       "Ukończ rundy, osiągnij kamienie milowe i zbieraj wzmocnienia nagród na podstawie swoich wyników",
       "Nagrody sesji są automatycznie dodawane do twojego skarbca, w tym nagrody zdobyte w darmowych sesjach gry"
@@ -1282,7 +1282,7 @@ const TEXT = {
     arcadeHowToPlay: "Cum să joci",
     arcadeSteps: [
       "Alege orice joc din arcade",
-      "Fiecare sesiune folosește cel puțin 1,000 MLEO din seiful tău în aplicație. Unele moduri pot folosi un cost de sesiune diferit",
+      "Fiecare sesiune folosește cel puțin 100 MLEO din seiful tău în aplicație. Unele moduri pot folosi un cost de sesiune diferit",
       "Urmează instrucțiunile specifice jocului",
       "Finalizează runde, atinge obiectivele și colectează impulsuri de recompensă bazate pe rezultatele tale",
       "Recompensele sesiunii sunt adăugate automat în seiful tău, inclusiv recompensele câștigate în sesiunile de joc gratuit"
@@ -1375,7 +1375,7 @@ const TEXT = {
     arcadeHowToPlay: "Jak hrát",
     arcadeSteps: [
       "Vyberte libovolnou hru z arkád",
-      "Každá relace používá alespoň 1,000 MLEO z vašeho trezoru v aplikaci. Některé režimy mohou používat jiné náklady na relaci",
+      "Každá relace používá alespoň 100 MLEO z vašeho trezoru v aplikaci. Některé režimy mohou používat jiné náklady na relaci",
       "Postupujte podle pokynů specifických pro hru",
       "Dokončete kola, dosáhněte milníků a sbírejte posílení odměn na základě vašich výsledků",
       "Odměny relace jsou automaticky přidávány do vašeho trezoru, včetně odměn získaných v bezplatných herních relacích"
@@ -1468,7 +1468,7 @@ const TEXT = {
     arcadeHowToPlay: "Hoe te spelen",
     arcadeSteps: [
       "Kies een willekeurige game uit de arcade",
-      "Elke sessie gebruikt minimaal 1,000 MLEO uit je kluis in de app. Sommige modi kunnen verschillende sessiekosten gebruiken",
+      "Elke sessie gebruikt minimaal 100 MLEO uit je kluis in de app. Sommige modi kunnen verschillende sessiekosten gebruiken",
       "Volg de gamespecifieke instructies",
       "Voltooi rondes, bereik mijlpalen en verzamel beloningsboosts op basis van je resultaten",
       "Sessiebeloningen worden automatisch toegevoegd aan je kluis, inclusief beloningen verdiend in gratis spelsessies"
@@ -1561,7 +1561,7 @@ const TEXT = {
     arcadeHowToPlay: "Πώς να παίξετε",
     arcadeSteps: [
       "Επιλέξτε οποιοδήποτε παιχνίδι από το arcade",
-      "Κάθε συνεδρία χρησιμοποιεί τουλάχιστον 1,000 MLEO από το χρηματοκιβώτιό σας στην εφαρμογή. Ορισμένες λειτουργίες μπορεί να χρησιμοποιούν διαφορετικό κόστος συνεδρίας",
+      "Κάθε συνεδρία χρησιμοποιεί τουλάχιστον 100 MLEO από το χρηματοκιβώτιό σας στην εφαρμογή. Ορισμένες λειτουργίες μπορεί να χρησιμοποιούν διαφορετικό κόστος συνεδρίας",
       "Ακολουθήστε τις οδηγίες ειδικές για το παιχνίδι",
       "Ολοκληρώστε γύρους, φτάστε στα ορόσημα και συλλέξτε ενισχύσεις ανταμοιβών με βάση τα αποτελέσματά σας",
       "Οι ανταμοιβές συνεδρίας προστίθενται αυτόματα στο χρηματοκιβώτιό σας, συμπεριλαμβανομένων των ανταμοιβών που κερδίζονται σε δωρεάν συνεδρίες παιχνιδιού"
@@ -1654,7 +1654,7 @@ const TEXT = {
     arcadeHowToPlay: "איך משחקים",
     arcadeSteps: [
       "בחרו כל משחק מהארקייד",
-      "כל סשן משתמש בלפחות 1,000 MLEO מהכספת שלכם באפליקציה. חלק מהמצבים עשויים להשתמש בעלות סשן שונה",
+      "כל סשן משתמש בלפחות 100 MLEO מהכספת שלכם באפליקציה. חלק מהמצבים עשויים להשתמש בעלות סשן שונה",
       "עקבו אחר ההוראות הספציפיות למשחק",
       "השלימו סבבים, הגיעו לאבני דרך ואספו הגברות פרסים בהתבסס על התוצאות שלכם",
       "פרסי הסשן מתווספים אוטומטית לכספת שלכם, כולל פרסים שהושגו בסשני משחק חינמיים"
@@ -2910,7 +2910,7 @@ export default function GamesHub() {
                   <div>
                     <h2 className="text-[20px] sm:text-2xl font-extrabold">🎮 MLEO Arcade</h2>
                     <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
-                      Mini-games arcade! Play Symbol Match, Dice, Wheel & Scratch cards. 1,000 MLEO per session with rewards up to 10,000 MLEO!
+                      Mini-games arcade! Play Symbol Match, Dice, Wheel & Scratch cards. 100 MLEO per session with rewards up to 10,000 MLEO!
         </p>
                   </div>
                   <span className="rounded-full px-2.5 py-1 text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 whitespace-nowrap">
