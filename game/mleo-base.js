@@ -1238,34 +1238,6 @@ export default function MleoBase() {
             </Section>
 
             <Section
-              title="Progress Summary"
-              subtitle="BASE should feel like the control room of the ecosystem, not just another reward tab."
-            >
-              <div className="space-y-3 text-sm text-white/75">
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                  <div className="font-semibold text-white">Totals</div>
-                  <div className="mt-2 space-y-1 text-white/70">
-                    <div>Total shipped: {fmt(state.totalBanked)} MLEO</div>
-                    <div>Total vault spent: {fmt(state.totalSharedSpent)} MLEO</div>
-                    <div>Total expeditions: {fmt(state.totalExpeditions)}</div>
-                    <div>Total missions claimed: {fmt(state.totalMissionsDone)}</div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                  <div className="font-semibold text-white">Why MLEO BASE is stronger as a support layer</div>
-                  <ul className="mt-2 space-y-2 text-sm text-white/65">
-                    <li>It uses the same shared vault via adapter, instead of raw localStorage writes.</li>
-                    <li>It adds missions, commander level and ecosystem-specific buildings.</li>
-                    <li>It shifts rewards toward progression and sinks, not just direct MLEO output.</li>
-                  </ul>
-                </div>
-              </div>
-            </Section>
-          </div>
-
-          <div className="mt-4 grid gap-4 xl:grid-cols-[1.5fr_1fr]">
-            <Section
               title="Base Structures"
               subtitle="MLEO BASE is tuned as a support-management game: it produces slowly, rewards planning, and feeds the main shared vault in measured batches."
             >
@@ -1297,6 +1269,34 @@ export default function MleoBase() {
                     </div>
                   );
                 })}
+              </div>
+            </Section>
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+            <Section
+              title="Progress Summary"
+              subtitle="BASE should feel like the control room of the ecosystem, not just another reward tab."
+            >
+              <div className="space-y-3 text-sm text-white/75">
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="font-semibold text-white">Totals</div>
+                  <div className="mt-2 space-y-1 text-white/70">
+                    <div>Total shipped: {fmt(state.totalBanked)} MLEO</div>
+                    <div>Total vault spent: {fmt(state.totalSharedSpent)} MLEO</div>
+                    <div>Total expeditions: {fmt(state.totalExpeditions)}</div>
+                    <div>Total missions claimed: {fmt(state.totalMissionsDone)}</div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="font-semibold text-white">Why MLEO BASE is stronger as a support layer</div>
+                  <ul className="mt-2 space-y-2 text-sm text-white/65">
+                    <li>It uses the same shared vault via adapter, instead of raw localStorage writes.</li>
+                    <li>It adds missions, commander level and ecosystem-specific buildings.</li>
+                    <li>It shifts rewards toward progression and sinks, not just direct MLEO output.</li>
+                  </ul>
+                </div>
               </div>
             </Section>
 
