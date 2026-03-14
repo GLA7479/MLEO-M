@@ -1069,20 +1069,24 @@ export default function MleoBase() {
             >
               <div className="grid gap-3 lg:grid-cols-2">
                 <div className="flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-                  <div className="text-sm font-semibold text-emerald-200">Ship to Shared Vault</div>
-                  <p className="mt-1 text-sm text-white/70">
-                    Move refined MLEO into the main vault with a daily softcut, so BASE supports Miners instead of replacing it.
-                  </p>
+                  <div className="flex min-h-[88px] flex-col">
+                    <div className="text-sm font-semibold text-emerald-200">Ship to Shared Vault</div>
+                    <p className="mt-1 text-sm text-white/70">
+                      Move refined MLEO into the main vault with a daily softcut, so BASE supports Miners instead of replacing it.
+                    </p>
+                  </div>
                   <button onClick={bankToSharedVault} className="mt-auto w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold hover:bg-emerald-500">
                     Ship {fmt(state.bankedMleo)} MLEO
                   </button>
                 </div>
 
                 <div className="flex h-full flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
-                  <div className="text-sm font-semibold text-cyan-200">Field Expedition</div>
-                  <p className="mt-1 text-sm text-white/70">
-                    Spend {CONFIG.expeditionCost} energy for Ore, Gold, Scrap, DATA and only a small chance of banked MLEO.
-                  </p>
+                  <div className="flex min-h-[88px] flex-col">
+                    <div className="text-sm font-semibold text-cyan-200">Field Expedition</div>
+                    <p className="mt-1 text-sm text-white/70">
+                      Spend {CONFIG.expeditionCost} energy for Ore, Gold, Scrap, DATA and only a small chance of banked MLEO.
+                    </p>
+                  </div>
                   <button
                     onClick={launchExpedition}
                     disabled={expeditionLeft > 0 || state.resources.ENERGY < CONFIG.expeditionCost}
@@ -1093,20 +1097,24 @@ export default function MleoBase() {
                 </div>
 
                 <div className="flex h-full flex-col gap-3 rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4">
-                  <div className="text-sm font-semibold text-fuchsia-200">Blueprint Cache</div>
-                  <p className="mt-1 text-sm text-white/70">
-                    Costs {fmt(blueprintCost)} shared MLEO. Raises banking efficiency and daily ship cap permanently.
-                  </p>
+                  <div className="flex min-h-[88px] flex-col">
+                    <div className="text-sm font-semibold text-fuchsia-200">Blueprint Cache</div>
+                    <p className="mt-1 text-sm text-white/70">
+                      Costs {fmt(blueprintCost)} shared MLEO. Raises banking efficiency and daily ship cap permanently.
+                    </p>
+                  </div>
                   <button onClick={buyBlueprint} className="mt-auto w-full rounded-xl bg-fuchsia-600 px-4 py-3 text-sm font-bold hover:bg-fuchsia-500">
                     Buy Blueprint Lv {state.blueprintLevel + 1}
                   </button>
                 </div>
 
                 <div className="flex h-full flex-col gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
-                  <div className="text-sm font-semibold text-amber-200">Shared Vault Utilities</div>
-                  <p className="mt-1 text-sm text-white/70">
-                    Spend shared MLEO on productivity instead of pure emissions. This creates healthy token sinks.
-                  </p>
+                  <div className="flex min-h-[88px] flex-col">
+                    <div className="text-sm font-semibold text-amber-200">Shared Vault Utilities</div>
+                    <p className="mt-1 text-sm text-white/70">
+                      Spend shared MLEO on productivity instead of pure emissions. This creates healthy token sinks.
+                    </p>
+                  </div>
                   <div className="mt-auto grid grid-cols-2 gap-2 pt-1">
                     <button onClick={activateOverclock} className="rounded-xl bg-amber-600 px-3 py-3 text-sm font-bold hover:bg-amber-500">
                       {overclockLeft > 0 ? `Overclock ${Math.ceil(overclockLeft / 1000)}s` : `Overclock ${fmt(CONFIG.overclockCost)}`}
@@ -1181,10 +1189,12 @@ export default function MleoBase() {
                     const owned = !!state.modules[module.key];
                     return (
                       <div key={module.key} className="flex h-full flex-col gap-3 rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <div className="text-sm font-semibold">{module.name}</div>
-                        <div className="mt-1 text-xs text-white/60">{module.desc}</div>
-                        <div className="mt-2 text-xs text-white/55">
-                          Cost: {Object.entries(module.cost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
+                        <div className="flex min-h-[96px] flex-col">
+                          <div className="text-sm font-semibold">{module.name}</div>
+                          <div className="mt-1 text-xs text-white/60">{module.desc}</div>
+                          <div className="mt-2 text-xs text-white/55">
+                            Cost: {Object.entries(module.cost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
+                          </div>
                         </div>
                         <button
                           onClick={() => buyModule(module.key)}
@@ -1267,13 +1277,15 @@ export default function MleoBase() {
                   const ready = isUnlocked && canAfford(state.resources, cost);
                   return (
                     <div key={building.key} className="flex h-full flex-col gap-3 rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm font-semibold">{building.name}</div>
-                        <div className="rounded-full bg-white/10 px-2 py-1 text-xs text-white/60">Lv {level}</div>
-                      </div>
-                      <div className="mt-2 text-xs text-white/60">{building.desc}</div>
-                      <div className="mt-3 text-xs text-white/55">
-                        Cost: {Object.entries(cost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
+                      <div className="flex flex-1 flex-col">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-semibold">{building.name}</div>
+                          <div className="rounded-full bg-white/10 px-2 py-1 text-xs text-white/60">Lv {level}</div>
+                        </div>
+                        <div className="mt-2 text-xs text-white/60">{building.desc}</div>
+                        <div className="mt-auto pt-3 text-xs leading-5 text-white/55">
+                          Cost: {Object.entries(cost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
+                        </div>
                       </div>
                       <button
                         onClick={() => buyBuilding(building.key)}
