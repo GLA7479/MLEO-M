@@ -10,6 +10,14 @@ import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
 import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import {
+  creditSharedVault,
+  debitSharedVault,
+  initSharedVault,
+  peekSharedVault,
+  readSharedVault,
+  subscribeSharedVault,
+} from "../lib/sharedVault";
 
 function useIOSViewportFix() {
   useEffect(() => {
@@ -57,8 +65,6 @@ const PRIZES = {
 
 function safeRead(key, fallback = {}) { if (typeof window === "undefined") return fallback; try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
 function safeWrite(key, val) { if (typeof window === "undefined") return; try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
-function getVault() { const rushData = safeRead("mleo_rush_core_v4", {}); return rushData.vault || 0; }
-function setVault(amount) { const rushData = safeRead("mleo_rush_core_v4", {}); rushData.vault = amount; safeWrite("mleo_rush_core_v4", rushData); }
 function fmt(n) { if (n >= 1e9) return (n / 1e9).toFixed(2) + "B"; if (n >= 1e6) return (n / 1e6).toFixed(2) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(2) + "K"; return Math.floor(n).toString(); }
 function formatPlayDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
 function shortAddr(addr) { if (!addr || addr.length < 10) return addr || ""; return `${addr.slice(0, 6)}...${addr.slice(-4)}`; }
@@ -108,21 +114,32 @@ export default function NumberHuntPage() {
   const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
 
   useEffect(() => {
+    let cancelled = false;
     setMounted(true);
-    setVaultState(getVault());
+    initSharedVault();
+    readSharedVault()
+      .then(snapshot => {
+        if (!cancelled) setVaultState(snapshot.balance);
+      })
+      .catch(() => {
+        if (!cancelled) setVaultState(peekSharedVault().balance);
+      });
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
     const freePlayStatus = getFreePlayStatus();
     setFreePlayTokens(freePlayStatus.tokens);
     const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
     if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
-    const interval = setInterval(() => { const status = getFreePlayStatus(); setFreePlayTokens(status.tokens); setVaultState(getVault()); }, 2000);
+    const unsubscribeVault = subscribeSharedVault(snapshot => {
+      if (!cancelled) setVaultState(snapshot.balance);
+    });
+    const interval = setInterval(() => { const status = getFreePlayStatus(); setFreePlayTokens(status.tokens); }, 2000);
     if (typeof Audio !== "undefined") {
       try { clickSound.current = new Audio(S_CLICK); winSound.current = new Audio(S_WIN); } catch {}
     }
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => { clearInterval(interval); document.removeEventListener("fullscreenchange", handleFullscreenChange); };
+    return () => { cancelled = true; unsubscribeVault(); clearInterval(interval); document.removeEventListener("fullscreenchange", handleFullscreenChange); };
   }, [router.query]);
 
   useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
@@ -142,8 +159,9 @@ export default function NumberHuntPage() {
       const amountUnits = parseUnits(Number(collectAmount).toFixed(Math.min(2, MLEO_DECIMALS)), MLEO_DECIMALS);
       const hash = await writeContractAsync({ address: CLAIM_ADDRESS, abi: MINING_CLAIM_ABI, functionName: "claim", args: [BigInt(GAME_ID), amountUnits], chainId: CLAIM_CHAIN_ID, account: address });
       await publicClient.waitForTransactionReceipt({ hash });
-      const newVault = Math.max(0, vault - collectAmount);
-      setVault(newVault); setVaultState(newVault);
+      const debitResult = await debitSharedVault(collectAmount, "keno-claim");
+      if (!debitResult.ok) { alert(debitResult.error || "Vault update failed"); return; }
+      setVaultState(debitResult.balance);
       alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
       setShowVaultModal(false);
     } catch (err) { console.error(err); alert("Claim failed or rejected"); } finally { setClaiming(false); }
@@ -159,11 +177,10 @@ export default function NumberHuntPage() {
     }
   };
 
-  const playNumberHunt = (isFreePlayParam = false) => {
+  const playNumberHunt = async (isFreePlayParam = false) => {
     if (selected.length === 0) { alert('Please select at least 1 number!'); return; }
     if (drawing) return;
     playSfx(clickSound.current);
-    const currentVault = getVault();
     let play = Number(playAmount) || MIN_PLAY;
     if (isFreePlay || isFreePlayParam) {
       const result = useFreePlayToken();
@@ -171,8 +188,9 @@ export default function NumberHuntPage() {
       else { alert('No free play tokens available!'); setIsFreePlay(false); return; }
     } else {
       if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
-      if (currentVault < play) { alert('Insufficient MLEO in vault'); return; }
-      setVault(currentVault - play); setVaultState(currentVault - play);
+      const debitResult = await debitSharedVault(play, "keno");
+      if (!debitResult.ok) { alert(debitResult.error || 'Insufficient MLEO in vault'); return; }
+      setVaultState(debitResult.balance);
     }
     setPlayAmount(String(play));
     setDrawing(true);
@@ -197,7 +215,7 @@ export default function NumberHuntPage() {
     }, 100);
   };
 
-  const checkResult = (drawnNumbers, play) => {
+  const checkResult = async (drawnNumbers, play) => {
     const matches = selected.filter(n => drawnNumbers.includes(n)).length;
     const prizeTable = PRIZES[selected.length] || {};
     const multiplier = prizeTable[matches] || 0;
@@ -205,8 +223,8 @@ export default function NumberHuntPage() {
     const win = prize > 0;
 
     if (win && prize > 0) {
-      const newVault = getVault() + prize;
-      setVault(newVault); setVaultState(newVault);
+      const creditResult = await creditSharedVault(prize, "keno");
+      setVaultState(creditResult.balance);
       playSfx(winSound.current);
     }
 
