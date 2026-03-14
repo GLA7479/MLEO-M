@@ -619,10 +619,92 @@ function Section({ title, subtitle, children }) {
   );
 }
 
+function AccordionSection({ title, subtitle, children, defaultOpen = false }) {
+  return (
+    <details
+      open={defaultOpen}
+      className="rounded-3xl border border-white/10 bg-white/5"
+    >
+      <summary className="cursor-pointer list-none px-4 py-4 sm:px-5 sm:py-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-white">{title}</h2>
+            {subtitle ? (
+              <p className="mt-1 text-sm text-white/60">{subtitle}</p>
+            ) : null}
+          </div>
+          <div className="rounded-xl bg-white/10 px-3 py-1 text-xs font-semibold text-white/70">
+            Open
+          </div>
+        </div>
+      </summary>
+      <div className="px-4 pb-4 sm:px-5 sm:pb-5">{children}</div>
+    </details>
+  );
+}
+
 function rewardText(reward) {
   return Object.entries(reward || {})
     .map(([k, v]) => `${k} ${fmt(v)}`)
     .join(" · ");
+}
+
+function getNextStep(state) {
+  const b = state.buildings || {};
+
+  if ((b.quarry || 0) < 2) {
+    return {
+      title: "Upgrade Quarry",
+      text: "Quarry is your first core producer. Push it to level 2 to unlock stronger early progression.",
+    };
+  }
+
+  if ((b.tradeHub || 0) < 1) {
+    return {
+      title: "Unlock Trade Hub",
+      text: "Trade Hub stabilizes your Gold income and helps your base grow faster.",
+    };
+  }
+
+  if ((b.salvage || 0) < 1) {
+    return {
+      title: "Unlock Salvage Yard",
+      text: "You need Scrap to move into stronger systems and prepare for Refinery.",
+    };
+  }
+
+  if ((b.powerCell || 0) < 1) {
+    return {
+      title: "Build Power Cell",
+      text: "Your energy economy is too important to ignore. Increase cap and regeneration early.",
+    };
+  }
+
+  if ((b.refinery || 0) < 1) {
+    return {
+      title: "Work toward Refinery",
+      text: "Refinery is what turns your base into a real MLEO support system.",
+    };
+  }
+
+  if ((state.bankedMleo || 0) < 50) {
+    return {
+      title: "Build more Banked MLEO",
+      text: "Keep your production running and prepare your next vault shipment.",
+    };
+  }
+
+  if ((state.sentToday || 0) < 250) {
+    return {
+      title: "Ship MLEO to Shared Vault",
+      text: "Move refined MLEO into the shared vault to support the wider ecosystem.",
+    };
+  }
+
+  return {
+    title: "Reinvest and expand",
+    text: "Upgrade buildings, improve efficiency, and use utilities wisely to strengthen your base.",
+  };
 }
 
 export default function MleoBase() {
@@ -743,6 +825,7 @@ export default function MleoBase() {
   const expeditionLeft = Math.max(0, (state.expeditionReadyAt || 0) - Date.now());
   const overclockLeft = Math.max(0, (state.overclockUntil || 0) - Date.now());
   const missionProgress = getMissionProgress(state);
+  const nextStep = useMemo(() => getNextStep(state), [state]);
 
   const showToast = (message) => setToast(message);
 
@@ -1009,6 +1092,244 @@ export default function MleoBase() {
     });
   };
 
+  const dailyMissionsContent = (
+    <div className="space-y-3">
+      {DAILY_MISSIONS.map((mission) => {
+        const progress = missionProgress[mission.key] || 0;
+        const done = progress >= mission.target;
+        const claimed = !!state.missionState?.claimed?.[mission.key];
+        return (
+          <div key={mission.key} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-sm font-semibold">{mission.name}</div>
+                <div className="mt-1 text-xs text-white/60">
+                  Progress: {fmt(progress)} / {fmt(mission.target)}
+                </div>
+                <div className="mt-2 text-xs text-white/55">Reward: {rewardText(mission.reward)}</div>
+              </div>
+              <button
+                onClick={() => claimMission(mission.key)}
+                disabled={!done || claimed}
+                className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {claimed ? "Claimed" : done ? "Claim" : "In Progress"}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const crewModulesResearchContent = (
+    <div className="space-y-3">
+      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold">Crew</div>
+            <div className="text-xs text-white/60">
+              {state.crew} workers · global output bonus {(state.research.fieldOps ? 3 : 2) * state.crew}%
+            </div>
+          </div>
+          <button onClick={hireCrew} className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20">
+            Hire
+          </button>
+        </div>
+        <div className="mt-2 text-xs text-white/55">
+          Next cost: {Object.entries(workerNextCost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        {MODULES.map((module) => {
+          const owned = !!state.modules[module.key];
+          return (
+            <div key={module.key} className="flex h-full flex-col gap-3 rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="flex min-h-[96px] flex-col">
+                <div className="text-sm font-semibold">{module.name}</div>
+                <div className="mt-1 text-xs text-white/60">{module.desc}</div>
+                <div className="mt-2 text-xs text-white/55">
+                  Cost: {Object.entries(module.cost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
+                </div>
+              </div>
+              <button
+                onClick={() => buyModule(module.key)}
+                disabled={owned}
+                className="mt-auto w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {owned ? "Installed" : "Install"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid gap-3">
+        {RESEARCH.map((item) => {
+          const done = !!state.research[item.key];
+          const locked = item.requires?.some((key) => !state.research[key]);
+          return (
+            <div key={item.key} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-sm font-semibold">{item.name}</div>
+                  <div className="mt-1 text-xs text-white/60">{item.desc}</div>
+                  <div className="mt-2 text-xs text-white/55">
+                    Cost: {Object.entries(item.cost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
+                  </div>
+                </div>
+                <button
+                  onClick={() => buyResearch(item.key)}
+                  disabled={done || locked}
+                  className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {done ? "Done" : locked ? "Locked" : "Research"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const baseStructuresContent = (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {BUILDINGS.map((building) => {
+        const level = state.buildings[building.key] || 0;
+        const nextLevel = level + 1;
+        const cost = buildingCost(building, level);
+        const isUnlocked = unlocked(building, state);
+        const ready = isUnlocked && canAfford(state.resources, cost);
+
+        const reqNameMap = {
+          hq: "HQ",
+          quarry: "Quarry",
+          tradeHub: "Trade Hub",
+          salvage: "Salvage",
+          refinery: "Refinery",
+          powerCell: "Power Cell",
+          minerControl: "Miner Ctrl",
+          arcadeHub: "Arcade Hub",
+          expeditionBay: "Expedition Bay",
+        };
+
+        const requirementsText = building.requires?.length
+          ? building.requires
+              .map((req) => `${reqNameMap[req.key] || req.key} Lv ${req.lvl}`)
+              .join(" · ")
+          : "";
+
+        const buttonText = ready
+          ? "Upgrade"
+          : isUnlocked
+          ? "Need resources"
+          : "Need requirements";
+
+        return (
+          <div
+            key={building.key}
+            className="flex min-h-[320px] flex-col rounded-2xl border border-white/10 bg-black/20 p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex h-[40px] items-start text-sm font-semibold leading-5 text-white">
+                  {building.name}
+                </div>
+              </div>
+
+              <div className="shrink-0 rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/65">
+                Lv {level}
+              </div>
+            </div>
+
+            <div className="mt-2 h-[60px] overflow-hidden text-xs leading-5 text-white/60">
+              {building.desc}
+            </div>
+
+            <div className="mt-2 flex h-5 items-center text-xs font-medium text-cyan-200/85">
+              Next level: Lv {nextLevel}
+            </div>
+
+            <div className="mt-3 h-[44px] overflow-hidden text-xs leading-5 text-white/55">
+              Cost:{" "}
+              {Object.entries(cost)
+                .map(([k, v]) => `${k} ${fmt(v)}`)
+                .join(" · ")}
+            </div>
+
+            <div className="mt-auto flex min-h-[76px] flex-col justify-end pt-4">
+              <button
+                onClick={() => buyBuilding(building.key)}
+                disabled={!ready}
+                className="w-full rounded-xl bg-white/10 px-3 py-2.5 text-sm font-semibold transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {buttonText}
+              </button>
+
+              <div className="mt-2 min-h-[34px] text-center text-[11px] leading-4 text-white/45">
+                {!isUnlocked && requirementsText ? (
+                  <>Requires: {requirementsText}</>
+                ) : ready ? (
+                  <>Ready to upgrade</>
+                ) : isUnlocked ? (
+                  <>Need more resources</>
+                ) : (
+                  <>&nbsp;</>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const progressSummaryContent = (
+    <div className="space-y-3 text-sm text-white/75">
+      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="font-semibold text-white">Totals</div>
+        <div className="mt-2 space-y-1 text-white/70">
+          <div>Total shipped: {fmt(state.totalBanked)} MLEO</div>
+          <div>Total vault spent: {fmt(state.totalSharedSpent)} MLEO</div>
+          <div>Total expeditions: {fmt(state.totalExpeditions)}</div>
+          <div>Total missions claimed: {fmt(state.totalMissionsDone)}</div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="font-semibold text-white">Why MLEO BASE is stronger as a support layer</div>
+        <ul className="mt-2 space-y-2 text-sm text-white/65">
+          <li>It uses the same shared vault via adapter, instead of raw localStorage writes.</li>
+          <li>It adds missions, commander level and ecosystem-specific buildings.</li>
+          <li>It shifts rewards toward progression and sinks, not just direct MLEO output.</li>
+        </ul>
+      </div>
+    </div>
+  );
+
+  const activityLogContent = (
+    <>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Link href="/mleo-miners" className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20">
+          Open Miners
+        </Link>
+        <Link href="/arcade" className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-2 text-sm font-semibold text-sky-200 hover:bg-sky-500/20">
+          Open Arcade
+        </Link>
+      </div>
+      <div className="space-y-2">
+        {(state.log || []).slice(0, 6).map((entry) => (
+          <div key={entry.id} className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/75">
+            <div>{entry.text}</div>
+            <div className="mt-1 text-xs text-white/40">{new Date(entry.ts).toLocaleTimeString()}</div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+
   if (!mounted) {
     return (
       <Layout title="MLEO BASE">
@@ -1020,7 +1341,26 @@ export default function MleoBase() {
   return (
     <Layout title="MLEO BASE">
       <main className="min-h-screen bg-[#07111f] text-white">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="sticky top-0 z-40 border-b border-white/10 bg-[#07111f]/95 backdrop-blur xl:hidden">
+          <div className="mx-auto grid max-w-7xl grid-cols-3 gap-2 px-4 py-2">
+            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Vault</div>
+              <div className="text-sm font-bold text-white">{fmt(sharedVault)}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Banked</div>
+              <div className="text-sm font-bold text-white">{fmt(state.bankedMleo)}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Energy</div>
+              <div className="text-sm font-bold text-white">
+                {fmt(state.resources.ENERGY)}/{fmt(derived.energyCap)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200">
@@ -1030,22 +1370,22 @@ export default function MleoBase() {
               <p className="mt-2 max-w-2xl text-sm text-white/70 sm:text-base">{CONFIG.subtitle}</p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Link href="/mining" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10">
+            <div className="flex flex-wrap items-center gap-2 sm:justify-start">
+              <Link href="/mining" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10">
                 Hub
               </Link>
               <button
                 onClick={() => setShowHowToPlay(true)}
-                className="rounded-xl border border-blue-500/25 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-200 hover:bg-blue-500/20"
+                className="rounded-xl border border-blue-500/25 bg-blue-500/10 px-4 py-2.5 text-sm font-semibold text-blue-200 hover:bg-blue-500/20"
               >
                 HOW TO PLAY
               </button>
               {isConnected ? (
-                <button onClick={() => openAccountModal?.()} className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20">
+                <button onClick={() => openAccountModal?.()} className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-white/20">
                   {address?.slice(0, 6)}…{address?.slice(-4)}
                 </button>
               ) : (
-                <button onClick={() => openConnectModal?.()} className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold hover:bg-rose-500">
+                <button onClick={() => openConnectModal?.()} className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold hover:bg-rose-500">
                   Connect
                 </button>
               )}
@@ -1063,12 +1403,27 @@ export default function MleoBase() {
             <MetricCard label="Energy" value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`} note={`Regen ${derived.energyRegen.toFixed(2)}/s`} accent="slate" />
           </div>
 
+          <div className="mt-4 rounded-3xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">
+                  Next Recommended Step
+                </div>
+                <div className="mt-1 text-lg font-bold text-white">{nextStep.title}</div>
+                <div className="mt-1 text-sm text-white/70">{nextStep.text}</div>
+              </div>
+              <div className="rounded-2xl bg-black/20 px-4 py-3 text-sm text-white/75">
+                Commander Lv {state.commanderLevel}
+              </div>
+            </div>
+          </div>
+
           <div className="mt-6 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
             <Section
               title="Operations Console"
               subtitle={`Ship cap today: ${fmt(state.sentToday)} / ${fmt(derived.shipCap)} MLEO. Blueprints and utilities make MLEO useful inside the ecosystem, not just claimable.`}
             >
-              <div className="grid gap-3 lg:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-2">
                 <div className="flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
                   <div className="flex min-h-[88px] flex-col">
                     <div className="text-sm font-semibold text-emerald-200">Ship to Shared Vault</div>
@@ -1076,7 +1431,10 @@ export default function MleoBase() {
                       Move refined MLEO into the main vault with a daily softcut, so BASE supports Miners instead of replacing it.
                     </p>
                   </div>
-                  <button onClick={bankToSharedVault} className="mt-auto w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold hover:bg-emerald-500">
+                  <button
+                    onClick={bankToSharedVault}
+                    className="mt-auto w-full rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-extrabold shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-500"
+                  >
                     Ship {fmt(state.bankedMleo)} MLEO
                   </button>
                 </div>
@@ -1091,7 +1449,7 @@ export default function MleoBase() {
                   <button
                     onClick={launchExpedition}
                     disabled={expeditionLeft > 0 || state.resources.ENERGY < CONFIG.expeditionCost}
-                    className="mt-auto w-full rounded-xl bg-cyan-600 px-4 py-3 text-sm font-bold hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="mt-auto w-full rounded-2xl bg-cyan-600 px-4 py-3.5 text-sm font-extrabold shadow-lg shadow-cyan-900/30 transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {expeditionLeft > 0 ? `Ready in ${Math.ceil(expeditionLeft / 1000)}s` : "Launch Expedition"}
                   </button>
@@ -1128,197 +1486,96 @@ export default function MleoBase() {
               </div>
             </Section>
 
-            <Section
-              title="Daily Missions"
-              subtitle="Daily goals give players direction without turning BASE into an aggressive faucet. Rewards are mostly XP and support resources."
-            >
-              <div className="space-y-3">
-                {DAILY_MISSIONS.map((mission) => {
-                  const progress = missionProgress[mission.key] || 0;
-                  const done = progress >= mission.target;
-                  const claimed = !!state.missionState?.claimed?.[mission.key];
-                  return (
-                    <div key={mission.key} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <div className="text-sm font-semibold">{mission.name}</div>
-                          <div className="mt-1 text-xs text-white/60">
-                            Progress: {fmt(progress)} / {fmt(mission.target)}
-                          </div>
-                          <div className="mt-2 text-xs text-white/55">Reward: {rewardText(mission.reward)}</div>
-                        </div>
-                        <button
-                          onClick={() => claimMission(mission.key)}
-                          disabled={!done || claimed}
-                          className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {claimed ? "Claimed" : done ? "Claim" : "In Progress"}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Section>
+            <div className="xl:hidden">
+              <AccordionSection
+                title="Daily Missions"
+                subtitle="Daily goals give players direction without turning BASE into an aggressive faucet."
+                defaultOpen={true}
+              >
+                {dailyMissionsContent}
+              </AccordionSection>
+            </div>
+            <div className="hidden xl:block">
+              <Section
+                title="Daily Missions"
+                subtitle="Daily goals give players direction without turning BASE into an aggressive faucet. Rewards are mostly XP and support resources."
+              >
+                {dailyMissionsContent}
+              </Section>
+            </div>
           </div>
 
           <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-            <Section
-              title="Crew, Modules & Research"
-              subtitle="Everything here strengthens the support loop around Miners and Arcade without opening a second uncontrolled faucet."
-            >
-              <div className="space-y-3">
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-semibold">Crew</div>
-                      <div className="text-xs text-white/60">
-                        {state.crew} workers · global output bonus {(state.research.fieldOps ? 3 : 2) * state.crew}%
-                      </div>
-                    </div>
-                    <button onClick={hireCrew} className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20">
-                      Hire
-                    </button>
-                  </div>
-                  <div className="mt-2 text-xs text-white/55">
-                    Next cost: {Object.entries(workerNextCost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
-                  </div>
-                </div>
+            <div className="xl:hidden">
+              <AccordionSection
+                title="Crew, Modules & Research"
+                subtitle="Upgrades, modules and research for long-term progression."
+                defaultOpen={false}
+              >
+                {crewModulesResearchContent}
+              </AccordionSection>
+            </div>
+            <div className="hidden xl:block">
+              <Section
+                title="Crew, Modules & Research"
+                subtitle="Everything here strengthens the support loop around Miners and Arcade without opening a second uncontrolled faucet."
+              >
+                {crewModulesResearchContent}
+              </Section>
+            </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  {MODULES.map((module) => {
-                    const owned = !!state.modules[module.key];
-                    return (
-                      <div key={module.key} className="flex h-full flex-col gap-3 rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <div className="flex min-h-[96px] flex-col">
-                          <div className="text-sm font-semibold">{module.name}</div>
-                          <div className="mt-1 text-xs text-white/60">{module.desc}</div>
-                          <div className="mt-2 text-xs text-white/55">
-                            Cost: {Object.entries(module.cost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => buyModule(module.key)}
-                          disabled={owned}
-                          className="mt-auto w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {owned ? "Installed" : "Install"}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="grid gap-3">
-                  {RESEARCH.map((item) => {
-                    const done = !!state.research[item.key];
-                    const locked = item.requires?.some((key) => !state.research[key]);
-                    return (
-                      <div key={item.key} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <div className="text-sm font-semibold">{item.name}</div>
-                            <div className="mt-1 text-xs text-white/60">{item.desc}</div>
-                            <div className="mt-2 text-xs text-white/55">
-                              Cost: {Object.entries(item.cost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => buyResearch(item.key)}
-                            disabled={done || locked}
-                            className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            {done ? "Done" : locked ? "Locked" : "Research"}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </Section>
-
-            <Section
-              title="Base Structures"
-              subtitle="MLEO BASE is tuned as a support-management game: it produces slowly, rewards planning, and feeds the main shared vault in measured batches."
-            >
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {BUILDINGS.map((building) => {
-                  const level = state.buildings[building.key] || 0;
-                  const cost = buildingCost(building, level);
-                  const isUnlocked = unlocked(building, state);
-                  const ready = isUnlocked && canAfford(state.resources, cost);
-                  return (
-                    <div key={building.key} className="flex h-full flex-col gap-3 rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <div className="flex flex-1 flex-col">
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm font-semibold">{building.name}</div>
-                          <div className="rounded-full bg-white/10 px-2 py-1 text-xs text-white/60">Lv {level}</div>
-                        </div>
-                        <div className="mt-2 text-xs text-white/60">{building.desc}</div>
-                        <div className="mt-auto pt-3 text-xs leading-5 text-white/55">
-                          Cost: {Object.entries(cost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => buyBuilding(building.key)}
-                        disabled={!ready}
-                        className="mt-auto w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {ready ? "Upgrade" : isUnlocked ? "Need resources" : "Locked"}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </Section>
+            <div className="xl:hidden">
+              <AccordionSection
+                title="Base Structures"
+                subtitle="Upgrade your base and unlock stronger systems."
+                defaultOpen={true}
+              >
+                {baseStructuresContent}
+              </AccordionSection>
+            </div>
+            <div className="hidden xl:block">
+              <Section
+                title="Base Structures"
+                subtitle="MLEO BASE is tuned as a support-management game: it produces slowly, rewards planning, and feeds the main shared vault in measured batches."
+              >
+                {baseStructuresContent}
+              </Section>
+            </div>
           </div>
 
           <div className="mt-4 grid gap-4 xl:grid-cols-[1.5fr_1fr]">
-            <Section
-              title="Progress Summary"
-              subtitle="BASE should feel like the control room of the ecosystem, not just another reward tab."
-            >
-              <div className="space-y-3 text-sm text-white/75">
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                  <div className="font-semibold text-white">Totals</div>
-                  <div className="mt-2 space-y-1 text-white/70">
-                    <div>Total shipped: {fmt(state.totalBanked)} MLEO</div>
-                    <div>Total vault spent: {fmt(state.totalSharedSpent)} MLEO</div>
-                    <div>Total expeditions: {fmt(state.totalExpeditions)}</div>
-                    <div>Total missions claimed: {fmt(state.totalMissionsDone)}</div>
-                  </div>
-                </div>
+            <div className="xl:hidden">
+              <AccordionSection
+                title="Progress Summary"
+                subtitle="Overview of your long-term base performance."
+                defaultOpen={false}
+              >
+                {progressSummaryContent}
+              </AccordionSection>
+            </div>
+            <div className="hidden xl:block">
+              <Section
+                title="Progress Summary"
+                subtitle="BASE should feel like the control room of the ecosystem, not just another reward tab."
+              >
+                {progressSummaryContent}
+              </Section>
+            </div>
 
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                  <div className="font-semibold text-white">Why MLEO BASE is stronger as a support layer</div>
-                  <ul className="mt-2 space-y-2 text-sm text-white/65">
-                    <li>It uses the same shared vault via adapter, instead of raw localStorage writes.</li>
-                    <li>It adds missions, commander level and ecosystem-specific buildings.</li>
-                    <li>It shifts rewards toward progression and sinks, not just direct MLEO output.</li>
-                  </ul>
-                </div>
-              </div>
-            </Section>
-
-            <Section title="Activity Log" subtitle="Quick read on what the base has been doing.">
-              <div className="mb-4 flex flex-wrap gap-2">
-                <Link href="/mleo-miners" className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20">
-                  Open Miners
-                </Link>
-                <Link href="/arcade" className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-2 text-sm font-semibold text-sky-200 hover:bg-sky-500/20">
-                  Open Arcade
-                </Link>
-              </div>
-              <div className="space-y-2">
-                {(state.log || []).map((entry) => (
-                  <div key={entry.id} className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/75">
-                    <div>{entry.text}</div>
-                    <div className="mt-1 text-xs text-white/40">{new Date(entry.ts).toLocaleTimeString()}</div>
-                  </div>
-                ))}
-              </div>
-            </Section>
+            <div className="xl:hidden">
+              <AccordionSection
+                title="Activity Log"
+                subtitle="Recent actions and quick links."
+                defaultOpen={false}
+              >
+                {activityLogContent}
+              </AccordionSection>
+            </div>
+            <div className="hidden xl:block">
+              <Section title="Activity Log" subtitle="Quick read on what the base has been doing.">
+                {activityLogContent}
+              </Section>
+            </div>
           </div>
         </div>
 
@@ -1334,7 +1591,7 @@ export default function MleoBase() {
             onClick={() => setShowHowToPlay(false)}
           >
             <div
-              className="w-full max-w-4xl max-h-[88vh] overflow-auto rounded-3xl border border-white/10 bg-[#0d1626] p-6 text-white shadow-2xl"
+              className="w-full max-w-4xl max-h-[88vh] overflow-auto rounded-3xl border border-white/10 bg-[#0d1626] p-4 text-white shadow-2xl sm:p-6"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-4">
