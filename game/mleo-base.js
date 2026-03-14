@@ -634,6 +634,7 @@ export default function MleoBase() {
   const [state, setState] = useState(() => freshState());
   const [sharedVault, setSharedVault] = useState(0);
   const [toast, setToast] = useState("");
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -1033,12 +1034,12 @@ export default function MleoBase() {
               <Link href="/mining" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10">
                 Hub
               </Link>
-              <Link href="/mleo-miners" className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20">
-                Open Miners
-              </Link>
-              <Link href="/arcade" className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-2 text-sm font-semibold text-sky-200 hover:bg-sky-500/20">
-                Open Arcade
-              </Link>
+              <button
+                onClick={() => setShowHowToPlay(true)}
+                className="rounded-xl border border-blue-500/25 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-200 hover:bg-blue-500/20"
+              >
+                HOW TO PLAY
+              </button>
               {isConnected ? (
                 <button onClick={() => openAccountModal?.()} className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20">
                   {address?.slice(0, 6)}…{address?.slice(-4)}
@@ -1301,6 +1302,14 @@ export default function MleoBase() {
             </Section>
 
             <Section title="Activity Log" subtitle="Quick read on what the base has been doing.">
+              <div className="mb-4 flex flex-wrap gap-2">
+                <Link href="/mleo-miners" className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20">
+                  Open Miners
+                </Link>
+                <Link href="/arcade" className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-2 text-sm font-semibold text-sky-200 hover:bg-sky-500/20">
+                  Open Arcade
+                </Link>
+              </div>
               <div className="space-y-2">
                 {(state.log || []).map((entry) => (
                   <div key={entry.id} className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/75">
@@ -1316,6 +1325,291 @@ export default function MleoBase() {
         {toast ? (
           <div className="fixed left-1/2 top-20 z-[120] -translate-x-1/2 rounded-2xl border border-emerald-400/30 bg-emerald-500/20 px-5 py-3 text-sm font-semibold text-white shadow-2xl backdrop-blur">
             {toast}
+          </div>
+        ) : null}
+
+        {showHowToPlay ? (
+          <div
+            className="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setShowHowToPlay(false)}
+          >
+            <div
+              className="w-full max-w-4xl max-h-[88vh] overflow-auto rounded-3xl border border-white/10 bg-[#0d1626] p-6 text-white shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-black sm:text-3xl">How to Play - MLEO BASE</h2>
+                  <p className="mt-2 text-sm text-white/65">
+                    MLEO BASE is your command center inside the MLEO ecosystem.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowHowToPlay(false)}
+                  className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-6 space-y-6 text-sm leading-7 text-white/80">
+                <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+                  <p>
+                    <strong className="text-white">MLEO BASE</strong> is your command center inside the MLEO ecosystem.
+                    This is not just another arcade game. It is the place where you build your base, manage resources,
+                    launch expeditions, improve efficiency, and support your shared MLEO vault.
+                  </p>
+                  <p className="mt-3">
+                    Your goal is to grow your base step by step, unlock stronger systems, refine resources into banked
+                    MLEO, and send it into the shared vault in a controlled and strategic way.
+                  </p>
+                </div>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">1. What is MLEO BASE?</h3>
+                  <p className="mt-2">
+                    MLEO BASE is a management and progression game.
+                  </p>
+                  <p className="mt-2">Instead of fast reactions like arcade games, this mode is about:</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>building your base</li>
+                    <li>upgrading structures</li>
+                    <li>managing energy</li>
+                    <li>producing resources</li>
+                    <li>refining materials</li>
+                    <li>completing missions</li>
+                    <li>using MLEO wisely inside the ecosystem</li>
+                  </ul>
+                  <p className="mt-2">
+                    It is designed to <strong className="text-white">work together with Miners and Arcade</strong>, not replace them.
+                  </p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">2. Your Main Goal</h3>
+                  <p className="mt-2">Your main objective is to turn your small base into a fully upgraded MLEO production center.</p>
+                  <p className="mt-2">You do this by:</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>collecting resources</li>
+                    <li>upgrading key buildings</li>
+                    <li>improving your energy system</li>
+                    <li>unlocking advanced structures</li>
+                    <li>running expeditions</li>
+                    <li>refining Ore and Scrap into banked MLEO</li>
+                    <li>shipping banked MLEO into the shared vault</li>
+                  </ul>
+                  <p className="mt-2">The stronger your base becomes, the better your long-term efficiency.</p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">3. Core Resources</h3>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><strong className="text-white">ORE</strong><p className="mt-1">Raw material produced mainly by the Quarry. Used for upgrades, research, and refining.</p></div>
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><strong className="text-white">GOLD</strong><p className="mt-1">Your main construction currency inside the base. Needed for most building upgrades and progression.</p></div>
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><strong className="text-white">SCRAP</strong><p className="mt-1">Recovered material used for advanced systems. Important for mid and late progression.</p></div>
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><strong className="text-white">ENERGY</strong><p className="mt-1">Powers your base. Many systems consume energy, so you must manage it carefully.</p></div>
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><strong className="text-white">DATA</strong><p className="mt-1">A progression resource connected to advanced systems, missions, and long-term growth.</p></div>
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><strong className="text-white">Banked MLEO</strong><p className="mt-1">This is refined MLEO produced inside the base. It is not automatically added to the shared vault. You must ship it manually.</p></div>
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">4. Buildings and What They Do</h3>
+                  <div className="mt-2 space-y-2">
+                    <p><strong className="text-white">HQ</strong>: Your main base level. Improves overall efficiency and unlocks advanced systems.</p>
+                    <p><strong className="text-white">Quarry</strong>: Produces raw ORE using energy. This is one of your most important early buildings.</p>
+                    <p><strong className="text-white">Trade Hub</strong>: Generates GOLD income and helps stabilize your economy.</p>
+                    <p><strong className="text-white">Salvage Yard</strong>: Produces SCRAP for advanced upgrades and systems.</p>
+                    <p><strong className="text-white">Refinery</strong>: Converts ORE and SCRAP into banked MLEO. This is the key building that turns your base into a real MLEO support system.</p>
+                    <p><strong className="text-white">Power Cell</strong>: Increases your maximum ENERGY and improves energy regeneration.</p>
+                    <p><strong className="text-white">Miner Control</strong>: Improves synergy with Miners and helps strengthen base production quality.</p>
+                    <p><strong className="text-white">Arcade Hub</strong>: Improves progression from activity and supports mission-oriented growth.</p>
+                    <p><strong className="text-white">Expedition Bay</strong>: Unlocks stronger expeditions and better loot potential.</p>
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">5. Energy Management</h3>
+                  <p className="mt-2">Energy is one of the most important parts of the game.</p>
+                  <p className="mt-2">Many buildings need energy to operate. If your energy is too low, your production slows down.</p>
+                  <p className="mt-2">To improve energy management:</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>build Power Cells</li>
+                    <li>upgrade your base wisely</li>
+                    <li>use Refill when needed</li>
+                    <li>avoid over-expanding too early</li>
+                  </ul>
+                  <p className="mt-2">Smart energy management is part of winning in MLEO BASE.</p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">6. How Production Works</h3>
+                  <p className="mt-2">Your base generates resources over time.</p>
+                  <p className="mt-2">Basic loop:</p>
+                  <ol className="mt-2 list-decimal space-y-1 pl-5">
+                    <li>Quarry produces ORE</li>
+                    <li>Trade Hub produces GOLD</li>
+                    <li>Salvage Yard produces SCRAP</li>
+                    <li>Power system keeps production running</li>
+                    <li>Refinery converts ORE + SCRAP into banked MLEO</li>
+                  </ol>
+                  <p className="mt-2">This means MLEO BASE is not instant reward farming. You first build infrastructure, then create efficiency, then refine value over time.</p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">7. What is Banked MLEO?</h3>
+                  <p className="mt-2">Banked MLEO is refined MLEO created inside your base.</p>
+                  <p className="mt-2">Important:</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>it stays inside the BASE system first</li>
+                    <li>it does not go straight into the shared vault</li>
+                    <li>you must use <strong className="text-white">Ship to Shared Vault</strong> to move it</li>
+                  </ul>
+                  <p className="mt-2">This creates a healthier system where production is gradual and controlled.</p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">8. Ship to Shared Vault</h3>
+                  <p className="mt-2">When you have banked MLEO ready, you can send it into the shared vault.</p>
+                  <p className="mt-2">Why it matters:</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>it connects BASE to the wider MLEO ecosystem</li>
+                    <li>it supports your shared vault balance</li>
+                    <li>it keeps BASE as a supporting system for Miners and Arcade</li>
+                  </ul>
+                  <p className="mt-2">There is also a <strong className="text-white">daily softcut / ship cap</strong>, which means shipping is controlled and cannot scale infinitely in one day.</p>
+                  <p className="mt-2">So even if your base becomes strong, production still stays balanced.</p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">9. Expeditions</h3>
+                  <p className="mt-2">Expeditions are active missions you can launch using energy.</p>
+                  <p className="mt-2">They can reward you with:</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>ORE</li>
+                    <li>GOLD</li>
+                    <li>SCRAP</li>
+                    <li>DATA</li>
+                    <li>and sometimes a small amount of banked MLEO</li>
+                  </ul>
+                  <p className="mt-2">Use them when:</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>you need extra resources</li>
+                    <li>you want progression bursts</li>
+                    <li>you want to speed up certain upgrades</li>
+                    <li>you want a chance at better rewards</li>
+                  </ul>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">10. Commander Level</h3>
+                  <p className="mt-2">As you play, you gain Commander XP.</p>
+                  <p className="mt-2">This increases your Commander Level, which represents your long-term progression inside MLEO BASE.</p>
+                  <p className="mt-2">Commander progression gives the player:</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>a stronger sense of growth</li>
+                    <li>milestone feeling</li>
+                    <li>more value beyond raw token output</li>
+                  </ul>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">11. Daily Missions</h3>
+                  <p className="mt-2">MLEO BASE includes daily missions to keep players active and focused.</p>
+                  <p className="mt-2">Examples:</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>upgrade a building</li>
+                    <li>ship MLEO</li>
+                    <li>complete an expedition</li>
+                    <li>spend shared vault MLEO on utility</li>
+                  </ul>
+                  <p className="mt-2">Daily missions help guide players toward healthy gameplay loops: progression, activity, reinvestment, ecosystem utility.</p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">12. Blueprint Cache</h3>
+                  <p className="mt-2">Blueprint Cache is a permanent improvement system.</p>
+                  <p className="mt-2">When you buy blueprint upgrades:</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>your banking efficiency improves</li>
+                    <li>your daily ship capacity improves</li>
+                    <li>your base becomes stronger long-term</li>
+                  </ul>
+                  <p className="mt-2">This is one of the best reinvestment tools in the game.</p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">13. Shared Vault Utilities</h3>
+                  <p className="mt-2">MLEO BASE is designed with token utility, not just emissions.</p>
+                  <p className="mt-2">That means shared vault MLEO can also be used for useful actions like:</p>
+                  <p className="mt-2"><strong className="text-white">Overclock</strong>: Temporarily boosts productivity and helps speed up growth.</p>
+                  <p className="mt-2"><strong className="text-white">Refill</strong>: Instantly restores energy so you can continue operating.</p>
+                  <p className="mt-2">These systems create healthy sinks and make MLEO more useful inside the ecosystem.</p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">14. Best Beginner Strategy</h3>
+                  <ol className="mt-2 list-decimal space-y-1 pl-5">
+                    <li>Upgrade Quarry first</li>
+                    <li>Build steady GOLD production</li>
+                    <li>Unlock Salvage Yard</li>
+                    <li>Improve your energy capacity</li>
+                    <li>Work toward unlocking Refinery</li>
+                    <li>Start creating banked MLEO</li>
+                    <li>Use expeditions for extra momentum</li>
+                    <li>Reinvest part of your gains into Blueprint and utility</li>
+                  </ol>
+                  <p className="mt-2">Do not try to rush everything at once. A stable base grows better than an overloaded base.</p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">15. Smart Progression Tips</h3>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>Keep your energy healthy</li>
+                    <li>Do not ignore Power Cell upgrades</li>
+                    <li>Refinery becomes important only after your raw economy is stable</li>
+                    <li>Use expeditions strategically, not randomly</li>
+                    <li>Reinvest in permanent systems, not only short-term gains</li>
+                    <li>Balance production with utility spending</li>
+                    <li>Think of BASE as long-term infrastructure</li>
+                  </ul>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">16. How MLEO BASE Fits the Ecosystem</h3>
+                  <p className="mt-2">MLEO BASE is part of a bigger system.</p>
+                  <p className="mt-2"><strong className="text-white">Miners</strong>: Miners focus more on mining-style progression and core resource generation.</p>
+                  <p className="mt-2"><strong className="text-white">Arcade</strong>: Arcade focuses more on activity, score, and fast gameplay.</p>
+                  <p className="mt-2"><strong className="text-white">MLEO BASE</strong>: BASE acts as the strategic hub: infrastructure, refinement, missions, progression, shared vault support, and token utility.</p>
+                  <p className="mt-2">Together, these systems make the ecosystem deeper and more engaging.</p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">17. Win Condition</h3>
+                  <p className="mt-2">There is no single final ending.</p>
+                  <p className="mt-2">Success in MLEO BASE means:</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>building an efficient base</li>
+                    <li>unlocking advanced systems</li>
+                    <li>shipping MLEO consistently</li>
+                    <li>completing missions</li>
+                    <li>increasing Commander Level</li>
+                    <li>using the ecosystem wisely</li>
+                    <li>supporting long-term MLEO growth</li>
+                  </ul>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">18. Final Advice</h3>
+                  <p className="mt-2">MLEO BASE rewards patience, planning, and smart reinvestment.</p>
+                  <p className="mt-2">This is not a pure clicker and not a pure idle game. It is a strategic support layer inside the MLEO world.</p>
+                  <p className="mt-2 font-semibold text-white">
+                    Build smart. Upgrade wisely. Manage your energy. Launch expeditions. Refine carefully. Ship strategically. Grow your base.
+                  </p>
+                  <p className="mt-3 text-base font-bold text-cyan-200">Welcome to MLEO BASE.</p>
+                </section>
+              </div>
+            </div>
           </div>
         ) : null}
       </main>
