@@ -847,7 +847,7 @@ function AccordionSection({ title, subtitle, children, defaultOpen = false }) {
   return (
     <details
       open={defaultOpen}
-      className="rounded-3xl border border-white/10 bg-white/5"
+      className="group rounded-3xl border border-white/10 bg-white/5"
     >
       <summary className="cursor-pointer list-none px-4 py-4 sm:px-5 sm:py-5">
         <div className="flex items-center justify-between gap-3">
@@ -858,7 +858,8 @@ function AccordionSection({ title, subtitle, children, defaultOpen = false }) {
             ) : null}
           </div>
           <div className="rounded-xl bg-white/10 px-3 py-1 text-xs font-semibold text-white/70">
-            Open
+            <span className="group-open:hidden">OPEN</span>
+            <span className="hidden group-open:inline">CLOSE</span>
           </div>
         </div>
       </summary>
@@ -1633,25 +1634,6 @@ export default function MleoBase() {
   return (
     <Layout title="MLEO BASE">
       <main className="min-h-screen bg-[#07111f] text-white">
-        <div className="sticky top-0 z-40 border-b border-white/10 bg-[#07111f]/95 backdrop-blur xl:hidden">
-          <div className="mx-auto grid max-w-7xl grid-cols-3 gap-2 px-4 py-2">
-            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Vault</div>
-              <div className="text-sm font-bold text-white">{fmt(sharedVault)}</div>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Banked</div>
-              <div className="text-sm font-bold text-white">{fmt(state.bankedMleo)}</div>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Energy</div>
-              <div className="text-sm font-bold text-white">
-                {fmt(state.resources.ENERGY)}/{fmt(derived.energyCap)}
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
