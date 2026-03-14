@@ -93,7 +93,7 @@ export default function GamesHub() {
             </h1>
             <p className="text-zinc-300 mt-2 max-w-2xl mx-auto">
               Two modes, one Vault. Play actively with upgrades in Miners or run
-              a support management loop in Quest Arcade. You can switch anytime.
+              MLEO BASE as your support-management layer. You can switch anytime.
             </p>
           </header>
 
@@ -141,14 +141,14 @@ export default function GamesHub() {
     </div>
   </article>
 
-  {/* QUEST ARCADE */}
+  {/* MLEO BASE */}
   <article className="rounded-2xl border border-white/5 bg-black/10 backdrop-blur-md shadow-xl p-5 flex flex-col w-full sm:max-w-[360px] min-h-[300px]">
     <div className="flex items-start justify-between">
       <div>
-        <h2 className="text-[20px] sm:text-2xl font-extrabold">MLEO — Quest Arcade</h2>
+        <h2 className="text-[20px] sm:text-2xl font-extrabold">MLEO — BASE</h2>
         <p className="text-[14px] sm:text-sm text-zinc-300 mt-1 leading-6 break-words hyphens-auto">
-          A support management game with Ore, Scrap, Refinery and timed
-          shipments into the shared MLEO Vault.
+          Command your support base, run missions, generate DATA, and feed the
+          shared MLEO Vault with structured progression.
         </p>
       </div>
       <span className="ml-3 mt-1 rounded-full px-2.5 py-1 text-xs font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">
@@ -174,10 +174,10 @@ export default function GamesHub() {
 
       <div className="border-t border-zinc-800/80 pt-3">
         <Link
-          href="/quest-arcade"
+          href="/mleo-base"
           className="inline-flex w-full items-center justify-center px-5 py-3 rounded-xl bg-orange-500 hover:bg-orange-400 text-black font-extrabold shadow-lg"
         >
-          Play Quest Arcade
+          Play MLEO BASE
         </Link>
       </div>
     </div>

@@ -1728,39 +1728,39 @@ function HowToPlay({ lang, onClose, gameType = "miners" }) {
   const text = TEXT[lang];
   const questText = lang === "he"
     ? {
-        title: "איך לשחק - Quest Arcade",
+        title: "איך לשחק - MLEO BASE",
         goal: "מטרת המשחק",
-        goalDesc: "בנה בסיס צדדי שתומך ב-Miners: הפק Ore, Scrap ו-Gold, זקק משלוחים ושלח MLEO ל-Vault המשותף בקצב נשלט.",
+        goalDesc: "נהל את MLEO BASE כבסיס תומך ל-Miners: ייצר משאבים, פתח DATA, השלם משימות ושלח MLEO ל-Vault המשותף בקצב נשלט.",
         gameplay: "הלופ המרכזי",
         gameplaySteps: [
-          "שדרג Districts כדי להפיק Ore, Gold ו-Scrap.",
-          "פתח Refinery כדי להמיר Ore + Scrap ל-MLEO מקומי מוכן למשלוח.",
-          "שלח את ה-MLEO ל-Vault המשותף דרך Ship to Shared Vault.",
-          "השתמש ב-Vault המשותף על Blueprint, Overclock ו-Energy Refill כדי ליצור sinks אמיתיים.",
+          "שדרג את מבני הבסיס כמו HQ, Quarry, Refinery ו-Arcade Hub.",
+          "צבור Ore, Gold, Scrap ו-DATA כדי לפתוח מחקר, מודולים ומבנים מתקדמים.",
+          "השלם משימות יומיות וצא למשלחות כדי להאיץ התקדמות ותגמולים.",
+          "שלח MLEO ל-Vault המשותף והשתמש בו לשדרוגי Blueprint, Overclock ויכולות בסיס.",
         ],
         features: "מה חשוב לדעת",
         featuresList: [
-          "המשחק משתמש באותו Vault משותף של שאר משחקי MLEO.",
-          "אין כאן הפקדה מבחוץ - זה משחק תומך, לא שער הזרמה חיצוני.",
-          "Expeditions, Crew, Modules ו-Research מוסיפים עומק בלי להתחרות ישירות ב-Miners.",
+          "MLEO BASE משתמש באותו Vault משותף של שאר משחקי MLEO.",
+          "זה משחק תומך עמוק יותר מ-Quest Arcade, עם DATA, משימות וחיבור חזק יותר לאקוסיסטם.",
+          "הוא לא מחליף את Miners, אלא יושב סביבו ומשפר את הכלכלה וההתקדמות.",
         ],
       }
     : {
-        title: "How to Play - Quest Arcade",
+        title: "How to Play - MLEO BASE",
         goal: "Goal",
-        goalDesc: "Build a support base for Miners: produce Ore, Scrap and Gold, refine timed shipments, and feed measured MLEO back into the shared vault.",
+        goalDesc: "Run MLEO BASE as a support layer for Miners: build structures, generate DATA, complete missions and ship measured MLEO back into the shared vault.",
         gameplay: "Core Loop",
         gameplaySteps: [
-          "Upgrade districts to produce Ore, Gold and Scrap.",
-          "Unlock the Refinery to turn Ore + Scrap into bankable MLEO.",
-          "Ship refined MLEO into the shared vault with the daily softcut system.",
-          "Spend shared-vault MLEO on Blueprints, Overclock and Refills to add real sinks.",
+          "Upgrade core structures such as HQ, Quarry, Refinery and Arcade Hub.",
+          "Generate Ore, Gold, Scrap and DATA to unlock research, modules and advanced systems.",
+          "Complete daily missions and launch expeditions to speed up progression and rewards.",
+          "Ship refined MLEO into the shared vault and spend it on Blueprints, Overclock and base support tools.",
         ],
         features: "Good to Know",
         featuresList: [
-          "Quest Arcade uses the same shared vault as the rest of the MLEO games.",
-          "There are no outside deposits here - this is a support loop, not an external on-ramp.",
-          "Expeditions, Crew, Modules and Research add depth without competing directly with Miners.",
+          "MLEO BASE uses the same shared vault as the rest of the MLEO games.",
+          "It is deeper than Quest Arcade, with DATA, missions and stronger ecosystem hooks.",
+          "It does not replace Miners; it surrounds Miners with support progression and shared-economy sinks.",
         ],
       };
   
@@ -2714,18 +2714,18 @@ export default function GamesHub() {
   const dir = text.dir || "ltr";
   const questCard = lang === "he"
     ? {
-        title: "MLEO — Quest Arcade",
-        desc: "משחק ניהול תומך עם Ore, Scrap, Refinery ומשלוחים ל-Vault המשותף. מוסיף עומק וסינקים בלי להתחרות ב-Miners.",
+        title: "MLEO — BASE",
+        desc: "בסיס ניהול תומך שמחבר בין Miners, Arcade וה-Vault המשותף עם משימות, DATA, משלחות ושדרוגי בסיס.",
         badge: "Support",
-        play: "שחק Quest Arcade",
-        hub: "שני מצבים, Vault אחד. שחק באופן פעיל ב-Miners, או בנה בסיס תומך ב-Quest Arcade שמזין את ה-Vault המשותף.",
+        play: "שחק MLEO BASE",
+        hub: "שני מצבים, Vault אחד. שחק באופן פעיל ב-Miners, או נהל את MLEO BASE כדי להזין ולשפר את ה-Vault המשותף.",
       }
     : {
-        title: "MLEO — Quest Arcade",
-        desc: "A support management game with Ore, Scrap, Refinery and shared-vault shipments. Adds depth and sinks without competing with Miners.",
+        title: "MLEO — BASE",
+        desc: "A support-management base that links Miners, Arcade and the shared vault with missions, DATA, expeditions and structural upgrades.",
         badge: "Support",
-        play: "Play Quest Arcade",
-        hub: "Two modes, one Vault. Play actively with Miners or run a support management loop in Quest Arcade that feeds the shared vault.",
+        play: "Play MLEO BASE",
+        hub: "Two modes, one Vault. Play actively with Miners or run MLEO BASE to feed and upgrade the shared vault ecosystem.",
       };
 
   if (!mounted) {
@@ -2890,7 +2890,7 @@ export default function GamesHub() {
         </button>
       </div>
 
-                  <Link href="/quest-arcade">
+                  <Link href="/mleo-base">
                     <button className="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors">
                       {questCard.play}
           </button>
