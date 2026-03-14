@@ -113,7 +113,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-4 text-center">
                 <div className="text-sm opacity-70 mb-1">Session Cost</div>
-                <div className="text-xl font-bold text-amber-400">1,000+ MLEO</div>
+                <div className="text-xl font-bold text-amber-400">100+ MLEO</div>
               </div>
               <div className="rounded-lg bg-green-500/10 border border-green-500/30 p-4 text-center">
                 <div className="text-sm opacity-70 mb-1">Top Reward Tier</div>
@@ -122,7 +122,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
             </div>
             <div>
               <h3 className="font-bold text-lg mb-2">How to Play</h3>
-              <p className="text-zinc-300">Click "PLAY NOW" to start the game. Each session uses 1,000 MLEO or more depending on the selected mode. Complete runs, reach milestones, and collect reward boosts based on your results.</p>
+              <p className="text-zinc-300">Click "PLAY NOW" to start the game. Each session uses 100 MLEO or more depending on the selected mode. Complete runs, reach milestones, and collect reward boosts based on your results.</p>
             </div>
           </div>
         </Modal>
@@ -287,21 +287,12 @@ export default function ArcadeHub() {
   }, []);
 
   const games = [
-    // Local offline arcade
-    {
-      title: "Local Party Arcade",
-      emoji: "📴",
-      description: "Offline-ready collection (TicTacToe, Tap Battle, Memory, more) that runs fully on-device.",
-      reward: "Offline",
-      href: "/local-arcade",
-      color: "#F97316",
-    },
     // 1. Plinko
     {
       title: "Drop Run",
       emoji: "🎯",
       description: "Drop the ball through pegs and aim for high-value reward zones.",
-      reward: "×4.3",
+      reward: "UP TO ×2.0",
       href: "/plinko",
       color: "#3B82F6",
     },
@@ -310,7 +301,7 @@ export default function ArcadeHub() {
       title: "Sky Run",
       emoji: "📈",
       description: "Track the live boost curve and lock in your result before the run ends.",
-      reward: "Unlimited",
+      reward: "UP TO ×10",
       href: "/crash",
       color: "#DC2626",
     },
@@ -319,7 +310,7 @@ export default function ArcadeHub() {
       title: "Diamonds",
       emoji: "💎",
       description: "Find diamonds, avoid bombs! 4 difficulty levels from Easy to Expert!",
-      reward: "×1000+",
+      reward: "UP TO ×17+",
       href: "/diamonds",
       color: "#0EA5E9",
     },
@@ -328,7 +319,7 @@ export default function ArcadeHub() {
       title: "21 Challenge",
       emoji: "♠️",
       description: "Reach 21 with smart card decisions in this fast card challenge.",
-      reward: "×2",
+      reward: "UP TO ×2.5",
       href: "/blackjack",
       color: "#10B981",
     },
@@ -337,7 +328,7 @@ export default function ArcadeHub() {
       title: "Card Arena",
       emoji: "🎴",
       description: "Build the strongest hand using your cards and the shared board.",
-      reward: "×1000",
+      reward: "UP TO ×800",
       href: "/poker",
       color: "#8B5CF6",
     },
@@ -355,7 +346,7 @@ export default function ArcadeHub() {
       title: "Triple Cards",
       emoji: "♦️",
       description: "Fast three-card challenge with quick round results.",
-      reward: "×100",
+      reward: "UP TO ×65",
       href: "/three-card-poker",
       color: "#EC4899",
     },
@@ -364,7 +355,7 @@ export default function ArcadeHub() {
       title: "Ultimate Cards",
       emoji: "🃏",
       description: "A strategy-focused card mode with staged decisions and stronger reward tiers.",
-      reward: "×500",
+      reward: "UP TO ×2",
       href: "/ultimate-poker",
       color: "#6366F1",
     },
@@ -382,7 +373,7 @@ export default function ArcadeHub() {
       title: "Ladder",
       emoji: "🪜",
       description: "Climb the ladder! Choose left or right to climb higher - lock in result before you fall!",
-      reward: "×20",
+      reward: "UP TO ×12",
       href: "/ladder",
       color: "#9333EA",
     },
@@ -391,7 +382,7 @@ export default function ArcadeHub() {
       title: "Bomb Squad",
       emoji: "💣",
       description: "Defuse the bomb! Cut the correct wire at each level - wrong wire = BOOM!",
-      reward: "×20",
+      reward: "UP TO ×17",
       href: "/bomb",
       color: "#DC2626",
     },
@@ -400,7 +391,7 @@ export default function ArcadeHub() {
       title: "Mystery Box",
       emoji: "🎁",
       description: "Choose 1 box from 10! Find the grand reward or walk away empty!",
-      reward: "×4",
+      reward: "UP TO ×3.49",
       href: "/mystery",
       color: "#F59E0B",
     },
@@ -409,7 +400,7 @@ export default function ArcadeHub() {
       title: "Mystery Chamber",
       emoji: "🔫",
       description: "Choose your path through 6 chambers and secure your progress before the danger appears.",
-      reward: "×7.5",
+      reward: "UP TO ×1.84",
       href: "/chamber",
       color: "#64748B",
     },
@@ -418,7 +409,7 @@ export default function ArcadeHub() {
       title: "Speed Track",
       emoji: "🏇",
       description: "Pick your racer and follow the track to see how your choice performs.",
-      reward: "×3.6",
+      reward: "UP TO ×3.25",
       href: "/horse",
       color: "#16A34A",
     },
@@ -427,7 +418,7 @@ export default function ArcadeHub() {
       title: "Target Shooter",
       emoji: "🏹",
       description: "Hit all targets in 20 seconds! Fast clicks = big wins!",
-      reward: "×15",
+      reward: "UP TO ×2.00",
       href: "/shooter",
       color: "#EA580C",
     },
@@ -436,7 +427,7 @@ export default function ArcadeHub() {
       title: "Triple Dice",
       emoji: "🀄",
       description: "A fast dice challenge based on totals, patterns, and bonus outcomes.",
-      reward: "×50",
+      reward: "UP TO ×50",
       href: "/sicbo",
       color: "#B91C1C",
     },
@@ -445,7 +436,7 @@ export default function ArcadeHub() {
       title: "Gold Rush Digger",
       emoji: "⛏️",
       description: "Dig a 5×5 treasure map! Find gems and grand rewards - avoid 6 skulls!",
-      reward: "×61",
+      reward: "UP TO ×1.67",
       href: "/goldrush",
       color: "#D97706",
     },
@@ -454,7 +445,7 @@ export default function ArcadeHub() {
       title: "Limit Run",
       emoji: "🔥",
       description: "Set your target boost and see whether your run reaches it.",
-      reward: "Unlimited",
+      reward: "UP TO ×100",
       href: "/limbo",
       color: "#6366F1",
     },
@@ -463,7 +454,7 @@ export default function ArcadeHub() {
       title: "Dice Pick",
       emoji: "⚄",
       description: "Choose your target range and roll for a result-based reward tier.",
-      reward: "Unlimited",
+      reward: "UP TO ×99",
       href: "/dice-over-under",
       color: "#14B8A6",
     },
@@ -472,7 +463,7 @@ export default function ArcadeHub() {
       title: "Color Wheel",
       emoji: "🔴",
       description: "Spin the wheel and land on color-based reward zones with different outcomes.",
-      reward: "×36",
+      reward: "UP TO ×1.97",
       href: "/roulette",
       color: "#7C3AED",
     },
@@ -481,7 +472,7 @@ export default function ArcadeHub() {
       title: "Checkers",
       emoji: "♟️",
       description: "Classic checkers vs bot! Capture all pieces to win!",
-      reward: "×1.92",
+      reward: "UP TO ×1.92",
       href: "/checkers",
       color: "#DC2626",
     },
@@ -490,7 +481,7 @@ export default function ArcadeHub() {
       title: "Backgammon",
       emoji: "🎲",
       description: "Classic backgammon vs bot! Bear off all pieces first to win!",
-      reward: "×1.92",
+      reward: "UP TO ×1.92",
       href: "/backgammon",
       color: "#D97706",
     },
@@ -499,7 +490,7 @@ export default function ArcadeHub() {
       title: "Dragon Tower",
       emoji: "🐉",
       description: "Climb 10 floors through the dragon's lair! 3 difficulty modes!",
-      reward: "×150",
+      reward: "UP TO ×22",
       href: "/dragon-tower",
       color: "#DC2626",
     },
@@ -507,7 +498,7 @@ export default function ArcadeHub() {
       title: "Symbol Match",
       emoji: "💰",
       description: "Match symbols across 5 reels to unlock bonus reward patterns.",
-      reward: "×500",
+      reward: "UP TO ×492.5",
       href: "/slots-upgraded",
       color: "#FBBF24",
     },
@@ -515,7 +506,7 @@ export default function ArcadeHub() {
       title: "Mega Spin Board",
       emoji: "🎡",
       description: "Spin across 40 segments and land on different reward tiers and bonus events.",
-      reward: "×8",
+      reward: "UP TO ×2.12",
       href: "/mega-wheel",
       color: "#A855F7",
     },
@@ -523,7 +514,7 @@ export default function ArcadeHub() {
       title: "Number Hunt",
       emoji: "🎱",
       description: "Choose your numbers and track how many matches you hit in each round.",
-      reward: "×1000",
+      reward: "UP TO ×188",
       href: "/keno",
       color: "#6366F1",
     },
@@ -531,7 +522,7 @@ export default function ArcadeHub() {
       title: "Dice Arena",
       emoji: "🎲",
       description: "Roll the dice through different outcome zones and unlock score-based rewards.",
-      reward: "×31",
+      reward: "UP TO ×8",
       href: "/craps",
       color: "#16A34A",
     },
@@ -539,7 +530,7 @@ export default function ArcadeHub() {
       title: "Card Duel",
       emoji: "♥️",
       description: "Choose between card sides and follow the result in a fast head-to-head round.",
-      reward: "×8",
+      reward: "UP TO ×8",
       href: "/baccarat",
       color: "#9333EA",
     },
@@ -548,7 +539,7 @@ export default function ArcadeHub() {
       title: "Quick Flip",
       emoji: "🪙",
       description: "Choose a side and reveal the result in a quick one-tap challenge.",
-      reward: "×1.95",
+      reward: "UP TO ×1.92",
       href: "/coin-flip",
       color: "#F59E0B",
     },
@@ -570,6 +561,16 @@ export default function ArcadeHub() {
       reward: "×10",
       href: "/plinko2",
       color: "#8B5CF6",
+      comingSoon: true,
+    },
+    // 28. COMING SOON
+    {
+      title: "Coming Soon",
+      emoji: "🚀",
+      description: "A new exciting game is coming soon! Stay tuned for updates.",
+      reward: "TBA",
+      href: "#",
+      color: "#6366F1",
       comingSoon: true,
     },
   ];
@@ -622,7 +623,7 @@ export default function ArcadeHub() {
             
             <p className="text-lg text-white/90 max-w-2xl mx-auto">
               Play mini-games, collect in-app MLEO rewards, and unlock extra challenges. 
-              Each session uses 1,000 MLEO from your in-app vault or a free play token when available.
+              Each session uses 100 MLEO from your in-app vault or a free play token when available.
             </p>
             
             {/* Vault and Free Play Status */}
@@ -662,7 +663,7 @@ export default function ArcadeHub() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/40">
               <span className="text-2xl">🎮</span>
-              <span className="font-bold text-purple-300">24 Exciting Games to Play!</span>
+              <span className="font-bold text-purple-300">29 Exciting Games to Play!</span>
             </div>
           </div>
 
@@ -674,7 +675,7 @@ export default function ArcadeHub() {
                 <h3 className="text-xl font-bold text-yellow-300 mb-2">Important Information</h3>
                 <ul className="text-sm text-white/90 space-y-2">
                   <li>• <strong>🎁 Free Play:</strong> Receive 1 free play token every hour (up to 5 stored). Use tokens on any game without using vault MLEO!</li>
-                  <li>• <strong>Session Cost:</strong> Each game session uses at least 1,000 MLEO from your in-app vault. Some modes may use a different session cost.</li>
+                  <li>• <strong>Session Cost:</strong> Each game session uses at least 100 MLEO from your in-app vault. Some modes may use a different session cost.</li>
                   <li>• <strong>Vault Usage:</strong> MLEO is taken from your in-app vault when you start a session (free play sessions do not use vault MLEO).</li>
                   <li>• <strong>Rewards:</strong> Session rewards are added automatically to your vault, including rewards earned from free play sessions.</li>
                   <li>• <strong>Game Info:</strong> Click the ℹ️ button on each game card to view the rules, controls, and reward structure.</li>
