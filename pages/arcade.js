@@ -6,6 +6,7 @@ import { ConnectButton, useConnectModal, useAccountModal } from "@rainbow-me/rai
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
 import { getFreePlayStatus, formatTimeRemaining } from "../lib/free-play-system";
+import { creditSharedVault } from "../lib/sharedVault";
 
 const ARCADE_BG = "linear-gradient(135deg, #1a1a1a 0%, #3a2a0a 50%, #1a1a1a 100%)";
 
@@ -176,6 +177,9 @@ export default function ArcadeHub() {
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [collectAmount, setCollectAmount] = useState(100);
   const [claiming, setClaiming] = useState(false);
+  const [devPassword, setDevPassword] = useState("");
+  const [showDevButton, setShowDevButton] = useState(false);
+  const [addingCoins, setAddingCoins] = useState(false);
 
   // Wagmi hooks
   const { openConnectModal } = useConnectModal();
@@ -236,6 +240,32 @@ export default function ArcadeHub() {
       return () => clearTimeout(timer);
     }
   }, [freePlayCountdown, freePlayStatus.tokens, freePlayStatus.isFull]);
+
+  // Add dev coins (testing only)
+  async function addDevCoins() {
+    if (devPassword !== "7479") {
+      alert("Invalid password");
+      return;
+    }
+
+    setAddingCoins(true);
+    try {
+      const result = await creditSharedVault(10000, "dev-test");
+      if (result.ok) {
+        setVault(result.balance);
+        alert(`✅ Added 10,000 MLEO! New balance: ${fmt(result.balance)}`);
+        setDevPassword("");
+        setShowDevButton(false);
+      } else {
+        alert(`Failed to add coins: ${result.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Failed to add dev coins:", error);
+      alert("Failed to add coins. Please try again.");
+    } finally {
+      setAddingCoins(false);
+    }
+  }
 
   // Collect MLEO to wallet
   async function collectToWallet() {
@@ -757,6 +787,48 @@ export default function ArcadeHub() {
               <span>Back to Main Games</span>
             </Link>
             
+            {/* Dev Button - Testing Only */}
+            {!showDevButton ? (
+              <button
+                onClick={() => setShowDevButton(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600/20 border border-red-500/30 text-red-300 text-sm font-bold hover:bg-red-600/30"
+                title="Dev Tools"
+              >
+                🔧
+              </button>
+            ) : (
+              <div className="inline-flex items-center gap-2">
+                <input
+                  type="password"
+                  value={devPassword}
+                  onChange={(e) => setDevPassword(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      addDevCoins();
+                    }
+                  }}
+                  placeholder="Password"
+                  className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm placeholder-zinc-400 focus:outline-none focus:border-red-500"
+                  style={{ minWidth: "120px" }}
+                />
+                <button
+                  onClick={addDevCoins}
+                  disabled={addingCoins}
+                  className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-white text-sm shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {addingCoins ? "Adding..." : "+10K"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDevButton(false);
+                    setDevPassword("");
+                  }}
+                  className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm hover:bg-white/20"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </main>
