@@ -14,10 +14,11 @@ const STATE_KEY = "mleo_base_v1";
 const MAX_LOG_ITEMS = 16;
 
 const DAILY_SOFTCUT = [
-  { upto: 0.8, factor: 1.0 },
-  { upto: 1.0, factor: 0.7 },
-  { upto: 1.2, factor: 0.45 },
-  { upto: 9.99, factor: 0.22 },
+  { upto: 0.60, factor: 1.00 },
+  { upto: 0.85, factor: 0.72 },
+  { upto: 1.00, factor: 0.50 },
+  { upto: 1.15, factor: 0.30 },
+  { upto: 9.99, factor: 0.16 },
 ];
 
 const OFFLINE_TIERS = [
@@ -72,7 +73,7 @@ const BUILDINGS = [
     baseCost: { GOLD: 280, ORE: 180, SCRAP: 35 },
     growth: 1.25,
     energyUse: 3.2,
-    convert: { ORE: 1.5, SCRAP: 0.5, MLEO: 0.18 },
+    convert: { ORE: 1.8, SCRAP: 0.7, MLEO: 0.12 },
     requires: [
       { key: "salvage", lvl: 2 },
       { key: "tradeHub", lvl: 2 },
@@ -120,6 +121,39 @@ const BUILDINGS = [
       { key: "hq", lvl: 3 },
       { key: "salvage", lvl: 2 },
     ],
+  },
+  {
+    key: "logisticsCenter",
+    name: "Logistics Center",
+    desc: "Improves shipment quality, export handling and daily ship efficiency.",
+    baseCost: { ORE: 220, GOLD: 180, SCRAP: 90 },
+    growth: 1.7,
+    maxLevel: 15,
+    energyUse: 0.7,
+    outputs: { DATA: 0.06 },
+    requires: [{ key: "hq", lvl: 2 }, { key: "tradeHub", lvl: 2 }],
+  },
+  {
+    key: "researchLab",
+    name: "Research Lab",
+    desc: "Boosts DATA generation and supports advanced research paths.",
+    baseCost: { ORE: 180, GOLD: 240, SCRAP: 110 },
+    growth: 1.75,
+    maxLevel: 15,
+    energyUse: 1.0,
+    outputs: { DATA: 0.22 },
+    requires: [{ key: "hq", lvl: 2 }, { key: "minerControl", lvl: 1 }],
+  },
+  {
+    key: "repairBay",
+    name: "Repair Bay",
+    desc: "Improves stability and lowers maintenance pressure.",
+    baseCost: { ORE: 160, GOLD: 160, SCRAP: 140 },
+    growth: 1.7,
+    maxLevel: 15,
+    energyUse: 0.8,
+    outputs: {},
+    requires: [{ key: "hq", lvl: 2 }, { key: "powerCell", lvl: 1 }],
   },
 ];
 
@@ -185,6 +219,34 @@ const RESEARCH = [
     cost: { ORE: 600, GOLD: 420, SCRAP: 180, DATA: 30 },
     requires: ["fieldOps"],
   },
+  {
+    key: "logistics",
+    name: "Logistics",
+    desc: "+10% ship efficiency and smoother export flow.",
+    cost: { ORE: 700, GOLD: 460, SCRAP: 220, DATA: 40 },
+    requires: ["routing"],
+  },
+  {
+    key: "predictiveMaintenance",
+    name: "Predictive Maintenance",
+    desc: "Maintenance decay is 25% slower and Repair Bay works better.",
+    cost: { ORE: 620, GOLD: 420, SCRAP: 260, DATA: 36 },
+    requires: ["fieldOps"],
+  },
+  {
+    key: "deepScan",
+    name: "Deep Scan",
+    desc: "+18% DATA from expeditions and better rare findings.",
+    cost: { ORE: 760, GOLD: 520, SCRAP: 240, DATA: 48 },
+    requires: ["arcadeOps"],
+  },
+  {
+    key: "tokenDiscipline",
+    name: "Token Discipline",
+    desc: "-12% raw banked MLEO output, +22% DATA output, +10% ship quality.",
+    cost: { ORE: 820, GOLD: 560, SCRAP: 280, DATA: 60 },
+    requires: ["logistics", "deepScan"],
+  },
 ];
 
 const DAILY_MISSIONS = [
@@ -212,6 +274,24 @@ const DAILY_MISSIONS = [
     target: 150,
     reward: { XP: 50, DATA: 12 },
   },
+  {
+    key: "generate_data",
+    name: "Generate 40 DATA",
+    target: 40,
+    reward: { XP: 35, GOLD: 120 },
+  },
+  {
+    key: "perform_maintenance",
+    name: "Perform 1 maintenance",
+    target: 1,
+    reward: { XP: 45, DATA: 10 },
+  },
+  {
+    key: "double_expedition",
+    name: "Launch 2 expeditions",
+    target: 2,
+    reward: { XP: 45, SCRAP: 30 },
+  },
 ];
 
 const CONFIG = {
@@ -220,14 +300,14 @@ const CONFIG = {
   startingGold: 140,
   baseEnergyCap: 120,
   baseEnergyRegen: 2.2,
-  dailyShipCap: 25_000,
-  expeditionCost: 28,
-  expeditionCooldownMs: 90_000,
-  overclockCost: 750,
-  overclockDurationMs: 10 * 60 * 1000,
-  refillCost: 250,
-  blueprintBaseCost: 2_000,
-  blueprintGrowth: 1.7,
+  dailyShipCap: 12_000,
+  expeditionCost: 36,
+  expeditionCooldownMs: 120_000,
+  overclockCost: 900,
+  overclockDurationMs: 8 * 60 * 1000,
+  refillCost: 300,
+  blueprintBaseCost: 2_500,
+  blueprintGrowth: 1.85,
 };
 
 function clamp(n, min, max) {
@@ -299,6 +379,18 @@ function pay(stock, cost) {
   return next;
 }
 
+function hasResources(resources, cost = {}) {
+  return Object.entries(cost).every(([key, amount]) => (resources[key] || 0) >= amount);
+}
+
+function spendResources(resources, cost = {}) {
+  const next = { ...resources };
+  for (const [key, amount] of Object.entries(cost)) {
+    next[key] = Math.max(0, (next[key] || 0) - amount);
+  }
+  return next;
+}
+
 function unlocked(def, state) {
   if (!def.requires?.length) return true;
   return def.requires.every((req) => (state.buildings[req.key] || 0) >= (req.lvl || 1));
@@ -310,7 +402,7 @@ function softcutFactor(used, cap) {
   for (const step of DAILY_SOFTCUT) {
     if (ratio <= step.upto) return step.factor;
   }
-  return 0.2;
+  return 0.16;
 }
 
 function offlineFactorFor(ms) {
@@ -380,12 +472,15 @@ function getMissionProgress(state) {
     ship_mleo: Number(state?.stats?.shippedToday || 0),
     run_expedition: Number(state?.stats?.expeditionsToday || 0),
     spend_vault: Number(state?.stats?.vaultSpentToday || 0),
+    generate_data: Number(state?.stats?.dataToday || 0),
+    perform_maintenance: Number(state?.stats?.maintenanceToday || 0),
+    double_expedition: Number(state?.stats?.expeditionsToday || 0),
   };
 }
 
 function freshState() {
   return {
-    version: 3,
+    version: 4,
     lastDay: todayKey(),
     lastTickAt: Date.now(),
     lastHiddenAt: 0,
@@ -406,6 +501,9 @@ function freshState() {
       minerControl: 0,
       arcadeHub: 0,
       expeditionBay: 0,
+      logisticsCenter: 0,
+      researchLab: 0,
+      repairBay: 0,
     },
     crew: 0,
     modules: {},
@@ -417,6 +515,8 @@ function freshState() {
     totalSharedSpent: 0,
     overclockUntil: 0,
     expeditionReadyAt: Date.now(),
+    maintenanceDue: 0,
+    stability: 100,
     commanderXp: 0,
     commanderLevel: 1,
     totalExpeditions: 0,
@@ -426,6 +526,8 @@ function freshState() {
       shippedToday: 0,
       expeditionsToday: 0,
       vaultSpentToday: 0,
+      dataToday: 0,
+      maintenanceToday: 0,
     },
     missionState: {
       dailySeed: todayKey(),
@@ -441,37 +543,87 @@ function derive(state, now = Date.now()) {
   const hqLevel = state.buildings.hq || 1;
   const minerLink = state.buildings.minerControl || 0;
   const arcadeLink = state.buildings.arcadeHub || 0;
+  const logisticsLevel = state.buildings.logisticsCenter || 0;
+  const researchLabLevel = state.buildings.researchLab || 0;
+  const repairBayLevel = state.buildings.repairBay || 0;
   const hasFieldOps = !!state.research.fieldOps;
   const workerBonus = 1 + state.crew * (hasFieldOps ? 0.03 : 0.02);
   const overclock = now < (state.overclockUntil || 0) ? 1.35 : 1;
   const hqBonus = 1 + hqLevel * 0.03;
-  const minerBonus = 1 + minerLink * 0.04 + (state.modules.minerLink ? 0.12 : 0);
-  const arcadeBonus = 1 + arcadeLink * 0.03 + (state.modules.arcadeRelay ? 0.1 : 0);
+  const minerBonus = 1 + minerLink * 0.04;
+  const arcadeBonus = 1 + arcadeLink * 0.03;
+  const stability = clamp(Number(state.stability || 100), 50, 100);
+  const stabilityFactor = 0.75 + (stability / 100) * 0.25;
 
   let oreMult = workerBonus * overclock;
   let goldMult = workerBonus * overclock;
   let scrapMult = workerBonus * overclock;
   let mleoMult = workerBonus * overclock;
+  let dataMult = (1 + researchLabLevel * 0.06) * arcadeBonus;
+  let bankBonus = 1 + state.blueprintLevel * 0.02 + logisticsLevel * 0.025;
+  let maintenanceRelief = 1 + repairBayLevel * 0.08;
 
   if (state.modules.servoDrill) oreMult *= 1.15;
-  if (state.modules.vaultCompressor) mleoMult *= 1.08;
-  if (state.research.routing) mleoMult *= 1.08;
+  if (state.modules.vaultCompressor) {
+    mleoMult *= 1.04;
+    bankBonus *= 1.08;
+  }
+  if (state.modules.arcadeRelay) {
+    dataMult *= 1.12;
+  }
+  if (state.modules.minerLink) {
+    oreMult *= 1.08;
+  }
+  if (state.research.routing) bankBonus *= 1.08;
   if (state.research.minerSync) oreMult *= 1.12;
+  if (state.research.arcadeOps) dataMult *= 1.10;
+  if (state.research.logistics) bankBonus *= 1.10;
+  if (state.research.deepScan) dataMult *= 1.18;
+  if (state.research.tokenDiscipline) {
+    dataMult *= 1.22;
+    mleoMult *= 0.88;
+    bankBonus *= 1.10;
+  }
+  if (state.research.predictiveMaintenance) {
+    maintenanceRelief *= 1.25;
+  }
+
+  oreMult *= hqBonus * minerBonus * stabilityFactor;
+  goldMult *= hqBonus * stabilityFactor;
+  scrapMult *= hqBonus * stabilityFactor;
+  mleoMult *= hqBonus * stabilityFactor;
+  dataMult *= hqBonus * stabilityFactor;
+
+  const shipCap =
+    CONFIG.dailyShipCap +
+    state.blueprintLevel * 1200 +
+    logisticsLevel * 900 +
+    (state.research.routing ? 5000 : 0);
+
+  const minersBonus = {
+    offlineRetention: minerLink * 0.015,
+    oreQuality: minerLink * 0.02,
+  };
+
+  const arcadeSupport = {
+    missionBoost: arcadeLink * 0.015,
+    retrySupport: arcadeLink * 0.005,
+  };
 
   return {
     energyCap: CONFIG.baseEnergyCap + powerLevel * 24 + (state.research.coolant ? 15 : 0),
     energyRegen: CONFIG.baseEnergyRegen + powerLevel * 0.35 + (state.research.coolant ? 0.8 : 0),
-    oreMult: oreMult * hqBonus * minerBonus,
-    goldMult: goldMult * hqBonus,
-    scrapMult: scrapMult * hqBonus,
-    mleoMult: mleoMult * hqBonus,
-    dataMult: arcadeBonus,
-    shipCap: CONFIG.dailyShipCap + state.blueprintLevel * 2500 + (state.research.routing ? 5000 : 0),
-    bankBonus:
-      1 +
-      state.blueprintLevel * 0.02 +
-      (state.research.routing ? 0.08 : 0) +
-      (state.modules.vaultCompressor ? 0.05 : 0),
+    oreMult,
+    goldMult,
+    scrapMult,
+    mleoMult,
+    dataMult,
+    shipCap,
+    bankBonus,
+    maintenanceRelief,
+    stability,
+    minersBonus,
+    arcadeSupport,
     expeditionCooldownMs: hasFieldOps ? 60000 : CONFIG.expeditionCooldownMs,
   };
 }
@@ -501,6 +653,8 @@ function simulate(state, elapsedMs, efficiency = 1) {
       shippedToday: 0,
       expeditionsToday: 0,
       vaultSpentToday: 0,
+      dataToday: 0,
+      maintenanceToday: 0,
     };
     next.missionState = {
       dailySeed: todayKey(),
@@ -513,6 +667,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
   const dt = clamp(elapsedMs / 1000, 0, 60 * 60 * 12);
   const effective = dt * efficiency;
   const d = derive(next, now);
+  const dataBefore = next.resources.DATA || 0;
 
   next.resources.ENERGY = clamp(next.resources.ENERGY + d.energyRegen * dt, 0, d.energyCap);
 
@@ -557,33 +712,76 @@ function simulate(state, elapsedMs, efficiency = 1) {
     next.resources.DATA += 0.12 * level * d.dataMult * effective;
   });
 
+  runBuilding("researchLab", (level) => {
+    const energyNeed = 1.0 * level * dt;
+    if (next.resources.ENERGY < energyNeed) return;
+    next.resources.ENERGY -= energyNeed;
+    next.resources.DATA += 0.22 * level * d.dataMult * effective;
+  });
+
+  runBuilding("logisticsCenter", (level) => {
+    const energyNeed = 0.7 * level * dt;
+    if (next.resources.ENERGY < energyNeed) return;
+    next.resources.ENERGY -= energyNeed;
+    next.resources.DATA += 0.06 * level * d.dataMult * effective;
+  });
+
+  runBuilding("repairBay", (level) => {
+    const energyNeed = 0.8 * level * dt;
+    if (next.resources.ENERGY < energyNeed) return;
+    next.resources.ENERGY -= energyNeed;
+    next.stability = Math.min(100, (next.stability || 100) + 0.02 * level * effective);
+  });
+
   runBuilding("refinery", (level) => {
     const energyNeed = 3.2 * level * dt;
-    const oreNeed = 1.5 * level * effective;
-    const scrapNeed = 0.5 * level * effective;
+    const oreNeed = 1.8 * level * effective;
+    const scrapNeed = 0.7 * level * effective;
     if (next.resources.ENERGY < energyNeed) return;
     if (next.resources.ORE < oreNeed || next.resources.SCRAP < scrapNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.ORE -= oreNeed;
     next.resources.SCRAP -= scrapNeed;
-    next.bankedMleo += 0.18 * level * d.mleoMult * effective;
+    next.bankedMleo += 0.12 * level * d.mleoMult * effective;
   });
 
+  const elapsedMinutes = dt / 60;
+  const decayMultiplier = 1 / (d.maintenanceRelief || 1);
+  next.maintenanceDue = (next.maintenanceDue || 0) + elapsedMinutes * 0.2 * decayMultiplier;
+
+  if ((next.maintenanceDue || 0) >= 1) {
+    const decaySteps = Math.floor(next.maintenanceDue);
+    next.maintenanceDue -= decaySteps;
+    next.stability = Math.max(55, (next.stability || 100) - decaySteps * 0.15);
+  }
+
+  const dataAfter = next.resources.DATA || 0;
+  const gainedData = Math.max(0, Math.floor(dataAfter - dataBefore));
+  if (gainedData > 0) {
+    next.stats = {
+      ...next.stats,
+      dataToday: (next.stats?.dataToday || 0) + gainedData,
+    };
+  }
+
   next.resources.ENERGY = clamp(next.resources.ENERGY, 0, d.energyCap);
+  next.stability = clamp(next.stability || 100, 55, 100);
   next.lastTickAt = now;
   return next;
 }
 
 function rollExpeditionLoot(state) {
   const bay = state.buildings.expeditionBay || 0;
-  const rareBonus = state.research.arcadeOps ? 1.12 : 1;
+  const rareBonus =
+    (state.research.arcadeOps ? 1.12 : 1) *
+    (state.research.deepScan ? 1.18 : 1);
   const base = 1 + bay * 0.12;
-  const ore = Math.floor((40 + Math.random() * 80) * base);
-  const gold = Math.floor((25 + Math.random() * 60) * base);
-  const scrap = Math.floor((10 + Math.random() * 30) * base);
-  const data = Math.floor((4 + Math.random() * 10) * rareBonus);
-  const mleoChance = 0.18 + bay * 0.02;
-  const bankedMleo = Math.random() < mleoChance ? Math.floor(8 + Math.random() * 22) : 0;
+  const ore = Math.floor((35 + Math.random() * 65) * base);
+  const gold = Math.floor((20 + Math.random() * 45) * base);
+  const scrap = Math.floor((12 + Math.random() * 28) * base);
+  const data = Math.floor((6 + Math.random() * 14) * rareBonus);
+  const mleoChance = 0.08 + bay * 0.01 + (state.research.deepScan ? 0.02 : 0);
+  const bankedMleo = Math.random() < mleoChance ? Math.floor(4 + Math.random() * 8) : 0;
   return { ore, gold, scrap, data, bankedMleo };
 }
 
@@ -748,7 +946,7 @@ export default function MleoBase() {
     let alive = true;
     const seed = freshState();
     const saved = loadJson(STATE_KEY, null);
-    const initial = saved && saved.version === 3
+    const initial = saved && saved.version >= 3
       ? {
           ...seed,
           ...saved,
@@ -963,6 +1161,10 @@ export default function MleoBase() {
         showToast("Not enough energy for an expedition.");
         return prev;
       }
+      if ((prev.resources.DATA || 0) < 4) {
+        showToast("Need 4 DATA to launch expedition.");
+        return prev;
+      }
       const loot = rollExpeditionLoot(prev);
       const xpGain = prev.research.arcadeOps ? 24 : 20;
       return applyLevelUps({
@@ -973,10 +1175,10 @@ export default function MleoBase() {
         resources: {
           ...prev.resources,
           ENERGY: Math.max(0, (prev.resources.ENERGY || 0) - CONFIG.expeditionCost),
+          DATA: Math.max(0, (prev.resources.DATA || 0) - 4) + loot.data,
           ORE: (prev.resources.ORE || 0) + loot.ore,
           GOLD: (prev.resources.GOLD || 0) + loot.gold,
           SCRAP: (prev.resources.SCRAP || 0) + loot.scrap,
-          DATA: (prev.resources.DATA || 0) + loot.data,
         },
         bankedMleo: prev.bankedMleo + loot.bankedMleo,
         stats: {
@@ -1041,36 +1243,61 @@ export default function MleoBase() {
     }
     const latestVault = await readVaultSafe();
     setSharedVault(latestVault);
-    setState((prev) =>
-      applyLevelUps({
-        ...applyUpdate(prev),
+    setState((prev) => {
+      const updated = applyUpdate(prev);
+
+      return applyLevelUps({
+        ...updated,
         totalSharedSpent: (prev.totalSharedSpent || 0) + cost,
-        commanderXp: (applyUpdate(prev).commanderXp || prev.commanderXp) + Math.max(5, Math.floor(cost / 40)),
+        commanderXp: (updated.commanderXp || prev.commanderXp) + Math.max(5, Math.floor(cost / 40)),
         stats: {
-          ...(applyUpdate(prev).stats || prev.stats),
+          ...(updated.stats || prev.stats),
           vaultSpentToday: (prev.stats?.vaultSpentToday || 0) + cost,
         },
         log: pushLog(prev.log, `${label} purchased for ${fmt(cost)} MLEO.`),
-      })
-    );
+      });
+    });
     if (successMessage) showToast(successMessage);
     return true;
   };
 
   const buyBlueprint = async () => {
+    const dataCost = 20 + state.blueprintLevel * 6;
+    if ((state.resources.DATA || 0) < dataCost) {
+      showToast(`Need ${fmt(dataCost)} DATA.`);
+      return;
+    }
     await handleVaultSpend(
       blueprintCost,
       "Blueprint cache",
-      (prev) => ({ ...prev, blueprintLevel: prev.blueprintLevel + 1 }),
+      (prev) => ({
+        ...prev,
+        blueprintLevel: prev.blueprintLevel + 1,
+        resources: {
+          ...prev.resources,
+          DATA: Math.max(0, (prev.resources.DATA || 0) - (20 + prev.blueprintLevel * 6)),
+        },
+      }),
       "Blueprint cache purchased."
     );
   };
 
   const activateOverclock = async () => {
+    if ((state.resources.DATA || 0) < 12) {
+      showToast("Need 12 DATA.");
+      return;
+    }
     await handleVaultSpend(
       CONFIG.overclockCost,
       "Overclock",
-      (prev) => ({ ...prev, overclockUntil: Date.now() + CONFIG.overclockDurationMs }),
+      (prev) => ({
+        ...prev,
+        overclockUntil: Date.now() + CONFIG.overclockDurationMs,
+        resources: {
+          ...prev.resources,
+          DATA: Math.max(0, (prev.resources.DATA || 0) - 12),
+        },
+      }),
       "Overclock activated."
     );
   };
@@ -1081,12 +1308,48 @@ export default function MleoBase() {
       showToast("Energy is already near full.");
       return;
     }
+    if ((state.resources.DATA || 0) < 5) {
+      showToast("Need 5 DATA.");
+      return;
+    }
     await handleVaultSpend(
       CONFIG.refillCost,
       "Emergency refill",
-      (prev) => ({ ...prev, resources: { ...prev.resources, ENERGY: cap } }),
+      (prev) => ({
+        ...prev,
+        resources: {
+          ...prev.resources,
+          ENERGY: cap,
+          DATA: Math.max(0, (prev.resources.DATA || 0) - 5),
+        },
+      }),
       "Energy refilled."
     );
+  };
+
+  const performMaintenance = () => {
+    const cost = { GOLD: 60, SCRAP: 35, DATA: 10 };
+
+    if (!hasResources(state.resources, cost)) {
+      showToast("Need GOLD, SCRAP and DATA for maintenance.");
+      return;
+    }
+
+    setState((prev) =>
+      applyLevelUps({
+        ...prev,
+        resources: spendResources(prev.resources, cost),
+        stability: Math.min(100, (prev.stability || 100) + 18),
+        commanderXp: prev.commanderXp + 20,
+        stats: {
+          ...prev.stats,
+          maintenanceToday: (prev.stats?.maintenanceToday || 0) + 1,
+        },
+        log: pushLog(prev.log, "Maintenance completed. Base stability improved."),
+      })
+    );
+
+    showToast("Maintenance completed.");
   };
 
   const claimMission = (key) => {
@@ -1239,6 +1502,9 @@ export default function MleoBase() {
           minerControl: "Miner Ctrl",
           arcadeHub: "Arcade Hub",
           expeditionBay: "Expedition Bay",
+          logisticsCenter: "Logistics",
+          researchLab: "Research Lab",
+          repairBay: "Repair Bay",
         };
 
         const requirementsText = building.requires?.length
@@ -1568,13 +1834,19 @@ export default function MleoBase() {
                     <p className="mt-1 text-sm text-white/70">
                       Spend shared MLEO on productivity instead of pure emissions. This creates healthy token sinks.
                     </p>
+                    <p className="mt-2 text-xs text-white/55">
+                      Stability: {fmt(state.stability)}% · Maintenance keeps the base efficient over time.
+                    </p>
                   </div>
-                  <div className="mt-auto grid grid-cols-2 gap-2 pt-1">
+                  <div className="mt-auto grid grid-cols-2 gap-2 pt-1 md:grid-cols-3">
                     <button onClick={activateOverclock} className="rounded-xl bg-amber-600 px-3 py-3 text-sm font-bold hover:bg-amber-500">
                       {overclockLeft > 0 ? `Overclock ${Math.ceil(overclockLeft / 1000)}s` : `Overclock ${fmt(CONFIG.overclockCost)}`}
                     </button>
                     <button onClick={refillEnergy} className="rounded-xl bg-white/10 px-3 py-3 text-sm font-bold hover:bg-white/20">
                       Refill {fmt(CONFIG.refillCost)}
+                    </button>
+                    <button onClick={performMaintenance} className="rounded-xl bg-white/10 px-3 py-3 text-sm font-bold hover:bg-white/20">
+                      Maintain
                     </button>
                   </div>
                 </div>
@@ -1693,7 +1965,7 @@ export default function MleoBase() {
                 <div>
                   <h2 className="text-2xl font-black sm:text-3xl">How to Play - MLEO BASE</h2>
                   <p className="mt-2 text-sm text-white/65">
-                    MLEO BASE is your command center inside the MLEO ecosystem.
+                    Build infrastructure, manage stability, refine resources, and support the shared MLEO vault with controlled strategy.
                   </p>
                 </div>
                 <button
@@ -1707,135 +1979,166 @@ export default function MleoBase() {
               <div className="mt-6 space-y-6 text-sm leading-7 text-white/80">
                 <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
                   <p>
-                    <strong className="text-white">MLEO BASE</strong> is your command center inside the MLEO ecosystem.
-                    This is not just another arcade game. It is the place where you build your base, manage resources,
-                    launch expeditions, improve efficiency, and support your shared MLEO vault.
+                    <strong className="text-white">MLEO BASE</strong> is the strategic command center of the MLEO ecosystem.
+                    It is not built for fast payouts. It is built for planning, progression, efficiency, and controlled support
+                    of the shared MLEO vault.
                   </p>
                   <p className="mt-3">
-                    Your goal is to grow your base step by step, unlock stronger systems, refine resources into banked
-                    MLEO, and send it into the shared vault in a controlled and strategic way.
+                    Your job is to build a stable base, manage resources, improve infrastructure, generate banked MLEO,
+                    and decide when it is smart to export part of it into the shared vault.
                   </p>
                 </div>
 
                 <section>
                   <h3 className="text-lg font-bold text-white">1. What is MLEO BASE?</h3>
                   <p className="mt-2">
-                    MLEO BASE is a management and progression game.
+                    MLEO BASE is a support-management and progression game inside the MLEO ecosystem.
                   </p>
-                  <p className="mt-2">Instead of fast reactions like arcade games, this mode is about:</p>
+                  <p className="mt-2">Instead of fast arcade reactions, BASE focuses on:</p>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
-                    <li>building your base</li>
-                    <li>upgrading structures</li>
-                    <li>managing energy</li>
-                    <li>producing resources</li>
-                    <li>refining materials</li>
+                    <li>building and upgrading structures</li>
+                    <li>managing energy and stability</li>
+                    <li>producing and refining resources</li>
+                    <li>launching expeditions</li>
                     <li>completing missions</li>
-                    <li>using MLEO wisely inside the ecosystem</li>
+                    <li>supporting Miners and Arcade through long-term infrastructure</li>
+                    <li>growing the shared vault in a controlled way</li>
                   </ul>
                   <p className="mt-2">
-                    It is designed to <strong className="text-white">work together with Miners and Arcade</strong>, not replace them.
+                    BASE is designed to work <strong className="text-white">with Miners and Arcade</strong>, not replace them.
                   </p>
                 </section>
 
                 <section>
                   <h3 className="text-lg font-bold text-white">2. Your Main Goal</h3>
-                  <p className="mt-2">Your main objective is to turn your small base into a fully upgraded MLEO production center.</p>
+                  <p className="mt-2">
+                    Your objective is to turn a small outpost into a strong and efficient MLEO command base.
+                  </p>
                   <p className="mt-2">You do this by:</p>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
-                    <li>collecting resources</li>
-                    <li>upgrading key buildings</li>
-                    <li>improving your energy system</li>
-                    <li>unlocking advanced structures</li>
-                    <li>running expeditions</li>
-                    <li>refining Ore and Scrap into banked MLEO</li>
-                    <li>shipping banked MLEO into the shared vault</li>
+                    <li>gathering core resources</li>
+                    <li>keeping energy healthy</li>
+                    <li>maintaining base stability</li>
+                    <li>unlocking better systems</li>
+                    <li>refining resources into banked MLEO</li>
+                    <li>deciding when to reinvest and when to ship</li>
                   </ul>
-                  <p className="mt-2">The stronger your base becomes, the better your long-term efficiency.</p>
+                  <p className="mt-2">
+                    Success in BASE is not about rushing. It is about building a system that stays efficient over time.
+                  </p>
                 </section>
 
                 <section>
                   <h3 className="text-lg font-bold text-white">3. Core Resources</h3>
-                  <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><strong className="text-white">ORE</strong><p className="mt-1">Raw material produced mainly by the Quarry. Used for upgrades, research, and refining.</p></div>
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><strong className="text-white">GOLD</strong><p className="mt-1">Your main construction currency inside the base. Needed for most building upgrades and progression.</p></div>
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><strong className="text-white">SCRAP</strong><p className="mt-1">Recovered material used for advanced systems. Important for mid and late progression.</p></div>
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><strong className="text-white">ENERGY</strong><p className="mt-1">Powers your base. Many systems consume energy, so you must manage it carefully.</p></div>
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><strong className="text-white">DATA</strong><p className="mt-1">A progression resource connected to advanced systems, missions, and long-term growth.</p></div>
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><strong className="text-white">Banked MLEO</strong><p className="mt-1">This is refined MLEO produced inside the base. It is not automatically added to the shared vault. You must ship it manually.</p></div>
-                  </div>
-                </section>
-
-                <section>
-                  <h3 className="text-lg font-bold text-white">4. Buildings and What They Do</h3>
-                  <div className="mt-2 space-y-2">
-                    <p><strong className="text-white">HQ</strong>: Your main base level. Improves overall efficiency and unlocks advanced systems.</p>
-                    <p><strong className="text-white">Quarry</strong>: Produces raw ORE using energy. This is one of your most important early buildings.</p>
-                    <p><strong className="text-white">Trade Hub</strong>: Generates GOLD income and helps stabilize your economy.</p>
-                    <p><strong className="text-white">Salvage Yard</strong>: Produces SCRAP for advanced upgrades and systems.</p>
-                    <p><strong className="text-white">Refinery</strong>: Converts ORE and SCRAP into banked MLEO. This is the key building that turns your base into a real MLEO support system.</p>
-                    <p><strong className="text-white">Power Cell</strong>: Increases your maximum ENERGY and improves energy regeneration.</p>
-                    <p><strong className="text-white">Miner Control</strong>: Improves synergy with Miners and helps strengthen base production quality.</p>
-                    <p><strong className="text-white">Arcade Hub</strong>: Improves progression from activity and supports mission-oriented growth.</p>
-                    <p><strong className="text-white">Expedition Bay</strong>: Unlocks stronger expeditions and better loot potential.</p>
-                  </div>
-                </section>
-
-                <section>
-                  <h3 className="text-lg font-bold text-white">5. Energy Management</h3>
-                  <p className="mt-2">Energy is one of the most important parts of the game.</p>
-                  <p className="mt-2">Many buildings need energy to operate. If your energy is too low, your production slows down.</p>
-                  <p className="mt-2">To improve energy management:</p>
+                  <p className="mt-2">Your base runs on multiple resources, and each one has a different role:</p>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
-                    <li>build Power Cells</li>
-                    <li>upgrade your base wisely</li>
-                    <li>use Refill when needed</li>
-                    <li>avoid over-expanding too early</li>
+                    <li><strong className="text-white">ORE</strong> - core industrial material</li>
+                    <li><strong className="text-white">GOLD</strong> - premium construction and upgrade resource</li>
+                    <li><strong className="text-white">SCRAP</strong> - support material used for systems and maintenance</li>
+                    <li><strong className="text-white">DATA</strong> - strategic resource for advanced operations</li>
+                    <li><strong className="text-white">ENERGY</strong> - the power that keeps your base active</li>
+                    <li><strong className="text-white">Banked MLEO</strong> - refined MLEO still stored inside BASE</li>
                   </ul>
-                  <p className="mt-2">Smart energy management is part of winning in MLEO BASE.</p>
+                  <p className="mt-2">
+                    A healthy base is built on balance. If you ignore one layer, your long-term growth becomes weaker.
+                  </p>
                 </section>
 
                 <section>
-                  <h3 className="text-lg font-bold text-white">6. How Production Works</h3>
-                  <p className="mt-2">Your base generates resources over time.</p>
-                  <p className="mt-2">Basic loop:</p>
-                  <ol className="mt-2 list-decimal space-y-1 pl-5">
-                    <li>Quarry produces ORE</li>
-                    <li>Trade Hub produces GOLD</li>
-                    <li>Salvage Yard produces SCRAP</li>
-                    <li>Power system keeps production running</li>
-                    <li>Refinery converts ORE + SCRAP into banked MLEO</li>
-                  </ol>
-                  <p className="mt-2">This means MLEO BASE is not instant reward farming. You first build infrastructure, then create efficiency, then refine value over time.</p>
-                </section>
-
-                <section>
-                  <h3 className="text-lg font-bold text-white">7. What is Banked MLEO?</h3>
-                  <p className="mt-2">Banked MLEO is refined MLEO created inside your base.</p>
-                  <p className="mt-2">Important:</p>
+                  <h3 className="text-lg font-bold text-white">4. Energy and Stability</h3>
+                  <p className="mt-2">
+                    Energy controls how much your base can do. Stability controls how well your base performs.
+                  </p>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
-                    <li>it stays inside the BASE system first</li>
-                    <li>it does not go straight into the shared vault</li>
-                    <li>you must use <strong className="text-white">Ship to Shared Vault</strong> to move it</li>
+                    <li>Low energy slows production and activity</li>
+                    <li>Low stability reduces efficiency across the base</li>
+                    <li>Maintenance helps restore strong performance</li>
                   </ul>
-                  <p className="mt-2">This creates a healthier system where production is gradual and controlled.</p>
+                  <p className="mt-2">
+                    If you want strong long-term output, do not ignore upkeep. A stable base always performs better than an overloaded base.
+                  </p>
                 </section>
 
                 <section>
-                  <h3 className="text-lg font-bold text-white">8. Ship to Shared Vault</h3>
-                  <p className="mt-2">When you have banked MLEO ready, you can send it into the shared vault.</p>
+                  <h3 className="text-lg font-bold text-white">5. Buildings and Progression</h3>
+                  <p className="mt-2">
+                    Buildings are the heart of BASE progression. Different structures improve different parts of your economy.
+                  </p>
+                  <p className="mt-2">Examples of what buildings help with:</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>resource production</li>
+                    <li>energy support</li>
+                    <li>refining</li>
+                    <li>expedition power</li>
+                    <li>research and DATA output</li>
+                    <li>maintenance and recovery</li>
+                    <li>shipping quality and control</li>
+                  </ul>
+                  <p className="mt-2">
+                    Upgrading buildings is one of the main ways to shape your long-term strategy.
+                  </p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">6. What DATA Does</h3>
+                  <p className="mt-2">
+                    <strong className="text-white">DATA</strong> is a strategic control resource.
+                  </p>
+                  <p className="mt-2">It is used to support advanced actions such as:</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>blueprint progression</li>
+                    <li>overclock activation</li>
+                    <li>energy refill support</li>
+                    <li>expedition launches</li>
+                    <li>advanced research paths</li>
+                    <li>maintenance-related systems</li>
+                  </ul>
+                  <p className="mt-2">
+                    DATA is important because it adds depth without simply printing more MLEO.
+                  </p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">7. Refinery and Banked MLEO</h3>
+                  <p className="mt-2">
+                    The Refinery converts raw resources into <strong className="text-white">banked MLEO</strong>.
+                  </p>
+                  <p className="mt-2">
+                    Banked MLEO is still inside BASE. It is not the same as shared vault MLEO.
+                  </p>
+                  <p className="mt-2">That means the loop is:</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>produce resources</li>
+                    <li>refine into banked MLEO</li>
+                    <li>decide whether to reinvest or ship part of it</li>
+                  </ul>
+                  <p className="mt-2">
+                    This makes BASE a controlled system, not an unlimited faucet.
+                  </p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">8. Shipping to the Shared Vault</h3>
+                  <p className="mt-2">
+                    Shipping moves part of your banked MLEO into the <strong className="text-white">shared vault</strong>.
+                  </p>
                   <p className="mt-2">Why it matters:</p>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
                     <li>it connects BASE to the wider MLEO ecosystem</li>
-                    <li>it supports your shared vault balance</li>
-                    <li>it keeps BASE as a supporting system for Miners and Arcade</li>
+                    <li>it supports your shared balance used across the platform</li>
+                    <li>it keeps BASE tied to long-term ecosystem utility</li>
                   </ul>
-                  <p className="mt-2">There is also a <strong className="text-white">daily softcut / ship cap</strong>, which means shipping is controlled and cannot scale infinitely in one day.</p>
-                  <p className="mt-2">So even if your base becomes strong, production still stays balanced.</p>
+                  <p className="mt-2">
+                    Shipping is controlled by a <strong className="text-white">daily cap and softcut system</strong>.
+                    This means big exports become less efficient over time, so smart pacing matters.
+                  </p>
                 </section>
 
                 <section>
                   <h3 className="text-lg font-bold text-white">9. Expeditions</h3>
-                  <p className="mt-2">Expeditions are active missions you can launch using energy.</p>
+                  <p className="mt-2">
+                    Expeditions are active operations that cost energy and support progression.
+                  </p>
                   <p className="mt-2">They can reward you with:</p>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
                     <li>ORE</li>
@@ -1844,121 +2147,94 @@ export default function MleoBase() {
                     <li>DATA</li>
                     <li>and sometimes a small amount of banked MLEO</li>
                   </ul>
-                  <p className="mt-2">Use them when:</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    <li>you need extra resources</li>
-                    <li>you want progression bursts</li>
-                    <li>you want to speed up certain upgrades</li>
-                    <li>you want a chance at better rewards</li>
-                  </ul>
+                  <p className="mt-2">
+                    Expeditions are mainly a progression tool, not a primary payout system.
+                  </p>
                 </section>
 
                 <section>
-                  <h3 className="text-lg font-bold text-white">10. Commander Level</h3>
-                  <p className="mt-2">As you play, you gain Commander XP.</p>
-                  <p className="mt-2">This increases your Commander Level, which represents your long-term progression inside MLEO BASE.</p>
-                  <p className="mt-2">Commander progression gives the player:</p>
+                  <h3 className="text-lg font-bold text-white">10. Maintenance</h3>
+                  <p className="mt-2">
+                    Maintenance keeps your base stable and efficient.
+                  </p>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
-                    <li>a stronger sense of growth</li>
-                    <li>milestone feeling</li>
-                    <li>more value beyond raw token output</li>
+                    <li>skipping upkeep lowers overall performance</li>
+                    <li>repair and maintenance improve stability</li>
+                    <li>smart upkeep protects long-term production</li>
                   </ul>
+                  <p className="mt-2">
+                    Maintenance is not a punishment. It is part of running a serious base.
+                  </p>
                 </section>
 
                 <section>
-                  <h3 className="text-lg font-bold text-white">11. Daily Missions</h3>
-                  <p className="mt-2">MLEO BASE includes daily missions to keep players active and focused.</p>
-                  <p className="mt-2">Examples:</p>
+                  <h3 className="text-lg font-bold text-white">11. Commander Level</h3>
+                  <p className="mt-2">
+                    As you play, you earn Commander XP and increase your Commander Level.
+                  </p>
+                  <p className="mt-2">
+                    This reflects your long-term progression inside BASE and gives the game a stronger sense of growth beyond raw token output.
+                  </p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">12. Daily Missions</h3>
+                  <p className="mt-2">
+                    Daily missions guide players into healthy gameplay loops.
+                  </p>
+                  <p className="mt-2">Examples include:</p>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
                     <li>upgrade a building</li>
                     <li>ship MLEO</li>
-                    <li>complete an expedition</li>
+                    <li>generate DATA</li>
+                    <li>run expeditions</li>
+                    <li>perform maintenance</li>
                     <li>spend shared vault MLEO on utility</li>
                   </ul>
-                  <p className="mt-2">Daily missions help guide players toward healthy gameplay loops: progression, activity, reinvestment, ecosystem utility.</p>
-                </section>
-
-                <section>
-                  <h3 className="text-lg font-bold text-white">12. Blueprint Cache</h3>
-                  <p className="mt-2">Blueprint Cache is a permanent improvement system.</p>
-                  <p className="mt-2">When you buy blueprint upgrades:</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    <li>your banking efficiency improves</li>
-                    <li>your daily ship capacity improves</li>
-                    <li>your base becomes stronger long-term</li>
-                  </ul>
-                  <p className="mt-2">This is one of the best reinvestment tools in the game.</p>
-                </section>
-
-                <section>
-                  <h3 className="text-lg font-bold text-white">13. Shared Vault Utilities</h3>
-                  <p className="mt-2">MLEO BASE is designed with token utility, not just emissions.</p>
-                  <p className="mt-2">That means shared vault MLEO can also be used for useful actions like:</p>
-                  <p className="mt-2"><strong className="text-white">Overclock</strong>: Temporarily boosts productivity and helps speed up growth.</p>
-                  <p className="mt-2"><strong className="text-white">Refill</strong>: Instantly restores energy so you can continue operating.</p>
-                  <p className="mt-2">These systems create healthy sinks and make MLEO more useful inside the ecosystem.</p>
-                </section>
-
-                <section>
-                  <h3 className="text-lg font-bold text-white">14. Best Beginner Strategy</h3>
-                  <ol className="mt-2 list-decimal space-y-1 pl-5">
-                    <li>Upgrade Quarry first</li>
-                    <li>Build steady GOLD production</li>
-                    <li>Unlock Salvage Yard</li>
-                    <li>Improve your energy capacity</li>
-                    <li>Work toward unlocking Refinery</li>
-                    <li>Start creating banked MLEO</li>
-                    <li>Use expeditions for extra momentum</li>
-                    <li>Reinvest part of your gains into Blueprint and utility</li>
-                  </ol>
-                  <p className="mt-2">Do not try to rush everything at once. A stable base grows better than an overloaded base.</p>
-                </section>
-
-                <section>
-                  <h3 className="text-lg font-bold text-white">15. Smart Progression Tips</h3>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    <li>Keep your energy healthy</li>
-                    <li>Do not ignore Power Cell upgrades</li>
-                    <li>Refinery becomes important only after your raw economy is stable</li>
-                    <li>Use expeditions strategically, not randomly</li>
-                    <li>Reinvest in permanent systems, not only short-term gains</li>
-                    <li>Balance production with utility spending</li>
-                    <li>Think of BASE as long-term infrastructure</li>
-                  </ul>
-                </section>
-
-                <section>
-                  <h3 className="text-lg font-bold text-white">16. How MLEO BASE Fits the Ecosystem</h3>
-                  <p className="mt-2">MLEO BASE is part of a bigger system.</p>
-                  <p className="mt-2"><strong className="text-white">Miners</strong>: Miners focus more on mining-style progression and core resource generation.</p>
-                  <p className="mt-2"><strong className="text-white">Arcade</strong>: Arcade focuses more on activity, score, and fast gameplay.</p>
-                  <p className="mt-2"><strong className="text-white">MLEO BASE</strong>: BASE acts as the strategic hub: infrastructure, refinement, missions, progression, shared vault support, and token utility.</p>
-                  <p className="mt-2">Together, these systems make the ecosystem deeper and more engaging.</p>
-                </section>
-
-                <section>
-                  <h3 className="text-lg font-bold text-white">17. Win Condition</h3>
-                  <p className="mt-2">There is no single final ending.</p>
-                  <p className="mt-2">Success in MLEO BASE means:</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    <li>building an efficient base</li>
-                    <li>unlocking advanced systems</li>
-                    <li>shipping MLEO consistently</li>
-                    <li>completing missions</li>
-                    <li>increasing Commander Level</li>
-                    <li>using the ecosystem wisely</li>
-                    <li>supporting long-term MLEO growth</li>
-                  </ul>
-                </section>
-
-                <section>
-                  <h3 className="text-lg font-bold text-white">18. Final Advice</h3>
-                  <p className="mt-2">MLEO BASE rewards patience, planning, and smart reinvestment.</p>
-                  <p className="mt-2">This is not a pure clicker and not a pure idle game. It is a strategic support layer inside the MLEO world.</p>
-                  <p className="mt-2 font-semibold text-white">
-                    Build smart. Upgrade wisely. Manage your energy. Launch expeditions. Refine carefully. Ship strategically. Grow your base.
+                  <p className="mt-2">
+                    Missions push players toward activity, reinvestment, and smart ecosystem use.
                   </p>
-                  <p className="mt-3 text-base font-bold text-cyan-200">Welcome to MLEO BASE.</p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">13. Best Beginner Strategy</h3>
+                  <ol className="mt-2 list-decimal space-y-1 pl-5">
+                    <li>Stabilize your raw resource income first</li>
+                    <li>Do not ignore energy support</li>
+                    <li>Build DATA production early enough</li>
+                    <li>Use expeditions for progression, not spam</li>
+                    <li>Unlock refining only when your base economy is ready</li>
+                    <li>Ship in measured amounts instead of rushing exports</li>
+                    <li>Use maintenance to protect long-term efficiency</li>
+                    <li>Reinvest part of your gains into permanent systems</li>
+                  </ol>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">14. How BASE Fits the Ecosystem</h3>
+                  <p className="mt-2">
+                    <strong className="text-white">Miners</strong> focuses on mining-style growth and core generation.
+                  </p>
+                  <p className="mt-2">
+                    <strong className="text-white">Arcade</strong> focuses on fast activity, sessions, and player engagement.
+                  </p>
+                  <p className="mt-2">
+                    <strong className="text-white">MLEO BASE</strong> is the strategic layer: infrastructure, refinement, maintenance,
+                    research, missions, shipping control, and system-wide support.
+                  </p>
+                  <p className="mt-2">
+                    Together, these three layers create a deeper and healthier ecosystem.
+                  </p>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-white">15. Final Advice</h3>
+                  <p className="mt-2">
+                    MLEO BASE rewards patience, planning, efficiency, and reinvestment.
+                  </p>
+                  <p className="mt-2">
+                    Do not think of BASE as a fast reward tab. Think of it as the command room that helps the whole MLEO ecosystem grow in a smarter way.
+                  </p>
                 </section>
               </div>
             </div>
