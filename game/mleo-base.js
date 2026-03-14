@@ -587,7 +587,7 @@ function rollExpeditionLoot(state) {
   return { ore, gold, scrap, data, bankedMleo };
 }
 
-function MetricCard({ label, value, note, accent = "emerald" }) {
+function MetricCard({ label, value, note, accent = "emerald", compact = false }) {
   const border = {
     emerald: "border-emerald-500/30 text-emerald-300",
     cyan: "border-cyan-500/30 text-cyan-300",
@@ -599,10 +599,10 @@ function MetricCard({ label, value, note, accent = "emerald" }) {
   }[accent];
 
   return (
-    <div className={`rounded-2xl border bg-white/5 px-4 py-3 ${border}`}>
-      <div className="text-xs uppercase tracking-[0.18em] text-white/55">{label}</div>
-      <div className="mt-1 text-xl font-bold text-white">{value}</div>
-      {note ? <div className="mt-1 text-xs text-white/55">{note}</div> : null}
+    <div className={`rounded-2xl border bg-white/5 ${compact ? "px-3 py-2.5" : "px-4 py-3"} ${border}`}>
+      <div className={`${compact ? "text-[10px]" : "text-xs"} uppercase tracking-[0.18em] text-white/55`}>{label}</div>
+      <div className={`mt-1 ${compact ? "text-base" : "text-xl"} font-bold text-white`}>{value}</div>
+      {note ? <div className={`mt-1 ${compact ? "text-[11px] leading-4" : "text-xs"} text-white/55`}>{note}</div> : null}
     </div>
   );
 }
@@ -1392,7 +1392,88 @@ export default function MleoBase() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-8">
+          {/* Mobile */}
+          <div className="mt-6 space-y-3 sm:hidden">
+            <div className="grid grid-cols-1 gap-3">
+              <MetricCard
+                label="Shared Vault"
+                value={`${fmt(sharedVault)} MLEO`}
+                note="Same balance used by Miners, Arcade and Online."
+                accent="emerald"
+              />
+              <MetricCard
+                label="Base Banked"
+                value={`${fmt(state.bankedMleo)} MLEO`}
+                note="Refined here, then shipped into the shared vault."
+                accent="violet"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 justify-items-center gap-2">
+              <div className="w-full max-w-[155px]">
+                <MetricCard
+                  label="Commander"
+                  value={`Lv ${state.commanderLevel}`}
+                  note={`${fmt(state.commanderXp)} / ${fmt(xpForLevel(state.commanderLevel))} XP`}
+                  accent="sky"
+                  compact
+                />
+              </div>
+
+              <div className="w-full max-w-[155px]">
+                <MetricCard
+                  label="Ore"
+                  value={fmt(state.resources.ORE)}
+                  note={`x${derived.oreMult.toFixed(2)} output`}
+                  accent="cyan"
+                  compact
+                />
+              </div>
+
+              <div className="w-full max-w-[155px]">
+                <MetricCard
+                  label="Gold"
+                  value={fmt(state.resources.GOLD)}
+                  note={`x${derived.goldMult.toFixed(2)} output`}
+                  accent="amber"
+                  compact
+                />
+              </div>
+
+              <div className="w-full max-w-[155px]">
+                <MetricCard
+                  label="Scrap"
+                  value={fmt(state.resources.SCRAP)}
+                  note={`x${derived.scrapMult.toFixed(2)} output`}
+                  accent="rose"
+                  compact
+                />
+              </div>
+
+              <div className="w-full max-w-[155px]">
+                <MetricCard
+                  label="Data"
+                  value={fmt(state.resources.DATA)}
+                  note={`x${derived.dataMult.toFixed(2)} progression`}
+                  accent="sky"
+                  compact
+                />
+              </div>
+
+              <div className="w-full max-w-[155px]">
+                <MetricCard
+                  label="Energy"
+                  value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
+                  note={`Regen ${derived.energyRegen.toFixed(2)}/s`}
+                  accent="slate"
+                  compact
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop */}
+          <div className="mt-6 hidden gap-3 sm:grid xl:grid-cols-8">
             <MetricCard label="Shared Vault" value={`${fmt(sharedVault)} MLEO`} note="Same balance used by Miners, Arcade and Online." accent="emerald" />
             <MetricCard label="Base Banked" value={`${fmt(state.bankedMleo)} MLEO`} note="Refined here, then shipped into the shared vault." accent="violet" />
             <MetricCard label="Commander" value={`Lv ${state.commanderLevel}`} note={`${fmt(state.commanderXp)} / ${fmt(xpForLevel(state.commanderLevel))} XP`} accent="sky" />
