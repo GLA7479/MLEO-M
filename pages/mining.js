@@ -1749,20 +1749,24 @@ function HowToPlay({ lang, onClose, gameType = "miners" }) {
     : {
         title: "How to Play - MLEO BASE",
         goal: "Goal",
-        goalDesc: "MLEO BASE is your strategic command center in the MLEO ecosystem. Build and upgrade your base, manage energy, produce resources, launch expeditions, refine materials into banked MLEO, and ship it to the shared vault.",
+        goalDesc: "MLEO BASE is the strategic command center of the MLEO ecosystem. Build and upgrade your base, manage energy and stability, produce key resources, launch expeditions, refine materials into banked MLEO, and carefully ship part of it to the shared vault.",
         gameplay: "Your mission",
         gameplaySteps: [
           "Upgrade buildings",
-          "Manage energy",
+          "Manage energy and base stability",
           "Produce Ore, Gold, Scrap, and Data",
-          "Refine banked MLEO",
-          "Launch expeditions",
-          "Ship MLEO to the shared vault",
+          "Use Data for advanced operations",
+          "Refine resources into banked MLEO",
+          "Launch expeditions for progression and materials",
+          "Ship MLEO to the shared vault with smart timing",
+          "Support the wider ecosystem through long-term planning",
         ],
         features: "Good to Know",
         featuresList: [
-          "This mode works together with Miners and Arcade to support long-term progression, smart utility, and healthy token balance.",
-          "Build smart, grow steadily, and strengthen your base.",
+          "Banked MLEO stays inside BASE until you ship it to the shared vault.",
+          "Shipping is controlled by daily limits and efficiency pressure, so smart pacing matters.",
+          "This mode works together with Miners and Arcade to support long-term progression, smart utility, and healthier token balance.",
+          "Build smart, maintain stability, grow steadily, and strengthen your base.",
         ],
       };
   
