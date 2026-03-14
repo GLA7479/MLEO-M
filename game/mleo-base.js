@@ -599,10 +599,36 @@ function MetricCard({ label, value, note, accent = "emerald", compact = false })
   }[accent];
 
   return (
-    <div className={`rounded-2xl border bg-white/5 ${compact ? "px-3 py-2.5" : "px-4 py-3"} ${border}`}>
-      <div className={`${compact ? "text-[10px]" : "text-xs"} uppercase tracking-[0.18em] text-white/55`}>{label}</div>
-      <div className={`mt-1 ${compact ? "text-base" : "text-xl"} font-bold text-white`}>{value}</div>
-      {note ? <div className={`mt-1 ${compact ? "text-[11px] leading-4" : "text-xs"} text-white/55`}>{note}</div> : null}
+    <div
+      className={`w-full rounded-2xl border bg-white/5 ${border} ${
+        compact ? "px-3 py-2.5" : "px-4 py-3"
+      }`}
+    >
+      <div
+        className={`uppercase tracking-[0.18em] text-white/55 ${
+          compact ? "text-[10px]" : "text-xs"
+        }`}
+      >
+        {label}
+      </div>
+
+      <div
+        className={`font-bold text-white ${
+          compact ? "mt-0.5 text-lg leading-5" : "mt-1 text-xl"
+        }`}
+      >
+        {value}
+      </div>
+
+      {note ? (
+        <div
+          className={`text-white/55 ${
+            compact ? "mt-0.5 text-[11px] leading-4" : "mt-1 text-xs"
+          }`}
+        >
+          {note}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1409,66 +1435,54 @@ export default function MleoBase() {
               />
             </div>
 
-            <div className="grid grid-cols-2 justify-items-center gap-2">
-              <div className="w-full max-w-[155px]">
-                <MetricCard
-                  label="Commander"
-                  value={`Lv ${state.commanderLevel}`}
-                  note={`${fmt(state.commanderXp)} / ${fmt(xpForLevel(state.commanderLevel))} XP`}
-                  accent="sky"
-                  compact
-                />
-              </div>
+            <div className="grid grid-cols-2 gap-3">
+              <MetricCard
+                label="Commander"
+                value={`Lv ${state.commanderLevel}`}
+                note={`${fmt(state.commanderXp)} / ${fmt(xpForLevel(state.commanderLevel))} XP`}
+                accent="sky"
+                compact
+              />
 
-              <div className="w-full max-w-[155px]">
-                <MetricCard
-                  label="Ore"
-                  value={fmt(state.resources.ORE)}
-                  note={`x${derived.oreMult.toFixed(2)} output`}
-                  accent="cyan"
-                  compact
-                />
-              </div>
+              <MetricCard
+                label="Ore"
+                value={fmt(state.resources.ORE)}
+                note={`x${derived.oreMult.toFixed(2)} output`}
+                accent="cyan"
+                compact
+              />
 
-              <div className="w-full max-w-[155px]">
-                <MetricCard
-                  label="Gold"
-                  value={fmt(state.resources.GOLD)}
-                  note={`x${derived.goldMult.toFixed(2)} output`}
-                  accent="amber"
-                  compact
-                />
-              </div>
+              <MetricCard
+                label="Gold"
+                value={fmt(state.resources.GOLD)}
+                note={`x${derived.goldMult.toFixed(2)} output`}
+                accent="amber"
+                compact
+              />
 
-              <div className="w-full max-w-[155px]">
-                <MetricCard
-                  label="Scrap"
-                  value={fmt(state.resources.SCRAP)}
-                  note={`x${derived.scrapMult.toFixed(2)} output`}
-                  accent="rose"
-                  compact
-                />
-              </div>
+              <MetricCard
+                label="Scrap"
+                value={fmt(state.resources.SCRAP)}
+                note={`x${derived.scrapMult.toFixed(2)} output`}
+                accent="rose"
+                compact
+              />
 
-              <div className="w-full max-w-[155px]">
-                <MetricCard
-                  label="Data"
-                  value={fmt(state.resources.DATA)}
-                  note={`x${derived.dataMult.toFixed(2)} progression`}
-                  accent="sky"
-                  compact
-                />
-              </div>
+              <MetricCard
+                label="Data"
+                value={fmt(state.resources.DATA)}
+                note={`x${derived.dataMult.toFixed(2)} progression`}
+                accent="sky"
+                compact
+              />
 
-              <div className="w-full max-w-[155px]">
-                <MetricCard
-                  label="Energy"
-                  value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
-                  note={`Regen ${derived.energyRegen.toFixed(2)}/s`}
-                  accent="slate"
-                  compact
-                />
-              </div>
+              <MetricCard
+                label="Energy"
+                value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
+                note={`Regen ${derived.energyRegen.toFixed(2)}/s`}
+                accent="slate"
+                compact
+              />
             </div>
           </div>
 
