@@ -229,10 +229,10 @@ export default function ArcadeHub() {
 
   // Auto-refresh when countdown reaches 0
   useEffect(() => {
-    if (freePlayStatus.tokens === 0 && !freePlayStatus.isFull && freePlayCountdown === 0 && freePlayCountdown !== null) {
+    if (freePlayStatus.tokens === 0 && !freePlayStatus.isFull && freePlayCountdown === 0) {
       const timer = setTimeout(() => {
         updateFreePlayStatus();
-      }, 100);
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [freePlayCountdown, freePlayStatus.tokens, freePlayStatus.isFull]);
