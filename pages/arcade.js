@@ -7,7 +7,6 @@ import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicC
 import { parseUnits } from "viem";
 import { getFreePlayStatus, formatTimeRemaining } from "../lib/free-play-system";
 import {
-  creditSharedVault,
   debitSharedVault,
   initSharedVault,
   readSharedVault,
@@ -245,14 +244,20 @@ export default function ArcadeHub() {
 
     setAddingCoins(true);
     try {
-      const result = await creditSharedVault(10000, "dev-test");
-      if (result.ok) {
-        setVault(result.balance);
-        alert(`✅ Added 10,000 MLEO! New balance: ${fmt(result.balance)}`);
+      const response = await fetch("/api/arcade/vault/dev-credit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ password: devPassword, amount: 10000 }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (response.ok && result?.success) {
+        setVault(result.balance || 0);
+        alert(`✅ Added 10,000 MLEO! New balance: ${fmt(result.balance || 0)}`);
         setDevPassword("");
         setShowDevButton(false);
       } else {
-        alert(`Failed to add coins: ${result.error || "Unknown error"}`);
+        alert(`Failed to add coins: ${result.message || "Unknown error"}`);
       }
     } catch (error) {
       console.error("Failed to add dev coins:", error);
