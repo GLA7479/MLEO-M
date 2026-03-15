@@ -9,9 +9,13 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -102,6 +106,7 @@ export default function NumberHuntPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionError, setSessionError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -190,12 +195,14 @@ export default function NumberHuntPage() {
     if (selected.length === 0) { alert('Please select at least 1 number!'); return; }
     if (drawing) return;
     playSfx(clickSound.current);
+    setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
+    let sessionId = null;
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'keno';
       try {
-        const result = await useFreePlayToken(gameId);
-        if (result.success) { play = result.amount; setIsFreePlay(false); router.replace('/keno', undefined, { shallow: true }); }
+        const result = await startFreeplayArcadeSession(gameId);
+        if (result.success) { play = result.amount; sessionId = result.sessionId; setFreePlayTokens(result.remainingTokens); setIsFreePlay(false); router.replace('/keno', undefined, { shallow: true }); }
         else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); return; }
       } catch (error) {
         console.error('Free play error:', error);
@@ -205,9 +212,10 @@ export default function NumberHuntPage() {
       }
     } else {
       if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
-      const debitResult = await debitSharedVault(play, "keno");
-      if (!debitResult.ok) { alert(debitResult.error || 'Insufficient MLEO in vault'); return; }
-      setVaultState(debitResult.balance);
+      const startResult = await startPaidArcadeSession("keno", play);
+      if (!startResult.success) { alert(startResult.message || 'Failed to start session'); return; }
+      sessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
     setPlayAmount(String(play));
     setDrawing(true);
@@ -215,7 +223,7 @@ export default function NumberHuntPage() {
     setDrawn([]);
 
     let count = 0;
-    const drawInterval = setInterval(() => {
+    const drawInterval = setInterval(async () => {
       const randomNums = [];
       for (let i = 0; i < DRAW_COUNT; i++) {
         let num;
@@ -226,26 +234,39 @@ export default function NumberHuntPage() {
       count++;
       if (count >= 10) {
         clearInterval(drawInterval);
-        setDrawing(false);
-        checkResult(randomNums, play);
+        try {
+          const finishResult = await finishArcadeSession(sessionId, { selected });
+          setDrawing(false);
+          checkResult(finishResult, play);
+        } catch (error) {
+          console.error("Finish session error:", error);
+          setDrawing(false);
+          setSessionError("Session failed to finish");
+          alert("Failed to finish session. Please refresh vault and try again.");
+        }
       }
     }, 100);
   };
 
-  const checkResult = async (drawnNumbers, play) => {
-    const matches = selected.filter(n => drawnNumbers.includes(n)).length;
-    const prizeTable = PRIZES[selected.length] || {};
-    const multiplier = prizeTable[matches] || 0;
-    const prize = multiplier > 0 ? play * multiplier : 0;
-    const win = prize > 0;
+  const checkResult = async (finishResult, play) => {
+    const payload = finishResult?.serverPayload || {};
+    const drawnNumbers = Array.isArray(payload.drawn) ? payload.drawn : [];
+    const matches = Number(payload.matches || 0);
+    const selectedCount = Number(payload.selectedCount || selected.length);
+    const multiplier = Number(payload.multiplier || 0);
+    const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
+    const win = Boolean(payload.won);
+    const perfect = Boolean(payload.perfect);
 
+    setDrawn(drawnNumbers);
+    if (Number.isFinite(finishResult?.balanceAfter)) {
+      setVaultState(finishResult.balanceAfter);
+    }
     if (win && prize > 0) {
-      const creditResult = await creditSharedVault(prize, "keno");
-      setVaultState(creditResult.balance);
       playSfx(winSound.current);
     }
 
-    const resultData = { win, selected: selected.length, matches, multiplier, prize, profit: win ? prize - play : -play, perfect: matches === selected.length };
+    const resultData = { win, selected: selectedCount, matches, multiplier, prize, profit: win ? prize - play : -play, perfect };
     setGameResult(resultData);
 
     const newStats = { ...stats, totalGames: stats.totalGames + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalPlay: stats.totalPlay + play, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), perfectHits: resultData.perfect ? stats.perfectHits + 1 : stats.perfectHits, lastPlay: play };
@@ -316,7 +337,7 @@ export default function NumberHuntPage() {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }}.*?className="w-12 h-8.*?">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={drawing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={drawing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={drawing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={drawing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={drawing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={drawing} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button>
@@ -332,6 +353,7 @@ export default function NumberHuntPage() {
             <button onClick={gameResult ? resetGame : () => playNumberHunt(false)} disabled={drawing || (!gameResult && selected.length === 0)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
               {drawing ? "Drawing..." : gameResult ? "PLAY AGAIN" : "DRAW"}
             </button>
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>

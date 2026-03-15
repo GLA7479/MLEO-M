@@ -9,9 +9,13 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -122,6 +126,7 @@ export default function DiceArenaPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionError, setSessionError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -229,13 +234,17 @@ export default function DiceArenaPage() {
   const rollDice = async (isFreePlayParam = false) => {
     if (rolling) return;
     playSfx(clickSound.current);
+    setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
+    let sessionId = null;
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'craps';
       try {
-        const result = await useFreePlayToken(gameId);
+        const result = await startFreeplayArcadeSession(gameId);
         if (result.success) {
           play = result.amount;
+          sessionId = result.sessionId;
+          setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
           router.replace('/craps', undefined, { shallow: true });
         } else {
@@ -251,40 +260,48 @@ export default function DiceArenaPage() {
       }
     } else {
       if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
-      const debitResult = await debitSharedVault(play, "craps");
-      if (!debitResult.ok) { alert(debitResult.error || 'Insufficient MLEO in vault'); return; }
-      setVaultState(debitResult.balance);
+      const startResult = await startPaidArcadeSession("craps", play);
+      if (!startResult.success) { alert(startResult.message || 'Failed to start session'); return; }
+      sessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
     setPlayAmount(String(play));
     setRolling(true);
     setGameResult(null);
     let rollCount = 0;
-    const rollInterval = setInterval(() => {
+    const rollInterval = setInterval(async () => {
       setDice([Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1]);
       rollCount++;
       if (rollCount >= 10) {
         clearInterval(rollInterval);
-        const finalDice = [Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1];
-        setDice(finalDice);
-        setRolling(false);
-        checkResult(finalDice, play);
+        try {
+          const finishResult = await finishArcadeSession(sessionId, { selectedPlay });
+          setRolling(false);
+          checkResult(finishResult, play);
+        } catch (error) {
+          console.error("Finish session error:", error);
+          setRolling(false);
+          setSessionError("Session failed to finish");
+          alert("Failed to finish session. Please refresh vault and try again.");
+        }
       }
     }, 100);
   };
 
-  const checkResult = async (finalDice, play) => {
-    const sum = finalDice[0] + finalDice[1];
-    const playType = PLAY_TYPES[selectedPlay];
-    let win = false;
-    if (selectedPlay === 'pass') win = [7, 11].includes(sum);
-    else if (selectedPlay === 'dont_pass') win = [2, 3, 12].includes(sum);
-    else if (selectedPlay === 'seven') win = sum === 7;
-    else if (selectedPlay === 'craps') win = [2, 3, 12].includes(sum);
+  const checkResult = async (finishResult, play) => {
+    const payload = finishResult?.serverPayload || {};
+    const finalDice = Array.isArray(payload.dice) ? payload.dice : [1, 1];
+    const sum = Number(payload.sum || 0);
+    const resolvedPlay = payload.selectedPlay || selectedPlay;
+    const playType = PLAY_TYPES[resolvedPlay] || PLAY_TYPES.pass;
+    const win = Boolean(payload.won);
+    const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
 
-    const prize = win ? play * playType.prize : 0;
+    setDice(finalDice);
+    if (Number.isFinite(finishResult?.balanceAfter)) {
+      setVaultState(finishResult.balanceAfter);
+    }
     if (win && prize > 0) {
-      const creditResult = await creditSharedVault(prize, "craps");
-      setVaultState(creditResult.balance);
       playSfx(winSound.current);
     }
 
@@ -373,7 +390,7 @@ export default function DiceArenaPage() {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }}.*?className="w-12 h-8.*?">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={rolling} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button>
@@ -387,6 +404,7 @@ export default function DiceArenaPage() {
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
             <button onClick={() => rollDice(false)} disabled={rolling} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">{rolling ? "Rolling..." : "ROLL DICE"}</button>
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>

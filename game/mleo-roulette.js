@@ -16,9 +16,13 @@ import {
   useChainId,
 } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -172,6 +176,7 @@ export default function ColorWheelPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionError, setSessionError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -366,14 +371,17 @@ export default function ColorWheelPage() {
 
   const spin = async (isFreePlayParam = false) => {
     playSfx(clickSound.current);
-    const currentVault = peekSharedVault().balance;
+    setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
+    let sessionId = null;
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'roulette';
       try {
-        const result = await useFreePlayToken(gameId);
+        const result = await startFreeplayArcadeSession(gameId);
         if (result.success) {
           play = result.amount;
+          sessionId = result.sessionId;
+          setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
           router.replace("/roulette", undefined, { shallow: true });
         } else {
@@ -392,34 +400,48 @@ export default function ColorWheelPage() {
         alert(`Minimum play is ${MIN_PLAY} MLEO`);
         return;
       }
-      const debitResult = await debitSharedVault(play, "roulette");
-      if (!debitResult.ok) {
-        alert(debitResult.error || 'Insufficient MLEO in vault');
+      const startResult = await startPaidArcadeSession("roulette", play);
+      if (!startResult.success) {
+        alert(startResult.message || 'Failed to start session');
         return;
       }
-      setVaultState(debitResult.balance);
+      sessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
     setPlayAmount(String(play));
     setGameResult(null);
     setResult(null);
     setSpinning(true);
 
-    setTimeout(() => {
-      const resultNum = ROULETTE_NUMBERS[Math.floor(Math.random() * ROULETTE_NUMBERS.length)];
-      setResult(resultNum);
-      setSpinning(false);
-      checkWin(resultNum, play);
+    setTimeout(async () => {
+      try {
+        const finishResult = await finishArcadeSession(sessionId, { playType });
+        setSpinning(false);
+        checkWin(finishResult, play);
+      } catch (error) {
+        console.error("Finish session error:", error);
+        setSpinning(false);
+        setResult(null);
+        setSessionError("Session failed to finish");
+        alert("Failed to finish session. Please refresh vault and try again.");
+      }
     }, 2000);
   };
 
-  const checkWin = async (resultNum, play) => {
-    const playData = PLAY_TYPES[playType];
-    const win = playData.check(resultNum.number);
-    const prize = win ? play * playData.prize : 0;
+  const checkWin = async (finishResult, play) => {
+    const payload = finishResult?.serverPayload || {};
+    const resultNum = {
+      number: Number(payload.resultNumber || 0),
+      color: payload.resultColor || "green",
+    };
+    const win = Boolean(payload.won);
+    const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
 
+    setResult(resultNum);
+    if (Number.isFinite(finishResult?.balanceAfter)) {
+      setVaultState(finishResult.balanceAfter);
+    }
     if (win && prize > 0) {
-      const creditResult = await creditSharedVault(prize, "roulette");
-      setVaultState(creditResult.balance);
       playSfx(winSound.current);
     }
 
@@ -638,7 +660,7 @@ export default function ColorWheelPage() {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }}.*?className="w-12 h-8.*?">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button>
@@ -662,6 +684,7 @@ export default function ColorWheelPage() {
             >
               {spinning ? "🎲 SPINNING..." : gameResult ? "PLAY AGAIN" : "SPIN"}
             </button>
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button
                 onClick={() => {

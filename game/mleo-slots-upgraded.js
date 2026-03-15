@@ -9,9 +9,13 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -108,6 +112,7 @@ export default function SlotsPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionError, setSessionError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -192,13 +197,14 @@ export default function SlotsPage() {
   const spin = async (isFreePlayParam = false) => {
     if (spinning) return;
     playSfx(clickSound.current);
-    const currentVault = peekSharedVault().balance;
+    setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
+    let sessionId = null;
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'slots-upgraded';
       try {
-        const result = await useFreePlayToken(gameId);
-        if (result.success) { play = result.amount; setIsFreePlay(false); router.replace('/slots-upgraded', undefined, { shallow: true }); }
+        const result = await startFreeplayArcadeSession(gameId);
+        if (result.success) { play = result.amount; sessionId = result.sessionId; setFreePlayTokens(result.remainingTokens); setIsFreePlay(false); router.replace('/slots-upgraded', undefined, { shallow: true }); }
         else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); return; }
       } catch (error) {
         console.error('Free play error:', error);
@@ -208,43 +214,53 @@ export default function SlotsPage() {
       }
     } else {
       if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
-      const debitResult = await debitSharedVault(play, "slots");
-      if (!debitResult.ok) {
-        alert(debitResult.error || 'Insufficient MLEO in vault');
+      const startResult = await startPaidArcadeSession("slots-upgraded", play);
+      if (!startResult.success) {
+        alert(startResult.message || 'Failed to start session');
         return;
       }
-      setVaultState(debitResult.balance);
+      sessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
     setPlayAmount(String(play));
     setSpinning(true);
     setGameResult(null);
 
     let count = 0;
-    const spinInterval = setInterval(() => {
+    const spinInterval = setInterval(async () => {
       setReels(SYMBOLS.slice(0, 5).map(() => SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]));
       count++;
       if (count >= 15) {
         clearInterval(spinInterval);
-        const finalReels = Array(5).fill(null).map(() => SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]);
-        setReels(finalReels);
-        setSpinning(false);
-        checkResult(finalReels, play);
+        try {
+          const finishResult = await finishArcadeSession(sessionId, {});
+          setSpinning(false);
+          checkResult(finishResult, play);
+        } catch (error) {
+          console.error("Finish session error:", error);
+          setSpinning(false);
+          setSessionError("Session failed to finish");
+          alert("Failed to finish session. Please refresh vault and try again.");
+        }
       }
     }, 100);
   };
 
-  const checkResult = async (finalReels, play) => {
-    const winData = checkWin(finalReels);
-    const prize = winData ? play * winData.multiplier : 0;
-    const win = prize > 0;
+  const checkResult = async (finishResult, play) => {
+    const payload = finishResult?.serverPayload || {};
+    const finalReels = Array.isArray(payload.reels) ? payload.reels : ['🎰', '🎰', '🎰', '🎰', '🎰'];
+    const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
+    const win = Boolean(payload.won);
 
+    setReels(finalReels);
+    if (Number.isFinite(finishResult?.balanceAfter)) {
+      setVaultState(finishResult.balanceAfter);
+    }
     if (win && prize > 0) {
-      const creditResult = await creditSharedVault(prize, "slots");
-      setVaultState(creditResult.balance);
       playSfx(winSound.current);
     }
 
-    const resultData = { win, symbol: winData?.symbol, count: winData?.count, multiplier: winData?.multiplier || 0, prize, profit: win ? prize - play : -play, grandPrize: winData?.count === 5 };
+    const resultData = { win, symbol: payload.symbol || null, count: Number(payload.count || 0), multiplier: Number(payload.multiplier || 0), prize, profit: win ? prize - play : -play, grandPrize: Number(payload.count || 0) === 5 };
     setGameResult(resultData);
 
     const newStats = { ...stats, totalSpins: stats.totalSpins + 1, wins: win ? stats.wins + 1 : stats.wins, totalPlay: stats.totalPlay + play, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), grandPrizes: resultData.grandPrize ? stats.grandPrizes + 1 : stats.grandPrizes, lastPlay: play };
@@ -301,7 +317,7 @@ export default function SlotsPage() {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }}.*?className="w-12 h-8.*?">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button>
@@ -315,6 +331,7 @@ export default function SlotsPage() {
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
             <button onClick={gameResult ? resetGame : () => spin(false)} disabled={spinning} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-yellow-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">{spinning ? "Spinning..." : gameResult ? "SPIN AGAIN" : "SPIN"}</button>
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>

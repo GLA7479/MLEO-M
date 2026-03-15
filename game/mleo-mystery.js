@@ -9,9 +9,13 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -164,6 +168,8 @@ export default function MysteryBoxPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionId, setSessionId] = useState(null);
+  const [sessionError, setSessionError] = useState("");
 
   // Modals
   const [menuOpen, setMenuOpen] = useState(false);
@@ -370,16 +376,18 @@ export default function MysteryBoxPage() {
   const startGame = async (isFreePlayParam = false) => {
     if (gameActive) return;
     playSfx(clickSound.current);
-
-    const currentVault = peekSharedVault().balance;
+    setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
+    let nextSessionId = null;
     
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'mystery';
       try {
-        const result = await useFreePlayToken(gameId);
+        const result = await startFreeplayArcadeSession(gameId);
         if (result.success) {
           play = result.amount;
+          nextSessionId = result.sessionId;
+          setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
           router.replace('/mystery', undefined, { shallow: true });
         } else {
@@ -398,63 +406,72 @@ export default function MysteryBoxPage() {
         alert(`Minimum play is ${MIN_PLAY} MLEO`);
         return;
       }
-      const debitResult = await debitSharedVault(play, "mystery");
-      if (!debitResult.ok) {
-        alert(debitResult.error || 'Insufficient MLEO in vault');
+      const startResult = await startPaidArcadeSession("mystery", play);
+      if (!startResult.success) {
+        alert(startResult.message || 'Failed to start session');
         return;
       }
-      setVaultState(debitResult.balance);
+      nextSessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
     
     setPlayAmount(String(play));
+    setSessionId(nextSessionId);
     setGameActive(true);
     setGameResult(null);
     setSelectedBox(null);
-    
-    // Shuffle prizes into boxes
-    const shuffledPrizes = [...PRIZES].sort(() => Math.random() - 0.5);
-    setBoxes(shuffledPrizes);
+    setBoxes(Array(PRIZES.length).fill(0));
   };
 
   const chooseBox = async (index) => {
-    if (!gameActive || gameResult || selectedBox !== null) return;
+    if (!gameActive || gameResult || selectedBox !== null || !sessionId) return;
     playSfx(clickSound.current);
+    try {
+      const finishResult = await finishArcadeSession(sessionId, { selectedBox: index });
+      const payload = finishResult?.serverPayload || {};
+      const resolvedBoxes = Array.isArray(payload.boxes) ? payload.boxes : [];
+      const multiplier = Number(payload.multiplier || 0);
+      const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
+      const play = Number(playAmount);
 
-    setSelectedBox(index);
-    const multiplier = boxes[index];
-    const play = Number(playAmount);
-    const prize = Math.floor(play * multiplier);
-    const win = multiplier > 0;
+      setSelectedBox(Number(payload.selectedBox ?? index));
+      setBoxes(resolvedBoxes);
+      if (Number.isFinite(finishResult?.balanceAfter)) {
+        setVaultState(finishResult.balanceAfter);
+      }
+      if (prize > 0) {
+        playSfx(winSound.current);
+      }
 
-    if (win && prize > 0) {
-      const creditResult = await creditSharedVault(prize, "mystery");
-      setVaultState(creditResult.balance);
-      playSfx(winSound.current);
+      const resultData = {
+        win: Boolean(payload.won),
+        multiplier,
+        prize,
+        profit: prize - play,
+        grandPrize: Boolean(payload.grandPrize)
+      };
+
+      setGameResult(resultData);
+      setGameActive(false);
+      setSessionId(null);
+
+      const newStats = {
+        ...stats,
+        totalGames: stats.totalGames + 1,
+        wins: Boolean(payload.won) ? stats.wins + 1 : stats.wins,
+        losses: Boolean(payload.won) ? stats.losses : stats.losses + 1,
+        totalPlay: stats.totalPlay + play,
+        totalWon: stats.totalWon + prize,
+        biggestWin: Math.max(stats.biggestWin, prize),
+        grandPrizes: Boolean(payload.grandPrize) ? stats.grandPrizes + 1 : stats.grandPrizes,
+        lastPlay: play
+      };
+      setStats(newStats);
+    } catch (error) {
+      console.error("Finish session error:", error);
+      setSessionError("Session failed to finish");
+      alert("Failed to finish session. Please refresh vault and try again.");
     }
-
-    const resultData = {
-      win: multiplier >= 1,
-      multiplier: multiplier,
-      prize: prize,
-      profit: prize - play,
-      grandPrize: multiplier === 4
-    };
-
-    setGameResult(resultData);
-    setGameActive(false);
-
-    const newStats = {
-      ...stats,
-      totalGames: stats.totalGames + 1,
-      wins: multiplier >= 1 ? stats.wins + 1 : stats.wins,
-      losses: multiplier < 1 ? stats.losses + 1 : stats.losses,
-      totalPlay: stats.totalPlay + play,
-      totalWon: stats.totalWon + prize,
-      biggestWin: Math.max(stats.biggestWin, prize),
-      grandPrizes: multiplier === Math.max(...PRIZES) ? stats.grandPrizes + 1 : stats.grandPrizes,
-      lastPlay: play
-    };
-    setStats(newStats);
   };
 
   const resetGame = () => {
@@ -463,6 +480,7 @@ export default function MysteryBoxPage() {
     setShowResultPopup(false);
     setSelectedBox(null);
     setBoxes([]);
+    setSessionId(null);
   };
 
   const backSafe = () => {
@@ -594,7 +612,7 @@ export default function MysteryBoxPage() {
                       : 'bg-gradient-to-br from-orange-500 to-amber-600 hover:brightness-110 shadow-lg cursor-pointer text-white'
                   } disabled:cursor-not-allowed`}
                 >
-                  {selectedBox === index ? (prize === 10 ? '💎' : prize >= 2 ? '🎁' : prize >= 1 ? '🪙' : prize > 0 ? '📉' : '💔') : '🎁'}
+                  {selectedBox === index ? (prize === Math.max(...PRIZES) ? '💎' : prize >= 2 ? '🎁' : prize >= 1 ? '🪙' : prize > 0 ? '📉' : '💔') : '🎁'}
                 </button>
               ))}
             </div>
@@ -607,7 +625,7 @@ export default function MysteryBoxPage() {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }}.*?className="w-12 h-8.*?">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button>
@@ -627,6 +645,7 @@ export default function MysteryBoxPage() {
             >
               {gameActive ? "Choose a box..." : gameResult ? "PLAY AGAIN" : "START GAME"}
             </button>
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
 
             <div className="flex gap-2">
               <button

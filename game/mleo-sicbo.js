@@ -9,9 +9,13 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -168,6 +172,7 @@ export default function SicBoPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionError, setSessionError] = useState("");
 
   // Modals
   const [menuOpen, setMenuOpen] = useState(false);
@@ -375,15 +380,19 @@ export default function SicBoPage() {
 
     if (rolling) return;
     playSfx(clickSound.current);
+    setSessionError("");
 
     let play = Number(playAmount) || MIN_PLAY;
+    let sessionId = null;
 
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'sicbo';
       try {
-        const result = await useFreePlayToken(gameId);
+        const result = await startFreeplayArcadeSession(gameId);
         if (result.success) {
           play = result.amount;
+          sessionId = result.sessionId;
+          setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
           router.replace('/sicbo', undefined, { shallow: true });
         } else {
@@ -402,14 +411,13 @@ export default function SicBoPage() {
         alert(`Minimum play is ${MIN_PLAY} MLEO`);
         return;
       }
-      const currentVault = peekSharedVault().balance;
-      if (currentVault < play) {
-        alert('Insufficient MLEO in vault');
+      const startResult = await startPaidArcadeSession("sicbo", play);
+      if (!startResult.success) {
+        alert(startResult.message || 'Failed to start session');
         return;
       }
-
-      const debitResult = await debitSharedVault(play, "sicbo");
-      setVaultState(debitResult.balance);
+      sessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
 
     setPlayAmount(String(play));
@@ -418,7 +426,7 @@ export default function SicBoPage() {
 
     // Animate dice rolling
     let rollCount = 0;
-    const rollInterval = setInterval(() => {
+    const rollInterval = setInterval(async () => {
       setDice([
         Math.floor(Math.random() * 6) + 1,
         Math.floor(Math.random() * 6) + 1,
@@ -428,34 +436,34 @@ export default function SicBoPage() {
 
       if (rollCount >= 10) {
         clearInterval(rollInterval);
-        const finalDice = [
-          Math.floor(Math.random() * 6) + 1,
-          Math.floor(Math.random() * 6) + 1,
-          Math.floor(Math.random() * 6) + 1
-        ];
-        setDice(finalDice);
-        setRolling(false);
-        checkResult(finalDice, play);
+        try {
+          const finishResult = await finishArcadeSession(sessionId, { selectedPlay });
+          setRolling(false);
+          checkResult(finishResult, play);
+        } catch (error) {
+          console.error("Finish session error:", error);
+          setRolling(false);
+          setSessionError("Session failed to finish");
+          alert("Failed to finish session. Please refresh vault and try again.");
+        }
       }
     }, 100);
   };
 
-  const checkResult = async (finalDice, play) => {
-    const sum = finalDice.reduce((a, b) => a + b, 0);
-    const playType = PLAY_TYPES[selectedPlay];
+  const checkResult = async (finishResult, play) => {
+    const payload = finishResult?.serverPayload || {};
+    const finalDice = Array.isArray(payload.dice) ? payload.dice : [1, 1, 1];
+    const sum = Number(payload.sum || 0);
+    const resolvedPlay = payload.selectedPlay || selectedPlay;
+    const playType = PLAY_TYPES[resolvedPlay] || PLAY_TYPES.small;
+    const win = Boolean(payload.won);
+    const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
 
-    let win = false;
-    if (selectedPlay === 'triple' || selectedPlay === 'specific_triple_6') {
-      win = playType.check(finalDice);
-    } else {
-      win = playType.check(sum);
+    setDice(finalDice);
+    if (Number.isFinite(finishResult?.balanceAfter)) {
+      setVaultState(finishResult.balanceAfter);
     }
-
-    const prize = win ? Math.floor(play * playType.prize) : 0;
-
     if (win && prize > 0) {
-      const creditResult = await creditSharedVault(prize, "sicbo");
-      setVaultState(creditResult.balance);
       playSfx(winSound.current);
     }
 
@@ -665,6 +673,7 @@ export default function SicBoPage() {
             >
               {rolling ? "Rolling..." : "ROLL DICE"}
             </button>
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
 
             <div className="flex gap-2">
               <button

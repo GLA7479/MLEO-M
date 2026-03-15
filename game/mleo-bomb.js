@@ -9,9 +9,13 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -98,6 +102,8 @@ export default function BombPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionId, setSessionId] = useState(null);
+  const [sessionError, setSessionError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -182,12 +188,14 @@ export default function BombPage() {
 
   const startGame = async (isFreePlayParam = false) => {
     playSfx(clickSound.current);
+    setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
+    let nextSessionId = null;
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'bomb';
       try {
-        const result = await useFreePlayToken(gameId);
-        if (result.success) { play = result.amount; setIsFreePlay(false); router.replace('/bomb', undefined, { shallow: true }); }
+        const result = await startFreeplayArcadeSession(gameId);
+        if (result.success) { play = result.amount; nextSessionId = result.sessionId; setFreePlayTokens(result.remainingTokens); setIsFreePlay(false); router.replace('/bomb', undefined, { shallow: true }); }
         else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); return; }
       } catch (error) {
         console.error('Free play error:', error);
@@ -197,12 +205,13 @@ export default function BombPage() {
       }
     } else {
       if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
-      const currentVault = peekSharedVault().balance;
-      if (currentVault < play) { alert('Insufficient MLEO in vault'); return; }
-      const debitResult = await debitSharedVault(play, "bomb");
-      setVaultState(debitResult.balance);
+      const startResult = await startPaidArcadeSession("bomb", play);
+      if (!startResult.success) { alert(startResult.message || 'Failed to start session'); return; }
+      nextSessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
     setPlayAmount(String(play));
+    setSessionId(nextSessionId);
     setGameResult(null);
     setLevel(0);
     setCorrectWire(WIRES[Math.floor(Math.random() * WIRES.length)]);
@@ -236,27 +245,40 @@ export default function BombPage() {
   };
 
   const endGame = async (win, finalLevel) => {
+    if (!sessionId) return;
     const play = Number(playAmount);
-    // Adjusted for RTP ~99% - High risk = high reward!
-    const multipliers = [2.5, 3.9, 5.8, 9.2, 17];
-    const multiplier = multipliers[Math.min(finalLevel - 1, multipliers.length - 1)] || 1;
-    const prize = win ? Math.floor(play * multiplier) : 0;
+    try {
+      const finishResult = await finishArcadeSession(sessionId, { survived: win, finalLevel });
+      const payload = finishResult?.serverPayload || {};
+      const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
+      const resolvedWin = Boolean(payload.won);
+      const multiplier = Number(payload.multiplier || 0);
+      const resolvedLevel = Number(payload.finalLevel || finalLevel);
 
-    if (win && prize > 0) {
-      const creditResult = await creditSharedVault(prize, "bomb");
-      setVaultState(creditResult.balance);
-      playSfx(winSound.current);
+      if (Number.isFinite(finishResult?.balanceAfter)) {
+        setVaultState(finishResult.balanceAfter);
+      }
+      if (resolvedWin && prize > 0) {
+        playSfx(winSound.current);
+      }
+
+      const resultData = { win: resolvedWin, level: resolvedLevel, multiplier, prize, profit: resolvedWin ? prize - play : -play, perfect: Boolean(payload.perfect) };
+      setGameResult(resultData);
+      setGameActive(false);
+      setSessionId(null);
+      
+      const newStats = { ...stats, totalGames: stats.totalGames + 1, wins: resolvedWin ? stats.wins + 1 : stats.wins, losses: resolvedWin ? stats.losses : stats.losses + 1, totalPlay: stats.totalPlay + play, totalWon: resolvedWin ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, resolvedWin ? prize : 0), perfectDefuses: Boolean(payload.perfect) ? stats.perfectDefuses + 1 : stats.perfectDefuses, lastPlay: play };
+      setStats(newStats);
+    } catch (error) {
+      console.error("Finish session error:", error);
+      setGameActive(false);
+      setSessionId(null);
+      setSessionError("Session failed to finish");
+      alert("Failed to finish session. Please refresh vault and try again.");
     }
-
-    const resultData = { win, level: finalLevel, multiplier, prize, profit: win ? prize - play : -play, perfect: finalLevel >= TOTAL_LEVELS };
-    setGameResult(resultData);
-    setGameActive(false);
-    
-    const newStats = { ...stats, totalGames: stats.totalGames + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalPlay: stats.totalPlay + play, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), perfectDefuses: resultData.perfect ? stats.perfectDefuses + 1 : stats.perfectDefuses, lastPlay: play };
-    setStats(newStats);
   };
 
-  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setLevel(0); setCorrectWire(null); setGameActive(false); };
+  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setLevel(0); setCorrectWire(null); setGameActive(false); setSessionId(null); };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-red-900 via-black to-orange-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -334,7 +356,7 @@ export default function BombPage() {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }}.*?className="w-12 h-8.*?">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button>
@@ -358,6 +380,7 @@ export default function BombPage() {
             >
               {gameActive ? `💰 CASH OUT ${fmt(currentPrize)}` : (gameResult ? "PLAY AGAIN" : "START")}
             </button>
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>

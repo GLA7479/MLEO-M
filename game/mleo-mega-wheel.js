@@ -9,9 +9,13 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -99,6 +103,7 @@ export default function MegaWheelPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionError, setSessionError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -183,13 +188,14 @@ export default function MegaWheelPage() {
   const spinWheel = async (isFreePlayParam = false) => {
     if (spinning) return;
     playSfx(clickSound.current);
-    const currentVault = peekSharedVault().balance;
+    setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
+    let sessionId = null;
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'mega-wheel';
       try {
-        const result = await useFreePlayToken(gameId);
-        if (result.success) { play = result.amount; setIsFreePlay(false); router.replace('/mega-wheel', undefined, { shallow: true }); }
+        const result = await startFreeplayArcadeSession(gameId);
+        if (result.success) { play = result.amount; sessionId = result.sessionId; setFreePlayTokens(result.remainingTokens); setIsFreePlay(false); router.replace('/mega-wheel', undefined, { shallow: true }); }
         else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); return; }
       } catch (error) {
         console.error('Free play error:', error);
@@ -199,22 +205,31 @@ export default function MegaWheelPage() {
       }
     } else {
       if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
-      const debitResult = await debitSharedVault(play, "megawheel");
-      if (!debitResult.ok) {
-        alert(debitResult.error || 'Insufficient MLEO in vault');
-        return;
-      }
-      setVaultState(debitResult.balance);
+      const startResult = await startPaidArcadeSession("mega-wheel", play);
+      if (!startResult.success) { alert(startResult.message || 'Failed to start session'); return; }
+      sessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
     setPlayAmount(String(play));
     setSpinning(true);
     setGameResult(null);
     setResult(null);
 
-    // Pre-determine result
-    const segmentIndex = Math.floor(Math.random() * WHEEL_SEGMENTS.length);
-    const multiplier = WHEEL_SEGMENTS[segmentIndex];
-    const color = WHEEL_COLORS[segmentIndex];
+    let finishResult;
+    try {
+      finishResult = await finishArcadeSession(sessionId, {});
+    } catch (error) {
+      console.error("Finish session error:", error);
+      setSpinning(false);
+      setSessionError("Session failed to finish");
+      alert("Failed to finish session. Please refresh vault and try again.");
+      return;
+    }
+
+    const payload = finishResult?.serverPayload || {};
+    const segmentIndex = Number(payload.segmentIndex || 0);
+    const multiplier = Number(payload.multiplier || 0);
+    const color = payload.color || WHEEL_COLORS[segmentIndex] || "Unknown";
     
     // Calculate target rotation (5 full spins + land on segment)
     const degreesPerSegment = 360 / WHEEL_SEGMENTS.length; // 45 degrees per segment
@@ -229,7 +244,7 @@ export default function MegaWheelPage() {
     const totalDuration = 3000; // 3 seconds
     const startTime = Date.now();
     
-    const animateWheel = async () => {
+    const animateWheel = () => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / totalDuration, 1);
       
@@ -245,11 +260,12 @@ export default function MegaWheelPage() {
         // Finished spinning
         setResult(multiplier);
         setSpinning(false);
-        
-        const prize = Math.floor(play * multiplier);
+
+        const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
+        if (Number.isFinite(finishResult?.balanceAfter)) {
+          setVaultState(finishResult.balanceAfter);
+        }
         if (prize > 0) {
-          const creditResult = await creditSharedVault(prize, "megawheel");
-          setVaultState(creditResult.balance);
           playSfx(winSound.current);
         }
         const resultData = { multiplier, prize, profit: prize - play, color };
@@ -348,7 +364,7 @@ export default function MegaWheelPage() {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }}.*?className="w-12 h-8.*?">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button>
@@ -364,6 +380,7 @@ export default function MegaWheelPage() {
             <button onClick={gameResult ? resetGame : () => spinWheel(false)} disabled={spinning} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-yellow-500 to-orange-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
               {spinning ? "Spinning..." : gameResult ? "SPIN AGAIN" : "SPIN"}
             </button>
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>

@@ -16,9 +16,13 @@ import {
   useChainId,
 } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -151,6 +155,8 @@ export default function LadderPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionId, setSessionId] = useState(null);
+  const [sessionError, setSessionError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -376,14 +382,17 @@ useEffect(() => {
 
   const startGame = async (isFreePlayParam = false) => {
     playSfx(clickSound.current);
-    const currentVault = peekSharedVault().balance;
+    setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
+    let nextSessionId = null;
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'ladder';
       try {
-        const result = await useFreePlayToken(gameId);
+        const result = await startFreeplayArcadeSession(gameId);
         if (result.success) {
           play = result.amount;
+          nextSessionId = result.sessionId;
+          setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
           router.replace("/ladder", undefined, { shallow: true });
         } else {
@@ -402,16 +411,18 @@ useEffect(() => {
         alert(`Minimum play is ${MIN_PLAY} MLEO`);
         return;
       }
-      const debitResult = await debitSharedVault(play, "ladder");
-      if (!debitResult.ok) {
-        alert(debitResult.error || 'Insufficient MLEO in vault');
+      const startResult = await startPaidArcadeSession("ladder", play);
+      if (!startResult.success) {
+        alert(startResult.message || 'Failed to start session');
         return;
       }
-      setVaultState(debitResult.balance);
+      nextSessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
     setPlayAmount(String(play));
     setGameResult(null);
     setCurrentStep(0);
+    setSessionId(nextSessionId);
     setGameActive(true);
   };
 
@@ -438,39 +449,53 @@ useEffect(() => {
   };
 
   const endGame = async (success) => {
+    if (!sessionId) return;
     const play = Number(playAmount);
-    const multiplier = currentStep > 0 ? MULTIPLIERS[currentStep - 1] : 0;
-    const prize = success ? Math.floor(play * multiplier) : 0;
-    const win = prize > 0;
+    try {
+      const finishResult = await finishArcadeSession(sessionId, { currentStep, success });
+      const payload = finishResult?.serverPayload || {};
+      const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
+      const win = Boolean(payload.won);
+      const step = Number(payload.currentStep || currentStep);
+      const multiplier = Number(payload.multiplier || 0);
 
-    if (win && prize > 0) {
-      const creditResult = await creditSharedVault(prize, "ladder");
-      setVaultState(creditResult.balance);
-      playSfx(winSound.current);
+      if (Number.isFinite(finishResult?.balanceAfter)) {
+        setVaultState(finishResult.balanceAfter);
+      }
+      if (win && prize > 0) {
+        playSfx(winSound.current);
+      }
+
+      const resultData = {
+        win,
+        step,
+        prize,
+        profit: win ? prize - play : -play,
+        multiplier,
+      };
+      setGameResult(resultData);
+      setGameActive(false);
+      setSessionId(null);
+
+      const newStats = {
+        ...stats,
+        totalGames: stats.totalGames + 1,
+        wins: win ? stats.wins + 1 : stats.wins,
+        losses: win ? stats.losses : stats.losses + 1,
+        totalPlay: stats.totalPlay + play,
+        totalWon: win ? stats.totalWon + prize : stats.totalWon,
+        biggestWin: Math.max(stats.biggestWin, win ? prize : 0),
+        maxStep: Math.max(stats.maxStep, step),
+        lastPlay: play,
+      };
+      setStats(newStats);
+    } catch (error) {
+      console.error("Finish session error:", error);
+      setGameActive(false);
+      setSessionId(null);
+      setSessionError("Session failed to finish");
+      alert("Failed to finish session. Please refresh vault and try again.");
     }
-
-    const resultData = {
-      win,
-      step: currentStep,
-      prize,
-      profit: win ? prize - play : -play,
-      multiplier,
-    };
-    setGameResult(resultData);
-    setGameActive(false);
-
-    const newStats = {
-      ...stats,
-      totalGames: stats.totalGames + 1,
-      wins: win ? stats.wins + 1 : stats.wins,
-      losses: win ? stats.losses : stats.losses + 1,
-      totalPlay: stats.totalPlay + play,
-      totalWon: win ? stats.totalWon + prize : stats.totalWon,
-      biggestWin: Math.max(stats.biggestWin, win ? prize : 0),
-      maxStep: Math.max(stats.maxStep, currentStep),
-      lastPlay: play,
-    };
-    setStats(newStats);
   };
 
   const resetGame = () => {
@@ -478,6 +503,7 @@ useEffect(() => {
     setShowResultPopup(false);
     setCurrentStep(0);
     setGameActive(false);
+    setSessionId(null);
   };
   const backSafe = () => {
     playSfx(clickSound.current);
@@ -638,7 +664,7 @@ useEffect(() => {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }}.*?className="w-12 h-8.*?">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button>
@@ -665,6 +691,7 @@ useEffect(() => {
                 {gameResult ? "PLAY AGAIN" : "START"}
               </button>
             )}
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button
                 onClick={() => {

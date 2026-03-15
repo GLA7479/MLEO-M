@@ -9,9 +9,13 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -174,6 +178,7 @@ export default function DicePage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionError, setSessionError] = useState("");
 
   // Modals
   const [menuOpen, setMenuOpen] = useState(false);
@@ -392,15 +397,19 @@ export default function DicePage() {
   const playDice = async (isFreePlayParam = false) => {
     if (rolling) return;
     playSfx(clickSound.current);
+    setSessionError("");
 
     let play = Number(playAmount) || MIN_PLAY;
+    let sessionId = null;
     
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'dice-over-under';
       try {
-        const result = await useFreePlayToken(gameId);
+        const result = await startFreeplayArcadeSession(gameId);
         if (result.success) {
           play = result.amount;
+          sessionId = result.sessionId;
+          setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
           router.replace('/dice-over-under', undefined, { shallow: true });
         } else {
@@ -419,14 +428,13 @@ export default function DicePage() {
         alert(`Minimum play is ${MIN_PLAY} MLEO`);
         return;
       }
-      const currentVault = peekSharedVault().balance;
-      if (currentVault < play) {
-        alert('Insufficient MLEO in vault');
+      const startResult = await startPaidArcadeSession("dice-over-under", play);
+      if (!startResult.success) {
+        alert(startResult.message || 'Failed to start session');
         return;
       }
-      
-      const debitResult = await debitSharedVault(play, "dice");
-      setVaultState(debitResult.balance);
+      sessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
     
     setRolling(true);
@@ -435,37 +443,54 @@ export default function DicePage() {
 
     // Animate rolling
     let count = 0;
-    const rollInterval = setInterval(() => {
+    const rollInterval = setInterval(async () => {
       setResult(rollDice());
       count++;
       
       if (count >= 20) {
         clearInterval(rollInterval);
-        const finalResult = parseFloat(rollDice());
-        setResult(finalResult.toFixed(2));
-        setRolling(false);
-        checkWin(finalResult, play);
+        try {
+          const finishResult = await finishArcadeSession(sessionId, { target, isOver });
+          setRolling(false);
+          checkWin(finishResult, play);
+        } catch (error) {
+          console.error("Finish session error:", error);
+          setRolling(false);
+          setResult(null);
+          setSessionError("Session failed to finish");
+          alert("Failed to finish session. Please refresh vault and try again.");
+        }
       }
     }, 40);
   };
 
-  const checkWin = async (finalResult, play) => {
-    const won = isOver ? finalResult > target : finalResult < target;
-    const { multiplier } = calculateStats(target, isOver);
-    const prize = won ? Math.floor(play * (multiplier / 100)) : 0;
+  const checkWin = async (finishResult, play) => {
+    const payload = finishResult?.serverPayload || {};
+    const finalResult = Number(payload.roll ?? 0);
+    const resolvedTarget = Number(payload.target ?? target);
+    const resolvedIsOver = Boolean(payload.isOver ?? isOver);
+    const resolvedMultiplier = Number(payload.multiplier || 0);
+    const won = Boolean(payload.won);
+    const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
+
+    if (Number.isFinite(finalResult)) {
+      setResult(finalResult.toFixed(2));
+    }
+
+    if (Number.isFinite(finishResult?.balanceAfter)) {
+      setVaultState(finishResult.balanceAfter);
+    }
 
     if (won && prize > 0) {
-      const creditResult = await creditSharedVault(prize, "dice");
-      setVaultState(creditResult.balance);
       playSfx(winSound.current);
     }
 
     const resultData = {
       win: won,
       result: finalResult,
-      target: target,
-      isOver: isOver,
-      multiplier: multiplier / 100,
+      target: resolvedTarget,
+      isOver: resolvedIsOver,
+      multiplier: resolvedMultiplier,
       prize: prize,
       profit: won ? prize - play : -play
     };
@@ -483,8 +508,8 @@ export default function DicePage() {
       highestResult: Math.max(stats.highestResult, finalResult),
       lowestResult: Math.min(stats.lowestResult, finalResult),
       lastPlay: play,
-      overWins: (won && isOver) ? stats.overWins + 1 : stats.overWins,
-      underWins: (won && !isOver) ? stats.underWins + 1 : stats.underWins
+      overWins: (won && resolvedIsOver) ? stats.overWins + 1 : stats.overWins,
+      underWins: (won && !resolvedIsOver) ? stats.underWins + 1 : stats.underWins
     };
     setStats(newStats);
   };
@@ -834,6 +859,9 @@ export default function DicePage() {
             >
               {rolling ? "Rolling..." : "ROLL DICE"}
             </button>
+            {sessionError ? (
+              <div className="text-center text-xs text-red-300">{sessionError}</div>
+            ) : null}
 
             <div className="flex gap-2">
               <button
@@ -979,7 +1007,7 @@ export default function DicePage() {
                   <p className="text-xs text-white/80 mt-2"><strong>You control the risk/reward!</strong></p>
                 </div>
                 <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-2 mt-2">
-                  <p className="text-purple-300 font-semibold text-xs">💡 Higher risk = Bigger prize but harder to win</p>
+                  <p className="text-purple-300 font-semibold text-xs">💡 Higher risk = bigger prize, and the final roll is approved by the server.</p>
                 </div>
               </div>
               <button

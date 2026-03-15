@@ -9,9 +9,13 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -160,6 +164,7 @@ export default function CoinFlipPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionError, setSessionError] = useState("");
 
   // Modals
   const [menuOpen, setMenuOpen] = useState(false);
@@ -384,15 +389,19 @@ export default function CoinFlipPage() {
   const flipCoin = async (isFreePlayParam = false) => {
     if (flipping) return;
     playSfx(clickSound.current);
+    setSessionError("");
 
     let play = Number(playAmount) || MIN_PLAY;
+    let sessionId = null;
 
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'coin-flip';
       try {
-        const result = await useFreePlayToken(gameId);
+        const result = await startFreeplayArcadeSession(gameId);
         if (result.success) {
           play = result.amount;
+          sessionId = result.sessionId;
+          setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
           router.replace('/coin-flip', undefined, { shallow: true });
         } else {
@@ -411,12 +420,13 @@ export default function CoinFlipPage() {
         alert(`Minimum play is ${MIN_PLAY} MLEO`);
         return;
       }
-      const debitResult = await debitSharedVault(play, "coinflip");
-      if (!debitResult.ok) {
-        alert(debitResult.error || 'Insufficient MLEO in vault');
+      const startResult = await startPaidArcadeSession("coin-flip", play);
+      if (!startResult.success) {
+        alert(startResult.message || 'Failed to start session');
         return;
       }
-      setVaultState(debitResult.balance);
+      sessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
 
     setFlipping(true);
@@ -425,27 +435,42 @@ export default function CoinFlipPage() {
 
     // Animate flip
     let count = 0;
-    const flipInterval = setInterval(() => {
+    const flipInterval = setInterval(async () => {
       setResult(Math.random() > 0.5 ? "heads" : "tails");
       count++;
 
       if (count >= 15) {
         clearInterval(flipInterval);
-        const finalResult = Math.random() > 0.5 ? "heads" : "tails";
-        setResult(finalResult);
-        setFlipping(false);
-        checkWin(finalResult, play);
+        try {
+          const finishResult = await finishArcadeSession(sessionId, { choice });
+          setFlipping(false);
+          checkWin(finishResult, play);
+        } catch (error) {
+          console.error("Finish session error:", error);
+          setFlipping(false);
+          setResult(null);
+          setSessionError("Session failed to finish");
+          alert("Failed to finish session. Please refresh vault and try again.");
+        }
       }
     }, 80);
   };
 
-  const checkWin = async (finalResult, play) => {
-    const won = finalResult === choice;
-    const prize = won ? Math.floor(play * WIN_MULTIPLIER) : 0;
+  const checkWin = async (finishResult, play) => {
+    const payload = finishResult?.serverPayload || {};
+    const finalResult = payload.result || null;
+    const won = Boolean(payload.won);
+    const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
+
+    if (finalResult) {
+      setResult(finalResult);
+    }
+
+    if (Number.isFinite(finishResult?.balanceAfter)) {
+      setVaultState(finishResult.balanceAfter);
+    }
 
     if (won && prize > 0) {
-      const creditResult = await creditSharedVault(prize, "coinflip");
-      setVaultState(creditResult.balance);
       playSfx(winSound.current);
     }
 
@@ -779,6 +804,9 @@ export default function CoinFlipPage() {
             >
               {flipping ? "🪙 Flipping..." : "🪙 FLIP COIN"}
             </button>
+            {sessionError ? (
+              <div className="text-center text-xs text-red-300">{sessionError}</div>
+            ) : null}
             <div className="flex gap-2">
               <button
                 onClick={() => {
@@ -930,7 +958,7 @@ export default function CoinFlipPage() {
                   <p className="text-xs text-white/80">• <strong>Wrong guess:</strong> Lose play</p>
                 </div>
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2 mt-2">
-                  <p className="text-blue-300 text-xs">💡 Each flip is resolved instantly with in-browser random generation.</p>
+                  <p className="text-blue-300 text-xs">💡 Each flip is started and resolved by the server before vault credit is approved.</p>
                 </div>
               </div>
               <button

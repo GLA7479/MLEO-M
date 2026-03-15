@@ -6,7 +6,13 @@ import { ConnectButton, useConnectModal, useAccountModal } from "@rainbow-me/rai
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
 import { getFreePlayStatus, formatTimeRemaining } from "../lib/free-play-system";
-import { creditSharedVault } from "../lib/sharedVault";
+import {
+  creditSharedVault,
+  debitSharedVault,
+  initSharedVault,
+  readSharedVault,
+  subscribeSharedVault,
+} from "../lib/sharedVault";
 
 const ARCADE_BG = "linear-gradient(135deg, #1a1a1a 0%, #3a2a0a 50%, #1a1a1a 100%)";
 
@@ -170,6 +176,7 @@ export default function ArcadeHub() {
     timeUntilNext: 0,
   });
   const [freePlayCountdown, setFreePlayCountdown] = useState(0);
+  const [freePlayLoaded, setFreePlayLoaded] = useState(false);
   const [showVaultModal, setShowVaultModal] = useState(false);
   const [showFreePlayModal, setShowFreePlayModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -189,19 +196,6 @@ export default function ArcadeHub() {
   const publicClient = usePublicClient();
   const chainId = useChainId();
   
-  // Read the shared vault used by the main MLEO games
-  function getVault() {
-    if (typeof window === "undefined") return 0;
-    try {
-      const rushData = localStorage.getItem("mleo_rush_core_v4");
-      if (!rushData) return 0;
-      const data = JSON.parse(rushData);
-      return data.vault || 0;
-    } catch {
-      return 0;
-    }
-  }
-  
   function fmt(n) {
     if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
     if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
@@ -214,6 +208,7 @@ export default function ArcadeHub() {
       const status = await getFreePlayStatus();
       setFreePlayStatus(status);
       setFreePlayCountdown(status.timeUntilNext || 0);
+      setFreePlayLoaded(true);
     } catch (error) {
       console.error("Failed to update free play status:", error);
     }
@@ -311,20 +306,11 @@ export default function ArcadeHub() {
 
       await publicClient.waitForTransactionReceipt({ hash });
 
-      // Update local vault
-      const newVault = Math.max(0, vault - collectAmount);
-      setVault(newVault);
-      
-      // Update shared vault snapshot
-      try {
-        const rushData = localStorage.getItem("mleo_rush_core_v4");
-        if (rushData) {
-          const data = JSON.parse(rushData);
-          data.vault = newVault;
-          localStorage.setItem("mleo_rush_core_v4", JSON.stringify(data));
-        }
-      } catch (e) {
-        console.error("Failed to update shared vault:", e);
+      const debit = await debitSharedVault(collectAmount, "arcade-claim");
+      if (!debit.ok) {
+        alert("Claim succeeded on-chain, but shared vault sync failed.");
+      } else {
+        setVault(debit.balance || 0);
       }
 
       alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
@@ -339,13 +325,26 @@ export default function ArcadeHub() {
   
   // Load vault and free play status on mount
   useEffect(() => {
-    setVault(getVault());
-    updateFreePlayStatus();
-    
-    // Refresh vault every 2 seconds (for real-time updates)
-    const vaultInterval = setInterval(() => {
-      setVault(getVault());
-    }, 2000);
+    let unsub = null;
+
+    async function boot() {
+      try {
+        initSharedVault();
+
+        const snapshot = await readSharedVault();
+        setVault(snapshot.balance || 0);
+
+        unsub = subscribeSharedVault((nextSnapshot) => {
+          setVault(nextSnapshot.balance || 0);
+        });
+
+        await updateFreePlayStatus();
+      } catch (err) {
+        console.error("Arcade boot failed:", err);
+      }
+    }
+
+    boot();
     
     // Refresh free play status every 30 seconds (to correct drift)
     const freePlayInterval = setInterval(() => {
@@ -353,17 +352,21 @@ export default function ArcadeHub() {
     }, 30000);
     
     // Refresh on visibility change / page focus
-    const handleVisibilityChange = () => {
+    const handleVisibilityChange = async () => {
       if (!document.hidden) {
+        try {
+          const snapshot = await readSharedVault();
+          setVault(snapshot.balance || 0);
+        } catch {}
         updateFreePlayStatus();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
-      clearInterval(vaultInterval);
       clearInterval(freePlayInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (unsub) unsub();
     };
   }, []);
 
@@ -723,7 +726,7 @@ export default function ArcadeHub() {
               >
                 <span>🎁</span>
                 <span className="text-amber-300">
-                  {freePlayStatus.tokens}/{freePlayStatus.maxTokens} Free
+                  {freePlayLoaded ? `${freePlayStatus.tokens}/${freePlayStatus.maxTokens} Free` : "Loading..."}
                 </span>
                 {freePlayStatus.tokens === 0 && !freePlayStatus.isFull && freePlayCountdown > 0 && (
                   <span className="text-xs text-amber-400/70">
@@ -890,7 +893,7 @@ export default function ArcadeHub() {
               <div className="flex items-center justify-center gap-2">
                 <span className="text-3xl">🎁</span>
                 <span className="text-2xl font-bold text-amber-400">
-                  {freePlayStatus.tokens}/{freePlayStatus.maxTokens} Free
+                  {freePlayLoaded ? `${freePlayStatus.tokens}/${freePlayStatus.maxTokens} Free` : "Loading..."}
                 </span>
               </div>
               {freePlayStatus.tokens === 0 && !freePlayStatus.isFull && freePlayCountdown > 0 && (
