@@ -1,4 +1,3 @@
-// pages/crash2.js
-export { default } from "../game/mleo-crash-v1";
+export { default } from "../game/mleo-crash-v2";
 
 

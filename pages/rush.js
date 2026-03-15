@@ -1,2 +1,1 @@
-// pages/rush.js
-export { default } from "../game/mleo-token-rush";
+export { default } from "./mleo-base";

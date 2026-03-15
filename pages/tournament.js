@@ -1,11 +1,12 @@
-import CardRoomsPage from "../game/mleo-texas-holdem-casino";
-
-export default function Tournament() {
-  return <CardRoomsPage />;
+export default function TournamentRedirect() {
+  return null;
 }
 
-export async function getStaticProps() {
+export async function getServerSideProps() {
   return {
-    props: {},
+    redirect: {
+      destination: "/arcade",
+      permanent: false,
+    },
   };
 }
