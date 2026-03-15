@@ -6,6 +6,7 @@ import { ConnectButton, useConnectModal, useAccountModal } from "@rainbow-me/rai
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
 import { getFreePlayStatus, formatTimeRemaining } from "../lib/free-play-system";
+import { ensureCsrfToken } from "../lib/arcadeDeviceClient";
 import {
   debitSharedVault,
   initSharedVault,
@@ -244,9 +245,13 @@ export default function ArcadeHub() {
 
     setAddingCoins(true);
     try {
+      const csrfToken = await ensureCsrfToken();
       const response = await fetch("/api/arcade/vault/dev-credit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrfToken ? { "x-csrf-token": csrfToken } : {}),
+        },
         credentials: "include",
         body: JSON.stringify({ password: devPassword, amount: 10000 }),
       });
