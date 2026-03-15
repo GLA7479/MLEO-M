@@ -9,18 +9,18 @@ function extractRow(data) {
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
-    return res.status(405).json({ success: false, message: "Method not allowed" });
+    return res.status(405).json({ success: false, code: "METHOD_NOT_ALLOWED", message: "Method not allowed" });
   }
 
   try {
     const supabase = getSupabaseAdmin();
     const deviceId = getArcadeDevice(req);
     if (!deviceId) {
-      return res.status(401).json({ success: false, message: "Device not initialized" });
+      return res.status(401).json({ success: false, code: "DEVICE_NOT_INITIALIZED", message: "Device not initialized" });
     }
     const rate = await checkArcadeRateLimit("miners-state", deviceId, 80, 60_000);
     if (!rate.allowed) {
-      return res.status(429).json({ success: false, message: "Too many miners state requests" });
+      return res.status(429).json({ success: false, code: "RATE_LIMIT_DEVICE", message: "Too many miners state requests" });
     }
 
     const [stateResp, configResp, sharedVaultResp] = await Promise.all([
@@ -30,13 +30,13 @@ export default async function handler(req, res) {
     ]);
 
     if (stateResp.error) {
-      return res.status(400).json({ success: false, message: stateResp.error.message || "Failed to read miners state" });
+      return res.status(400).json({ success: false, code: "MINERS_STATE_LOAD_FAILED", message: stateResp.error.message || "Failed to read miners state" });
     }
     if (configResp.error) {
-      return res.status(400).json({ success: false, message: configResp.error.message || "Failed to read miners config" });
+      return res.status(400).json({ success: false, code: "MINERS_CONFIG_LOAD_FAILED", message: configResp.error.message || "Failed to read miners config" });
     }
     if (sharedVaultResp.error) {
-      return res.status(400).json({ success: false, message: sharedVaultResp.error.message || "Failed to read shared vault balance" });
+      return res.status(400).json({ success: false, code: "MINERS_VAULT_LOAD_FAILED", message: sharedVaultResp.error.message || "Failed to read shared vault balance" });
     }
 
     const state = extractRow(stateResp.data) || {};
@@ -71,6 +71,6 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error("miners/state failed", error);
-    return res.status(500).json({ success: false, message: "Miners state API failed" });
+    return res.status(500).json({ success: false, code: "MINERS_STATE_INTERNAL_ERROR", message: "Miners state API failed" });
   }
 }

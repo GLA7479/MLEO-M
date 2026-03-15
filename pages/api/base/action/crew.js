@@ -31,29 +31,29 @@ function pay(resources, cost) {
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
-    return res.status(405).json({ success: false, message: "Method not allowed" });
+    return res.status(405).json({ success: false, code: "METHOD_NOT_ALLOWED", message: "Method not allowed" });
   }
 
   try {
     if (!validateCsrfToken(req)) {
       logCsrfFailure(req);
-      return res.status(403).json({ success: false, message: "Invalid CSRF token" });
+      return res.status(403).json({ success: false, code: "CSRF_INVALID", message: "Invalid CSRF token" });
     }
 
     const ipRate = await checkIpRateLimit(req, 60, 60_000);
     if (!ipRate.allowed) {
       logIpRateLimitExceeded(req, 60);
-      return res.status(429).json({ success: false, message: "Too many requests from this IP" });
+      return res.status(429).json({ success: false, code: "RATE_LIMIT_IP", message: "Too many requests from this IP" });
     }
 
     const deviceId = getArcadeDevice(req);
     if (!deviceId) {
-      return res.status(401).json({ success: false, message: "Device not initialized" });
+      return res.status(401).json({ success: false, code: "DEVICE_NOT_INITIALIZED", message: "Device not initialized" });
     }
 
     const rateLimit = await checkArcadeRateLimit("base-action-crew", deviceId, 20, 60_000);
     if (!rateLimit.allowed) {
-      return res.status(429).json({ success: false, message: "Too many crew requests" });
+      return res.status(429).json({ success: false, code: "RATE_LIMIT_DEVICE", message: "Too many crew requests" });
     }
 
     const supabase = getSupabaseAdmin();
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
       .single();
 
     if (freshStateError || !freshStateData) {
-      return res.status(400).json({ success: false, message: "Failed to reload latest base state" });
+      return res.status(400).json({ success: false, code: "BASE_STATE_LOAD_FAILED", message: "Failed to reload latest base state" });
     }
 
     const state = freshStateData;
@@ -74,7 +74,7 @@ export default async function handler(req, res) {
 
     const cost = crewCost(crew);
     if (!canAfford(resources, cost)) {
-      return res.status(400).json({ success: false, message: "Crew hiring needs more supplies" });
+      return res.status(400).json({ success: false, code: "BASE_INSUFFICIENT_RESOURCES", message: "Crew hiring needs more supplies" });
     }
 
     const newResources = pay(resources, cost);
@@ -94,7 +94,7 @@ export default async function handler(req, res) {
       .single();
 
     if (updateError) {
-      return res.status(400).json({ success: false, message: updateError.message || "Failed to update state" });
+      return res.status(400).json({ success: false, code: "BASE_STATE_UPDATE_FAILED", message: updateError.message || "Failed to update state" });
     }
 
     return res.status(200).json({
@@ -104,6 +104,6 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error("base/action/crew failed", error);
-    return res.status(500).json({ success: false, message: "Crew action failed" });
+    return res.status(500).json({ success: false, code: "BASE_CREW_INTERNAL_ERROR", message: "Crew action failed" });
   }
 }

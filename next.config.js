@@ -28,6 +28,8 @@ const securityHeaders = [
       ]
     : []),
   // CSP בסיסי
+  // Note: 'unsafe-eval' is required for Next.js react-refresh in development
+  // In production, it should be removed for better security
   {
     key: "Content-Security-Policy",
     value: [
@@ -36,7 +38,7 @@ const securityHeaders = [
       "media-src 'self' blob: https:",
       "font-src 'self' data: https:",
       "style-src 'self' 'unsafe-inline' https:",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:",
+      `script-src 'self' 'unsafe-inline' ${isProduction ? '' : "'unsafe-eval'"} https:`,
       "connect-src 'self' https: wss:",
       "frame-ancestors 'self'",
       "base-uri 'self'",

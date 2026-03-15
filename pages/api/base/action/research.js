@@ -35,39 +35,39 @@ function pay(resources, cost) {
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
-    return res.status(405).json({ success: false, message: "Method not allowed" });
+    return res.status(405).json({ success: false, code: "METHOD_NOT_ALLOWED", message: "Method not allowed" });
   }
 
   try {
     if (!validateCsrfToken(req)) {
       logCsrfFailure(req);
-      return res.status(403).json({ success: false, message: "Invalid CSRF token" });
+      return res.status(403).json({ success: false, code: "CSRF_INVALID", message: "Invalid CSRF token" });
     }
 
     const ipRate = await checkIpRateLimit(req, 60, 60_000);
     if (!ipRate.allowed) {
       logIpRateLimitExceeded(req, 60);
-      return res.status(429).json({ success: false, message: "Too many requests from this IP" });
+      return res.status(429).json({ success: false, code: "RATE_LIMIT_IP", message: "Too many requests from this IP" });
     }
 
     const deviceId = getArcadeDevice(req);
     if (!deviceId) {
-      return res.status(401).json({ success: false, message: "Device not initialized" });
+      return res.status(401).json({ success: false, code: "DEVICE_NOT_INITIALIZED", message: "Device not initialized" });
     }
 
     const rateLimit = await checkArcadeRateLimit("base-action-research", deviceId, 20, 60_000);
     if (!rateLimit.allowed) {
-      return res.status(429).json({ success: false, message: "Too many research requests" });
+      return res.status(429).json({ success: false, code: "RATE_LIMIT_DEVICE", message: "Too many research requests" });
     }
 
     const { research_key } = req.body || {};
     if (!research_key || typeof research_key !== "string") {
-      return res.status(400).json({ success: false, message: "Missing or invalid research_key" });
+      return res.status(400).json({ success: false, code: "BASE_INVALID_RESEARCH_KEY", message: "Missing or invalid research_key" });
     }
 
     const def = RESEARCH.find((r) => r.key === research_key);
     if (!def) {
-      return res.status(400).json({ success: false, message: "Invalid research key" });
+      return res.status(400).json({ success: false, code: "BASE_RESEARCH_NOT_FOUND", message: "Invalid research key" });
     }
 
     const supabase = getSupabaseAdmin();
@@ -79,7 +79,7 @@ export default async function handler(req, res) {
       .single();
 
     if (freshStateError || !freshStateData) {
-      return res.status(400).json({ success: false, message: "Failed to reload latest base state" });
+      return res.status(400).json({ success: false, code: "BASE_STATE_LOAD_FAILED", message: "Failed to reload latest base state" });
     }
 
     const state = freshStateData;
@@ -87,15 +87,15 @@ export default async function handler(req, res) {
     const resources = state.resources || {};
 
     if (research[research_key]) {
-      return res.status(400).json({ success: false, message: "Research already completed" });
+      return res.status(400).json({ success: false, code: "BASE_RESEARCH_ALREADY_COMPLETED", message: "Research already completed" });
     }
 
     if (def.requires?.some((req) => !research[req])) {
-      return res.status(400).json({ success: false, message: "Prerequisites not met" });
+      return res.status(400).json({ success: false, code: "BASE_RESEARCH_PREREQUISITES_NOT_MET", message: "Prerequisites not met" });
     }
 
     if (!canAfford(resources, def.cost)) {
-      return res.status(400).json({ success: false, message: "Insufficient resources" });
+      return res.status(400).json({ success: false, code: "BASE_INSUFFICIENT_RESOURCES", message: "Insufficient resources" });
     }
 
     const newResources = pay(resources, def.cost);
@@ -115,7 +115,7 @@ export default async function handler(req, res) {
       .single();
 
     if (updateError) {
-      return res.status(400).json({ success: false, message: updateError.message || "Failed to update state" });
+      return res.status(400).json({ success: false, code: "BASE_STATE_UPDATE_FAILED", message: updateError.message || "Failed to update state" });
     }
 
     return res.status(200).json({
@@ -125,6 +125,6 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error("base/action/research failed", error);
-    return res.status(500).json({ success: false, message: "Research action failed" });
+    return res.status(500).json({ success: false, code: "BASE_RESEARCH_INTERNAL_ERROR", message: "Research action failed" });
   }
 }

@@ -956,10 +956,25 @@ const { disconnect } = useDisconnect();
       });
     }, 15000);
 
+    // Listen for storage changes from other tabs
+    const onStorage = (e) => {
+      if (!e.key) return;
+      if (e.key === MINING_LS_KEY) {
+        try {
+          setMining(loadMiningState());
+        } catch (err) {
+          console.error("[mleo-miners] Storage sync failed", err);
+        }
+      }
+    };
+
+    window.addEventListener("storage", onStorage);
+
     return () => {
       clearInterval(flushId);
       clearInterval(refreshId);
       registerMinersStateSync(null);
+      window.removeEventListener("storage", onStorage);
     };
   }, [mounted]);
 
@@ -1070,6 +1085,7 @@ async function onClaimMined() {
   }
 
   // 4) שליחה — claim(gameId, amountUnits)
+  // NOTE: Working with whole numbers only (no decimals) before launch
   let toClaim;
   if (claimAmount && claimAmount.trim() !== "") {
     toClaim = Math.floor(Number(claimAmount) || 0);
@@ -1082,7 +1098,7 @@ async function onClaimMined() {
       return; 
     }
   } else {
-    toClaim = vaultNow;                           // מספר "אנושי" (יכול לכלול עד 2 ספרות)
+    toClaim = Math.floor(vaultNow);  // Whole numbers only - no decimals
   }
   const amountUnits = parseUnits(
     Number(toClaim).toFixed(Math.min(2, MLEO_DECIMALS)),
@@ -4288,7 +4304,7 @@ MLEO
                     type="number"
                     value={claimAmount}
                     onChange={(e) => setClaimAmount(e.target.value)}
-                    placeholder="Enter amount or leave empty for all"
+                    placeholder="Whole MLEO only (no decimals)"
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
                     min="0"
                     step="0.01"

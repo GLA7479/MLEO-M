@@ -12,32 +12,32 @@ function extractRow(data) {
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
-    return res.status(405).json({ success: false, message: "Method not allowed" });
+    return res.status(405).json({ success: false, code: "METHOD_NOT_ALLOWED", message: "Method not allowed" });
   }
 
   try {
     // CSRF validation
     if (!validateCsrfToken(req)) {
       logCsrfFailure(req);
-      return res.status(403).json({ success: false, message: "Invalid CSRF token" });
+      return res.status(403).json({ success: false, code: "CSRF_INVALID", message: "Invalid CSRF token" });
     }
 
     // IP-based rate limiting
     const ipRate = await checkIpRateLimit(req, 30, 60_000);
     if (!ipRate.allowed) {
       logIpRateLimitExceeded(req, 30);
-      return res.status(429).json({ success: false, message: "Too many requests from this IP" });
+      return res.status(429).json({ success: false, code: "RATE_LIMIT_IP", message: "Too many requests from this IP" });
     }
 
     const supabase = getSupabaseAdmin();
     const deviceId = getArcadeDevice(req);
     if (!deviceId) {
-      return res.status(401).json({ success: false, message: "Device not initialized" });
+      return res.status(401).json({ success: false, code: "DEVICE_NOT_INITIALIZED", message: "Device not initialized" });
     }
     const rate = await checkArcadeRateLimit("miners-gift-claim", deviceId, 20, 60_000);
     if (!rate.allowed) {
       logRateLimitExceeded(req, "miners-gift-claim", 20);
-      return res.status(429).json({ success: false, message: "Too many gift claim requests" });
+      return res.status(429).json({ success: false, code: "RATE_LIMIT_DEVICE", message: "Too many gift claim requests" });
     }
 
     const { data, error } = await supabase.rpc("miners_claim_hourly_gift", {
@@ -48,6 +48,7 @@ export default async function handler(req, res) {
       const notReady = String(error.message || "").toLowerCase().includes("not ready");
       return res.status(notReady ? 409 : 400).json({
         success: false,
+        code: notReady ? "MINERS_GIFT_NOT_READY" : "MINERS_GIFT_CLAIM_FAILED",
         message: error.message || "Failed to claim hourly gift",
       });
     }
@@ -67,6 +68,6 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error("miners/gift/claim failed", error);
-    return res.status(500).json({ success: false, message: "Miners gift claim API failed" });
+    return res.status(500).json({ success: false, code: "MINERS_GIFT_INTERNAL_ERROR", message: "Miners gift claim API failed" });
   }
 }
