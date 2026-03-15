@@ -4,6 +4,9 @@
 
 BEGIN;
 
+-- Create poker schema if it doesn't exist
+CREATE SCHEMA IF NOT EXISTS poker;
+
 ALTER TABLE poker.poker_seats
 ADD COLUMN IF NOT EXISTS seat_token text;
 
