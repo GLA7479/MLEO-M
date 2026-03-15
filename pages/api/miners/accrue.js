@@ -1,0 +1,70 @@
+import { ensureArcadeDevice } from "../../../lib/server/arcadeDeviceCookie";
+import { checkArcadeRateLimit } from "../../../lib/server/arcadeRateLimit";
+import { getSupabaseAdmin } from "../../../lib/server/supabaseAdmin";
+
+function extractRow(data) {
+  return Array.isArray(data) ? data[0] : data;
+}
+
+function normalizeStageCounts(raw) {
+  const src = raw && typeof raw === "object" ? raw : {};
+  const out = {};
+  let total = 0;
+  for (const [k, v] of Object.entries(src)) {
+    const stage = Math.max(1, Math.floor(Number(k) || 0));
+    const count = Math.max(0, Math.floor(Number(v) || 0));
+    if (!stage || !count) continue;
+    out[String(stage)] = (out[String(stage)] || 0) + count;
+    total += count;
+  }
+  return { stageCounts: out, total };
+}
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ success: false, message: "Method not allowed" });
+  }
+
+  try {
+    const supabase = getSupabaseAdmin();
+    const deviceId = ensureArcadeDevice(req, res);
+    const rate = checkArcadeRateLimit("miners-accrue", deviceId, 120, 60_000);
+    if (!rate.allowed) {
+      return res.status(429).json({ success: false, message: "Too many miners accrue requests" });
+    }
+
+    const { stageCounts: rawStageCounts, offline = false } = req.body || {};
+    const { stageCounts, total } = normalizeStageCounts(rawStageCounts);
+
+    if (!total) {
+      return res.status(400).json({ success: false, message: "Missing stageCounts" });
+    }
+    if (total > 200) {
+      return res.status(400).json({ success: false, message: "Too many breaks in one batch" });
+    }
+
+    const { data, error } = await supabase.rpc("miners_apply_breaks", {
+      p_device_id: deviceId,
+      p_stage_counts: stageCounts,
+      p_offline: Boolean(offline),
+    });
+
+    if (error) {
+      return res.status(400).json({ success: false, message: error.message || "Failed to apply miners accrual" });
+    }
+
+    const row = extractRow(data);
+    return res.status(200).json({
+      success: true,
+      added: Number(row?.added || 0),
+      balance: Number(row?.balance || 0),
+      minedToday: Number(row?.mined_today || 0),
+      dailyCap: Number(row?.daily_cap || 0),
+      softcutFactor: Number(row?.softcut_factor || 1),
+    });
+  } catch (error) {
+    console.error("miners/accrue failed", error);
+    return res.status(500).json({ success: false, message: "Miners accrue API failed" });
+  }
+}

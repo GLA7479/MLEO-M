@@ -8,6 +8,15 @@ import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
  import { parseUnits } from "viem";
 import { useRouter } from "next/router";
+import {
+  claimMinerBalanceToVault,
+  claimMinerHourlyGift,
+  claimMinerToWallet,
+  fetchMinersState,
+  flushMinerBreakAccrual,
+  queueMinerBreakAccrual,
+  registerMinersStateSync,
+} from "../lib/minersEconomyClient";
 
 
 // --- iOS 100vh fix (sets --app-100vh = window.innerHeight) ---
@@ -810,30 +819,75 @@ const { disconnect } = useDisconnect();
   useEffect(() => {
     if (!mounted) return;
     try { setMining(loadMiningState()); } catch {}
+
+    registerMinersStateSync((serverPatch) => {
+      setMining((prev) => ({
+        ...(prev || {}),
+        balance: Number(serverPatch?.balance ?? prev?.balance ?? 0),
+        minedToday: Number(serverPatch?.minedToday ?? prev?.minedToday ?? 0),
+      }));
+    });
+
+    fetchMinersState()
+      .then((resp) => {
+        if (!resp?.success) return;
+        const st = resp.state || {};
+        const merged = {
+          ...(loadMiningState() || {}),
+          balance: Math.max(0, Math.floor(Number(st.balance || 0))),
+          minedToday: Math.max(0, Math.floor(Number(st.minedToday || 0))),
+          scoreToday: Math.max(0, Math.floor(Number(st.scoreToday || 0))),
+          lastDay: st.lastDay || getTodayKey(),
+          vault: Math.max(0, Math.floor(Number(st.vault || 0))),
+          claimedTotal: Math.max(0, Math.floor(Number(st.claimedTotal || 0))),
+          claimedToWallet: Math.max(0, Math.floor(Number(st.claimedToWallet || 0))),
+        };
+        saveMiningState(merged);
+        setMining(merged);
+      })
+      .catch(() => {});
+
     const id = setInterval(() => {
       try { setMining(loadMiningState()); } catch {}
     }, 1000);
-    return () => clearInterval(id);
+
+    const flushId = setInterval(() => {
+      flushMinerBreakAccrual().catch(() => {});
+    }, 1000);
+
+    return () => {
+      clearInterval(id);
+      clearInterval(flushId);
+    };
   }, [mounted]);
 
   // === DEMO handlers for Mining ===
-  function claimBalanceToVaultDemo() {
+  async function claimBalanceToVaultDemo() {
     try { play?.(S_CLICK); } catch {}
-    const st  = loadMiningState();
-    const amt = Number((st?.balance || 0).toFixed(2));
-    if (!amt) { setGiftToastWithTTL("No tokens to claim"); return; }
-
-    st.vault        = Number(((st.vault || 0) + amt).toFixed(2));
-    st.claimedTotal = Number(((st.claimedTotal || 0) + amt).toFixed(2));
-    st.history      = Array.isArray(st.history) ? st.history : [];
-    st.history.unshift({ ts: Date.now(), amt, type: "to_vault" });
-    st.balance = 0;
-
-    // שמור מקומי; vaultShim ידאג לסנכרון שרת
-    saveMiningState(st);
-    setMining(st);
-    
-    setGiftToastWithTTL(`Moved ${formatMleoShort(amt)} MLEO to Vault`);
+    try {
+      await flushMinerBreakAccrual();
+      const resp = await claimMinerBalanceToVault(null);
+      const moved = Math.max(0, Number(resp?.moved || 0));
+      if (!moved) {
+        setGiftToastWithTTL("No tokens to claim");
+        return;
+      }
+      const st = loadMiningState();
+      const next = {
+        ...st,
+        balance: Math.max(0, Number(resp?.balance || 0)),
+        vault: Math.max(0, Number(resp?.vault || 0)),
+        claimedTotal: Math.max(0, Number(resp?.claimedTotal || st?.claimedTotal || 0)),
+      };
+      next.history = Array.isArray(next.history) ? next.history : [];
+      next.history.unshift({ ts: Date.now(), amt: moved, type: "to_vault" });
+      saveMiningState(next);
+      setMining(next);
+      setGiftToastWithTTL(`Moved ${formatMleoShort(moved)} MLEO to Vault`);
+    } catch (err) {
+      console.error(err);
+      setGiftToastWithTTL("Vault claim failed");
+    }
   }
 
   // === Unified Wallet Modal Opener (מחובר/לא מחובר) + Terms gate ===
@@ -876,6 +930,7 @@ const { disconnect } = useDisconnect();
 // === MINING: CLAIM (איסוף כולל → לארנק) — V3 strict ===
 async function onClaimMined() {
   try { play?.(S_CLICK); } catch {}
+  try { await flushMinerBreakAccrual(); } catch {}
 
   // 0) לאחד balance לתוך vault המקומי לפני איסוף
   try {
@@ -945,17 +1000,17 @@ async function onClaimMined() {
 
     await publicClient.waitForTransactionReceipt({ hash });
 
-    // 5) עדכון לוקאלי
+    // 5) עדכון שרת כסמכות + סנכרון לוקאלי
+    const delta = Math.max(0, Math.floor(Number(toClaim) || 0));
+    const resp = await claimMinerToWallet(delta);
     const after = loadMiningState();
-    const delta = Number(toClaim);
-    after.vault           = Math.max(0, Number(((after.vault || 0) - delta).toFixed(2)));
-    after.claimedToWallet = Number(((after.claimedToWallet || 0) + delta).toFixed(2));
+    after.vault = Math.max(0, Number(resp?.vault || 0));
+    after.claimedToWallet = Math.max(0, Number(resp?.claimedToWallet || 0));
     after.history = Array.isArray(after.history) ? after.history : [];
     after.history.unshift({ t: Date.now(), kind: "claim_wallet_all", amount: delta, tx: String(hash) });
-    // שמור מקומי; vaultShim ידאג לסנכרון שרת
     saveMiningState(after);
     setMining(after);
-    
+
     setCenterPopup?.({ text: `✅ Sent ${formatMleoShort(delta)} MLEO to wallet`, id: Math.random() });
     setClaimAmount(""); // Reset claim amount after successful claim
   } catch (err) {
@@ -969,6 +1024,7 @@ async function onClaimMined() {
 
 async function onClaimMinedToWallet() {
   try { play?.(S_CLICK); } catch {}
+  try { await flushMinerBreakAccrual(); } catch {}
   const st = loadMiningState();
 
   // מושכים מה-Vault, לא מה-Balance
@@ -1015,15 +1071,14 @@ async function onClaimMinedToWallet() {
 
     await publicClient.waitForTransactionReceipt({ hash });
 
-    // עדכון סטייט לוקלי: מורידים מה-Vault, מוסיפים ל-claimedToWallet
+    // עדכון שרת כסמכות + סנכרון לוקאלי
+    const delta = Math.max(0, Math.floor(Number(toClaim) || 0));
+    const resp = await claimMinerToWallet(delta);
     const after = loadMiningState();
-    const delta = Number(toClaim);
-    after.vault           = Math.max(0, Number(((after.vault || 0) - delta).toFixed(2)));
-    after.claimedToWallet = Number(((after.claimedToWallet || 0) + delta).toFixed(2));
+    after.vault = Math.max(0, Number(resp?.vault || 0));
+    after.claimedToWallet = Math.max(0, Number(resp?.claimedToWallet || 0));
     after.history = Array.isArray(after.history) ? after.history : [];
     after.history.unshift({ t: Date.now(), kind: "claim_wallet", amount: delta, tx: String(hash) });
-    
-    // שמור מקומי; vaultShim ידאג לסנכרון שרת
     saveMiningState(after);
     setMining(after);
 
@@ -1114,50 +1169,84 @@ async function onClaimMinedToWallet() {
 
   function grantGift(){
     const s = stateRef.current; if (!s) return;
-    const type = rollGiftType();
+  claimMinerHourlyGift()
+    .then((gift) => {
+      const type = String(gift?.rewardKey || "");
+      if (!type) return;
 
-    if (type === "coins20") {
-      const base = Math.max(10, expectedGiftCoinReward(s));
-      const gain = Math.round(base * 0.10);
-      s.gold += gain;
-      setUi(u => ({ ...u, gold: s.gold }));
-      setCenterPopup({ text: `🎁 +${formatShort(gain)} coins`, id: Math.random() });
+      if (type === "coins20" || type === "coins40") {
+        const base = Math.max(10, expectedGiftCoinReward(s));
+        const pct = Number(gift?.coinsPct || (type === "coins20" ? 0.1 : 0.2));
+        const gain = Math.round(base * pct);
+        s.gold += gain;
+        setUi(u => ({ ...u, gold: s.gold }));
+        setCenterPopup({ text: `🎁 +${formatShort(gain)} coins`, id: Math.random() });
+      } else if (type === "dps") {
+        const mul = Number(gift?.dpsMultiplier || 1.1);
+        s.dpsMult = +((s.dpsMult || 1) * mul).toFixed(2);
+        setCenterPopup({ text: `🎁 DPS boost (×${(s.dpsMult||1).toFixed(2)})`, id: Math.random() });
+      } else if (type === "gold") {
+        const mul = Number(gift?.goldMultiplier || 1.1);
+        s.goldMult = +((s.goldMult || 1) * mul).toFixed(2);
+        setCenterPopup({ text: `🎁 GOLD boost (×${(s.goldMult||1).toFixed(2)})`, id: Math.random() });
+      } else if (type === "diamond") {
+        const diamonds = Math.max(1, Number(gift?.diamonds || 1));
+        s.diamonds = (s.diamonds || 0) + diamonds;
+        setCenterPopup({ text: `🎁 +${diamonds} 💎 (Diamonds: ${s.diamonds})`, id: Math.random() });
+      }
 
-    } else if (type === "coins40") {
-      const base = Math.max(10, expectedGiftCoinReward(s));
-      const gain = Math.round(base * 0.20);
-      s.gold += gain;
-      setUi(u => ({ ...u, gold: s.gold }));
-      setCenterPopup({ text: `🎁 +${formatShort(gain)} coins`, id: Math.random() });
+      if (Number(gift?.mleoBonus || 0) > 0) {
+        const st = loadMiningState();
+        st.balance = Math.max(0, Number(gift.balance || st.balance || 0));
+        st.minedToday = Math.max(0, Number(gift.minedToday || st.minedToday || 0));
+        saveMiningState(st);
+        setMining(st);
+      }
 
-    } else if (type === "dps") {
-      s.dpsMult = +((s.dpsMult || 1) * 1.1).toFixed(2);
-      setCenterPopup({ text: `🎁 DPS +10% (×${(s.dpsMult||1).toFixed(2)})`, id: Math.random() });
-
-    } else if (type === "gold") {
-      s.goldMult = +((s.goldMult || 1) * 1.1).toFixed(2);
-      setCenterPopup({ text: `🎁 GOLD +10% (×${(s.goldMult||1).toFixed(2)})`, id: Math.random() });
-
-    } else if (type === "diamond") {
-      s.diamonds = (s.diamonds || 0) + 1;
-      setCenterPopup({ text: `🎁 +1 💎 (Diamonds: ${s.diamonds})`, id: Math.random() });
-    }
-
-    s.giftReady = false;
-    {
-      const now = Date.now();
-      const stepSec = currentGiftIntervalSec(s, now);
-      s.giftNextAt = now + stepSec * 1000;
-    }
-
-    s.giftFirstReadyAt = null;
-    s.isIdleOffline = false;
-    resetOfflineSession(s);
-
-
-    setGiftReadyFlag(false);
-    try { play(S_GIFT); } catch {}
-    save?.();
+      s.giftReady = false;
+      s.giftNextAt = gift?.nextClaimAt ? new Date(gift.nextClaimAt).getTime() : (Date.now() + currentGiftIntervalSec(s, Date.now()) * 1000);
+      s.giftFirstReadyAt = null;
+      s.isIdleOffline = false;
+      resetOfflineSession(s);
+      setGiftReadyFlag(false);
+      try { play(S_GIFT); } catch {}
+      save?.();
+    })
+    .catch((err) => {
+      // Fallback keeps game playable if SQL/API isn't deployed yet.
+      console.warn("Server gift claim failed, falling back locally", err);
+      const type = rollGiftType();
+      if (type === "coins20") {
+        const base = Math.max(10, expectedGiftCoinReward(s));
+        const gain = Math.round(base * 0.10);
+        s.gold += gain;
+        setUi(u => ({ ...u, gold: s.gold }));
+        setCenterPopup({ text: `🎁 +${formatShort(gain)} coins`, id: Math.random() });
+      } else if (type === "coins40") {
+        const base = Math.max(10, expectedGiftCoinReward(s));
+        const gain = Math.round(base * 0.20);
+        s.gold += gain;
+        setUi(u => ({ ...u, gold: s.gold }));
+        setCenterPopup({ text: `🎁 +${formatShort(gain)} coins`, id: Math.random() });
+      } else if (type === "dps") {
+        s.dpsMult = +((s.dpsMult || 1) * 1.1).toFixed(2);
+        setCenterPopup({ text: `🎁 DPS +10% (×${(s.dpsMult||1).toFixed(2)})`, id: Math.random() });
+      } else if (type === "gold") {
+        s.goldMult = +((s.goldMult || 1) * 1.1).toFixed(2);
+        setCenterPopup({ text: `🎁 GOLD +10% (×${(s.goldMult||1).toFixed(2)})`, id: Math.random() });
+      } else if (type === "diamond") {
+        s.diamonds = (s.diamonds || 0) + 1;
+        setCenterPopup({ text: `🎁 +1 💎 (Diamonds: ${s.diamonds})`, id: Math.random() });
+      }
+      s.giftReady = false;
+      s.giftNextAt = Date.now() + currentGiftIntervalSec(s, Date.now()) * 1000;
+      s.giftFirstReadyAt = null;
+      s.isIdleOffline = false;
+      resetOfflineSession(s);
+      setGiftReadyFlag(false);
+      try { play(S_GIFT); } catch {}
+      save?.();
+    });
   }
 
   // ====== מסך מלא + Back (נוסף) ======
@@ -1993,6 +2082,7 @@ setUi(u => ({ ...u, gold: s.gold }));
 const stageNow = rockStageNow(rock);
 const baseForBreak = mleoBaseForStage(stageNow);
 const eff = addPlayerScorePoints(s, baseForBreak);finalizeDailyRewardOncePerTick();
+queueMinerBreakAccrual(stageNow, 1, Boolean(s.isIdleOffline));
 
 
 // מציגים ב־POP את מה שבאמת נכנס (eff), לא Preview
