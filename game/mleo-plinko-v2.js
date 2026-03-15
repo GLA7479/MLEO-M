@@ -16,9 +16,13 @@ import {
   useChainId,
 } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -184,6 +188,7 @@ export default function Plinko2Page() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionError, setSessionError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -451,10 +456,21 @@ export default function Plinko2Page() {
         const biasForce = (centerX - ball.x) * centerBias * dt * 60;
         ball.vx += biasForce;
 
+        if (Number.isInteger(ball.targetBucketIndex)) {
+          const targetBucket = bucketsRef.current[ball.targetBucketIndex];
+          if (targetBucket) {
+            const targetCenterX = targetBucket.x + targetBucket.w / 2;
+            const steerStrength = ball.y >= canvas.height * 0.55 ? 0.14 : 0.03;
+            ball.vx += (targetCenterX - ball.x) * steerStrength * dt * 60;
+          }
+        }
+
         // Wall collision - REMOVE ball if hits walls (0x multiplier)
         if (ball.x - ball.r < 0 || ball.x + ball.r > canvas.width) {
-          const zeroBucket = { multiplier: 0, index: -1 };
-          landInBucket(ball, zeroBucket);
+          const fallbackBucket = Number.isInteger(ball.targetBucketIndex)
+            ? bucketsRef.current[ball.targetBucketIndex]
+            : { multiplier: 0, index: 8 };
+          landInBucket(ball, fallbackBucket);
           balls.splice(i, 1);
           continue;
         }
@@ -480,14 +496,16 @@ export default function Plinko2Page() {
         // Bucket collision - only check if ball reached buckets area
         let landed = false;
         if (ball.y >= canvas.height - 80 && ball.vy > 0) {
-          // Find which bucket the ball landed in based on x position
+          const targetBucket = Number.isInteger(ball.targetBucketIndex)
+            ? bucketsRef.current[ball.targetBucketIndex]
+            : null;
           const bucketWidth = canvas.width / MULTIPLIERS.length;
           let bucketIndex = Math.floor(ball.x / bucketWidth);
           bucketIndex = Math.max(0, Math.min(bucketIndex, bucketsRef.current.length - 1));
-          
-          const bucket = bucketsRef.current[bucketIndex];
+          const bucket = targetBucket || bucketsRef.current[bucketIndex];
           if (bucket && ball.y + ball.r >= bucket.y && ball.x >= bucket.x - 10 && ball.x <= bucket.x + bucket.w + 10) {
             landed = true;
+            ball.x = bucket.x + bucket.w / 2;
             landInBucket(ball, bucket);
             balls.splice(i, 1);
           }
@@ -516,16 +534,16 @@ export default function Plinko2Page() {
 
   const landInBucket = async (ball, bucket) => {
     const play = ball.play;
-    
-    // Use the ACTUAL physical bucket the ball landed in!
-    const bucketIndex = bucket.index;
-    const multiplier = MULTIPLIERS[bucketIndex];
-    const prize = Math.floor(play * multiplier);
-    const win = prize > 0;
+    const payload = ball.finishResult?.serverPayload || {};
+    const bucketIndex = Number.isInteger(payload.bucketIndex) ? payload.bucketIndex : bucket.index;
+    const multiplier = Number(payload.multiplier ?? MULTIPLIERS[bucketIndex] ?? 0);
+    const prize = Math.max(0, Number(ball.finishResult?.approvedReward ?? Math.floor(play * multiplier)));
+    const win = Boolean(payload.won ?? (prize > 0));
 
+    if (Number.isFinite(ball.finishResult?.balanceAfter)) {
+      setVaultState(ball.finishResult.balanceAfter);
+    }
     if (win && prize > 0) {
-      const creditResult = await creditSharedVault(prize, "plinko-v2");
-      setVaultState(creditResult.balance);
       playSfx(winSound.current);
     }
 
@@ -557,54 +575,71 @@ export default function Plinko2Page() {
 
   const dropBall = async (isFreePlayParam = false) => {
     playSfx(clickSound.current);
-    let play = Number(playAmount) || MIN_PLAY;
-    if (isFreePlay || isFreePlayParam) {
-      const gameId = router.pathname.replace('/', '') || 'plinko';
-      try {
-        const result = await useFreePlayToken(gameId);
-        if (result.success) {
-          play = result.amount;
-          setIsFreePlay(false);
-          router.replace("/plinko", undefined, { shallow: true });
-        } else {
-          alert(result.message || "No free play tokens available!");
+    setSessionError("");
+    try {
+      let play = Number(playAmount) || MIN_PLAY;
+      let finishResult;
+      if (isFreePlay || isFreePlayParam) {
+        const gameId = router.pathname.replace('/', '') || 'plinko';
+        try {
+          const startResult = await startFreeplayArcadeSession(gameId);
+          if (startResult.success) {
+            play = startResult.amount;
+            setFreePlayTokens(startResult.remainingTokens);
+            setIsFreePlay(false);
+            router.replace("/plinko", undefined, { shallow: true });
+            finishResult = await finishArcadeSession(startResult.sessionId, {});
+          } else {
+            alert(startResult.message || "No free play tokens available!");
+            setIsFreePlay(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Free play error:', error);
+          alert('Failed to use free play token. Please try again.');
           setIsFreePlay(false);
           return;
         }
-      } catch (error) {
-        console.error('Free play error:', error);
-        alert('Failed to use free play token. Please try again.');
-        setIsFreePlay(false);
+      } else {
+        if (play < MIN_PLAY) {
+          alert(`Minimum play is ${MIN_PLAY} MLEO`);
+          return;
+        }
+        const startResult = await startPaidArcadeSession("plinko", play);
+        if (!startResult.success) {
+          alert(startResult.message || "Failed to start session");
+          return;
+        }
+        setVaultState(startResult.balanceAfter);
+        finishResult = await finishArcadeSession(startResult.sessionId, {});
+      }
+      if (!finishResult?.success) {
+        setSessionError("Session failed to finish");
+        alert(finishResult?.message || "Failed to finish session");
         return;
       }
-    } else {
-      if (play < MIN_PLAY) {
-        alert(`Minimum play is ${MIN_PLAY} MLEO`);
-        return;
-      }
-      const currentVault = peekSharedVault().balance;
-      if (currentVault < play) {
-        alert("Insufficient MLEO in vault");
-        return;
-      }
-      const debitResult = await debitSharedVault(play, "plinko-v2");
-      setVaultState(debitResult.balance);
+      setPlayAmount(String(play));
+
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const ball = {
+        x: canvas.width / 2 + (Math.random() - 0.5) * 20,
+        y: 20,
+        vx: (Math.random() - 0.5) * 50,
+        vy: 50,
+        r: 3,
+        play,
+        finishResult,
+        targetBucketIndex: Number(finishResult?.serverPayload?.bucketIndex),
+      };
+
+      ballsRef.current.push(ball);
+    } catch (error) {
+      console.error("Plinko session error:", error);
+      setSessionError("Session failed to finish");
+      alert("Failed to finish session. Please refresh vault and try again.");
     }
-    setPlayAmount(String(play));
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ball = {
-      x: canvas.width / 2 + (Math.random() - 0.5) * 20,
-      y: 20,
-      vx: (Math.random() - 0.5) * 50,
-      vy: 50,
-      r: 3,
-      play,
-    };
-
-    ballsRef.current.push(ball);
   };
 
   const backSafe = () => {
@@ -962,6 +997,7 @@ export default function Plinko2Page() {
             >
               🎯 DROP BALL
             </button>
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button
                 onClick={() => {

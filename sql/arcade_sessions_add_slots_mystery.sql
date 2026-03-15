@@ -89,6 +89,14 @@ DECLARE
   v_hilo_streak integer := 0;
   v_hilo_cashout boolean := false;
   v_hilo_multiplier numeric := 0;
+  v_plinko_bucket integer := 0;
+  v_plinko_pick numeric := 0;
+  v_plinko_multiplier numeric := 0;
+  v_crash_hex text := '';
+  v_crash_value numeric := 0;
+  v_crash_u numeric := 0;
+  v_crash_point numeric := 0;
+  v_crash_cashout numeric := 0;
   v_ladder_step integer;
   v_ladder_success boolean;
   v_ladder_multiplier numeric := 0;
@@ -624,6 +632,97 @@ BEGIN
       'cashout', v_hilo_cashout,
       'streak', v_hilo_streak,
       'multiplier', v_hilo_multiplier,
+      'won', v_won,
+      'approved_reward', v_reward
+    );
+
+  ELSIF coalesce(v_session.game_id, '') = 'plinko' THEN
+    v_plinko_pick := random() * 1.0396;
+    IF v_plinko_pick < 0.0002 THEN
+      v_plinko_bucket := 0;
+      v_plinko_multiplier := 0;
+    ELSIF v_plinko_pick < 0.0003 THEN
+      v_plinko_bucket := 1;
+      v_plinko_multiplier := 40;
+    ELSIF v_plinko_pick < 0.0033 THEN
+      v_plinko_bucket := 2;
+      v_plinko_multiplier := 18;
+    ELSIF v_plinko_pick < 0.0048 THEN
+      v_plinko_bucket := 3;
+      v_plinko_multiplier := 5;
+    ELSIF v_plinko_pick < 0.0198 THEN
+      v_plinko_bucket := 4;
+      v_plinko_multiplier := 2;
+    ELSIF v_plinko_pick < 0.0598 THEN
+      v_plinko_bucket := 5;
+      v_plinko_multiplier := 1.5;
+    ELSIF v_plinko_pick < 0.1498 THEN
+      v_plinko_bucket := 6;
+      v_plinko_multiplier := 1;
+    ELSIF v_plinko_pick < 0.2698 THEN
+      v_plinko_bucket := 7;
+      v_plinko_multiplier := 0.5;
+    ELSIF v_plinko_pick < 0.7698 THEN
+      v_plinko_bucket := 8;
+      v_plinko_multiplier := 0;
+    ELSIF v_plinko_pick < 0.8898 THEN
+      v_plinko_bucket := 9;
+      v_plinko_multiplier := 0.5;
+    ELSIF v_plinko_pick < 0.9798 THEN
+      v_plinko_bucket := 10;
+      v_plinko_multiplier := 1;
+    ELSIF v_plinko_pick < 1.0198 THEN
+      v_plinko_bucket := 11;
+      v_plinko_multiplier := 1.5;
+    ELSIF v_plinko_pick < 1.0348 THEN
+      v_plinko_bucket := 12;
+      v_plinko_multiplier := 2;
+    ELSIF v_plinko_pick < 1.0363 THEN
+      v_plinko_bucket := 13;
+      v_plinko_multiplier := 5;
+    ELSIF v_plinko_pick < 1.0393 THEN
+      v_plinko_bucket := 14;
+      v_plinko_multiplier := 18;
+    ELSIF v_plinko_pick < 1.0394 THEN
+      v_plinko_bucket := 15;
+      v_plinko_multiplier := 40;
+    ELSE
+      v_plinko_bucket := 16;
+      v_plinko_multiplier := 0;
+    END IF;
+    v_reward := floor(v_session.stake * v_plinko_multiplier)::bigint;
+    v_won := v_reward > 0;
+    v_server_payload := jsonb_build_object(
+      'game', 'plinko',
+      'mode', v_session.mode,
+      'stake', v_session.stake,
+      'bucketIndex', v_plinko_bucket,
+      'multiplier', v_plinko_multiplier,
+      'won', v_won,
+      'approved_reward', v_reward
+    );
+
+  ELSIF coalesce(v_session.game_id, '') = 'crash' THEN
+    v_crash_hex := substr(replace(v_session.id::text, '-', ''), 1, 12);
+    v_crash_value := 0;
+    FOR i IN 0..5 LOOP
+      v_crash_value := (v_crash_value * 256) + get_byte(decode(v_crash_hex, 'hex'), i);
+    END LOOP;
+    v_crash_u := v_crash_value / 281474976710656::numeric;
+    v_crash_point := round(least(10.0::numeric, greatest(1.01::numeric, (1.01 + ((10.0 - 1.01) * power(v_crash_u, 1.45))))), 2);
+    v_crash_cashout := round(coalesce((p_payload->>'cashoutMultiplier')::numeric, 0), 2);
+    IF v_crash_cashout < 0 THEN
+      RAISE EXCEPTION 'crash cashoutMultiplier cannot be negative';
+    END IF;
+    v_won := coalesce((p_payload->>'cashedOut')::boolean, false) AND v_crash_cashout >= 1.01 AND v_crash_cashout < v_crash_point;
+    v_reward := CASE WHEN v_won THEN floor(v_session.stake * v_crash_cashout)::bigint ELSE 0 END;
+    v_server_payload := jsonb_build_object(
+      'game', 'crash',
+      'mode', v_session.mode,
+      'stake', v_session.stake,
+      'crashPoint', v_crash_point,
+      'cashedOut', v_won,
+      'cashedOutAt', CASE WHEN v_won THEN v_crash_cashout ELSE null END,
       'won', v_won,
       'approved_reward', v_reward
     );

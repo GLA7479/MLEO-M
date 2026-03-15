@@ -16,7 +16,19 @@ import {
   useChainId,
 } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
+import {
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
+  debitSharedVault,
+  initSharedVault,
+  peekSharedVault,
+  readSharedVault,
+  subscribeSharedVault,
+} from "../lib/sharedVault";
 
 // ===== viewport fix =====
 function useIOSViewportFix() {
@@ -97,15 +109,6 @@ function safeWrite(key, val) {
     localStorage.setItem(key, JSON.stringify(val));
   } catch {}
 }
-function getVault() {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  return rushData.vault || 0;
-}
-function setVault(amount) {
-  const rushData = safeRead("mleo_rush_core_v4", {});
-  rushData.vault = amount;
-  safeWrite("mleo_rush_core_v4", rushData);
-}
 function fmt(n) {
   if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
   if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
@@ -144,6 +147,16 @@ function hashToCrash(hex, minCrash, maxCrash) {
   const u = hashToUnitFloat(hex);
   const k = 1.45;
   const skew = Math.pow(u, k);
+  const v = minCrash + (maxCrash - minCrash) * skew;
+  return Math.max(minCrash, Math.min(maxCrash, Math.round(v * 100) / 100));
+}
+
+async function getCrashPointFromSessionId(sessionId, minCrash, maxCrash) {
+  const hex = String(sessionId || "").replace(/-/g, "").slice(0, 12);
+  const value = parseInt(hex || "0", 16);
+  const unit = value / 281474976710656;
+  const k = 1.45;
+  const skew = Math.pow(unit, k);
   const v = minCrash + (maxCrash - minCrash) * skew;
   return Math.max(minCrash, Math.min(maxCrash, Math.round(v * 100) / 100));
 }
@@ -198,6 +211,11 @@ export default function Crash2Page() {
   const rafRef = useRef(0);
   const dataRef = useRef([]);
   const [chartData, setChartData] = useState([]);
+  const playerBetRef = useRef(null);
+  const canCashOutRef = useRef(false);
+  const cashedOutAtRef = useRef(null);
+  const autoCashOutEnabledRef = useRef(false);
+  const autoCashOutValueRef = useRef("2.00");
 
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
@@ -207,6 +225,7 @@ export default function Crash2Page() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionError, setSessionError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -214,6 +233,7 @@ export default function Crash2Page() {
   const [sfxMuted, setSfxMuted] = useState(false);
   const clickSound = useRef(null);
   const winSound = useRef(null);
+  const settledResultRef = useRef(null);
 
   const [stats, setStats] = useState(() =>
     safeRead(LS_KEY, {
@@ -238,8 +258,16 @@ export default function Crash2Page() {
 
   // Init
   useEffect(() => {
+    let cancelled = false;
     setMounted(true);
-    setVaultState(getVault());
+    initSharedVault();
+    readSharedVault()
+      .then((snapshot) => {
+        if (!cancelled) setVaultState(snapshot.balance);
+      })
+      .catch(() => {
+        if (!cancelled) setVaultState(peekSharedVault().balance);
+      });
     const isFree = router.query.freePlay === "true";
     setIsFreePlay(isFree);
     const gameId = router.pathname.replace('/', '') || 'crash';
@@ -248,11 +276,13 @@ export default function Crash2Page() {
     }).catch(err => console.error('Failed to get free play status:', err));
     const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
     if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
+    const unsubscribeVault = subscribeSharedVault((snapshot) => {
+      if (!cancelled) setVaultState(snapshot.balance);
+    });
     const interval = setInterval(() => {
       getFreePlayStatus().then(status => {
         if (!cancelled) setFreePlayTokens(status.tokens);
       }).catch(err => console.error('Failed to get free play status:', err));
-      setVaultState(getVault());
     }, 2000);
     if (typeof Audio !== "undefined") {
       try {
@@ -264,6 +294,8 @@ export default function Crash2Page() {
       setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => {
+      cancelled = true;
+      unsubscribeVault();
       clearInterval(interval);
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
@@ -272,6 +304,23 @@ export default function Crash2Page() {
   useEffect(() => {
     safeWrite(LS_KEY, stats);
   }, [stats]);
+
+  useEffect(() => {
+    playerBetRef.current = playerBet;
+  }, [playerBet]);
+
+  useEffect(() => {
+    canCashOutRef.current = canCashOut;
+  }, [canCashOut]);
+
+  useEffect(() => {
+    cashedOutAtRef.current = cashedOutAt;
+  }, [cashedOutAt]);
+
+  useEffect(() => {
+    autoCashOutEnabledRef.current = enableAutoCashOut;
+    autoCashOutValueRef.current = autoCashOut;
+  }, [enableAutoCashOut, autoCashOut]);
 
   useEffect(() => {
     if (gameResult) {
@@ -333,11 +382,11 @@ export default function Crash2Page() {
   }, [phase]);
 
   const startNextRound = async () => {
-    const seed = Math.random().toString(36).slice(2, 12);
-    setServerSeed(seed);
-    const hash = await sha256Hex(seed + clientSeed + nonce);
-    setServerSeedHash(hash);
-    const crash = hashToCrash(hash, ROUND.minCrash, ROUND.maxCrash);
+    const crash = Number(playerBet?.crashPoint || 0) > 0
+      ? Number(playerBet.crashPoint)
+      : hashToCrash(await sha256Hex(`${Math.random().toString(36).slice(2, 12)}${clientSeed}${nonce}`), ROUND.minCrash, ROUND.maxCrash);
+    setServerSeed(playerBet?.sessionId || "");
+    setServerSeedHash(playerBet?.sessionId ? await sha256Hex(playerBet.sessionId) : "");
     setCrashPoint(crash);
     setPhase("running");
     setMultiplier(1.0);
@@ -359,11 +408,11 @@ export default function Crash2Page() {
 
       // Auto cash out
       if (
-        enableAutoCashOut &&
-        playerBet &&
-        canCashOut &&
-        !cashedOutAt &&
-        m >= Number(autoCashOut)
+        autoCashOutEnabledRef.current &&
+        playerBetRef.current &&
+        canCashOutRef.current &&
+        !cashedOutAtRef.current &&
+        m >= Number(autoCashOutValueRef.current)
       ) {
         cashOut();
       }
@@ -381,17 +430,20 @@ export default function Crash2Page() {
     rafRef.current = requestAnimationFrame(animate);
   };
 
-  const placeBet = (isFreePlayParam = false) => {
+  const placeBet = async (isFreePlayParam = false) => {
     playSfx(clickSound.current);
     if (phase !== "playing") return;
-    const currentVault = getVault();
+    setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
+    let nextSessionId = null;
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'crash';
       try {
-        const result = await useFreePlayToken(gameId);
+        const result = await startFreeplayArcadeSession(gameId);
         if (result.success) {
           play = result.amount;
+          nextSessionId = result.sessionId;
+          setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
           router.replace("/crash", undefined, { shallow: true });
         } else {
@@ -410,15 +462,18 @@ export default function Crash2Page() {
         alert(`Minimum play is ${MIN_PLAY} MLEO`);
         return;
       }
-      if (currentVault < play) {
-        alert("Insufficient MLEO in vault");
+      const startResult = await startPaidArcadeSession("crash", play);
+      if (!startResult.success) {
+        alert(startResult.message || "Failed to start session");
         return;
       }
-      setVault(currentVault - play);
-      setVaultState(currentVault - play);
+      nextSessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
+    const crash = await getCrashPointFromSessionId(nextSessionId, ROUND.minCrash, ROUND.maxCrash);
     setPlayAmount(String(play));
-    setPlayerBet({ amount: play, accepted: true });
+    settledResultRef.current = null;
+    setPlayerBet({ amount: play, accepted: true, sessionId: nextSessionId, crashPoint: crash });
     setCanCashOut(false);
     setCashedOutAt(null);
     setPayoutAmount(null);
@@ -431,52 +486,91 @@ export default function Crash2Page() {
     }
   }, [phase, playerBet, cashedOutAt]);
 
-  const cashOut = () => {
+  const cashOut = async () => {
     if (!canCashOut || !playerBet || cashedOutAt) return;
     playSfx(clickSound.current);
-    setCashedOutAt(multiplier);
-    setCanCashOut(false);
-    const prize = Math.floor(playerBet.amount * multiplier);
-    setPayoutAmount(prize);
-    const newVault = getVault() + prize;
-    setVault(newVault);
-    setVaultState(newVault);
-    playSfx(winSound.current);
+    try {
+      const cashoutMultiplier = Math.round(multiplier * 100) / 100;
+      const finishResult = await finishArcadeSession(playerBet.sessionId, {
+        cashedOut: true,
+        cashoutMultiplier,
+      });
+      const payload = finishResult?.serverPayload || {};
+      const resolvedCashedOutAt = Number(payload.cashedOutAt || cashoutMultiplier);
+      const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
+      setCashedOutAt(resolvedCashedOutAt);
+      setCanCashOut(false);
+      setPayoutAmount(prize);
+      if (Number.isFinite(finishResult?.balanceAfter)) {
+        setVaultState(finishResult.balanceAfter);
+      }
+      if (prize > 0) playSfx(winSound.current);
+      settledResultRef.current = {
+        win: prize > 0,
+        crashedAt: Number(payload.crashPoint || playerBet.crashPoint || 0),
+        cashedAt: resolvedCashedOutAt,
+        prize,
+        profit: prize - playerBet.amount,
+      };
+    } catch (error) {
+      console.error("Crash cashout session error:", error);
+      setSessionError("Session failed to cash out");
+    }
   };
 
-  const endRound = (won) => {
+  const endRound = async () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     
     if (playerBet) {
       const play = playerBet.amount;
-      const cashed = cashedOutAt;
-      const prize = cashed ? Math.floor(play * cashed) : 0;
-      const win = prize > 0;
-
-      const resultData = {
-        win,
-        crashedAt: crashPoint,
-        cashedAt: cashed,
-        prize,
-        profit: win ? prize - play : -play,
-      };
+      let resultData = settledResultRef.current;
+      if (!resultData) {
+        try {
+          const finishResult = await finishArcadeSession(playerBet.sessionId, {
+            cashedOut: false,
+          });
+          const payload = finishResult?.serverPayload || {};
+          const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
+          if (Number.isFinite(finishResult?.balanceAfter)) {
+            setVaultState(finishResult.balanceAfter);
+          }
+          resultData = {
+            win: prize > 0,
+            crashedAt: Number(payload.crashPoint || playerBet.crashPoint || crashPoint || 0),
+            cashedAt: null,
+            prize,
+            profit: prize > 0 ? prize - play : -play,
+          };
+        } catch (error) {
+          console.error("Crash finish session error:", error);
+          setSessionError("Session failed to finish");
+          resultData = {
+            win: false,
+            crashedAt: Number(playerBet.crashPoint || crashPoint || 0),
+            cashedAt: null,
+            prize: 0,
+            profit: -play,
+          };
+        }
+      }
       setGameResult(resultData);
 
       const newStats = {
         ...stats,
         totalGames: stats.totalGames + 1,
-        wins: win ? stats.wins + 1 : stats.wins,
-        losses: win ? stats.losses : stats.losses + 1,
+        wins: resultData.win ? stats.wins + 1 : stats.wins,
+        losses: resultData.win ? stats.losses : stats.losses + 1,
         totalPlay: stats.totalPlay + play,
-        totalWon: win ? stats.totalWon + prize : stats.totalWon,
-        biggestWin: Math.max(stats.biggestWin, win ? prize : 0),
+        totalWon: resultData.win ? stats.totalWon + resultData.prize : stats.totalWon,
+        biggestWin: Math.max(stats.biggestWin, resultData.win ? resultData.prize : 0),
         biggestMultiplier: Math.max(
           stats.biggestMultiplier,
-          cashed || 0
+          resultData.cashedAt || 0
         ),
         lastPlay: play,
       };
       setStats(newStats);
+      settledResultRef.current = null;
     }
 
     setTimeout(() => {
@@ -502,6 +596,7 @@ export default function Crash2Page() {
     setNonce((n) => n + 1);
     dataRef.current = [];
     setChartData([]);
+    setSessionError("");
   };
 
   const backSafe = () => {
@@ -533,14 +628,15 @@ export default function Crash2Page() {
       alert("Missing CLAIM address");
       return;
     }
-    if (collectAmount <= 0 || collectAmount > vault) {
+      const wholeCollectAmount = normalizeWholeAmount(collectAmount);
+      if (wholeCollectAmount <= 0 || wholeCollectAmount > vault) {
       alert("Invalid amount!");
       return;
     }
     setClaiming(true);
     try {
       const amountUnits = parseUnits(
-        Number(collectAmount).toFixed(Math.min(2, MLEO_DECIMALS)),
+        String(wholeCollectAmount),
         MLEO_DECIMALS
       );
       const hash = await writeContractAsync({
@@ -552,10 +648,13 @@ export default function Crash2Page() {
         account: address,
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      const newVault = Math.max(0, vault - collectAmount);
-      setVault(newVault);
-      setVaultState(newVault);
-      alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
+      const debitResult = await debitSharedVault(wholeCollectAmount, "crash-v2-claim");
+      if (!debitResult.ok) {
+        alert(debitResult.error || "Vault update failed");
+        return;
+      }
+      setVaultState(debitResult.balance);
+      alert(`✅ Sent ${fmt(wholeCollectAmount)} MLEO to wallet!`);
       setShowVaultModal(false);
     } catch (err) {
       console.error(err);
@@ -906,6 +1005,7 @@ export default function Crash2Page() {
                 ? "✅ PLAY PLACED"
                 : `🎲 JOIN ROUND`}
             </button>
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button
                 onClick={() => {
