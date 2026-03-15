@@ -797,20 +797,26 @@ const { disconnect } = useDisconnect();
         Math.max(0, Math.floor(Number(count) || 0)),
       ])
       .filter(([, count]) => count > 0);
+
     if (!entries.length) return null;
 
     let queuedCount = 0;
     let totalAdded = 0;
     let lastPayload = null;
+
     for (const [stage, total] of entries) {
       let remaining = total;
+
       while (remaining > 0) {
-        const room = Math.max(1, 120 - queuedCount); // יישור לשרת: 120 במקום 200
+        const room = Math.max(1, 120 - queuedCount);
         const take = Math.min(remaining, room);
-        queueMinerBreakAccrual(stage, take, false);
+
+        queueMinerBreakAccrual(stage, take, true); // true = offline
+
         queuedCount += take;
         remaining -= take;
-        if (queuedCount >= 120) { // יישור לשרת: 120 במקום 200
+
+        if (queuedCount >= 120) {
           lastPayload = await flushMinerBreakAccrual();
           totalAdded += Number(lastPayload?.added || 0);
           queuedCount = 0;
@@ -822,6 +828,7 @@ const { disconnect } = useDisconnect();
       lastPayload = await flushMinerBreakAccrual();
       totalAdded += Number(lastPayload?.added || 0);
     }
+
     return {
       added: totalAdded,
       lastPayload,
@@ -1318,6 +1325,10 @@ useEffect(() => {
 
   if (loaded && loaded.minerScale == null) init.minerScale = 1.60;
   if (loaded && loaded.minerWidth  == null) init.minerWidth  = 0.8;
+  // וודא שיש pendingOfflineStageCounts
+  if (!init.pendingOfflineStageCounts || typeof init.pendingOfflineStageCounts !== "object") {
+    init.pendingOfflineStageCounts = {};
+  }
 
   if (init.costBase == null) {
     try { init.costBase = Math.max(80, expectedRockCoinReward(init)); }
@@ -2232,6 +2243,7 @@ function save() {
       lastSeen: s.lastSeen,
       pendingOfflineGold: s.pendingOfflineGold || 0,
       pendingOfflineMleo: s.pendingOfflineMleo || 0,
+      pendingOfflineStageCounts: s.pendingOfflineStageCounts || {},
       totalPurchased: s.totalPurchased, spawnLevel: s.spawnLevel,
 
       cycleStartAt: s.cycleStartAt,
@@ -2376,29 +2388,92 @@ function upgradeGold() {
   setUi(u => ({ ...u, gold: s.gold })); save();
 }
 
-function onOfflineCollect() {
-  const s = stateRef.current; if (!s) return;
-  const addCoins = s.pendingOfflineGold || 0;
-  const addMleo  = Number(s.pendingOfflineMleo || 0);
+async function onOfflineCollect() {
+  const s = stateRef.current;
+  if (!s) return;
 
+  const addCoins = Math.max(0, Number(s.pendingOfflineGold || 0));
+  const addMleo = Math.max(0, Number(s.pendingOfflineMleo || 0));
+  const stageCountsCopy = { ...(s.pendingOfflineStageCounts || {}) };
+
+  // 1) זיכוי מיידי בלקוח
   if (addCoins > 0) {
     s.gold += addCoins;
-    s.pendingOfflineGold = 0;
-    setUi(u => ({ ...u, gold: s.gold }));
+    setUi((u) => ({ ...u, gold: s.gold }));
   }
+
+  // מאפסים pending של offline במסך המשחק
+  s.pendingOfflineGold = 0;
   s.pendingOfflineMleo = 0;
+  s.pendingOfflineStageCounts = {};
 
   save();
 
-  if (addCoins > 0 || addMleo > 0) {
-  setCenterPopup({
-  text: `⛏️ +${formatShort(addCoins)} coins • +${formatMleoShort(addMleo)} MLEO`,
+  // 2) זיכוי מיידי ל-Vault בלקוח (אופטימי)
+  if (addMleo > 0) {
+    const currentMining = normalizeMiningState(loadMiningState());
+    const nextSharedVault = Number(currentMining.sharedVaultBalance || currentMining.vault || 0) + addMleo;
+    const nextMinersVault = Number(currentMining.minersVault || 0) + addMleo;
 
-  id: Math.random()
-});
+    const optimisticMining = mergeMiningState(currentMining, {
+      vault: nextSharedVault,
+      sharedVaultBalance: nextSharedVault,
+      minersVault: nextMinersVault,
+    });
 
+    saveMiningState(optimisticMining);
+    setMining(optimisticMining);
   }
+
+  // 3) popup מיידי
+  if (addCoins > 0 || addMleo > 0) {
+    setCenterPopup({
+      text: `⛏️ +${formatShort(addCoins)} coins • +${formatMleoShort(addMleo)} MLEO`,
+      id: Math.random(),
+    });
+  }
+
   setShowCollect(false);
+
+  // 4) ברקע: סוגרים את ה-offline לשרת ואז מעבירים ל-vault בשרת
+  (async () => {
+    try {
+      const hasOfflineStages = Object.keys(stageCountsCopy).length > 0;
+
+      if (hasOfflineStages) {
+        await flushOfflineStageCounts(stageCountsCopy);
+      }
+
+      // שים לב:
+      // claimMinerBalanceToVault(null) יעביר ל-vault את כל ה-miners balance הקיים כרגע בשרת,
+      // כולל אם נשאר שם משהו קודם.
+      const resp = await claimMinerBalanceToVault(null);
+
+      if (resp?.success) {
+        applyMiningServerSnapshot(
+          {
+            balance: resp?.balance,
+            vault: resp?.sharedVaultBalance,
+            sharedVaultBalance: resp?.sharedVaultBalance,
+            minersVault: resp?.vault,
+            claimedTotal: resp?.claimedTotal,
+          },
+          Number(resp?.moved || 0) > 0
+            ? { ts: Date.now(), amt: Number(resp.moved || 0), type: "offline_to_vault" }
+            : null
+        );
+      } else {
+        await syncMiningFromServer();
+      }
+    } catch (err) {
+      console.error("[mleo-miners] Offline collect settlement failed", err);
+      try {
+        await syncMiningFromServer();
+      } catch (syncErr) {
+        console.error("[mleo-miners] Offline collect fallback sync failed", syncErr);
+      }
+    }
+  })();
 }
 
 // ===== אוטו־דוג/אופליין/מתנות =====
