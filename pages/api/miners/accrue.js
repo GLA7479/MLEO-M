@@ -1,6 +1,7 @@
 import { getArcadeDevice } from "../../../lib/server/arcadeDeviceCookie";
 import { checkArcadeRateLimit } from "../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../lib/server/supabaseAdmin";
+import { validateCsrfToken } from "../../../lib/server/csrf";
 
 function extractRow(data) {
   return Array.isArray(data) ? data[0] : data;
@@ -27,6 +28,11 @@ export default async function handler(req, res) {
   }
 
   try {
+    // CSRF validation
+    if (!validateCsrfToken(req)) {
+      return res.status(403).json({ success: false, message: "Invalid CSRF token" });
+    }
+
     const supabase = getSupabaseAdmin();
     const deviceId = getArcadeDevice(req);
     if (!deviceId) {

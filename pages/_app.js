@@ -8,11 +8,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { wagmiConfig } from "../lib/wagmi";
 
 import { useEffect } from "react";
+import { ensureCsrfToken } from "../lib/arcadeDeviceClient";
 
 const queryClient = new QueryClient();
 
 export default function App({ Component, pageProps }) {
   useEffect(() => {
+    // --- Initialize CSRF token on app load ---
+    if (typeof window !== "undefined") {
+      ensureCsrfToken().catch(() => {});
+    }
+
     // --- Service Worker: disable in dev, enable in prod ---
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       if (process.env.NODE_ENV !== "production") {
