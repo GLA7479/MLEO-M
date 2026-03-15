@@ -1498,7 +1498,7 @@ useEffect(() => {
       return;
     }
 
-    if (!s.giftReady && s.giftNextAt <= now) {
+    if (!s.giftReady && s.giftNextAt && s.giftNextAt <= now) {
       s.giftReady = true;
       // חשוב: לא מאבדים את זמן ה־ready האמיתי
       s.giftFirstReadyAt = s.giftFirstReadyAt || s.giftNextAt;
@@ -1519,6 +1519,34 @@ useEffect(() => {
    }, 200);
   return () => clearInterval(id);
 }, []);
+
+// הגדרת helpers לפני השימוש (בתוך הקומפוננטה)
+const _currentGiftIntervalSec = typeof currentGiftIntervalSec==="function"?currentGiftIntervalSec:(s)=>Math.max(5,Math.floor(s?.lastGiftIntervalSec||20));
+const _getPhaseInfo = typeof getPhaseInfo==="function"?getPhaseInfo:(s,now=Date.now())=>{ 
+  const sec=_currentGiftIntervalSec(s,now); 
+  return { index:0,into:0,remain:sec,intervalSec:sec }; 
+};
+const DOG_INTERVAL_SEC_LOCAL = (typeof window !== "undefined" && window.DOG_INTERVAL_SEC) || 600;
+const DOG_BANK_CAP_LOCAL     = (typeof window !== "undefined" && window.DOG_BANK_CAP)     || 6;
+
+// חישוב giftProgress ו-dogProgress (מתעדכן בכל רנדר בגלל forceUiPulse)
+const giftProgress = (() => { 
+  const s = stateRef.current; if (!s) return 0; 
+  if (s.giftReady) return 1; 
+  const now = Date.now(); 
+  const total = _currentGiftIntervalSec(s, now) * 1000; 
+  const remain = Math.max(0, (s.giftNextAt || now) - now); 
+  return Math.max(0, Math.min(1, 1 - remain / total)); 
+})();
+
+const dogProgress = (() => {
+  const s = stateRef.current; if (!s) return 0;
+  if ((s.autoDogBank || 0) >= DOG_BANK_CAP_LOCAL) return 1;
+  const now = Date.now();
+  const total = DOG_INTERVAL_SEC_LOCAL * 1000;
+  const remain = Math.max(0, (s.autoDogNextAt || (now + total)) - now);
+  return Math.max(0, Math.min(1, 1 - remain / total));
+})();
 
 // ---------- init/load/save ----------
 function freshState(){
@@ -2602,28 +2630,6 @@ function openDiamondChestIfReady() {
 // HUD computed values + Gift heartbeat + EARN cooldown
 const DOG_INTERVAL_SEC = (typeof window !== "undefined" && window.DOG_INTERVAL_SEC) || 600;
 const DOG_BANK_CAP     = (typeof window !== "undefined" && window.DOG_BANK_CAP)     || 6;
-
-const _currentGiftIntervalSec = typeof currentGiftIntervalSec==="function"?currentGiftIntervalSec:(s)=>Math.max(5,Math.floor(s?.lastGiftIntervalSec||20));
-const _getPhaseInfo = typeof getPhaseInfo==="function"?getPhaseInfo:(s,now=Date.now())=>{ const sec=_currentGiftIntervalSec(s,now); return { index:0,into:0,remain:sec,intervalSec:sec }; };
-
-const giftProgress = (() => { 
-  const s = stateRef.current; if (!s) return 0; 
-  if (s.giftReady) return 1; 
-  const now = Date.now(); 
-  const total = _currentGiftIntervalSec(s, now) * 1000; 
-  const remain = Math.max(0, (s.giftNextAt || now) - now); 
-  return Math.max(0, Math.min(1, 1 - remain / total)); 
-})();
-
-const dogProgress = (() => {
-  const s = stateRef.current; if (!s) return 0;
-  if ((s.autoDogBank || 0) >= DOG_BANK_CAP) return 1;
-  const now = Date.now();
-  const total = DOG_INTERVAL_SEC * 1000;
-  const remain = Math.max(0, (s.autoDogNextAt || (now + total)) - now);
-  return Math.max(0, Math.min(1, 1 - remain / total));
-})();
-
 
 const diamondsReady = (stateRef.current?.diamonds || 0) >= 3;
 
