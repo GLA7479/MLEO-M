@@ -445,14 +445,6 @@ async function addToVault(amount, gameId = "mleo-base") {
   return applyBaseVaultDelta(delta, gameId);
 }
 
-async function spendFromVault(amount, gameId = "mleo-base") {
-  const delta = Math.max(0, Math.floor(Number(amount || 0)));
-  if (!delta) return { ok: true, skipped: true };
-  const current = await readVaultSafe();
-  if (current < delta) return { ok: false, error: "Not enough vault balance" };
-  return applyBaseVaultDelta(-delta, gameId);
-}
-
 function xpForLevel(level) {
   return 120 + (level - 1) * 80;
 }
@@ -1345,7 +1337,14 @@ export default function MleoBase() {
   };
 
   const handleVaultSpend = async (cost, label, applyUpdate, successMessage) => {
-    const res = await spendFromVault(cost, "mleo-base-spend");
+    const delta = Math.max(0, Math.floor(Number(cost || 0)));
+    if (!delta) return false;
+    const current = await readVaultSafe();
+    if (current < delta) {
+      showToast("Shared vault balance is too low.");
+      return false;
+    }
+    const res = await applyBaseVaultDelta(-delta, "mleo-base-spend");
     if (!res?.ok) {
       showToast("Shared vault balance is too low.");
       return false;
