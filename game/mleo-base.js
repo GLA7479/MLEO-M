@@ -630,6 +630,96 @@ function sectorStatusClasses(status) {
   return "border-white/10 bg-white/5 text-white/45";
 }
 
+function getAlerts(state, derived, systemState, liveContracts = []) {
+  const alerts = [];
+
+  const energy = Number(state.resources?.ENERGY || 0);
+  const energyCap = Number(derived.energyCap || 0);
+  const banked = Number(state.bankedMleo || 0);
+  const sentToday = Number(state.sentToday || 0);
+  const shipCap = Number(derived.shipCap || 0);
+  const expeditionReady = Number(state.expeditionReadyAt || 0) <= Date.now();
+  const claimableContracts = liveContracts.filter((c) => c.done && !c.claimed).length;
+
+  if (systemState === "critical") {
+    alerts.push({
+      key: "critical-stability",
+      tone: "critical",
+      title: "Critical stability",
+      text: "Systems are under pressure. Prioritize maintenance and safe actions.",
+    });
+  } else if (systemState === "warning") {
+    alerts.push({
+      key: "warning-stability",
+      tone: "warning",
+      title: "Stability slipping",
+      text: "Base performance is softening. Repair flow is recommended soon.",
+    });
+  }
+
+  if (energyCap > 0 && energy <= energyCap * 0.25) {
+    alerts.push({
+      key: "low-energy",
+      tone: "warning",
+      title: "Low energy reserve",
+      text: "Production may stall soon. Consider refill or reducing pressure.",
+    });
+  }
+
+  if (expeditionReady && Number(state.resources?.DATA || 0) >= 4) {
+    alerts.push({
+      key: "expedition-ready",
+      tone: "info",
+      title: "Expedition ready",
+      text: "Field team is available for deployment.",
+    });
+  }
+
+  if (banked >= 120) {
+    alerts.push({
+      key: "banked-ready",
+      tone: "info",
+      title: "Banked MLEO ready",
+      text: "Refined reserves are building up. You may want to ship strategically.",
+    });
+  }
+
+  if (shipCap > 0 && sentToday / shipCap >= 0.8) {
+    alerts.push({
+      key: "ship-pressure",
+      tone: "warning",
+      title: "Ship cap nearing limit",
+      text: "Daily export capacity is getting tight. Pace shipments carefully.",
+    });
+  }
+
+  if (claimableContracts > 0) {
+    alerts.push({
+      key: "contracts-ready",
+      tone: "success",
+      title: "Contract reward ready",
+      text: `${claimableContracts} command contract${claimableContracts > 1 ? "s are" : " is"} ready to claim.`,
+    });
+  }
+
+  return alerts.slice(0, 4);
+}
+
+function alertToneClasses(tone) {
+  if (tone === "critical") return "border-rose-500/35 bg-rose-500/12 text-rose-200";
+  if (tone === "warning") return "border-amber-500/35 bg-amber-500/12 text-amber-200";
+  if (tone === "success") return "border-emerald-500/35 bg-emerald-500/12 text-emerald-200";
+  return "border-sky-500/35 bg-sky-500/12 text-sky-200";
+}
+
+function highlightCard(condition, mode = "info") {
+  if (!condition) return "";
+  if (mode === "critical") return "ring-2 ring-rose-400/40 shadow-[0_0_0_1px_rgba(251,113,133,0.15)]";
+  if (mode === "warning") return "ring-2 ring-amber-400/35 shadow-[0_0_0_1px_rgba(251,191,36,0.12)]";
+  if (mode === "success") return "ring-2 ring-emerald-400/35 shadow-[0_0_0_1px_rgba(52,211,153,0.12)]";
+  return "ring-2 ring-cyan-400/30 shadow-[0_0_0_1px_rgba(34,211,238,0.12)]";
+}
+
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
@@ -1214,8 +1304,34 @@ function rewardText(reward) {
     .join(" · ");
 }
 
-function getNextStep(state) {
+function getNextStep(state, derived, systemState, liveContracts = []) {
   const b = state.buildings || {};
+  const energy = Number(state.resources?.ENERGY || 0);
+  const energyCap = Number(derived?.energyCap || 0);
+  const banked = Number(state.bankedMleo || 0);
+  const expeditionReady = Number(state.expeditionReadyAt || 0) <= Date.now();
+  const claimableContracts = liveContracts.filter((c) => c.done && !c.claimed).length;
+
+  if (systemState === "critical") {
+    return {
+      title: "Stabilize the base",
+      text: "You are in critical state. Maintenance and system recovery should come before expansion.",
+    };
+  }
+
+  if (systemState === "warning" && (b.repairBay || 0) < 1) {
+    return {
+      title: "Build Repair Bay",
+      text: "Your base is starting to feel pressure. Repair Bay will make stability management safer.",
+    };
+  }
+
+  if (energyCap > 0 && energy <= energyCap * 0.25) {
+    return {
+      title: "Recover energy reserves",
+      text: "Low energy is becoming a bottleneck. Refill energy or improve your power support.",
+    };
+  }
 
   if ((b.quarry || 0) < 2) {
     return {
@@ -1252,10 +1368,24 @@ function getNextStep(state) {
     };
   }
 
-  if ((state.bankedMleo || 0) < 50) {
+  if (claimableContracts > 0) {
     return {
-      title: "Build more Banked MLEO",
-      text: "Keep your production running and prepare your next vault shipment.",
+      title: "Claim contract rewards",
+      text: "You already completed a live contract. Collect the support reward and keep momentum going.",
+    };
+  }
+
+  if (expeditionReady && Number(state.resources?.DATA || 0) >= 4) {
+    return {
+      title: "Launch expedition",
+      text: "Your field team is ready. Expeditions are a good way to keep progression moving.",
+    };
+  }
+
+  if (banked >= 120) {
+    return {
+      title: "Consider a shipment",
+      text: "Banked MLEO is building up. You may be ready for a measured export to the shared vault.",
     };
   }
 
@@ -1488,7 +1618,15 @@ export default function MleoBase() {
   const expeditionLeft = Math.max(0, (state.expeditionReadyAt || 0) - Date.now());
   const overclockLeft = Math.max(0, (state.overclockUntil || 0) - Date.now());
   const missionProgress = getMissionProgress(state);
-  const nextStep = useMemo(() => getNextStep(state), [state]);
+  const alerts = useMemo(
+    () => getAlerts(state, derived, systemState, liveContracts),
+    [state, derived, systemState, liveContracts]
+  );
+
+  const nextStep = useMemo(
+    () => getNextStep(state, derived, systemState, liveContracts),
+    [state, derived, systemState, liveContracts]
+  );
 
   const showToast = (message) => setToast(message);
 
@@ -1949,7 +2087,7 @@ export default function MleoBase() {
           };
           return applyLevelUps(next);
         });
-        showToast("Blueprint cache purchased.");
+        showToast("Blueprint cache secured. Banking efficiency improved.");
       } else {
         showToast(res?.message || "Blueprint purchase failed.");
       }
@@ -1983,7 +2121,7 @@ export default function MleoBase() {
           };
           return applyLevelUps(next);
         });
-        showToast("Overclock activated.");
+        showToast("Overclock engaged. Base output is temporarily boosted.");
       } else {
         showToast(res?.message || "Overclock failed.");
       }
@@ -2021,7 +2159,7 @@ export default function MleoBase() {
           };
           return applyLevelUps(next);
         });
-        showToast("Energy refilled.");
+        showToast("Energy reserves restored.");
       } else {
         showToast(res?.message || "Refill failed.");
       }
@@ -2055,7 +2193,7 @@ export default function MleoBase() {
           };
           return applyLevelUps(next);
         });
-        showToast("Maintenance completed.");
+        showToast("Repair crews completed maintenance. Stability restored.");
       } else {
         showToast(res?.message || "Maintenance failed.");
       }
@@ -2512,13 +2650,25 @@ export default function MleoBase() {
                 compact
               />
 
-              <MetricCard
-                label="Energy"
-                value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
-                note={`Regen ${derived.energyRegen.toFixed(2)}/s`}
-                accent="slate"
-                compact
-              />
+              <div className={`w-full ${highlightCard((state.resources.ENERGY || 0) <= derived.energyCap * 0.25, "warning")}`}>
+                <MetricCard
+                  label="Energy"
+                  value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
+                  note={`Regen ${derived.energyRegen.toFixed(2)}/s`}
+                  accent="slate"
+                  compact
+                />
+              </div>
+
+              <div className={`w-full ${highlightCard(systemState === "critical", "critical") || highlightCard(systemState === "warning", "warning")}`}>
+                <MetricCard
+                  label="Stability"
+                  value={`${fmt(state.stability)}%`}
+                  note={systemMeta.label}
+                  accent={systemMeta.accent}
+                  compact
+                />
+              </div>
             </div>
           </div>
 
@@ -2531,16 +2681,28 @@ export default function MleoBase() {
             <MetricCard label="Gold" value={fmt(state.resources.GOLD)} note={`x${derived.goldMult.toFixed(2)} output`} accent="amber" />
             <MetricCard label="Scrap" value={fmt(state.resources.SCRAP)} note={`x${derived.scrapMult.toFixed(2)} output`} accent="rose" />
             <MetricCard label="Data" value={fmt(state.resources.DATA)} note={`x${derived.dataMult.toFixed(2)} progression`} accent="sky" />
-            <MetricCard label="Energy" value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`} note={`Regen ${derived.energyRegen.toFixed(2)}/s`} accent="slate" />
-            <MetricCard
-              label="Stability"
-              value={`${fmt(state.stability)}%`}
-              note={systemMeta.label}
-              accent={systemMeta.accent}
-            />
+            <div className={`w-full ${highlightCard((state.resources.ENERGY || 0) <= derived.energyCap * 0.25, "warning")}`}>
+              <MetricCard label="Energy" value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`} note={`Regen ${derived.energyRegen.toFixed(2)}/s`} accent="slate" />
+            </div>
+            <div className={`w-full ${highlightCard(systemState === "critical", "critical") || highlightCard(systemState === "warning", "warning")}`}>
+              <MetricCard
+                label="Stability"
+                value={`${fmt(state.stability)}%`}
+                note={systemMeta.label}
+                accent={systemMeta.accent}
+              />
+            </div>
           </div>
 
-          <div className="mt-4 rounded-3xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+          <div
+            className={`mt-4 rounded-3xl border p-4 ${
+              systemState === "critical"
+                ? "border-rose-500/25 bg-rose-500/10"
+                : systemState === "warning"
+                ? "border-amber-500/25 bg-amber-500/10"
+                : "border-cyan-500/20 bg-cyan-500/10"
+            }`}
+          >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">
@@ -2708,12 +2870,17 @@ export default function MleoBase() {
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {liveContracts.map((contract) => (
-                <div key={contract.key} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div
+                  key={contract.key}
+                  className={`flex min-h-[180px] flex-col rounded-2xl border border-white/10 bg-black/20 p-4 ${
+                    contract.done && !contract.claimed ? highlightCard(true, "success") : ""
+                  }`}
+                >
                   <div className="text-sm font-semibold text-white">{contract.title}</div>
                   <div className="mt-1 text-xs text-white/60">{contract.desc}</div>
-                  <div className="mt-2 text-xs text-cyan-200/80">{contract.rewardText}</div>
 
-                  <div className="mt-3">
+                  <div className="mt-auto">
+                    <div className="mb-3 text-xs text-cyan-200/80">{contract.rewardText}</div>
                     <button
                       onClick={() => claimContract(contract.key)}
                       disabled={!contract.done || contract.claimed}
@@ -2733,7 +2900,11 @@ export default function MleoBase() {
               subtitle={`Ship cap today: ${fmt(state.sentToday)} / ${fmt(derived.shipCap)} MLEO. Blueprints, contracts, specialization and utilities turn BASE into a real command layer instead of a passive reward tab.`}
             >
               <div className="grid gap-3 md:grid-cols-2">
-                <div className="flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                <div
+                  className={`flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
+                    highlightCard((state.bankedMleo || 0) >= 120, "success")
+                  }`}
+                >
                   <div className="flex min-h-[88px] flex-col">
                     <div className="text-sm font-semibold text-emerald-200">Ship to Shared Vault</div>
                     <p className="mt-1 text-sm text-white/70">
@@ -2748,7 +2919,11 @@ export default function MleoBase() {
                   </button>
                 </div>
 
-                <div className="flex h-full flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+                <div
+                  className={`flex h-full flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 ${
+                    highlightCard(expeditionLeft <= 0 && (state.resources.DATA || 0) >= 4, "info")
+                  }`}
+                >
                   <div className="flex min-h-[88px] flex-col">
                     <div className="text-sm font-semibold text-cyan-200">Field Expedition</div>
                     <p className="mt-1 text-sm text-white/70">
@@ -2794,7 +2969,15 @@ export default function MleoBase() {
                   </button>
                 </div>
 
-                <div className="flex h-full flex-col gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+                <div
+                  className={`flex h-full flex-col gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 ${
+                    systemState === "critical"
+                      ? highlightCard(true, "critical")
+                      : systemState === "warning"
+                      ? highlightCard(true, "warning")
+                      : ""
+                  }`}
+                >
                   <div className="flex min-h-[88px] flex-col">
                     <div className="text-sm font-semibold text-amber-200">Shared Vault Utilities</div>
                     <p className="mt-1 text-sm text-white/70">
@@ -2911,14 +3094,14 @@ export default function MleoBase() {
             <div className="xl:hidden">
               <AccordionSection
                 title="Activity Log"
-                subtitle="Recent actions and quick links."
+                subtitle="Recent actions, system activity and quick links."
                 defaultOpen={false}
               >
                 {activityLogContent}
               </AccordionSection>
             </div>
             <div className="hidden xl:block">
-              <Section title="Activity Log" subtitle="Quick read on what the base has been doing.">
+              <Section title="Activity Log" subtitle="Live operational feed from your command room.">
                 {activityLogContent}
               </Section>
             </div>
@@ -2959,12 +3142,12 @@ export default function MleoBase() {
                 <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
                   <p>
                     <strong className="text-white">MLEO BASE</strong> is the strategic command center of the MLEO ecosystem.
-                    It is not built for fast payouts. It is built for planning, progression, efficiency, and controlled support
+                    It is built around planning, progression, sector control, contracts, stability management and measured support
                     of the shared MLEO vault.
                   </p>
                   <p className="mt-3">
-                    Your job is to build a stable base, manage resources, improve infrastructure, generate banked MLEO,
-                    and decide when it is smart to export part of it into the shared vault.
+                    Your job is to run a live command room: build infrastructure, manage system pressure, refine resources,
+                    respond to alerts, complete support contracts and decide when shipping is actually smart.
                   </p>
                 </div>
 

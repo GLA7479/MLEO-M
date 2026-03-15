@@ -94,6 +94,7 @@ export default function NumberHuntPage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [playAmount, setPlayAmount] = useState("100");
+  const [activeAmountButton, setActiveAmountButton] = useState("100"); // Track which amount button is active
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [selected, setSelected] = useState([]);
   const [drawn, setDrawn] = useState([]);
@@ -136,8 +137,9 @@ export default function NumberHuntPage() {
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
-    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
-    if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
+    // Always set initial bet to 100 on game entry
+    setPlayAmount("100");
+    setActiveAmountButton("100");
     const unsubscribeVault = subscribeSharedVault(snapshot => {
       if (!cancelled) setVaultState(snapshot.balance);
     });

@@ -435,7 +435,21 @@ export default function DragonTowerPage() {
           </div>
         </div>
 
-        {showResultPopup && gameResult && (<div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none"><div className={`${gameResult.win ? 'bg-green-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}><div className="text-4xl mb-2">{gameResult.complete ? '👑' : gameResult.win ? '✅' : '🐉'}</div><div className="text-2xl font-bold mb-1">{gameResult.complete ? 'TOWER COMPLETE!' : gameResult.win ? 'ESCAPED!' : 'DRAGON!'}</div><div className="text-lg">{gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div><div className="text-sm opacity-80 mt-2">Floor {gameResult.floor}/{TOTAL_FLOORS}</div></div></div>)}
+        {showResultPopup && gameResult && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
+            <div className={`${gameResult.win ? 'bg-green-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
+              <div className="text-4xl mb-2">{gameResult.complete ? '👑' : gameResult.win ? '✅' : '🐉'}</div>
+              <div className="text-2xl font-bold mb-1">{gameResult.complete ? 'TOWER COMPLETE!' : gameResult.win ? 'ESCAPED!' : 'DRAGON!'}</div>
+              <div className="text-lg font-bold">{gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div>
+              {gameResult.multiplier && (
+                <div className="text-xs opacity-90 mt-1">
+                  Multiplier: ×{gameResult.multiplier.toFixed(2)}
+                </div>
+              )}
+              <div className="text-sm opacity-80 mt-2">Floor {gameResult.floor}/{TOTAL_FLOORS}</div>
+            </div>
+          </div>
+        )}
 
         {menuOpen && (<div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}><div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div><div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div><div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div><div className="mt-4 text-xs opacity-70"><p>Dragon Tower v2.0</p></div></div></div>)}
 
