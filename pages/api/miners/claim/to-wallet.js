@@ -2,6 +2,7 @@ import { getArcadeDevice } from "../../../../lib/server/arcadeDeviceCookie";
 import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { validateCsrfToken } from "../../../../lib/server/csrf";
+import { logRateLimitExceeded, logCsrfFailure, logValidationFailure } from "../../../../lib/server/securityLogger";
 
 function extractRow(data) {
   return Array.isArray(data) ? data[0] : data;
@@ -16,6 +17,7 @@ export default async function handler(req, res) {
   try {
     // CSRF validation
     if (!validateCsrfToken(req)) {
+      logCsrfFailure(req);
       return res.status(403).json({ success: false, message: "Invalid CSRF token" });
     }
 
@@ -24,13 +26,15 @@ export default async function handler(req, res) {
     if (!deviceId) {
       return res.status(401).json({ success: false, message: "Device not initialized" });
     }
-    const rate = checkArcadeRateLimit("miners-claim-wallet", deviceId, 15, 60_000);
+    const rate = await checkArcadeRateLimit("miners-claim-wallet", deviceId, 15, 60_000);
     if (!rate.allowed) {
+      logRateLimitExceeded(req, "miners-claim-wallet", 15);
       return res.status(429).json({ success: false, message: "Too many wallet claim requests" });
     }
 
     const wholeAmount = Math.max(0, Math.floor(Number(req.body?.amount) || 0));
     if (wholeAmount <= 0) {
+      logValidationFailure(req, "Invalid amount", { amount: req.body?.amount });
       return res.status(400).json({ success: false, message: "Invalid amount" });
     }
 

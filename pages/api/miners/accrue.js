@@ -2,6 +2,7 @@ import { getArcadeDevice } from "../../../lib/server/arcadeDeviceCookie";
 import { checkArcadeRateLimit } from "../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../lib/server/supabaseAdmin";
 import { validateCsrfToken } from "../../../lib/server/csrf";
+import { logSuspiciousActivity, logValidationFailure, logRateLimitExceeded, logCsrfFailure } from "../../../lib/server/securityLogger";
 
 function extractRow(data) {
   return Array.isArray(data) ? data[0] : data;
@@ -30,6 +31,7 @@ export default async function handler(req, res) {
   try {
     // CSRF validation
     if (!validateCsrfToken(req)) {
+      logCsrfFailure(req);
       return res.status(403).json({ success: false, message: "Invalid CSRF token" });
     }
 
@@ -38,8 +40,9 @@ export default async function handler(req, res) {
     if (!deviceId) {
       return res.status(401).json({ success: false, message: "Device not initialized" });
     }
-    const rate = checkArcadeRateLimit("miners-accrue", deviceId, 120, 60_000);
+    const rate = await checkArcadeRateLimit("miners-accrue", deviceId, 120, 60_000);
     if (!rate.allowed) {
+      logRateLimitExceeded(req, "miners-accrue", 120);
       return res.status(429).json({ success: false, message: "Too many miners accrue requests" });
     }
 
@@ -47,9 +50,11 @@ export default async function handler(req, res) {
     const { stageCounts, total } = normalizeStageCounts(rawStageCounts);
 
     if (!total) {
+      logValidationFailure(req, "Missing stageCounts", { rawStageCounts });
       return res.status(400).json({ success: false, message: "Missing stageCounts" });
     }
     if (total > 200) {
+      logSuspiciousActivity(req, `Too many breaks in batch: ${total}`);
       return res.status(400).json({ success: false, message: "Too many breaks in one batch" });
     }
 

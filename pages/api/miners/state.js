@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     if (!deviceId) {
       return res.status(401).json({ success: false, message: "Device not initialized" });
     }
-    const rate = checkArcadeRateLimit("miners-state", deviceId, 80, 60_000);
+    const rate = await checkArcadeRateLimit("miners-state", deviceId, 80, 60_000);
     if (!rate.allowed) {
       return res.status(429).json({ success: false, message: "Too many miners state requests" });
     }

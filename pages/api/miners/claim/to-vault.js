@@ -2,6 +2,7 @@ import { getArcadeDevice } from "../../../../lib/server/arcadeDeviceCookie";
 import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { validateCsrfToken } from "../../../../lib/server/csrf";
+import { logRateLimitExceeded, logCsrfFailure, logValidationFailure } from "../../../../lib/server/securityLogger";
 
 function extractRow(data) {
   return Array.isArray(data) ? data[0] : data;
@@ -16,6 +17,7 @@ export default async function handler(req, res) {
   try {
     // CSRF validation
     if (!validateCsrfToken(req)) {
+      logCsrfFailure(req);
       return res.status(403).json({ success: false, message: "Invalid CSRF token" });
     }
 
@@ -24,8 +26,9 @@ export default async function handler(req, res) {
     if (!deviceId) {
       return res.status(401).json({ success: false, message: "Device not initialized" });
     }
-    const rate = checkArcadeRateLimit("miners-claim-vault", deviceId, 20, 60_000);
+    const rate = await checkArcadeRateLimit("miners-claim-vault", deviceId, 20, 60_000);
     if (!rate.allowed) {
+      logRateLimitExceeded(req, "miners-claim-vault", 20);
       return res.status(429).json({ success: false, message: "Too many claim-to-vault requests" });
     }
 
