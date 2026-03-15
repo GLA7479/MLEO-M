@@ -381,6 +381,133 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.start_paid_session(text, text, bigint);
+
+CREATE OR REPLACE FUNCTION public.start_paid_session(
+  p_device_id text,
+  p_game_id text,
+  p_stake bigint
+)
+RETURNS TABLE(
+  session_id uuid,
+  balance_after bigint,
+  stake bigint,
+  game_id text,
+  mode text,
+  status text
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_balance_before bigint;
+  v_balance_after bigint;
+  v_session_id uuid;
+  v_reclaimed_stake bigint := 0;
+BEGIN
+  IF coalesce(trim(p_device_id), '') = '' THEN
+    RAISE EXCEPTION 'device_id is required';
+  END IF;
+
+  IF coalesce(trim(p_game_id), '') = '' THEN
+    RAISE EXCEPTION 'game_id is required';
+  END IF;
+
+  IF p_stake IS NULL OR p_stake <= 0 THEN
+    RAISE EXCEPTION 'stake must be greater than 0';
+  END IF;
+
+  INSERT INTO public.vault_balances (device_id, balance, last_sync_at)
+  VALUES (p_device_id, 0, now())
+  ON CONFLICT (device_id) DO NOTHING;
+
+  SELECT vb.balance
+  INTO v_balance_before
+  FROM public.vault_balances vb
+  WHERE vb.device_id = p_device_id
+  FOR UPDATE;
+
+  v_balance_before := coalesce(v_balance_before, 0);
+
+  WITH reclaimed AS (
+    UPDATE public.arcade_device_sessions s
+    SET status = 'finished',
+        approved_reward = s.stake,
+        finished_at = now(),
+        client_payload = coalesce(s.client_payload, '{}'::jsonb),
+        server_payload = coalesce(s.server_payload, '{}'::jsonb) || jsonb_build_object(
+          'cancelled', true,
+          'cancel_reason', 'superseded_by_new_session',
+          'approved_reward', s.stake
+        )
+    WHERE s.device_id = p_device_id
+      AND s.mode = 'paid'
+      AND s.status = 'started'
+    RETURNING s.stake
+  )
+  SELECT coalesce(sum(reclaimed.stake), 0)::bigint
+  INTO v_reclaimed_stake
+  FROM reclaimed;
+
+  IF v_reclaimed_stake > 0 THEN
+    v_balance_before := v_balance_before + v_reclaimed_stake;
+    UPDATE public.vault_balances vb
+    SET balance = v_balance_before,
+        last_sync_at = now()
+    WHERE vb.device_id = p_device_id;
+  END IF;
+
+  IF v_balance_before < p_stake THEN
+    RAISE EXCEPTION 'Insufficient vault balance';
+  END IF;
+
+  v_balance_after := v_balance_before - p_stake;
+
+  UPDATE public.vault_balances vb
+  SET balance = v_balance_after,
+      last_sync_at = now()
+  WHERE vb.device_id = p_device_id;
+
+  INSERT INTO public.arcade_device_sessions (
+    device_id,
+    game_id,
+    mode,
+    status,
+    stake,
+    approved_reward,
+    consumed_token,
+    client_payload,
+    server_payload
+  )
+  VALUES (
+    p_device_id,
+    p_game_id,
+    'paid',
+    'started',
+    p_stake,
+    0,
+    false,
+    '{}'::jsonb,
+    jsonb_build_object(
+      'balance_before', v_balance_before,
+      'balance_after_start', v_balance_after,
+      'reclaimed_prior_started_stake', v_reclaimed_stake
+    )
+  )
+  RETURNING id INTO v_session_id;
+
+  RETURN QUERY
+  SELECT
+    v_session_id,
+    v_balance_after,
+    p_stake,
+    p_game_id,
+    'paid'::text,
+    'started'::text;
+END;
+$$;
+
 DROP FUNCTION IF EXISTS public.start_freeplay_session(text, text);
 
 CREATE OR REPLACE FUNCTION public.start_freeplay_session(

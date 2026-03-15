@@ -400,36 +400,49 @@ export default function BlackjackPage() {
     setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
     let nextSessionId = null;
-    if (isFreePlay || isFreePlayParam) {
-      const gameId = router.pathname.replace('/', '') || 'blackjack';
-      try {
+    try {
+      if (isFreePlay || isFreePlayParam) {
+        const gameId = router.pathname.replace('/', '') || 'blackjack';
         const result = await startFreeplayArcadeSession(gameId);
-        if (result.success) { 
+        if (result.success) {
           play = Math.max(MIN_PLAY, Math.floor(Number(result.amount || 0) / RESERVED_STAKE_MULTIPLIER) || MIN_PLAY);
           nextSessionId = result.sessionId;
           setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
+        } else {
+          setSessionError("Failed to start session");
+          alert(result.message || "No free play tokens available!");
+          setIsFreePlay(false);
+          return;
         }
-        else { setSessionError("Failed to start session"); alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); return; }
-      } catch (error) {
-        console.error('Free play error:', error);
-        setSessionError("Failed to start session");
-        alert('Failed to use free play token. Please try again.');
+      } else {
+        if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
+        const reservedStake = Math.floor(play * RESERVED_STAKE_MULTIPLIER);
+        const startResult = await startPaidArcadeSession("blackjack", reservedStake);
+        if (!startResult.success) {
+          setSessionError("Failed to start session");
+          alert(startResult.message || "Failed to start session");
+          return;
+        }
+        nextSessionId = startResult.sessionId;
+        setVaultState(startResult.balanceAfter);
+      }
+
+      if (!nextSessionId) {
+        throw new Error("Missing session id");
+      }
+    } catch (error) {
+      console.error("Blackjack start session error:", error);
+      setSessionError(error?.message || "Failed to start session");
+      if (isFreePlay || isFreePlayParam) {
         setIsFreePlay(false);
-        return;
+        alert(error?.message || "Failed to use free play token. Please try again.");
+      } else {
+        alert(error?.message || "Failed to start session");
       }
-    } else {
-      if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
-      const reservedStake = Math.floor(play * RESERVED_STAKE_MULTIPLIER);
-      const startResult = await startPaidArcadeSession("blackjack", reservedStake);
-      if (!startResult.success) {
-        setSessionError("Failed to start session");
-        alert(startResult.message || "Failed to start session");
-        return;
-      }
-      nextSessionId = startResult.sessionId;
-      setVaultState(startResult.balanceAfter);
+      return;
     }
+
     setPlayAmount(String(play));
     setSessionId(nextSessionId);
     sessionIdRef.current = nextSessionId;
