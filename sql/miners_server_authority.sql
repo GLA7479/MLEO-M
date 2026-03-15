@@ -76,9 +76,9 @@ ON CONFLICT (reward_key) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS public.miners_device_state (
   device_id text PRIMARY KEY,
-  balance bigint NOT NULL DEFAULT 0,
-  mined_today bigint NOT NULL DEFAULT 0,
-  score_today bigint NOT NULL DEFAULT 0,
+  balance numeric(20,2) NOT NULL DEFAULT 0,
+  mined_today numeric(20,2) NOT NULL DEFAULT 0,
+  score_today numeric(20,2) NOT NULL DEFAULT 0,
   last_day date NOT NULL DEFAULT current_date,
   vault bigint NOT NULL DEFAULT 0,
   claimed_total bigint NOT NULL DEFAULT 0,
@@ -89,6 +89,11 @@ CREATE TABLE IF NOT EXISTS public.miners_device_state (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.miners_device_state
+  ALTER COLUMN balance TYPE numeric(20,2) USING round(balance::numeric, 2),
+  ALTER COLUMN mined_today TYPE numeric(20,2) USING round(mined_today::numeric, 2),
+  ALTER COLUMN score_today TYPE numeric(20,2) USING round(score_today::numeric, 2);
 
 CREATE INDEX IF NOT EXISTS idx_miners_device_state_updated_at
   ON public.miners_device_state(updated_at DESC);
@@ -115,8 +120,10 @@ REVOKE ALL ON public.miners_device_state FROM anon, authenticated;
 -- 3) Helper Functions
 -- ----------------------------------------------------------------------------
 
+DROP FUNCTION IF EXISTS public.miners_softcut_factor(bigint, bigint);
+DROP FUNCTION IF EXISTS public.miners_softcut_factor(numeric, bigint);
 CREATE OR REPLACE FUNCTION public.miners_softcut_factor(
-  p_used bigint,
+  p_used numeric,
   p_cap bigint
 )
 RETURNS numeric
@@ -266,14 +273,15 @@ AS $$
   LIMIT 1;
 $$;
 
+DROP FUNCTION IF EXISTS public.miners_get_state(text);
 CREATE OR REPLACE FUNCTION public.miners_get_state(
   p_device_id text
 )
 RETURNS TABLE(
   device_id text,
-  balance bigint,
-  mined_today bigint,
-  score_today bigint,
+  balance numeric,
+  mined_today numeric,
+  score_today numeric,
   last_day date,
   vault bigint,
   claimed_total bigint,
@@ -316,15 +324,16 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.miners_apply_breaks(text, jsonb, boolean);
 CREATE OR REPLACE FUNCTION public.miners_apply_breaks(
   p_device_id text,
   p_stage_counts jsonb,
   p_offline boolean DEFAULT false
 )
 RETURNS TABLE(
-  added bigint,
-  balance bigint,
-  mined_today bigint,
+  added numeric,
+  balance numeric,
+  mined_today numeric,
   daily_cap bigint,
   softcut_factor numeric
 )
@@ -338,8 +347,8 @@ DECLARE
   v_offline_factor numeric;
   v_raw numeric(30,12) := 0;
   v_effective numeric(30,12) := 0;
-  v_room bigint := 0;
-  v_add bigint := 0;
+  v_room numeric(20,2) := 0;
+  v_add numeric(20,2) := 0;
   v_softcut numeric := 1;
   v_stage integer;
   v_count integer;
@@ -370,9 +379,9 @@ BEGIN
 
   v_softcut := public.miners_softcut_factor(v_state.mined_today, v_daily_cap);
   v_effective := v_raw * v_softcut;
-  v_add := greatest(0, floor(v_effective)::bigint);
+  v_add := greatest(0, round(v_effective::numeric, 2));
 
-  v_room := greatest(0, v_daily_cap - v_state.mined_today);
+  v_room := greatest(0::numeric, (v_daily_cap::numeric - v_state.mined_today));
   v_add := least(v_add, v_room);
 
   IF v_add > 0 THEN
@@ -394,6 +403,7 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.miners_claim_hourly_gift(text);
 CREATE OR REPLACE FUNCTION public.miners_claim_hourly_gift(
   p_device_id text
 )
@@ -403,10 +413,10 @@ RETURNS TABLE(
   dps_multiplier numeric,
   gold_multiplier numeric,
   diamonds integer,
-  mleo_bonus bigint,
+  mleo_bonus numeric,
   next_claim_at timestamptz,
-  balance bigint,
-  mined_today bigint
+  balance numeric,
+  mined_today numeric
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -421,7 +431,7 @@ DECLARE
   v_acc numeric := 0;
   v_row record;
   v_daily_cap bigint := 0;
-  v_add bigint := 0;
+  v_add numeric(20,2) := 0;
 BEGIN
   v_state := public.miners_get_or_create_state(p_device_id);
 
@@ -455,10 +465,10 @@ BEGIN
   LOOP
     v_acc := v_acc + v_row.weight;
     IF v_pick <= v_acc THEN
-      v_add := greatest(0, coalesce(v_row.mleo_bonus, 0));
+      v_add := greatest(0::numeric, coalesce(v_row.mleo_bonus, 0)::numeric);
 
       IF v_add > 0 THEN
-        v_add := least(v_add, greatest(0, v_daily_cap - v_state.mined_today));
+        v_add := least(v_add, greatest(0::numeric, (v_daily_cap::numeric - v_state.mined_today)));
       END IF;
 
       UPDATE public.miners_device_state mds
@@ -490,13 +500,14 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.miners_move_balance_to_vault(text, bigint);
 CREATE OR REPLACE FUNCTION public.miners_move_balance_to_vault(
   p_device_id text,
   p_amount bigint DEFAULT NULL
 )
 RETURNS TABLE(
   moved bigint,
-  balance bigint,
+  balance numeric,
   vault bigint,
   claimed_total bigint,
   shared_vault_balance bigint
@@ -513,8 +524,8 @@ BEGIN
   v_state := public.miners_get_or_create_state(p_device_id);
 
   v_move := CASE
-    WHEN p_amount IS NULL OR p_amount <= 0 THEN v_state.balance
-    ELSE least(v_state.balance, p_amount)
+    WHEN p_amount IS NULL OR p_amount <= 0 THEN floor(v_state.balance)::bigint
+    ELSE least(floor(v_state.balance)::bigint, p_amount)
   END;
 
   v_move := greatest(0, v_move);

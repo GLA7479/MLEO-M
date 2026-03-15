@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { ensureArcadeDevice } from "../../../../lib/server/arcadeDeviceCookie";
+import { getArcadeDevice } from "../../../../lib/server/arcadeDeviceCookie";
 import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 
@@ -15,7 +15,10 @@ export default async function handler(req, res) {
 
   try {
     const supabase = getSupabaseAdmin();
-    const deviceId = ensureArcadeDevice(req, res);
+    const deviceId = getArcadeDevice(req);
+    if (!deviceId) {
+      return res.status(401).json({ success: false, message: "Device not initialized" });
+    }
     const rateLimit = checkArcadeRateLimit("arcade-vault-claim", deviceId, 10, 60_000);
     if (!rateLimit.allowed) {
       return res.status(429).json({ success: false, message: "Too many vault claim requests" });
