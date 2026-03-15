@@ -1,3 +1,5 @@
+const isProduction = process.env.NODE_ENV === "production";
+
 const securityHeaders = [
   {
     key: "X-Frame-Options",
@@ -16,6 +18,31 @@ const securityHeaders = [
     value: "camera=(), microphone=(), geolocation=()",
   },
   // הוסר Cross-Origin-Opener-Policy כדי לאפשר תאימות עם Coinbase Wallet
+  // HSTS רק בפרודקשן (אם האתר כולו HTTPS)
+  ...(isProduction
+    ? [
+        {
+          key: "Strict-Transport-Security",
+          value: "max-age=31536000; includeSubDomains; preload",
+        },
+      ]
+    : []),
+  // CSP בסיסי
+  {
+    key: "Content-Security-Policy",
+    value: [
+      "default-src 'self'",
+      "img-src 'self' data: blob: https:",
+      "media-src 'self' blob: https:",
+      "font-src 'self' data: https:",
+      "style-src 'self' 'unsafe-inline' https:",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:",
+      "connect-src 'self' https: wss:",
+      "frame-ancestors 'self'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join("; "),
+  },
 ];
 
 /** @type {import('next').NextConfig} */

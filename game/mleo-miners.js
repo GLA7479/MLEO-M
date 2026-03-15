@@ -743,6 +743,7 @@ const { disconnect } = useDisconnect();
   });
   const [claiming, setClaiming] = useState(false);
   const [claimAmount, setClaimAmount] = useState("");
+  const [syncStatus, setSyncStatus] = useState("synced"); // "synced" | "syncing" | "pending"
   const minersConfigRef = useRef({
     offlineFactor: 0.5,
     dailyCap: DAILY_CAP,
@@ -758,25 +759,36 @@ const { disconnect } = useDisconnect();
     return next;
   }
   async function syncMiningFromServer() {
-    const resp = await fetchMinersState();
-    if (!resp?.success) return null;
-    const st = resp.state || {};
-    const cfg = resp.config || {};
-    minersConfigRef.current = {
-      offlineFactor: Number(cfg.offlineFactor || minersConfigRef.current.offlineFactor || 0.5),
-      dailyCap: Number(cfg.dailyCap || minersConfigRef.current.dailyCap || DAILY_CAP),
-    };
-    return applyMiningServerSnapshot({
-      balance: st.balance,
-      minedToday: st.minedToday,
-      scoreToday: st.scoreToday,
-      lastDay: st.lastDay,
-      vault: st.sharedVaultBalance ?? st.vault,
-      sharedVaultBalance: st.sharedVaultBalance ?? st.vault,
-      minersVault: st.minersVault ?? st.vault,
-      claimedTotal: st.claimedTotal,
-      claimedToWallet: st.claimedToWallet,
-    });
+    setSyncStatus("syncing");
+    try {
+      const resp = await fetchMinersState();
+      if (!resp?.success) {
+        setSyncStatus("pending");
+        return null;
+      }
+      const st = resp.state || {};
+      const cfg = resp.config || {};
+      minersConfigRef.current = {
+        offlineFactor: Number(cfg.offlineFactor || minersConfigRef.current.offlineFactor || 0.5),
+        dailyCap: Number(cfg.dailyCap || minersConfigRef.current.dailyCap || DAILY_CAP),
+      };
+      const result = applyMiningServerSnapshot({
+        balance: st.balance,
+        minedToday: st.minedToday,
+        scoreToday: st.scoreToday,
+        lastDay: st.lastDay,
+        vault: st.sharedVaultBalance ?? st.vault,
+        sharedVaultBalance: st.sharedVaultBalance ?? st.vault,
+        minersVault: st.minersVault ?? st.vault,
+        claimedTotal: st.claimedTotal,
+        claimedToWallet: st.claimedToWallet,
+      });
+      setSyncStatus("synced");
+      return result;
+    } catch (err) {
+      setSyncStatus("pending");
+      throw err;
+    }
   }
   async function flushOfflineStageCounts(stageCounts) {
     const entries = Object.entries(stageCounts || {})
@@ -918,6 +930,7 @@ const { disconnect } = useDisconnect();
         balance: serverPatch?.balance,
         minedToday: serverPatch?.minedToday,
       });
+      setSyncStatus("synced");
     });
 
     syncMiningFromServer().catch((err) => {
@@ -4082,6 +4095,15 @@ MLEO
                 <div className="text-slate-500 text-xs">Balance</div>
                 <div className="font-extrabold text-slate-900 tabular-nums">
                   {formatMleo2(Number(mining?.balance || 0))} MLEO
+                  {syncStatus === "syncing" && (
+                    <span className="ml-2 text-xs text-blue-500">🔄 Syncing...</span>
+                  )}
+                  {syncStatus === "pending" && (
+                    <span className="ml-2 text-xs text-amber-500">⏳ Pending...</span>
+                  )}
+                  {syncStatus === "synced" && (
+                    <span className="ml-2 text-xs text-green-500 opacity-50">✓ Synced</span>
+                  )}
                 </div>
               </div>
               <div className="p-3 rounded-xl bg-slate-100">
