@@ -90,6 +90,7 @@ export default function DragonTowerPage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [playAmount, setPlayAmount] = useState("100");
+  const [activeAmountButton, setActiveAmountButton] = useState("100"); // Track which amount button is active
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [floor, setFloor] = useState(0);
   const [safeCards, setSafeCards] = useState([]);
@@ -134,8 +135,9 @@ export default function DragonTowerPage() {
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
-    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
-    if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
+    // Always set initial bet to 100 on game entry
+    setPlayAmount("100");
+    setActiveAmountButton("100");
 
     const unsubscribeVault = subscribeSharedVault(snapshot => {
       if (!cancelled) setVaultState(snapshot.balance);
@@ -185,7 +187,30 @@ export default function DragonTowerPage() {
     } catch (err) { console.error(err); alert("Claim failed or rejected"); } finally { setClaiming(false); }
   };
 
+  // Handle amount button clicks
+  const handleAmountButtonClick = (amountValue) => {
+    if (gameActive || gameResult) return;
+    playSfx(clickSound.current);
+    
+    const currentAmount = Number(playAmount) || MIN_PLAY;
+    const amountStr = String(amountValue);
+    
+    if (activeAmountButton === amountStr) {
+      // Same button clicked - add the amount
+      const newAmount = Math.min(vault, currentAmount + amountValue);
+      setPlayAmount(String(newAmount));
+    } else {
+      // Different button clicked - switch to that amount
+      setActiveAmountButton(amountStr);
+      const newAmount = Math.min(vault, amountValue);
+      setPlayAmount(String(newAmount));
+    }
+  };
+
   const startGame = async (isFreePlayParam = false) => {
+    if (gameActive || gameResult) return; // Prevent double clicks
+    // Disable play button immediately to prevent double clicks
+    setGameActive(true);
     playSfx(clickSound.current);
     setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
@@ -195,17 +220,26 @@ export default function DragonTowerPage() {
       try {
         const result = await startFreeplayArcadeSession(gameId);
         if (result.success) { play = result.amount; nextSessionId = result.sessionId; setFreePlayTokens(result.remainingTokens); setIsFreePlay(false); router.replace('/dragon-tower', undefined, { shallow: true }); }
-        else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); return; }
+        else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); setGameActive(false); return; }
       } catch (error) {
         console.error('Free play error:', error);
         alert('Failed to use free play token. Please try again.');
         setIsFreePlay(false);
+        setGameActive(false);
         return;
       }
     } else {
-      if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
+      if (play < MIN_PLAY) { 
+        alert(`Minimum play is ${MIN_PLAY} MLEO`); 
+        setGameActive(false);
+        return; 
+      }
       const startResult = await startPaidArcadeSession("dragon-tower", play);
-      if (!startResult.success) { alert(startResult.message || 'Failed to start session'); return; }
+      if (!startResult.success) { 
+        alert(startResult.message || 'Failed to start session'); 
+        setGameActive(false);
+        return; 
+      }
       nextSessionId = startResult.sessionId;
       setVaultState(startResult.balanceAfter);
     }
@@ -273,7 +307,7 @@ export default function DragonTowerPage() {
     endGame(true, floor);
   };
 
-  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setFloor(0); setSafeCards([]); setGameActive(false); setSessionId(null); };
+  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setFloor(0); setSafeCards([]); setGameActive(false); setSessionId(null); setActiveAmountButton("100"); };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-red-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -281,7 +315,8 @@ export default function DragonTowerPage() {
   const multipliers = [1.65, 2.3, 3.1, 4.5, 6.7, 9.5, 14, 22];
   const currentMultiplier = gameActive && floor > 0 ? multipliers[floor - 1] : (floor + 1 <= multipliers.length ? multipliers[floor] : 1);
   const currentPrize = gameActive && floor > 0 ? Math.floor(Number(playAmount) * multipliers[floor - 1]) : 0;
-  const potentialWin = Math.floor(Number(playAmount) * currentMultiplier);
+  // Only show potentialWin when game is not active (no gameResult and not gameActive)
+  const potentialWin = (!gameResult && !gameActive) ? Math.floor(Number(playAmount) * currentMultiplier) : 0;
 
   return (
     <Layout>
@@ -327,13 +362,54 @@ export default function DragonTowerPage() {
             </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
+            <button
+              onClick={() => handleAmountButtonClick(100)}
+              disabled={gameActive || gameResult}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "100"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              100
+            </button>
+            <button
+              onClick={() => handleAmountButtonClick(1000)}
+              disabled={gameActive || gameResult}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "1000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              1K
+            </button>
+            <button
+              onClick={() => handleAmountButtonClick(10000)}
+              disabled={gameActive || gameResult}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "10000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              10K
+            </button>
+            <button
+              onClick={() => handleAmountButtonClick(100000)}
+              disabled={gameActive || gameResult}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "100000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              100K
+            </button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.max(MIN_PLAY, current - 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
             <div className="relative">
-              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={gameActive} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
-              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); playSfx(clickSound.current); }} disabled={gameActive} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
+              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); setActiveAmountButton(null); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={gameActive || gameResult} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
+              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); setActiveAmountButton("100"); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
             </div>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
           </div>
@@ -341,8 +417,8 @@ export default function DragonTowerPage() {
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
             <button 
               onClick={gameActive ? cashOut : (gameResult ? resetGame : () => startGame(false))} 
-              disabled={gameActive && floor === 0}
-              className={`w-full py-3 rounded-lg font-bold text-base shadow-lg hover:brightness-110 transition-all disabled:opacity-50 ${
+              disabled={(gameActive && floor === 0) || (gameResult && !gameResult)}
+              className={`w-full py-3 rounded-lg font-bold text-base shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 gameActive 
                   ? 'bg-gradient-to-r from-emerald-500 to-green-600' 
                   : 'bg-gradient-to-r from-purple-500 to-red-600'

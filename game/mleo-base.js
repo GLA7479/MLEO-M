@@ -542,6 +542,94 @@ function commanderPathMeta(pathKey) {
   return COMMANDER_PATHS.find((item) => item.key === pathKey) || COMMANDER_PATHS[0];
 }
 
+const LIVE_CONTRACTS = [
+  {
+    key: "stability_watch",
+    title: "Stability Watch",
+    desc: "Keep base stability at 85%+.",
+    rewardText: "Reward: DATA 10 · XP 20",
+    check: (state) => Number(state.stability || 0) >= 85,
+    reward: { DATA: 10, XP: 20 },
+  },
+  {
+    key: "energy_ready",
+    title: "Energy Reserve",
+    desc: "Keep energy above 70% of cap.",
+    rewardText: "Reward: GOLD 80 · XP 15",
+    check: (state, derived) =>
+      Number(state.resources?.ENERGY || 0) >= Math.floor((derived.energyCap || 0) * 0.7),
+    reward: { GOLD: 80, XP: 15 },
+  },
+  {
+    key: "banking_cycle",
+    title: "Banking Cycle",
+    desc: "Accumulate at least 120 banked MLEO before next shipment.",
+    rewardText: "Reward: DATA 8 · SCRAP 16 · XP 18",
+    check: (state) => Number(state.bankedMleo || 0) >= 120,
+    reward: { DATA: 8, SCRAP: 16, XP: 18 },
+  },
+  {
+    key: "field_readiness",
+    title: "Field Readiness",
+    desc: "Maintain expedition readiness and 4+ DATA.",
+    rewardText: "Reward: GOLD 60 · XP 18",
+    check: (state) =>
+      Number(state.resources?.DATA || 0) >= 4 &&
+      Number(state.expeditionReadyAt || 0) <= Date.now(),
+    reward: { GOLD: 60, XP: 18 },
+  },
+];
+
+function buildingRoleTag(key) {
+  if (["quarry", "tradeHub", "salvage", "refinery"].includes(key)) return "Production";
+  if (["powerCell", "repairBay"].includes(key)) return "Systems";
+  if (["minerControl", "arcadeHub"].includes(key)) return "Ecosystem";
+  if (["expeditionBay", "researchLab", "logisticsCenter"].includes(key)) return "Command";
+  return "Core";
+}
+
+function buildingSynergyTag(key) {
+  if (key === "minerControl") return "Synergy: Miners";
+  if (key === "arcadeHub") return "Synergy: Arcade";
+  if (key === "refinery") return "Synergy: Vault loop";
+  if (key === "logisticsCenter") return "Synergy: Shipments";
+  if (key === "researchLab") return "Synergy: DATA";
+  if (key === "repairBay") return "Synergy: Stability";
+  if (key === "expeditionBay") return "Synergy: Expeditions";
+  if (key === "powerCell") return "Synergy: Energy";
+  return "Synergy: Base";
+}
+
+function buildingRiskTag(key) {
+  if (key === "refinery") return "Risk: Stability load";
+  if (key === "quarry") return "Risk: Energy demand";
+  if (key === "tradeHub") return "Risk: Low impact";
+  if (key === "salvage") return "Risk: Medium load";
+  if (key === "powerCell") return "Risk: Low";
+  if (key === "repairBay") return "Risk: Low";
+  if (key === "researchLab") return "Risk: Energy pressure";
+  if (key === "logisticsCenter") return "Risk: Low";
+  if (key === "expeditionBay") return "Risk: Resource timing";
+  return "Risk: Low";
+}
+
+function sectorStatusForBuilding(key, state) {
+  const level = Number(state.buildings?.[key] || 0);
+  const stability = Number(state.stability || 100);
+
+  if (level <= 0) return "offline";
+  if (stability < 60 && ["refinery", "researchLab", "logisticsCenter"].includes(key)) return "critical";
+  if (stability < 85 && ["repairBay", "powerCell", "refinery"].includes(key)) return "warning";
+  return "active";
+}
+
+function sectorStatusClasses(status) {
+  if (status === "critical") return "border-rose-500/35 bg-rose-500/10 text-rose-200";
+  if (status === "warning") return "border-amber-500/35 bg-amber-500/10 text-amber-200";
+  if (status === "active") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-200";
+  return "border-white/10 bg-white/5 text-white/45";
+}
+
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
@@ -1202,6 +1290,7 @@ export default function MleoBase() {
   const [expeditionMode, setExpeditionMode] = useState("balanced");
   const [crewRole, setCrewRole] = useState("engineer");
   const [commanderPath, setCommanderPath] = useState("industry");
+  const [claimedContracts, setClaimedContracts] = useState({});
 
   useEffect(() => {
     let alive = true;
@@ -1384,6 +1473,14 @@ export default function MleoBase() {
     if (commanderPath === "research") return "Command style: DATA and systems optimization.";
     return "Command style: wider MLEO ecosystem support.";
   }, [commanderPath]);
+
+  const liveContracts = useMemo(() => {
+    return LIVE_CONTRACTS.map((contract) => ({
+      ...contract,
+      done: contract.check(state, derived),
+      claimed: !!claimedContracts[contract.key],
+    }));
+  }, [state, derived, claimedContracts]);
   const blueprintCost = useMemo(
     () => Math.floor(CONFIG.blueprintBaseCost * Math.pow(CONFIG.blueprintGrowth, state.blueprintLevel)),
     [state.blueprintLevel]
@@ -1507,6 +1604,39 @@ export default function MleoBase() {
       log: pushLog(prev.log, `Commander path set to ${commanderPathMeta(pathKey).name}.`),
     }));
     showToast(`Commander path: ${commanderPathMeta(pathKey).name}`);
+  };
+
+  const claimContract = (key) => {
+    const contract = LIVE_CONTRACTS.find((item) => item.key === key);
+    if (!contract) return;
+
+    const done = contract.check(state, derived);
+    if (!done) {
+      showToast("Contract is not complete yet.");
+      return;
+    }
+    if (claimedContracts[key]) {
+      showToast("Contract already claimed.");
+      return;
+    }
+
+    setState((prev) => {
+      const nextResources = { ...prev.resources };
+      for (const [rk, rv] of Object.entries(contract.reward || {})) {
+        if (rk === "XP") continue;
+        nextResources[rk] = (nextResources[rk] || 0) + rv;
+      }
+
+      return applyLevelUps({
+        ...prev,
+        resources: nextResources,
+        commanderXp: prev.commanderXp + Number(contract.reward?.XP || 0),
+        log: pushLog(prev.log, `Contract claimed: ${contract.title}.`),
+      });
+    });
+
+    setClaimedContracts((prev) => ({ ...prev, [key]: true }));
+    showToast(`Contract claimed: ${contract.title}`);
   };
 
   const buyBuilding = async (key) => {
@@ -2176,6 +2306,23 @@ export default function MleoBase() {
               {building.desc}
             </div>
 
+            <div className="mt-3 flex flex-wrap gap-2">
+              <div className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/70">
+                {buildingRoleTag(building.key)}
+              </div>
+              <div className="rounded-full bg-cyan-500/10 px-2 py-1 text-[11px] font-semibold text-cyan-200">
+                {buildingSynergyTag(building.key)}
+              </div>
+            </div>
+
+            <div className="mt-2 text-[11px] text-white/45">
+              {buildingRiskTag(building.key)}
+            </div>
+
+            <div className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-white/65">
+              Status: {sectorStatusForBuilding(building.key, state).toUpperCase()}
+            </div>
+
             <div className="mt-2 flex h-5 items-center text-xs font-medium text-cyan-200/85">
               Next level: Lv {nextLevel}
             </div>
@@ -2223,6 +2370,9 @@ export default function MleoBase() {
           <div>Total vault spent: {fmt(state.totalSharedSpent)} MLEO</div>
           <div>Total expeditions: {fmt(state.totalExpeditions)}</div>
           <div>Total missions claimed: {fmt(state.totalMissionsDone)}</div>
+          <div>Crew role: {crewRoleInfo.name}</div>
+          <div>Commander path: {commanderPathInfo.name}</div>
+          <div>System state: {systemMeta.label}</div>
         </div>
       </div>
 
@@ -2249,7 +2399,7 @@ export default function MleoBase() {
         </Link>
       </div>
       <div className="space-y-2">
-        {(state.log || []).slice(0, 6).map((entry) => (
+        {(state.log || []).slice(0, 8).map((entry) => (
           <div key={entry.id} className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/75">
             <div>{entry.text}</div>
             <div className="mt-1 text-xs text-white/40">{new Date(entry.ts).toLocaleTimeString()}</div>
@@ -2277,7 +2427,9 @@ export default function MleoBase() {
                 MLEO ecosystem command hub
               </div>
               <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{CONFIG.title}</h1>
-              <p className="mt-2 max-w-2xl text-sm text-white/70 sm:text-base">{CONFIG.subtitle}</p>
+              <p className="mt-2 max-w-2xl text-sm text-white/70 sm:text-base">
+                {CONFIG.subtitle} Build a live command identity through sectors, contracts, specialization and controlled support systems.
+              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 sm:justify-start">
@@ -2497,10 +2649,88 @@ export default function MleoBase() {
             </div>
           </div>
 
+          <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+            <div className="mb-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-white/55">Command Schematic</div>
+              <div className="mt-1 text-lg font-bold text-white">Base Sectors</div>
+              <div className="mt-1 text-sm text-white/65">
+                A live overview of core sectors, support links and current operational state.
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {[
+                { key: "hq", label: "HQ Core" },
+                { key: "refinery", label: "Refinery Sector" },
+                { key: "logisticsCenter", label: "Logistics Sector" },
+                { key: "researchLab", label: "Research Sector" },
+                { key: "repairBay", label: "Repair Sector" },
+                { key: "expeditionBay", label: "Expedition Sector" },
+                { key: "minerControl", label: "Miner Link Sector" },
+                { key: "arcadeHub", label: "Arcade Link Sector" },
+              ].map((sector) => {
+                const status = sectorStatusForBuilding(sector.key, state);
+                const level = Number(state.buildings?.[sector.key] || 0);
+
+                return (
+                  <div
+                    key={sector.key}
+                    className={`rounded-2xl border px-4 py-3 ${sectorStatusClasses(status)}`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold">{sector.label}</div>
+                      <div className="rounded-full bg-black/20 px-2 py-1 text-[11px] font-bold">
+                        Lv {level}
+                      </div>
+                    </div>
+
+                    <div className="mt-2 text-xs uppercase tracking-[0.14em]">
+                      {status}
+                    </div>
+
+                    <div className="mt-2 text-xs text-white/70">
+                      {buildingSynergyTag(sector.key)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+            <div className="mb-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-white/55">Live Contracts</div>
+              <div className="mt-1 text-lg font-bold text-white">Command Objectives</div>
+              <div className="mt-1 text-sm text-white/65">
+                Short support contracts that reward healthy base behavior without turning BASE into an aggressive faucet.
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {liveContracts.map((contract) => (
+                <div key={contract.key} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="text-sm font-semibold text-white">{contract.title}</div>
+                  <div className="mt-1 text-xs text-white/60">{contract.desc}</div>
+                  <div className="mt-2 text-xs text-cyan-200/80">{contract.rewardText}</div>
+
+                  <div className="mt-3">
+                    <button
+                      onClick={() => claimContract(contract.key)}
+                      disabled={!contract.done || contract.claimed}
+                      className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {contract.claimed ? "Claimed" : contract.done ? "Claim Contract" : "In Progress"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="mt-6 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
             <Section
               title="Operations Console"
-              subtitle={`Ship cap today: ${fmt(state.sentToday)} / ${fmt(derived.shipCap)} MLEO. Blueprints and utilities make MLEO useful inside the ecosystem, not just claimable.`}
+              subtitle={`Ship cap today: ${fmt(state.sentToday)} / ${fmt(derived.shipCap)} MLEO. Blueprints, contracts, specialization and utilities turn BASE into a real command layer instead of a passive reward tab.`}
             >
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
@@ -2672,7 +2902,7 @@ export default function MleoBase() {
             <div className="hidden xl:block">
               <Section
                 title="Progress Summary"
-                subtitle="BASE should feel like the control room of the ecosystem, not just another reward tab."
+                subtitle="BASE should feel like a live control room with sectors, contracts, identity and operational pressure — not just another reward tab."
               >
                 {progressSummaryContent}
               </Section>
