@@ -15,10 +15,7 @@ const securityHeaders = [
     key: "Permissions-Policy",
     value: "camera=(), microphone=(), geolocation=()",
   },
-  {
-    key: "Cross-Origin-Opener-Policy",
-    value: "same-origin",
-  },
+  // הוסר Cross-Origin-Opener-Policy כדי לאפשר תאימות עם Coinbase Wallet
 ];
 
 /** @type {import('next').NextConfig} */
@@ -64,10 +61,7 @@ const nextConfig = {
     
     return config;
   },
-  // Ensure proper build output
-  generateBuildId: async () => {
-    return 'build-' + Date.now();
-  }
+  // הוסר generateBuildId - Next.js יוצר build ID אוטומטית
 };
 
 module.exports = nextConfig;

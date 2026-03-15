@@ -63,7 +63,11 @@ export default async function handler(req, res) {
 
     if (!total) {
       logValidationFailure(req, "Missing stageCounts", { rawStageCounts });
-      return res.status(400).json({ success: false, message: "Missing stageCounts" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Missing stageCounts",
+        debug: { rawStageCounts, normalized: stageCounts, total }
+      });
     }
     if (total > 120) {
       logSuspiciousActivity(req, `Too many breaks in batch: ${total}`);
@@ -77,7 +81,13 @@ export default async function handler(req, res) {
     });
 
     if (error) {
-      return res.status(400).json({ success: false, message: error.message || "Failed to apply miners accrual" });
+      console.error("miners_apply_breaks RPC error:", error);
+      return res.status(400).json({ 
+        success: false, 
+        message: error.message || "Failed to apply miners accrual",
+        errorCode: error.code,
+        errorDetails: error.details
+      });
     }
 
     const row = extractRow(data);
@@ -91,6 +101,10 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error("miners/accrue failed", error);
-    return res.status(500).json({ success: false, message: "Miners accrue API failed" });
+    return res.status(500).json({ 
+      success: false, 
+      message: "Miners accrue API failed",
+      error: error.message
+    });
   }
 }

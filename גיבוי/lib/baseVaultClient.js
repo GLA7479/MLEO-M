@@ -50,13 +50,6 @@ export async function getBaseState() {
   return apiFetch("/api/base/state", { method: "GET" });
 }
 
-export async function saveBaseState(patch) {
-  return apiFetch("/api/base/state", {
-    method: "POST",
-    body: JSON.stringify(patch || {}),
-  });
-}
-
 // Action APIs
 export async function buildBuilding(buildingKey) {
   return apiFetch("/api/base/action/build", {

@@ -84,16 +84,18 @@ export default async function handler(req, res) {
 
     const supabase = getSupabaseAdmin();
 
-    // Get current state
-    const { data: stateData, error: stateError } = await supabase.rpc("base_get_or_create_state", {
-      p_device_id: deviceId,
-    });
+    // Get fresh state with lock
+    const { data: freshStateData, error: freshStateError } = await supabase
+      .from("base_device_state")
+      .select("*")
+      .eq("device_id", deviceId)
+      .single();
 
-    if (stateError) {
-      return res.status(400).json({ success: false, message: stateError.message || "Failed to load state" });
+    if (freshStateError || !freshStateData) {
+      return res.status(400).json({ success: false, message: "Failed to reload latest base state" });
     }
 
-    const state = Array.isArray(stateData) ? stateData[0] : stateData;
+    const state = freshStateData;
     const buildings = state.buildings || {};
     const resources = state.resources || {};
     const level = Number(buildings[building_key] || 0);

@@ -2,7 +2,7 @@ import { getArcadeDevice } from "../../../../lib/server/arcadeDeviceCookie";
 import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { validateCsrfToken } from "../../../../lib/server/csrf";
-import { logRateLimitExceeded, logCsrfFailure, logValidationFailure, logIpRateLimitExceeded } from "../../../../lib/server/securityLogger";
+import { logRateLimitExceeded, logCsrfFailure, logValidationFailure, logIpRateLimitExceeded, logSuspiciousActivity } from "../../../../lib/server/securityLogger";
 import { checkIpRateLimit } from "../../../../lib/server/ipRateLimit";
 
 function extractRow(data) {

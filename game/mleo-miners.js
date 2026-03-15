@@ -793,12 +793,12 @@ const { disconnect } = useDisconnect();
     for (const [stage, total] of entries) {
       let remaining = total;
       while (remaining > 0) {
-        const room = Math.max(1, 200 - queuedCount);
+        const room = Math.max(1, 120 - queuedCount); // יישור לשרת: 120 במקום 200
         const take = Math.min(remaining, room);
         queueMinerBreakAccrual(stage, take, false);
         queuedCount += take;
         remaining -= take;
-        if (queuedCount >= 200) {
+        if (queuedCount >= 120) { // יישור לשרת: 120 במקום 200
           lastPayload = await flushMinerBreakAccrual();
           totalAdded += Number(lastPayload?.added || 0);
           queuedCount = 0;
@@ -2102,11 +2102,38 @@ setUi(u => ({ ...u, gold: s.gold }));
 // מעניקים MLEO לפי שלב הסלע עצמו (בלתי תלוי בסלעים אחרים)
 const stageNow = rockStageNow(rock);
 const baseForBreak = mleoBaseForStage(stageNow);
-const eff = addPlayerScorePoints(s, baseForBreak);finalizeDailyRewardOncePerTick();
+const eff = addPlayerScorePoints(s, baseForBreak);
+finalizeDailyRewardOncePerTick();
+
+// Optimistic update - זכה את המשתמש מיד ב-local state
+// השרת יסתנכרן ויתקן אם יש סתירות
+if (eff > 0) {
+  const st = loadMiningState();
+  const today = getTodayKey();
+  if (st.lastDay !== today) {
+    st.minedToday = 0;
+    st.scoreToday = 0;
+    st.lastDay = today;
+  }
+  const currentMined = Number(st.minedToday || 0);
+  const newMined = Math.min(currentMined + eff, DAILY_CAP);
+  const actualAdded = newMined - currentMined;
+  if (actualAdded > 0) {
+    st.minedToday = newMined;
+    st.balance = Number(((st.balance || 0) + actualAdded).toFixed(2));
+    saveMiningState(st);
+    // עדכן את ה-state ב-UI
+    setMining(prev => mergeMiningState(prev, {
+      balance: st.balance,
+      minedToday: st.minedToday,
+    }));
+  }
+}
+
 queueMinerBreakAccrual(stageNow, 1, false);
 
-
-// השרת הוא מקור האמת; ה-POP מציג את ההערכה עד לסנכרון הבא.
+// ה-POP מציג את הזכייה - המשתמש כבר קיבל אותה ב-local state
+// השרת יסתנכרן ויתקן אם יש סתירות
 const mleoTxt = formatMleoShort(eff || 0);
 setCenterPopup({ text: `⛏️ +${formatShort(coinsGain)} coins • +${mleoTxt} MLEO`, id: Math.random() });
 

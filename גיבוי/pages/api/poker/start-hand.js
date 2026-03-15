@@ -134,8 +134,24 @@ export default async function handler(req, res) {
     
     // Post blinds
     async function postBlind(seatIndex, amount){
-      await q(`UPDATE poker.poker_seats SET stack_live = GREATEST(0, stack_live - $3) WHERE table_id=$1 AND seat_index=$2`, [table_id, seatIndex, amount]);
-      await q(`UPDATE poker.poker_hand_players SET bet_street = bet_street + $3 WHERE hand_id=$1 AND seat_index=$2`, [hand_id, seatIndex, amount]);
+      const deb = await q(
+        `UPDATE poker.poker_seats
+         SET stack_live = stack_live - $3
+         WHERE table_id=$1 AND seat_index=$2 AND stack_live >= $3
+         RETURNING stack_live`,
+        [table_id, seatIndex, amount]
+      );
+
+      if (!deb.rowCount) {
+        throw new Error("insufficient_stack_live_for_blind");
+      }
+
+      await q(
+        `UPDATE poker.poker_hand_players
+         SET bet_street = bet_street + $3
+         WHERE hand_id=$1 AND seat_index=$2`,
+        [hand_id, seatIndex, amount]
+      );
     }
     await postBlind(sbSeat, sb);
     await postBlind(bbSeat, bb);

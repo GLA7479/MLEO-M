@@ -763,6 +763,14 @@ BEGIN
     RAISE EXCEPTION 'Session not found';
   END IF;
 
+  IF v_session.status <> 'started' THEN
+    RAISE EXCEPTION 'Invalid session status';
+  END IF;
+
+  IF v_session.started_at IS NULL THEN
+    RAISE EXCEPTION 'Missing started_at';
+  END IF;
+
   IF v_session.status = 'cancelled' THEN
     RAISE EXCEPTION 'Session is cancelled';
   END IF;
@@ -794,7 +802,7 @@ BEGIN
 
   -- Minimum session time check (prevent instant finish) - general check
   -- Individual games may have stricter requirements
-  IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '800 milliseconds' THEN
+  IF now() < v_session.started_at + interval '800 milliseconds' THEN
     RAISE EXCEPTION 'Session finished too quickly';
   END IF;
 

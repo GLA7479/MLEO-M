@@ -9,8 +9,12 @@ export function getLegacyVaultDeviceId() {
 
 let csrfTokenCache = null;
 
-export async function ensureCsrfToken() {
-  if (csrfTokenCache) return csrfTokenCache;
+export function clearCsrfTokenCache() {
+  csrfTokenCache = null;
+}
+
+export async function ensureCsrfToken(forceRefresh = false) {
+  if (!forceRefresh && csrfTokenCache) return csrfTokenCache;
   if (typeof window === "undefined") return null;
   
   try {

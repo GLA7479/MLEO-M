@@ -920,14 +920,20 @@ const { disconnect } = useDisconnect();
       });
     });
 
-    syncMiningFromServer().catch(() => {});
+    syncMiningFromServer().catch((err) => {
+      console.error("[mleo-miners] Initial sync failed", err);
+    });
 
     const flushId = setInterval(() => {
-      flushMinerBreakAccrual().catch(() => {});
+      flushMinerBreakAccrual().catch((err) => {
+        console.error("[mleo-miners] Periodic flush failed", err);
+      });
     }, 1000);
 
     const refreshId = setInterval(() => {
-      syncMiningFromServer().catch(() => {});
+      syncMiningFromServer().catch((err) => {
+        console.error("[mleo-miners] Periodic sync failed", err);
+      });
     }, 15000);
 
     return () => {

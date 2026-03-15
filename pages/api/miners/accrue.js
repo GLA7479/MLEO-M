@@ -11,7 +11,7 @@ function extractRow(data) {
 
 function normalizeStageCounts(raw) {
   const MIN_STAGE = 1;
-  const MAX_STAGE = 10;
+  const MAX_STAGE = 100000; // הסרת מגבלה - רק sanity check נגד abuse
   const src = raw && typeof raw === "object" ? raw : {};
   const out = {};
   let total = 0;
