@@ -197,6 +197,8 @@ DECLARE
   v_balance_before bigint;
   v_balance_after bigint;
   v_session_id uuid;
+  v_reclaimed_stake bigint := 0;
+  v_reclaim_timeout interval := interval '5 minutes';
 BEGIN
   IF coalesce(trim(p_device_id), '') = '' THEN
     RAISE EXCEPTION 'device_id is required';
@@ -221,6 +223,35 @@ BEGIN
   FOR UPDATE;
 
   v_balance_before := coalesce(v_balance_before, 0);
+
+  WITH reclaimed AS (
+    UPDATE public.arcade_device_sessions s
+    SET status = 'finished',
+        approved_reward = s.stake,
+        finished_at = now(),
+        client_payload = coalesce(s.client_payload, '{}'::jsonb),
+        server_payload = coalesce(s.server_payload, '{}'::jsonb) || jsonb_build_object(
+          'cancelled', true,
+          'cancel_reason', 'expired_started_session',
+          'approved_reward', s.stake
+        )
+    WHERE s.device_id = p_device_id
+      AND s.mode = 'paid'
+      AND s.status = 'started'
+      AND s.started_at <= now() - v_reclaim_timeout
+    RETURNING s.stake
+  )
+  SELECT coalesce(sum(reclaimed.stake), 0)::bigint
+  INTO v_reclaimed_stake
+  FROM reclaimed;
+
+  IF v_reclaimed_stake > 0 THEN
+    v_balance_before := v_balance_before + v_reclaimed_stake;
+    UPDATE public.vault_balances vb
+    SET balance = v_balance_before,
+        last_sync_at = now()
+    WHERE vb.device_id = p_device_id;
+  END IF;
 
   IF v_balance_before < p_stake THEN
     RAISE EXCEPTION 'Insufficient vault balance';
@@ -255,7 +286,9 @@ BEGIN
     '{}'::jsonb,
     jsonb_build_object(
       'balance_before', v_balance_before,
-      'balance_after_start', v_balance_after
+      'balance_after_start', v_balance_after,
+      'reclaimed_prior_started_stake', v_reclaimed_stake,
+      'reclaim_timeout_seconds', extract(epoch from v_reclaim_timeout)::integer
     )
   )
   RETURNING id INTO v_session_id;

@@ -405,6 +405,7 @@ DECLARE
   v_balance_after bigint;
   v_session_id uuid;
   v_reclaimed_stake bigint := 0;
+  v_reclaim_timeout interval := interval '5 minutes';
 BEGIN
   IF coalesce(trim(p_device_id), '') = '' THEN
     RAISE EXCEPTION 'device_id is required';
@@ -438,12 +439,13 @@ BEGIN
         client_payload = coalesce(s.client_payload, '{}'::jsonb),
         server_payload = coalesce(s.server_payload, '{}'::jsonb) || jsonb_build_object(
           'cancelled', true,
-          'cancel_reason', 'superseded_by_new_session',
+          'cancel_reason', 'expired_started_session',
           'approved_reward', s.stake
         )
     WHERE s.device_id = p_device_id
       AND s.mode = 'paid'
       AND s.status = 'started'
+      AND s.started_at <= now() - v_reclaim_timeout
     RETURNING s.stake
   )
   SELECT coalesce(sum(reclaimed.stake), 0)::bigint
@@ -492,7 +494,8 @@ BEGIN
     jsonb_build_object(
       'balance_before', v_balance_before,
       'balance_after_start', v_balance_after,
-      'reclaimed_prior_started_stake', v_reclaimed_stake
+      'reclaimed_prior_started_stake', v_reclaimed_stake,
+      'reclaim_timeout_seconds', extract(epoch from v_reclaim_timeout)::integer
     )
   )
   RETURNING id INTO v_session_id;
