@@ -3,6 +3,13 @@ import { ensureArcadeDevice } from "../../../../lib/server/arcadeDeviceCookie";
 import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 
+const MAX_BASE_DELTA = 5_000_000;
+const ALLOWED_REASONS = new Set([
+  "mleo-base",
+  "mleo-base-ship",
+  "mleo-base-spend",
+]);
+
 function extractRow(data) {
   return Array.isArray(data) ? data[0] : data;
 }
@@ -22,14 +29,31 @@ export default async function handler(req, res) {
     }
 
     const { delta, reason = "mleo-base" } = req.body || {};
+    const reasonKey = String(reason || "mleo-base").trim().toLowerCase();
     const wholeDelta = Math.trunc(Number(delta) || 0);
 
     if (!wholeDelta) {
       return res.status(400).json({ success: false, message: "Invalid delta" });
     }
 
+    if (!ALLOWED_REASONS.has(reasonKey)) {
+      return res.status(400).json({ success: false, message: "Invalid reason" });
+    }
+
+    if (Math.abs(wholeDelta) > MAX_BASE_DELTA) {
+      return res.status(400).json({ success: false, message: "Delta exceeds limit" });
+    }
+
+    if (reasonKey.endsWith("-ship") && wholeDelta < 0) {
+      return res.status(400).json({ success: false, message: "Invalid delta sign for ship action" });
+    }
+
+    if (reasonKey.endsWith("-spend") && wholeDelta > 0) {
+      return res.status(400).json({ success: false, message: "Invalid delta sign for spend action" });
+    }
+
     const { data, error } = await supabase.rpc("sync_vault_delta", {
-      p_game_id: String(reason || "mleo-base"),
+      p_game_id: reasonKey,
       p_delta: wholeDelta,
       p_device_id: deviceId,
       p_prev_nonce: null,
