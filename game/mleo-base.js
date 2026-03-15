@@ -2800,6 +2800,18 @@ export default function MleoBase() {
               </div>
             </div>
 
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-4 xl:block">
+              <div className="text-xs uppercase tracking-[0.18em] text-white/55">Base Profile</div>
+              <div className="mt-1 text-lg font-bold text-white">
+                {state.crew >= 5 ? "Developed Command" : state.crew >= 2 ? "Growing Outpost" : "Early Outpost"}
+              </div>
+              <div className="mt-1 text-sm text-white/65">
+                Buildings, role choice and commander path now shape the identity of your base.
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 xl:hidden">
             <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-white/55">Base Profile</div>
               <div className="mt-1 text-lg font-bold text-white">
@@ -2811,7 +2823,7 @@ export default function MleoBase() {
             </div>
           </div>
 
-          <div className="xl:hidden">
+          <div className="mt-4 xl:hidden">
             <AccordionSection
               title="Command Schematic"
               subtitle="A live overview of core sectors, support links and current operational state."
@@ -2906,7 +2918,7 @@ export default function MleoBase() {
             </div>
           </div>
 
-          <div className="xl:hidden">
+          <div className="mt-4 xl:hidden">
             <AccordionSection
               title="Live Contracts"
               subtitle="Short support contracts that reward healthy base behavior without turning BASE into an aggressive faucet."
@@ -2975,13 +2987,12 @@ export default function MleoBase() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-            <div className="xl:hidden">
-              <AccordionSection
-                title="Operations Console"
-                subtitle={`Ship cap today: ${fmt(state.sentToday)} / ${fmt(derived.shipCap)} MLEO. Blueprints, contracts, specialization and utilities turn BASE into a real command layer instead of a passive reward tab.`}
-                defaultOpen={true}
-              >
+          <div className="mt-4 xl:hidden">
+            <AccordionSection
+              title="Operations Console"
+              subtitle={`Ship cap today: ${fmt(state.sentToday)} / ${fmt(derived.shipCap)} MLEO. Blueprints, contracts, specialization and utilities turn BASE into a real command layer instead of a passive reward tab.`}
+              defaultOpen={true}
+            >
                 <div className="grid gap-3 md:grid-cols-2">
                   <div
                     className={`flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
@@ -3098,6 +3109,8 @@ export default function MleoBase() {
                 </div>
               </AccordionSection>
             </div>
+
+          <div className="mt-6 hidden gap-4 xl:grid xl:grid-cols-[1.2fr_1fr]">
             <div className="hidden xl:block">
               <Section
                 title="Operations Console"
@@ -3218,16 +3231,6 @@ export default function MleoBase() {
                   </div>
                 </div>
               </Section>
-            </div>
-
-            <div className="xl:hidden">
-              <AccordionSection
-                title="Daily Missions"
-                subtitle="Daily goals give players direction without turning BASE into an aggressive faucet."
-                defaultOpen={true}
-              >
-                {dailyMissionsContent}
-              </AccordionSection>
             </div>
             <div className="hidden xl:block">
               <Section
@@ -3237,6 +3240,16 @@ export default function MleoBase() {
                 {dailyMissionsContent}
               </Section>
             </div>
+          </div>
+
+          <div className="mt-4 xl:hidden">
+            <AccordionSection
+              title="Daily Missions"
+              subtitle="Daily goals give players direction without turning BASE into an aggressive faucet."
+              defaultOpen={true}
+            >
+              {dailyMissionsContent}
+            </AccordionSection>
           </div>
 
           <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
