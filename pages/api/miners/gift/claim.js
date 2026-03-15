@@ -2,7 +2,8 @@ import { getArcadeDevice } from "../../../../lib/server/arcadeDeviceCookie";
 import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { validateCsrfToken } from "../../../../lib/server/csrf";
-import { logRateLimitExceeded, logCsrfFailure } from "../../../../lib/server/securityLogger";
+import { logRateLimitExceeded, logCsrfFailure, logIpRateLimitExceeded } from "../../../../lib/server/securityLogger";
+import { checkIpRateLimit } from "../../../../lib/server/ipRateLimit";
 
 function extractRow(data) {
   return Array.isArray(data) ? data[0] : data;
@@ -19,6 +20,13 @@ export default async function handler(req, res) {
     if (!validateCsrfToken(req)) {
       logCsrfFailure(req);
       return res.status(403).json({ success: false, message: "Invalid CSRF token" });
+    }
+
+    // IP-based rate limiting
+    const ipRate = await checkIpRateLimit(req, 30, 60_000);
+    if (!ipRate.allowed) {
+      logIpRateLimitExceeded(req, 30);
+      return res.status(429).json({ success: false, message: "Too many requests from this IP" });
     }
 
     const supabase = getSupabaseAdmin();

@@ -2,7 +2,8 @@ import { getArcadeDevice } from "../../../../lib/server/arcadeDeviceCookie";
 import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { validateCsrfToken } from "../../../../lib/server/csrf";
-import { logRateLimitExceeded, logCsrfFailure, logValidationFailure } from "../../../../lib/server/securityLogger";
+import { logRateLimitExceeded, logCsrfFailure, logValidationFailure, logIpRateLimitExceeded } from "../../../../lib/server/securityLogger";
+import { checkIpRateLimit } from "../../../../lib/server/ipRateLimit";
 
 function extractRow(data) {
   return Array.isArray(data) ? data[0] : data;
@@ -21,6 +22,13 @@ export default async function handler(req, res) {
       return res.status(403).json({ success: false, message: "Invalid CSRF token" });
     }
 
+    // IP-based rate limiting (stricter for wallet claims)
+    const ipRate = await checkIpRateLimit(req, 20, 60_000);
+    if (!ipRate.allowed) {
+      logIpRateLimitExceeded(req, 20);
+      return res.status(429).json({ success: false, message: "Too many requests from this IP" });
+    }
+
     const supabase = getSupabaseAdmin();
     const deviceId = getArcadeDevice(req);
     if (!deviceId) {
@@ -36,6 +44,12 @@ export default async function handler(req, res) {
     if (wholeAmount <= 0) {
       logValidationFailure(req, "Invalid amount", { amount: req.body?.amount });
       return res.status(400).json({ success: false, message: "Invalid amount" });
+    }
+    
+    // Additional validation: check for suspiciously large amounts
+    if (wholeAmount > 1_000_000_000) {
+      logSuspiciousActivity(req, `Suspiciously large wallet claim: ${wholeAmount}`);
+      return res.status(400).json({ success: false, message: "Amount exceeds maximum" });
     }
 
     const { data, error } = await supabase.rpc("miners_claim_to_wallet", {

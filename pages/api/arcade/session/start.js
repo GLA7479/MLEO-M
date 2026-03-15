@@ -1,6 +1,9 @@
 import { getArcadeDevice } from "../../../../lib/server/arcadeDeviceCookie";
 import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
+import { checkIpRateLimit } from "../../../../lib/server/ipRateLimit";
+import { logIpRateLimitExceeded, logValidationFailure } from "../../../../lib/server/securityLogger";
+import { sanitizeGameId, validatePositiveInteger } from "../../../../lib/server/inputValidation";
 
 function extractRow(data) {
   return Array.isArray(data) ? data[0] : data;
@@ -13,6 +16,13 @@ export default async function handler(req, res) {
   }
 
   try {
+    // IP-based rate limiting
+    const ipRate = await checkIpRateLimit(req, 30, 60_000);
+    if (!ipRate.allowed) {
+      logIpRateLimitExceeded(req, 30);
+      return res.status(429).json({ success: false, message: "Too many requests from this IP" });
+    }
+
     const supabase = getSupabaseAdmin();
     const deviceId = getArcadeDevice(req);
     if (!deviceId) {
@@ -24,14 +34,17 @@ export default async function handler(req, res) {
     }
     const { gameId, stake, freeplay = false } = req.body || {};
 
-    if (!gameId) {
-      return res.status(400).json({ success: false, message: "Missing gameId" });
+    // Validate gameId
+    const sanitizedGameId = sanitizeGameId(gameId);
+    if (!sanitizedGameId) {
+      logValidationFailure(req, "Invalid gameId", { gameId });
+      return res.status(400).json({ success: false, message: "Invalid gameId" });
     }
 
     if (freeplay) {
       const { data, error } = await supabase.rpc("start_freeplay_session", {
         p_device_id: deviceId,
-        p_game_id: String(gameId),
+        p_game_id: sanitizedGameId,
       });
       if (error) {
         const message = error.message?.includes("No free play tokens available")
@@ -46,20 +59,21 @@ export default async function handler(req, res) {
         sessionId: row?.session_id || null,
         remainingTokens: Number(row?.tokens_remaining || 0),
         amount: Number(row?.stake || 0),
-        gameId: row?.game_id || gameId,
+        gameId: row?.game_id || sanitizedGameId,
         mode: row?.mode || "freeplay",
         status: row?.status || "started",
       });
     }
 
-    const wholeStake = Math.max(0, Math.floor(Number(stake) || 0));
-    if (wholeStake <= 0) {
+    const wholeStake = validatePositiveInteger(stake, 10_000_000);
+    if (!wholeStake) {
+      logValidationFailure(req, "Invalid stake", { stake });
       return res.status(400).json({ success: false, message: "Invalid stake" });
     }
 
     const { data, error } = await supabase.rpc("start_paid_session", {
       p_device_id: deviceId,
-      p_game_id: String(gameId),
+      p_game_id: sanitizedGameId,
       p_stake: wholeStake,
     });
 
@@ -76,7 +90,7 @@ export default async function handler(req, res) {
       sessionId: row?.session_id || null,
       balanceAfter: Number(row?.balance_after || 0),
       stake: Number(row?.stake || wholeStake),
-      gameId: row?.game_id || gameId,
+      gameId: row?.game_id || sanitizedGameId,
       mode: row?.mode || "paid",
       status: row?.status || "started",
     });

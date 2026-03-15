@@ -2,6 +2,8 @@ import crypto from "crypto";
 import { getArcadeDevice } from "../../../../lib/server/arcadeDeviceCookie";
 import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
+import { checkIpRateLimit } from "../../../../lib/server/ipRateLimit";
+import { logIpRateLimitExceeded, logSuspiciousActivity } from "../../../../lib/server/securityLogger";
 
 const MAX_BASE_DELTA = 5_000_000;
 const ALLOWED_REASONS = new Set([
@@ -21,6 +23,13 @@ export default async function handler(req, res) {
   }
 
   try {
+    // IP-based rate limiting
+    const ipRate = await checkIpRateLimit(req, 60, 60_000);
+    if (!ipRate.allowed) {
+      logIpRateLimitExceeded(req, 60);
+      return res.status(429).json({ success: false, message: "Too many requests from this IP" });
+    }
+
     const supabase = getSupabaseAdmin();
     const deviceId = getArcadeDevice(req);
     if (!deviceId) {
@@ -44,6 +53,7 @@ export default async function handler(req, res) {
     }
 
     if (Math.abs(wholeDelta) > MAX_BASE_DELTA) {
+      logSuspiciousActivity(req, `Delta exceeds limit: ${wholeDelta}`);
       return res.status(400).json({ success: false, message: "Delta exceeds limit" });
     }
 
