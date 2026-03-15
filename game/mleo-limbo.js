@@ -9,9 +9,13 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -172,6 +176,8 @@ export default function LimitRunPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionId, setSessionId] = useState(null);
+  const [sessionError, setSessionError] = useState("");
 
   // Modals
   const [menuOpen, setMenuOpen] = useState(false);
@@ -391,16 +397,18 @@ export default function LimitRunPage() {
   const playLimitRun = async (isFreePlayParam = false) => {
     if (rolling) return;
     playSfx(clickSound.current);
-
-    const currentVault = peekSharedVault().balance;
+    setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
+    let nextSessionId = null;
 
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'limbo';
       try {
-        const result = await useFreePlayToken(gameId);
+        const result = await startFreeplayArcadeSession(gameId);
         if (result.success) {
           play = result.amount;
+          nextSessionId = result.sessionId;
+          setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
           router.replace('/limbo', undefined, { shallow: true });
         } else {
@@ -419,17 +427,35 @@ export default function LimitRunPage() {
         alert(`Minimum play is ${MIN_PLAY} MLEO`);
         return;
       }
-      const debitResult = await debitSharedVault(play, "limbo");
-      if (!debitResult.ok) {
-        alert(debitResult.error || 'Insufficient MLEO in vault');
+      const startResult = await startPaidArcadeSession("limbo", play);
+      if (!startResult.success) {
+        alert(startResult.message || 'Failed to start session');
         return;
       }
-      setVaultState(debitResult.balance);
+      nextSessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
+
+    let finishResult;
+    try {
+      finishResult = await finishArcadeSession(nextSessionId, { targetMultiplier });
+    } catch (error) {
+      console.error("Finish session error:", error);
+      setSessionId(null);
+      setSessionError("Session failed to finish");
+      alert("Failed to finish session. Please refresh vault and try again.");
+      return;
+    }
+
+    const payload = finishResult?.serverPayload || {};
+    const finalResult = Number(payload.result || 0);
+    const resolvedTarget = Number(payload.targetMultiplier || targetMultiplier);
 
     setRolling(true);
     setGameResult(null);
     setResult(null);
+    setPlayAmount(String(play));
+    setSessionId(nextSessionId);
 
     // Animate rolling
     let count = 0;
@@ -439,33 +465,35 @@ export default function LimitRunPage() {
 
       if (count >= 15) {
         clearInterval(rollInterval);
-        const finalResult = generateResult();
         setResult(finalResult.toFixed(2));
         setRolling(false);
-        checkWin(finalResult, play);
+        checkWin(finishResult, finalResult, resolvedTarget, play);
       }
     }, 50);
   };
 
-  const checkWin = async (finalResult, play) => {
-    const won = finalResult >= targetMultiplier;
-    const prize = won ? Math.floor(play * targetMultiplier) : 0;
+  const checkWin = (finishResult, finalResult, target, play) => {
+    const payload = finishResult?.serverPayload || {};
+    const won = Boolean(payload.won);
+    const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
 
+    if (Number.isFinite(finishResult?.balanceAfter)) {
+      setVaultState(finishResult.balanceAfter);
+    }
     if (won && prize > 0) {
-      const creditResult = await creditSharedVault(prize, "limbo");
-      setVaultState(creditResult.balance);
       playSfx(winSound.current);
     }
 
     const resultData = {
       win: won,
       result: finalResult,
-      target: targetMultiplier,
+      target,
       prize: prize,
       profit: won ? prize - play : -play
     };
 
     setGameResult(resultData);
+    setSessionId(null);
 
     const newStats = {
       ...stats,
@@ -797,6 +825,7 @@ export default function LimitRunPage() {
             >
               {rolling ? "Rolling..." : "ROLL"}
             </button>
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
 
             <div className="flex gap-2">
               <button

@@ -79,6 +79,16 @@ DECLARE
   v_horse_my_position integer;
   v_horse_multiplier numeric := 0;
   v_horse_place text := '';
+  v_goldrush_found text[];
+  v_goldrush_item text;
+  v_goldrush_treasures integer;
+  v_goldrush_cashout boolean;
+  v_goldrush_total numeric := 0;
+  v_limbo_target numeric := 0;
+  v_limbo_result numeric := 0;
+  v_hilo_streak integer := 0;
+  v_hilo_cashout boolean := false;
+  v_hilo_multiplier numeric := 0;
   v_ladder_step integer;
   v_ladder_success boolean;
   v_ladder_multiplier numeric := 0;
@@ -540,6 +550,80 @@ BEGIN
       'positions', to_jsonb(v_horse_positions),
       'place', v_horse_place,
       'multiplier', v_horse_multiplier,
+      'won', v_won,
+      'approved_reward', v_reward
+    );
+
+  ELSIF coalesce(v_session.game_id, '') = 'goldrush' THEN
+    SELECT array_agg(value::text ORDER BY ordinality)
+    INTO v_goldrush_found
+    FROM jsonb_array_elements_text(coalesce(p_payload->'foundItems', '[]'::jsonb)) WITH ORDINALITY AS t(value, ordinality);
+    v_goldrush_treasures := floor(coalesce((p_payload->>'treasures')::numeric, 0));
+    v_goldrush_cashout := coalesce((p_payload->>'cashout')::boolean, false);
+    IF coalesce(array_length(v_goldrush_found, 1), 0) <> v_goldrush_treasures THEN
+      RAISE EXCEPTION 'goldrush payload treasures count does not match foundItems length';
+    END IF;
+    v_goldrush_total := 0;
+    FOREACH v_goldrush_item IN ARRAY coalesce(v_goldrush_found, ARRAY[]::text[]) LOOP
+      IF v_goldrush_item NOT IN ('small_gem', 'medium_gem', 'large_treasure', 'grandPrize', 'skull') THEN
+        RAISE EXCEPTION 'goldrush invalid found item: %', v_goldrush_item;
+      END IF;
+      v_goldrush_total := v_goldrush_total + CASE v_goldrush_item
+        WHEN 'small_gem' THEN floor(v_session.stake * 0.44)
+        WHEN 'medium_gem' THEN floor(v_session.stake * 0.67)
+        WHEN 'large_treasure' THEN floor(v_session.stake * 1.0)
+        WHEN 'grandPrize' THEN floor(v_session.stake * 1.67)
+        ELSE 0
+      END;
+    END LOOP;
+    v_reward := CASE WHEN v_goldrush_cashout THEN floor(v_goldrush_total)::bigint ELSE 0 END;
+    v_won := v_reward > 0;
+    v_server_payload := jsonb_build_object(
+      'game', 'goldrush',
+      'mode', v_session.mode,
+      'stake', v_session.stake,
+      'cashout', v_goldrush_cashout,
+      'treasures', v_goldrush_treasures,
+      'foundItems', to_jsonb(coalesce(v_goldrush_found, ARRAY[]::text[])),
+      'calculated_total', floor(v_goldrush_total)::bigint,
+      'won', v_won,
+      'approved_reward', v_reward
+    );
+
+  ELSIF coalesce(v_session.game_id, '') = 'limbo' THEN
+    v_limbo_target := round(coalesce((p_payload->>'targetMultiplier')::numeric, 0), 2);
+    IF v_limbo_target < 1.01 OR v_limbo_target > 1000 THEN
+      RAISE EXCEPTION 'limbo payload must include targetMultiplier between 1.01 and 1000';
+    END IF;
+    v_limbo_result := round(least((0.96 / greatest(random(), 0.000001))::numeric, 1000::numeric), 2);
+    v_won := v_limbo_result >= v_limbo_target;
+    v_reward := CASE WHEN v_won THEN floor(v_session.stake * v_limbo_target)::bigint ELSE 0 END;
+    v_server_payload := jsonb_build_object(
+      'game', 'limbo',
+      'mode', v_session.mode,
+      'stake', v_session.stake,
+      'targetMultiplier', v_limbo_target,
+      'result', v_limbo_result,
+      'won', v_won,
+      'approved_reward', v_reward
+    );
+
+  ELSIF coalesce(v_session.game_id, '') = 'hilo' THEN
+    v_hilo_streak := floor(coalesce((p_payload->>'streak')::numeric, 0));
+    v_hilo_cashout := coalesce((p_payload->>'cashout')::boolean, false);
+    IF v_hilo_streak < 0 OR v_hilo_streak > 52 THEN
+      RAISE EXCEPTION 'hilo payload must include streak between 0 and 52';
+    END IF;
+    v_hilo_multiplier := round((1 + (v_hilo_streak * 0.206))::numeric, 3);
+    v_reward := CASE WHEN v_hilo_cashout AND v_hilo_streak > 0 THEN floor(v_session.stake * v_hilo_multiplier)::bigint ELSE 0 END;
+    v_won := v_reward > 0;
+    v_server_payload := jsonb_build_object(
+      'game', 'hilo',
+      'mode', v_session.mode,
+      'stake', v_session.stake,
+      'cashout', v_hilo_cashout,
+      'streak', v_hilo_streak,
+      'multiplier', v_hilo_multiplier,
       'won', v_won,
       'approved_reward', v_reward
     );

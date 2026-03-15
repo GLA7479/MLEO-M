@@ -16,9 +16,13 @@ import {
   useChainId,
 } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -170,6 +174,8 @@ export default function GoldRushPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionId, setSessionId] = useState(null);
+  const [sessionError, setSessionError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -373,14 +379,17 @@ useEffect(() => {
 
   const startGame = async (isFreePlayParam = false) => {
     playSfx(clickSound.current);
-    const currentVault = peekSharedVault().balance;
+    setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
+    let nextSessionId = null;
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'goldrush';
       try {
-        const result = await useFreePlayToken(gameId);
+        const result = await startFreeplayArcadeSession(gameId);
         if (result.success) {
           play = result.amount;
+          nextSessionId = result.sessionId;
+          setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
           router.replace("/goldrush", undefined, { shallow: true });
         } else {
@@ -399,14 +408,16 @@ useEffect(() => {
         alert(`Minimum play is ${MIN_PLAY} MLEO`);
         return;
       }
-      const debitResult = await debitSharedVault(play, "goldrush");
-      if (!debitResult.ok) {
-        alert(debitResult.error || 'Insufficient MLEO in vault');
+      const startResult = await startPaidArcadeSession("goldrush", play);
+      if (!startResult.success) {
+        alert(startResult.message || 'Failed to start session');
         return;
       }
-      setVaultState(debitResult.balance);
+      nextSessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
     setPlayAmount(String(play));
+    setSessionId(nextSessionId);
     setGameResult(null);
     setDug([]);
     setTotalPrize(0);
@@ -440,37 +451,58 @@ useEffect(() => {
   };
 
   const endGame = async (cashout, treasures) => {
+    if (!sessionId) return;
     const play = Number(playAmount);
-    const prize = cashout ? totalPrize : 0;
-    const win = prize > 0;
+    const foundItems = dug
+      .map((index) => map[index])
+      .filter((item) => item && item !== "skull");
+    try {
+      const finishResult = await finishArcadeSession(sessionId, {
+        cashout,
+        treasures,
+        foundItems,
+      });
+      const payload = finishResult?.serverPayload || {};
+      const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
+      const win = Boolean(payload.won);
+      const resolvedTreasures = Number(payload.treasures || treasures);
 
-    if (win && prize > 0) {
-      const creditResult = await creditSharedVault(prize, "goldrush");
-      setVaultState(creditResult.balance);
-      playSfx(winSound.current);
+      if (Number.isFinite(finishResult?.balanceAfter)) {
+        setVaultState(finishResult.balanceAfter);
+      }
+      if (win && prize > 0) {
+        playSfx(winSound.current);
+      }
+
+      const resultData = {
+        win,
+        treasures: resolvedTreasures,
+        prize,
+        profit: win ? prize - play : -play,
+      };
+      setGameResult(resultData);
+      setGameActive(false);
+      setSessionId(null);
+
+      const newStats = {
+        ...stats,
+        totalGames: stats.totalGames + 1,
+        wins: win ? stats.wins + 1 : stats.wins,
+        losses: win ? stats.losses : stats.losses + 1,
+        totalPlay: stats.totalPlay + play,
+        totalWon: win ? stats.totalWon + prize : stats.totalWon,
+        biggestWin: Math.max(stats.biggestWin, win ? prize : 0),
+        treasuresFound: stats.treasuresFound + resolvedTreasures,
+        lastPlay: play,
+      };
+      setStats(newStats);
+    } catch (error) {
+      console.error("Finish session error:", error);
+      setGameActive(false);
+      setSessionId(null);
+      setSessionError("Session failed to finish");
+      alert("Failed to finish session. Please refresh vault and try again.");
     }
-
-    const resultData = {
-      win,
-      treasures,
-      prize,
-      profit: win ? prize - play : -play,
-    };
-    setGameResult(resultData);
-    setGameActive(false);
-
-    const newStats = {
-      ...stats,
-      totalGames: stats.totalGames + 1,
-      wins: win ? stats.wins + 1 : stats.wins,
-      losses: win ? stats.losses : stats.losses + 1,
-      totalPlay: stats.totalPlay + play,
-      totalWon: win ? stats.totalWon + prize : stats.totalWon,
-      biggestWin: Math.max(stats.biggestWin, win ? prize : 0),
-      treasuresFound: stats.treasuresFound + treasures,
-      lastPlay: play,
-    };
-    setStats(newStats);
   };
 
   const resetGame = () => {
@@ -480,6 +512,7 @@ useEffect(() => {
     setDug([]);
     setTotalPrize(0);
     setGameActive(false);
+    setSessionId(null);
   };
   const backSafe = () => {
     playSfx(clickSound.current);
@@ -674,6 +707,7 @@ useEffect(() => {
                 ? "PLAY AGAIN"
                 : "START"}
             </button>
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button
                 onClick={() => {
