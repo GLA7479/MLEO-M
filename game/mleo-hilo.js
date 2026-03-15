@@ -365,7 +365,8 @@ export default function HiLoPage() {
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-blue-900 via-black to-purple-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
 
   const currentMultiplier = gameActive ? 1 + (streak * 0.206) : 1;
-  const potentialWin = gameActive ? Math.floor(Number(playAmount) * currentMultiplier) : Math.floor(Number(playAmount) * 2);
+  // Only show potential win when game is active, otherwise show 0 or play amount
+  const potentialWin = gameActive ? Math.floor(Number(playAmount) * currentMultiplier) : 0;
 
     return (
       <Layout>
@@ -400,7 +401,9 @@ export default function HiLoPage() {
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">Win</div>
-              <div className="text-sm font-bold text-green-400">{fmt(potentialWin)}</div>
+              <div className="text-sm font-bold text-green-400">
+                {gameActive ? fmt(potentialWin) : '-'}
+              </div>
             </div>
           </div>
 

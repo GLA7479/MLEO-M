@@ -663,7 +663,7 @@ export default function LimitRunPage() {
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">Win</div>
               <div className="text-sm font-bold text-green-400">
-                {fmt(potentialWin)}
+                {rolling ? fmt(potentialWin) : (potentialWin > 0 && Number(playAmount) >= MIN_PLAY) ? fmt(potentialWin) : '-'}
               </div>
             </div>
           </div>
