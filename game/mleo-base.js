@@ -2681,10 +2681,10 @@ export default function MleoBase() {
             <MetricCard label="Gold" value={fmt(state.resources.GOLD)} note={`x${derived.goldMult.toFixed(2)} output`} accent="amber" />
             <MetricCard label="Scrap" value={fmt(state.resources.SCRAP)} note={`x${derived.scrapMult.toFixed(2)} output`} accent="rose" />
             <MetricCard label="Data" value={fmt(state.resources.DATA)} note={`x${derived.dataMult.toFixed(2)} progression`} accent="sky" />
-            <div className={`w-full ${highlightCard((state.resources.ENERGY || 0) <= derived.energyCap * 0.25, "warning")}`}>
+            <div className={`h-full w-full ${highlightCard((state.resources.ENERGY || 0) <= derived.energyCap * 0.25, "warning")}`}>
               <MetricCard label="Energy" value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`} note={`Regen ${derived.energyRegen.toFixed(2)}/s`} accent="slate" />
             </div>
-            <div className={`w-full ${highlightCard(systemState === "critical", "critical") || highlightCard(systemState === "warning", "warning")}`}>
+            <div className={`h-full w-full ${highlightCard(systemState === "critical", "critical") || highlightCard(systemState === "warning", "warning")}`}>
               <MetricCard
                 label="Stability"
                 value={`${fmt(state.stability)}%`}
