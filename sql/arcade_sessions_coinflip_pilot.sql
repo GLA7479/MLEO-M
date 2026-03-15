@@ -456,9 +456,12 @@ $$;
 -- ============================================================================
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.start_freeplay_session(text, text) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.start_paid_session(text, text, bigint) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.finish_arcade_session(uuid, jsonb) TO anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.start_freeplay_session(text, text) FROM public, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.start_paid_session(text, text, bigint) FROM public, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.finish_arcade_session(uuid, jsonb) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.start_freeplay_session(text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.start_paid_session(text, text, bigint) TO service_role;
+GRANT EXECUTE ON FUNCTION public.finish_arcade_session(uuid, jsonb) TO service_role;
 
 COMMIT;
 

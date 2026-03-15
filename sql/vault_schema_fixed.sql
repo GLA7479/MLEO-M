@@ -154,9 +154,12 @@ END $$;
 
 -- === Grant Permissions ===
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
-GRANT SELECT, INSERT, UPDATE ON public.vault_balances TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.get_vault_balance(text) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.sync_vault_delta(text, bigint, text, text, text) TO anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE ON public.vault_balances FROM public, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.get_vault_balance(text) FROM public, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.sync_vault_delta(text, bigint, text, text, text) FROM public, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.vault_balances TO service_role;
+GRANT EXECUTE ON FUNCTION public.get_vault_balance(text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.sync_vault_delta(text, bigint, text, text, text) TO service_role;
 
 -- === Realtime (optional) ===
 -- Only add if you want realtime updates

@@ -174,6 +174,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.finish_arcade_session(uuid, jsonb) TO anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.finish_arcade_session(uuid, jsonb) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.finish_arcade_session(uuid, jsonb) TO service_role;
 
 COMMIT;
