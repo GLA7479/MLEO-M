@@ -3,12 +3,7 @@ import Link from "next/link";
 import { useAccount } from "wagmi";
 import { useAccountModal, useConnectModal } from "@rainbow-me/rainbowkit";
 import Layout from "../components/Layout";
-import {
-  initVaultAdapter,
-  getBalance as getVaultBalance,
-  queueDelta,
-  flushDelta,
-} from "../lib/vaultAdapter";
+import { applyBaseVaultDelta, getBaseVaultBalance } from "../lib/baseVaultClient";
 
 const STATE_KEY = "mleo_base_v1";
 const MAX_LOG_ITEMS = 16;
@@ -426,7 +421,7 @@ function offlineFactorFor(ms) {
 
 async function readVaultSafe() {
   try {
-    const value = await getVaultBalance();
+    const value = await getBaseVaultBalance();
     return Number.isFinite(value) ? Math.max(0, value) : 0;
   } catch {
     return 0;
@@ -436,8 +431,7 @@ async function readVaultSafe() {
 async function addToVault(amount, gameId = "mleo-base") {
   const delta = Math.max(0, Math.floor(Number(amount || 0)));
   if (!delta) return { ok: true, skipped: true };
-  queueDelta(delta, { syncLocal: true });
-  return flushDelta(gameId);
+  return applyBaseVaultDelta(delta, gameId);
 }
 
 async function spendFromVault(amount, gameId = "mleo-base") {
@@ -445,8 +439,7 @@ async function spendFromVault(amount, gameId = "mleo-base") {
   if (!delta) return { ok: true, skipped: true };
   const current = await readVaultSafe();
   if (current < delta) return { ok: false, error: "Not enough vault balance" };
-  queueDelta(-delta, { syncLocal: true });
-  return flushDelta(gameId);
+  return applyBaseVaultDelta(-delta, gameId);
 }
 
 function xpForLevel(level) {
@@ -973,7 +966,6 @@ export default function MleoBase() {
 
     async function boot() {
       try {
-        initVaultAdapter();
         const bal = await readVaultSafe();
         if (alive) setSharedVault(bal);
       } catch {}
