@@ -483,6 +483,65 @@ function pickLiveEvent(state) {
   return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
+const CREW_ROLES = [
+  {
+    key: "engineer",
+    name: "Engineer",
+    desc: "Improves stability handling and maintenance flow.",
+  },
+  {
+    key: "logistician",
+    name: "Logistician",
+    desc: "Improves shipment preparation and export discipline.",
+  },
+  {
+    key: "researcher",
+    name: "Researcher",
+    desc: "Focuses on DATA efficiency and system analysis.",
+  },
+  {
+    key: "scout",
+    name: "Scout",
+    desc: "Improves expedition awareness and field scouting identity.",
+  },
+  {
+    key: "operations",
+    name: "Operations Chief",
+    desc: "Balances overall command pressure and base rhythm.",
+  },
+];
+
+const COMMANDER_PATHS = [
+  {
+    key: "industry",
+    name: "Industry",
+    desc: "Production-focused command style with safer infrastructure pacing.",
+  },
+  {
+    key: "logistics",
+    name: "Logistics",
+    desc: "Shipment discipline, export timing and vault flow identity.",
+  },
+  {
+    key: "research",
+    name: "Research",
+    desc: "DATA, analysis and long-term systems optimization.",
+  },
+  {
+    key: "ecosystem",
+    name: "Ecosystem",
+    desc: "Supports synergy with Miners, Arcade and broader MLEO structure.",
+  },
+];
+
+function crewRoleMeta(roleKey) {
+  return CREW_ROLES.find((item) => item.key === roleKey) || CREW_ROLES[0];
+}
+
+function commanderPathMeta(pathKey) {
+  return COMMANDER_PATHS.find((item) => item.key === pathKey) || COMMANDER_PATHS[0];
+}
+
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
@@ -669,6 +728,7 @@ function freshState() {
       repairBay: 0,
     },
     crew: 0,
+    crewRole: "engineer",
     modules: {},
     research: {},
     bankedMleo: 0,
@@ -682,6 +742,7 @@ function freshState() {
     stability: 100,
     commanderXp: 0,
     commanderLevel: 1,
+    commanderPath: "industry",
     totalExpeditions: 0,
     totalMissionsDone: 0,
     stats: {
@@ -710,6 +771,9 @@ function derive(state, now = Date.now()) {
   const researchLabLevel = state.buildings.researchLab || 0;
   const repairBayLevel = state.buildings.repairBay || 0;
   const hasFieldOps = !!state.research.fieldOps;
+
+  const crewRole = state.crewRole || "engineer";
+  const commanderPath = state.commanderPath || "industry";
   const workerBonus = 1 + state.crew * (hasFieldOps ? 0.03 : 0.02);
   const overclock = now < (state.overclockUntil || 0) ? 1.35 : 1;
   const hqBonus = 1 + hqLevel * 0.03;
@@ -725,6 +789,31 @@ function derive(state, now = Date.now()) {
   let dataMult = (1 + researchLabLevel * 0.06) * arcadeBonus;
   let bankBonus = 1 + state.blueprintLevel * 0.02 + logisticsLevel * 0.025;
   let maintenanceRelief = 1 + repairBayLevel * 0.08;
+
+  if (crewRole === "engineer") {
+    maintenanceRelief *= 1.06;
+  } else if (crewRole === "logistician") {
+    bankBonus *= 1.03;
+  } else if (crewRole === "researcher") {
+    dataMult *= 1.05;
+  } else if (crewRole === "scout") {
+    dataMult *= 1.02;
+  } else if (crewRole === "operations") {
+    goldMult *= 1.02;
+    scrapMult *= 1.02;
+  }
+
+  if (commanderPath === "industry") {
+    oreMult *= 1.03;
+    maintenanceRelief *= 1.03;
+  } else if (commanderPath === "logistics") {
+    bankBonus *= 1.04;
+  } else if (commanderPath === "research") {
+    dataMult *= 1.06;
+  } else if (commanderPath === "ecosystem") {
+    goldMult *= 1.01;
+    dataMult *= 1.02;
+  }
 
   if (state.modules.servoDrill) oreMult *= 1.15;
   if (state.modules.vaultCompressor) {
@@ -1111,6 +1200,8 @@ export default function MleoBase() {
   const [nextShipBonus, setNextShipBonus] = useState(0);
 
   const [expeditionMode, setExpeditionMode] = useState("balanced");
+  const [crewRole, setCrewRole] = useState("engineer");
+  const [commanderPath, setCommanderPath] = useState("industry");
 
   useEffect(() => {
     let alive = true;
@@ -1132,8 +1223,10 @@ export default function MleoBase() {
               totalSharedSpent: Number(saved.total_shared_spent || 0),
               commanderLevel: Number(saved.commander_level || 1),
               commanderXp: Number(saved.commander_xp || 0),
+              commanderPath: saved.commander_path || seed.commanderPath,
               blueprintLevel: Number(saved.blueprint_level || 0),
               crew: Number(saved.crew || 0),
+              crewRole: saved.crew_role || seed.crewRole,
               overclockUntil: saved.overclock_until ? new Date(saved.overclock_until).getTime() : 0,
               expeditionReadyAt: saved.expedition_ready_at ? new Date(saved.expedition_ready_at).getTime() : Date.now(),
               maintenanceDue: Number(saved.maintenance_due || 0),
@@ -1205,8 +1298,10 @@ export default function MleoBase() {
           totalSharedSpent: Number(serverState.total_shared_spent || prev.totalSharedSpent),
           commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
           commanderXp: Number(serverState.commander_xp || prev.commanderXp),
+          commanderPath: serverState.commander_path || prev.commanderPath,
           blueprintLevel: Number(serverState.blueprint_level || prev.blueprintLevel),
           crew: Number(serverState.crew || prev.crew),
+          crewRole: serverState.crew_role || prev.crewRole,
           overclockUntil: serverState.overclock_until ? new Date(serverState.overclock_until).getTime() : 0,
           expeditionReadyAt: serverState.expedition_ready_at ? new Date(serverState.expedition_ready_at).getTime() : prev.expeditionReadyAt,
           maintenanceDue: Number(serverState.maintenance_due || prev.maintenanceDue),
@@ -1271,6 +1366,24 @@ export default function MleoBase() {
   const systemState = useMemo(() => getSystemState(state.stability), [state.stability]);
   const systemMeta = useMemo(() => systemStateMeta(systemState), [systemState]);
   const workerNextCost = useMemo(() => crewCost(state.crew), [state.crew]);
+
+  const crewRoleInfo = useMemo(() => crewRoleMeta(crewRole), [crewRole]);
+  const commanderPathInfo = useMemo(() => commanderPathMeta(commanderPath), [commanderPath]);
+
+  const roleBonusText = useMemo(() => {
+    if (crewRole === "engineer") return "Focus: stability + maintenance";
+    if (crewRole === "logistician") return "Focus: shipments + export flow";
+    if (crewRole === "researcher") return "Focus: DATA + analysis";
+    if (crewRole === "scout") return "Focus: expedition identity";
+    return "Focus: balanced command flow";
+  }, [crewRole]);
+
+  const commanderPathText = useMemo(() => {
+    if (commanderPath === "industry") return "Command style: infrastructure and safer production.";
+    if (commanderPath === "logistics") return "Command style: export discipline and vault flow.";
+    if (commanderPath === "research") return "Command style: DATA and systems optimization.";
+    return "Command style: wider MLEO ecosystem support.";
+  }, [commanderPath]);
   const blueprintCost = useMemo(
     () => Math.floor(CONFIG.blueprintBaseCost * Math.pow(CONFIG.blueprintGrowth, state.blueprintLevel)),
     [state.blueprintLevel]
@@ -1324,6 +1437,12 @@ export default function MleoBase() {
     return () => window.clearTimeout(id);
   }, [mounted, activeEvent, eventCooldownUntil, systemState]);
 
+  useEffect(() => {
+    if (!mounted) return;
+    setCrewRole(state.crewRole || "engineer");
+    setCommanderPath(state.commanderPath || "industry");
+  }, [mounted, state.crewRole, state.commanderPath]);
+
   const resolveLiveEventChoice = (choice) => {
     if (!activeEvent || !choice) return;
 
@@ -1368,6 +1487,26 @@ export default function MleoBase() {
 
     showToast(choice.label);
     setActiveEvent(null);
+  };
+
+  const handleCrewRoleChange = (roleKey) => {
+    setCrewRole(roleKey);
+    setState((prev) => ({
+      ...prev,
+      crewRole: roleKey,
+      log: pushLog(prev.log, `Crew specialization changed to ${crewRoleMeta(roleKey).name}.`),
+    }));
+    showToast(`Crew role: ${crewRoleMeta(roleKey).name}`);
+  };
+
+  const handleCommanderPathChange = (pathKey) => {
+    setCommanderPath(pathKey);
+    setState((prev) => ({
+      ...prev,
+      commanderPath: pathKey,
+      log: pushLog(prev.log, `Commander path set to ${commanderPathMeta(pathKey).name}.`),
+    }));
+    showToast(`Commander path: ${commanderPathMeta(pathKey).name}`);
   };
 
   const buyBuilding = async (key) => {
@@ -1858,19 +1997,72 @@ export default function MleoBase() {
   const crewModulesResearchContent = (
     <div className="space-y-3">
       <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold">Crew</div>
+              <div className="text-xs text-white/60">
+                {state.crew} workers · global output bonus {(state.research.fieldOps ? 3 : 2) * state.crew}%
+              </div>
+            </div>
+            <button onClick={hireCrew} className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20">
+              Hire
+            </button>
+          </div>
+
+          <div className="text-xs text-white/55">
+            Next cost: {Object.entries(workerNextCost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
+          </div>
+
           <div>
-            <div className="text-sm font-semibold">Crew</div>
-            <div className="text-xs text-white/60">
-              {state.crew} workers · global output bonus {(state.research.fieldOps ? 3 : 2) * state.crew}%
+            <div className="mb-2 text-xs uppercase tracking-[0.18em] text-white/45">Crew Specialization</div>
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {CREW_ROLES.map((role) => {
+                const active = crewRole === role.key;
+                return (
+                  <button
+                    key={role.key}
+                    onClick={() => handleCrewRoleChange(role.key)}
+                    className={`rounded-2xl border px-3 py-3 text-left transition ${
+                      active
+                        ? "border-cyan-400/40 bg-cyan-500/15"
+                        : "border-white/10 bg-white/5 hover:bg-white/10"
+                    }`}
+                  >
+                    <div className="text-sm font-semibold text-white">{role.name}</div>
+                    <div className="mt-1 text-xs text-white/60">{role.desc}</div>
+                  </button>
+                );
+              })}
             </div>
           </div>
-          <button onClick={hireCrew} className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20">
-            Hire
-          </button>
         </div>
-        <div className="mt-2 text-xs text-white/55">
-          Next cost: {Object.entries(workerNextCost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="text-sm font-semibold text-white">Commander Path</div>
+        <div className="mt-1 text-xs text-white/60">
+          Choose a command identity for your base. This changes specialization, not the core economy.
+        </div>
+
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          {COMMANDER_PATHS.map((path) => {
+            const active = commanderPath === path.key;
+            return (
+              <button
+                key={path.key}
+                onClick={() => handleCommanderPathChange(path.key)}
+                className={`rounded-2xl border px-3 py-3 text-left transition ${
+                  active
+                    ? "border-fuchsia-400/40 bg-fuchsia-500/15"
+                    : "border-white/10 bg-white/5 hover:bg-white/10"
+                }`}
+              >
+                <div className="text-sm font-semibold text-white">{path.name}</div>
+                <div className="mt-1 text-xs text-white/60">{path.desc}</div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -2038,8 +2230,9 @@ export default function MleoBase() {
         <div className="font-semibold text-white">Why MLEO BASE is stronger as a support layer</div>
         <ul className="mt-2 space-y-2 text-sm text-white/65">
           <li>It uses the same shared vault via adapter, instead of raw localStorage writes.</li>
-          <li>It adds missions, commander level and ecosystem-specific buildings.</li>
-          <li>It shifts rewards toward progression and sinks, not just direct MLEO output.</li>
+          <li>It adds missions, commander level, crew specialization and command identity.</li>
+          <li>It shifts rewards toward progression, decision-making and sinks, not just direct MLEO output.</li>
+          <li>It now feels more like a live command center than a passive dashboard.</li>
         </ul>
       </div>
     </div>
@@ -2205,7 +2398,8 @@ export default function MleoBase() {
                 <div className="mt-1 text-sm text-white/70">{nextStep.text}</div>
               </div>
               <div className="rounded-2xl bg-black/20 px-4 py-3 text-sm text-white/75">
-                Commander Lv {state.commanderLevel}
+                <div>Commander Lv {state.commanderLevel}</div>
+                <div className="mt-1 text-xs text-white/55">{commanderPathInfo.name}</div>
               </div>
             </div>
           </div>
@@ -2265,6 +2459,42 @@ export default function MleoBase() {
                 })}
               </div>
             ) : null}
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-white/55">Crew Role</div>
+              <div className="mt-1 text-lg font-bold text-white">{crewRoleInfo.name}</div>
+              <div className="mt-1 text-sm text-white/65">{crewRoleInfo.desc}</div>
+              <div className="mt-2 text-xs text-cyan-200/80">{roleBonusText}</div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-white/55">Commander Path</div>
+              <div className="mt-1 text-lg font-bold text-white">{commanderPathInfo.name}</div>
+              <div className="mt-1 text-sm text-white/65">{commanderPathInfo.desc}</div>
+              <div className="mt-2 text-xs text-cyan-200/80">{commanderPathText}</div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-white/55">Ship Discipline</div>
+              <div className="mt-1 text-lg font-bold text-white">
+                {fmt(state.sentToday)} / {fmt(derived.shipCap)}
+              </div>
+              <div className="mt-1 text-sm text-white/65">
+                Daily export pressure remains controlled by softcut and cap logic.
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-white/55">Base Profile</div>
+              <div className="mt-1 text-lg font-bold text-white">
+                {state.crew >= 5 ? "Developed Command" : state.crew >= 2 ? "Growing Outpost" : "Early Outpost"}
+              </div>
+              <div className="mt-1 text-sm text-white/65">
+                Buildings, role choice and commander path now shape the identity of your base.
+              </div>
+            </div>
           </div>
 
           <div className="mt-6 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
