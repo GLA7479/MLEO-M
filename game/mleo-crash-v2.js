@@ -184,6 +184,7 @@ export default function Crash2Page() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [playAmount, setPlayAmount] = useState("100");
+  const [activeAmountButton, setActiveAmountButton] = useState("100"); // Track which amount button is active
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [autoCashOut, setAutoCashOut] = useState("2.00");
   const [enableAutoCashOut, setEnableAutoCashOut] = useState(false);
@@ -276,8 +277,9 @@ export default function Crash2Page() {
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
-    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
-    if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
+    // Always set initial bet to 100 on game entry
+    setPlayAmount("100");
+    setActiveAmountButton("100");
     const unsubscribeVault = subscribeSharedVault((snapshot) => {
       if (!cancelled) setVaultState(snapshot.balance);
     });
@@ -441,9 +443,29 @@ export default function Crash2Page() {
     rafRef.current = requestAnimationFrame(animate);
   };
 
-  const placeBet = async (isFreePlayParam = false) => {
+  // Handle amount button clicks
+  const handleAmountButtonClick = (amountValue) => {
+    if (phase !== "playing" || playerBet) return;
     playSfx(clickSound.current);
-    if (phase !== "playing") return;
+    
+    const currentAmount = Number(playAmount) || MIN_PLAY;
+    const amountStr = String(amountValue);
+    
+    if (activeAmountButton === amountStr) {
+      // Same button clicked - add the amount
+      const newAmount = Math.min(vault, currentAmount + amountValue);
+      setPlayAmount(String(newAmount));
+    } else {
+      // Different button clicked - switch to that amount
+      setActiveAmountButton(amountStr);
+      const newAmount = Math.min(vault, amountValue);
+      setPlayAmount(String(newAmount));
+    }
+  };
+
+  const placeBet = async (isFreePlayParam = false) => {
+    if (phase !== "playing" || playerBet) return; // Prevent double clicks
+    playSfx(clickSound.current);
     setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
     let nextSessionId = null;
@@ -823,7 +845,7 @@ export default function Crash2Page() {
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">Win</div>
               <div className="text-sm font-bold text-green-400">
-                {fmt(payoutAmount || potentialWin)}
+                {playerBet ? fmt(payoutAmount || potentialWin) : '-'}
               </div>
             </div>
           </div>
@@ -873,60 +895,48 @@ export default function Crash2Page() {
           <div ref={betRef} className="w-full max-w-md mb-1 space-y-2">
             <div className="flex items-center justify-center gap-1 flex-wrap">
               <button
-                onClick={() => {
-                  const current = Number(playAmount) || MIN_PLAY;
-                  const newBet = current === MIN_PLAY 
-                    ? Math.min(vault, 1000)
-                    : Math.min(vault, current + 1000);
-                  setPlayAmount(String(newBet));
-                  playSfx(clickSound.current);
-                }}
+                onClick={() => handleAmountButtonClick(100)}
                 disabled={phase !== "playing" || playerBet}
-                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+                className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                  activeAmountButton === "100"
+                    ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                    : 'bg-white/10 hover:bg-white/20 text-white'
+                }`}
+              >
+                100
+              </button>
+              <button
+                onClick={() => handleAmountButtonClick(1000)}
+                disabled={phase !== "playing" || playerBet}
+                className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                  activeAmountButton === "1000"
+                    ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                    : 'bg-white/10 hover:bg-white/20 text-white'
+                }`}
               >
                 1K
               </button>
               <button
-                onClick={() => {
-                  const current = Number(playAmount) || MIN_PLAY;
-                  const newBet = current === MIN_PLAY 
-                    ? Math.min(vault, 10000)
-                    : Math.min(vault, current + 10000);
-                  setPlayAmount(String(newBet));
-                  playSfx(clickSound.current);
-                }}
+                onClick={() => handleAmountButtonClick(10000)}
                 disabled={phase !== "playing" || playerBet}
-                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+                className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                  activeAmountButton === "10000"
+                    ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                    : 'bg-white/10 hover:bg-white/20 text-white'
+                }`}
               >
                 10K
               </button>
               <button
-                onClick={() => {
-                  const current = Number(playAmount) || MIN_PLAY;
-                  const newBet = current === MIN_PLAY 
-                    ? Math.min(vault, 100000)
-                    : Math.min(vault, current + 100000);
-                  setPlayAmount(String(newBet));
-                  playSfx(clickSound.current);
-                }}
+                onClick={() => handleAmountButtonClick(100000)}
                 disabled={phase !== "playing" || playerBet}
-                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+                className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                  activeAmountButton === "100000"
+                    ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                    : 'bg-white/10 hover:bg-white/20 text-white'
+                }`}
               >
                 100K
-              </button>
-              <button
-                onClick={() => {
-                  const current = Number(playAmount) || MIN_PLAY;
-                  const newBet = current === MIN_PLAY 
-                    ? Math.min(vault, 100)
-                    : Math.min(vault, current + 100);
-                  setPlayAmount(String(newBet));
-                  playSfx(clickSound.current);
-                }}
-                disabled={phase !== "playing" || playerBet}
-                className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
-              >
-                1M
               </button>
               <button
                 onClick={() => {
@@ -947,6 +957,8 @@ export default function Crash2Page() {
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^0-9]/g, '');
                   setPlayAmount(val || '0');
+                  // Clear active button when manually editing
+                  setActiveAmountButton(null);
                 }}
                 onBlur={() => {
                   setIsEditingPlay(false);
@@ -971,6 +983,7 @@ export default function Crash2Page() {
               <button
                 onClick={() => {
                   setPlayAmount(String(MIN_PLAY));
+                  setActiveAmountButton("100");
                   playSfx(clickSound.current);
                 }}
                 disabled={phase !== "playing" || playerBet}
@@ -1016,6 +1029,7 @@ export default function Crash2Page() {
                 (phase === "running" && !canCashOut) ||
                 (phase !== "playing" && phase !== "running")
               }
+              className="disabled:cursor-not-allowed"
               className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
             >
               {phase === "running" && canCashOut
@@ -1071,11 +1085,16 @@ export default function Crash2Page() {
               <div className="text-2xl font-bold mb-1">
                 {gameResult.win ? "CASHED OUT!" : "CRASHED!"}
               </div>
-              <div className="text-lg">
+              <div className="text-lg font-bold">
                 {gameResult.win
                   ? `+${fmt(gameResult.prize)} MLEO`
                   : `-${fmt(Math.abs(gameResult.profit))} MLEO`}
               </div>
+              {gameResult.win && gameResult.multiplier && (
+                <div className="text-xs opacity-90 mt-1">
+                  Prize: {fmt(gameResult.prize)} MLEO (×{gameResult.multiplier.toFixed(2)})
+                </div>
+              )}
               <div className="text-sm opacity-80 mt-2">
                 {gameResult.win
                   ? `@ ${gameResult.cashedAt?.toFixed(2)}x`

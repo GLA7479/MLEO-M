@@ -90,6 +90,7 @@ export default function ShooterPage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [playAmount, setPlayAmount] = useState("100");
+  const [activeAmountButton, setActiveAmountButton] = useState("100"); // Track which amount button is active
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [score, setScore] = useState(0);
   const [misses, setMisses] = useState(0);
@@ -137,8 +138,9 @@ export default function ShooterPage() {
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
-    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
-    if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
+    // Always set initial bet to 100 on game entry
+    setPlayAmount("100");
+    setActiveAmountButton("100");
 
     const unsubscribeVault = subscribeSharedVault(snapshot => {
       if (!cancelled) setVaultState(snapshot.balance);
@@ -196,7 +198,30 @@ export default function ShooterPage() {
     } catch (err) { console.error(err); alert("Claim failed or rejected"); } finally { setClaiming(false); }
   };
 
+  // Handle amount button clicks
+  const handleAmountButtonClick = (amountValue) => {
+    if (gameActive) return;
+    playSfx(clickSound.current);
+    
+    const currentAmount = Number(playAmount) || MIN_PLAY;
+    const amountStr = String(amountValue);
+    
+    if (activeAmountButton === amountStr) {
+      // Same button clicked - add the amount
+      const newAmount = Math.min(vault, currentAmount + amountValue);
+      setPlayAmount(String(newAmount));
+    } else {
+      // Different button clicked - switch to that amount
+      setActiveAmountButton(amountStr);
+      const newAmount = Math.min(vault, amountValue);
+      setPlayAmount(String(newAmount));
+    }
+  };
+
   const startGame = async (isFreePlayParam = false) => {
+    if (gameActive) return;
+    // Disable play button immediately to prevent double clicks
+    setGameActive(true);
     playSfx(clickSound.current);
     setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
@@ -206,17 +231,18 @@ export default function ShooterPage() {
       try {
         const result = await startFreeplayArcadeSession(gameId);
         if (result.success) { play = result.amount; nextSessionId = result.sessionId; setFreePlayTokens(result.remainingTokens); setIsFreePlay(false); router.replace('/shooter', undefined, { shallow: true }); }
-        else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); return; }
+        else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); setGameActive(false); return; }
       } catch (error) {
         console.error('Free play error:', error);
         alert('Failed to use free play token. Please try again.');
         setIsFreePlay(false);
+        setGameActive(false);
         return;
       }
     } else {
-      if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
+      if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); setGameActive(false); return; }
       const startResult = await startPaidArcadeSession("shooter", play);
-      if (!startResult.success) { alert(startResult.message || 'Failed to start session'); return; }
+      if (!startResult.success) { alert(startResult.message || 'Failed to start session'); setGameActive(false); return; }
       nextSessionId = startResult.sessionId;
       setVaultState(startResult.balanceAfter);
     }
@@ -226,7 +252,6 @@ export default function ShooterPage() {
     setScore(0);
     setMisses(0);
     setTimeLeft(TIME_LIMIT);
-    setGameActive(true);
     moveTarget();
   };
 
@@ -345,7 +370,9 @@ export default function ShooterPage() {
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">Prize</div>
-              <div className="text-sm font-bold text-green-400">{fmt(potentialWin)}</div>
+              <div className="text-sm font-bold text-green-400">
+                {gameActive ? fmt(potentialWin) : '-'}
+              </div>
             </div>
           </div>
 
@@ -365,20 +392,60 @@ export default function ShooterPage() {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button>
+            <button
+              onClick={() => handleAmountButtonClick(100)}
+              disabled={gameActive}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "100"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              100
+            </button>
+            <button
+              onClick={() => handleAmountButtonClick(1000)}
+              disabled={gameActive}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "1000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              1K
+            </button>
+            <button
+              onClick={() => handleAmountButtonClick(10000)}
+              disabled={gameActive}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "10000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              10K
+            </button>
+            <button
+              onClick={() => handleAmountButtonClick(100000)}
+              disabled={gameActive}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "100000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              100K
+            </button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.max(MIN_PLAY, current - 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
             <div className="relative">
-              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={gameActive} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
-              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); playSfx(clickSound.current); }} disabled={gameActive} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
+              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); setActiveAmountButton(null); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={gameActive} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
+              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); setActiveAmountButton("100"); playSfx(clickSound.current); }} disabled={gameActive} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
             </div>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            <button onClick={gameResult ? resetGame : () => startGame(false)} disabled={gameActive} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-blue-500 to-cyan-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">{gameResult ? "PLAY AGAIN" : "START"}</button>
+            <button onClick={gameResult ? resetGame : () => startGame(false)} disabled={gameActive || (!gameResult && Number(playAmount) < MIN_PLAY)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-blue-500 to-cyan-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed">{gameResult ? "PLAY AGAIN" : "START"}</button>
             {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
@@ -388,7 +455,7 @@ export default function ShooterPage() {
           </div>
         </div>
 
-        {showResultPopup && gameResult && (<div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none"><div className={`${gameResult.perfect ? 'bg-yellow-500' : gameResult.win ? 'bg-green-500' : gameResult.prize > 0 ? 'bg-blue-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}><div className="text-4xl mb-2">{gameResult.perfect ? '👑' : gameResult.win ? '🎯' : gameResult.prize > 0 ? '💪' : '⏰'}</div><div className="text-2xl font-bold mb-1">{gameResult.perfect ? 'PERFECT!' : gameResult.win ? 'NICE!' : gameResult.prize > 0 ? 'GOOD TRY!' : 'MISS!'}</div><div className="text-lg">{gameResult.prize > 0 ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div><div className="text-sm opacity-80 mt-2">Score: {gameResult.score}/{TOTAL_TARGETS} • ×{gameResult.multiplier.toFixed(2)}</div></div></div>)}
+        {showResultPopup && gameResult && (<div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none"><div className={`${gameResult.perfect ? 'bg-yellow-500' : gameResult.win ? 'bg-green-500' : gameResult.prize > 0 ? 'bg-blue-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}><div className="text-4xl mb-2">{gameResult.perfect ? '👑' : gameResult.win ? '🎯' : gameResult.prize > 0 ? '💪' : '⏰'}</div><div className="text-2xl font-bold mb-1">{gameResult.perfect ? 'PERFECT!' : gameResult.win ? 'NICE!' : gameResult.prize > 0 ? 'GOOD TRY!' : 'MISS!'}</div><div className="text-lg font-bold">{gameResult.prize > 0 ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div>{gameResult.prize > 0 && gameResult.multiplier && (<div className="text-xs opacity-90 mt-1">Prize: {fmt(gameResult.prize)} MLEO (×{gameResult.multiplier.toFixed(2)})</div>)}<div className="text-sm opacity-80 mt-2">Score: {gameResult.score}/{TOTAL_TARGETS} • ×{gameResult.multiplier.toFixed(2)}</div></div></div>)}
 
         {menuOpen && (<div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}><div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div><div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div><div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div><div className="mt-4 text-xs opacity-70"><p>Target Shooter v2.0</p></div></div></div>)}
 

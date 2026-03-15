@@ -1100,10 +1100,7 @@ async function onClaimMined() {
   } else {
     toClaim = Math.floor(vaultNow);  // Whole numbers only - no decimals
   }
-  const amountUnits = parseUnits(
-    Number(toClaim).toFixed(Math.min(2, MLEO_DECIMALS)),
-    MLEO_DECIMALS
-  );
+  const amountUnits = parseUnits(String(Math.floor(Number(toClaim) || 0)), MLEO_DECIMALS);
 
   setClaiming(true);
   try {

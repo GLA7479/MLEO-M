@@ -175,6 +175,7 @@ export default function BlackjackPage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [playAmount, setPlayAmount] = useState("100");
+  const [activeAmountButton, setActiveAmountButton] = useState("100"); // Track which amount button is active
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [deck, setDeck] = useState([]);
   const [playerHand, setPlayerHand] = useState([]);
@@ -341,8 +342,9 @@ export default function BlackjackPage() {
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
-    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
-    if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
+    // Always set initial bet to 100 on game entry
+    setPlayAmount("100");
+    setActiveAmountButton("100");
     const unsubscribeVault = subscribeSharedVault(snapshot => {
       if (!cancelled) setVaultState(snapshot.balance);
     });
@@ -394,8 +396,30 @@ export default function BlackjackPage() {
     return false;
   };
 
+  // Handle amount button clicks
+  const handleAmountButtonClick = (amountValue) => {
+    if (gameState === "playing" || gameState === "opponent" || gameState === "dealing") return;
+    playSfx(clickSound.current);
+    
+    const currentAmount = Number(playAmount) || MIN_PLAY;
+    const amountStr = String(amountValue);
+    
+    if (activeAmountButton === amountStr) {
+      // Same button clicked - add the amount
+      const newAmount = Math.min(vault, currentAmount + amountValue);
+      setPlayAmount(String(newAmount));
+    } else {
+      // Different button clicked - switch to that amount
+      setActiveAmountButton(amountStr);
+      const newAmount = Math.min(vault, amountValue);
+      setPlayAmount(String(newAmount));
+    }
+  };
+
   const dealCards = async (isFreePlayParam = false) => {
     if (gameState !== "playing" && gameState !== "lobby" && gameState !== "finished") return;
+    // Disable play button immediately to prevent double clicks
+    setGameState("dealing");
     playSfx(clickSound.current);
     setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
@@ -413,15 +437,21 @@ export default function BlackjackPage() {
           setSessionError("Failed to start session");
           alert(result.message || "No free play tokens available!");
           setIsFreePlay(false);
+          setGameState("lobby");
           return;
         }
       } else {
-        if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
+        if (play < MIN_PLAY) { 
+          alert(`Minimum play is ${MIN_PLAY} MLEO`); 
+          setGameState("lobby");
+          return; 
+        }
         const reservedStake = Math.floor(play * RESERVED_STAKE_MULTIPLIER);
         const startResult = await startPaidArcadeSession("blackjack", reservedStake);
         if (!startResult.success) {
           setSessionError("Failed to start session");
           alert(startResult.message || "Failed to start session");
+          setGameState("lobby");
           return;
         }
         nextSessionId = startResult.sessionId;
@@ -965,14 +995,54 @@ export default function BlackjackPage() {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap" style={{ minHeight: '48px' }}>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState === "playing" || gameState === "opponent" || gameState === "dealing"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState === "playing" || gameState === "opponent" || gameState === "dealing"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState === "playing" || gameState === "opponent" || gameState === "dealing"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState === "playing" || gameState === "opponent" || gameState === "dealing"} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
+            <button
+              onClick={() => handleAmountButtonClick(100)}
+              disabled={gameState === "playing" || gameState === "opponent" || gameState === "dealing"}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "100"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              100
+            </button>
+            <button
+              onClick={() => handleAmountButtonClick(1000)}
+              disabled={gameState === "playing" || gameState === "opponent" || gameState === "dealing"}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "1000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              1K
+            </button>
+            <button
+              onClick={() => handleAmountButtonClick(10000)}
+              disabled={gameState === "playing" || gameState === "opponent" || gameState === "dealing"}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "10000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              10K
+            </button>
+            <button
+              onClick={() => handleAmountButtonClick(100000)}
+              disabled={gameState === "playing" || gameState === "opponent" || gameState === "dealing"}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "100000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              100K
+            </button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.max(MIN_PLAY, current - 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState === "playing" || gameState === "opponent" || gameState === "dealing"} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
             <div className="relative">
-              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={gameState === "playing" || gameState === "opponent" || gameState === "dealing"} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-xs disabled:opacity-50 pr-6" />
-              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); playSfx(clickSound.current); }} disabled={gameState === "playing" || gameState === "opponent" || gameState === "dealing"} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
+              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); setActiveAmountButton(null); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={gameState === "playing" || gameState === "opponent" || gameState === "dealing"} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-xs disabled:opacity-50 pr-6" />
+              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); setActiveAmountButton("100"); playSfx(clickSound.current); }} disabled={gameState === "playing" || gameState === "opponent" || gameState === "dealing"} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
             </div>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameState === "playing" || gameState === "opponent" || gameState === "dealing"} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
           </div>
@@ -987,7 +1057,7 @@ export default function BlackjackPage() {
                 <button onClick={surrender} disabled={!canSurrender} className="flex-1 h-12 rounded-lg font-bold text-[10px] bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed">SURR</button>
               </div>
             ) : (
-              <button onClick={gameState === "finished" ? newHand : () => dealCards(false)} disabled={gameState === "opponent" || gameState === "dealing"} className="w-full h-12 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">
+              <button onClick={gameState === "finished" ? newHand : () => dealCards(false)} disabled={(gameState === "opponent" || gameState === "dealing") || (gameState === "lobby" && Number(playAmount) < MIN_PLAY)} className="w-full h-12 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                 {gameState === "opponent" || gameState === "dealing" ? "Dealing..." : gameState === "finished" ? "NEW HAND" : "DEAL"}
               </button>
             )}
@@ -1008,9 +1078,14 @@ export default function BlackjackPage() {
               <div className="text-2xl font-bold mb-1">
                 {gameResult.surrender ? 'SURRENDERED' : gameResult.split ? `SPLIT: ${gameResult.splitWins}W ${gameResult.splitLosses}L` : gameResult.blackjack ? 'PERFECT 21!' : gameResult.win ? 'YOU WIN!' : gameResult.push ? 'PUSH' : 'OPPONENT WINS'}
               </div>
-              <div className="text-lg">
+              <div className="text-lg font-bold">
                 {gameResult.win || gameResult.push ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}
               </div>
+              {gameResult.win && gameResult.multiplier && (
+                <div className="text-xs opacity-90 mt-1">
+                  Prize: {fmt(gameResult.prize)} MLEO (×{gameResult.multiplier.toFixed(2)})
+                </div>
+              )}
               {!gameResult.surrender && !gameResult.split && (
                 <div className="text-sm opacity-80 mt-2">You: {gameResult.playerValue} • Opponent: {gameResult.opponentValue}</div>
               )}

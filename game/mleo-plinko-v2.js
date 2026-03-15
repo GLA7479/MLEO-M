@@ -170,6 +170,7 @@ export default function Plinko2Page() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [playAmount, setPlayAmount] = useState("100");
+  const [activeAmountButton, setActiveAmountButton] = useState("100"); // Track which amount button is active
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [ballsDropping, setBallsDropping] = useState(0);
 
@@ -237,8 +238,9 @@ export default function Plinko2Page() {
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
-    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
-    if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
+    // Always set initial bet to 100 on game entry
+    setPlayAmount("100");
+    setActiveAmountButton("100");
 
     const unsubscribeVault = subscribeSharedVault(snapshot => {
       if (!cancelled) setVaultState(snapshot.balance);
@@ -573,7 +575,28 @@ export default function Plinko2Page() {
     setStats(newStats);
   };
 
+  // Handle amount button clicks
+  const handleAmountButtonClick = (amountValue) => {
+    if (ballsDropping > 0) return;
+    playSfx(clickSound.current);
+    
+    const currentAmount = Number(playAmount) || MIN_PLAY;
+    const amountStr = String(amountValue);
+    
+    if (activeAmountButton === amountStr) {
+      // Same button clicked - add the amount
+      const newAmount = Math.min(vault, currentAmount + amountValue);
+      setPlayAmount(String(newAmount));
+    } else {
+      // Different button clicked - switch to that amount
+      setActiveAmountButton(amountStr);
+      const newAmount = Math.min(vault, amountValue);
+      setPlayAmount(String(newAmount));
+    }
+  };
+
   const dropBall = async (isFreePlayParam = false) => {
+    if (ballsDropping > 0) return; // Prevent double clicks
     playSfx(clickSound.current);
     setSessionError("");
     try {
@@ -853,11 +876,16 @@ export default function Plinko2Page() {
                   <div className="text-sm font-bold mb-1">
                     {lastResult.win ? `${lastResult.multiplier}x!` : "BETTER LUCK!"}
                   </div>
-                  <div className="text-xs">
+                  <div className="text-xs font-bold">
                     {lastResult.win
                       ? `+${fmt(lastResult.prize)} MLEO`
                       : `-${fmt(Math.abs(lastResult.profit))} MLEO`}
                   </div>
+                  {lastResult.win && lastResult.multiplier && (
+                    <div className="text-[10px] opacity-90 mt-0.5">
+                      Prize: {fmt(lastResult.prize)} MLEO (×{lastResult.multiplier.toFixed(2)})
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -865,74 +893,48 @@ export default function Plinko2Page() {
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
             <button
-              onClick={() => {
-                const current = Number(playAmount) || MIN_PLAY;
-                // If at default (100), SET the amount. Otherwise ADD to it.
-                const newBet = current === MIN_PLAY 
-                  ? Math.min(vault, 100)
-                  : Math.min(vault, current + 100);
-                setPlayAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              onClick={() => handleAmountButtonClick(100)}
+              disabled={ballsDropping > 0}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "100"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
             >
               100
             </button>
             <button
-              onClick={() => {
-                const current = Number(playAmount) || MIN_PLAY;
-                // If at default (100), SET the amount. Otherwise ADD to it.
-                const newBet = current === MIN_PLAY 
-                  ? Math.min(vault, 1000)
-                  : Math.min(vault, current + 1000);
-                setPlayAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              onClick={() => handleAmountButtonClick(1000)}
+              disabled={ballsDropping > 0}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "1000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
             >
               1K
             </button>
             <button
-              onClick={() => {
-                const current = Number(playAmount) || MIN_PLAY;
-                // If at default (1000), SET the amount. Otherwise ADD to it.
-                const newBet = current === MIN_PLAY 
-                  ? Math.min(vault, 10000)
-                  : Math.min(vault, current + 10000);
-                setPlayAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              onClick={() => handleAmountButtonClick(10000)}
+              disabled={ballsDropping > 0}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "10000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
             >
               10K
             </button>
             <button
-              onClick={() => {
-                const current = Number(playAmount) || MIN_PLAY;
-                // If at default (1000), SET the amount. Otherwise ADD to it.
-                const newBet = current === MIN_PLAY 
-                  ? Math.min(vault, 100000)
-                  : Math.min(vault, current + 100000);
-                setPlayAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              onClick={() => handleAmountButtonClick(100000)}
+              disabled={ballsDropping > 0}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "100000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
             >
               100K
-            </button>
-            <button
-              onClick={() => {
-                const current = Number(playAmount) || MIN_PLAY;
-                // If at default (1000), SET the amount. Otherwise ADD to it.
-                const newBet = current === MIN_PLAY 
-                  ? Math.min(vault, 100)
-                  : Math.min(vault, current + 100);
-                setPlayAmount(String(newBet));
-                playSfx(clickSound.current);
-              }}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
-            >
-              100
             </button>
             <button
               onClick={() => {
@@ -953,6 +955,8 @@ export default function Plinko2Page() {
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^0-9]/g, '');
                   setPlayAmount(val || '0');
+                  // Clear active button when manually editing
+                  setActiveAmountButton(null);
                 }}
                 onBlur={() => {
                   setIsEditingPlay(false);
@@ -964,6 +968,7 @@ export default function Plinko2Page() {
               <button
                 onClick={() => {
                   setPlayAmount(String(MIN_PLAY));
+                  setActiveAmountButton("100");
                   playSfx(clickSound.current);
                 }}
                 className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center"
@@ -992,10 +997,10 @@ export default function Plinko2Page() {
           >
             <button
               onClick={() => dropBall(false)}
-              disabled={Number(playAmount) < MIN_PLAY}
-              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
+              disabled={ballsDropping > 0 || Number(playAmount) < MIN_PLAY}
+              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              🎯 DROP BALL
+              {ballsDropping > 0 ? "🎯 Dropping..." : "🎯 DROP BALL"}
             </button>
             {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
