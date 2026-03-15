@@ -7,7 +7,6 @@ import {
   applyBaseVaultDelta,
   getBaseVaultBalance,
   getBaseState,
-  saveBaseState,
   buildBuilding,
   installModule,
   researchTech,
@@ -18,7 +17,6 @@ import {
   performMaintenanceAction,
 } from "../lib/baseVaultClient";
 
-const STATE_KEY = "mleo_base_v1";
 const MAX_LOG_ITEMS = 16;
 
 const DAILY_SOFTCUT = [
@@ -1014,39 +1012,6 @@ export default function MleoBase() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!mounted) return;
-
-    const id = window.setTimeout(() => {
-      saveBaseState({
-        version: state.version,
-        last_day: state.lastDay,
-        banked_mleo: Math.floor(state.bankedMleo || 0),
-        sent_today: Math.floor(state.sentToday || 0),
-        total_banked: Math.floor(state.totalBanked || 0),
-        total_shared_spent: Math.floor(state.totalSharedSpent || 0),
-        commander_level: Math.floor(state.commanderLevel || 1),
-        commander_xp: Math.floor(state.commanderXp || 0),
-        blueprint_level: Math.floor(state.blueprintLevel || 0),
-        crew: Math.floor(state.crew || 0),
-        overclock_until: state.overclockUntil ? new Date(state.overclockUntil).toISOString() : null,
-        expedition_ready_at: state.expeditionReadyAt ? new Date(state.expeditionReadyAt).toISOString() : null,
-        maintenance_due: Number(state.maintenanceDue || 0),
-        stability: Number(state.stability || 100),
-        resources: state.resources || {},
-        buildings: state.buildings || {},
-        modules: state.modules || {},
-        research: state.research || {},
-        stats: state.stats || {},
-        mission_state: state.missionState || {},
-        log: Array.isArray(state.log) ? state.log.slice(0, 40) : [],
-      }).catch((err) => {
-        console.error("Failed to persist BASE state", err);
-      });
-    }, 500);
-
-    return () => window.clearTimeout(id);
-  }, [mounted, state]);
 
   useEffect(() => {
     if (!toast) return;
@@ -1057,22 +1022,58 @@ export default function MleoBase() {
   useEffect(() => {
     if (!mounted) return;
 
-    const tickId = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      setState((prev) => simulate(prev, 1000, 1));
-    }, 1000);
+    let alive = true;
 
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") {
-        setState((prev) => ({ ...prev, lastHiddenAt: Date.now(), lastTickAt: Date.now() }));
-        return;
+    async function refreshFromServer() {
+      try {
+        const res = await getBaseState();
+        const serverState = res?.state;
+        if (!alive || !serverState) return;
+
+        setState((prev) => ({
+          ...prev,
+          version: Number(serverState.version || prev.version),
+          lastDay: serverState.last_day || prev.lastDay,
+          bankedMleo: Number(serverState.banked_mleo || prev.bankedMleo),
+          sentToday: Number(serverState.sent_today || prev.sentToday),
+          totalBanked: Number(serverState.total_banked || prev.totalBanked),
+          totalSharedSpent: Number(serverState.total_shared_spent || prev.totalSharedSpent),
+          commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
+          commanderXp: Number(serverState.commander_xp || prev.commanderXp),
+          blueprintLevel: Number(serverState.blueprint_level || prev.blueprintLevel),
+          crew: Number(serverState.crew || prev.crew),
+          overclockUntil: serverState.overclock_until ? new Date(serverState.overclock_until).getTime() : 0,
+          expeditionReadyAt: serverState.expedition_ready_at ? new Date(serverState.expedition_ready_at).getTime() : prev.expeditionReadyAt,
+          maintenanceDue: Number(serverState.maintenance_due || prev.maintenanceDue),
+          stability: Number(serverState.stability || prev.stability),
+          resources: serverState.resources || prev.resources,
+          buildings: serverState.buildings || prev.buildings,
+          modules: serverState.modules || prev.modules,
+          research: serverState.research || prev.research,
+          stats: { ...prev.stats, ...(serverState.stats || {}) },
+          missionState: {
+            ...prev.missionState,
+            ...(serverState.mission_state || {}),
+            completed: { ...(serverState.mission_state?.completed || {}) },
+            claimed: { ...(serverState.mission_state?.claimed || {}) },
+          },
+          log: Array.isArray(serverState.log) && serverState.log.length ? serverState.log : prev.log,
+          lastTickAt: Date.now(),
+          lastHiddenAt: 0,
+        }));
+      } catch (error) {
+        console.error("BASE refresh failed", error);
       }
-      setState((prev) => {
-        const hiddenAt = prev.lastHiddenAt || prev.lastTickAt || Date.now();
-        const elapsed = Math.max(0, Date.now() - hiddenAt);
-        const efficiency = offlineFactorFor(elapsed);
-        return simulate({ ...prev, lastHiddenAt: 0, lastTickAt: hiddenAt }, elapsed, efficiency);
-      });
+    }
+
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        refreshFromServer();
+      }
+    }, 3000);
+
+    const onFocus = () => {
+      refreshFromServer();
     };
 
     const onStorage = async (event) => {
@@ -1087,13 +1088,16 @@ export default function MleoBase() {
       setSharedVault((prev) => (Math.abs(prev - bal) > 1e-6 ? bal : prev));
     }, 4000);
 
-    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
     window.addEventListener("storage", onStorage);
 
     return () => {
-      window.clearInterval(tickId);
+      alive = false;
+      window.clearInterval(id);
       window.clearInterval(pollId);
-      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
       window.removeEventListener("storage", onStorage);
     };
   }, [mounted]);

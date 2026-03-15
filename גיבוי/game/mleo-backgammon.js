@@ -1,0 +1,1193 @@
+// ============================================================================
+// MLEO Backgammon - Full-Screen Game Template
+// Classic Backgammon vs Bot! Win to earn MLEO!
+// ============================================================================
+
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/router";
+import Layout from "../components/Layout";
+import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
+import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
+import { parseUnits } from "viem";
+import { getFreePlayStatus } from "../lib/free-play-system";
+import {
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
+  debitSharedVault,
+  initSharedVault,
+  peekSharedVault,
+  readSharedVault,
+  subscribeSharedVault,
+} from "../lib/sharedVault";
+
+function useIOSViewportFix() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const vv = window.visualViewport;
+    const setVH = () => {
+      const h = vv ? vv.height : window.innerHeight;
+      root.style.setProperty("--app-100vh", `${Math.round(h)}px`);
+    };
+    const onOrient = () => requestAnimationFrame(() => setTimeout(setVH, 250));
+    setVH();
+    if (vv) {
+      vv.addEventListener("resize", setVH);
+      vv.addEventListener("scroll", setVH);
+    }
+    window.addEventListener("orientationchange", onOrient);
+    return () => {
+      if (vv) {
+        vv.removeEventListener("resize", setVH);
+        vv.removeEventListener("scroll", setVH);
+      }
+      window.removeEventListener("orientationchange", onOrient);
+    };
+  }, []);
+}
+
+const LS_KEY = "mleo_backgammon_v2";
+const MIN_PLAY = 100;
+const WIN_MULTIPLIER = 1.92; // RTP 96% for skill game
+const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
+const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
+const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
+const GAME_ID = 21;
+const MINING_CLAIM_ABI = [{ type: "function", name: "claim", stateMutability: "nonpayable", inputs: [{ name: "gameId", type: "uint256" }, { name: "amount", type: "uint256" }], outputs: [] }];
+const S_CLICK = "/sounds/click.mp3";
+const S_WIN = "/sounds/gift.mp3";
+
+// Bot timing constants
+const BOT_TURN_START_DELAY = 1800; // Delay before bot starts its turn
+const BOT_MOVE_DELAY = 1100; // Delay between bot moves
+const AUTO_PASS_DELAY = 1400; // Delay when auto-passing turn
+
+function safeRead(key, fallback = {}) { if (typeof window === "undefined") return fallback; try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
+function safeWrite(key, val) { if (typeof window === "undefined") return; try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+function fmt(n) { if (n >= 1e9) return (n / 1e9).toFixed(2) + "B"; if (n >= 1e6) return (n / 1e6).toFixed(2) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(2) + "K"; return Math.floor(n).toString(); }
+function formatPlayDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
+function shortAddr(addr) { if (!addr || addr.length < 10) return addr || ""; return `${addr.slice(0, 6)}...${addr.slice(-4)}`; }
+function normalizeWholeAmount(value) { return Math.max(0, Math.floor(Number(value) || 0)); }
+
+function rollDice() {
+  const d1 = Math.floor(Math.random() * 6) + 1;
+  const d2 = Math.floor(Math.random() * 6) + 1;
+  if (d1 === d2) {
+    return { pair: [d1, d2], expanded: [d1, d1, d1, d1] };
+  }
+  return { pair: [d1, d2], expanded: [d1, d2] };
+}
+
+function initBoard() {
+  const board = Array(24).fill(0);
+  // Backgammon starting position (standard setup)
+  // Player (red, positive): points 24, 13, 8, 6
+  board[23] = 2;   // Point 24: 2 checkers
+  board[12] = 5;   // Point 13: 5 checkers
+  board[7] = 3;    // Point 8: 3 checkers
+  board[5] = 5;    // Point 6: 5 checkers
+  
+  // Bot (blue, negative): points 1, 12, 17, 19
+  board[0] = -2;   // Point 1: 2 checkers
+  board[11] = -5;  // Point 12: 5 checkers
+  board[16] = -3;  // Point 17: 3 checkers
+  board[18] = -5;  // Point 19: 5 checkers
+  
+  return board;
+}
+
+function getBarEntryPoint(playerType, dieValue) {
+  // Player enters into bot home: points 19-24
+  // Bot enters into player home: points 1-6
+  return playerType === 1
+    ? 24 - dieValue   // die 1 -> point 24, die 6 -> point 19
+    : dieValue - 1;   // die 1 -> point 1, die 6 -> point 6
+}
+
+function allCheckersInHome(board, bar, playerType) {
+  // Must have no checkers on bar
+  if (playerType === 1 && bar.player > 0) return false;
+  if (playerType === -1 && bar.bot > 0) return false;
+  
+  // Check all points - player's checkers must be only in home board
+  for (let i = 0; i < 24; i++) {
+    const val = board[i];
+    if (playerType === 1) {
+      // Player home is 0-5 (points 1-6)
+      if (val > 0 && i >= 6) return false;
+    } else {
+      // Bot home is 18-23 (points 19-24)
+      if (val < 0 && i < 18) return false;
+    }
+  }
+  
+  return true;
+}
+
+function canBearOff(board, bar, from, dieValue, playerType) {
+  if (!allCheckersInHome(board, bar, playerType)) return false;
+  
+  if (playerType === 1) {
+    // Player bears off from home (0-5)
+    const target = from - dieValue;
+    
+    // Exact bear off
+    if (target === -1) return true;
+    
+    // Overshoot - only if no checkers behind
+    if (target < -1) {
+      for (let i = from + 1; i <= 5; i++) {
+        if (board[i] > 0) return false;
+      }
+      return true;
+    }
+    
+    return false;
+  } else {
+    // Bot bears off from home (18-23)
+    const target = from + dieValue;
+    
+    // Exact bear off
+    if (target === 24) return true;
+    
+    // Overshoot - only if no checkers behind
+    if (target > 24) {
+      for (let i = from - 1; i >= 18; i--) {
+        if (board[i] < 0) return false;
+      }
+      return true;
+    }
+    
+    return false;
+  }
+}
+
+function canMove(board, bar, borneOff, source, dieValue, playerType) {
+  const sourceType = source.type;
+  const from = source.index;
+  
+  // Must enter from bar first
+  if (playerType === 1 && bar.player > 0 && sourceType !== 'bar') return false;
+  if (playerType === -1 && bar.bot > 0 && sourceType !== 'bar') return false;
+  
+  // Entry from bar - only one entry point per die value
+  if (sourceType === 'bar') {
+    if (playerType === 1 && bar.player === 0) return false;
+    if (playerType === -1 && bar.bot === 0) return false;
+    
+    const entryPoint = getBarEntryPoint(playerType, dieValue);
+    if (entryPoint < 0 || entryPoint > 23) return false;
+    
+    // Can enter if empty, own checker, or single opponent checker (hit)
+    if (board[entryPoint] === 0) return true;
+    if (Math.sign(board[entryPoint]) === playerType) return true;
+    return Math.abs(board[entryPoint]) === 1;
+  }
+  
+  // Regular move from point
+  if (from === null || board[from] === 0 || Math.sign(board[from]) !== playerType) return false;
+  
+  // Calculate destination
+  const to = playerType === 1 ? from - dieValue : from + dieValue;
+  
+  // Bearing off - must use canBearOff function
+  if (to < 0 || to > 23) {
+    return canBearOff(board, bar, from, dieValue, playerType);
+  }
+  
+  // Regular move within board
+  // Cannot move backward
+  if (playerType === 1 && to > from) return false;
+  if (playerType === -1 && to < from) return false;
+  
+  // Can move if empty, own checker, or single opponent checker (hit)
+  if (board[to] === 0) return true;
+  if (Math.sign(board[to]) === playerType) return true;
+  return Math.abs(board[to]) === 1;
+}
+
+function makeMove(board, bar, borneOff, move, playerType) {
+  const newBoard = [...board];
+  const newBar = { ...bar };
+  const newBorneOff = { ...borneOff };
+  
+  const sourceType = move.sourceType;
+  const from = move.from;
+  const bearOff = move.bearOff || false;
+  
+  // Entry from bar
+  if (sourceType === 'bar') {
+    if (playerType === 1) {
+      newBar.player -= 1;
+    } else {
+      newBar.bot -= 1;
+    }
+    
+    // Bar entry destination is already calculated in move.to
+    const to = move.to;
+    if (to === null || to < 0 || to > 23) {
+      // Invalid move
+      return { board: newBoard, bar: newBar, borneOff: newBorneOff };
+    }
+    
+    // Check for hit
+    if (newBoard[to] !== 0 && Math.sign(newBoard[to]) !== playerType) {
+      if (playerType === 1) {
+        newBar.bot += 1;
+      } else {
+        newBar.player += 1;
+      }
+      newBoard[to] = 0;
+    }
+    
+    // Place checker
+    newBoard[to] = (newBoard[to] || 0) + playerType;
+  } else if (bearOff) {
+    // Bearing off - remove from source, add to borneOff
+    newBoard[from] -= playerType;
+    if (playerType === 1) {
+      newBorneOff.player += 1;
+    } else {
+      newBorneOff.bot += 1;
+    }
+  } else {
+    // Regular move from point
+    newBoard[from] -= playerType;
+    const to = move.to;
+    
+    if (to === null || to < 0 || to > 23) {
+      // Invalid move
+      return { board: newBoard, bar: newBar, borneOff: newBorneOff };
+    }
+    
+    // Check for hit
+    if (newBoard[to] !== 0 && Math.sign(newBoard[to]) !== playerType) {
+      if (playerType === 1) {
+        newBar.bot += 1;
+      } else {
+        newBar.player += 1;
+      }
+      newBoard[to] = 0;
+    }
+    
+    // Place checker
+    newBoard[to] = (newBoard[to] || 0) + playerType;
+  }
+  
+  return { board: newBoard, bar: newBar, borneOff: newBorneOff };
+}
+
+function getAvailableDieIndexes(turnDice, usedDice) {
+  return turnDice.map((_, idx) => idx).filter(idx => !usedDice.includes(idx));
+}
+
+function getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, playerType) {
+  const moves = [];
+  const availableIndexes = getAvailableDieIndexes(turnDice, usedDice);
+  
+  for (const dieIndex of availableIndexes) {
+    const dieValue = turnDice[dieIndex];
+    
+    if (!canMove(board, bar, borneOff, source, dieValue, playerType)) {
+      continue;
+    }
+    
+    let to = null;
+    let bearOff = false;
+    
+    if (source.type === 'bar') {
+      // Bar entry - only one destination per die value
+      to = getBarEntryPoint(playerType, dieValue);
+      if (to < 0 || to > 23) continue; // Invalid entry point
+    } else {
+      // Regular move or bear off
+      to = playerType === 1 ? source.index - dieValue : source.index + dieValue;
+      
+      if (to < 0 || to > 23) {
+        // Bearing off - verify it's legal
+        if (!canBearOff(board, bar, source.index, dieValue, playerType)) {
+          continue; // Not a legal bear off
+        }
+        bearOff = true;
+        to = null;
+      }
+    }
+    
+    // Check for hit (only if not bearing off)
+    const hit = !bearOff && to !== null && to >= 0 && to <= 23 && 
+                board[to] !== 0 && 
+                Math.sign(board[to]) !== playerType && 
+                Math.abs(board[to]) === 1;
+    
+    moves.push({
+      sourceType: source.type,
+      from: source.index,
+      to: bearOff ? null : to,
+      steps: dieValue,
+      dieIndex,
+      hit,
+      bearOff
+    });
+  }
+  
+  return moves;
+}
+
+function getLegalMoveSequences(board, bar, borneOff, turnDice, usedDice, playerType) {
+  const sequences = [];
+  
+  function findSequences(currentBoard, currentBar, currentBorneOff, currentUsedDice, sequence) {
+    const availableIndexes = getAvailableDieIndexes(turnDice, currentUsedDice);
+    if (availableIndexes.length === 0) {
+      sequences.push([...sequence]);
+      return;
+    }
+    
+    let hasMove = false;
+    
+    // Check bar first
+    if ((playerType === 1 && currentBar.player > 0) || (playerType === -1 && currentBar.bot > 0)) {
+      const barSource = { type: 'bar', index: null };
+      const moves = getLegalMovesForSource(currentBoard, currentBar, currentBorneOff, barSource, turnDice, currentUsedDice, playerType);
+      
+      for (const move of moves) {
+        hasMove = true;
+        const result = makeMove(currentBoard, currentBar, currentBorneOff, move, playerType);
+        findSequences(result.board, result.bar, result.borneOff, [...currentUsedDice, move.dieIndex], [...sequence, move]);
+      }
+    } else {
+      // Check all points
+      for (let i = 0; i < 24; i++) {
+        if ((playerType === 1 && currentBoard[i] > 0) || (playerType === -1 && currentBoard[i] < 0)) {
+          const pointSource = { type: 'point', index: i };
+          const moves = getLegalMovesForSource(currentBoard, currentBar, currentBorneOff, pointSource, turnDice, currentUsedDice, playerType);
+          
+          for (const move of moves) {
+            hasMove = true;
+            const result = makeMove(currentBoard, currentBar, currentBorneOff, move, playerType);
+            findSequences(result.board, result.bar, result.borneOff, [...currentUsedDice, move.dieIndex], [...sequence, move]);
+          }
+        }
+      }
+    }
+    
+    if (!hasMove) {
+      sequences.push([...sequence]);
+    }
+  }
+  
+  findSequences(board, bar, borneOff, usedDice, []);
+  
+  // Filter to only longest sequences
+  if (sequences.length === 0) return [];
+  const maxLength = Math.max(...sequences.map(s => s.length));
+  return sequences.filter(s => s.length === maxLength);
+}
+
+function checkGameOver(borneOff) {
+  if (borneOff.player === 15) return 'player';
+  if (borneOff.bot === 15) return 'bot';
+  return null;
+}
+
+export default function BackgammonPage() {
+  useIOSViewportFix();
+  const router = useRouter();
+  const wrapRef = useRef(null);
+  const headerRef = useRef(null);
+  const metersRef = useRef(null);
+  const betRef = useRef(null);
+  const ctaRef = useRef(null);
+  const { openConnectModal } = useConnectModal();
+  const { openAccountModal } = useAccountModal();
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const { switchChain } = useSwitchChain();
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
+  const chainId = useChainId();
+
+  const [mounted, setMounted] = useState(false);
+  const [vault, setVaultState] = useState(0);
+  const [playAmount, setPlayAmount] = useState("100");
+  const [isEditingPlay, setIsEditingPlay] = useState(false);
+  const [board, setBoard] = useState(() => initBoard());
+  const [bar, setBar] = useState({ player: 0, bot: 0 });
+  const [borneOff, setBorneOff] = useState({ player: 0, bot: 0 });
+  const [dice, setDice] = useState([1, 1]);
+  const [turnDice, setTurnDice] = useState([]);
+  const [currentPlayer, setCurrentPlayer] = useState('player');
+  const [gameActive, setGameActive] = useState(false);
+  const [gameResult, setGameResult] = useState(null);
+  const [isFreePlay, setIsFreePlay] = useState(false);
+  const [freePlayTokens, setFreePlayTokens] = useState(0);
+  const [showResultPopup, setShowResultPopup] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [copiedAddr, setCopiedAddr] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionId, setSessionId] = useState(null);
+  const [sessionError, setSessionError] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [showVaultModal, setShowVaultModal] = useState(false);
+  const [sfxMuted, setSfxMuted] = useState(false);
+  const clickSound = useRef(null);
+  const winSound = useRef(null);
+  const [selectedSource, setSelectedSource] = useState(null);
+  const [usedDice, setUsedDice] = useState([]);
+  const [legalTargets, setLegalTargets] = useState([]);
+
+  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalGames: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, lastPlay: MIN_PLAY }));
+
+  const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
+
+  useEffect(() => {
+    let cancelled = false;
+    setMounted(true);
+    initSharedVault();
+    readSharedVault()
+      .then(snapshot => {
+        if (!cancelled) setVaultState(snapshot.balance);
+      })
+      .catch(() => {
+        if (!cancelled) setVaultState(peekSharedVault().balance);
+      });
+    const isFree = router.query.freePlay === 'true';
+    setIsFreePlay(isFree);
+    const gameId = router.pathname.replace('/', '') || 'backgammon';
+    getFreePlayStatus().then(status => {
+      if (!cancelled) setFreePlayTokens(status.tokens);
+    }).catch(err => console.error('Failed to get free play status:', err));
+    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
+    if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
+    const unsubscribeVault = subscribeSharedVault(snapshot => {
+      if (!cancelled) setVaultState(snapshot.balance);
+    });
+    const interval = setInterval(() => {
+      getFreePlayStatus().then(status => {
+        if (!cancelled) setFreePlayTokens(status.tokens);
+      }).catch(err => console.error('Failed to get free play status:', err));
+    }, 2000);
+    if (typeof Audio !== "undefined") {
+      try { clickSound.current = new Audio(S_CLICK); winSound.current = new Audio(S_WIN); } catch {}
+    }
+    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => { cancelled = true; unsubscribeVault(); clearInterval(interval); document.removeEventListener("fullscreenchange", handleFullscreenChange); };
+  }, [router.query]);
+
+  useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
+  useEffect(() => { if (!wrapRef.current) return; const calc = () => { const rootH = window.visualViewport?.height ?? window.innerHeight; const safeBottom = Number(getComputedStyle(document.documentElement).getPropertyValue("--satb").replace("px", "")) || 0; const headH = headerRef.current?.offsetHeight || 0; document.documentElement.style.setProperty("--head-h", headH + "px"); const topPad = headH + 8; const used = headH + (metersRef.current?.offsetHeight || 0) + (betRef.current?.offsetHeight || 0) + (ctaRef.current?.offsetHeight || 0) + topPad + 48 + safeBottom + 24; const freeH = Math.max(200, rootH - used); document.documentElement.style.setProperty("--chart-h", freeH + "px"); }; calc(); window.addEventListener("resize", calc); window.visualViewport?.addEventListener("resize", calc); return () => { window.removeEventListener("resize", calc); window.visualViewport?.removeEventListener("resize", calc); }; }, [mounted]);
+  useEffect(() => { if (gameResult) { setShowResultPopup(true); const timer = setTimeout(() => setShowResultPopup(false), 4000); return () => clearTimeout(timer); } }, [gameResult]);
+
+  // Show legal targets when player has checkers on bar
+  useEffect(() => {
+    if (!gameActive || currentPlayer !== 'player' || gameResult || turnDice.length === 0) return;
+    if (bar.player > 0 && selectedSource === null) {
+      const source = { type: 'bar', index: null };
+      const moves = getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, 1);
+      setLegalTargets(moves);
+    }
+  }, [gameActive, currentPlayer, bar.player, turnDice, usedDice, board, bar, borneOff, selectedSource, gameResult]);
+
+  useEffect(() => {
+    if (!gameActive || currentPlayer !== 'bot' || gameResult || turnDice.length === 0) return;
+    
+    const timeout = setTimeout(() => {
+      const sequences = getLegalMoveSequences(board, bar, borneOff, turnDice, usedDice, -1);
+      
+      if (sequences.length === 0 || sequences[0].length === 0) {
+        endTurn('player');
+        return;
+      }
+      
+      // Choose random sequence
+      const chosenSequence = sequences[Math.floor(Math.random() * sequences.length)];
+      
+      // Execute moves one by one
+      let currentBoard = board;
+      let currentBar = bar;
+      let currentBorneOff = borneOff;
+      let currentUsedDice = [...usedDice];
+      
+      const executeMoves = (index) => {
+        if (index >= chosenSequence.length) {
+          setBoard(currentBoard);
+          setBar(currentBar);
+          setBorneOff(currentBorneOff);
+          setUsedDice(currentUsedDice);
+          
+          const winner = checkGameOver(currentBorneOff);
+          if (winner) {
+            endGame(winner === 'player');
+          } else {
+            endTurn('player');
+          }
+          return;
+        }
+        
+        const move = chosenSequence[index];
+        const result = makeMove(currentBoard, currentBar, currentBorneOff, move, -1);
+        currentBoard = result.board;
+        currentBar = result.bar;
+        currentBorneOff = result.borneOff;
+        currentUsedDice.push(move.dieIndex);
+        
+        setTimeout(() => {
+          setBoard(currentBoard);
+          setBar(currentBar);
+          setBorneOff(currentBorneOff);
+          setUsedDice(currentUsedDice);
+          executeMoves(index + 1);
+        }, BOT_MOVE_DELAY);
+      };
+      
+      executeMoves(0);
+    }, BOT_TURN_START_DELAY);
+    
+    return () => clearTimeout(timeout);
+  }, [gameActive, currentPlayer, board, bar, borneOff, turnDice, usedDice, gameResult]);
+
+  const openWalletModalUnified = () => isConnected ? openAccountModal?.() : openConnectModal?.();
+  const hardDisconnect = () => { disconnect?.(); setMenuOpen(false); };
+
+  const collectToWallet = async () => {
+    if (!isConnected) { openConnectModal?.(); return; }
+    if (chainId !== CLAIM_CHAIN_ID) { try { await switchChain?.({ chainId: CLAIM_CHAIN_ID }); } catch { alert("Switch to BSC Testnet"); return; } }
+    if (!CLAIM_ADDRESS) { alert("Missing CLAIM address"); return; }
+    const wholeCollectAmount = normalizeWholeAmount(collectAmount);
+    if (wholeCollectAmount <= 0 || wholeCollectAmount > vault) { alert("Invalid amount!"); return; }
+    setClaiming(true);
+    try {
+      const amountUnits = parseUnits(String(wholeCollectAmount), MLEO_DECIMALS);
+      const hash = await writeContractAsync({ address: CLAIM_ADDRESS, abi: MINING_CLAIM_ABI, functionName: "claim", args: [BigInt(GAME_ID), amountUnits], chainId: CLAIM_CHAIN_ID, account: address });
+      await publicClient.waitForTransactionReceipt({ hash });
+      const debitResult = await debitSharedVault(wholeCollectAmount, "backgammon-claim");
+      if (!debitResult.ok) { alert(debitResult.error || "Vault update failed"); return; }
+      setVaultState(debitResult.balance);
+      setCollectAmount(wholeCollectAmount);
+      alert(`✅ Sent ${fmt(wholeCollectAmount)} MLEO to wallet!`);
+      setShowVaultModal(false);
+    } catch (err) { console.error(err); alert("Claim failed or rejected"); } finally { setClaiming(false); }
+  };
+
+  const startTurn = (player) => {
+    const playerType = player === 'player' ? 1 : -1;
+    const roll = rollDice();
+    setDice(roll.pair);
+    setTurnDice(roll.expanded);
+    setUsedDice([]);
+    setSelectedSource(null);
+    setLegalTargets([]);
+    setCurrentPlayer(player);
+    
+    // Check if player has any legal moves
+    const sequences = getLegalMoveSequences(board, bar, borneOff, roll.expanded, [], playerType);
+    if (sequences.length === 0 || sequences[0].length === 0) {
+      // No moves available, pass turn
+      setTimeout(() => {
+        endTurn(player === 'player' ? 'bot' : 'player');
+      }, AUTO_PASS_DELAY);
+    }
+  };
+
+  const endTurn = (nextPlayer) => {
+    setSelectedSource(null);
+    setUsedDice([]);
+    setLegalTargets([]);
+    
+    const winner = checkGameOver(borneOff);
+    if (winner) {
+      endGame(winner === 'player');
+    } else {
+      startTurn(nextPlayer);
+    }
+  };
+
+  const startGame = async (isFreePlayParam = false) => {
+    if (gameActive) return;
+    playSfx(clickSound.current);
+    setSessionError("");
+    let play = Number(playAmount) || MIN_PLAY;
+    let nextSessionId = null;
+    if (isFreePlay || isFreePlayParam) {
+      const gameId = router.pathname.replace('/', '') || 'backgammon';
+      try {
+        const result = await startFreeplayArcadeSession(gameId);
+        if (result.success) {
+          play = result.amount;
+          nextSessionId = result.sessionId;
+          setFreePlayTokens(result.remainingTokens);
+          setIsFreePlay(false);
+          router.replace('/backgammon', undefined, { shallow: true });
+        } else {
+          setSessionError("Failed to start session");
+          alert(result.message || 'No free play tokens available!');
+          setIsFreePlay(false);
+          return;
+        }
+      } catch (error) {
+        console.error('Free play error:', error);
+        setSessionError("Failed to start session");
+        alert('Failed to use free play token. Please try again.');
+        setIsFreePlay(false);
+        return;
+      }
+    } else {
+      if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
+      const startResult = await startPaidArcadeSession("backgammon", play);
+      if (!startResult.success) {
+        setSessionError("Failed to start session");
+        alert(startResult.message || 'Failed to start session');
+        return;
+      }
+      nextSessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
+    }
+    setPlayAmount(String(play));
+    setSessionId(nextSessionId);
+    setBoard(initBoard());
+    setBar({ player: 0, bot: 0 });
+    setBorneOff({ player: 0, bot: 0 });
+    setSelectedSource(null);
+    setUsedDice([]);
+    setLegalTargets([]);
+    setGameActive(true);
+    setGameResult(null);
+    startTurn('player');
+  };
+
+  function handlePointClick(pointIndex) {
+    if (!gameActive || currentPlayer !== 'player' || gameResult) return;
+    
+    // Must enter from bar first - if bar has checkers, only allow bar entry
+    if (bar.player > 0) {
+      const source = { type: 'bar', index: null };
+      const moves = getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, 1);
+      const move = moves.find(m => m.to === pointIndex);
+      
+      if (move) {
+        const result = makeMove(board, bar, borneOff, move, 1);
+        setBoard(result.board);
+        setBar(result.bar);
+        setBorneOff(result.borneOff);
+        setUsedDice([...usedDice, move.dieIndex]);
+        setSelectedSource(null);
+        playSfx(clickSound.current);
+        
+        // If still have checkers on bar, update legal targets
+        if (result.bar.player > 0) {
+          const newSource = { type: 'bar', index: null };
+          const newMoves = getLegalMovesForSource(result.board, result.bar, result.borneOff, newSource, turnDice, [...usedDice, move.dieIndex], 1);
+          setLegalTargets(newMoves);
+        } else {
+          setLegalTargets([]);
+        }
+        
+        const winner = checkGameOver(result.borneOff);
+        if (winner) {
+          endGame(winner === 'player');
+        } else {
+          const remainingSequences = getLegalMoveSequences(
+            result.board,
+            result.bar,
+            result.borneOff,
+            turnDice,
+            [...usedDice, move.dieIndex],
+            1
+          );
+          
+          if (remainingSequences.length === 0 || remainingSequences[0].length === 0) {
+            endTurn('bot');
+          }
+        }
+      }
+      
+      return;
+    }
+    
+    // Check if all checkers are in home and only bear off moves are available
+    const allInHome = allCheckersInHome(board, bar, 1);
+    if (allInHome && selectedSource === null) {
+      // Check if there are any regular moves (not just bear off)
+      let hasRegularMoves = false;
+      for (let i = 0; i < 24; i++) {
+        if (board[i] > 0) {
+          const source = { type: 'point', index: i };
+          const moves = getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, 1);
+          const hasNonBearOffMove = moves.some(m => !m.bearOff);
+          if (hasNonBearOffMove) {
+            hasRegularMoves = true;
+            break;
+          }
+        }
+      }
+      
+      // If only bear off moves available, auto-bear off on click
+      if (!hasRegularMoves && board[pointIndex] > 0) {
+        const source = { type: 'point', index: pointIndex };
+        const moves = getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, 1);
+        const bearOffMove = moves.find(m => m.bearOff);
+        
+        if (bearOffMove) {
+          const result = makeMove(board, bar, borneOff, bearOffMove, 1);
+          setBoard(result.board);
+          setBar(result.bar);
+          setBorneOff(result.borneOff);
+          setUsedDice([...usedDice, bearOffMove.dieIndex]);
+          setSelectedSource(null);
+          setLegalTargets([]);
+          playSfx(clickSound.current);
+          
+          const winner = checkGameOver(result.borneOff);
+          if (winner) {
+            endGame(winner === 'player');
+          } else {
+            const remainingSequences = getLegalMoveSequences(
+              result.board,
+              result.bar,
+              result.borneOff,
+              turnDice,
+              [...usedDice, bearOffMove.dieIndex],
+              1
+            );
+            
+            if (remainingSequences.length === 0 || remainingSequences[0].length === 0) {
+              endTurn('bot');
+            }
+          }
+          return;
+        }
+      }
+    }
+    
+    // Regular point selection - only if no checkers on bar
+    if (selectedSource === null) {
+      if (board[pointIndex] > 0) {
+        const source = { type: 'point', index: pointIndex };
+        const moves = getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, 1);
+        if (moves.length > 0) {
+          setSelectedSource(source);
+          setLegalTargets(moves);
+          playSfx(clickSound.current);
+        }
+      }
+    } else {
+      // Try to make a move
+      const moves = getLegalMovesForSource(board, bar, borneOff, selectedSource, turnDice, usedDice, 1);
+      const move = moves.find(m => {
+        if (m.bearOff) {
+          // For bearing off, allow click on any point in home board (0-5)
+          return pointIndex <= 5;
+        }
+        return m.to === pointIndex;
+      });
+      
+      if (move) {
+        const result = makeMove(board, bar, borneOff, move, 1);
+        setBoard(result.board);
+        setBar(result.bar);
+        setBorneOff(result.borneOff);
+        setUsedDice([...usedDice, move.dieIndex]);
+        setSelectedSource(null);
+        setLegalTargets([]);
+        playSfx(clickSound.current);
+        
+        const winner = checkGameOver(result.borneOff);
+        if (winner) {
+          endGame(winner === 'player');
+        } else {
+          const remainingSequences = getLegalMoveSequences(result.board, result.bar, result.borneOff, turnDice, [...usedDice, move.dieIndex], 1);
+          if (remainingSequences.length === 0 || remainingSequences[0].length === 0) {
+            endTurn('bot');
+          }
+        }
+      } else {
+        // Try to select different source
+        if (board[pointIndex] > 0) {
+          const source = { type: 'point', index: pointIndex };
+          const moves = getLegalMovesForSource(board, bar, borneOff, source, turnDice, usedDice, 1);
+          if (moves.length > 0) {
+            setSelectedSource(source);
+            setLegalTargets(moves);
+            playSfx(clickSound.current);
+          } else {
+            setSelectedSource(null);
+            setLegalTargets([]);
+          }
+        } else {
+          setSelectedSource(null);
+          setLegalTargets([]);
+        }
+      }
+    }
+  }
+
+  async function endGame(playerWon) {
+    if (!sessionId) return;
+    const play = Number(playAmount);
+    try {
+      const finishResult = await finishArcadeSession(sessionId, { playerWon });
+      if (!finishResult?.success) {
+        throw new Error(finishResult?.message || "Failed to finish session");
+      }
+      const prize = Math.max(0, Number(finishResult.approvedReward || 0));
+      const win = Boolean(finishResult?.serverPayload?.won);
+      setVaultState(Number(finishResult.balanceAfter || 0));
+      if (win && prize > 0) {
+        playSfx(winSound.current);
+      }
+
+      const resultData = { win, prize, profit: win ? prize - play : -play };
+      setGameResult(resultData);
+      setGameActive(false);
+      setCurrentPlayer(null);
+      setSessionId(null);
+
+      const newStats = { ...stats, totalGames: stats.totalGames + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalPlay: stats.totalPlay + play, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), lastPlay: play };
+      setStats(newStats);
+    } catch (error) {
+      console.error("Backgammon finish session error:", error);
+      setGameActive(false);
+      setCurrentPlayer(null);
+      setSessionId(null);
+      setSessionError("Session failed to finish");
+      alert("Failed to finish session. Please refresh vault and try again.");
+    }
+  }
+
+  const resetGame = () => {
+    setGameResult(null);
+    setShowResultPopup(false);
+    setSessionId(null);
+    setSessionError("");
+    setBoard(initBoard());
+    setBar({ player: 0, bot: 0 });
+    setBorneOff({ player: 0, bot: 0 });
+    setDice([1, 1]);
+    setTurnDice([]);
+    setSelectedSource(null);
+    setUsedDice([]);
+    setLegalTargets([]);
+    setCurrentPlayer('player');
+    setGameActive(false);
+  };
+  const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
+
+  if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-amber-900 via-black to-yellow-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
+
+  const potentialWin = Math.floor(Number(playAmount) * WIN_MULTIPLIER);
+
+  return (
+    <Layout>
+      <div ref={wrapRef} className="relative w-full overflow-hidden bg-gradient-to-br from-amber-900 via-black to-yellow-900" style={{ height: '100svh' }}>
+        <div className="absolute inset-0 opacity-10"><div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} /></div>
+        <div ref={headerRef} className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+          <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
+            <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
+              <button onClick={backSafe} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">BACK</button>
+              {freePlayTokens > 0 && (<button onClick={() => startGame(true)} disabled={gameActive} className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50" title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}><span className="text-base">🎁</span><span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">{freePlayTokens}</span></button>)}
+            </div>
+            <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
+              <button onClick={() => { playSfx(clickSound.current); const el = wrapRef.current || document.documentElement; if (!document.fullscreenElement) { el.requestFullscreen?.().catch(() => {}); } else { document.exitFullscreen?.().catch(() => {}); } }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFullscreen ? "EXIT" : "FULL"}</button>
+              <button onClick={() => { playSfx(clickSound.current); setMenuOpen(true); }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">MENU</button>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
+          <div className="text-center mb-1">
+            <h1 className="text-2xl font-extrabold text-white mb-0.5">🎲 Backgammon</h1>
+            <p className="text-white/70 text-xs">Classic Backgammon • Win ×{WIN_MULTIPLIER}!</p>
+          </div>
+          <div ref={metersRef} className="grid grid-cols-3 gap-1 mb-1 w-full max-w-md">
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Vault</div>
+              <div className="text-sm font-bold text-emerald-400">{fmt(vault)}</div>
+            </div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Play</div>
+              <div className="text-sm font-bold text-amber-400">{fmt(Number(playAmount))}</div>
+            </div>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
+              <div className="text-[10px] text-white/60">Win</div>
+              <div className="text-sm font-bold text-green-400">{fmt(potentialWin)}</div>
+            </div>
+          </div>
+
+          <div className="mb-1 w-full max-w-md flex flex-col items-center justify-center" style={{ height: "var(--chart-h, 350px)" }}>
+            <div className="w-full max-w-md bg-gradient-to-b from-amber-900 to-amber-700 rounded-lg p-2 border-4 border-amber-600" style={{ aspectRatio: "1/1", maxHeight: "calc(100% - 32px)" }}>
+              {/* Backgammon board with triangular points */}
+              <div className="relative h-full w-full bg-amber-800/30">
+                {/* Top half - Outer board and Home board (points 13-24) */}
+                <div className="absolute top-0 left-0 right-0 h-1/2 grid" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr)) 28px repeat(6, minmax(0, 1fr))' }}>
+                  {/* Left side - points 13-18 (Outer board) */}
+                  {[13, 14, 15, 16, 17, 18].map((pointIdx) => {
+                    const count = board[pointIdx - 1];
+                    const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
+                    const isLegalTarget = legalTargets.some(m => m.to === pointIdx - 1);
+                    const pieces = Math.abs(count);
+                    const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
+                    const isDark = pointIdx % 2 === 1;
+                    
+                    return (
+                      <button
+                        key={`top-left-${pointIdx}`}
+                        onClick={() => handlePointClick(pointIdx - 1)}
+                        disabled={!gameActive || gameResult || currentPlayer !== 'player'}
+                        className={`relative h-full w-full transition-all ${
+                          isSelected ? 'ring-2 ring-blue-400 z-20' : ''
+                        } ${
+                          isLegalTarget ? 'ring-2 ring-cyan-300 bg-cyan-400/10' : ''
+                        } hover:brightness-110 disabled:opacity-50`}
+                      >
+                        <div className="absolute inset-0 pointer-events-none">
+                          <div
+                            className={`${isDark ? 'bg-gray-900' : 'bg-amber-100'} absolute inset-x-[10%] top-0 bottom-0`}
+                            style={{ clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }}
+                          />
+                        </div>
+                        {pieces > 0 && (
+                          <div className="absolute inset-x-0 top-1 flex flex-col items-center gap-[2px]">
+                            {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={`w-3 h-3 rounded-full border-[1px] ${
+                                  playerType === 'player'
+                                    ? 'bg-red-600 border-red-800'
+                                    : 'bg-blue-600 border-blue-800'
+                                }`}
+                              />
+                            ))}
+                            {pieces > 5 && <span className="text-[8px] text-white font-bold">+{pieces - 5}</span>}
+                          </div>
+                        )}
+                        {isLegalTarget && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-3 h-3 rounded-full bg-cyan-400/80 ring-2 ring-white/60" />
+                          </div>
+                        )}
+                        <span className="absolute bottom-0 inset-x-0 text-center text-[8px] text-white/60">{pointIdx}</span>
+                      </button>
+                    );
+                  })}
+                  
+                  {/* Center bar spacer */}
+                  <div className="col-start-7 col-end-8 bg-amber-950/40 border-x border-amber-700 flex flex-col items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-xs text-white/90 font-semibold">Dice: {dice[0]} {dice[1]}</div>
+                      {usedDice.length > 0 && <div className="text-[10px] text-white/60">Used: {usedDice.length}/{turnDice.length}</div>}
+                      {bar.player > 0 && <div className="text-[10px] text-red-300 mt-0.5">Bar: {bar.player}</div>}
+                      {bar.bot > 0 && <div className="text-[10px] text-blue-300 mt-0.5">Bot Bar: {bar.bot}</div>}
+                    </div>
+                  </div>
+                  
+                  {/* Right side - points 19-24 (Home board) */}
+                  {[19, 20, 21, 22, 23, 24].map((pointIdx) => {
+                    const count = board[pointIdx - 1];
+                    const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
+                    const isLegalTarget = legalTargets.some(m => m.to === pointIdx - 1);
+                    const pieces = Math.abs(count);
+                    const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
+                    const isDark = pointIdx % 2 === 1;
+                    
+                    return (
+                      <button
+                        key={`top-right-${pointIdx}`}
+                        onClick={() => handlePointClick(pointIdx - 1)}
+                        disabled={!gameActive || gameResult || currentPlayer !== 'player'}
+                        className={`relative h-full w-full transition-all ${
+                          isSelected ? 'ring-2 ring-blue-400 z-20' : ''
+                        } ${
+                          isLegalTarget ? 'ring-2 ring-cyan-300 bg-cyan-400/10' : ''
+                        } hover:brightness-110 disabled:opacity-50`}
+                      >
+                        <div className="absolute inset-0 pointer-events-none">
+                          <div
+                            className={`${isDark ? 'bg-gray-900' : 'bg-amber-100'} absolute inset-x-[10%] top-0 bottom-0`}
+                            style={{ clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }}
+                          />
+                        </div>
+                        {pieces > 0 && (
+                          <div className="absolute inset-x-0 top-1 flex flex-col items-center gap-[2px]">
+                            {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={`w-3 h-3 rounded-full border-[1px] ${
+                                  playerType === 'player'
+                                    ? 'bg-red-600 border-red-800'
+                                    : 'bg-blue-600 border-blue-800'
+                                }`}
+                              />
+                            ))}
+                            {pieces > 5 && <span className="text-[8px] text-white font-bold">+{pieces - 5}</span>}
+                          </div>
+                        )}
+                        {isLegalTarget && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-3 h-3 rounded-full bg-cyan-400/80 ring-2 ring-white/60" />
+                          </div>
+                        )}
+                        <span className="absolute bottom-0 inset-x-0 text-center text-[8px] text-white/60">{pointIdx}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                {/* Bottom half - Home board and Outer board (points 1-12) */}
+                <div className="absolute bottom-0 left-0 right-0 h-1/2 grid" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr)) 28px repeat(6, minmax(0, 1fr))' }}>
+                  {/* Left side - points 7-12 (Outer board) */}
+                  {[12, 11, 10, 9, 8, 7].map((pointIdx) => {
+                    const count = board[pointIdx - 1];
+                    const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
+                    const isLegalTarget = legalTargets.some(m => m.to === pointIdx - 1 || (m.bearOff && pointIdx <= 5));
+                    const pieces = Math.abs(count);
+                    const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
+                    const isDark = pointIdx % 2 === 1;
+                    
+                    return (
+                      <button
+                        key={`bottom-left-${pointIdx}`}
+                        onClick={() => handlePointClick(pointIdx - 1)}
+                        disabled={!gameActive || gameResult || currentPlayer !== 'player'}
+                        className={`relative h-full w-full transition-all ${
+                          isSelected ? 'ring-2 ring-blue-400 z-20' : ''
+                        } ${
+                          isLegalTarget ? 'ring-2 ring-cyan-300 bg-cyan-400/10' : ''
+                        } hover:brightness-110 disabled:opacity-50`}
+                      >
+                        <div className="absolute inset-0 pointer-events-none">
+                          <div
+                            className={`${isDark ? 'bg-gray-900' : 'bg-amber-100'} absolute inset-x-[10%] top-0 bottom-0`}
+                            style={{ clipPath: 'polygon(0 100%, 100% 100%, 50% 0)' }}
+                          />
+                        </div>
+                        {pieces > 0 && (
+                          <div className="absolute inset-x-0 bottom-1 flex flex-col-reverse items-center gap-[2px]">
+                            {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={`w-3 h-3 rounded-full border-[1px] ${
+                                  playerType === 'player'
+                                    ? 'bg-red-600 border-red-800'
+                                    : 'bg-blue-600 border-blue-800'
+                                }`}
+                              />
+                            ))}
+                            {pieces > 5 && <span className="text-[8px] text-white font-bold">+{pieces - 5}</span>}
+                          </div>
+                        )}
+                        {isLegalTarget && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-3 h-3 rounded-full bg-cyan-400/80 ring-2 ring-white/60" />
+                          </div>
+                        )}
+                        <span className="absolute top-0 inset-x-0 text-center text-[8px] text-white/60">{pointIdx}</span>
+                      </button>
+                    );
+                  })}
+                  
+                  {/* Center bar spacer */}
+                  <div className="col-start-7 col-end-8 bg-amber-950/40 border-x border-amber-700" />
+                  
+                  {/* Right side - points 1-6 (Home board) */}
+                  {[1, 2, 3, 4, 5, 6].reverse().map((pointIdx) => {
+                    const count = board[pointIdx - 1];
+                    const isSelected = selectedSource?.type === 'point' && selectedSource?.index === pointIdx - 1;
+                    const isLegalTarget = legalTargets.some(m => m.to === pointIdx - 1 || (m.bearOff && pointIdx <= 5));
+                    const pieces = Math.abs(count);
+                    const playerType = count > 0 ? 'player' : count < 0 ? 'bot' : null;
+                    const isDark = pointIdx % 2 === 1;
+                    
+                    return (
+                      <button
+                        key={`bottom-right-${pointIdx}`}
+                        onClick={() => handlePointClick(pointIdx - 1)}
+                        disabled={!gameActive || gameResult || currentPlayer !== 'player'}
+                        className={`relative h-full w-full transition-all ${
+                          isSelected ? 'ring-2 ring-blue-400 z-20' : ''
+                        } ${
+                          isLegalTarget ? 'ring-2 ring-cyan-300 bg-cyan-400/10' : ''
+                        } hover:brightness-110 disabled:opacity-50`}
+                      >
+                        <div className="absolute inset-0 pointer-events-none">
+                          <div
+                            className={`${isDark ? 'bg-gray-900' : 'bg-amber-100'} absolute inset-x-[10%] top-0 bottom-0`}
+                            style={{ clipPath: 'polygon(0 100%, 100% 100%, 50% 0)' }}
+                          />
+                        </div>
+                        {pieces > 0 && (
+                          <div className="absolute inset-x-0 bottom-1 flex flex-col-reverse items-center gap-[2px]">
+                            {Array.from({ length: Math.min(pieces, 5) }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={`w-3 h-3 rounded-full border-[1px] ${
+                                  playerType === 'player'
+                                    ? 'bg-red-600 border-red-800'
+                                    : 'bg-blue-600 border-blue-800'
+                                }`}
+                              />
+                            ))}
+                            {pieces > 5 && <span className="text-[8px] text-white font-bold">+{pieces - 5}</span>}
+                          </div>
+                        )}
+                        {isLegalTarget && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-3 h-3 rounded-full bg-cyan-400/80 ring-2 ring-white/60" />
+                          </div>
+                        )}
+                        <span className="absolute top-0 inset-x-0 text-center text-[8px] text-white/60">{pointIdx}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="text-center mt-2" style={{ height: '28px' }}>
+              <div className={`text-base font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-red-400'}`}>
+                {gameResult ? (gameResult.win ? 'YOU WIN!' : 'YOU LOSE') : gameActive ? (currentPlayer === 'player' ? 'Your Turn' : 'Bot Thinking...') : 'Ready to Play'}
+              </div>
+            </div>
+          </div>
+
+          <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.max(MIN_PLAY, current - 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
+            <div className="relative">
+              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={gameActive} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
+              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); playSfx(clickSound.current); }} disabled={gameActive} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
+            </div>
+            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
+          </div>
+
+          <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
+            <button onClick={gameResult ? resetGame : () => startGame(false)} disabled={gameActive} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-amber-500 to-yellow-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">{gameResult ? "PLAY AGAIN" : gameActive ? "GAME IN PROGRESS" : "START GAME"}</button>
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
+            <div className="flex gap-2">
+              <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
+              <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>
+              <button onClick={() => { setShowVaultModal(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 font-semibold text-xs transition-all">💰 Vault</button>
+            </div>
+          </div>
+        </div>
+
+        {showResultPopup && gameResult && (<div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none"><div className={`${gameResult.win ? 'bg-green-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}><div className="text-4xl mb-2">{gameResult.win ? '🎉' : '😔'}</div><div className="text-2xl font-bold mb-1">{gameResult.win ? 'YOU WIN!' : 'YOU LOSE'}</div><div className="text-lg">{gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div></div></div>)}
+
+        {menuOpen && (<div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}><div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div><div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div><div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div><div className="mt-4 text-xs opacity-70"><p>Backgammon v2.0</p></div></div></div>)}
+
+        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">🎲 How to Play</h2><div className="space-y-3 text-sm"><p><strong>1. Place Play:</strong> Min {MIN_PLAY} MLEO</p><p><strong>2. Start Game:</strong> Click "START GAME" to begin</p><p><strong>3. Move Pieces:</strong> Click your point, then click destination</p><p><strong>4. Win:</strong> Bear off all your pieces first!</p><div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3"><p className="text-amber-300 font-semibold mb-2">💰 Win Rewards:</p><div className="text-xs text-white/80 space-y-1"><p>• Win the game: ×{WIN_MULTIPLIER}</p><p>• Lose: Lose your play amount</p><p>• Move pieces based on dice rolls!</p></div></div><div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2 mt-2"><p className="text-blue-300 font-semibold text-xs">💡 Tip: Bear off pieces from your home board!</p></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+
+        {showStats && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2><div className="space-y-3"><div className="grid grid-cols-2 gap-3"><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Games</div><div className="text-xl font-bold">{stats.totalGames}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalGames > 0 ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : 0}%</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Play</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalPlay)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Net Profit</div><div className={`text-lg font-bold ${stats.totalWon - stats.totalPlay >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.totalWon - stats.totalPlay)}</div></div></div></div><button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+
+        {showVaultModal && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">💰 MLEO Vault</h2><div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-6 text-center"><div className="text-sm text-white/60 mb-1">Current Balance</div><div className="text-3xl font-bold text-emerald-400">{fmt(vault)} MLEO</div></div><div className="space-y-4"><div><label className="text-sm text-white/70 mb-2 block">Collect to Wallet</label><div className="flex gap-2 mb-2"><input type="number" value={collectAmount} onChange={(e) => setCollectAmount(normalizeWholeAmount(e.target.value))} className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white" min="1" step="1" max={vault} /><button onClick={() => setCollectAmount(vault)} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold">MAX</button></div><button onClick={collectToWallet} disabled={collectAmount <= 0 || collectAmount > vault || claiming} className="w-full py-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed">{claiming ? "Collecting..." : `Collect ${fmt(collectAmount)} MLEO`}</button></div><div className="text-xs text-white/60"><p>• Your vault is shared across all MLEO games</p><p>• Collect earnings to your wallet anytime</p><p>• Network: BSC Testnet (TBNB)</p></div></div><button onClick={() => setShowVaultModal(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+      </div>
+    </Layout>
+  );
+}

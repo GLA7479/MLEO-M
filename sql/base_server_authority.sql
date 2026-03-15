@@ -158,4 +158,151 @@ BEGIN
 END;
 $$;
 
+ALTER TABLE public.base_device_state
+ADD COLUMN IF NOT EXISTS last_tick_at timestamptz NOT NULL DEFAULT now();
+
+CREATE OR REPLACE FUNCTION public.base_reconcile_state(
+  p_device_id text
+)
+RETURNS public.base_device_state
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_state public.base_device_state%ROWTYPE;
+  v_now timestamptz := now();
+  v_elapsed_seconds numeric := 0;
+  v_resources jsonb;
+  v_buildings jsonb;
+  v_modules jsonb;
+  v_research jsonb;
+  v_stats jsonb;
+  v_energy_cap numeric := 120;
+  v_energy_regen numeric := 0.8;
+  v_efficiency numeric := 1.0;
+  v_hq integer := 1;
+  v_quarry integer := 1;
+  v_trade integer := 0;
+  v_salvage integer := 0;
+  v_refinery integer := 0;
+  v_power integer := 0;
+  v_arcade integer := 0;
+  v_miner integer := 0;
+  v_banked numeric := 0;
+  v_ore_gain numeric := 0;
+  v_gold_gain numeric := 0;
+  v_scrap_gain numeric := 0;
+  v_data_gain numeric := 0;
+  v_energy_now numeric := 0;
+  v_ore_now numeric := 0;
+  v_gold_now numeric := 0;
+  v_scrap_now numeric := 0;
+  v_data_now numeric := 0;
+  v_stability numeric := 100;
+BEGIN
+  SELECT *
+  INTO v_state
+  FROM public.base_get_or_create_state(p_device_id);
+
+  SELECT *
+  INTO v_state
+  FROM public.base_device_state
+  WHERE device_id = p_device_id
+  FOR UPDATE;
+
+  IF v_state.last_tick_at IS NULL THEN
+    UPDATE public.base_device_state
+    SET last_tick_at = v_now
+    WHERE device_id = p_device_id;
+
+    SELECT *
+    INTO v_state
+    FROM public.base_device_state
+    WHERE device_id = p_device_id
+    FOR UPDATE;
+
+    RETURN v_state;
+  END IF;
+
+  v_elapsed_seconds := EXTRACT(EPOCH FROM (v_now - v_state.last_tick_at));
+  IF v_elapsed_seconds <= 0 THEN
+    RETURN v_state;
+  END IF;
+
+  v_resources := coalesce(v_state.resources, '{}'::jsonb);
+  v_buildings := coalesce(v_state.buildings, '{}'::jsonb);
+  v_modules := coalesce(v_state.modules, '{}'::jsonb);
+  v_research := coalesce(v_state.research, '{}'::jsonb);
+  v_stats := coalesce(v_state.stats, '{}'::jsonb);
+
+  v_hq := greatest(1, coalesce((v_buildings->>'hq')::int, 1));
+  v_quarry := greatest(0, coalesce((v_buildings->>'quarry')::int, 0));
+  v_trade := greatest(0, coalesce((v_buildings->>'tradeHub')::int, 0));
+  v_salvage := greatest(0, coalesce((v_buildings->>'salvage')::int, 0));
+  v_refinery := greatest(0, coalesce((v_buildings->>'refinery')::int, 0));
+  v_power := greatest(0, coalesce((v_buildings->>'powerCell')::int, 0));
+  v_arcade := greatest(0, coalesce((v_buildings->>'arcadeHub')::int, 0));
+  v_miner := greatest(0, coalesce((v_buildings->>'minerControl')::int, 0));
+
+  v_energy_cap := 120 + (v_power * 24);
+  v_energy_regen := 0.8 + (v_power * 0.35);
+  v_efficiency := 1 + ((v_hq - 1) * 0.03);
+
+  IF coalesce((v_modules->>'optimizer')::boolean, false) THEN
+    v_efficiency := v_efficiency + 0.08;
+  END IF;
+
+  IF coalesce((v_research->>'automation')::boolean, false) THEN
+    v_efficiency := v_efficiency + 0.10;
+  END IF;
+
+  IF v_state.overclock_until IS NOT NULL AND v_state.overclock_until > v_now THEN
+    v_efficiency := v_efficiency + 0.18;
+  END IF;
+
+  v_stability := least(100, greatest(0, coalesce(v_state.stability, 100)));
+  v_efficiency := v_efficiency * least(1.0, greatest(0.45, v_stability / 100.0));
+
+  v_ore_gain := (v_quarry * 2.0 * v_efficiency) * (v_elapsed_seconds / 60.0);
+  v_gold_gain := (v_trade * 1.0 * v_efficiency) * (v_elapsed_seconds / 60.0);
+  v_scrap_gain := (v_salvage * 0.8 * v_efficiency) * (v_elapsed_seconds / 60.0);
+  v_data_gain := ((v_arcade * 0.12) + (v_miner * 0.15)) * v_efficiency * (v_elapsed_seconds / 60.0);
+  v_banked := (v_refinery * 0.12 * v_efficiency) * (v_elapsed_seconds / 60.0);
+
+  v_energy_now := least(
+    v_energy_cap,
+    greatest(0, coalesce((v_resources->>'ENERGY')::numeric, 0) + (v_energy_regen * (v_elapsed_seconds / 60.0)))
+  );
+
+  v_ore_now := greatest(0, coalesce((v_resources->>'ORE')::numeric, 0) + v_ore_gain);
+  v_gold_now := greatest(0, coalesce((v_resources->>'GOLD')::numeric, 0) + v_gold_gain);
+  v_scrap_now := greatest(0, coalesce((v_resources->>'SCRAP')::numeric, 0) + v_scrap_gain);
+  v_data_now := greatest(0, coalesce((v_resources->>'DATA')::numeric, 0) + v_data_gain);
+
+  UPDATE public.base_device_state
+  SET
+    resources = jsonb_build_object(
+      'ORE', floor(v_ore_now),
+      'GOLD', floor(v_gold_now),
+      'SCRAP', floor(v_scrap_now),
+      'ENERGY', floor(v_energy_now),
+      'DATA', floor(v_data_now)
+    ),
+    banked_mleo = greatest(0, coalesce(banked_mleo, 0) + floor(v_banked)::bigint),
+    maintenance_due = greatest(0, coalesce(maintenance_due, 0) + ((v_elapsed_seconds / 3600.0) * 1.2)),
+    stability = greatest(35, least(100, coalesce(stability, 100) - ((v_elapsed_seconds / 3600.0) * 0.35))),
+    last_tick_at = v_now,
+    updated_at = v_now
+  WHERE device_id = p_device_id;
+
+  SELECT *
+  INTO v_state
+  FROM public.base_device_state
+  WHERE device_id = p_device_id;
+
+  RETURN v_state;
+END;
+$$;
+
 COMMIT;

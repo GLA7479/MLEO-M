@@ -51,15 +51,17 @@ export default async function handler(req, res) {
 
     const supabase = getSupabaseAdmin();
 
-    const { data: stateData, error: stateError } = await supabase.rpc("base_get_or_create_state", {
-      p_device_id: deviceId,
-    });
+    const { data: freshStateData, error: freshStateError } = await supabase
+      .from("base_device_state")
+      .select("*")
+      .eq("device_id", deviceId)
+      .single();
 
-    if (stateError) {
-      return res.status(400).json({ success: false, message: stateError.message || "Failed to load state" });
+    if (freshStateError || !freshStateData) {
+      return res.status(400).json({ success: false, message: "Failed to reload latest base state" });
     }
 
-    const state = Array.isArray(stateData) ? stateData[0] : stateData;
+    const state = freshStateData;
     const now = new Date();
     const expeditionReadyAt = state.expedition_ready_at ? new Date(state.expedition_ready_at) : null;
     const resources = state.resources || {};

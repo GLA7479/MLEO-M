@@ -2,29 +2,7 @@ import { getArcadeDevice } from "../../../lib/server/arcadeDeviceCookie";
 import { checkArcadeRateLimit } from "../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../lib/server/supabaseAdmin";
 import { checkIpRateLimit } from "../../../lib/server/ipRateLimit";
-import { validateCsrfToken } from "../../../lib/server/csrf";
-import { logCsrfFailure, logIpRateLimitExceeded } from "../../../lib/server/securityLogger";
-
-// Reduced ALLOWED_KEYS - only non-critical fields can be updated via POST
-// Critical economic fields (banked_mleo, sent_today, total_banked, total_shared_spent, stats)
-// should only be updated through dedicated action APIs (to be implemented)
-const ALLOWED_KEYS = new Set([
-  "version",
-  "commander_level",
-  "commander_xp",
-  "blueprint_level",
-  "crew",
-  "overclock_until",
-  "expedition_ready_at",
-  "maintenance_due",
-  "stability",
-  "resources",
-  "buildings",
-  "modules",
-  "research",
-  "mission_state",
-  "log",
-]);
+import { logIpRateLimitExceeded } from "../../../lib/server/securityLogger";
 
 export default async function handler(req, res) {
   try {
@@ -47,7 +25,7 @@ export default async function handler(req, res) {
     const supabase = getSupabaseAdmin();
 
     if (req.method === "GET") {
-      const { data, error } = await supabase.rpc("base_get_or_create_state", {
+      const { data, error } = await supabase.rpc("base_reconcile_state", {
         p_device_id: deviceId,
       });
 
@@ -59,39 +37,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, state: row || null });
     }
 
-    if (req.method === "POST") {
-      if (!validateCsrfToken(req)) {
-        logCsrfFailure(req);
-        return res.status(403).json({ success: false, message: "Invalid CSRF token" });
-      }
-
-      const patch = req.body || {};
-      const update = {};
-
-      for (const [key, value] of Object.entries(patch)) {
-        if (!ALLOWED_KEYS.has(key)) continue;
-        update[key] = value;
-      }
-
-      await supabase.rpc("base_get_or_create_state", {
-        p_device_id: deviceId,
-      });
-
-      const { data, error } = await supabase
-        .from("base_device_state")
-        .update(update)
-        .eq("device_id", deviceId)
-        .select("*")
-        .single();
-
-      if (error) {
-        return res.status(400).json({ success: false, message: error.message || "Failed to save base state" });
-      }
-
-      return res.status(200).json({ success: true, state: data });
-    }
-
-    res.setHeader("Allow", "GET, POST");
+    res.setHeader("Allow", "GET");
     return res.status(405).json({ success: false, message: "Method not allowed" });
   } catch (error) {
     console.error("base/state failed", error);
