@@ -466,11 +466,15 @@ function getDefaultMiningState() {
     claimedTotal: 0,
     history: [],
     vault: 0,
+    minersVault: 0,
+    sharedVaultBalance: 0,
     claimedToWallet: 0,
   };
 }
 function normalizeMiningState(st) {
   const src = st && typeof st === "object" ? st : {};
+  const sharedVaultBalance = Math.max(0, Number((src.sharedVaultBalance ?? src.vault) || 0));
+  const minersVault = Math.max(0, Number((src.minersVault ?? src.vault) || 0));
   return {
     ...src,
     balance: Math.max(0, Number(src.balance || 0)),
@@ -479,7 +483,9 @@ function normalizeMiningState(st) {
     scoreToday: Math.max(0, Number(src.scoreToday || 0)),
     claimedTotal: Math.max(0, Number(src.claimedTotal || 0)),
     history: Array.isArray(src.history) ? src.history : [],
-    vault: Math.max(0, Number(src.vault || 0)),
+    vault: sharedVaultBalance,
+    minersVault,
+    sharedVaultBalance,
     claimedToWallet: Math.max(0, Number(src.claimedToWallet || 0)),
   };
 }
@@ -491,6 +497,11 @@ function mergeMiningState(prev, patch = {}) {
   if (patch.scoreToday != null) next.scoreToday = Math.max(0, Number(patch.scoreToday || 0));
   if (patch.claimedTotal != null) next.claimedTotal = Math.max(0, Number(patch.claimedTotal || 0));
   if (patch.vault != null) next.vault = Math.max(0, Number(patch.vault || 0));
+  if (patch.sharedVaultBalance != null) {
+    next.sharedVaultBalance = Math.max(0, Number(patch.sharedVaultBalance || 0));
+    next.vault = next.sharedVaultBalance;
+  }
+  if (patch.minersVault != null) next.minersVault = Math.max(0, Number(patch.minersVault || 0));
   if (patch.claimedToWallet != null) next.claimedToWallet = Math.max(0, Number(patch.claimedToWallet || 0));
   return next;
 }
@@ -728,7 +739,7 @@ const { disconnect } = useDisconnect();
   // === Mining HUD state (CLAIM) ===
   const [mining, setMining] = useState({
     balance: 0, minedToday: 0, lastDay: "", scoreToday: 0,
-    vault: 0, claimedTotal: 0, claimedToWallet: 0, history: []
+    vault: 0, minersVault: 0, sharedVaultBalance: 0, claimedTotal: 0, claimedToWallet: 0, history: []
   });
   const [claiming, setClaiming] = useState(false);
   const [claimAmount, setClaimAmount] = useState("");
@@ -774,7 +785,9 @@ const { disconnect } = useDisconnect();
       minedToday: st.minedToday,
       scoreToday: st.scoreToday,
       lastDay: st.lastDay,
-      vault: st.vault,
+      vault: st.sharedVaultBalance ?? st.vault,
+      sharedVaultBalance: st.sharedVaultBalance ?? st.vault,
+      minersVault: st.minersVault ?? st.vault,
       claimedTotal: st.claimedTotal,
       claimedToWallet: st.claimedToWallet,
     });
@@ -796,7 +809,7 @@ const { disconnect } = useDisconnect();
       while (remaining > 0) {
         const room = Math.max(1, 200 - queuedCount);
         const take = Math.min(remaining, room);
-        queueMinerBreakAccrual(stage, take, true);
+        queueMinerBreakAccrual(stage, take, false);
         queuedCount += take;
         remaining -= take;
         if (queuedCount >= 200) {
@@ -955,7 +968,9 @@ const { disconnect } = useDisconnect();
       }
       applyMiningServerSnapshot({
         balance: resp?.balance,
-        vault: resp?.vault,
+        vault: resp?.sharedVaultBalance,
+        sharedVaultBalance: resp?.sharedVaultBalance,
+        minersVault: resp?.vault,
         claimedTotal: resp?.claimedTotal,
       }, { ts: Date.now(), amt: moved, type: "to_vault" });
       setGiftToastWithTTL(`Moved ${formatMleoShort(moved)} MLEO to Vault`);
@@ -1013,7 +1028,9 @@ async function onClaimMined() {
       const moveResp = await claimMinerBalanceToVault(null);
       snapshot = applyMiningServerSnapshot({
         balance: moveResp?.balance,
-        vault: moveResp?.vault,
+        vault: moveResp?.sharedVaultBalance,
+        sharedVaultBalance: moveResp?.sharedVaultBalance,
+        minersVault: moveResp?.vault,
         claimedTotal: moveResp?.claimedTotal,
       }, Number(moveResp?.moved || 0) > 0 ? { ts: Date.now(), amt: Number(moveResp.moved || 0), type: "to_vault" } : null);
     } catch (err) {
@@ -1024,7 +1041,7 @@ async function onClaimMined() {
   }
 
   // 1) כמה דורשים מה־Vault
-  const vaultNow = Number((snapshot?.vault || 0).toFixed(2));
+  const vaultNow = Number((snapshot?.minersVault ?? 0).toFixed(2));
   if (!vaultNow) { setGiftToastWithTTL("Vault is empty"); return; }
 
   // 2) ארנק ורשת
@@ -1077,7 +1094,9 @@ async function onClaimMined() {
     const delta = Math.max(0, Math.floor(Number(toClaim) || 0));
     const resp = await claimMinerToWallet(delta);
     applyMiningServerSnapshot({
-      vault: resp?.vault,
+      vault: resp?.sharedVaultBalance,
+      sharedVaultBalance: resp?.sharedVaultBalance,
+      minersVault: resp?.vault,
       claimedToWallet: resp?.claimedToWallet,
     }, { t: Date.now(), kind: "claim_wallet_all", amount: delta, tx: String(hash) });
 
@@ -2054,7 +2073,7 @@ setUi(u => ({ ...u, gold: s.gold }));
 const stageNow = rockStageNow(rock);
 const baseForBreak = mleoBaseForStage(stageNow);
 const eff = addPlayerScorePoints(s, baseForBreak);finalizeDailyRewardOncePerTick();
-queueMinerBreakAccrual(stageNow, 1, Boolean(s.isIdleOffline));
+queueMinerBreakAccrual(stageNow, 1, false);
 
 
 // השרת הוא מקור האמת; ה-POP מציג את ההערכה עד לסנכרון הבא.
@@ -2441,8 +2460,6 @@ function handleOfflineAccrual(s, elapsedMs) {
   let totalCoins = 0;
   let offlineAddedMleo = 0;
   const offlineStageCounts = Object.create(null);
-  const offlineFactor = Math.max(0, Number(minersConfigRef.current?.offlineFactor || 0.5));
-
   for (let lane = 0; lane < LANES; lane++) {
     let dps = laneDpsSum(s, lane) * OFFLINE_DPS_FACTOR;
     if (dps <= 0) continue;
@@ -2465,7 +2482,7 @@ function handleOfflineAccrual(s, elapsedMs) {
         // ערך MLEO לפי שלב הסלע בנתיב זה ברגע השבירה
         const stageNow = (idx + 1);
         const baseForBreak = mleoBaseForStage(stageNow);
-        const eff = round2(addPlayerScorePoints(s, baseForBreak) * offlineFactor);
+        const eff = round2(addPlayerScorePoints(s, baseForBreak));
         offlineStageCounts[String(stageNow)] = (offlineStageCounts[String(stageNow)] || 0) + 1;
         offlineAddedMleo += eff;
         finalizeDailyRewardOncePerTick();
@@ -2532,7 +2549,7 @@ async function resetGame() {
 
   setMining({
     balance: 0, minedToday: 0, lastDay: getTodayKey(),
-    scoreToday: 0, vault: 0, claimedTotal: 0, claimedToWallet: 0, history: []
+    scoreToday: 0, vault: 0, minersVault: 0, sharedVaultBalance: 0, claimedTotal: 0, claimedToWallet: 0, history: []
   });
 
   const fresh = makeFreshState();
@@ -4091,6 +4108,7 @@ MLEO
            {/* Mining modal (Wallet connect + Claim UI) */}
       {showMiningInfo && (() => {
         const vault   = Number(mining?.vault || 0);
+        const minersVault = Number(mining?.minersVault || 0);
         const bal     = Number(mining?.balance || 0);
         const mined   = Number(mining?.minedToday || 0);
         const claimed = Number(mining?.claimedTotal || 0);
@@ -4136,6 +4154,12 @@ MLEO
                   </div>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-100">
+                  <div className="text-slate-500 text-xs">Miners Claimable</div>
+                  <div className="font-extrabold text-slate-900 tabular-nums">
+                    {formatMleo2(minersVault)} MLEO
+                  </div>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-100">
                   <div className="text-slate-500 text-xs">Claimed (Total)</div>
                   <div className="font-extrabold text-slate-900 tabular-nums">
                     {formatMleo2(claimed)} MLEO
@@ -4160,7 +4184,7 @@ MLEO
                     step="0.01"
                   />
                   <div className="text-xs text-slate-500 mt-1">
-                    Available: {formatMleoShort(Number((mining?.vault || 0).toFixed(2)))} MLEO
+                    Claimable from MINERS: {formatMleoShort(Number((mining?.minersVault || 0).toFixed(2)))} MLEO
                   </div>
                 </div>
 
@@ -4189,13 +4213,13 @@ MLEO
   disabled={
     claiming ||
     // צריך שיהיה משהו ב-Vault
-    (Number((mining?.vault || 0).toFixed(2)) <= 0) ||
+    (Number((mining?.minersVault || 0).toFixed(2)) <= 0) ||
     // אם לא בעקיפת טסטנט — אל תאפשר כשאין room לפי הלו״ז
     (TOKEN_LIVE && !(ALLOW_TESTNET_WALLET_FLAG && chainId === CLAIM_CHAIN_ID) && (remainingWalletClaimRoom() <= 0))
   }
   className={`px-3 py-1.5 rounded-lg font-extrabold text-xs active:scale-95 ${
     (!claiming &&
-      Number((mining?.vault || 0).toFixed(2)) > 0 &&
+      Number((mining?.minersVault || 0).toFixed(2)) > 0 &&
       ((ALLOW_TESTNET_WALLET_FLAG && chainId === CLAIM_CHAIN_ID) || remainingWalletClaimRoom() > 0)
     )
       ? "bg-yellow-400 hover:bg-yellow-300 text-black"

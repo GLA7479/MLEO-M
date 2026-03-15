@@ -23,9 +23,10 @@ export default async function handler(req, res) {
       return res.status(429).json({ success: false, message: "Too many miners state requests" });
     }
 
-    const [stateResp, configResp] = await Promise.all([
+    const [stateResp, configResp, sharedVaultResp] = await Promise.all([
       supabase.rpc("miners_get_state", { p_device_id: deviceId }),
       supabase.rpc("miners_get_config"),
+      supabase.rpc("get_vault_balance", { p_device_id: deviceId }),
     ]);
 
     if (stateResp.error) {
@@ -34,9 +35,13 @@ export default async function handler(req, res) {
     if (configResp.error) {
       return res.status(400).json({ success: false, message: configResp.error.message || "Failed to read miners config" });
     }
+    if (sharedVaultResp.error) {
+      return res.status(400).json({ success: false, message: sharedVaultResp.error.message || "Failed to read shared vault balance" });
+    }
 
     const state = extractRow(stateResp.data) || {};
     const config = extractRow(configResp.data) || {};
+    const sharedVault = extractRow(sharedVaultResp.data);
 
     return res.status(200).json({
       success: true,
@@ -45,7 +50,9 @@ export default async function handler(req, res) {
         minedToday: Number(state.mined_today || 0),
         scoreToday: Number(state.score_today || 0),
         lastDay: state.last_day || null,
-        vault: Number(state.vault || 0),
+        vault: Number(sharedVault?.vault_balance ?? sharedVault?.balance ?? sharedVault ?? state.vault ?? 0),
+        minersVault: Number(state.vault || 0),
+        sharedVaultBalance: Number(sharedVault?.vault_balance ?? sharedVault?.balance ?? sharedVault ?? state.vault ?? 0),
         claimedTotal: Number(state.claimed_total || 0),
         claimedToWallet: Number(state.claimed_to_wallet || 0),
         giftNextClaimAt: state.gift_next_claim_at || null,
