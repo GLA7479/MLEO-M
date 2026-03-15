@@ -1,6 +1,7 @@
 // pages/api/poker/sit.js
 export const config = { runtime: "nodejs" };
 import { q } from "../../../lib/db";
+import crypto from "crypto";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
@@ -18,13 +19,16 @@ export default async function handler(req, res) {
       ON CONFLICT (table_id, seat_index) DO NOTHING
     `, [table_id, seat_index]);
 
+    // Generate seat token
+    const seatToken = crypto.randomBytes(24).toString("hex");
+
     // שב רק אם המושב פנוי (player_name IS NULL)
     const up = await q(`
       UPDATE poker.poker_seats
-      SET player_name=$3, stack=$4, stack_live=$4, sat_out=false
+      SET player_name=$3, stack=$4, stack_live=$4, sat_out=false, seat_token=$5
       WHERE table_id=$1 AND seat_index=$2 AND (player_name IS NULL OR player_name = '')
-      RETURNING seat_index, player_name, stack_live, sat_out
-    `, [table_id, seat_index, player_name, Number(buyin||0)]);
+      RETURNING seat_index, player_name, stack_live, sat_out, seat_token
+    `, [table_id, seat_index, player_name, Number(buyin||0), seatToken]);
 
     await q("COMMIT");
 

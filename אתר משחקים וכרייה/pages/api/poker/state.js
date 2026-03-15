@@ -4,8 +4,8 @@ import { q } from "../../../lib/db";
 
 export default async function handler(req, res) {
   try {
-    // קבל מזהה יד + שם הצופה (viewer) כדי להחזיר רק את הקלפים שלו
-    const { hand_id, viewer } =
+    // קבל מזהה יד + seat_token כדי להחזיר רק את הקלפים שלו
+    const { hand_id, seat_token } =
       req.method === "POST" ? (req.body || {}) : (req.query || {});
     if (!hand_id) return res.status(400).json({ error:"bad_request", details:"missing hand_id" });
 
@@ -42,13 +42,13 @@ export default async function handler(req, res) {
     const toCall = await q(`SELECT poker.poker_to_call_json($1) AS j`, [hand_id]);
     const to_call = toCall.rows[0].j || {};
 
-    // 🟢 החזרת הקלפים של הצופה בלבד (viewer)
+    // 🟢 החזרת הקלפים של הצופה בלבד (seat_token)
     let my_seat_index = null;
     let my_hole = null;
-    if (viewer && String(viewer).trim()) {
+    if (seat_token && String(seat_token).trim()) {
       const me = await q(
-        `SELECT seat_index FROM poker.poker_seats WHERE table_id=$1 AND player_name=$2`,
-        [hand.table_id, String(viewer).trim()]
+        `SELECT seat_index FROM poker.poker_seats WHERE table_id=$1 AND seat_token=$2`,
+        [hand.table_id, String(seat_token).trim()]
       );
       if (me.rowCount) {
         my_seat_index = me.rows[0].seat_index;

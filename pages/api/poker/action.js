@@ -8,7 +8,7 @@ import { q } from '../../../lib/db'; // adjust if your q() is elsewhere
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
-  const { hand_id, seat_index, action, amount = 0 } = req.body || {};
+  const { hand_id, seat_index, seat_token, action, amount = 0 } = req.body || {};
   if (!hand_id || typeof seat_index !== 'number' || !action) {
     return res.status(400).json({ error: 'bad_request' });
   }
@@ -26,6 +26,20 @@ export default async function handler(req, res) {
     if (!hand) {
       await q('ROLLBACK');
       return res.status(404).json({ error: 'hand_not_found' });
+    }
+
+    // Validate seat ownership
+    if (seat_token && String(seat_token).trim()) {
+      const seatOwner = await q(
+        `SELECT seat_index
+         FROM poker.poker_seats
+         WHERE table_id=$1 AND seat_index=$2 AND seat_token=$3`,
+        [hand.table_id, seat_index, String(seat_token).trim()]
+      );
+      if (!seatOwner.rowCount) {
+        await q('ROLLBACK');
+        return res.status(403).json({ error: 'invalid_seat_token' });
+      }
     }
 
     // Must be player's turn
@@ -243,12 +257,18 @@ async function applyAction(hand, seat, action, amount) {
 
 async function spendToBet(tableId, seat, amt, handId) {
   // take from seat.stack_live -> add to hand_player.bet_street
-  await q(
+  // Prevent overbet by checking stack_live >= amt
+  const deb = await q(
     `UPDATE poker.poker_seats
-        SET stack_live = GREATEST(0, stack_live - $3)
-      WHERE table_id=$1 AND seat_index=$2`,
+     SET stack_live = stack_live - $3
+     WHERE table_id=$1 AND seat_index=$2 AND stack_live >= $3
+     RETURNING stack_live`,
     [tableId, seat, amt]
   );
+  
+  if (!deb.rowCount) {
+    throw new Error("insufficient_stack_live");
+  }
   await q(
     `UPDATE poker.poker_hand_players
         SET bet_street = COALESCE(bet_street,0) + $3

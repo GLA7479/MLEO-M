@@ -5,14 +5,17 @@ const DEVICE_SIG_COOKIE = "mleo_arcade_device_sig";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 function getCookieSecret() {
-  return (
+  const secret =
     process.env.ARCADE_DEVICE_COOKIE_SECRET ||
     process.env.SESSION_COOKIE_SECRET ||
     process.env.NEXTAUTH_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY_MP ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    ""
-  );
+    "";
+
+  if (!secret) {
+    throw new Error("Missing ARCADE_DEVICE_COOKIE_SECRET");
+  }
+
+  return secret;
 }
 
 function randomId() {
@@ -48,54 +51,54 @@ function serializeCookie(name, value, options = {}) {
 }
 
 function setCookies(res, cookies) {
-  const existing = res.getHeader("Set-Cookie");
-  const next = Array.isArray(existing)
-    ? existing.concat(cookies)
-    : existing
-      ? [existing].concat(cookies)
-      : cookies;
-  res.setHeader("Set-Cookie", next);
-}
-
-export function ensureArcadeDevice(req, res) {
-  const cookies = parseCookies(req);
-  const currentDevice = cookies[DEVICE_COOKIE];
-  const currentSig = cookies[DEVICE_SIG_COOKIE];
-  const requestedLegacyDeviceId = req?.body?.legacyDeviceId;
-
-  if (currentDevice && currentSig && currentSig === sign(currentDevice)) {
-    return currentDevice;
-  }
-
-  const deviceId =
-    typeof requestedLegacyDeviceId === "string" && requestedLegacyDeviceId.trim()
-      ? requestedLegacyDeviceId.trim()
-      : randomId();
-  const signature = sign(deviceId);
-  const secure = process.env.NODE_ENV === "production";
-
-  setCookies(res, [
-    serializeCookie(DEVICE_COOKIE, deviceId, {
-      httpOnly: true,
-      sameSite: "Lax",
-      secure,
-      maxAge: COOKIE_MAX_AGE,
-    }),
-    serializeCookie(DEVICE_SIG_COOKIE, signature, {
-      httpOnly: true,
-      sameSite: "Lax",
-      secure,
-      maxAge: COOKIE_MAX_AGE,
-    }),
-  ]);
-
-  return deviceId;
+  const existing = res.getHeader("Set-Cookie") || [];
+  const array = Array.isArray(existing) ? existing : [existing];
+  res.setHeader("Set-Cookie", [...array, ...cookies]);
 }
 
 export function getArcadeDevice(req) {
   const cookies = parseCookies(req);
-  const currentDevice = cookies[DEVICE_COOKIE];
-  const currentSig = cookies[DEVICE_SIG_COOKIE];
-  if (!currentDevice || !currentSig) return null;
-  return currentSig === sign(currentDevice) ? currentDevice : null;
+  const deviceId = cookies[DEVICE_COOKIE];
+  const signature = cookies[DEVICE_SIG_COOKIE];
+
+  if (!deviceId || !signature) {
+    return null;
+  }
+
+  const expectedSignature = sign(deviceId);
+  if (signature !== expectedSignature) {
+    return null;
+  }
+
+  return deviceId;
+}
+
+export function ensureArcadeDevice(req, res) {
+  const existing = getArcadeDevice(req);
+  if (existing) {
+    return existing;
+  }
+
+  const allowLegacyMigration = process.env.ALLOW_LEGACY_DEVICE_MIGRATION === "true";
+  const requestedLegacyDeviceId = allowLegacyMigration ? req?.body?.legacyDeviceId : null;
+
+  const deviceId = requestedLegacyDeviceId || randomId();
+  const signature = sign(deviceId);
+
+  setCookies(res, [
+    serializeCookie(DEVICE_COOKIE, deviceId, {
+      maxAge: COOKIE_MAX_AGE,
+      httpOnly: true,
+      sameSite: "Strict",
+      secure: true,
+    }),
+    serializeCookie(DEVICE_SIG_COOKIE, signature, {
+      maxAge: COOKIE_MAX_AGE,
+      httpOnly: true,
+      sameSite: "Strict",
+      secure: true,
+    }),
+  ]);
+
+  return deviceId;
 }

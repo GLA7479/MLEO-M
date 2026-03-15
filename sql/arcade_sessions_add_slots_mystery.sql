@@ -787,6 +787,17 @@ BEGIN
     RETURN;
   END IF;
 
+  -- Validate payload is an object
+  IF jsonb_typeof(coalesce(p_payload, '{}'::jsonb)) IS DISTINCT FROM 'object' THEN
+    RAISE EXCEPTION 'payload must be a json object';
+  END IF;
+
+  -- Minimum session time check (prevent instant finish) - general check
+  -- Individual games may have stricter requirements
+  IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '800 milliseconds' THEN
+    RAISE EXCEPTION 'Session finished too quickly';
+  END IF;
+
   IF coalesce(v_session.game_id, '') = 'coin-flip' THEN
     v_choice := lower(trim(coalesce(p_payload->>'choice', '')));
     IF v_choice NOT IN ('heads', 'tails') THEN
@@ -833,6 +844,11 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'baccarat' THEN
+    -- Minimum time for baccarat (casino game)
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1200 milliseconds' THEN
+      RAISE EXCEPTION 'Session finished too quickly';
+    END IF;
+    
     v_baccarat_play := lower(trim(coalesce(p_payload->>'selectedPlay', '')));
     IF v_baccarat_play NOT IN ('player', 'banker', 'tie') THEN
       RAISE EXCEPTION 'baccarat payload must include selectedPlay=player, banker, or tie';
@@ -1022,11 +1038,24 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'shooter' THEN
-    v_shooter_score := floor(coalesce((p_payload->>'score')::numeric, -1));
-    IF v_shooter_score < 0 OR v_shooter_score > 10 THEN
-      RAISE EXCEPTION 'shooter payload must include score between 0 and 10';
+    -- Minimum time for shooter (light game)
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '800 milliseconds' THEN
+      RAISE EXCEPTION 'Session finished too quickly';
     END IF;
-    v_shooter_multiplier := v_shooter_score * 0.20;
+    
+    v_shooter_score := floor(coalesce((p_payload->>'score')::numeric, -1));
+    IF v_shooter_score < 0 OR v_shooter_score > 200 THEN
+      RAISE EXCEPTION 'Invalid shooter score';
+    END IF;
+    
+    -- Use reward buckets instead of linear
+    v_shooter_multiplier := CASE
+      WHEN v_shooter_score >= 0 AND v_shooter_score <= 19 THEN 0
+      WHEN v_shooter_score >= 20 AND v_shooter_score <= 49 THEN 0.8
+      WHEN v_shooter_score >= 50 AND v_shooter_score <= 99 THEN 1.15
+      WHEN v_shooter_score >= 100 AND v_shooter_score <= 149 THEN 1.6
+      ELSE 2.1
+    END;
     v_reward := CASE WHEN v_shooter_multiplier > 0 THEN floor(v_session.stake * v_shooter_multiplier)::bigint ELSE 0 END;
     v_won := v_reward > v_session.stake;
     v_server_payload := jsonb_build_object(
@@ -1041,16 +1070,26 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'dragon-tower' THEN
+    -- Minimum time for dragon-tower
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1000 milliseconds' THEN
+      RAISE EXCEPTION 'Session finished too quickly';
+    END IF;
+    
     v_dragon_floor := floor(coalesce((p_payload->>'finalFloor')::numeric, -1));
     v_dragon_survived := coalesce((p_payload->>'survived')::boolean, false);
     IF v_dragon_floor < 0 OR v_dragon_floor > 8 THEN
-      RAISE EXCEPTION 'dragon-tower payload must include finalFloor between 0 and 8';
+      RAISE EXCEPTION 'Invalid dragon floor';
     END IF;
-    IF v_dragon_survived AND v_dragon_floor > 0 THEN
+    
+    -- Force reward=0 if survived=false
+    IF NOT v_dragon_survived THEN
+      v_reward := 0;
+      v_dragon_multiplier := 0;
+    ELSIF v_dragon_survived AND v_dragon_floor > 0 THEN
       v_dragon_multiplier := v_dragon_multipliers[LEAST(v_dragon_floor, array_length(v_dragon_multipliers, 1))];
       v_reward := floor(v_session.stake * v_dragon_multiplier)::bigint;
     ELSE
-      v_dragon_multiplier := CASE WHEN v_dragon_floor > 0 THEN v_dragon_multipliers[LEAST(v_dragon_floor, array_length(v_dragon_multipliers, 1))] ELSE 0 END;
+      v_dragon_multiplier := 0;
       v_reward := 0;
     END IF;
     v_won := v_reward > 0;
@@ -1067,10 +1106,15 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'chamber' THEN
+    -- Minimum time for chamber
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1000 milliseconds' THEN
+      RAISE EXCEPTION 'Session finished too quickly';
+    END IF;
+    
     v_chamber_count := floor(coalesce((p_payload->>'chambers')::numeric, -1));
     v_chamber_cashout := coalesce((p_payload->>'cashout')::boolean, false);
-    IF v_chamber_count < 0 OR v_chamber_count > 5 THEN
-      RAISE EXCEPTION 'chamber payload must include chambers between 0 and 5';
+    IF v_chamber_count < 0 OR v_chamber_count > 6 THEN
+      RAISE EXCEPTION 'Invalid chamber count';
     END IF;
     v_chamber_multiplier := power(1.13::numeric, v_chamber_count);
     v_reward := CASE WHEN v_chamber_cashout THEN floor(v_session.stake * v_chamber_multiplier)::bigint ELSE 0 END;
@@ -1088,10 +1132,15 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'bomb' THEN
+    -- Minimum time for bomb
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1000 milliseconds' THEN
+      RAISE EXCEPTION 'Session finished too quickly';
+    END IF;
+    
     v_bomb_level := floor(coalesce((p_payload->>'finalLevel')::numeric, -1));
     v_bomb_survived := coalesce((p_payload->>'survived')::boolean, false);
     IF v_bomb_level < 0 OR v_bomb_level > 5 THEN
-      RAISE EXCEPTION 'bomb payload must include finalLevel between 0 and 5';
+      RAISE EXCEPTION 'Invalid bomb level';
     END IF;
     v_bomb_multiplier := CASE WHEN v_bomb_level > 0 THEN v_bomb_multipliers[LEAST(v_bomb_level, array_length(v_bomb_multipliers, 1))] ELSE 0 END;
     v_reward := CASE WHEN v_bomb_survived AND v_bomb_level > 0 THEN floor(v_session.stake * v_bomb_multiplier)::bigint ELSE 0 END;
@@ -1109,14 +1158,19 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'diamonds' THEN
+    -- Minimum time for diamonds
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1200 milliseconds' THEN
+      RAISE EXCEPTION 'Session finished too quickly';
+    END IF;
+    
     v_diamonds_gems := floor(coalesce((p_payload->>'gems')::numeric, -1));
     v_diamonds_difficulty := floor(coalesce((p_payload->>'difficulty')::numeric, -1));
     v_diamonds_cashout := coalesce((p_payload->>'cashout')::boolean, false);
-    IF v_diamonds_gems < 0 OR v_diamonds_gems > 22 THEN
-      RAISE EXCEPTION 'diamonds payload must include gems between 0 and 22';
+    IF v_diamonds_difficulty < 1 OR v_diamonds_difficulty > 5 THEN
+      RAISE EXCEPTION 'Invalid diamonds difficulty';
     END IF;
-    IF v_diamonds_difficulty < 0 OR v_diamonds_difficulty > 3 THEN
-      RAISE EXCEPTION 'diamonds payload must include difficulty between 0 and 3';
+    IF v_diamonds_gems < 0 OR v_diamonds_gems > 24 THEN
+      RAISE EXCEPTION 'Invalid diamonds gem count';
     END IF;
     v_diamonds_bomb_count := CASE v_diamonds_difficulty
       WHEN 0 THEN 3
@@ -1194,11 +1248,19 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'goldrush' THEN
+    -- Minimum time for goldrush
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1000 milliseconds' THEN
+      RAISE EXCEPTION 'Session finished too quickly';
+    END IF;
+    
     SELECT array_agg(value::text ORDER BY ordinality)
     INTO v_goldrush_found
     FROM jsonb_array_elements_text(coalesce(p_payload->'foundItems', '[]'::jsonb)) WITH ORDINALITY AS t(value, ordinality);
     v_goldrush_treasures := floor(coalesce((p_payload->>'treasures')::numeric, 0));
     v_goldrush_cashout := coalesce((p_payload->>'cashout')::boolean, false);
+    IF v_goldrush_treasures < 0 OR v_goldrush_treasures > 8 THEN
+      RAISE EXCEPTION 'Invalid goldrush treasures';
+    END IF;
     IF coalesce(array_length(v_goldrush_found, 1), 0) <> v_goldrush_treasures THEN
       RAISE EXCEPTION 'goldrush payload treasures count does not match foundItems length';
     END IF;
@@ -1248,10 +1310,15 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'hilo' THEN
+    -- Minimum time for hilo
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1000 milliseconds' THEN
+      RAISE EXCEPTION 'Session finished too quickly';
+    END IF;
+    
     v_hilo_streak := floor(coalesce((p_payload->>'streak')::numeric, 0));
     v_hilo_cashout := coalesce((p_payload->>'cashout')::boolean, false);
-    IF v_hilo_streak < 0 OR v_hilo_streak > 52 THEN
-      RAISE EXCEPTION 'hilo payload must include streak between 0 and 52';
+    IF v_hilo_streak < 0 OR v_hilo_streak > 12 THEN
+      RAISE EXCEPTION 'Invalid hilo streak';
     END IF;
     v_hilo_multiplier := round((1 + (v_hilo_streak * 0.206))::numeric, 3);
     v_reward := CASE WHEN v_hilo_cashout AND v_hilo_streak > 0 THEN floor(v_session.stake * v_hilo_multiplier)::bigint ELSE 0 END;
@@ -1334,6 +1401,11 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'crash' THEN
+    -- Minimum time for crash (sensitive game)
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1500 milliseconds' THEN
+      RAISE EXCEPTION 'Session finished too quickly';
+    END IF;
+    
     v_crash_hex := substr(replace(v_session.id::text, '-', ''), 1, 12);
     v_crash_value := 0;
     FOR i IN 0..5 LOOP
@@ -1342,8 +1414,8 @@ BEGIN
     v_crash_u := v_crash_value / 281474976710656::numeric;
     v_crash_point := round(least(10.0::numeric, greatest(1.01::numeric, (1.01 + ((10.0 - 1.01) * power(v_crash_u, 1.45))))), 2);
     v_crash_cashout := round(coalesce((p_payload->>'cashoutMultiplier')::numeric, 0), 2);
-    IF v_crash_cashout < 0 THEN
-      RAISE EXCEPTION 'crash cashoutMultiplier cannot be negative';
+    IF v_crash_cashout < 0 OR v_crash_cashout > 100 THEN
+      RAISE EXCEPTION 'Invalid crash cashout multiplier';
     END IF;
     v_won := coalesce((p_payload->>'cashedOut')::boolean, false) AND v_crash_cashout >= 1.01 AND v_crash_cashout < v_crash_point;
     v_reward := CASE WHEN v_won THEN floor(v_session.stake * v_crash_cashout)::bigint ELSE 0 END;
@@ -1359,10 +1431,15 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'ladder' THEN
+    -- Minimum time for ladder
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1000 milliseconds' THEN
+      RAISE EXCEPTION 'Session finished too quickly';
+    END IF;
+    
     v_ladder_step := floor(coalesce((p_payload->>'currentStep')::numeric, 0));
     v_ladder_success := coalesce((p_payload->>'success')::boolean, false);
-    IF v_ladder_step < 0 OR v_ladder_step > array_length(v_ladder_multipliers, 1) THEN
-      RAISE EXCEPTION 'ladder payload must include currentStep between 0 and 10';
+    IF v_ladder_step < 0 OR v_ladder_step > 10 THEN
+      RAISE EXCEPTION 'Invalid ladder step';
     END IF;
     v_ladder_multiplier := CASE WHEN v_ladder_step > 0 THEN v_ladder_multipliers[v_ladder_step] ELSE 0 END;
     v_reward := CASE WHEN v_ladder_success AND v_ladder_step > 0 THEN floor(v_session.stake * v_ladder_multiplier)::bigint ELSE 0 END;
@@ -1379,6 +1456,11 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'roulette' THEN
+    -- Minimum time for roulette (casino game)
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1200 milliseconds' THEN
+      RAISE EXCEPTION 'Session finished too quickly';
+    END IF;
+    
     v_roulette_play := lower(trim(coalesce(p_payload->>'playType', '')));
     IF v_roulette_play NOT IN ('red', 'black', 'even', 'odd', 'low', 'high') THEN
       RAISE EXCEPTION 'roulette payload must include playType';
@@ -1474,6 +1556,11 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'blackjack' THEN
+    -- Minimum time for blackjack (casino game)
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1500 milliseconds' THEN
+      RAISE EXCEPTION 'Session finished too quickly';
+    END IF;
+    
     v_blackjack_base_stake := floor(coalesce((p_payload->>'baseStake')::numeric, 0))::bigint;
     v_blackjack_decision := lower(trim(coalesce(p_payload->>'decision', 'play')));
     v_blackjack_insurance_taken := coalesce((p_payload->>'insuranceTaken')::boolean, false);
@@ -1706,6 +1793,11 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'ultimate-poker' THEN
+    -- Minimum time for ultimate-poker (casino game)
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1800 milliseconds' THEN
+      RAISE EXCEPTION 'Session finished too quickly';
+    END IF;
+    
     v_ultimate_decision := lower(trim(coalesce(p_payload->>'decision', '')));
     IF v_ultimate_decision NOT IN (
       'raise4x',
@@ -1811,6 +1903,11 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'poker' THEN
+    -- Minimum time for poker (casino game)
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1800 milliseconds' THEN
+      RAISE EXCEPTION 'Session finished too quickly';
+    END IF;
+    
     v_card_draw := public.arcade_draw_cards(7);
     v_eval := public.arcade_eval_best_poker7(v_card_draw);
     v_poker_multiplier := CASE v_eval->>'hand'
@@ -1840,6 +1937,11 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'three-card-poker' THEN
+    -- Minimum time for three-card-poker (casino game)
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1500 milliseconds' THEN
+      RAISE EXCEPTION 'Session finished too quickly';
+    END IF;
+    
     v_card_draw := public.arcade_draw_cards(6);
     v_player_eval := public.arcade_eval_three_card(v_card_draw[1:3]);
     v_opponent_eval := public.arcade_eval_three_card(v_card_draw[4:6]);
@@ -1885,6 +1987,11 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'checkers' THEN
+    -- Minimum time for checkers (strategic game)
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '20 seconds' THEN
+      RAISE EXCEPTION 'Game finished too quickly';
+    END IF;
+    
     v_won := coalesce((p_payload->>'playerWon')::boolean, false);
     v_reward := CASE WHEN v_won THEN floor(v_session.stake * 1.92)::bigint ELSE 0 END;
     v_server_payload := jsonb_build_object(
@@ -1898,6 +2005,11 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'backgammon' THEN
+    -- Minimum time for backgammon (strategic game)
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '25 seconds' THEN
+      RAISE EXCEPTION 'Game finished too quickly';
+    END IF;
+    
     v_won := coalesce((p_payload->>'playerWon')::boolean, false);
     v_reward := CASE WHEN v_won THEN floor(v_session.stake * 1.92)::bigint ELSE 0 END;
     v_server_payload := jsonb_build_object(
