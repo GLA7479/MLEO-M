@@ -216,6 +216,8 @@ export default function Crash2Page() {
   const cashedOutAtRef = useRef(null);
   const autoCashOutEnabledRef = useRef(false);
   const autoCashOutValueRef = useRef("2.00");
+  const multiplierRef = useRef(1.0);
+  const crashPointRef = useRef(null);
 
   const [isFreePlay, setIsFreePlay] = useState(false);
   const [freePlayTokens, setFreePlayTokens] = useState(0);
@@ -323,6 +325,14 @@ export default function Crash2Page() {
   }, [enableAutoCashOut, autoCashOut]);
 
   useEffect(() => {
+    multiplierRef.current = multiplier;
+  }, [multiplier]);
+
+  useEffect(() => {
+    crashPointRef.current = crashPoint;
+  }, [crashPoint]);
+
+  useEffect(() => {
     if (gameResult) {
       setShowResultPopup(true);
       const timer = setTimeout(() => setShowResultPopup(false), 4000);
@@ -382,11 +392,12 @@ export default function Crash2Page() {
   }, [phase]);
 
   const startNextRound = async () => {
-    const crash = Number(playerBet?.crashPoint || 0) > 0
-      ? Number(playerBet.crashPoint)
+    const activeBet = playerBetRef.current;
+    const crash = Number(activeBet?.crashPoint || 0) > 0
+      ? Number(activeBet.crashPoint)
       : hashToCrash(await sha256Hex(`${Math.random().toString(36).slice(2, 12)}${clientSeed}${nonce}`), ROUND.minCrash, ROUND.maxCrash);
-    setServerSeed(playerBet?.sessionId || "");
-    setServerSeedHash(playerBet?.sessionId ? await sha256Hex(playerBet.sessionId) : "");
+    setServerSeed(activeBet?.sessionId || "");
+    setServerSeedHash(activeBet?.sessionId ? await sha256Hex(activeBet.sessionId) : "");
     setCrashPoint(crash);
     setPhase("running");
     setMultiplier(1.0);
@@ -414,7 +425,7 @@ export default function Crash2Page() {
         !cashedOutAtRef.current &&
         m >= Number(autoCashOutValueRef.current)
       ) {
-        cashOut();
+        cashOut(m);
       }
 
       if (m >= crash) {
@@ -422,7 +433,7 @@ export default function Crash2Page() {
         setMultiplier(crash);
         dataRef.current.push([elapsed, crash]);
         setChartData([...dataRef.current]);
-        endRound(false);
+        endRound();
       } else {
         rafRef.current = requestAnimationFrame(animate);
       }
@@ -486,12 +497,18 @@ export default function Crash2Page() {
     }
   }, [phase, playerBet, cashedOutAt]);
 
-  const cashOut = async () => {
-    if (!canCashOut || !playerBet || cashedOutAt) return;
+  const cashOut = async (liveMultiplier = null) => {
+    const activeBet = playerBetRef.current;
+    if (!canCashOutRef.current || !activeBet || cashedOutAtRef.current) return;
     playSfx(clickSound.current);
     try {
-      const cashoutMultiplier = Math.round(multiplier * 100) / 100;
-      const finishResult = await finishArcadeSession(playerBet.sessionId, {
+      const resolvedMultiplier =
+        typeof liveMultiplier === "number" && Number.isFinite(liveMultiplier)
+          ? liveMultiplier
+          : Number(multiplierRef.current ?? multiplier);
+      const cashoutMultiplier = Math.round(resolvedMultiplier * 100) / 100;
+      setCanCashOut(false);
+      const finishResult = await finishArcadeSession(activeBet.sessionId, {
         cashedOut: true,
         cashoutMultiplier,
       });
@@ -507,13 +524,14 @@ export default function Crash2Page() {
       if (prize > 0) playSfx(winSound.current);
       settledResultRef.current = {
         win: prize > 0,
-        crashedAt: Number(payload.crashPoint || playerBet.crashPoint || 0),
+        crashedAt: Number(payload.crashPoint || activeBet.crashPoint || 0),
         cashedAt: resolvedCashedOutAt,
         prize,
-        profit: prize - playerBet.amount,
+        profit: prize - activeBet.amount,
       };
     } catch (error) {
       console.error("Crash cashout session error:", error);
+      setCanCashOut(true);
       setSessionError("Session failed to cash out");
     }
   };
@@ -521,12 +539,13 @@ export default function Crash2Page() {
   const endRound = async () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     
-    if (playerBet) {
-      const play = playerBet.amount;
+    const activeBet = playerBetRef.current;
+    if (activeBet) {
+      const play = activeBet.amount;
       let resultData = settledResultRef.current;
       if (!resultData) {
         try {
-          const finishResult = await finishArcadeSession(playerBet.sessionId, {
+          const finishResult = await finishArcadeSession(activeBet.sessionId, {
             cashedOut: false,
           });
           const payload = finishResult?.serverPayload || {};
@@ -536,7 +555,7 @@ export default function Crash2Page() {
           }
           resultData = {
             win: prize > 0,
-            crashedAt: Number(payload.crashPoint || playerBet.crashPoint || crashPoint || 0),
+            crashedAt: Number(payload.crashPoint || activeBet.crashPoint || crashPointRef.current || 0),
             cashedAt: null,
             prize,
             profit: prize > 0 ? prize - play : -play,
@@ -546,7 +565,7 @@ export default function Crash2Page() {
           setSessionError("Session failed to finish");
           resultData = {
             win: false,
-            crashedAt: Number(playerBet.crashPoint || crashPoint || 0),
+            crashedAt: Number(activeBet.crashPoint || crashPointRef.current || 0),
             cashedAt: null,
             prize: 0,
             profit: -play,
@@ -989,7 +1008,7 @@ export default function Crash2Page() {
             <button
               onClick={
                 phase === "running" && canCashOut
-                  ? cashOut
+                  ? () => cashOut()
                   : () => placeBet(false)
               }
               disabled={
