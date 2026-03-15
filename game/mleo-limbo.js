@@ -164,6 +164,7 @@ export default function LimitRunPage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [playAmount, setPlayAmount] = useState("100");
+  const [activeAmountButton, setActiveAmountButton] = useState("100"); // Track which amount button is active
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [targetMultiplier, setTargetMultiplier] = useState(2);
   const [rolling, setRolling] = useState(false);
@@ -234,10 +235,9 @@ export default function LimitRunPage() {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
 
-    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
-    if (savedStats.lastPlay) {
-      setPlayAmount(String(savedStats.lastPlay));
-    }
+    // Always set initial bet to 100 on game entry
+    setPlayAmount("100");
+    setActiveAmountButton("100");
 
     const unsubscribeVault = subscribeSharedVault(snapshot => {
       if (!cancelled) setVaultState(snapshot.balance);
@@ -393,9 +393,31 @@ export default function LimitRunPage() {
     }
   };
 
+  // Handle amount button clicks
+  const handleAmountButtonClick = (amountValue) => {
+    if (rolling) return;
+    playSfx(clickSound.current);
+    
+    const currentAmount = Number(playAmount) || MIN_PLAY;
+    const amountStr = String(amountValue);
+    
+    if (activeAmountButton === amountStr) {
+      // Same button clicked - add the amount
+      const newAmount = Math.min(vault, currentAmount + amountValue);
+      setPlayAmount(String(newAmount));
+    } else {
+      // Different button clicked - switch to that amount
+      setActiveAmountButton(amountStr);
+      const newAmount = Math.min(vault, amountValue);
+      setPlayAmount(String(newAmount));
+    }
+  };
+
   // Game logic
   const playLimitRun = async (isFreePlayParam = false) => {
     if (rolling) return;
+    // Disable play button immediately to prevent double clicks
+    setRolling(true);
     playSfx(clickSound.current);
     setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
@@ -414,22 +436,26 @@ export default function LimitRunPage() {
         } else {
           alert(result.message || 'No free play tokens available!');
           setIsFreePlay(false);
+          setRolling(false);
           return;
         }
       } catch (error) {
         console.error('Free play error:', error);
         alert('Failed to use free play token. Please try again.');
         setIsFreePlay(false);
+        setRolling(false);
         return;
       }
     } else {
       if (play < MIN_PLAY) {
         alert(`Minimum play is ${MIN_PLAY} MLEO`);
+        setRolling(false);
         return;
       }
       const startResult = await startPaidArcadeSession("limbo", play);
       if (!startResult.success) {
         alert(startResult.message || 'Failed to start session');
+        setRolling(false);
         return;
       }
       nextSessionId = startResult.sessionId;
@@ -693,50 +719,46 @@ export default function LimitRunPage() {
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
             <button
-              onClick={() => {
-                const current = Number(playAmount) || MIN_PLAY;
-                const newPlay = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000);
-                setPlayAmount(String(newPlay));
-                playSfx(clickSound.current);
-              }}
+              onClick={() => handleAmountButtonClick(100)}
               disabled={rolling}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "100"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
             >
               100
             </button>
             <button
-              onClick={() => {
-                const current = Number(playAmount) || MIN_PLAY;
-                const newPlay = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000);
-                setPlayAmount(String(newPlay));
-                playSfx(clickSound.current);
-              }}
+              onClick={() => handleAmountButtonClick(1000)}
               disabled={rolling}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "1000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
             >
               1K
             </button>
             <button
-              onClick={() => {
-                const current = Number(playAmount) || MIN_PLAY;
-                const newPlay = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000);
-                setPlayAmount(String(newPlay));
-                playSfx(clickSound.current);
-              }}
+              onClick={() => handleAmountButtonClick(10000)}
               disabled={rolling}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "10000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
             >
               10K
             </button>
             <button
-              onClick={() => {
-                const current = Number(playAmount) || MIN_PLAY;
-                const newPlay = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000);
-                setPlayAmount(String(newPlay));
-                playSfx(clickSound.current);
-              }}
+              onClick={() => handleAmountButtonClick(100000)}
               disabled={rolling}
-              className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50"
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "100000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
             >
               100K
             </button>
@@ -760,6 +782,8 @@ export default function LimitRunPage() {
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^0-9]/g, '');
                   setPlayAmount(val || '0');
+                  // Clear active button when manually editing
+                  setActiveAmountButton(null);
                 }}
                 onBlur={() => {
                   setIsEditingPlay(false);
@@ -772,6 +796,7 @@ export default function LimitRunPage() {
               <button
                 onClick={() => {
                   setPlayAmount(String(MIN_PLAY));
+                  setActiveAmountButton("100");
                   playSfx(clickSound.current);
                 }}
                 disabled={rolling}
@@ -820,8 +845,8 @@ export default function LimitRunPage() {
           >
             <button
               onClick={() => playLimitRun(false)}
-              disabled={rolling}
-              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
+              disabled={rolling || Number(playAmount) < MIN_PLAY}
+              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {rolling ? "Rolling..." : "ROLL"}
             </button>
@@ -858,11 +883,16 @@ export default function LimitRunPage() {
               <div className="text-2xl font-bold mb-1">
                 {gameResult.win ? 'YOU WIN!' : 'YOU LOSE'}
               </div>
-              <div className="text-lg">
+              <div className="text-lg font-bold">
                 {gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}
               </div>
+              {gameResult.win && gameResult.multiplier && (
+                <div className="text-xs opacity-90 mt-1">
+                  Prize: {fmt(gameResult.prize)} MLEO (×{gameResult.multiplier.toFixed(2)})
+                </div>
+              )}
               <div className="text-sm opacity-80 mt-2">
-                Result: ×{gameResult.result.toFixed(2)}
+                Result: ×{gameResult.result?.toFixed(2) || '0.00'}
               </div>
             </div>
           </div>
