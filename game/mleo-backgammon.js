@@ -412,6 +412,7 @@ export default function BackgammonPage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [playAmount, setPlayAmount] = useState("100");
+  const [activeAmountButton, setActiveAmountButton] = useState("100"); // Track which amount button is active
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [board, setBoard] = useState(() => initBoard());
   const [bar, setBar] = useState({ player: 0, bot: 0 });
@@ -462,8 +463,9 @@ export default function BackgammonPage() {
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
-    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
-    if (savedStats.lastPlay) setPlayAmount(String(savedStats.lastPlay));
+    // Always set initial bet to 100 on game entry
+    setPlayAmount("100");
+    setActiveAmountButton("100");
     const unsubscribeVault = subscribeSharedVault(snapshot => {
       if (!cancelled) setVaultState(snapshot.balance);
     });
@@ -608,8 +610,30 @@ export default function BackgammonPage() {
     }
   };
 
+  // Handle amount button clicks
+  const handleAmountButtonClick = (amountValue) => {
+    if (gameActive || gameResult) return;
+    playSfx(clickSound.current);
+    
+    const currentAmount = Number(playAmount) || MIN_PLAY;
+    const amountStr = String(amountValue);
+    
+    if (activeAmountButton === amountStr) {
+      // Same button clicked - add the amount
+      const newAmount = Math.min(vault, currentAmount + amountValue);
+      setPlayAmount(String(newAmount));
+    } else {
+      // Different button clicked - switch to that amount
+      setActiveAmountButton(amountStr);
+      const newAmount = Math.min(vault, amountValue);
+      setPlayAmount(String(newAmount));
+    }
+  };
+
   const startGame = async (isFreePlayParam = false) => {
-    if (gameActive) return;
+    if (gameActive || gameResult) return; // Prevent double clicks
+    // Disable play button immediately to prevent double clicks
+    setGameActive(true);
     playSfx(clickSound.current);
     setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
@@ -628,6 +652,7 @@ export default function BackgammonPage() {
           setSessionError("Failed to start session");
           alert(result.message || 'No free play tokens available!');
           setIsFreePlay(false);
+          setGameActive(false);
           return;
         }
       } catch (error) {
@@ -635,14 +660,20 @@ export default function BackgammonPage() {
         setSessionError("Failed to start session");
         alert('Failed to use free play token. Please try again.');
         setIsFreePlay(false);
+        setGameActive(false);
         return;
       }
     } else {
-      if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
+      if (play < MIN_PLAY) { 
+        alert(`Minimum play is ${MIN_PLAY} MLEO`); 
+        setGameActive(false);
+        return; 
+      }
       const startResult = await startPaidArcadeSession("backgammon", play);
       if (!startResult.success) {
         setSessionError("Failed to start session");
         alert(startResult.message || 'Failed to start session');
+        setGameActive(false);
         return;
       }
       nextSessionId = startResult.sessionId;
@@ -656,7 +687,6 @@ export default function BackgammonPage() {
     setSelectedSource(null);
     setUsedDice([]);
     setLegalTargets([]);
-    setGameActive(true);
     setGameResult(null);
     startTurn('player');
   };
@@ -842,7 +872,8 @@ export default function BackgammonPage() {
         playSfx(winSound.current);
       }
 
-      const resultData = { win, prize, profit: win ? prize - play : -play };
+      const multiplier = play > 0 ? (prize / play) : 0;
+      const resultData = { win, prize, multiplier: multiplier, profit: win ? prize - play : -play };
       setGameResult(resultData);
       setGameActive(false);
       setCurrentPlayer(null);
@@ -1155,20 +1186,60 @@ export default function BackgammonPage() {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button>
+            <button
+              onClick={() => handleAmountButtonClick(100)}
+              disabled={gameActive || gameResult}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "100"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              100
+            </button>
+            <button
+              onClick={() => handleAmountButtonClick(1000)}
+              disabled={gameActive || gameResult}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "1000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              1K
+            </button>
+            <button
+              onClick={() => handleAmountButtonClick(10000)}
+              disabled={gameActive || gameResult}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "10000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              10K
+            </button>
+            <button
+              onClick={() => handleAmountButtonClick(100000)}
+              disabled={gameActive || gameResult}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "100000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              100K
+            </button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.max(MIN_PLAY, current - 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
             <div className="relative">
-              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={gameActive} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
-              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); playSfx(clickSound.current); }} disabled={gameActive} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
+              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); setActiveAmountButton(null); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={gameActive || gameResult} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
+              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); setActiveAmountButton("100"); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
             </div>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            <button onClick={gameResult ? resetGame : () => startGame(false)} disabled={gameActive} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-amber-500 to-yellow-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">{gameResult ? "PLAY AGAIN" : gameActive ? "GAME IN PROGRESS" : "START GAME"}</button>
+            <button onClick={gameResult ? resetGame : () => startGame(false)} disabled={gameActive || (gameResult && !gameResult)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-amber-500 to-yellow-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed">{gameResult ? "PLAY AGAIN" : gameActive ? "GAME IN PROGRESS" : "START GAME"}</button>
             {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>

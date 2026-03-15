@@ -10,7 +10,7 @@ import {
   buildBuilding,
   installModule,
   researchTech,
-  launchExpedition,
+  launchExpedition as launchExpeditionAction,
   shipToVault,
   spendFromVault,
   hireCrewAction,
@@ -315,6 +315,173 @@ const CONFIG = {
   blueprintBaseCost: 2_500,
   blueprintGrowth: 1.85,
 };
+
+const EVENT_COOLDOWN_MS = 2 * 60 * 1000;
+
+const LIVE_EVENTS = [
+  {
+    key: "reactor_surge",
+    title: "Reactor Surge",
+    text: "A sudden power spike is stressing core systems. Choose between stability or short-term output.",
+    when: (state) => (state.buildings.powerCell || 0) >= 1 || (state.buildings.refinery || 0) >= 1,
+    choices: [
+      {
+        key: "stabilize",
+        label: "Stabilize Core",
+        effect: {
+          resources: { GOLD: -30, SCRAP: -12 },
+          stability: +8,
+        },
+        log: "Core stabilized. Stability improved.",
+      },
+      {
+        key: "overload",
+        label: "Push Output",
+        effect: {
+          stability: -6,
+          tempBuff: { key: "surge_boost", untilMs: 60 * 1000 },
+        },
+        log: "Reactor overloaded. Production boost active, but stability dropped.",
+      },
+    ],
+  },
+  {
+    key: "salvage_signal",
+    title: "Salvage Signal",
+    text: "Your scanners picked up a drifting salvage cluster. Spend energy for a controlled recovery.",
+    when: (state) => (state.buildings.salvage || 0) >= 1 || (state.buildings.expeditionBay || 0) >= 1,
+    choices: [
+      {
+        key: "ignore",
+        label: "Ignore",
+        effect: {},
+        log: "Signal ignored. No recovery team dispatched.",
+      },
+      {
+        key: "send_scout",
+        label: "Send Scout",
+        effect: {
+          resources: { ENERGY: -18, SCRAP: +22, DATA: +5 },
+        },
+        log: "Scout returned with salvage materials and tactical data.",
+      },
+      {
+        key: "full_recovery",
+        label: "Full Recovery",
+        effect: {
+          resources: { ENERGY: -28, GOLD: -20, SCRAP: +36, DATA: +8 },
+          stability: -2,
+        },
+        log: "Full recovery team deployed. Larger haul secured.",
+      },
+    ],
+  },
+  {
+    key: "crew_dispute",
+    title: "Crew Dispute",
+    text: "Tension is rising among workers. Resolve it cleanly or accept a temporary efficiency dip.",
+    when: (state) => (state.crew || 0) >= 2,
+    choices: [
+      {
+        key: "bonus",
+        label: "Pay Bonus",
+        effect: {
+          resources: { GOLD: -40 },
+          stability: +4,
+        },
+        log: "Crew bonus paid. Morale stabilized.",
+      },
+      {
+        key: "delay",
+        label: "Delay Response",
+        effect: {
+          stability: -5,
+        },
+        log: "Issue delayed. Crew morale weakened.",
+      },
+    ],
+  },
+  {
+    key: "logistics_window",
+    title: "Logistics Window",
+    text: "A narrow export route is open. Improve your next shipment quality or wait.",
+    when: (state) => (state.buildings.logisticsCenter || 0) >= 1,
+    choices: [
+      {
+        key: "prepare",
+        label: "Prepare Route",
+        effect: {
+          resources: { DATA: -6 },
+          nextShipBonus: 0.08,
+        },
+        log: "Logistics route prepared. Next shipment will be slightly stronger.",
+      },
+      {
+        key: "skip",
+        label: "Skip Window",
+        effect: {},
+        log: "Window skipped. Standard export flow maintained.",
+      },
+    ],
+  },
+];
+
+function getSystemState(stability) {
+  const value = Number(stability || 100);
+  if (value < 60) return "critical";
+  if (value < 85) return "warning";
+  return "normal";
+}
+
+function systemStateMeta(systemState) {
+  if (systemState === "critical") {
+    return {
+      label: "CRITICAL",
+      accent: "rose",
+      panel: "border-rose-500/30 bg-rose-500/10",
+      text: "Base performance is under pressure. Prioritize maintenance and safe decisions.",
+    };
+  }
+  if (systemState === "warning") {
+    return {
+      label: "WARNING",
+      accent: "amber",
+      panel: "border-amber-500/30 bg-amber-500/10",
+      text: "Base stability is slipping. Stay ahead before systems degrade further.",
+    };
+  }
+  return {
+    label: "STABLE",
+    accent: "emerald",
+    panel: "border-emerald-500/30 bg-emerald-500/10",
+    text: "Systems are healthy. Good time to expand and optimize.",
+  };
+}
+
+function applyResourceDelta(resources, delta = {}, caps = {}) {
+  const next = { ...resources };
+  for (const [key, amount] of Object.entries(delta)) {
+    const current = Number(next[key] || 0);
+    const raw = current + Number(amount || 0);
+    const maxCap = Number.isFinite(caps[key]) ? caps[key] : Infinity;
+    next[key] = clamp(raw, 0, maxCap);
+  }
+  return next;
+}
+
+function canApplyEventChoice(state, choice, derived) {
+  const delta = choice?.effect?.resources || {};
+  return Object.entries(delta).every(([key, value]) => {
+    if (value >= 0) return true;
+    return (state.resources[key] || 0) >= Math.abs(value);
+  });
+}
+
+function pickLiveEvent(state) {
+  const candidates = LIVE_EVENTS.filter((event) => event.when(state));
+  if (!candidates.length) return null;
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
 
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
@@ -939,6 +1106,12 @@ export default function MleoBase() {
   const [toast, setToast] = useState("");
   const [showHowToPlay, setShowHowToPlay] = useState(false);
 
+  const [activeEvent, setActiveEvent] = useState(null);
+  const [eventCooldownUntil, setEventCooldownUntil] = useState(0);
+  const [nextShipBonus, setNextShipBonus] = useState(0);
+
+  const [expeditionMode, setExpeditionMode] = useState("balanced");
+
   useEffect(() => {
     let alive = true;
 
@@ -1095,6 +1268,8 @@ export default function MleoBase() {
   }, [mounted]);
 
   const derived = useMemo(() => derive(state), [state]);
+  const systemState = useMemo(() => getSystemState(state.stability), [state.stability]);
+  const systemMeta = useMemo(() => systemStateMeta(systemState), [systemState]);
   const workerNextCost = useMemo(() => crewCost(state.crew), [state.crew]);
   const blueprintCost = useMemo(
     () => Math.floor(CONFIG.blueprintBaseCost * Math.pow(CONFIG.blueprintGrowth, state.blueprintLevel)),
@@ -1112,6 +1287,87 @@ export default function MleoBase() {
       const next = updater(prev);
       return next ?? prev;
     });
+  };
+
+  useEffect(() => {
+    if (!mounted) return;
+    if (activeEvent) return;
+
+    const now = Date.now();
+    if (now < eventCooldownUntil) return;
+
+    const id = window.setTimeout(() => {
+      setState((prev) => {
+        const currentSystemState = getSystemState(prev.stability);
+        const shouldFire =
+          currentSystemState !== "normal" ||
+          (prev.crew || 0) >= 2 ||
+          (prev.buildings.logisticsCenter || 0) >= 1 ||
+          (prev.buildings.expeditionBay || 0) >= 1 ||
+          (prev.buildings.salvage || 0) >= 1 ||
+          (prev.buildings.powerCell || 0) >= 1 ||
+          (prev.buildings.refinery || 0) >= 1;
+
+        if (!shouldFire) return prev;
+
+        if (Math.random() > 0.42) return prev;
+
+        const picked = pickLiveEvent(prev);
+        if (picked) {
+          setActiveEvent(picked);
+          setEventCooldownUntil(Date.now() + EVENT_COOLDOWN_MS);
+        }
+        return prev;
+      });
+    }, 6000);
+
+    return () => window.clearTimeout(id);
+  }, [mounted, activeEvent, eventCooldownUntil, systemState]);
+
+  const resolveLiveEventChoice = (choice) => {
+    if (!activeEvent || !choice) return;
+
+    if (!canApplyEventChoice(state, choice, derived)) {
+      showToast("Not enough resources for this decision.");
+      return;
+    }
+
+    const effect = choice.effect || {};
+
+    setState((prev) => {
+      const currentDerived = derive(prev);
+      const nextResources = applyResourceDelta(
+        prev.resources,
+        effect.resources || {},
+        { ENERGY: currentDerived.energyCap }
+      );
+
+      let nextStability = clamp(
+        Number(prev.stability || 100) + Number(effect.stability || 0),
+        55,
+        100
+      );
+
+      let nextOverclockUntil = prev.overclockUntil || 0;
+      if (effect.tempBuff?.key === "surge_boost") {
+        nextOverclockUntil = Math.max(nextOverclockUntil, Date.now() + (effect.tempBuff.untilMs || 0));
+      }
+
+      if (effect.nextShipBonus) {
+        setNextShipBonus((prevBonus) => Math.max(prevBonus, effect.nextShipBonus));
+      }
+
+      return {
+        ...prev,
+        resources: nextResources,
+        stability: nextStability,
+        overclockUntil: nextOverclockUntil,
+        log: pushLog(prev.log, choice.log || `${activeEvent.title}: ${choice.label}`),
+      };
+    });
+
+    showToast(choice.label);
+    setActiveEvent(null);
   };
 
   const buyBuilding = async (key) => {
@@ -1260,7 +1516,7 @@ export default function MleoBase() {
     }
   };
 
-  const launchExpedition = async () => {
+  const handleLaunchExpedition = async () => {
     const now = Date.now();
     if ((state.expeditionReadyAt || 0) > now) {
       showToast("Expedition team is still out in the field.");
@@ -1274,15 +1530,19 @@ export default function MleoBase() {
       showToast("Need 4 DATA to launch expedition.");
       return;
     }
+
     try {
-      const res = await launchExpedition();
+      const res = await launchExpeditionAction();
       if (res?.success && res?.state) {
         const serverState = res.state;
         const loot = res.loot || {};
+
         setState((prev) => {
           const next = {
             ...prev,
-            expeditionReadyAt: serverState.expedition_ready_at ? new Date(serverState.expedition_ready_at).getTime() : prev.expeditionReadyAt,
+            expeditionReadyAt: serverState.expedition_ready_at
+              ? new Date(serverState.expedition_ready_at).getTime()
+              : prev.expeditionReadyAt,
             totalExpeditions: (prev.totalExpeditions || 0) + 1,
             resources: serverState.resources || prev.resources,
             bankedMleo: Number(serverState.banked_mleo || prev.bankedMleo),
@@ -1291,12 +1551,15 @@ export default function MleoBase() {
             stats: { ...prev.stats, ...(serverState.stats || {}) },
             log: pushLog(
               prev.log,
-              `Expedition returned with ${loot.ore || 0} ORE, ${loot.gold || 0} GOLD, ${loot.scrap || 0} SCRAP, ${loot.data || 0} DATA${loot.bankedMleo ? ` and ${loot.bankedMleo} MLEO` : ""}.`
+              `Expedition (${expeditionMode}) returned with ${loot.ore || 0} ORE, ${loot.gold || 0} GOLD, ${loot.scrap || 0} SCRAP, ${loot.data || 0} DATA${loot.bankedMleo ? ` and ${loot.bankedMleo} MLEO` : ""}.`
             ),
           };
           return applyLevelUps(next);
         });
-        showToast(`Expedition returned with ${loot.ore || 0} ORE, ${loot.gold || 0} GOLD, ${loot.scrap || 0} SCRAP, ${loot.data || 0} DATA${loot.bankedMleo ? ` and ${loot.bankedMleo} MLEO` : ""}.`);
+
+        showToast(
+          `Expedition (${expeditionMode}) returned with ${loot.ore || 0} ORE, ${loot.gold || 0} GOLD, ${loot.scrap || 0} SCRAP, ${loot.data || 0} DATA${loot.bankedMleo ? ` and ${loot.bankedMleo} MLEO` : ""}.`
+        );
       } else {
         showToast(res?.message || "Expedition failed.");
       }
@@ -1313,6 +1576,17 @@ export default function MleoBase() {
         const serverState = res.state;
         const latestVault = await readVaultSafe();
         setSharedVault(latestVault);
+
+        const shippedBase = Number(res.shipped || 0);
+        const bonusAmount =
+          nextShipBonus > 0 ? Math.floor(shippedBase * nextShipBonus) : 0;
+
+        if (bonusAmount > 0) {
+          await addToVault(bonusAmount, "mleo-base-logistics-bonus");
+          const afterBonusVault = await readVaultSafe();
+          setSharedVault(afterBonusVault);
+        }
+
         setState((prev) => {
           const next = {
             ...prev,
@@ -1322,11 +1596,23 @@ export default function MleoBase() {
             commanderXp: Number(serverState.commander_xp || prev.commanderXp),
             commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
             stats: { ...prev.stats, ...(serverState.stats || {}) },
-            log: pushLog(prev.log, `Shipped ${fmt(res.shipped || 0)} MLEO to shared vault.`),
+            log: pushLog(
+              prev.log,
+              `Shipped ${fmt(shippedBase)} MLEO to shared vault${
+                bonusAmount > 0 ? ` (+${fmt(bonusAmount)} logistics bonus)` : ""
+              }.`
+            ),
           };
           return applyLevelUps(next);
         });
-        showToast(`+${fmt(res.shipped || 0)} MLEO shipped to your shared vault.`);
+
+        setNextShipBonus(0);
+
+        showToast(
+          `+${fmt(shippedBase)} MLEO shipped${
+            bonusAmount > 0 ? ` (+${fmt(bonusAmount)} bonus)` : ""
+          }.`
+        );
       } else {
         showToast(res?.message || "Ship failed.");
       }
@@ -1892,7 +2178,7 @@ export default function MleoBase() {
           </div>
 
           {/* Desktop */}
-          <div className="mt-6 hidden gap-3 sm:grid xl:grid-cols-8">
+          <div className="mt-6 hidden gap-3 sm:grid xl:grid-cols-9">
             <MetricCard label="Shared Vault" value={`${fmt(sharedVault)} MLEO`} note="Same balance used by Miners, Arcade and Online." accent="emerald" />
             <MetricCard label="Base Banked" value={`${fmt(state.bankedMleo)} MLEO`} note="Refined here, then shipped into the shared vault." accent="violet" />
             <MetricCard label="Commander" value={`Lv ${state.commanderLevel}`} note={`${fmt(state.commanderXp)} / ${fmt(xpForLevel(state.commanderLevel))} XP`} accent="sky" />
@@ -1901,6 +2187,12 @@ export default function MleoBase() {
             <MetricCard label="Scrap" value={fmt(state.resources.SCRAP)} note={`x${derived.scrapMult.toFixed(2)} output`} accent="rose" />
             <MetricCard label="Data" value={fmt(state.resources.DATA)} note={`x${derived.dataMult.toFixed(2)} progression`} accent="sky" />
             <MetricCard label="Energy" value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`} note={`Regen ${derived.energyRegen.toFixed(2)}/s`} accent="slate" />
+            <MetricCard
+              label="Stability"
+              value={`${fmt(state.stability)}%`}
+              note={systemMeta.label}
+              accent={systemMeta.accent}
+            />
           </div>
 
           <div className="mt-4 rounded-3xl border border-cyan-500/20 bg-cyan-500/10 p-4">
@@ -1916,6 +2208,63 @@ export default function MleoBase() {
                 Commander Lv {state.commanderLevel}
               </div>
             </div>
+          </div>
+
+          <div className={`mt-4 rounded-3xl border p-4 ${systemMeta.panel}`}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-white/70">
+                  Base System State
+                </div>
+                <div className="mt-1 text-lg font-bold text-white">{systemMeta.label}</div>
+                <div className="mt-1 text-sm text-white/70">{systemMeta.text}</div>
+              </div>
+              <div className="rounded-2xl bg-black/20 px-4 py-3 text-sm text-white/75">
+                Stability {fmt(state.stability)}%
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">
+                  Live Command Event
+                </div>
+                <div className="mt-1 text-lg font-bold text-white">
+                  {activeEvent ? activeEvent.title : "No active event"}
+                </div>
+                <div className="mt-1 text-sm text-white/70">
+                  {activeEvent
+                    ? activeEvent.text
+                    : "Base stable. Awaiting next signal from operations, logistics or field crews."}
+                </div>
+              </div>
+
+              {nextShipBonus > 0 ? (
+                <div className="rounded-2xl bg-emerald-500/15 px-4 py-3 text-sm text-emerald-200">
+                  Next ship bonus: +{Math.round(nextShipBonus * 100)}%
+                </div>
+              ) : null}
+            </div>
+
+            {activeEvent ? (
+              <div className="mt-4 grid gap-2 md:grid-cols-3">
+                {activeEvent.choices.map((choice) => {
+                  const allowed = canApplyEventChoice(state, choice, derived);
+                  return (
+                    <button
+                      key={choice.key}
+                      onClick={() => resolveLiveEventChoice(choice)}
+                      disabled={!allowed}
+                      className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <div>{choice.label}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-6 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
@@ -1945,9 +2294,27 @@ export default function MleoBase() {
                     <p className="mt-1 text-sm text-white/70">
                       Spend {CONFIG.expeditionCost} energy for Ore, Gold, Scrap, DATA and only a small chance of banked MLEO.
                     </p>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {["balanced", "scan", "salvage"].map((mode) => (
+                        <button
+                          key={mode}
+                          onClick={() => setExpeditionMode(mode)}
+                          className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
+                            expeditionMode === mode
+                              ? "bg-cyan-500 text-white"
+                              : "bg-white/10 text-white/75 hover:bg-white/20"
+                          }`}
+                        >
+                          {mode.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-2 text-xs text-white/55">
+                      Current mode: {expeditionMode.toUpperCase()} · For wave 1 this changes mission feel/logging only, not server loot balance.
+                    </div>
                   </div>
                   <button
-                    onClick={launchExpedition}
+                    onClick={handleLaunchExpedition}
                     disabled={expeditionLeft > 0 || state.resources.ENERGY < CONFIG.expeditionCost}
                     className="mt-auto w-full rounded-2xl bg-cyan-600 px-4 py-3.5 text-sm font-extrabold shadow-lg shadow-cyan-900/30 transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
                   >
@@ -1984,8 +2351,21 @@ export default function MleoBase() {
                     <button onClick={refillEnergy} className="rounded-xl bg-white/10 px-3 py-3 text-sm font-bold hover:bg-white/20">
                       Refill {fmt(CONFIG.refillCost)}
                     </button>
-                    <button onClick={performMaintenance} className="rounded-xl bg-white/10 px-3 py-3 text-sm font-bold hover:bg-white/20">
-                      Maintain
+                    <button
+                      onClick={performMaintenance}
+                      className={`rounded-xl px-3 py-3 text-sm font-bold ${
+                        systemState === "critical"
+                          ? "bg-rose-600 hover:bg-rose-500"
+                          : systemState === "warning"
+                          ? "bg-amber-600 hover:bg-amber-500"
+                          : "bg-white/10 hover:bg-white/20"
+                      }`}
+                    >
+                      {systemState === "critical"
+                        ? "Emergency Maintain"
+                        : systemState === "warning"
+                        ? "Priority Maintain"
+                        : "Maintain"}
                     </button>
                   </div>
                 </div>
