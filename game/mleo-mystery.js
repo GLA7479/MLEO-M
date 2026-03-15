@@ -156,6 +156,7 @@ export default function MysteryBoxPage() {
   const [mounted, setMounted] = useState(false);
   const [vault, setVaultState] = useState(0);
   const [playAmount, setPlayAmount] = useState("100");
+  const [activeAmountButton, setActiveAmountButton] = useState("100"); // Track which amount button is active
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [gameActive, setGameActive] = useState(false);
   const [boxes, setBoxes] = useState([]);
@@ -226,10 +227,9 @@ export default function MysteryBoxPage() {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
     
-    const savedStats = safeRead(LS_KEY, { lastPlay: MIN_PLAY });
-    if (savedStats.lastPlay) {
-      setPlayAmount(String(savedStats.lastPlay));
-    }
+    // Always set initial bet to 100 on game entry
+    setPlayAmount("100");
+    setActiveAmountButton("100");
     
     const unsubscribeVault = subscribeSharedVault(snapshot => {
       if (!cancelled) setVaultState(snapshot.balance);
@@ -372,9 +372,31 @@ export default function MysteryBoxPage() {
     }
   };
 
+  // Handle amount button clicks
+  const handleAmountButtonClick = (amountValue) => {
+    if (gameActive || gameResult) return;
+    playSfx(clickSound.current);
+    
+    const currentAmount = Number(playAmount) || MIN_PLAY;
+    const amountStr = String(amountValue);
+    
+    if (activeAmountButton === amountStr) {
+      // Same button clicked - add the amount
+      const newAmount = Math.min(vault, currentAmount + amountValue);
+      setPlayAmount(String(newAmount));
+    } else {
+      // Different button clicked - switch to that amount
+      setActiveAmountButton(amountStr);
+      const newAmount = Math.min(vault, amountValue);
+      setPlayAmount(String(newAmount));
+    }
+  };
+
   // Game logic
   const startGame = async (isFreePlayParam = false) => {
     if (gameActive) return;
+    // Disable play button immediately to prevent double clicks
+    setGameActive(true);
     playSfx(clickSound.current);
     setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
@@ -393,22 +415,26 @@ export default function MysteryBoxPage() {
         } else {
           alert(result.message || 'No free play tokens available!');
           setIsFreePlay(false);
+          setGameActive(false);
           return;
         }
       } catch (error) {
         console.error('Free play error:', error);
         alert('Failed to use free play token. Please try again.');
         setIsFreePlay(false);
+        setGameActive(false);
         return;
       }
     } else {
       if (play < MIN_PLAY) {
         alert(`Minimum play is ${MIN_PLAY} MLEO`);
+        setGameActive(false);
         return;
       }
       const startResult = await startPaidArcadeSession("mystery", play);
       if (!startResult.success) {
         alert(startResult.message || 'Failed to start session');
+        setGameActive(false);
         return;
       }
       nextSessionId = startResult.sessionId;
@@ -625,14 +651,54 @@ export default function MysteryBoxPage() {
           </div>
 
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button><button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 1000) : Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">1K</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 10000) : Math.min(vault, current + 10000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">10K</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100000) : Math.min(vault, current + 100000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100K</button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = current === MIN_PLAY ? Math.min(vault, 100) : Math.min(vault, current + 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="w-12 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs disabled:opacity-50">100</button>
+            <button
+              onClick={() => handleAmountButtonClick(100)}
+              disabled={gameActive || gameResult}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "100"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              100
+            </button>
+            <button
+              onClick={() => handleAmountButtonClick(1000)}
+              disabled={gameActive || gameResult}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "1000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              1K
+            </button>
+            <button
+              onClick={() => handleAmountButtonClick(10000)}
+              disabled={gameActive || gameResult}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "10000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              10K
+            </button>
+            <button
+              onClick={() => handleAmountButtonClick(100000)}
+              disabled={gameActive || gameResult}
+              className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
+                activeAmountButton === "100000"
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              100K
+            </button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.max(MIN_PLAY, current - 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
             <div className="relative">
-              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={gameActive || gameResult} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
-              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
+              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); setActiveAmountButton(null); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={gameActive || gameResult} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
+              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); setActiveAmountButton("100"); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
             </div>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={gameActive || gameResult} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
           </div>
@@ -640,8 +706,8 @@ export default function MysteryBoxPage() {
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
             <button
               onClick={gameResult ? resetGame : () => startGame(false)}
-              disabled={gameActive}
-              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50"
+              disabled={gameActive || Number(playAmount) < MIN_PLAY}
+              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {gameActive ? "Choose a box..." : gameResult ? "PLAY AGAIN" : "START GAME"}
             </button>
@@ -676,14 +742,21 @@ export default function MysteryBoxPage() {
             <div className={`${gameResult.win ? 'bg-green-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
               <div className="text-4xl mb-2">{gameResult.grandPrize ? '💎' : gameResult.win ? '🎉' : '😔'}</div>
               <div className="text-2xl font-bold mb-1">
-                {gameResult.grandPrize ? 'GRAND_PRIZE!' : gameResult.win ? 'YOU WIN!' : 'YOU LOSE'}
+                {gameResult.grandPrize ? 'GRAND PRIZE!' : gameResult.win ? 'YOU WIN!' : 'YOU LOSE'}
               </div>
-              <div className="text-lg">
+              <div className="text-lg font-bold">
                 {gameResult.win ? `+${fmt(gameResult.prize)} MLEO` : `${fmt(gameResult.profit)} MLEO`}
               </div>
-              <div className="text-sm opacity-80 mt-2">
-                Multiplier: ×{gameResult.multiplier}
-              </div>
+              {gameResult.win && gameResult.multiplier && (
+                <div className="text-xs opacity-90 mt-1">
+                  Prize: {fmt(gameResult.prize)} MLEO (×{gameResult.multiplier.toFixed(2)})
+                </div>
+              )}
+              {!gameResult.win && gameResult.multiplier && (
+                <div className="text-sm opacity-80 mt-2">
+                  Multiplier: ×{gameResult.multiplier.toFixed(2)}
+                </div>
+              )}
             </div>
           </div>
         )}
