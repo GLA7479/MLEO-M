@@ -28,18 +28,21 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'hand_not_found' });
     }
 
-    // Validate seat ownership
-    if (seat_token && String(seat_token).trim()) {
-      const seatOwner = await q(
-        `SELECT seat_index
-         FROM poker.poker_seats
-         WHERE table_id=$1 AND seat_index=$2 AND seat_token=$3`,
-        [hand.table_id, seat_index, String(seat_token).trim()]
-      );
-      if (!seatOwner.rowCount) {
-        await q('ROLLBACK');
-        return res.status(403).json({ error: 'invalid_seat_token' });
-      }
+    // Validate seat ownership - seat_token is REQUIRED
+    if (!seat_token || !String(seat_token).trim()) {
+      await q('ROLLBACK');
+      return res.status(403).json({ error: 'missing_seat_token' });
+    }
+
+    const seatOwner = await q(
+      `SELECT seat_index
+       FROM poker.poker_seats
+       WHERE table_id=$1 AND seat_index=$2 AND seat_token=$3`,
+      [hand.table_id, seat_index, String(seat_token).trim()]
+    );
+    if (!seatOwner.rowCount) {
+      await q('ROLLBACK');
+      return res.status(403).json({ error: 'invalid_seat_token' });
     }
 
     // Must be player's turn

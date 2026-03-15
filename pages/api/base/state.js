@@ -5,12 +5,11 @@ import { checkIpRateLimit } from "../../../lib/server/ipRateLimit";
 import { validateCsrfToken } from "../../../lib/server/csrf";
 import { logCsrfFailure, logIpRateLimitExceeded } from "../../../lib/server/securityLogger";
 
+// Reduced ALLOWED_KEYS - only non-critical fields can be updated via POST
+// Critical economic fields (banked_mleo, sent_today, total_banked, total_shared_spent, stats)
+// should only be updated through dedicated action APIs (to be implemented)
 const ALLOWED_KEYS = new Set([
   "version",
-  "banked_mleo",
-  "sent_today",
-  "total_banked",
-  "total_shared_spent",
   "commander_level",
   "commander_xp",
   "blueprint_level",
@@ -23,7 +22,6 @@ const ALLOWED_KEYS = new Set([
   "buildings",
   "modules",
   "research",
-  "stats",
   "mission_state",
   "log",
 ]);

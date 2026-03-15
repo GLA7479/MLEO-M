@@ -22,17 +22,19 @@ export default async function handler(req, res) {
         return res.status(400).json({ error:"bad_request", details: "Missing table_id, player_name, or message" });
       }
       
-      // Validate seat_token matches player_name
-      if (seat_token && String(seat_token).trim()) {
-        const seatCheck = await q(
-          `SELECT seat_index
-           FROM poker.poker_seats
-           WHERE table_id=$1 AND player_name=$2 AND seat_token=$3`,
-          [table_id, player_name, String(seat_token).trim()]
-        );
-        if (!seatCheck.rowCount) {
-          return res.status(403).json({ error: "invalid_seat_token" });
-        }
+      // Validate seat_token - REQUIRED and must match player_name
+      if (!seat_token || !String(seat_token).trim()) {
+        return res.status(403).json({ error: "missing_seat_token" });
+      }
+
+      const seatCheck = await q(
+        `SELECT seat_index
+         FROM poker.poker_seats
+         WHERE table_id=$1 AND player_name=$2 AND seat_token=$3`,
+        [table_id, player_name, String(seat_token).trim()]
+      );
+      if (!seatCheck.rowCount) {
+        return res.status(403).json({ error: "invalid_seat_token" });
       }
       
       await q(

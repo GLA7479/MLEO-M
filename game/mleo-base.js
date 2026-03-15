@@ -3,7 +3,20 @@ import Link from "next/link";
 import { useAccount } from "wagmi";
 import { useAccountModal, useConnectModal } from "@rainbow-me/rainbowkit";
 import Layout from "../components/Layout";
-import { applyBaseVaultDelta, getBaseVaultBalance, getBaseState, saveBaseState } from "../lib/baseVaultClient";
+import {
+  applyBaseVaultDelta,
+  getBaseVaultBalance,
+  getBaseState,
+  saveBaseState,
+  buildBuilding,
+  installModule,
+  researchTech,
+  launchExpedition,
+  shipToVault,
+  spendFromVault,
+  hireCrewAction,
+  performMaintenanceAction,
+} from "../lib/baseVaultClient";
 
 const STATE_KEY = "mleo_base_v1";
 const MAX_LOG_ITEMS = 16;
@@ -1105,190 +1118,226 @@ export default function MleoBase() {
     });
   };
 
-  const buyBuilding = (key) => {
+  const buyBuilding = async (key) => {
     const def = BUILDINGS.find((item) => item.key === key);
     if (!def) return;
-    updateState((prev) => {
-      if (!unlocked(def, prev)) {
-        showToast("Unlock earlier systems first.");
-        return prev;
+    const level = state.buildings[key] || 0;
+    if (!unlocked(def, state)) {
+      showToast("Unlock earlier systems first.");
+      return;
+    }
+    const cost = buildingCost(def, level);
+    if (!canAfford(state.resources, cost)) {
+      showToast("Not enough resources.");
+      return;
+    }
+    try {
+      const res = await buildBuilding(key);
+      if (res?.success && res?.state) {
+        const serverState = res.state;
+        setState((prev) => {
+          const next = {
+            ...prev,
+            resources: serverState.resources || prev.resources,
+            buildings: serverState.buildings || prev.buildings,
+            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
+            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
+            stats: { ...prev.stats, ...(serverState.stats || {}) },
+            log: pushLog(prev.log, `${def.name} upgraded to level ${res.new_level || level + 1}.`),
+          };
+          return applyLevelUps(next);
+        });
+        showToast(`${def.name} upgraded to level ${res.new_level || level + 1}.`);
+      } else {
+        showToast(res?.message || "Build failed.");
       }
-      const level = prev.buildings[key] || 0;
-      const cost = buildingCost(def, level);
-      if (!canAfford(prev.resources, cost)) {
-        showToast("Not enough resources.");
-        return prev;
-      }
-      return applyLevelUps({
-        ...prev,
-        resources: pay(prev.resources, cost),
-        buildings: { ...prev.buildings, [key]: level + 1 },
-        commanderXp: prev.commanderXp + 18,
-        stats: { ...prev.stats, upgradesToday: (prev.stats?.upgradesToday || 0) + 1 },
-        log: pushLog(prev.log, `${def.name} upgraded to level ${level + 1}.`),
-      });
-    });
+    } catch (error) {
+      console.error("Build failed", error);
+      showToast("Build action failed. Try again.");
+    }
   };
 
-  const hireCrew = () => {
-    updateState((prev) => {
-      const cost = crewCost(prev.crew);
-      if (!canAfford(prev.resources, cost)) {
-        showToast("Crew hiring needs more supplies.");
-        return prev;
+  const hireCrew = async () => {
+    const cost = crewCost(state.crew);
+    if (!canAfford(state.resources, cost)) {
+      showToast("Crew hiring needs more supplies.");
+      return;
+    }
+    try {
+      const res = await hireCrewAction();
+      if (res?.success && res?.state) {
+        const serverState = res.state;
+        setState((prev) => {
+          const next = {
+            ...prev,
+            crew: Number(serverState.crew || prev.crew),
+            resources: serverState.resources || prev.resources,
+            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
+            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
+            log: pushLog(prev.log, `Crew hired. Team size is now ${res.new_crew || prev.crew + 1}.`),
+          };
+          return applyLevelUps(next);
+        });
+        showToast(`Crew hired. Team size is now ${res.new_crew || state.crew + 1}.`);
+      } else {
+        showToast(res?.message || "Hire failed.");
       }
-      return applyLevelUps({
-        ...prev,
-        crew: prev.crew + 1,
-        resources: pay(prev.resources, cost),
-        commanderXp: prev.commanderXp + 10,
-        log: pushLog(prev.log, `Crew hired. Team size is now ${prev.crew + 1}.`),
-      });
-    });
+    } catch (error) {
+      console.error("Hire crew failed", error);
+      showToast("Hire action failed. Try again.");
+    }
   };
 
-  const buyModule = (key) => {
+  const buyModule = async (key) => {
     const moduleDef = MODULES.find((item) => item.key === key);
     if (!moduleDef) return;
-    updateState((prev) => {
-      if (prev.modules[key]) {
-        showToast("Module already installed.");
-        return prev;
+    if (state.modules[key]) {
+      showToast("Module already installed.");
+      return;
+    }
+    if (!canAfford(state.resources, moduleDef.cost)) {
+      showToast("Module cost is not covered yet.");
+      return;
+    }
+    try {
+      const res = await installModule(key);
+      if (res?.success && res?.state) {
+        const serverState = res.state;
+        setState((prev) => {
+          const next = {
+            ...prev,
+            resources: serverState.resources || prev.resources,
+            modules: serverState.modules || prev.modules,
+            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
+            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
+            log: pushLog(prev.log, `${moduleDef.name} installed.`),
+          };
+          return applyLevelUps(next);
+        });
+        showToast(`${moduleDef.name} installed.`);
+      } else {
+        showToast(res?.message || "Module install failed.");
       }
-      if (!canAfford(prev.resources, moduleDef.cost)) {
-        showToast("Module cost is not covered yet.");
-        return prev;
-      }
-      return applyLevelUps({
-        ...prev,
-        resources: pay(prev.resources, moduleDef.cost),
-        modules: { ...prev.modules, [key]: true },
-        commanderXp: prev.commanderXp + 15,
-        log: pushLog(prev.log, `${moduleDef.name} installed.`),
-      });
-    });
+    } catch (error) {
+      console.error("Module install failed", error);
+      showToast("Module install failed. Try again.");
+    }
   };
 
-  const buyResearch = (key) => {
+  const buyResearch = async (key) => {
     const def = RESEARCH.find((item) => item.key === key);
     if (!def) return;
-    updateState((prev) => {
-      if (prev.research[key]) {
-        showToast("Research already completed.");
-        return prev;
+    if (state.research[key]) {
+      showToast("Research already completed.");
+      return;
+    }
+    if (def.requires?.some((item) => !state.research[item])) {
+      showToast("Complete the prerequisite research first.");
+      return;
+    }
+    if (!canAfford(state.resources, def.cost)) {
+      showToast("Research lab needs more materials.");
+      return;
+    }
+    try {
+      const res = await researchTech(key);
+      if (res?.success && res?.state) {
+        const serverState = res.state;
+        setState((prev) => {
+          const next = {
+            ...prev,
+            resources: serverState.resources || prev.resources,
+            research: serverState.research || prev.research,
+            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
+            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
+            log: pushLog(prev.log, `${def.name} research completed.`),
+          };
+          return applyLevelUps(next);
+        });
+        showToast(`${def.name} research completed.`);
+      } else {
+        showToast(res?.message || "Research failed.");
       }
-      if (def.requires?.some((item) => !prev.research[item])) {
-        showToast("Complete the prerequisite research first.");
-        return prev;
-      }
-      if (!canAfford(prev.resources, def.cost)) {
-        showToast("Research lab needs more materials.");
-        return prev;
-      }
-      return applyLevelUps({
-        ...prev,
-        resources: pay(prev.resources, def.cost),
-        research: { ...prev.research, [key]: true },
-        commanderXp: prev.commanderXp + 28,
-        log: pushLog(prev.log, `${def.name} research completed.`),
-      });
-    });
+    } catch (error) {
+      console.error("Research failed", error);
+      showToast("Research action failed. Try again.");
+    }
   };
 
-  const launchExpedition = () => {
-    updateState((prev) => {
-      const now = Date.now();
-      if ((prev.expeditionReadyAt || 0) > now) {
-        showToast("Expedition team is still out in the field.");
-        return prev;
+  const launchExpedition = async () => {
+    const now = Date.now();
+    if ((state.expeditionReadyAt || 0) > now) {
+      showToast("Expedition team is still out in the field.");
+      return;
+    }
+    if ((state.resources.ENERGY || 0) < CONFIG.expeditionCost) {
+      showToast("Not enough energy for an expedition.");
+      return;
+    }
+    if ((state.resources.DATA || 0) < 4) {
+      showToast("Need 4 DATA to launch expedition.");
+      return;
+    }
+    try {
+      const res = await launchExpedition();
+      if (res?.success && res?.state) {
+        const serverState = res.state;
+        const loot = res.loot || {};
+        setState((prev) => {
+          const next = {
+            ...prev,
+            expeditionReadyAt: serverState.expedition_ready_at ? new Date(serverState.expedition_ready_at).getTime() : prev.expeditionReadyAt,
+            totalExpeditions: (prev.totalExpeditions || 0) + 1,
+            resources: serverState.resources || prev.resources,
+            bankedMleo: Number(serverState.banked_mleo || prev.bankedMleo),
+            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
+            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
+            stats: { ...prev.stats, ...(serverState.stats || {}) },
+            log: pushLog(
+              prev.log,
+              `Expedition returned with ${loot.ore || 0} ORE, ${loot.gold || 0} GOLD, ${loot.scrap || 0} SCRAP, ${loot.data || 0} DATA${loot.bankedMleo ? ` and ${loot.bankedMleo} MLEO` : ""}.`
+            ),
+          };
+          return applyLevelUps(next);
+        });
+        showToast(`Expedition returned with ${loot.ore || 0} ORE, ${loot.gold || 0} GOLD, ${loot.scrap || 0} SCRAP, ${loot.data || 0} DATA${loot.bankedMleo ? ` and ${loot.bankedMleo} MLEO` : ""}.`);
+      } else {
+        showToast(res?.message || "Expedition failed.");
       }
-      if ((prev.resources.ENERGY || 0) < CONFIG.expeditionCost) {
-        showToast("Not enough energy for an expedition.");
-        return prev;
-      }
-      if ((prev.resources.DATA || 0) < 4) {
-        showToast("Need 4 DATA to launch expedition.");
-        return prev;
-      }
-      const loot = rollExpeditionLoot(prev);
-      const xpGain = prev.research.arcadeOps ? 24 : 20;
-      return applyLevelUps({
-        ...prev,
-        expeditionReadyAt: now + derive(prev).expeditionCooldownMs,
-        totalExpeditions: (prev.totalExpeditions || 0) + 1,
-        commanderXp: prev.commanderXp + xpGain,
-        resources: {
-          ...prev.resources,
-          ENERGY: Math.max(0, (prev.resources.ENERGY || 0) - CONFIG.expeditionCost),
-          DATA: Math.max(0, (prev.resources.DATA || 0) - 4) + loot.data,
-          ORE: (prev.resources.ORE || 0) + loot.ore,
-          GOLD: (prev.resources.GOLD || 0) + loot.gold,
-          SCRAP: (prev.resources.SCRAP || 0) + loot.scrap,
-        },
-        bankedMleo: prev.bankedMleo + loot.bankedMleo,
-        stats: {
-          ...prev.stats,
-          expeditionsToday: (prev.stats?.expeditionsToday || 0) + 1,
-        },
-        log: pushLog(
-          prev.log,
-          `Expedition returned with ${loot.ore} ORE, ${loot.gold} GOLD, ${loot.scrap} SCRAP, ${loot.data} DATA${loot.bankedMleo ? ` and ${loot.bankedMleo} MLEO` : ""}.`
-        ),
-      });
-    });
+    } catch (error) {
+      console.error("Expedition failed", error);
+      showToast("Expedition action failed. Try again.");
+    }
   };
 
   const bankToSharedVault = async () => {
-    let queued, room, factor, shipped, consumed;
-    
     try {
-      const latestBase = await getBaseState();
-      const serverBanked = Math.floor(Number(latestBase?.state?.banked_mleo || 0));
-      queued = Math.min(serverBanked, Math.floor(state.bankedMleo || 0));
+      const res = await shipToVault();
+      if (res?.success && res?.state) {
+        const serverState = res.state;
+        const latestVault = await readVaultSafe();
+        setSharedVault(latestVault);
+        setState((prev) => {
+          const next = {
+            ...prev,
+            bankedMleo: Number(serverState.banked_mleo || prev.bankedMleo),
+            sentToday: Number(serverState.sent_today || prev.sentToday),
+            totalBanked: Number(serverState.total_banked || prev.totalBanked),
+            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
+            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
+            stats: { ...prev.stats, ...(serverState.stats || {}) },
+            log: pushLog(prev.log, `Shipped ${fmt(res.shipped || 0)} MLEO to shared vault.`),
+          };
+          return applyLevelUps(next);
+        });
+        showToast(`+${fmt(res.shipped || 0)} MLEO shipped to your shared vault.`);
+      } else {
+        showToast(res?.message || "Ship failed.");
+      }
     } catch (error) {
-      console.error("Failed to re-read server state", error);
-      queued = Math.floor(state.bankedMleo || 0);
+      console.error("Ship failed", error);
+      showToast("Ship action failed. Try again.");
     }
-    
-    if (queued <= 0) {
-      showToast("Nothing ready to ship yet.");
-      return;
-    }
-    room = Math.max(0, derived.shipCap - state.sentToday);
-    if (room <= 0) {
-      showToast("Today's shipping cap is already full.");
-      return;
-    }
-    factor = softcutFactor(state.sentToday, derived.shipCap);
-    shipped = Math.min(Math.floor(queued * factor * derived.bankBonus), room);
-    if (shipped <= 0) {
-      showToast("Shipment too small after softcut.");
-      return;
-    }
-    consumed = Math.min(queued, Math.max(1, Math.ceil(shipped / Math.max(0.01, factor * derived.bankBonus))));
-    
-    const res = await addToVault(shipped, "mleo-base-ship");
-    if (!res?.ok && !res?.skipped) {
-      showToast("Vault sync failed. Try again.");
-      return;
-    }
-    const latestVault = await readVaultSafe();
-    setSharedVault(latestVault);
-    setState((prev) =>
-      applyLevelUps({
-        ...prev,
-        bankedMleo: Math.max(0, prev.bankedMleo - consumed),
-        sentToday: prev.sentToday + shipped,
-        totalBanked: prev.totalBanked + shipped,
-        commanderXp: prev.commanderXp + Math.max(10, Math.floor(shipped / 50)),
-        stats: {
-          ...prev.stats,
-          shippedToday: (prev.stats?.shippedToday || 0) + shipped,
-        },
-        log: pushLog(prev.log, `Shipped ${fmt(shipped)} MLEO to shared vault.`),
-      })
-    );
-    showToast(`+${fmt(shipped)} MLEO shipped to your shared vault.`);
   };
 
   const handleVaultSpend = async (cost, label, applyUpdate, successMessage) => {
@@ -1323,19 +1372,33 @@ export default function MleoBase() {
       showToast(`Need ${fmt(dataCost)} DATA.`);
       return;
     }
-    await handleVaultSpend(
-      blueprintCost,
-      "Blueprint cache",
-      (prev) => ({
-        ...prev,
-        blueprintLevel: prev.blueprintLevel + 1,
-        resources: {
-          ...prev.resources,
-          DATA: Math.max(0, (prev.resources.DATA || 0) - (20 + prev.blueprintLevel * 6)),
-        },
-      }),
-      "Blueprint cache purchased."
-    );
+    try {
+      const res = await spendFromVault("blueprint");
+      if (res?.success && res?.state) {
+        const serverState = res.state;
+        const latestVault = await readVaultSafe();
+        setSharedVault(latestVault);
+        setState((prev) => {
+          const next = {
+            ...prev,
+            blueprintLevel: Number(serverState.blueprint_level || prev.blueprintLevel),
+            resources: serverState.resources || prev.resources,
+            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
+            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
+            totalSharedSpent: Number(serverState.total_shared_spent || prev.totalSharedSpent),
+            stats: { ...prev.stats, ...(serverState.stats || {}) },
+            log: pushLog(prev.log, "Blueprint cache purchased."),
+          };
+          return applyLevelUps(next);
+        });
+        showToast("Blueprint cache purchased.");
+      } else {
+        showToast(res?.message || "Blueprint purchase failed.");
+      }
+    } catch (error) {
+      console.error("Blueprint purchase failed", error);
+      showToast("Blueprint purchase failed. Try again.");
+    }
   };
 
   const activateOverclock = async () => {
@@ -1343,19 +1406,33 @@ export default function MleoBase() {
       showToast("Need 12 DATA.");
       return;
     }
-    await handleVaultSpend(
-      CONFIG.overclockCost,
-      "Overclock",
-      (prev) => ({
-        ...prev,
-        overclockUntil: Date.now() + CONFIG.overclockDurationMs,
-        resources: {
-          ...prev.resources,
-          DATA: Math.max(0, (prev.resources.DATA || 0) - 12),
-        },
-      }),
-      "Overclock activated."
-    );
+    try {
+      const res = await spendFromVault("overclock");
+      if (res?.success && res?.state) {
+        const serverState = res.state;
+        const latestVault = await readVaultSafe();
+        setSharedVault(latestVault);
+        setState((prev) => {
+          const next = {
+            ...prev,
+            overclockUntil: serverState.overclock_until ? new Date(serverState.overclock_until).getTime() : prev.overclockUntil,
+            resources: serverState.resources || prev.resources,
+            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
+            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
+            totalSharedSpent: Number(serverState.total_shared_spent || prev.totalSharedSpent),
+            stats: { ...prev.stats, ...(serverState.stats || {}) },
+            log: pushLog(prev.log, "Overclock activated."),
+          };
+          return applyLevelUps(next);
+        });
+        showToast("Overclock activated.");
+      } else {
+        showToast(res?.message || "Overclock failed.");
+      }
+    } catch (error) {
+      console.error("Overclock failed", error);
+      showToast("Overclock action failed. Try again.");
+    }
   };
 
   const refillEnergy = async () => {
@@ -1368,22 +1445,35 @@ export default function MleoBase() {
       showToast("Need 5 DATA.");
       return;
     }
-    await handleVaultSpend(
-      CONFIG.refillCost,
-      "Emergency refill",
-      (prev) => ({
-        ...prev,
-        resources: {
-          ...prev.resources,
-          ENERGY: cap,
-          DATA: Math.max(0, (prev.resources.DATA || 0) - 5),
-        },
-      }),
-      "Energy refilled."
-    );
+    try {
+      const res = await spendFromVault("refill", cap);
+      if (res?.success && res?.state) {
+        const serverState = res.state;
+        const latestVault = await readVaultSafe();
+        setSharedVault(latestVault);
+        setState((prev) => {
+          const next = {
+            ...prev,
+            resources: serverState.resources || prev.resources,
+            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
+            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
+            totalSharedSpent: Number(serverState.total_shared_spent || prev.totalSharedSpent),
+            stats: { ...prev.stats, ...(serverState.stats || {}) },
+            log: pushLog(prev.log, "Energy refilled."),
+          };
+          return applyLevelUps(next);
+        });
+        showToast("Energy refilled.");
+      } else {
+        showToast(res?.message || "Refill failed.");
+      }
+    } catch (error) {
+      console.error("Refill failed", error);
+      showToast("Refill action failed. Try again.");
+    }
   };
 
-  const performMaintenance = () => {
+  const performMaintenance = async () => {
     const cost = { GOLD: 60, SCRAP: 35, DATA: 10 };
 
     if (!hasResources(state.resources, cost)) {
@@ -1391,21 +1481,30 @@ export default function MleoBase() {
       return;
     }
 
-    setState((prev) =>
-      applyLevelUps({
-        ...prev,
-        resources: spendResources(prev.resources, cost),
-        stability: Math.min(100, (prev.stability || 100) + 18),
-        commanderXp: prev.commanderXp + 20,
-        stats: {
-          ...prev.stats,
-          maintenanceToday: (prev.stats?.maintenanceToday || 0) + 1,
-        },
-        log: pushLog(prev.log, "Maintenance completed. Base stability improved."),
-      })
-    );
-
-    showToast("Maintenance completed.");
+    try {
+      const res = await performMaintenanceAction();
+      if (res?.success && res?.state) {
+        const serverState = res.state;
+        setState((prev) => {
+          const next = {
+            ...prev,
+            resources: serverState.resources || prev.resources,
+            stability: Number(serverState.stability || prev.stability),
+            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
+            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
+            stats: { ...prev.stats, ...(serverState.stats || {}) },
+            log: pushLog(prev.log, "Maintenance completed. Base stability improved."),
+          };
+          return applyLevelUps(next);
+        });
+        showToast("Maintenance completed.");
+      } else {
+        showToast(res?.message || "Maintenance failed.");
+      }
+    } catch (error) {
+      console.error("Maintenance failed", error);
+      showToast("Maintenance action failed. Try again.");
+    }
   };
 
   const claimMission = (key) => {
