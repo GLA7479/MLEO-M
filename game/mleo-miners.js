@@ -2396,7 +2396,7 @@ async function onOfflineCollect() {
   const addMleo = Math.max(0, Number(s.pendingOfflineMleo || 0));
   const stageCountsCopy = { ...(s.pendingOfflineStageCounts || {}) };
 
-  // 1) זיכוי מיידי בלקוח
+  // 1) זיכוי מיידי בלקוח - coins
   if (addCoins > 0) {
     s.gold += addCoins;
     setUi((u) => ({ ...u, gold: s.gold }));
@@ -2409,20 +2409,28 @@ async function onOfflineCollect() {
 
   save();
 
-  // 2) זיכוי מיידי ל-Vault בלקוח (אופטימי)
+  // 2) זיכוי מיידי ל-balance (miners balance פנימי) - בדיוק כמו במצב רגיל
   if (addMleo > 0) {
-    const currentMining = normalizeMiningState(loadMiningState());
-    const nextSharedVault = Number(currentMining.sharedVaultBalance || currentMining.vault || 0) + addMleo;
-    const nextMinersVault = Number(currentMining.minersVault || 0) + addMleo;
-
-    const optimisticMining = mergeMiningState(currentMining, {
-      vault: nextSharedVault,
-      sharedVaultBalance: nextSharedVault,
-      minersVault: nextMinersVault,
-    });
-
-    saveMiningState(optimisticMining);
-    setMining(optimisticMining);
+    const st = loadMiningState();
+    const today = getTodayKey();
+    if (st.lastDay !== today) {
+      st.minedToday = 0;
+      st.scoreToday = 0;
+      st.lastDay = today;
+    }
+    const currentMined = Number(st.minedToday || 0);
+    const newMined = Math.min(currentMined + addMleo, DAILY_CAP);
+    const actualAdded = newMined - currentMined;
+    if (actualAdded > 0) {
+      st.minedToday = newMined;
+      st.balance = Number(((st.balance || 0) + actualAdded).toFixed(2));
+      saveMiningState(st);
+      // עדכן את ה-state ב-UI
+      setMining(prev => mergeMiningState(prev, {
+        balance: st.balance,
+        minedToday: st.minedToday,
+      }));
+    }
   }
 
   // 3) popup מיידי
@@ -2435,7 +2443,7 @@ async function onOfflineCollect() {
 
   setShowCollect(false);
 
-  // 4) ברקע: סוגרים את ה-offline לשרת ואז מעבירים ל-vault בשרת
+  // 4) ברקע: סוגרים את ה-offline לשרת (השרת יעדכן balance)
   (async () => {
     try {
       const hasOfflineStages = Object.keys(stageCountsCopy).length > 0;
@@ -2444,27 +2452,8 @@ async function onOfflineCollect() {
         await flushOfflineStageCounts(stageCountsCopy);
       }
 
-      // שים לב:
-      // claimMinerBalanceToVault(null) יעביר ל-vault את כל ה-miners balance הקיים כרגע בשרת,
-      // כולל אם נשאר שם משהו קודם.
-      const resp = await claimMinerBalanceToVault(null);
-
-      if (resp?.success) {
-        applyMiningServerSnapshot(
-          {
-            balance: resp?.balance,
-            vault: resp?.sharedVaultBalance,
-            sharedVaultBalance: resp?.sharedVaultBalance,
-            minersVault: resp?.vault,
-            claimedTotal: resp?.claimedTotal,
-          },
-          Number(resp?.moved || 0) > 0
-            ? { ts: Date.now(), amt: Number(resp.moved || 0), type: "offline_to_vault" }
-            : null
-        );
-      } else {
-        await syncMiningFromServer();
-      }
+      // סנכרן מהשרת כדי לתקן balance אם יש סתירות
+      await syncMiningFromServer();
     } catch (err) {
       console.error("[mleo-miners] Offline collect settlement failed", err);
       try {
