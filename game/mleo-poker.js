@@ -9,9 +9,13 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -169,6 +173,7 @@ export default function PokerPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionError, setSessionError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -252,83 +257,85 @@ export default function PokerPage() {
 
   const dealHand = async (isFreePlayParam = false) => {
     playSfx(clickSound.current);
+    setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
-    if (isFreePlay || isFreePlayParam) {
-      const gameId = router.pathname.replace('/', '') || 'poker';
-      try {
-        const result = await useFreePlayToken(gameId);
-        if (result.success) { play = result.amount; setIsFreePlay(false); router.replace('/poker', undefined, { shallow: true }); }
-        else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); return; }
-      } catch (error) {
-        console.error('Free play error:', error);
-        alert('Failed to use free play token. Please try again.');
+    try {
+      let finishResult = null;
+      if (isFreePlay || isFreePlayParam) {
+        const gameId = router.pathname.replace('/', '') || 'poker';
+        const startResult = await startFreeplayArcadeSession(gameId);
+        if (!startResult.success) {
+          setSessionError("Failed to start session");
+          alert(startResult.message || 'No free play tokens available!');
+          setIsFreePlay(false);
+          return;
+        }
+        play = startResult.amount;
+        setFreePlayTokens(startResult.remainingTokens);
         setIsFreePlay(false);
+        router.replace('/poker', undefined, { shallow: true });
+        finishResult = await finishArcadeSession(startResult.sessionId, {});
+      } else {
+        if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
+        const startResult = await startPaidArcadeSession("poker", play);
+        if (!startResult.success) {
+          setSessionError("Failed to start session");
+          alert(startResult.message || 'Failed to start session');
+          return;
+        }
+        setVaultState(startResult.balanceAfter);
+        finishResult = await finishArcadeSession(startResult.sessionId, {});
+      }
+
+      if (!finishResult?.success) {
+        setSessionError("Session failed to finish");
+        alert(finishResult?.message || "Failed to finish session");
         return;
       }
-    } else {
-      if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
-      const currentVault = peekSharedVault().balance;
-      if (currentVault < play) { alert('Insufficient MLEO in vault'); return; }
-      const debitResult = await debitSharedVault(play, "poker");
-      setVaultState(debitResult.balance);
-    }
-    setPlayAmount(String(play));
-    setGameResult(null);
 
-    const deck = shuffleDeck(createDeck());
-    const player = [deck[0], deck[2]];
-    const community = [deck[4], deck[6], deck[8], deck[10], deck[12]];
-    
-    // Clear previous cards
-    setPlayerCards([]);
-    setCommunityCards([]);
-    setPlayerHand(null);
-    
-    // Player cards - one by one
-    setTimeout(() => setPlayerCards([deck[0]]), 200);
-    setTimeout(() => setPlayerCards([deck[0], deck[2]]), 400);
-    
-    // FLOP - 3 cards one by one
-    setTimeout(() => setCommunityCards([deck[4]]), 800);
-    setTimeout(() => setCommunityCards([deck[4], deck[6]]), 1000);
-    setTimeout(() => setCommunityCards([deck[4], deck[6], deck[8]]), 1200);
-    
-    // TURN - 4th card
-    setTimeout(() => {
-      setCommunityCards([deck[4], deck[6], deck[8], deck[10]]);
-    }, 1800);
-    
-    // RIVER - 5th card
-    setTimeout(async () => {
-      setCommunityCards(community);
-      
-      // Wait for the last card animation to complete (card delay 4*200ms + animation 400ms = 1200ms) + extra pause to see the card (700ms)
-      setTimeout(async () => {
-        // Evaluate hand after all cards shown AND animated AND visible
-        const allCards = [...player, ...community];
-        const hand = evaluateHand(allCards);
-        setPlayerHand(hand);
-        
-        const multiplier = PRIZES[hand.hand] || 0;
-        const prize = multiplier > 0 ? Math.floor(play * multiplier) : 0;
-        const win = prize > 0;
-        
-        if (win && prize > 0) {
-          const creditResult = await creditSharedVault(prize, "poker");
-          setVaultState(creditResult.balance);
-          playSfx(winSound.current);
-        }
-        
-        const resultData = { win, hand: hand.hand, multiplier, prize, profit: win ? prize - play : -play, isRoyal: hand.hand === "Royal Flush" };
-        setGameResult(resultData);
-        
-        const newStats = { ...stats, totalHands: stats.totalHands + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalPlay: stats.totalPlay + play, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), royalFlushes: resultData.isRoyal ? stats.royalFlushes + 1 : stats.royalFlushes, lastPlay: play };
-        setStats(newStats);
-      }, 1900);
-    }, 2400);
+      const payload = finishResult.serverPayload || {};
+      const player = Array.isArray(payload.playerCards) ? payload.playerCards : [];
+      const community = Array.isArray(payload.communityCards) ? payload.communityCards : [];
+      const handName = payload.hand || "High Card";
+      const multiplier = Number(payload.multiplier || 0);
+      const prize = Math.max(0, Number(finishResult.approvedReward || 0));
+      const win = Boolean(payload.won);
+
+      setVaultState(Number(finishResult.balanceAfter || 0));
+      setPlayAmount(String(play));
+      setGameResult(null);
+      setPlayerCards([]);
+      setCommunityCards([]);
+      setPlayerHand(null);
+
+      setTimeout(() => setPlayerCards(player.slice(0, 1)), 200);
+      setTimeout(() => setPlayerCards(player.slice(0, 2)), 400);
+      setTimeout(() => setCommunityCards(community.slice(0, 1)), 800);
+      setTimeout(() => setCommunityCards(community.slice(0, 2)), 1000);
+      setTimeout(() => setCommunityCards(community.slice(0, 3)), 1200);
+      setTimeout(() => setCommunityCards(community.slice(0, 4)), 1800);
+      setTimeout(() => {
+        setCommunityCards(community);
+        setTimeout(() => {
+          setPlayerHand({ hand: handName });
+          if (win && prize > 0) {
+            playSfx(winSound.current);
+          }
+          const resultData = { win, hand: handName, multiplier, prize, profit: win ? prize - play : -play, isRoyal: handName === "Royal Flush" };
+          setGameResult(resultData);
+
+          const newStats = { ...stats, totalHands: stats.totalHands + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalPlay: stats.totalPlay + play, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), royalFlushes: resultData.isRoyal ? stats.royalFlushes + 1 : stats.royalFlushes, lastPlay: play };
+          setStats(newStats);
+        }, 1900);
+      }, 2400);
+    } catch (error) {
+      console.error("Poker session error:", error);
+      setSessionError("Session failed to finish");
+      alert("Failed to finish session. Please refresh vault and try again.");
+    }
   };
 
-  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setPlayerCards([]); setCommunityCards([]); setPlayerHand(null); };
+  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setPlayerCards([]); setCommunityCards([]); setPlayerHand(null); setSessionError(""); };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-green-900 via-black to-blue-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -405,6 +412,7 @@ export default function PokerPage() {
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
             <button onClick={gameResult ? resetGame : () => dealHand(false)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-blue-600 text-white shadow-lg hover:brightness-110 transition-all">{gameResult ? "NEW HAND" : "DEAL"}</button>
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>

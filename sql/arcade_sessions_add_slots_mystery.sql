@@ -5,6 +5,425 @@
 
 BEGIN;
 
+CREATE OR REPLACE FUNCTION public.arcade_draw_cards(p_count integer)
+RETURNS text[]
+LANGUAGE sql
+AS $$
+  SELECT coalesce(array_agg(card), ARRAY[]::text[])
+  FROM (
+    SELECT card
+    FROM unnest(ARRAY[
+      'AS','2S','3S','4S','5S','6S','7S','8S','9S','10S','JS','QS','KS',
+      'AH','2H','3H','4H','5H','6H','7H','8H','9H','10H','JH','QH','KH',
+      'AD','2D','3D','4D','5D','6D','7D','8D','9D','10D','JD','QD','KD',
+      'AC','2C','3C','4C','5C','6C','7C','8C','9C','10C','JC','QC','KC'
+    ]::text[]) AS card
+    ORDER BY random()
+    LIMIT greatest(coalesce(p_count, 0), 0)
+  ) drawn;
+$$;
+
+CREATE OR REPLACE FUNCTION public.arcade_shuffle_deck(p_session_id uuid)
+RETURNS text[]
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_deck text[] := ARRAY[
+    'AS','2S','3S','4S','5S','6S','7S','8S','9S','10S','JS','QS','KS',
+    'AH','2H','3H','4H','5H','6H','7H','8H','9H','10H','JH','QH','KH',
+    'AD','2D','3D','4D','5D','6D','7D','8D','9D','10D','JD','QD','KD',
+    'AC','2C','3C','4C','5C','6C','7C','8C','9C','10C','JC','QC','KC'
+  ]::text[];
+  v_seed bigint;
+  v_i integer;
+  v_j integer;
+  v_tmp text;
+  v_hex text := substr(replace(coalesce(p_session_id::text, ''), '-', ''), 1, 8);
+  v_seed_bytes bytea;
+BEGIN
+  v_seed_bytes := decode(lpad(nullif(v_hex, ''), 8, '0'), 'hex');
+  v_seed := (get_byte(v_seed_bytes, 0)::bigint << 24)
+    + (get_byte(v_seed_bytes, 1)::bigint << 16)
+    + (get_byte(v_seed_bytes, 2)::bigint << 8)
+    + get_byte(v_seed_bytes, 3)::bigint;
+  IF v_seed = 0 THEN
+    v_seed := 1;
+  END IF;
+
+  FOR v_i IN REVERSE 2..array_length(v_deck, 1) LOOP
+    v_seed := mod((v_seed * 1664525) + 1013904223, 4294967296);
+    v_j := mod(v_seed, v_i)::integer + 1;
+    v_tmp := v_deck[v_i];
+    v_deck[v_i] := v_deck[v_j];
+    v_deck[v_j] := v_tmp;
+  END LOOP;
+
+  RETURN v_deck;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.arcade_card_rank(p_card text)
+RETURNS integer
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_value text := left(coalesce(p_card, ''), greatest(length(coalesce(p_card, '')) - 1, 0));
+BEGIN
+  RETURN CASE v_value
+    WHEN 'A' THEN 14
+    WHEN 'K' THEN 13
+    WHEN 'Q' THEN 12
+    WHEN 'J' THEN 11
+    ELSE coalesce(nullif(v_value, '')::integer, 0)
+  END;
+EXCEPTION
+  WHEN others THEN
+    RETURN 0;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.arcade_card_suit(p_card text)
+RETURNS text
+LANGUAGE sql
+AS $$
+  SELECT right(coalesce(p_card, ''), 1);
+$$;
+
+CREATE OR REPLACE FUNCTION public.arcade_card_json(p_card text)
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_value text := left(coalesce(p_card, ''), greatest(length(coalesce(p_card, '')) - 1, 0));
+  v_suit text := public.arcade_card_suit(p_card);
+  v_pretty_suit text := CASE v_suit
+    WHEN 'S' THEN '♠️'
+    WHEN 'H' THEN '♥️'
+    WHEN 'D' THEN '♦️'
+    WHEN 'C' THEN '♣️'
+    ELSE ''
+  END;
+BEGIN
+  RETURN jsonb_build_object(
+    'value', v_value,
+    'suit', v_pretty_suit,
+    'display', v_value || v_pretty_suit
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.arcade_cards_json(p_cards text[])
+RETURNS jsonb
+LANGUAGE sql
+AS $$
+  SELECT coalesce(
+    jsonb_agg(public.arcade_card_json(card) ORDER BY ord),
+    '[]'::jsonb
+  )
+  FROM unnest(coalesce(p_cards, ARRAY[]::text[])) WITH ORDINALITY AS t(card, ord);
+$$;
+
+CREATE OR REPLACE FUNCTION public.arcade_compare_rank_arrays(p_left integer[], p_right integer[])
+RETURNS integer
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  i integer;
+  v_len integer := greatest(coalesce(array_length(p_left, 1), 0), coalesce(array_length(p_right, 1), 0));
+  v_left integer;
+  v_right integer;
+BEGIN
+  FOR i IN 1..v_len LOOP
+    v_left := coalesce(p_left[i], 0);
+    v_right := coalesce(p_right[i], 0);
+    IF v_left > v_right THEN
+      RETURN 1;
+    ELSIF v_left < v_right THEN
+      RETURN -1;
+    END IF;
+  END LOOP;
+  RETURN 0;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.arcade_eval_three_card(p_cards text[])
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_values integer[];
+  v_suits text[];
+  v_counts integer[];
+  v_is_flush boolean := false;
+  v_is_straight boolean := false;
+  v_hand text := 'High Card';
+  v_rank integer := 1;
+  v_high_cards integer[] := ARRAY[]::integer[];
+  v_pair_value integer := 0;
+  v_trip_value integer := 0;
+  v_kickers integer[] := ARRAY[]::integer[];
+BEGIN
+  SELECT array_agg(public.arcade_card_rank(card) ORDER BY public.arcade_card_rank(card) DESC)
+  INTO v_values
+  FROM unnest(coalesce(p_cards, ARRAY[]::text[])) AS card;
+
+  SELECT array_agg(public.arcade_card_suit(card))
+  INTO v_suits
+  FROM unnest(coalesce(p_cards, ARRAY[]::text[])) AS card;
+
+  SELECT array_agg(cnt ORDER BY cnt DESC)
+  INTO v_counts
+  FROM (
+    SELECT count(*) AS cnt
+    FROM unnest(coalesce(p_cards, ARRAY[]::text[])) AS card
+    GROUP BY public.arcade_card_rank(card)
+  ) counted;
+
+  v_is_flush := coalesce(array_length(v_suits, 1), 0) = 3 AND v_suits[1] = v_suits[2] AND v_suits[2] = v_suits[3];
+  v_is_straight := coalesce(array_length(v_values, 1), 0) = 3
+    AND v_values[1] = v_values[2] + 1
+    AND v_values[2] = v_values[3] + 1;
+
+  IF v_is_flush AND v_is_straight THEN
+    v_hand := 'Straight Flush';
+    v_rank := 6;
+    v_high_cards := v_values;
+  ELSIF coalesce(v_counts[1], 0) = 3 THEN
+    SELECT max(public.arcade_card_rank(card))
+    INTO v_trip_value
+    FROM unnest(coalesce(p_cards, ARRAY[]::text[])) AS card
+    GROUP BY public.arcade_card_rank(card)
+    HAVING count(*) = 3;
+    v_hand := 'Three of a Kind';
+    v_rank := 5;
+    v_high_cards := ARRAY[v_trip_value];
+  ELSIF v_is_straight THEN
+    v_hand := 'Straight';
+    v_rank := 4;
+    v_high_cards := v_values;
+  ELSIF v_is_flush THEN
+    v_hand := 'Flush';
+    v_rank := 3;
+    v_high_cards := v_values;
+  ELSIF coalesce(v_counts[1], 0) = 2 THEN
+    SELECT max(public.arcade_card_rank(card))
+    INTO v_pair_value
+    FROM unnest(coalesce(p_cards, ARRAY[]::text[])) AS card
+    GROUP BY public.arcade_card_rank(card)
+    HAVING count(*) = 2;
+    SELECT coalesce(array_agg(public.arcade_card_rank(card) ORDER BY public.arcade_card_rank(card) DESC), ARRAY[]::integer[])
+    INTO v_kickers
+    FROM unnest(coalesce(p_cards, ARRAY[]::text[])) AS card
+    WHERE public.arcade_card_rank(card) <> v_pair_value;
+    v_hand := 'Pair';
+    v_rank := 2;
+    v_high_cards := ARRAY[v_pair_value] || v_kickers;
+  ELSE
+    v_high_cards := v_values;
+  END IF;
+
+  RETURN jsonb_build_object('hand', v_hand, 'rank', v_rank, 'highCards', to_jsonb(v_high_cards));
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.arcade_eval_poker5(p_cards text[])
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_values integer[];
+  v_suits text[];
+  v_counts integer[];
+  v_is_flush boolean := false;
+  v_is_straight boolean := false;
+  v_hand text := 'High Card';
+  v_rank integer := 1;
+BEGIN
+  SELECT array_agg(public.arcade_card_rank(card) ORDER BY public.arcade_card_rank(card) DESC)
+  INTO v_values
+  FROM unnest(coalesce(p_cards, ARRAY[]::text[])) AS card;
+
+  SELECT array_agg(public.arcade_card_suit(card))
+  INTO v_suits
+  FROM unnest(coalesce(p_cards, ARRAY[]::text[])) AS card;
+
+  SELECT array_agg(cnt ORDER BY cnt DESC)
+  INTO v_counts
+  FROM (
+    SELECT count(*) AS cnt
+    FROM unnest(coalesce(p_cards, ARRAY[]::text[])) AS card
+    GROUP BY public.arcade_card_rank(card)
+  ) counted;
+
+  v_is_flush := coalesce(array_length(v_suits, 1), 0) = 5
+    AND v_suits[1] = v_suits[2]
+    AND v_suits[2] = v_suits[3]
+    AND v_suits[3] = v_suits[4]
+    AND v_suits[4] = v_suits[5];
+  v_is_straight := coalesce(array_length(v_values, 1), 0) = 5
+    AND v_values[1] = v_values[2] + 1
+    AND v_values[2] = v_values[3] + 1
+    AND v_values[3] = v_values[4] + 1
+    AND v_values[4] = v_values[5] + 1;
+
+  IF v_is_flush AND v_is_straight AND v_values[1] = 14 AND v_values[5] = 10 THEN
+    v_hand := 'Royal Flush';
+    v_rank := 10;
+  ELSIF v_is_flush AND v_is_straight THEN
+    v_hand := 'Straight Flush';
+    v_rank := 9;
+  ELSIF coalesce(v_counts[1], 0) = 4 THEN
+    v_hand := 'Four of a Kind';
+    v_rank := 8;
+  ELSIF coalesce(v_counts[1], 0) = 3 AND coalesce(v_counts[2], 0) = 2 THEN
+    v_hand := 'Full Platform';
+    v_rank := 7;
+  ELSIF v_is_flush THEN
+    v_hand := 'Flush';
+    v_rank := 6;
+  ELSIF v_is_straight THEN
+    v_hand := 'Straight';
+    v_rank := 5;
+  ELSIF coalesce(v_counts[1], 0) = 3 THEN
+    v_hand := 'Three of a Kind';
+    v_rank := 4;
+  ELSIF coalesce(v_counts[1], 0) = 2 AND coalesce(v_counts[2], 0) = 2 THEN
+    v_hand := 'Two Pair';
+    v_rank := 3;
+  ELSIF coalesce(v_counts[1], 0) = 2 THEN
+    v_hand := 'One Pair';
+    v_rank := 2;
+  END IF;
+
+  RETURN jsonb_build_object('hand', v_hand, 'rank', v_rank);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.arcade_eval_best_poker7(p_cards text[])
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_best jsonb := jsonb_build_object('hand', 'High Card', 'rank', 1);
+  v_current jsonb;
+  i integer;
+  j integer;
+  k integer;
+  l integer;
+  m integer;
+  v_len integer := coalesce(array_length(p_cards, 1), 0);
+BEGIN
+  IF v_len < 5 THEN
+    RETURN v_best;
+  END IF;
+
+  FOR i IN 1..v_len - 4 LOOP
+    FOR j IN i + 1..v_len - 3 LOOP
+      FOR k IN j + 1..v_len - 2 LOOP
+        FOR l IN k + 1..v_len - 1 LOOP
+          FOR m IN l + 1..v_len LOOP
+            v_current := public.arcade_eval_poker5(ARRAY[p_cards[i], p_cards[j], p_cards[k], p_cards[l], p_cards[m]]);
+            IF coalesce((v_current->>'rank')::integer, 0) > coalesce((v_best->>'rank')::integer, 0) THEN
+              v_best := v_current;
+            END IF;
+          END LOOP;
+        END LOOP;
+      END LOOP;
+    END LOOP;
+  END LOOP;
+
+  RETURN v_best;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.start_freeplay_session(text, text);
+
+CREATE OR REPLACE FUNCTION public.start_freeplay_session(
+  p_device_id text,
+  p_game_id text
+)
+RETURNS TABLE(
+  session_id uuid,
+  tokens_remaining bigint,
+  stake bigint,
+  game_id text,
+  mode text,
+  status text
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_refresh record;
+  v_consume record;
+  v_session_id uuid;
+  v_base_stake bigint;
+  v_stake_multiplier bigint := CASE
+    WHEN coalesce(p_game_id, '') = 'ultimate-poker' THEN 5
+    ELSE 1
+  END;
+  v_stake bigint;
+BEGIN
+  IF coalesce(trim(p_device_id), '') = '' THEN
+    RAISE EXCEPTION 'device_id is required';
+  END IF;
+
+  IF coalesce(trim(p_game_id), '') = '' THEN
+    RAISE EXCEPTION 'game_id is required';
+  END IF;
+
+  SELECT *
+  INTO v_refresh
+  FROM public.freeplay_device_refresh(p_device_id);
+
+  SELECT *
+  INTO v_consume
+  FROM public.freeplay_device_consume(p_device_id, p_game_id);
+
+  v_base_stake := GREATEST(0, coalesce((v_consume.free_play_amount)::bigint, 0));
+  v_stake := v_base_stake * v_stake_multiplier;
+
+  INSERT INTO public.arcade_device_sessions (
+    device_id,
+    game_id,
+    mode,
+    status,
+    stake,
+    approved_reward,
+    consumed_token,
+    client_payload,
+    server_payload
+  )
+  VALUES (
+    p_device_id,
+    p_game_id,
+    'freeplay',
+    'started',
+    v_stake,
+    0,
+    true,
+    '{}'::jsonb,
+    jsonb_build_object(
+      'tokens_before', coalesce((v_refresh.tokens)::bigint, null),
+      'tokens_after', coalesce((v_consume.tokens_remaining)::bigint, null),
+      'free_play_amount', v_base_stake,
+      'reserved_stake', v_stake
+    )
+  )
+  RETURNING id INTO v_session_id;
+
+  RETURN QUERY
+  SELECT
+    v_session_id,
+    GREATEST(0, coalesce((v_consume.tokens_remaining)::bigint, 0)),
+    v_stake,
+    p_game_id,
+    'freeplay'::text,
+    'started'::text;
+END;
+$$;
+
 DROP FUNCTION IF EXISTS public.finish_arcade_session(uuid, jsonb);
 
 CREATE OR REPLACE FUNCTION public.finish_arcade_session(
@@ -113,6 +532,20 @@ DECLARE
   v_craps_dice integer[];
   v_craps_sum integer;
   v_craps_multiplier numeric;
+  v_card_draw text[];
+  v_shuffled_deck text[];
+  v_eval jsonb := '{}'::jsonb;
+  v_player_eval jsonb := '{}'::jsonb;
+  v_opponent_eval jsonb := '{}'::jsonb;
+  v_poker_multiplier numeric := 0;
+  v_three_multiplier numeric := 0;
+  v_compare_result text := '';
+  v_compare integer := 0;
+  v_ultimate_decision text := '';
+  v_ultimate_play_bet bigint := 0;
+  v_ultimate_total_bet bigint := 0;
+  v_ultimate_fold boolean := false;
+  v_ultimate_dealer_qualifies boolean := false;
   v_won boolean;
   v_reward bigint := 0;
   v_balance_after bigint := 0;
@@ -839,6 +1272,211 @@ BEGIN
       'sum', v_craps_sum,
       'won', v_won,
       'multiplier', v_craps_multiplier,
+      'approved_reward', v_reward
+    );
+
+  ELSIF coalesce(v_session.game_id, '') = 'ultimate-poker' THEN
+    v_ultimate_decision := lower(trim(coalesce(p_payload->>'decision', '')));
+    IF v_ultimate_decision NOT IN (
+      'raise4x',
+      'raise2x',
+      'raise1x-turn',
+      'raise1x-river',
+      'fold-preflop',
+      'fold-flop',
+      'fold-turn',
+      'fold-river'
+    ) THEN
+      RAISE EXCEPTION 'ultimate-poker payload must include a valid decision';
+    END IF;
+
+    v_shuffled_deck := public.arcade_shuffle_deck(v_session.id);
+    v_ultimate_fold := v_ultimate_decision LIKE 'fold-%';
+    v_ultimate_play_bet := CASE v_ultimate_decision
+      WHEN 'raise4x' THEN floor(v_session.stake / 5) * 4
+      WHEN 'raise2x' THEN floor(v_session.stake / 5) * 2
+      WHEN 'raise1x-turn' THEN floor(v_session.stake / 5)
+      WHEN 'raise1x-river' THEN floor(v_session.stake / 5)
+      ELSE 0
+    END;
+    v_ultimate_total_bet := floor(v_session.stake / 5) + v_ultimate_play_bet;
+
+    v_player_eval := public.arcade_eval_best_poker7(ARRAY[
+      v_shuffled_deck[1],
+      v_shuffled_deck[3],
+      v_shuffled_deck[5],
+      v_shuffled_deck[6],
+      v_shuffled_deck[7],
+      v_shuffled_deck[8],
+      v_shuffled_deck[9]
+    ]);
+    v_opponent_eval := public.arcade_eval_best_poker7(ARRAY[
+      v_shuffled_deck[2],
+      v_shuffled_deck[4],
+      v_shuffled_deck[5],
+      v_shuffled_deck[6],
+      v_shuffled_deck[7],
+      v_shuffled_deck[8],
+      v_shuffled_deck[9]
+    ]);
+    v_ultimate_dealer_qualifies := coalesce((v_opponent_eval->>'rank')::integer, 0) >= 2;
+    v_compare := CASE
+      WHEN coalesce((v_player_eval->>'rank')::integer, 0) > coalesce((v_opponent_eval->>'rank')::integer, 0) THEN 1
+      WHEN coalesce((v_player_eval->>'rank')::integer, 0) < coalesce((v_opponent_eval->>'rank')::integer, 0) THEN -1
+      ELSE public.arcade_compare_rank_arrays(
+        ARRAY(SELECT jsonb_array_elements_text(coalesce(v_player_eval->'highCards', '[]'::jsonb))::integer),
+        ARRAY(SELECT jsonb_array_elements_text(coalesce(v_opponent_eval->'highCards', '[]'::jsonb))::integer)
+      )
+    END;
+
+    IF v_ultimate_fold THEN
+      v_won := false;
+      v_compare_result := 'fold';
+      v_reward := greatest(v_session.stake - v_ultimate_total_bet, 0);
+    ELSE
+      IF NOT v_ultimate_dealer_qualifies OR v_compare > 0 THEN
+        v_won := true;
+        v_compare_result := 'player';
+        v_reward := greatest(v_session.stake - v_ultimate_total_bet, 0) + (v_ultimate_total_bet * 2);
+      ELSIF v_compare = 0 THEN
+        v_won := false;
+        v_compare_result := 'tie';
+        v_reward := greatest(v_session.stake - v_ultimate_total_bet, 0) + v_ultimate_total_bet;
+      ELSE
+        v_won := false;
+        v_compare_result := 'dealer';
+        v_reward := greatest(v_session.stake - v_ultimate_total_bet, 0);
+      END IF;
+    END IF;
+
+    v_server_payload := jsonb_build_object(
+      'game', 'ultimate-poker',
+      'mode', v_session.mode,
+      'stake', floor(v_session.stake / 5),
+      'reservedStake', v_session.stake,
+      'decision', v_ultimate_decision,
+      'fold', v_ultimate_fold,
+      'won', v_won,
+      'tie', v_compare_result = 'tie',
+      'playBet', v_ultimate_play_bet,
+      'totalBetAmount', v_ultimate_total_bet,
+      'playerCards', public.arcade_cards_json(ARRAY[v_shuffled_deck[1], v_shuffled_deck[3]]),
+      'dealerCards', public.arcade_cards_json(ARRAY[v_shuffled_deck[2], v_shuffled_deck[4]]),
+      'communityCards', public.arcade_cards_json(v_shuffled_deck[5:9]),
+      'playerHand', coalesce(v_player_eval->>'hand', 'High Card'),
+      'dealerHand', coalesce(v_opponent_eval->>'hand', 'High Card'),
+      'dealerQualifies', v_ultimate_dealer_qualifies,
+      'profit', CASE
+        WHEN v_compare_result = 'player' THEN v_ultimate_total_bet
+        WHEN v_compare_result = 'tie' THEN 0
+        ELSE -v_ultimate_total_bet
+      END,
+      'message', CASE
+        WHEN v_ultimate_fold THEN 'FOLDED'
+        WHEN v_compare_result = 'tie' THEN 'TIE - PUSH'
+        WHEN v_compare_result = 'player' THEN 'YOU WIN!'
+        ELSE 'OPPONENT WINS'
+      END,
+      'approved_reward', v_reward
+    );
+
+  ELSIF coalesce(v_session.game_id, '') = 'poker' THEN
+    v_card_draw := public.arcade_draw_cards(7);
+    v_eval := public.arcade_eval_best_poker7(v_card_draw);
+    v_poker_multiplier := CASE v_eval->>'hand'
+      WHEN 'Royal Flush' THEN 800
+      WHEN 'Straight Flush' THEN 160
+      WHEN 'Four of a Kind' THEN 40
+      WHEN 'Full Platform' THEN 16
+      WHEN 'Flush' THEN 8
+      WHEN 'Straight' THEN 6.4
+      WHEN 'Three of a Kind' THEN 4
+      WHEN 'Two Pair' THEN 2.4
+      WHEN 'One Pair' THEN 1.6
+      ELSE 0
+    END;
+    v_reward := CASE WHEN v_poker_multiplier > 0 THEN floor(v_session.stake * v_poker_multiplier)::bigint ELSE 0 END;
+    v_won := v_reward > 0;
+    v_server_payload := jsonb_build_object(
+      'game', 'poker',
+      'mode', v_session.mode,
+      'stake', v_session.stake,
+      'playerCards', public.arcade_cards_json(v_card_draw[1:2]),
+      'communityCards', public.arcade_cards_json(v_card_draw[3:7]),
+      'hand', coalesce(v_eval->>'hand', 'High Card'),
+      'won', v_won,
+      'multiplier', v_poker_multiplier,
+      'approved_reward', v_reward
+    );
+
+  ELSIF coalesce(v_session.game_id, '') = 'three-card-poker' THEN
+    v_card_draw := public.arcade_draw_cards(6);
+    v_player_eval := public.arcade_eval_three_card(v_card_draw[1:3]);
+    v_opponent_eval := public.arcade_eval_three_card(v_card_draw[4:6]);
+    v_compare_result := CASE
+      WHEN coalesce((v_player_eval->>'rank')::integer, 0) > coalesce((v_opponent_eval->>'rank')::integer, 0) THEN 'player'
+      WHEN coalesce((v_player_eval->>'rank')::integer, 0) < coalesce((v_opponent_eval->>'rank')::integer, 0) THEN 'opponent'
+      WHEN public.arcade_compare_rank_arrays(
+        ARRAY(SELECT jsonb_array_elements_text(coalesce(v_player_eval->'highCards', '[]'::jsonb))::integer),
+        ARRAY(SELECT jsonb_array_elements_text(coalesce(v_opponent_eval->'highCards', '[]'::jsonb))::integer)
+      ) > 0 THEN 'player'
+      WHEN public.arcade_compare_rank_arrays(
+        ARRAY(SELECT jsonb_array_elements_text(coalesce(v_player_eval->'highCards', '[]'::jsonb))::integer),
+        ARRAY(SELECT jsonb_array_elements_text(coalesce(v_opponent_eval->'highCards', '[]'::jsonb))::integer)
+      ) < 0 THEN 'opponent'
+      ELSE 'tie'
+    END;
+    v_won := v_compare_result = 'player';
+    v_three_multiplier := CASE v_player_eval->>'hand'
+      WHEN 'Straight Flush' THEN 64
+      WHEN 'Three of a Kind' THEN 19
+      WHEN 'Straight' THEN 3.8
+      WHEN 'Flush' THEN 1.9
+      WHEN 'Pair' THEN 0.64
+      ELSE 0
+    END;
+    v_reward := CASE
+      WHEN v_compare_result = 'tie' THEN v_session.stake
+      WHEN v_won THEN floor(v_session.stake + (v_session.stake * v_three_multiplier))::bigint
+      ELSE 0
+    END;
+    v_server_payload := jsonb_build_object(
+      'game', 'three-card-poker',
+      'mode', v_session.mode,
+      'stake', v_session.stake,
+      'playerCards', public.arcade_cards_json(v_card_draw[1:3]),
+      'opponentCards', public.arcade_cards_json(v_card_draw[4:6]),
+      'playerHand', coalesce(v_player_eval->>'hand', 'High Card'),
+      'opponentHand', coalesce(v_opponent_eval->>'hand', 'High Card'),
+      'won', v_won,
+      'tie', v_compare_result = 'tie',
+      'multiplier', CASE WHEN v_won THEN v_three_multiplier ELSE 0 END,
+      'approved_reward', v_reward
+    );
+
+  ELSIF coalesce(v_session.game_id, '') = 'checkers' THEN
+    v_won := coalesce((p_payload->>'playerWon')::boolean, false);
+    v_reward := CASE WHEN v_won THEN floor(v_session.stake * 1.92)::bigint ELSE 0 END;
+    v_server_payload := jsonb_build_object(
+      'game', 'checkers',
+      'mode', v_session.mode,
+      'stake', v_session.stake,
+      'playerWon', v_won,
+      'won', v_won,
+      'multiplier', 1.92,
+      'approved_reward', v_reward
+    );
+
+  ELSIF coalesce(v_session.game_id, '') = 'backgammon' THEN
+    v_won := coalesce((p_payload->>'playerWon')::boolean, false);
+    v_reward := CASE WHEN v_won THEN floor(v_session.stake * 1.92)::bigint ELSE 0 END;
+    v_server_payload := jsonb_build_object(
+      'game', 'backgammon',
+      'mode', v_session.mode,
+      'stake', v_session.stake,
+      'playerWon', v_won,
+      'won', v_won,
+      'multiplier', 1.92,
       'approved_reward', v_reward
     );
 

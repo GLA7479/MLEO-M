@@ -7,12 +7,15 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
-import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
-import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { useAccount, useDisconnect } from "wagmi";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
-  debitSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import { createDeterministicCardDeck } from "../lib/arcadeDeterministicCards";
+import {
   initSharedVault,
   peekSharedVault,
   readSharedVault,
@@ -61,6 +64,7 @@ const BLIND_BONUS = {
 
 const S_CLICK = "/sounds/click.mp3";
 const S_WIN = "/sounds/gift.mp3";
+const RESERVED_STAKE_MULTIPLIER = 5;
 
 function safeRead(key, fallback = {}) { if (typeof window === "undefined") return fallback; try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
 function safeWrite(key, val) { if (typeof window === "undefined") return; try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
@@ -239,6 +243,8 @@ export default function UltimatePokerPage() {
   const [playerHand, setPlayerHand] = useState(null);
   const [dealerHand, setDealerHand] = useState(null);
   const [gameResult, setGameResult] = useState(null);
+  const [sessionId, setSessionId] = useState(null);
+  const [sessionDeck, setSessionDeck] = useState([]);
   
   // Playing
   const [anteBet, setAnteBet] = useState(0);
@@ -258,6 +264,7 @@ export default function UltimatePokerPage() {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showVaultModal, setShowVaultModal] = useState(false);
+  const [sessionError, setSessionError] = useState("");
   const [sfxMuted, setSfxMuted] = useState(false);
   const clickSound = useRef(null);
   const winSound = useRef(null);
@@ -320,48 +327,220 @@ export default function UltimatePokerPage() {
   const hardDisconnect = () => { disconnect?.(); setMenuOpen(false); };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
+  const clearActions = () => {
+    setCanRaise4x(false);
+    setCanRaise2x(false);
+    setCanRaise1x(false);
+  };
+
+  const revealFlop = (community) => {
+    setGameState("dealing_flop");
+    setTimeout(() => setCommunityCards(community.slice(0, 1)), 400);
+    setTimeout(() => setCommunityCards(community.slice(0, 2)), 600);
+    setTimeout(() => {
+      setCommunityCards(community.slice(0, 3));
+      setCanRaise2x(true);
+      setGameState("flop");
+    }, 800);
+  };
+
+  const revealTurn = (community, nextState = "turn") => {
+    setGameState("dealing_turn");
+    setTimeout(() => {
+      setCommunityCards(community.slice(0, 4));
+      if (nextState === "turn") {
+        setCanRaise1x(true);
+        setGameState("turn");
+      }
+    }, 400);
+  };
+
+  const revealRiver = (community, nextState = "river", onComplete = null) => {
+    setGameState("dealing_river");
+    setTimeout(() => {
+      setCommunityCards(community.slice(0, 5));
+      if (typeof onComplete === "function") {
+        onComplete();
+        return;
+      }
+      if (nextState === "river") {
+        setCanRaise1x(true);
+        setGameState("river");
+      }
+    }, 400);
+  };
+
+  const finishResolvedHand = (finishResult, resolvedPlayBet, extraStats = {}) => {
+    const payload = finishResult?.serverPayload || {};
+    const totalPrize = Math.max(0, Number(finishResult?.approvedReward || 0));
+    const totalBetAmount = Math.max(0, Number(payload.totalBetAmount || (anteBet + resolvedPlayBet)));
+    const profit = Number(payload.profit ?? (totalPrize - totalBetAmount));
+    const win = Boolean(payload.won);
+    const tie = Boolean(payload.tie);
+    const fold = Boolean(payload.fold);
+
+    setPlayerHand(payload.playerHand ? { hand: payload.playerHand } : null);
+    setDealerHand(payload.dealerHand ? { hand: payload.dealerHand } : null);
+    if (win && !fold) {
+      playSfx(winSound.current);
+    }
+
+    setGameResult({
+      win,
+      tie,
+      fold,
+      profit,
+      totalPrize,
+      totalBetAmount,
+      playerHand: payload.playerHand || null,
+      dealerHand: payload.dealerHand || null,
+      dealerQualifies: Boolean(payload.dealerQualifies),
+      message: payload.message || (fold ? "FOLDED" : tie ? "TIE - PUSH" : win ? "YOU WIN!" : "OPPONENT WINS"),
+    });
+
+    const newStats = {
+      ...stats,
+      totalHands: stats.totalHands + 1,
+      wins: win ? stats.wins + 1 : stats.wins,
+      losses: !win && !tie ? stats.losses + 1 : stats.losses,
+      ties: tie ? stats.ties + 1 : stats.ties,
+      totalPlay: stats.totalPlay + totalBetAmount,
+      totalWon: stats.totalWon + totalPrize,
+      biggestWin: Math.max(stats.biggestWin, profit),
+      royalFlushes: payload.playerHand === "Royal Flush" ? stats.royalFlushes + 1 : stats.royalFlushes,
+      raise4x: stats.raise4x + (extraStats.raise4x || 0),
+      raise2x: stats.raise2x + (extraStats.raise2x || 0),
+      raise1x: stats.raise1x + (extraStats.raise1x || 0),
+      folds: stats.folds + (extraStats.folds || 0),
+    };
+    setStats(newStats);
+    setVaultState(Number(finishResult?.balanceAfter || 0));
+    setSessionId(null);
+    setGameState("finished");
+  };
+
+  const settleRound = async (decision, resolvedPlayBet, revealMode = "showdown", extraStats = {}) => {
+    if (!sessionId) return;
+    clearActions();
+    try {
+      const finishResult = await finishArcadeSession(sessionId, { decision });
+      if (!finishResult?.success) {
+        throw new Error(finishResult?.message || "Failed to finish session");
+      }
+
+      const payload = finishResult.serverPayload || {};
+      const player = Array.isArray(payload.playerCards) ? payload.playerCards : playerCards;
+      const dealer = Array.isArray(payload.dealerCards) ? payload.dealerCards : dealerCards;
+      const community = Array.isArray(payload.communityCards) ? payload.communityCards : communityCards;
+
+      setPlayerCards(player);
+      setDealerCards(dealer);
+      setPlayBet(resolvedPlayBet);
+
+      if (payload.fold || revealMode === "fold") {
+        finishResolvedHand(finishResult, resolvedPlayBet, extraStats);
+        return;
+      }
+
+      const doShowdown = () => {
+        setGameState("showdown");
+        setTimeout(() => finishResolvedHand(finishResult, resolvedPlayBet, extraStats), 1200);
+      };
+
+      if (revealMode === "all") {
+        setGameState("dealing_flop");
+        setTimeout(() => setCommunityCards(community.slice(0, 1)), 400);
+        setTimeout(() => setCommunityCards(community.slice(0, 2)), 600);
+        setTimeout(() => setCommunityCards(community.slice(0, 3)), 800);
+        setTimeout(() => setCommunityCards(community.slice(0, 4)), 1200);
+        setTimeout(() => {
+          setCommunityCards(community.slice(0, 5));
+          doShowdown();
+        }, 1600);
+        return;
+      }
+
+      if (revealMode === "turn-river") {
+        revealTurn(community, "showdown");
+        setTimeout(() => revealRiver(community, "showdown", doShowdown), 600);
+        return;
+      }
+
+      if (revealMode === "river") {
+        revealRiver(community, "showdown", doShowdown);
+        return;
+      }
+
+      doShowdown();
+    } catch (error) {
+      console.error("Ultimate poker session error:", error);
+      setSessionError("Session failed to finish");
+      clearActions();
+    }
+  };
+
   const dealHand = async (isFreePlayParam = false) => {
     playSfx(clickSound.current);
+    setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
+    let nextSessionId = null;
+    let reservedStake = 0;
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'ultimate-poker';
       try {
-        const result = await useFreePlayToken(gameId);
-        if (result.success) { play = result.amount; setIsFreePlay(false); router.replace('/ultimate-poker', undefined, { shallow: true }); }
-        else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); return; }
+        const result = await startFreeplayArcadeSession(gameId);
+        if (!result.success) {
+          setSessionError("Failed to start session");
+          alert(result.message || 'No free play tokens available!');
+          setIsFreePlay(false);
+          return;
+        }
+        reservedStake = Number(result.amount || 0);
+        play = Math.max(MIN_PLAY, Math.floor(reservedStake / RESERVED_STAKE_MULTIPLIER) || MIN_PLAY);
+        nextSessionId = result.sessionId;
+        setFreePlayTokens(result.remainingTokens);
+        setIsFreePlay(false);
+        router.replace('/ultimate-poker', undefined, { shallow: true });
       } catch (error) {
         console.error('Free play error:', error);
+        setSessionError("Failed to start session");
         alert('Failed to use free play token. Please try again.');
         setIsFreePlay(false);
         return;
       }
     } else {
       if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
-      const currentVault = peekSharedVault().balance;
-      if (currentVault < play * 2) { alert('Insufficient MLEO in vault (need 2x play for Ante + Blind)'); return; }
-      const debitResult = await debitSharedVault(play, "ultimate-poker");
-      setVaultState(debitResult.balance);
+      reservedStake = play * RESERVED_STAKE_MULTIPLIER;
+      const startResult = await startPaidArcadeSession("ultimate-poker", reservedStake);
+      if (!startResult.success) {
+        setSessionError("Failed to start session");
+        alert(startResult.message || 'Failed to start session');
+        return;
+      }
+      nextSessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
+
+    const deck = createDeterministicCardDeck(nextSessionId);
+    const player = [deck[0], deck[2]];
+    const dealer = [deck[1], deck[3]];
     
+    setSessionId(nextSessionId);
+    setSessionDeck(deck);
+    setPlayAmount(String(play));
     setAnteBet(play);
     setBlindBet(0);
     setPlayBet(0);
     setGameResult(null);
-    
-    const deck = shuffleDeck(createDeck());
-    const player = [deck[0], deck[2]];
-    const dealer = [deck[1], deck[3]];
-    const community = [deck[4], deck[5], deck[6], deck[7], deck[8]];
-    
-    // Clear cards
+
     setPlayerCards([]);
     setDealerCards([]);
     setCommunityCards([]);
     setPlayerHand(null);
     setDealerHand(null);
+    clearActions();
     setGameState("dealing");
     
-    // Deal player cards one by one
     setTimeout(() => setPlayerCards([player[0]]), 400);
     setTimeout(() => setPlayerCards(player), 800);
     setTimeout(() => {
@@ -376,231 +555,43 @@ export default function UltimatePokerPage() {
   const raise4x = async () => {
     playSfx(clickSound.current);
     const raiseBet = anteBet * 4;
-    const currentVault = peekSharedVault().balance;
-    if (currentVault < raiseBet) { alert('Insufficient MLEO in vault!'); return; }
-    const debitResult = await debitSharedVault(raiseBet, "ultimate-poker");
-    setVaultState(debitResult.balance);
-    setPlayBet(playBet + raiseBet);
-    setCanRaise4x(false);
-    setCanRaise2x(false);
-    setCanRaise1x(false);
-    const newStats = { ...stats, raise4x: stats.raise4x + 1 };
-    setStats(newStats);
-    dealCommunity();
+    await settleRound("raise4x", raiseBet, "all", { raise4x: 1 });
   };
 
   const check = () => {
     playSfx(clickSound.current);
+    const community = sessionDeck.slice(4, 9);
     if (gameState === "preflop") {
-      dealCommunity();
+      clearActions();
+      revealFlop(community);
     } else if (gameState === "flop") {
-      dealTurn();
+      clearActions();
+      revealTurn(community);
     } else if (gameState === "turn") {
-      dealRiver();
+      clearActions();
+      revealRiver(community);
     }
   };
 
   const raise2x = async () => {
     playSfx(clickSound.current);
     const raiseBet = anteBet * 2;
-    const currentVault = peekSharedVault().balance;
-    if (currentVault < raiseBet) { alert('Insufficient MLEO in vault!'); return; }
-    const debitResult = await debitSharedVault(raiseBet, "ultimate-poker");
-    setVaultState(debitResult.balance);
-    setPlayBet(playBet + raiseBet);
-    setCanRaise4x(false);
-    setCanRaise2x(false);
-    setCanRaise1x(false);
-    const newStats = { ...stats, raise2x: stats.raise2x + 1 };
-    setStats(newStats);
-    dealTurn();
+    await settleRound("raise2x", raiseBet, "turn-river", { raise2x: 1 });
   };
 
   const raise1x = async () => {
     playSfx(clickSound.current);
     const raiseBet = anteBet;
-    const currentVault = peekSharedVault().balance;
-    if (currentVault < raiseBet) { alert('Insufficient MLEO in vault!'); return; }
-    const debitResult = await debitSharedVault(raiseBet, "ultimate-poker");
-    setVaultState(debitResult.balance);
-    setPlayBet(playBet + raiseBet);
-    setCanRaise4x(false);
-    setCanRaise2x(false);
-    setCanRaise1x(false);
-    const newStats = { ...stats, raise1x: stats.raise1x + 1 };
-    setStats(newStats);
-    
-    // If we're at Turn, deal River. If we're at River, finish game.
     if (gameState === "turn") {
-      dealRiver();
+      await settleRound("raise1x-turn", raiseBet, "river", { raise1x: 1 });
     } else if (gameState === "river") {
-      setTimeout(() => finishGame(), 600);
+      await settleRound("raise1x-river", raiseBet, "showdown", { raise1x: 1 });
     }
   };
 
-  const fold = () => {
+  const fold = async () => {
     playSfx(clickSound.current);
-    setCanRaise4x(false);
-    setCanRaise2x(false);
-    setCanRaise1x(false);
-    setGameState("finished");
-    const newStats = { 
-      ...stats, 
-      totalHands: stats.totalHands + 1,
-      losses: stats.losses + 1,
-      folds: stats.folds + 1,
-      totalPlay: stats.totalPlay + anteBet + playBet
-    };
-    setStats(newStats);
-    setGameResult({ 
-      win: false, 
-      fold: true,
-      profit: -(anteBet + playBet),
-      message: "FOLDED"
-    });
-  };
-
-  const dealCommunity = () => {
-    setGameState("dealing_flop");
-    const deck = shuffleDeck(createDeck());
-    const community = [deck[0], deck[1], deck[2], deck[3], deck[4]];
-    
-    setTimeout(() => setCommunityCards([community[0]]), 400);
-    setTimeout(() => setCommunityCards([community[0], community[1]]), 600);
-    setTimeout(() => {
-      setCommunityCards([community[0], community[1], community[2]]);
-      setCanRaise2x(true);
-      setGameState("flop");
-    }, 800);
-  };
-
-  const dealTurn = () => {
-    setGameState("dealing_turn");
-    const current = [...communityCards];
-    const deck = shuffleDeck(createDeck());
-    
-    setTimeout(() => {
-      current.push(deck[0]);
-      setCommunityCards([...current]);
-      setCanRaise1x(true);
-      setGameState("turn");
-    }, 400);
-  };
-
-  const dealRiver = () => {
-    setGameState("dealing_river");
-    const current = [...communityCards];
-    const deck = shuffleDeck(createDeck());
-    
-    setTimeout(() => {
-      current.push(deck[0]);
-      setCommunityCards([...current]);
-      setCanRaise1x(true);
-      setGameState("river");
-    }, 400);
-  };
-
-  const finishGame = () => {
-    setGameState("showdown");
-    
-    setTimeout(() => {
-      const playerBest = evaluateHand([...playerCards, ...communityCards]);
-      const dealerBest = evaluateHand([...dealerCards, ...communityCards]);
-      setPlayerHand(playerBest);
-      setDealerHand(dealerBest);
-      
-      setTimeout(() => {
-        let totalPrize = 0;
-        let profit = 0;
-        let win = false;
-        let tie = false;
-        
-        // Check dealer qualification (pair or better)
-        const dealerQualifies = dealerBest.rank >= 2;
-        
-        if (!dealerQualifies) {
-          // Dealer doesn't qualify - Player wins
-          totalPrize = (anteBet + playBet) * 2;
-          win = true;
-        } else {
-          // Dealer qualifies - compare hands
-          if (playerBest.rank > dealerBest.rank) {
-            // Player wins
-            totalPrize = (anteBet + playBet) * 2;
-            win = true;
-          } else if (playerBest.rank === dealerBest.rank) {
-            // Same rank - compare high cards
-            const playerCards = playerBest.highCards || [];
-            const dealerCards = dealerBest.highCards || [];
-            
-            let playerWins = false;
-            let dealerWins = false;
-            
-            // Compare cards one by one
-            for (let i = 0; i < Math.min(playerCards.length, dealerCards.length); i++) {
-              if (playerCards[i] > dealerCards[i]) {
-                playerWins = true;
-                break;
-              } else if (dealerCards[i] > playerCards[i]) {
-                dealerWins = true;
-                break;
-              }
-              // If equal, continue to next card
-            }
-            
-            if (playerWins) {
-              // Player wins on high card comparison
-              totalPrize = (anteBet + playBet) * 2;
-              win = true;
-            } else if (dealerWins) {
-              // Opponent wins on high card comparison - no prize
-            } else {
-              // Complete tie - all plays push
-              totalPrize = anteBet + playBet;
-              tie = true;
-            }
-          }
-          // else: Player loses - totalPrize stays 0
-        }
-        
-        profit = totalPrize - (anteBet + playBet);
-        const totalBetAmount = anteBet + playBet;
-        
-        if (totalPrize > 0) {
-          creditSharedVault(Math.floor(totalPrize), "ultimate-poker").then(creditResult => {
-            setVaultState(creditResult.balance);
-            if (win) playSfx(winSound.current);
-          });
-        }
-        
-        const newStats = {
-          ...stats,
-          totalHands: stats.totalHands + 1,
-          wins: win ? stats.wins + 1 : stats.wins,
-          losses: (!win && !tie) ? stats.losses + 1 : stats.losses,
-          ties: tie ? stats.ties + 1 : stats.ties,
-          totalPlay: stats.totalPlay + anteBet + blindBet + playBet,
-          totalWon: stats.totalWon + totalPrize,
-          biggestWin: Math.max(stats.biggestWin, profit),
-          royalFlushes: playerBest.hand === "Royal Flush" ? stats.royalFlushes + 1 : stats.royalFlushes
-        };
-        setStats(newStats);
-        
-        setGameResult({
-          win,
-          tie,
-          profit,
-          totalPrize,
-          totalBetAmount,
-          playerHand: playerBest.hand,
-          dealerHand: dealerBest.hand,
-          dealerQualifies,
-          message: tie ? "TIE - PUSH" : win ? "YOU WIN!" : "OPPONENT WINS"
-        });
-        
-        setGameState("finished");
-      }, 1200);
-    }, 600);
+    await settleRound(`fold-${gameState}`, playBet, "fold", { folds: 1 });
   };
 
   const newHand = () => {
@@ -612,12 +603,13 @@ export default function UltimatePokerPage() {
     setDealerHand(null);
     setGameResult(null);
     setShowResultPopup(false);
+    setSessionId(null);
+    setSessionDeck([]);
+    setSessionError("");
     setAnteBet(0);
     setBlindBet(0);
     setPlayBet(0);
-    setCanRaise4x(false);
-    setCanRaise2x(false);
-    setCanRaise1x(false);
+    clearActions();
   };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-black to-purple-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -756,6 +748,7 @@ export default function UltimatePokerPage() {
             ) : (
               <div className="w-full h-12 flex items-center justify-center text-white/60 text-sm">Dealing...</div>
             )}
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>

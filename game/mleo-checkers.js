@@ -9,9 +9,13 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -310,6 +314,8 @@ export default function CheckersPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionId, setSessionId] = useState(null);
+  const [sessionError, setSessionError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -415,26 +421,45 @@ export default function CheckersPage() {
   const startGame = async (isFreePlayParam = false) => {
     if (gameActive) return;
     playSfx(clickSound.current);
+    setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
+    let nextSessionId = null;
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'checkers';
       try {
-        const result = await useFreePlayToken(gameId);
-        if (result.success) { play = result.amount; setIsFreePlay(false); router.replace('/checkers', undefined, { shallow: true }); }
-        else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); return; }
+        const result = await startFreeplayArcadeSession(gameId);
+        if (result.success) {
+          play = result.amount;
+          nextSessionId = result.sessionId;
+          setFreePlayTokens(result.remainingTokens);
+          setIsFreePlay(false);
+          router.replace('/checkers', undefined, { shallow: true });
+        } else {
+          setSessionError("Failed to start session");
+          alert(result.message || 'No free play tokens available!');
+          setIsFreePlay(false);
+          return;
+        }
       } catch (error) {
         console.error('Free play error:', error);
+        setSessionError("Failed to start session");
         alert('Failed to use free play token. Please try again.');
         setIsFreePlay(false);
         return;
       }
     } else {
       if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
-      const debitResult = await debitSharedVault(play, "checkers");
-      if (!debitResult.ok) { alert(debitResult.error || 'Insufficient MLEO in vault'); return; }
-      setVaultState(debitResult.balance);
+      const startResult = await startPaidArcadeSession("checkers", play);
+      if (!startResult.success) {
+        setSessionError("Failed to start session");
+        alert(startResult.message || 'Failed to start session');
+        return;
+      }
+      nextSessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
     setPlayAmount(String(play));
+    setSessionId(nextSessionId);
     setBoard(initBoard());
     setSelected(null);
     setValidMoves([]);
@@ -548,28 +573,42 @@ export default function CheckersPage() {
   }
 
   async function endGame(playerWon) {
+    if (!sessionId) return;
     const play = Number(playAmount);
-    const prize = playerWon ? Math.floor(play * WIN_MULTIPLIER) : 0;
-    const win = playerWon;
+    try {
+      const finishResult = await finishArcadeSession(sessionId, { playerWon });
+      if (!finishResult?.success) {
+        throw new Error(finishResult?.message || "Failed to finish session");
+      }
+      const prize = Math.max(0, Number(finishResult.approvedReward || 0));
+      const win = Boolean(finishResult?.serverPayload?.won);
+      setVaultState(Number(finishResult.balanceAfter || 0));
+      if (win && prize > 0) {
+        playSfx(winSound.current);
+      }
+      const resultData = { win, prize, profit: win ? prize - play : -play };
+      setGameResult(resultData);
+      setGameActive(false);
+      setCurrentPlayer(null);
+      setSessionId(null);
 
-    if (win && prize > 0) {
-      const creditResult = await creditSharedVault(prize, "checkers");
-      setVaultState(creditResult.balance);
-      playSfx(winSound.current);
+      const newStats = { ...stats, totalGames: stats.totalGames + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalPlay: stats.totalPlay + play, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), lastPlay: play };
+      setStats(newStats);
+    } catch (error) {
+      console.error("Checkers finish session error:", error);
+      setGameActive(false);
+      setCurrentPlayer(null);
+      setSessionId(null);
+      setSessionError("Session failed to finish");
+      alert("Failed to finish session. Please refresh vault and try again.");
     }
-
-    const resultData = { win, prize, profit: win ? prize - play : -play };
-    setGameResult(resultData);
-    setGameActive(false);
-    setCurrentPlayer(null);
-
-    const newStats = { ...stats, totalGames: stats.totalGames + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalPlay: stats.totalPlay + play, totalWon: win ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), lastPlay: play };
-    setStats(newStats);
   }
 
   const resetGame = () => {
     setGameResult(null);
     setShowResultPopup(false);
+    setSessionId(null);
+    setSessionError("");
     setBoard(initBoard());
     setSelected(null);
     setValidMoves([]);
@@ -680,6 +719,7 @@ export default function CheckersPage() {
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
             <button onClick={gameResult ? resetGame : () => startGame(false)} disabled={gameActive} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-red-500 to-orange-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50">{gameResult ? "PLAY AGAIN" : gameActive ? "GAME IN PROGRESS" : "START GAME"}</button>
+            {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
               <button onClick={() => { setShowStats(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 font-semibold text-xs transition-all">Stats</button>
