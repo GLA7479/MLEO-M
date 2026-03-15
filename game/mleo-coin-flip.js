@@ -685,8 +685,8 @@ export default function CoinFlipPage() {
               onClick={() => {
                 const current = Number(playAmount) || MIN_PLAY;
                 const newBet = current === MIN_PLAY 
-                  ? Math.min(vault, 1000)
-                  : Math.min(vault, current + 1000);
+                  ? Math.min(vault, 100)
+                  : Math.min(vault, current + 100);
                 setPlayAmount(String(newBet));
                 playSfx(clickSound.current);
               }}
