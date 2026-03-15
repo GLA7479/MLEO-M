@@ -50,7 +50,7 @@ BEGIN
     v_seed := 1;
   END IF;
 
-  FOR v_i IN REVERSE 2..array_length(v_deck, 1) LOOP
+  FOR v_i IN REVERSE array_length(v_deck, 1)..2 LOOP
     v_seed := mod((v_seed * 1664525) + 1013904223, 4294967296);
     v_j := mod(v_seed, v_i)::integer + 1;
     v_tmp := v_deck[v_i];
