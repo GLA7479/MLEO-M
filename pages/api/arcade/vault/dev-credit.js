@@ -2,6 +2,8 @@ import crypto from "crypto";
 import { getArcadeDevice } from "../../../../lib/server/arcadeDeviceCookie";
 import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
+import { validateCsrfToken } from "../../../../lib/server/csrf";
+import { logCsrfFailure } from "../../../../lib/server/securityLogger";
 
 function extractRow(data) {
   return Array.isArray(data) ? data[0] : data;
@@ -18,12 +20,17 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (!validateCsrfToken(req)) {
+      logCsrfFailure(req);
+      return res.status(403).json({ success: false, message: "Invalid CSRF token" });
+    }
+
     const supabase = getSupabaseAdmin();
     const deviceId = getArcadeDevice(req);
     if (!deviceId) {
       return res.status(401).json({ success: false, message: "Device not initialized" });
     }
-    const rateLimit = checkArcadeRateLimit("arcade-dev-credit", deviceId, 5, 60_000);
+    const rateLimit = await checkArcadeRateLimit("arcade-dev-credit", deviceId, 5, 60_000);
     if (!rateLimit.allowed) {
       return res.status(429).json({ success: false, message: "Too many dev credit requests" });
     }

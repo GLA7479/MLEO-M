@@ -78,7 +78,7 @@ BEGIN
   RETURN QUERY SELECT v_balance AS vault_balance;
 END $$;
 
--- === Function: Sync Vault Delta (Production Ready) ===
+-- === Function: Sync Vault Delta (Hardened Version) ===
 CREATE OR REPLACE FUNCTION public.sync_vault_delta(
   p_game_id text,
   p_delta bigint,
@@ -95,60 +95,45 @@ DECLARE
   v_current_nonce text;
   v_new_balance bigint;
 BEGIN
-  -- Get or create vault record for this device
-  SELECT vb.balance, vb.last_nonce INTO v_current_balance, v_current_nonce
-  FROM public.vault_balances vb
-  WHERE vb.device_id = p_device_id;
-  
-  -- If device doesn't exist, create it
-  IF v_current_balance IS NULL THEN
-    INSERT INTO public.vault_balances (device_id, balance, last_nonce)
-    VALUES (p_device_id, 0, p_next_nonce)
-    ON CONFLICT (device_id) DO UPDATE
-    SET last_nonce = p_next_nonce
-    RETURNING balance, last_nonce INTO v_current_balance, v_current_nonce;
-    
-    -- If still null, try to get it again
-    IF v_current_balance IS NULL THEN
-      SELECT vb.balance, vb.last_nonce INTO v_current_balance, v_current_nonce
-      FROM public.vault_balances vb
-      WHERE vb.device_id = p_device_id;
-    END IF;
+  IF p_device_id IS NULL OR length(trim(p_device_id)) = 0 THEN
+    RAISE EXCEPTION 'Missing device_id';
   END IF;
-  
-  -- Set defaults if still null
+
+  IF p_next_nonce IS NULL OR length(trim(p_next_nonce)) = 0 THEN
+    RAISE EXCEPTION 'Missing next nonce';
+  END IF;
+
+  INSERT INTO public.vault_balances (device_id, balance, last_nonce)
+  VALUES (p_device_id, 0, NULL)
+  ON CONFLICT (device_id) DO NOTHING;
+
+  SELECT vb.balance, vb.last_nonce
+  INTO v_current_balance, v_current_nonce
+  FROM public.vault_balances vb
+  WHERE vb.device_id = p_device_id
+  FOR UPDATE;
+
   IF v_current_balance IS NULL THEN
     v_current_balance := 0;
   END IF;
-  
-  -- Verify nonce (prevent replay attacks) - only if prev_nonce is provided
-  IF p_prev_nonce IS NOT NULL AND v_current_nonce IS NOT NULL AND p_prev_nonce != v_current_nonce THEN
+
+  IF p_prev_nonce IS NOT NULL AND v_current_nonce IS NOT NULL AND p_prev_nonce <> v_current_nonce THEN
     RAISE EXCEPTION 'Invalid nonce: expected %, got %', v_current_nonce, p_prev_nonce;
   END IF;
-  
-  -- Calculate new balance (ensure non-negative)
-  v_new_balance := GREATEST(0, (v_current_balance + p_delta));
-  
-  -- Update vault (using explicit table alias to avoid ambiguity)
+
+  IF p_delta < 0 AND v_current_balance + p_delta < 0 THEN
+    RAISE EXCEPTION 'Insufficient vault balance';
+  END IF;
+
+  v_new_balance := v_current_balance + p_delta;
+
   UPDATE public.vault_balances vb
-  SET 
+  SET
     balance = v_new_balance,
     last_nonce = p_next_nonce,
     last_sync_at = now()
   WHERE vb.device_id = p_device_id;
-  
-  -- If update didn't affect any rows, insert instead
-  IF NOT FOUND THEN
-    INSERT INTO public.vault_balances (device_id, balance, last_nonce)
-    VALUES (p_device_id, v_new_balance, p_next_nonce)
-    ON CONFLICT (device_id) DO UPDATE
-    SET 
-      balance = v_new_balance,
-      last_nonce = p_next_nonce,
-      last_sync_at = now();
-  END IF;
-  
-  -- Return new balance
+
   RETURN QUERY SELECT v_new_balance;
 END $$;
 

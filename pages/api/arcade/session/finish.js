@@ -2,7 +2,8 @@ import { getArcadeDevice } from "../../../../lib/server/arcadeDeviceCookie";
 import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { checkIpRateLimit } from "../../../../lib/server/ipRateLimit";
-import { logIpRateLimitExceeded, logValidationFailure } from "../../../../lib/server/securityLogger";
+import { validateCsrfToken } from "../../../../lib/server/csrf";
+import { logIpRateLimitExceeded, logValidationFailure, logCsrfFailure } from "../../../../lib/server/securityLogger";
 import { validateUuid, validateObject } from "../../../../lib/server/inputValidation";
 
 function extractRow(data) {
@@ -16,6 +17,11 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (!validateCsrfToken(req)) {
+      logCsrfFailure(req);
+      return res.status(403).json({ success: false, message: "Invalid CSRF token" });
+    }
+
     // IP-based rate limiting
     const ipRate = await checkIpRateLimit(req, 80, 60_000);
     if (!ipRate.allowed) {
@@ -28,7 +34,7 @@ export default async function handler(req, res) {
     if (!deviceId) {
       return res.status(401).json({ success: false, message: "Device not initialized" });
     }
-    const rateLimit = checkArcadeRateLimit("arcade-finish", deviceId, 60, 60_000);
+    const rateLimit = await checkArcadeRateLimit("arcade-finish", deviceId, 60, 60_000);
     if (!rateLimit.allowed) {
       return res.status(429).json({ success: false, message: "Too many finish requests" });
     }

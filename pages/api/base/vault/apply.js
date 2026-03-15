@@ -3,11 +3,11 @@ import { getArcadeDevice } from "../../../../lib/server/arcadeDeviceCookie";
 import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { checkIpRateLimit } from "../../../../lib/server/ipRateLimit";
-import { logIpRateLimitExceeded, logSuspiciousActivity } from "../../../../lib/server/securityLogger";
+import { validateCsrfToken } from "../../../../lib/server/csrf";
+import { logIpRateLimitExceeded, logSuspiciousActivity, logCsrfFailure } from "../../../../lib/server/securityLogger";
 
 const MAX_BASE_DELTA = 5_000_000;
 const ALLOWED_REASONS = new Set([
-  "mleo-base",
   "mleo-base-ship",
   "mleo-base-spend",
 ]);
@@ -23,6 +23,11 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (!validateCsrfToken(req)) {
+      logCsrfFailure(req);
+      return res.status(403).json({ success: false, message: "Invalid CSRF token" });
+    }
+
     // IP-based rate limiting
     const ipRate = await checkIpRateLimit(req, 60, 60_000);
     if (!ipRate.allowed) {
@@ -35,7 +40,7 @@ export default async function handler(req, res) {
     if (!deviceId) {
       return res.status(401).json({ success: false, message: "Device not initialized" });
     }
-    const rateLimit = checkArcadeRateLimit("base-vault-apply", deviceId, 40, 60_000);
+    const rateLimit = await checkArcadeRateLimit("base-vault-apply", deviceId, 40, 60_000);
     if (!rateLimit.allowed) {
       return res.status(429).json({ success: false, message: "Too many base vault requests" });
     }

@@ -10,13 +10,17 @@ function extractRow(data) {
 }
 
 function normalizeStageCounts(raw) {
+  const MIN_STAGE = 1;
+  const MAX_STAGE = 10;
   const src = raw && typeof raw === "object" ? raw : {};
   const out = {};
   let total = 0;
   for (const [k, v] of Object.entries(src)) {
-    const stage = Math.max(1, Math.floor(Number(k) || 0));
+    const parsedStage = Math.floor(Number(k) || 0);
+    if (parsedStage < MIN_STAGE || parsedStage > MAX_STAGE) continue;
+    const stage = parsedStage;
     const count = Math.max(0, Math.floor(Number(v) || 0));
-    if (!stage || !count) continue;
+    if (!count) continue;
     out[String(stage)] = (out[String(stage)] || 0) + count;
     total += count;
   }
@@ -61,7 +65,7 @@ export default async function handler(req, res) {
       logValidationFailure(req, "Missing stageCounts", { rawStageCounts });
       return res.status(400).json({ success: false, message: "Missing stageCounts" });
     }
-    if (total > 200) {
+    if (total > 120) {
       logSuspiciousActivity(req, `Too many breaks in batch: ${total}`);
       return res.status(400).json({ success: false, message: "Too many breaks in one batch" });
     }

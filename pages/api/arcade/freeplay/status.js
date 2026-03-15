@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     if (!deviceId) {
       return res.status(401).json({ success: false, message: "Device not initialized" });
     }
-    const rateLimit = checkArcadeRateLimit("arcade-freeplay-status", deviceId, 60, 60_000);
+    const rateLimit = await checkArcadeRateLimit("arcade-freeplay-status", deviceId, 60, 60_000);
     if (!rateLimit.allowed) {
       return res.status(429).json({ success: false, message: "Too many free play requests" });
     }

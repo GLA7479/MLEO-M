@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useAccount } from "wagmi";
 import { useAccountModal, useConnectModal } from "@rainbow-me/rainbowkit";
 import Layout from "../components/Layout";
-import { applyBaseVaultDelta, getBaseVaultBalance } from "../lib/baseVaultClient";
+import { applyBaseVaultDelta, getBaseVaultBalance, getBaseState, saveBaseState } from "../lib/baseVaultClient";
 
 const STATE_KEY = "mleo_base_v1";
 const MAX_LOG_ITEMS = 16;
@@ -938,37 +938,60 @@ export default function MleoBase() {
 
   useEffect(() => {
     let alive = true;
-    const seed = freshState();
-    const saved = loadJson(STATE_KEY, null);
-    const initial = saved && saved.version >= 3
-      ? {
-          ...seed,
-          ...saved,
-          resources: { ...seed.resources, ...(saved.resources || {}) },
-          buildings: { ...seed.buildings, ...(saved.buildings || {}) },
-          modules: { ...(saved.modules || {}) },
-          research: { ...(saved.research || {}) },
-          stats: { ...seed.stats, ...(saved.stats || {}) },
-          missionState: {
-            ...seed.missionState,
-            ...(saved.missionState || {}),
-            completed: { ...(saved.missionState?.completed || {}) },
-            claimed: { ...(saved.missionState?.claimed || {}) },
-          },
-          lastTickAt: Date.now(),
-          lastHiddenAt: 0,
-          log: Array.isArray(saved.log) && saved.log.length ? saved.log : seed.log,
-        }
-      : seed;
-
-    setMounted(true);
-    setState(initial);
 
     async function boot() {
       try {
+        const seed = freshState();
+        const serverRes = await getBaseState();
+        const saved = serverRes?.state || null;
+
+        const initial = saved
+          ? {
+              ...seed,
+              version: Number(saved.version || seed.version),
+              lastDay: saved.last_day || seed.lastDay,
+              bankedMleo: Number(saved.banked_mleo || 0),
+              sentToday: Number(saved.sent_today || 0),
+              totalBanked: Number(saved.total_banked || 0),
+              totalSharedSpent: Number(saved.total_shared_spent || 0),
+              commanderLevel: Number(saved.commander_level || 1),
+              commanderXp: Number(saved.commander_xp || 0),
+              blueprintLevel: Number(saved.blueprint_level || 0),
+              crew: Number(saved.crew || 0),
+              overclockUntil: saved.overclock_until ? new Date(saved.overclock_until).getTime() : 0,
+              expeditionReadyAt: saved.expedition_ready_at ? new Date(saved.expedition_ready_at).getTime() : Date.now(),
+              maintenanceDue: Number(saved.maintenance_due || 0),
+              stability: Number(saved.stability || 100),
+              resources: { ...seed.resources, ...(saved.resources || {}) },
+              buildings: { ...seed.buildings, ...(saved.buildings || {}) },
+              modules: { ...(saved.modules || {}) },
+              research: { ...(saved.research || {}) },
+              stats: { ...seed.stats, ...(saved.stats || {}) },
+              missionState: {
+                ...seed.missionState,
+                ...(saved.mission_state || {}),
+                completed: { ...(saved.mission_state?.completed || {}) },
+                claimed: { ...(saved.mission_state?.claimed || {}) },
+              },
+              log: Array.isArray(saved.log) && saved.log.length ? saved.log : seed.log,
+              lastTickAt: Date.now(),
+              lastHiddenAt: 0,
+            }
+          : seed;
+
+        if (!alive) return;
+
+        setMounted(true);
+        setState(initial);
+
         const bal = await readVaultSafe();
         if (alive) setSharedVault(bal);
-      } catch {}
+      } catch (error) {
+        console.error("BASE boot failed", error);
+        if (!alive) return;
+        setMounted(true);
+        setState(freshState());
+      }
     }
 
     boot();
@@ -980,7 +1003,36 @@ export default function MleoBase() {
 
   useEffect(() => {
     if (!mounted) return;
-    saveJson(STATE_KEY, state);
+
+    const id = window.setTimeout(() => {
+      saveBaseState({
+        version: state.version,
+        last_day: state.lastDay,
+        banked_mleo: Math.floor(state.bankedMleo || 0),
+        sent_today: Math.floor(state.sentToday || 0),
+        total_banked: Math.floor(state.totalBanked || 0),
+        total_shared_spent: Math.floor(state.totalSharedSpent || 0),
+        commander_level: Math.floor(state.commanderLevel || 1),
+        commander_xp: Math.floor(state.commanderXp || 0),
+        blueprint_level: Math.floor(state.blueprintLevel || 0),
+        crew: Math.floor(state.crew || 0),
+        overclock_until: state.overclockUntil ? new Date(state.overclockUntil).toISOString() : null,
+        expedition_ready_at: state.expeditionReadyAt ? new Date(state.expeditionReadyAt).toISOString() : null,
+        maintenance_due: Number(state.maintenanceDue || 0),
+        stability: Number(state.stability || 100),
+        resources: state.resources || {},
+        buildings: state.buildings || {},
+        modules: state.modules || {},
+        research: state.research || {},
+        stats: state.stats || {},
+        mission_state: state.missionState || {},
+        log: Array.isArray(state.log) ? state.log.slice(0, 40) : [],
+      }).catch((err) => {
+        console.error("Failed to persist BASE state", err);
+      });
+    }, 500);
+
+    return () => window.clearTimeout(id);
   }, [mounted, state]);
 
   useEffect(() => {
@@ -1187,23 +1239,34 @@ export default function MleoBase() {
   };
 
   const bankToSharedVault = async () => {
-    const queued = Math.floor(state.bankedMleo || 0);
+    let queued, room, factor, shipped, consumed;
+    
+    try {
+      const latestBase = await getBaseState();
+      const serverBanked = Math.floor(Number(latestBase?.state?.banked_mleo || 0));
+      queued = Math.min(serverBanked, Math.floor(state.bankedMleo || 0));
+    } catch (error) {
+      console.error("Failed to re-read server state", error);
+      queued = Math.floor(state.bankedMleo || 0);
+    }
+    
     if (queued <= 0) {
       showToast("Nothing ready to ship yet.");
       return;
     }
-    const room = Math.max(0, derived.shipCap - state.sentToday);
+    room = Math.max(0, derived.shipCap - state.sentToday);
     if (room <= 0) {
       showToast("Today's shipping cap is already full.");
       return;
     }
-    const factor = softcutFactor(state.sentToday, derived.shipCap);
-    const shipped = Math.min(Math.floor(queued * factor * derived.bankBonus), room);
+    factor = softcutFactor(state.sentToday, derived.shipCap);
+    shipped = Math.min(Math.floor(queued * factor * derived.bankBonus), room);
     if (shipped <= 0) {
       showToast("Shipment too small after softcut.");
       return;
     }
-    const consumed = Math.min(queued, Math.max(1, Math.ceil(shipped / Math.max(0.01, factor * derived.bankBonus))));
+    consumed = Math.min(queued, Math.max(1, Math.ceil(shipped / Math.max(0.01, factor * derived.bankBonus))));
+    
     const res = await addToVault(shipped, "mleo-base-ship");
     if (!res?.ok && !res?.skipped) {
       showToast("Vault sync failed. Try again.");
