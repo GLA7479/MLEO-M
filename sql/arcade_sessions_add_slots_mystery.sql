@@ -336,6 +336,51 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.arcade_blackjack_card_value(p_card text)
+RETURNS integer
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_value text := left(coalesce(p_card, ''), greatest(length(coalesce(p_card, '')) - 1, 0));
+BEGIN
+  RETURN CASE v_value
+    WHEN 'A' THEN 11
+    WHEN 'K' THEN 10
+    WHEN 'Q' THEN 10
+    WHEN 'J' THEN 10
+    ELSE coalesce(nullif(v_value, '')::integer, 0)
+  END;
+EXCEPTION
+  WHEN others THEN
+    RETURN 0;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.arcade_blackjack_hand_value(p_cards text[])
+RETURNS integer
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_card text;
+  v_total integer := 0;
+  v_aces integer := 0;
+BEGIN
+  FOREACH v_card IN ARRAY coalesce(p_cards, ARRAY[]::text[]) LOOP
+    v_total := v_total + public.arcade_blackjack_card_value(v_card);
+    IF left(coalesce(v_card, ''), greatest(length(coalesce(v_card, '')) - 1, 0)) = 'A' THEN
+      v_aces := v_aces + 1;
+    END IF;
+  END LOOP;
+
+  WHILE v_total > 21 AND v_aces > 0 LOOP
+    v_total := v_total - 10;
+    v_aces := v_aces - 1;
+  END LOOP;
+
+  RETURN v_total;
+END;
+$$;
+
 DROP FUNCTION IF EXISTS public.start_freeplay_session(text, text);
 
 CREATE OR REPLACE FUNCTION public.start_freeplay_session(
@@ -359,10 +404,6 @@ DECLARE
   v_consume record;
   v_session_id uuid;
   v_base_stake bigint;
-  v_stake_multiplier bigint := CASE
-    WHEN coalesce(p_game_id, '') = 'ultimate-poker' THEN 5
-    ELSE 1
-  END;
   v_stake bigint;
 BEGIN
   IF coalesce(trim(p_device_id), '') = '' THEN
@@ -382,7 +423,11 @@ BEGIN
   FROM public.freeplay_device_consume(p_device_id, p_game_id);
 
   v_base_stake := GREATEST(0, coalesce((v_consume.free_play_amount)::bigint, 0));
-  v_stake := v_base_stake * v_stake_multiplier;
+  v_stake := CASE
+    WHEN coalesce(p_game_id, '') = 'ultimate-poker' THEN v_base_stake * 5
+    WHEN coalesce(p_game_id, '') = 'blackjack' THEN floor(v_base_stake * 2.5)::bigint
+    ELSE v_base_stake
+  END;
 
   INSERT INTO public.arcade_device_sessions (
     device_id,
@@ -546,6 +591,29 @@ DECLARE
   v_ultimate_total_bet bigint := 0;
   v_ultimate_fold boolean := false;
   v_ultimate_dealer_qualifies boolean := false;
+  v_blackjack_base_stake bigint := 0;
+  v_blackjack_insurance bigint := 0;
+  v_blackjack_used_total bigint := 0;
+  v_blackjack_reward_total bigint := 0;
+  v_blackjack_decision text := '';
+  v_blackjack_insurance_taken boolean := false;
+  v_blackjack_split boolean := false;
+  v_blackjack_player_cards text[];
+  v_blackjack_dealer_cards text[];
+  v_blackjack_hand_one text[];
+  v_blackjack_hand_two text[];
+  v_blackjack_actions text[];
+  v_blackjack_split_hand_one_actions text[];
+  v_blackjack_split_hand_two_actions text[];
+  v_blackjack_player_value integer := 0;
+  v_blackjack_dealer_value integer := 0;
+  v_blackjack_result jsonb := '{}'::jsonb;
+  v_blackjack_idx integer := 5;
+  v_blackjack_action text := '';
+  v_blackjack_wins integer := 0;
+  v_blackjack_losses integer := 0;
+  v_blackjack_pushes integer := 0;
+  v_blackjack_prize bigint := 0;
   v_won boolean;
   v_reward bigint := 0;
   v_balance_after bigint := 0;
@@ -1272,6 +1340,238 @@ BEGIN
       'sum', v_craps_sum,
       'won', v_won,
       'multiplier', v_craps_multiplier,
+      'approved_reward', v_reward
+    );
+
+  ELSIF coalesce(v_session.game_id, '') = 'blackjack' THEN
+    v_blackjack_base_stake := floor(coalesce((p_payload->>'baseStake')::numeric, 0))::bigint;
+    v_blackjack_decision := lower(trim(coalesce(p_payload->>'decision', 'play')));
+    v_blackjack_insurance_taken := coalesce((p_payload->>'insuranceTaken')::boolean, false);
+    v_blackjack_actions := ARRAY(SELECT jsonb_array_elements_text(coalesce(p_payload->'actions', '[]'::jsonb)));
+    v_blackjack_split_hand_one_actions := ARRAY(SELECT jsonb_array_elements_text(coalesce(p_payload->'splitHandOneActions', '[]'::jsonb)));
+    v_blackjack_split_hand_two_actions := ARRAY(SELECT jsonb_array_elements_text(coalesce(p_payload->'splitHandTwoActions', '[]'::jsonb)));
+
+    IF v_blackjack_base_stake <= 0 THEN
+      RAISE EXCEPTION 'blackjack payload must include baseStake';
+    END IF;
+    IF v_session.stake < floor(v_blackjack_base_stake * 2.5) THEN
+      RAISE EXCEPTION 'blackjack baseStake exceeds reserved session stake';
+    END IF;
+    IF v_blackjack_decision NOT IN ('play', 'double', 'split', 'surrender') THEN
+      RAISE EXCEPTION 'blackjack payload must include a valid decision';
+    END IF;
+
+    v_shuffled_deck := public.arcade_shuffle_deck(v_session.id);
+    v_blackjack_player_cards := ARRAY[v_shuffled_deck[1], v_shuffled_deck[3]];
+    v_blackjack_dealer_cards := ARRAY[v_shuffled_deck[2], v_shuffled_deck[4]];
+    v_blackjack_idx := 5;
+    v_blackjack_insurance := floor(v_blackjack_base_stake / 2.0)::bigint;
+    v_blackjack_used_total := v_blackjack_base_stake;
+    v_blackjack_split := v_blackjack_decision = 'split';
+    v_blackjack_player_value := public.arcade_blackjack_hand_value(v_blackjack_player_cards);
+    v_blackjack_dealer_value := public.arcade_blackjack_hand_value(v_blackjack_dealer_cards);
+
+    IF v_blackjack_player_value = 21 THEN
+      IF v_blackjack_dealer_value = 21 THEN
+        v_compare_result := 'push';
+        v_blackjack_prize := v_blackjack_base_stake;
+      ELSE
+        v_compare_result := 'win';
+        v_blackjack_prize := floor(v_blackjack_base_stake * 2.5)::bigint;
+      END IF;
+      v_reward := greatest(v_session.stake - v_blackjack_used_total, 0) + v_blackjack_prize;
+      v_won := v_compare_result = 'win';
+
+    ELSE
+      IF v_blackjack_insurance_taken THEN
+        v_blackjack_used_total := v_blackjack_used_total + v_blackjack_insurance;
+      END IF;
+
+      IF v_blackjack_dealer_value = 21 THEN
+        IF v_blackjack_insurance_taken THEN
+          v_compare_result := 'insurance';
+          v_blackjack_prize := v_blackjack_insurance * 3;
+          v_reward := greatest(v_session.stake - v_blackjack_used_total, 0) + v_blackjack_prize;
+        ELSE
+          v_compare_result := 'lose';
+          v_blackjack_prize := 0;
+          v_reward := greatest(v_session.stake - v_blackjack_used_total, 0);
+        END IF;
+        v_won := false;
+
+      ELSIF v_blackjack_decision = 'surrender' THEN
+        v_compare_result := 'surrender';
+        v_blackjack_prize := floor(v_blackjack_base_stake / 2.0)::bigint;
+        v_reward := greatest(v_session.stake - v_blackjack_used_total, 0) + v_blackjack_prize;
+        v_won := false;
+
+      ELSIF v_blackjack_decision = 'double' THEN
+        v_blackjack_used_total := v_blackjack_used_total + v_blackjack_base_stake;
+        v_blackjack_player_cards := array_append(v_blackjack_player_cards, v_shuffled_deck[v_blackjack_idx]);
+        v_blackjack_idx := v_blackjack_idx + 1;
+        v_blackjack_player_value := public.arcade_blackjack_hand_value(v_blackjack_player_cards);
+
+        IF v_blackjack_player_value > 21 THEN
+          v_compare_result := 'lose';
+          v_blackjack_prize := 0;
+        ELSE
+          WHILE public.arcade_blackjack_hand_value(v_blackjack_dealer_cards) < 17 LOOP
+            v_blackjack_dealer_cards := array_append(v_blackjack_dealer_cards, v_shuffled_deck[v_blackjack_idx]);
+            v_blackjack_idx := v_blackjack_idx + 1;
+          END LOOP;
+          v_blackjack_dealer_value := public.arcade_blackjack_hand_value(v_blackjack_dealer_cards);
+          IF v_blackjack_dealer_value > 21 OR v_blackjack_player_value > v_blackjack_dealer_value THEN
+            v_compare_result := 'win';
+            v_blackjack_prize := v_blackjack_base_stake * 4;
+          ELSIF v_blackjack_player_value = v_blackjack_dealer_value THEN
+            v_compare_result := 'push';
+            v_blackjack_prize := v_blackjack_base_stake * 2;
+          ELSE
+            v_compare_result := 'lose';
+            v_blackjack_prize := 0;
+          END IF;
+        END IF;
+        v_reward := greatest(v_session.stake - v_blackjack_used_total, 0) + v_blackjack_prize;
+        v_won := v_compare_result = 'win';
+
+      ELSIF v_blackjack_decision = 'split' THEN
+        v_blackjack_used_total := v_blackjack_used_total + v_blackjack_base_stake;
+        v_blackjack_hand_one := ARRAY[v_blackjack_player_cards[1], v_shuffled_deck[v_blackjack_idx]];
+        v_blackjack_idx := v_blackjack_idx + 1;
+        v_blackjack_hand_two := ARRAY[v_blackjack_player_cards[2], v_shuffled_deck[v_blackjack_idx]];
+        v_blackjack_idx := v_blackjack_idx + 1;
+
+        IF left(v_blackjack_player_cards[1], greatest(length(v_blackjack_player_cards[1]) - 1, 0)) <> 'A' THEN
+          FOREACH v_blackjack_action IN ARRAY coalesce(v_blackjack_split_hand_one_actions, ARRAY[]::text[]) LOOP
+            EXIT WHEN public.arcade_blackjack_hand_value(v_blackjack_hand_one) >= 21;
+            IF v_blackjack_action = 'hit' THEN
+              v_blackjack_hand_one := array_append(v_blackjack_hand_one, v_shuffled_deck[v_blackjack_idx]);
+              v_blackjack_idx := v_blackjack_idx + 1;
+            ELSIF v_blackjack_action = 'stand' THEN
+              EXIT;
+            END IF;
+          END LOOP;
+
+          FOREACH v_blackjack_action IN ARRAY coalesce(v_blackjack_split_hand_two_actions, ARRAY[]::text[]) LOOP
+            EXIT WHEN public.arcade_blackjack_hand_value(v_blackjack_hand_two) >= 21;
+            IF v_blackjack_action = 'hit' THEN
+              v_blackjack_hand_two := array_append(v_blackjack_hand_two, v_shuffled_deck[v_blackjack_idx]);
+              v_blackjack_idx := v_blackjack_idx + 1;
+            ELSIF v_blackjack_action = 'stand' THEN
+              EXIT;
+            END IF;
+          END LOOP;
+        END IF;
+
+        IF public.arcade_blackjack_hand_value(v_blackjack_hand_one) <= 21
+           OR public.arcade_blackjack_hand_value(v_blackjack_hand_two) <= 21 THEN
+          WHILE public.arcade_blackjack_hand_value(v_blackjack_dealer_cards) < 17 LOOP
+            v_blackjack_dealer_cards := array_append(v_blackjack_dealer_cards, v_shuffled_deck[v_blackjack_idx]);
+            v_blackjack_idx := v_blackjack_idx + 1;
+          END LOOP;
+        END IF;
+        v_blackjack_dealer_value := public.arcade_blackjack_hand_value(v_blackjack_dealer_cards);
+
+        v_blackjack_wins := 0;
+        v_blackjack_losses := 0;
+        v_blackjack_pushes := 0;
+        v_blackjack_prize := 0;
+
+        v_blackjack_player_value := public.arcade_blackjack_hand_value(v_blackjack_hand_one);
+        IF v_blackjack_player_value > 21 THEN
+          v_blackjack_losses := v_blackjack_losses + 1;
+        ELSIF v_blackjack_dealer_value > 21 OR v_blackjack_player_value > v_blackjack_dealer_value THEN
+          v_blackjack_wins := v_blackjack_wins + 1;
+          v_blackjack_prize := v_blackjack_prize + (v_blackjack_base_stake * 2);
+        ELSIF v_blackjack_player_value = v_blackjack_dealer_value THEN
+          v_blackjack_pushes := v_blackjack_pushes + 1;
+          v_blackjack_prize := v_blackjack_prize + v_blackjack_base_stake;
+        ELSE
+          v_blackjack_losses := v_blackjack_losses + 1;
+        END IF;
+
+        v_blackjack_player_value := public.arcade_blackjack_hand_value(v_blackjack_hand_two);
+        IF v_blackjack_player_value > 21 THEN
+          v_blackjack_losses := v_blackjack_losses + 1;
+        ELSIF v_blackjack_dealer_value > 21 OR v_blackjack_player_value > v_blackjack_dealer_value THEN
+          v_blackjack_wins := v_blackjack_wins + 1;
+          v_blackjack_prize := v_blackjack_prize + (v_blackjack_base_stake * 2);
+        ELSIF v_blackjack_player_value = v_blackjack_dealer_value THEN
+          v_blackjack_pushes := v_blackjack_pushes + 1;
+          v_blackjack_prize := v_blackjack_prize + v_blackjack_base_stake;
+        ELSE
+          v_blackjack_losses := v_blackjack_losses + 1;
+        END IF;
+
+        v_compare_result := CASE
+          WHEN v_blackjack_wins > 0 THEN 'split-win'
+          WHEN v_blackjack_pushes = 2 THEN 'split-push'
+          ELSE 'split-lose'
+        END;
+        v_reward := greatest(v_session.stake - v_blackjack_used_total, 0) + v_blackjack_prize;
+        v_won := v_blackjack_wins > 0;
+
+      ELSE
+        FOREACH v_blackjack_action IN ARRAY coalesce(v_blackjack_actions, ARRAY[]::text[]) LOOP
+          EXIT WHEN public.arcade_blackjack_hand_value(v_blackjack_player_cards) >= 21;
+          IF v_blackjack_action = 'hit' THEN
+            v_blackjack_player_cards := array_append(v_blackjack_player_cards, v_shuffled_deck[v_blackjack_idx]);
+            v_blackjack_idx := v_blackjack_idx + 1;
+          ELSIF v_blackjack_action = 'stand' THEN
+            EXIT;
+          END IF;
+        END LOOP;
+
+        v_blackjack_player_value := public.arcade_blackjack_hand_value(v_blackjack_player_cards);
+        IF v_blackjack_player_value > 21 THEN
+          v_compare_result := 'lose';
+          v_blackjack_prize := 0;
+        ELSE
+          WHILE public.arcade_blackjack_hand_value(v_blackjack_dealer_cards) < 17 LOOP
+            v_blackjack_dealer_cards := array_append(v_blackjack_dealer_cards, v_shuffled_deck[v_blackjack_idx]);
+            v_blackjack_idx := v_blackjack_idx + 1;
+          END LOOP;
+          v_blackjack_dealer_value := public.arcade_blackjack_hand_value(v_blackjack_dealer_cards);
+          IF v_blackjack_dealer_value > 21 OR v_blackjack_player_value > v_blackjack_dealer_value THEN
+            v_compare_result := 'win';
+            v_blackjack_prize := v_blackjack_base_stake * 2;
+          ELSIF v_blackjack_player_value = v_blackjack_dealer_value THEN
+            v_compare_result := 'push';
+            v_blackjack_prize := v_blackjack_base_stake;
+          ELSE
+            v_compare_result := 'lose';
+            v_blackjack_prize := 0;
+          END IF;
+        END IF;
+        v_reward := greatest(v_session.stake - v_blackjack_used_total, 0) + v_blackjack_prize;
+        v_won := v_compare_result = 'win';
+      END IF;
+    END IF;
+
+    v_server_payload := jsonb_build_object(
+      'game', 'blackjack',
+      'mode', v_session.mode,
+      'stake', v_blackjack_base_stake,
+      'reservedStake', v_session.stake,
+      'decision', v_blackjack_decision,
+      'insuranceTaken', v_blackjack_insurance_taken,
+      'split', v_blackjack_split,
+      'won', v_won,
+      'push', v_compare_result IN ('push', 'split-push'),
+      'blackjack', v_compare_result = 'win' AND public.arcade_blackjack_hand_value(ARRAY[v_shuffled_deck[1], v_shuffled_deck[3]]) = 21,
+      'surrender', v_compare_result = 'surrender',
+      'playerCards', public.arcade_cards_json(v_blackjack_player_cards),
+      'dealerCards', public.arcade_cards_json(v_blackjack_dealer_cards),
+      'splitHandOne', public.arcade_cards_json(coalesce(v_blackjack_hand_one, ARRAY[]::text[])),
+      'splitHandTwo', public.arcade_cards_json(coalesce(v_blackjack_hand_two, ARRAY[]::text[])),
+      'playerValue', public.arcade_blackjack_hand_value(v_blackjack_player_cards),
+      'dealerValue', public.arcade_blackjack_hand_value(v_blackjack_dealer_cards),
+      'splitWins', v_blackjack_wins,
+      'splitLosses', v_blackjack_losses,
+      'splitPushes', v_blackjack_pushes,
+      'usedTotal', v_blackjack_used_total,
+      'payout', v_blackjack_prize,
+      'profit', v_reward - v_session.stake,
       'approved_reward', v_reward
     );
 

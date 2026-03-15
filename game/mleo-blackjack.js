@@ -9,9 +9,14 @@ import Layout from "../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { useFreePlayToken, getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../lib/free-play-system";
 import {
-  creditSharedVault,
+  finishArcadeSession,
+  startFreeplayArcadeSession,
+  startPaidArcadeSession,
+} from "../lib/arcadeSessionClient";
+import { createDeterministicCardDeck } from "../lib/arcadeDeterministicCards";
+import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
@@ -55,6 +60,7 @@ const GAME_ID = 2;
 const MINING_CLAIM_ABI = [{ type: "function", name: "claim", stateMutability: "nonpayable", inputs: [{ name: "gameId", type: "uint256" }, { name: "amount", type: "uint256" }], outputs: [] }];
 const S_CLICK = "/sounds/click.mp3";
 const S_WIN = "/sounds/gift.mp3";
+const RESERVED_STAKE_MULTIPLIER = 2.5;
 
 function safeRead(key, fallback = {}) { if (typeof window === "undefined") return fallback; try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
 function safeWrite(key, val) { if (typeof window === "undefined") return; try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
@@ -182,6 +188,8 @@ export default function BlackjackPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [collectAmount, setCollectAmount] = useState(100);
+  const [sessionId, setSessionId] = useState(null);
+  const [sessionError, setSessionError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -207,6 +215,12 @@ export default function BlackjackPage() {
     biggestWin: 0, blackjacks: 0, doubles: 0, splits: 0, surrenders: 0, 
     insuranceWins: 0, insuranceLosses: 0, lastPlay: MIN_PLAY 
   }));
+  const sessionIdRef = useRef(null);
+  const baseStakeRef = useRef(0);
+  const insuranceTakenRef = useRef(false);
+  const actionsRef = useRef([]);
+  const splitHandOneActionsRef = useRef([]);
+  const splitHandTwoActionsRef = useRef([]);
 
   const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
 
@@ -218,10 +232,96 @@ export default function BlackjackPage() {
     return result;
   };
 
-  const applyVaultCredit = async (amount, gameId) => {
-    const result = await creditSharedVault(amount, gameId);
-    setVaultState(result.balance);
-    return result;
+  const resetActionLog = (baseStake = 0) => {
+    baseStakeRef.current = Math.max(0, Math.floor(Number(baseStake) || 0));
+    insuranceTakenRef.current = false;
+    actionsRef.current = [];
+    splitHandOneActionsRef.current = [];
+    splitHandTwoActionsRef.current = [];
+  };
+
+  const buildBlackjackPayload = (decision = "play") => ({
+    baseStake: baseStakeRef.current,
+    insuranceTaken: insuranceTakenRef.current,
+    decision,
+    actions: actionsRef.current,
+    splitHandOneActions: splitHandOneActionsRef.current,
+    splitHandTwoActions: splitHandTwoActionsRef.current,
+  });
+
+  const finishBlackjackSession = async (decision = "play") => {
+    const activeSessionId = sessionIdRef.current;
+    if (!activeSessionId) return null;
+    const finishResult = await finishArcadeSession(activeSessionId, buildBlackjackPayload(decision));
+    if (!finishResult?.success) {
+      throw new Error(finishResult?.message || "Failed to finish session");
+    }
+
+    const payload = finishResult.serverPayload || {};
+    const payout = Math.max(0, Number(payload.payout || 0));
+    const profit = Number(payload.profit ?? 0);
+    const splitResult = Boolean(payload.split);
+    const push = Boolean(payload.push);
+    const win = Boolean(payload.won);
+    const totalPlay = Math.max(0, Number(payload.usedTotal || baseStakeRef.current));
+
+    if (Array.isArray(payload.dealerCards) && payload.dealerCards.length > 0) {
+      setOpponentHand(payload.dealerCards);
+    }
+    if (splitResult) {
+      if (Array.isArray(payload.splitHandOne)) {
+        setSplitHands([
+          { cards: payload.splitHandOne, play: baseStakeRef.current, finished: true, result: null },
+          { cards: Array.isArray(payload.splitHandTwo) ? payload.splitHandTwo : [], play: baseStakeRef.current, finished: true, result: null },
+        ]);
+      }
+    } else if (Array.isArray(payload.playerCards) && payload.playerCards.length > 0) {
+      setPlayerHand(payload.playerCards);
+    }
+
+    setVaultState(Number(finishResult.balanceAfter || 0));
+    if (win && payout > 0) {
+      playSfx(winSound.current);
+    }
+
+    setGameResult({
+      win,
+      push,
+      playerValue: Number(payload.playerValue || 0),
+      opponentValue: Number(payload.dealerValue || 0),
+      prize: payout,
+      profit,
+      blackjack: Boolean(payload.blackjack),
+      surrender: Boolean(payload.surrender),
+      split: splitResult,
+      splitWins: Number(payload.splitWins || 0),
+      splitLosses: Number(payload.splitLosses || 0),
+      splitPushes: Number(payload.splitPushes || 0),
+      insurance: insuranceTakenRef.current && !win && !push && payout > 0,
+    });
+
+    setStats((prev) => ({
+      ...prev,
+      totalHands: prev.totalHands + (splitResult ? 2 : 1),
+      wins: prev.wins + (splitResult ? Number(payload.splitWins || 0) : (win ? 1 : 0)),
+      losses: prev.losses + (splitResult ? Number(payload.splitLosses || 0) : (!win && !push ? 1 : 0)),
+      pushes: prev.pushes + (splitResult ? Number(payload.splitPushes || 0) : (push ? 1 : 0)),
+      totalPlay: prev.totalPlay + totalPlay,
+      totalWon: prev.totalWon + payout,
+      biggestWin: Math.max(prev.biggestWin, payout),
+      blackjacks: prev.blackjacks + (payload.blackjack ? 1 : 0),
+      doubles: prev.doubles + (decision === "double" ? 1 : 0),
+      splits: prev.splits + (splitResult ? 1 : 0),
+      surrenders: prev.surrenders + (payload.surrender ? 1 : 0),
+      insuranceWins: prev.insuranceWins + (insuranceTakenRef.current && !win && !push && payout > 0 ? 1 : 0),
+      insuranceLosses: prev.insuranceLosses + (insuranceTakenRef.current && payout === 0 ? 1 : 0),
+      lastPlay: baseStakeRef.current || prev.lastPlay,
+    }));
+
+    sessionIdRef.current = null;
+    setSessionId(null);
+    setGameState("finished");
+    return { finishResult, payload };
   };
 
   useEffect(() => {
@@ -285,26 +385,11 @@ export default function BlackjackPage() {
     } catch (err) { console.error(err); alert("Claim failed or rejected"); } finally { setClaiming(false); }
   };
 
-  const checkOpponentPerfect21 = async (opponent, player, play) => {
+  const checkOpponentPerfect21 = async (opponent, player) => {
     const opponentVal = calculateHandValue(opponent);
     if (opponentVal === 21) {
-      const playerVal = calculateHandValue(player);
-      if (playerVal === 21) {
-        // Both have perfect 21 - push
-        await applyVaultCredit(play, "blackjack-push");
-        setGameResult({ win: false, push: true, playerValue: 21, opponentValue: 21, prize: play, profit: 0, blackjack: false });
-        const newStats = { ...stats, totalHands: stats.totalHands + 1, pushes: stats.pushes + 1, totalPlay: stats.totalPlay + play, totalWon: stats.totalWon + play, lastPlay: play };
-        setStats(newStats);
-        setGameState("finished");
-        return true;
-      } else {
-        // Opponent has perfect 21, player doesn't - opponent wins
-        setGameResult({ win: false, push: false, playerValue: playerVal, opponentValue: 21, prize: 0, profit: -play, blackjack: false });
-        const newStats = { ...stats, totalHands: stats.totalHands + 1, losses: stats.losses + 1, totalPlay: stats.totalPlay + play, lastPlay: play };
-        setStats(newStats);
-        setGameState("finished");
-        return true;
-    }
+      await finishBlackjackSession("play");
+      return true;
     }
     return false;
   };
@@ -312,28 +397,43 @@ export default function BlackjackPage() {
   const dealCards = async (isFreePlayParam = false) => {
     if (gameState !== "playing" && gameState !== "lobby" && gameState !== "finished") return;
     playSfx(clickSound.current);
+    setSessionError("");
     let play = Number(playAmount) || MIN_PLAY;
+    let nextSessionId = null;
     if (isFreePlay || isFreePlayParam) {
       const gameId = router.pathname.replace('/', '') || 'blackjack';
       try {
-        const result = await useFreePlayToken(gameId);
+        const result = await startFreeplayArcadeSession(gameId);
         if (result.success) { 
-          play = result.amount;
+          play = Math.max(MIN_PLAY, Math.floor(Number(result.amount || 0) / RESERVED_STAKE_MULTIPLIER) || MIN_PLAY);
+          nextSessionId = result.sessionId;
+          setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
         }
-        else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); return; }
+        else { setSessionError("Failed to start session"); alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); return; }
       } catch (error) {
         console.error('Free play error:', error);
+        setSessionError("Failed to start session");
         alert('Failed to use free play token. Please try again.');
         setIsFreePlay(false);
         return;
       }
     } else {
       if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
-      const debitResult = await applyVaultDebit(play, "blackjack");
-      if (!debitResult.ok) { alert(debitResult.error || 'Insufficient MLEO in vault'); return; }
+      const reservedStake = Math.floor(play * RESERVED_STAKE_MULTIPLIER);
+      const startResult = await startPaidArcadeSession("blackjack", reservedStake);
+      if (!startResult.success) {
+        setSessionError("Failed to start session");
+        alert(startResult.message || "Failed to start session");
+        return;
+      }
+      nextSessionId = startResult.sessionId;
+      setVaultState(startResult.balanceAfter);
     }
     setPlayAmount(String(play));
+    setSessionId(nextSessionId);
+    sessionIdRef.current = nextSessionId;
+    resetActionLog(play);
 
     // Reset all states
     setHasDoubled(false);
@@ -343,8 +443,8 @@ export default function BlackjackPage() {
     setIsSplitGame(false);
     setSplitHands([]);
     setCurrentSplitIndex(0);
+    const newDeck = createDeterministicCardDeck(nextSessionId);
 
-    const newDeck = shuffleDeck(createDeck());
     const player = [newDeck[0], newDeck[2]];
     const opponent = [newDeck[1], newDeck[3]];
     setDeck(newDeck.slice(4));
@@ -373,17 +473,10 @@ export default function BlackjackPage() {
         if (playerValue === 21) {
           // Player has perfect 21 - check if opponent also has it
           setTimeout(async () => {
-            if (await checkOpponentPerfect21(opponent, player, play)) {
+            if (await checkOpponentPerfect21(opponent, player)) {
               return;
             }
-            // Player perfect 21 wins
-            const prize = Math.floor(play * 2.5);
-            await applyVaultCredit(prize, "blackjack-perfect21");
-            playSfx(winSound.current);
-            setGameResult({ win: true, push: false, playerValue: 21, opponentValue: calculateHandValue(opponent), prize, profit: prize - play, blackjack: true });
-            const newStats = { ...stats, totalHands: stats.totalHands + 1, wins: stats.wins + 1, totalPlay: stats.totalPlay + play, totalWon: stats.totalWon + prize, biggestWin: Math.max(stats.biggestWin, prize), blackjacks: stats.blackjacks + 1, lastPlay: play };
-            setStats(newStats);
-            setGameState("finished");
+            await finishBlackjackSession("play");
           }, 700);
           return;
         }
@@ -406,58 +499,15 @@ export default function BlackjackPage() {
     playSfx(clickSound.current);
     const play = Number(playAmount);
     const insuranceAmount = Math.floor(play / 2);
-    const currentVault = readVaultBalance();
-    
-    if (currentVault < insuranceAmount) {
-      alert('Insufficient MLEO for insurance!');
-      setShowInsurance(false);
-      setGameState("playing");
-      setCanDouble(true);
-      setCanSplit(canSplitCards(playerHand));
-      setCanSurrender(true);
-      return;
-    }
-
-    const debitResult = await applyVaultDebit(insuranceAmount, "blackjack-insurance");
-    if (!debitResult.ok) {
-      alert(debitResult.error || 'Insufficient MLEO for insurance!');
-      setShowInsurance(false);
-      setGameState("playing");
-      setCanDouble(true);
-      setCanSplit(canSplitCards(playerHand));
-      setCanSurrender(true);
-      return;
-    }
+    insuranceTakenRef.current = true;
     setInsuranceBet(insuranceAmount);
     setShowInsurance(false);
 
     // Check for opponent perfect 21
     const opponentVal = calculateHandValue(opponentHand);
     if (opponentVal === 21) {
-      // Insurance pays 2:1
-      const insurancePrize = insuranceAmount * 3; // play + 2x win
-      await applyVaultCredit(insurancePrize, "blackjack-insurance");
-      
-      // Player loses main play but wins insurance
-      const playerVal = calculateHandValue(playerHand);
-      setGameResult({ 
-        win: false, 
-        push: false, 
-        playerValue: playerVal, 
-        opponentValue: 21, 
-        prize: insurancePrize, 
-        profit: insuranceAmount - play, // Insurance win - main play loss
-        blackjack: false,
-        insurance: true
-      });
-      const newStats = { ...stats, totalHands: stats.totalHands + 1, losses: stats.losses + 1, totalPlay: stats.totalPlay + play + insuranceAmount, totalWon: stats.totalWon + insurancePrize, insuranceWins: stats.insuranceWins + 1, lastPlay: play };
-      setStats(newStats);
-      setGameState("finished");
+      await finishBlackjackSession("play");
       return;
-    } else {
-      // No perfect 21 - insurance lost
-      const newStats = { ...stats, insuranceLosses: stats.insuranceLosses + 1 };
-      setStats(newStats);
     }
 
     setGameState("playing");
@@ -468,10 +518,11 @@ export default function BlackjackPage() {
 
   const declineInsurance = async () => {
     playSfx(clickSound.current);
+    insuranceTakenRef.current = false;
     setShowInsurance(false);
     
     // Check for opponent perfect 21 anyway
-    if (await checkOpponentPerfect21(opponentHand, playerHand, Number(playAmount))) {
+    if (await checkOpponentPerfect21(opponentHand, playerHand)) {
       return;
     }
 
@@ -484,20 +535,7 @@ export default function BlackjackPage() {
   const doubleDown = async () => {
     if (!canDouble || gameState !== "playing") return;
     playSfx(clickSound.current);
-
     const play = Number(playAmount);
-    const currentVault = readVaultBalance();
-    
-    if (currentVault < play) {
-      alert('Insufficient MLEO to double down!');
-      return;
-    }
-
-    const debitResult = await applyVaultDebit(play, "blackjack-double");
-    if (!debitResult.ok) {
-      alert(debitResult.error || 'Insufficient MLEO to double down!');
-      return;
-    }
     setPlayAmount(String(play * 2));
     setHasDoubled(true);
     setCanDouble(false);
@@ -519,10 +557,12 @@ export default function BlackjackPage() {
       const value = calculateHandValue(newHand);
       if (value > 21) {
         setGameState("finished");
-        setTimeout(() => finishGame(newHand, opponentHand, play * 2, false), 800);
+        setTimeout(() => finishBlackjackSession("double").catch((error) => {
+          console.error("Blackjack finish session error:", error);
+          setSessionError("Session failed to finish");
+        }), 800);
       } else {
-        // Automatically stand after double down
-        stand(newHand, play * 2);
+        stand(newHand, play * 2, true);
       }
     }, 600);
 
@@ -533,20 +573,7 @@ export default function BlackjackPage() {
   const split = async () => {
     if (!canSplit || gameState !== "playing") return;
     playSfx(clickSound.current);
-
     const play = Number(playAmount);
-    const currentVault = readVaultBalance();
-    
-    if (currentVault < play) {
-      alert('Insufficient MLEO to split!');
-      return;
-    }
-
-    const debitResult = await applyVaultDebit(play, "blackjack-split");
-    if (!debitResult.ok) {
-      alert(debitResult.error || 'Insufficient MLEO to split!');
-      return;
-    }
     setCanDouble(false);
     setCanSplit(false);
     setCanSurrender(false);
@@ -612,7 +639,9 @@ export default function BlackjackPage() {
           setOpponentHand([...currentOpponentHand]);
           setDeck(currentDeck);
           setGameState("finished");
-          setTimeout(() => finishGame(currentPlayerHand, currentOpponentHand, play, false), 1200);
+          setTimeout(() => {
+            evaluateSplitResults();
+          }, 1200);
           return;
         }
         currentOpponentHand.push(currentDeck[0]);
@@ -631,111 +660,23 @@ export default function BlackjackPage() {
     setTimeout(opponentPlay, 500);
   };
   
-  const evaluateSplitResults = async (hands, opponent, individualBet) => {
-    const opponentValue = calculateHandValue(opponent);
-
-    // Evaluate each hand
-    let totalPrize = 0;
-    let wins = 0;
-    let losses = 0;
-    let pushes = 0;
-
-    hands.forEach(hand => {
-      const playerValue = calculateHandValue(hand.cards);
-      let win = false;
-      let push = false;
-      let prize = 0;
-
-      if (playerValue > 21) {
-        win = false;
-      } else if (opponentValue > 21) {
-        win = true;
-        prize = individualBet * 2;
-      } else if (playerValue > opponentValue) {
-        win = true;
-        prize = individualBet * 2;
-      } else if (playerValue === opponentValue) {
-        push = true;
-        prize = individualBet;
-      }
-
-      if (win) wins++;
-      else if (push) pushes++;
-      else losses++;
-
-      totalPrize += prize;
-    });
-
-    if (totalPrize > 0) {
-      await applyVaultCredit(totalPrize, "blackjack-split-settle");
-      if (wins > 0) playSfx(winSound.current);
-    }
-
-    const totalPlay = individualBet * 2;
-    const profit = totalPrize - totalPlay;
-
-    setGameResult({ 
-      win: wins > losses, 
-      push: wins === 0 && losses === 0, 
-      prize: totalPrize, 
-      profit: profit,
-      split: true,
-      splitWins: wins,
-      splitLosses: losses,
-      splitPushes: pushes
-    });
-
-    const newStats = { 
-      ...stats, 
-      totalHands: stats.totalHands + 2, // Split counts as 2 hands
-      wins: stats.wins + wins,
-      losses: stats.losses + losses,
-      pushes: stats.pushes + pushes,
-      totalPlay: stats.totalPlay + totalPlay,
-      totalWon: stats.totalWon + totalPrize,
-      biggestWin: Math.max(stats.biggestWin, totalPrize),
-      lastPlay: individualBet
-    };
-    setStats(newStats);
-    setGameState("finished");
+  const evaluateSplitResults = async () => {
+    await finishBlackjackSession("split");
   };
 
   const surrender = async () => {
     if (!canSurrender || gameState !== "playing") return;
     playSfx(clickSound.current);
-    
-    const play = Number(playAmount);
-    const refund = Math.floor(play / 2);
-    
-    // Refund half the play
-    await applyVaultCredit(refund, "blackjack-surrender");
-    
     setHasSurrendered(true);
     setCanDouble(false);
     setCanSplit(false);
     setCanSurrender(false);
-
-    setGameResult({ 
-      win: false, 
-      push: false, 
-      playerValue: calculateHandValue(playerHand), 
-      opponentValue: 0, 
-      prize: refund, 
-      profit: -Math.floor(play / 2),
-      surrender: true
-    });
-
-    const newStats = {
-      ...stats,
-      totalHands: stats.totalHands + 1,
-      losses: stats.losses + 1,
-      surrenders: stats.surrenders + 1,
-      totalPlay: stats.totalPlay + play,
-      totalWon: stats.totalWon + refund,
-      lastPlay: play
-    };
-    setStats(newStats);
-    setGameState("finished");
+    try {
+      await finishBlackjackSession("surrender");
+    } catch (error) {
+      console.error("Blackjack surrender session error:", error);
+      setSessionError("Session failed to finish");
+    }
   };
 
   const hit = () => {
@@ -747,6 +688,8 @@ export default function BlackjackPage() {
     setCanSurrender(false);
 
     if (isSplitGame) {
+      if (currentSplitIndex === 0) splitHandOneActionsRef.current.push("hit");
+      else splitHandTwoActionsRef.current.push("hit");
       if (!deck || deck.length === 0) {
         alert('Deck is empty! Please start a new game.');
         return;
@@ -782,6 +725,7 @@ export default function BlackjackPage() {
         }
       }, 600);
     } else {
+      actionsRef.current.push("hit");
       if (!deck || deck.length === 0) {
         alert('Deck is empty! Please start a new game.');
         return;
@@ -796,7 +740,10 @@ export default function BlackjackPage() {
         const value = calculateHandValue(newHand);
         if (value > 21) {
           setGameState("finished");
-          setTimeout(() => finishGame(newHand, opponentHand, Number(playAmount), false), 800);
+          setTimeout(() => finishBlackjackSession("play").catch((error) => {
+            console.error("Blackjack finish session error:", error);
+            setSessionError("Session failed to finish");
+          }), 800);
         } else if (value === 21) {
           stand(newHand);
         }
@@ -805,6 +752,8 @@ export default function BlackjackPage() {
   };
 
   const standSplitHand = () => {
+    if (currentSplitIndex === 0) splitHandOneActionsRef.current.push("stand");
+    else splitHandTwoActionsRef.current.push("stand");
     const newHands = [...splitHands];
     newHands[currentSplitIndex].finished = true;
     setSplitHands(newHands);
@@ -819,7 +768,7 @@ export default function BlackjackPage() {
     }
   };
 
-  const stand = (hand = null, customBet = null) => {
+  const stand = (hand = null, customBet = null, isDouble = false) => {
     if (gameState !== "playing") return;
     playSfx(clickSound.current);
     
@@ -832,6 +781,11 @@ export default function BlackjackPage() {
     setCanDouble(false);
     setCanSplit(false);
     setCanSurrender(false);
+    if (isDouble) {
+      actionsRef.current.push("double");
+    } else {
+      actionsRef.current.push("stand");
+    }
 
     const currentPlayerHand = hand || playerHand;
     const play = customBet || Number(playAmount);
@@ -847,7 +801,10 @@ export default function BlackjackPage() {
           setOpponentHand([...currentOpponentHand]);
           setDeck(currentDeck);
           setGameState("finished");
-          setTimeout(() => finishGame(currentPlayerHand, currentOpponentHand, play, false), 1200);
+          setTimeout(() => finishBlackjackSession(isDouble ? "double" : "play").catch((error) => {
+            console.error("Blackjack finish session error:", error);
+            setSessionError("Session failed to finish");
+          }), 1200);
           return;
         }
         
@@ -856,7 +813,10 @@ export default function BlackjackPage() {
           setOpponentHand([...currentOpponentHand]);
           setDeck(currentDeck);
           setGameState("finished");
-          setTimeout(() => finishGame(currentPlayerHand, currentOpponentHand, play, false), 1200);
+          setTimeout(() => finishBlackjackSession(isDouble ? "double" : "play").catch((error) => {
+            console.error("Blackjack finish session error:", error);
+            setSessionError("Session failed to finish");
+          }), 1200);
           return;
         }
         currentOpponentHand.push(currentDeck[0]);
@@ -875,41 +835,6 @@ export default function BlackjackPage() {
     setTimeout(opponentPlay, 500);
   };
 
-  const finishGame = async (player, opponent, play, isBlackjack) => {
-    const playerValue = calculateHandValue(player);
-    const opponentValue = calculateHandValue(opponent);
-    let win = false;
-    let push = false;
-    let prize = 0;
-
-    if (isBlackjack) {
-      win = true;
-      prize = Math.floor(play * 2.5);
-    } else if (playerValue > 21) {
-      win = false;
-    } else if (opponentValue > 21) {
-      win = true;
-      prize = play * 2;
-    } else if (playerValue > opponentValue) {
-      win = true;
-      prize = play * 2;
-    } else if (playerValue === opponentValue) {
-      push = true;
-      prize = play;
-    }
-
-    if (win || push) {
-      await applyVaultCredit(prize, push ? "blackjack-push" : "blackjack-settle");
-      if (win) playSfx(winSound.current);
-    }
-
-    const resultData = { win, push, playerValue, opponentValue, prize, profit: win ? prize - play : push ? 0 : -play, blackjack: isBlackjack };
-    setGameResult(resultData);
-
-    const newStats = { ...stats, totalHands: stats.totalHands + 1, wins: win ? stats.wins + 1 : stats.wins, losses: (!win && !push) ? stats.losses + 1 : stats.losses, pushes: push ? stats.pushes + 1 : stats.pushes, totalPlay: stats.totalPlay + play, totalWon: (win || push) ? stats.totalWon + prize : stats.totalWon, biggestWin: Math.max(stats.biggestWin, win ? prize : 0), blackjacks: isBlackjack ? stats.blackjacks + 1 : stats.blackjacks, lastPlay: play };
-    setStats(newStats);
-  };
-
   const newHand = () => { 
     setGameState("lobby"); 
     setPlayerHand([]);
@@ -926,6 +851,10 @@ export default function BlackjackPage() {
     setIsSplitGame(false);
     setSplitHands([]);
     setCurrentSplitIndex(0);
+    setSessionError("");
+    setSessionId(null);
+    sessionIdRef.current = null;
+    resetActionLog(0);
   };
 
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
@@ -964,6 +893,12 @@ export default function BlackjackPage() {
             </div>
           </div>
         </div>
+
+        {sessionError ? (
+          <div className="absolute top-[72px] left-1/2 -translate-x-1/2 z-40 px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/40 text-red-200 text-sm">
+            {sessionError}
+          </div>
+        ) : null}
 
         <div className="relative h-full flex flex-col items-center justify-start px-4 pb-4" style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}>
           <div className="text-center mb-1">
