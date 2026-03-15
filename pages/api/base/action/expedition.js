@@ -4,9 +4,11 @@ import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { checkIpRateLimit } from "../../../../lib/server/ipRateLimit";
 import { validateCsrfToken } from "../../../../lib/server/csrf";
 import { logCsrfFailure, logIpRateLimitExceeded } from "../../../../lib/server/securityLogger";
-
+import { logError, EVENTS } from "../../../../lib/server/monitoring";
 
 export default async function handler(req, res) {
+  let deviceId = null;
+
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ success: false, code: "METHOD_NOT_ALLOWED", message: "Method not allowed" });
@@ -24,7 +26,7 @@ export default async function handler(req, res) {
       return res.status(429).json({ success: false, code: "RATE_LIMIT_IP", message: "Too many requests from this IP" });
     }
 
-    const deviceId = getArcadeDevice(req);
+    deviceId = getArcadeDevice(req);
     if (!deviceId) {
       return res.status(401).json({ success: false, code: "DEVICE_NOT_INITIALIZED", message: "Device not initialized" });
     }
@@ -71,6 +73,7 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error("base/action/expedition failed", error);
+    logError(error, { event: EVENTS.BASE_EXPEDITION_FAIL, deviceId });
     return res.status(500).json({ success: false, code: "BASE_EXPEDITION_INTERNAL_ERROR", message: "Expedition action failed" });
   }
 }
