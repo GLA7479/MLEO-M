@@ -2880,68 +2880,6 @@ export default function MleoBase() {
             </div>
           </div>
 
-          {/* Desktop */}
-          <div className="mt-6 hidden gap-3 xl:grid xl:grid-cols-6 xl:items-stretch">
-            <MetricCard
-              label="Shared Vault"
-              value={`${fmt(sharedVault)} MLEO`}
-              note="Shared across Miners, Arcade and Online."
-              accent="emerald"
-            />
-            <MetricCard
-              label="Base Banked"
-              value={`${fmt(state.bankedMleo)} MLEO`}
-              note="Refined here, then shipped."
-              accent="violet"
-            />
-            <MetricCard
-              label="Commander"
-              value={`Lv ${state.commanderLevel}`}
-              note={`${fmt(state.commanderXp)} / ${fmt(xpForLevel(state.commanderLevel))} XP`}
-              accent="sky"
-            />
-            <div className={`h-full w-full ${highlightCard((state.resources.ENERGY || 0) <= derived.energyCap * 0.25, "warning")}`}>
-              <MetricCard
-                label="Energy"
-                value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
-                note={`Regen ${derived.energyRegen.toFixed(2)}/s`}
-                accent="slate"
-              />
-            </div>
-            <div className={`h-full w-full ${highlightCard(systemState === "critical", "critical") || highlightCard(systemState === "warning", "warning")}`}>
-              <MetricCard
-                label="Stability"
-                value={`${fmt(state.stability)}%`}
-                note={systemMeta.label}
-                accent={systemMeta.accent}
-              />
-            </div>
-            <MetricCard
-              label="Data"
-              value={fmt(state.resources.DATA)}
-              note={`x${derived.dataMult.toFixed(2)} progression`}
-              accent="sky"
-            />
-          </div>
-
-          <div className="mt-3 hidden xl:grid xl:grid-cols-3 gap-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Ore</div>
-              <div className="mt-1 text-lg font-bold text-white">{fmt(state.resources.ORE)}</div>
-              <div className="mt-1 text-xs text-white/55">x{derived.oreMult.toFixed(2)} output</div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Gold</div>
-              <div className="mt-1 text-lg font-bold text-white">{fmt(state.resources.GOLD)}</div>
-              <div className="mt-1 text-xs text-white/55">x{derived.goldMult.toFixed(2)} output</div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Scrap</div>
-              <div className="mt-1 text-lg font-bold text-white">{fmt(state.resources.SCRAP)}</div>
-              <div className="mt-1 text-xs text-white/55">x{derived.scrapMult.toFixed(2)} output</div>
-            </div>
-          </div>
-
           {/* Mobile Bottom Nav */}
           <div className="fixed inset-x-0 bottom-0 z-[110] border-t border-white/10 bg-[#07111f]/95 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3 backdrop-blur sm:hidden">
             <div className="grid grid-cols-4 gap-2">
