@@ -2705,7 +2705,7 @@ export default function MleoBase() {
 
   return (
     <Layout title="MLEO BASE">
-      <main className="min-h-screen overflow-x-hidden bg-[#07111f] text-white">
+      <main className="h-[100dvh] overflow-hidden overflow-x-hidden bg-[#07111f] text-white sm:min-h-screen sm:h-auto sm:overflow-visible">
         <div className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -2835,7 +2835,7 @@ export default function MleoBase() {
           </div>
 
           {/* Mobile */}
-          <div className="mt-6 space-y-3 sm:hidden pb-2">
+          <div className="mt-4 space-y-3 sm:hidden overscroll-none pb-0">
 
             <div
               onClick={() => {
@@ -2918,7 +2918,7 @@ export default function MleoBase() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="mt-auto grid grid-cols-3 gap-2">
               <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
                 <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Ore</div>
                 <div className="mt-1 text-sm font-bold text-white">{fmt(state.resources.ORE)}</div>
