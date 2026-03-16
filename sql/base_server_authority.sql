@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS public.base_device_state (
   sent_today bigint NOT NULL DEFAULT 0,
   total_banked bigint NOT NULL DEFAULT 0,
   total_shared_spent bigint NOT NULL DEFAULT 0,
+  total_missions_done bigint NOT NULL DEFAULT 0,
   commander_level integer NOT NULL DEFAULT 1,
   commander_xp bigint NOT NULL DEFAULT 0,
   blueprint_level integer NOT NULL DEFAULT 0,
@@ -175,6 +176,9 @@ ADD COLUMN IF NOT EXISTS crew_role text DEFAULT 'engineer';
 ALTER TABLE public.base_device_state
 ADD COLUMN IF NOT EXISTS commander_path text DEFAULT 'industry';
 
+ALTER TABLE public.base_device_state
+ADD COLUMN IF NOT EXISTS total_missions_done bigint NOT NULL DEFAULT 0;
+
 -- Update existing rows to have default values if NULL
 UPDATE public.base_device_state
 SET crew_role = 'engineer'
@@ -281,6 +285,7 @@ BEGIN
       sent_today = 0,
       total_banked = 0,
       total_shared_spent = 0,
+      total_missions_done = 0,
       overclock_until = NULL,
       expedition_ready_at = now(),
       maintenance_due = 0,
