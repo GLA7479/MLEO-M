@@ -881,7 +881,7 @@ function getMissionProgress(state) {
 
 function freshState() {
   return {
-    version: 5,
+    version: 6,
     lastDay: todayKey(),
     lastTickAt: Date.now(),
     lastHiddenAt: 0,
@@ -938,6 +938,79 @@ function freshState() {
       claimed: {},
     },
     log: pushLog([], "MLEO BASE online. HQ is active."),
+  };
+}
+
+function normalizeServerState(raw) {
+  if (!raw) return freshState();
+
+  const seed = freshState();
+
+  const lastTick =
+    raw.lastTickAt ??
+    (raw.last_tick_at ? new Date(raw.last_tick_at).getTime() : Date.now());
+
+  const expeditionReady =
+    raw.expeditionReadyAt ??
+    (raw.expedition_ready_at
+      ? new Date(raw.expedition_ready_at).getTime()
+      : Date.now());
+
+  const overclockUntil =
+    raw.overclockUntil ??
+    (raw.overclock_until ? new Date(raw.overclock_until).getTime() : 0);
+
+  return {
+    ...seed,
+    ...raw,
+    version: Number(raw.version ?? seed.version),
+    lastDay: raw.lastDay || raw.last_day || seed.lastDay,
+    lastTickAt: lastTick,
+    lastHiddenAt: 0,
+    resources: raw.resources || seed.resources,
+    buildings: raw.buildings || seed.buildings,
+    modules: raw.modules || {},
+    research: raw.research || {},
+    crew: Number(raw.crew ?? 0),
+    crewRole: raw.crewRole || raw.crew_role || "engineer",
+    commanderPath: raw.commanderPath || raw.commander_path || "industry",
+    bankedMleo: Number(raw.bankedMleo ?? raw.banked_mleo ?? 0),
+    sentToday: Number(raw.sentToday ?? raw.sent_today ?? 0),
+    totalBanked: Number(raw.totalBanked ?? raw.total_banked ?? 0),
+    totalSharedSpent: Number(
+      raw.totalSharedSpent ?? raw.total_shared_spent ?? 0
+    ),
+    totalMissionsDone: Number(
+      raw.totalMissionsDone ?? raw.total_missions_done ?? 0
+    ),
+    totalExpeditions: Number(
+      raw.totalExpeditions ?? raw.total_expeditions ?? 0
+    ),
+    blueprintLevel: Number(raw.blueprintLevel ?? raw.blueprint_level ?? 0),
+    overclockUntil,
+    expeditionReadyAt: expeditionReady,
+    maintenanceDue: Number(raw.maintenanceDue ?? raw.maintenance_due ?? 0),
+    stability: Number(raw.stability ?? seed.stability),
+    commanderXp: Number(raw.commanderXp ?? raw.commander_xp ?? 0),
+    commanderLevel: Number(
+      raw.commanderLevel ?? raw.commander_level ?? seed.commanderLevel
+    ),
+    stats: raw.stats || seed.stats,
+    missionState: {
+      dailySeed:
+        raw?.missionState?.dailySeed ||
+        raw?.mission_state?.dailySeed ||
+        todayKey(),
+      completed: {
+        ...(raw?.missionState?.completed || {}),
+        ...(raw?.mission_state?.completed || {}),
+      },
+      claimed: {
+        ...(raw?.missionState?.claimed || {}),
+        ...(raw?.mission_state?.claimed || {}),
+      },
+    },
+    log: Array.isArray(raw.log) ? raw.log : seed.log,
   };
 }
 
@@ -1439,60 +1512,27 @@ export default function MleoBase() {
         const serverRes = await getBaseState();
         const saved = serverRes?.state || null;
 
-        // Reset state if version is less than 5 (new starter pack) or reset flag is set
-        const resetFlag = typeof window !== "undefined" ? window.localStorage.getItem("base_reset_flag") === "true" : false;
-        const resetVersion = typeof window !== "undefined" ? window.localStorage.getItem("base_reset_version") : null;
-        
-        // If reset flag is set, treat saved version as 0 to force reset
-        const savedVersion = resetFlag && resetVersion ? Number(resetVersion) : (saved ? Number(saved.version || 0) : 0);
-        const shouldReset = savedVersion < 5 || resetFlag;
+        // Reset state if version is less than 6 (new starter pack) or reset flag is set
+        const resetFlag =
+          typeof window !== "undefined"
+            ? window.localStorage.getItem("base_reset_flag") === "true"
+            : false;
+        const resetVersion =
+          typeof window !== "undefined"
+            ? window.localStorage.getItem("base_reset_version")
+            : null;
 
-        const initial = saved && !shouldReset
-          ? {
-              ...seed,
-              version: Number(saved.version || seed.version),
-              lastDay: saved.last_day || seed.lastDay,
-              bankedMleo: Number(saved.banked_mleo || 0),
-              sentToday: Number(saved.sent_today || 0),
-              totalBanked: Number(saved.total_banked || 0),
-              totalSharedSpent: Number(saved.total_shared_spent || 0),
-              commanderLevel: Number(saved.commander_level || 1),
-              commanderXp: Number(saved.commander_xp || 0),
-              commanderPath: saved.commander_path || seed.commanderPath,
-              blueprintLevel: Number(saved.blueprint_level || 0),
-              crew: Number(saved.crew || 0),
-              crewRole: saved.crew_role || seed.crewRole,
-              overclockUntil: saved.overclock_until ? new Date(saved.overclock_until).getTime() : 0,
-              expeditionReadyAt: saved.expedition_ready_at ? new Date(saved.expedition_ready_at).getTime() : Date.now(),
-              maintenanceDue: Number(saved.maintenance_due || 0),
-              stability: Number(saved.stability || 100),
-              resources: { ...seed.resources, ...(saved.resources || {}) },
-              buildings: { ...seed.buildings, ...(saved.buildings || {}) },
-              modules: { ...(saved.modules || {}) },
-              research: { ...(saved.research || {}) },
-              stats: { ...seed.stats, ...(saved.stats || {}) },
-              missionState: {
-                dailySeed:
-                  saved?.missionState?.dailySeed ||
-                  saved?.mission_state?.dailySeed ||
-                  seed?.missionState?.dailySeed ||
-                  todayKey(),
-                completed: {
-                  ...(seed?.missionState?.completed || {}),
-                  ...(saved?.missionState?.completed || {}),
-                  ...(saved?.mission_state?.completed || {}),
-                },
-                claimed: {
-                  ...(seed?.missionState?.claimed || {}),
-                  ...(saved?.missionState?.claimed || {}),
-                  ...(saved?.mission_state?.claimed || {}),
-                },
-              },
-              log: Array.isArray(saved.log) && saved.log.length ? saved.log : seed.log,
-              lastTickAt: Date.now(),
-              lastHiddenAt: 0,
-            }
-          : seed;
+        // If reset flag is set, treat saved version as 0 to force reset
+        const savedVersion =
+          resetFlag && resetVersion
+            ? Number(resetVersion)
+            : saved
+            ? Number(saved.version || 0)
+            : 0;
+        const shouldReset = savedVersion < 6 || resetFlag;
+
+        const initial =
+          saved && !shouldReset ? normalizeServerState(saved) : seed;
 
         if (!alive) return;
 
@@ -1540,50 +1580,29 @@ export default function MleoBase() {
         const serverState = res?.state;
         if (!alive || !serverState) return;
 
-        setState((prev) => ({
-          ...prev,
-          version: Number(serverState.version || prev.version),
-          lastDay: serverState.last_day || prev.lastDay,
-          bankedMleo: Number(serverState.banked_mleo || prev.bankedMleo),
-          sentToday: Number(serverState.sent_today || prev.sentToday),
-          totalBanked: Number(serverState.total_banked || prev.totalBanked),
-          totalSharedSpent: Number(serverState.total_shared_spent || prev.totalSharedSpent),
-          commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
-          commanderXp: Number(serverState.commander_xp || prev.commanderXp),
-          commanderPath: serverState.commander_path || prev.commanderPath,
-          blueprintLevel: Number(serverState.blueprint_level || prev.blueprintLevel),
-          crew: Number(serverState.crew || prev.crew),
-          crewRole: serverState.crew_role || prev.crewRole,
-          overclockUntil: serverState.overclock_until ? new Date(serverState.overclock_until).getTime() : 0,
-          expeditionReadyAt: serverState.expedition_ready_at ? new Date(serverState.expedition_ready_at).getTime() : prev.expeditionReadyAt,
-          maintenanceDue: Number(serverState.maintenance_due || prev.maintenanceDue),
-          stability: Number(serverState.stability || prev.stability),
-          resources: serverState.resources || prev.resources,
-          buildings: serverState.buildings || prev.buildings,
-          modules: serverState.modules || prev.modules,
-          research: serverState.research || prev.research,
-          stats: { ...prev.stats, ...(serverState.stats || {}) },
-          missionState: {
-            dailySeed:
-              serverState?.missionState?.dailySeed ||
-              serverState?.mission_state?.dailySeed ||
-              prev?.missionState?.dailySeed ||
-              todayKey(),
-            completed: {
-              ...(prev?.missionState?.completed || {}),
-              ...(serverState?.missionState?.completed || {}),
-              ...(serverState?.mission_state?.completed || {}),
+        setState((prev) =>
+          applyLevelUps({
+            ...prev,
+            ...normalizeServerState(serverState),
+            missionState: {
+              dailySeed:
+                serverState?.missionState?.dailySeed ||
+                serverState?.mission_state?.dailySeed ||
+                prev?.missionState?.dailySeed ||
+                todayKey(),
+              completed: {
+                ...(prev?.missionState?.completed || {}),
+                ...(serverState?.missionState?.completed || {}),
+                ...(serverState?.mission_state?.completed || {}),
+              },
+              claimed: {
+                ...(prev?.missionState?.claimed || {}),
+                ...(serverState?.missionState?.claimed || {}),
+                ...(serverState?.mission_state?.claimed || {}),
+              },
             },
-            claimed: {
-              ...(prev?.missionState?.claimed || {}),
-              ...(serverState?.missionState?.claimed || {}),
-              ...(serverState?.mission_state?.claimed || {}),
-            },
-          },
-          log: Array.isArray(serverState.log) && serverState.log.length ? serverState.log : prev.log,
-          lastTickAt: Date.now(),
-          lastHiddenAt: 0,
-        }));
+          })
+        );
       } catch (error) {
         console.error("BASE refresh failed", error);
       }
@@ -1879,16 +1898,30 @@ export default function MleoBase() {
       if (res?.success && res?.state) {
         const serverState = res.state;
         setState((prev) => {
-          const next = {
+          const base = normalizeServerState(serverState);
+          const next = applyLevelUps({
             ...prev,
-            resources: serverState.resources || prev.resources,
-            buildings: serverState.buildings || prev.buildings,
-            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
-            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
-            stats: { ...prev.stats, ...(serverState.stats || {}) },
-            log: pushLog(prev.log, `${def.name} upgraded to level ${res.new_level || level + 1}.`),
-          };
-          return applyLevelUps(next);
+            ...base,
+            missionState: {
+              dailySeed:
+                base?.missionState?.dailySeed ||
+                prev?.missionState?.dailySeed ||
+                todayKey(),
+              completed: {
+                ...(prev?.missionState?.completed || {}),
+                ...(base?.missionState?.completed || {}),
+              },
+              claimed: {
+                ...(prev?.missionState?.claimed || {}),
+                ...(base?.missionState?.claimed || {}),
+              },
+            },
+          });
+          next.log = pushLog(
+            next.log,
+            `${def.name} upgraded to level ${res.new_level || level + 1}.`
+          );
+          return next;
         });
         showToast(`${def.name} upgraded to level ${res.new_level || level + 1}.`);
       } else {
@@ -1911,15 +1944,30 @@ export default function MleoBase() {
       if (res?.success && res?.state) {
         const serverState = res.state;
         setState((prev) => {
-          const next = {
+          const base = normalizeServerState(serverState);
+          const next = applyLevelUps({
             ...prev,
-            crew: Number(serverState.crew || prev.crew),
-            resources: serverState.resources || prev.resources,
-            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
-            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
-            log: pushLog(prev.log, `Crew hired. Team size is now ${res.new_crew || prev.crew + 1}.`),
-          };
-          return applyLevelUps(next);
+            ...base,
+            missionState: {
+              dailySeed:
+                base?.missionState?.dailySeed ||
+                prev?.missionState?.dailySeed ||
+                todayKey(),
+              completed: {
+                ...(prev?.missionState?.completed || {}),
+                ...(base?.missionState?.completed || {}),
+              },
+              claimed: {
+                ...(prev?.missionState?.claimed || {}),
+                ...(base?.missionState?.claimed || {}),
+              },
+            },
+          });
+          next.log = pushLog(
+            next.log,
+            `Crew hired. Team size is now ${res.new_crew || prev.crew + 1}.`
+          );
+          return next;
         });
         showToast(`Crew hired. Team size is now ${res.new_crew || state.crew + 1}.`);
       } else {
@@ -1947,15 +1995,27 @@ export default function MleoBase() {
       if (res?.success && res?.state) {
         const serverState = res.state;
         setState((prev) => {
-          const next = {
+          const base = normalizeServerState(serverState);
+          const next = applyLevelUps({
             ...prev,
-            resources: serverState.resources || prev.resources,
-            modules: serverState.modules || prev.modules,
-            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
-            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
-            log: pushLog(prev.log, `${moduleDef.name} installed.`),
-          };
-          return applyLevelUps(next);
+            ...base,
+            missionState: {
+              dailySeed:
+                base?.missionState?.dailySeed ||
+                prev?.missionState?.dailySeed ||
+                todayKey(),
+              completed: {
+                ...(prev?.missionState?.completed || {}),
+                ...(base?.missionState?.completed || {}),
+              },
+              claimed: {
+                ...(prev?.missionState?.claimed || {}),
+                ...(base?.missionState?.claimed || {}),
+              },
+            },
+          });
+          next.log = pushLog(next.log, `${moduleDef.name} installed.`);
+          return next;
         });
         showToast(`${moduleDef.name} installed.`);
       } else {
@@ -1987,15 +2047,27 @@ export default function MleoBase() {
       if (res?.success && res?.state) {
         const serverState = res.state;
         setState((prev) => {
-          const next = {
+          const base = normalizeServerState(serverState);
+          const next = applyLevelUps({
             ...prev,
-            resources: serverState.resources || prev.resources,
-            research: serverState.research || prev.research,
-            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
-            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
-            log: pushLog(prev.log, `${def.name} research completed.`),
-          };
-          return applyLevelUps(next);
+            ...base,
+            missionState: {
+              dailySeed:
+                base?.missionState?.dailySeed ||
+                prev?.missionState?.dailySeed ||
+                todayKey(),
+              completed: {
+                ...(prev?.missionState?.completed || {}),
+                ...(base?.missionState?.completed || {}),
+              },
+              claimed: {
+                ...(prev?.missionState?.claimed || {}),
+                ...(base?.missionState?.claimed || {}),
+              },
+            },
+          });
+          next.log = pushLog(next.log, `${def.name} research completed.`);
+          return next;
         });
         showToast(`${def.name} research completed.`);
       } else {
@@ -2029,23 +2101,36 @@ export default function MleoBase() {
         const loot = res.loot || {};
 
         setState((prev) => {
-          const next = {
+          const base = normalizeServerState(serverState);
+          const next = applyLevelUps({
             ...prev,
-            expeditionReadyAt: serverState.expedition_ready_at
-              ? new Date(serverState.expedition_ready_at).getTime()
-              : prev.expeditionReadyAt,
+            ...base,
+            expeditionReadyAt: base.expeditionReadyAt || prev.expeditionReadyAt,
             totalExpeditions: (prev.totalExpeditions || 0) + 1,
-            resources: serverState.resources || prev.resources,
-            bankedMleo: Number(serverState.banked_mleo || prev.bankedMleo),
-            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
-            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
-            stats: { ...prev.stats, ...(serverState.stats || {}) },
-            log: pushLog(
-              prev.log,
-              `Expedition (${expeditionMode}) returned with ${loot.ore || 0} ORE, ${loot.gold || 0} GOLD, ${loot.scrap || 0} SCRAP, ${loot.data || 0} DATA${loot.bankedMleo ? ` and ${loot.bankedMleo} MLEO` : ""}.`
-            ),
-          };
-          return applyLevelUps(next);
+            missionState: {
+              dailySeed:
+                base?.missionState?.dailySeed ||
+                prev?.missionState?.dailySeed ||
+                todayKey(),
+              completed: {
+                ...(prev?.missionState?.completed || {}),
+                ...(base?.missionState?.completed || {}),
+              },
+              claimed: {
+                ...(prev?.missionState?.claimed || {}),
+                ...(base?.missionState?.claimed || {}),
+              },
+            },
+          });
+          next.log = pushLog(
+            next.log,
+            `Expedition (${expeditionMode}) returned with ${loot.ore || 0} ORE, ${
+              loot.gold || 0
+            } GOLD, ${loot.scrap || 0} SCRAP, ${loot.data || 0} DATA${
+              loot.bankedMleo ? ` and ${loot.bankedMleo} MLEO` : ""
+            }.`
+          );
+          return next;
         });
 
         showToast(
@@ -2079,22 +2164,32 @@ export default function MleoBase() {
         }
 
         setState((prev) => {
-          const next = {
+          const base = normalizeServerState(serverState);
+          const next = applyLevelUps({
             ...prev,
-            bankedMleo: Number(serverState.banked_mleo || prev.bankedMleo),
-            sentToday: Number(serverState.sent_today || prev.sentToday),
-            totalBanked: Number(serverState.total_banked || prev.totalBanked),
-            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
-            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
-            stats: { ...prev.stats, ...(serverState.stats || {}) },
-            log: pushLog(
-              prev.log,
-              `Shipped ${fmt(shippedBase)} MLEO to shared vault${
-                bonusAmount > 0 ? ` (+${fmt(bonusAmount)} logistics bonus)` : ""
-              }.`
-            ),
-          };
-          return applyLevelUps(next);
+            ...base,
+            missionState: {
+              dailySeed:
+                base?.missionState?.dailySeed ||
+                prev?.missionState?.dailySeed ||
+                todayKey(),
+              completed: {
+                ...(prev?.missionState?.completed || {}),
+                ...(base?.missionState?.completed || {}),
+              },
+              claimed: {
+                ...(prev?.missionState?.claimed || {}),
+                ...(base?.missionState?.claimed || {}),
+              },
+            },
+          });
+          next.log = pushLog(
+            next.log,
+            `Shipped ${fmt(shippedBase)} MLEO to shared vault${
+              bonusAmount > 0 ? ` (+${fmt(bonusAmount)} logistics bonus)` : ""
+            }.`
+          );
+          return next;
         });
 
         setNextShipBonus(0);
@@ -2297,30 +2392,34 @@ export default function MleoBase() {
         throw new Error("Missing updated base state");
       }
 
-      setState((prev) => ({
-        ...prev,
-        ...serverState,
-        missionState: {
-          dailySeed:
-            serverState?.missionState?.dailySeed ||
-            serverState?.mission_state?.dailySeed ||
-            prev?.missionState?.dailySeed ||
-            todayKey(),
-          completed: {
-            ...(prev?.missionState?.completed || {}),
-            ...(serverState?.missionState?.completed || {}),
-            ...(serverState?.mission_state?.completed || {}),
+      setState((prev) =>
+        applyLevelUps({
+          ...prev,
+          ...normalizeServerState(serverState),
+          missionState: {
+            dailySeed:
+              serverState?.missionState?.dailySeed ||
+              serverState?.mission_state?.dailySeed ||
+              prev?.missionState?.dailySeed ||
+              todayKey(),
+            completed: {
+              ...(prev?.missionState?.completed || {}),
+              ...(serverState?.missionState?.completed || {}),
+              ...(serverState?.mission_state?.completed || {}),
+            },
+            claimed: {
+              ...(prev?.missionState?.claimed || {}),
+              ...(serverState?.missionState?.claimed || {}),
+              ...(serverState?.mission_state?.claimed || {}),
+            },
           },
-          claimed: {
-            ...(prev?.missionState?.claimed || {}),
-            ...(serverState?.missionState?.claimed || {}),
-            ...(serverState?.mission_state?.claimed || {}),
-          },
-        },
-      }));
+        })
+      );
+
+      showToast("Mission reward claimed.");
     } catch (error) {
-      console.error(error);
-      alert(error?.message || "Mission claim failed");
+      console.error("Mission claim failed", error);
+      showToast(error?.message || "Mission claim failed");
     } finally {
       setBusy(false);
     }

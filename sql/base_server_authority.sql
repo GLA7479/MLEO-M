@@ -2,13 +2,14 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.base_device_state (
   device_id text PRIMARY KEY,
-  version integer NOT NULL DEFAULT 5,
+  version integer NOT NULL DEFAULT 6,
   last_day date NOT NULL DEFAULT current_date,
   banked_mleo bigint NOT NULL DEFAULT 0,
   sent_today bigint NOT NULL DEFAULT 0,
   total_banked bigint NOT NULL DEFAULT 0,
   total_shared_spent bigint NOT NULL DEFAULT 0,
   total_missions_done bigint NOT NULL DEFAULT 0,
+  total_expeditions bigint NOT NULL DEFAULT 0,
   commander_level integer NOT NULL DEFAULT 1,
   commander_xp bigint NOT NULL DEFAULT 0,
   blueprint_level integer NOT NULL DEFAULT 0,
@@ -17,8 +18,8 @@ CREATE TABLE IF NOT EXISTS public.base_device_state (
   commander_path text NOT NULL DEFAULT 'industry',
   overclock_until timestamptz,
   expedition_ready_at timestamptz,
-  maintenance_due numeric(10,2) NOT NULL DEFAULT 0,
-  stability numeric(10,2) NOT NULL DEFAULT 100,
+  maintenance_due numeric(12,4) NOT NULL DEFAULT 0,
+  stability numeric(10,4) NOT NULL DEFAULT 100,
   resources jsonb NOT NULL DEFAULT '{}'::jsonb,
   buildings jsonb NOT NULL DEFAULT '{}'::jsonb,
   modules jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -26,6 +27,7 @@ CREATE TABLE IF NOT EXISTS public.base_device_state (
   stats jsonb NOT NULL DEFAULT '{}'::jsonb,
   mission_state jsonb NOT NULL DEFAULT '{}'::jsonb,
   log jsonb NOT NULL DEFAULT '[]'::jsonb,
+  last_tick_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -51,6 +53,100 @@ FOR EACH ROW EXECUTE FUNCTION public.base_touch_updated_at();
 ALTER TABLE public.base_device_state ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.base_device_state FROM anon, authenticated;
 GRANT ALL ON public.base_device_state TO service_role;
+
+CREATE OR REPLACE FUNCTION public.base_default_resources()
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT jsonb_build_object(
+    'ORE', 45,
+    'GOLD', 260,
+    'SCRAP', 12,
+    'ENERGY', 140,
+    'DATA', 6
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.base_default_buildings()
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT jsonb_build_object(
+    'hq', 1,
+    'quarry', 1,
+    'tradeHub', 0,
+    'salvage', 0,
+    'refinery', 0,
+    'powerCell', 0,
+    'minerControl', 0,
+    'arcadeHub', 0,
+    'expeditionBay', 0,
+    'logisticsCenter', 0,
+    'researchLab', 0,
+    'repairBay', 0
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.base_default_stats()
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT jsonb_build_object(
+    'upgradesToday', 0,
+    'shippedToday', 0,
+    'expeditionsToday', 0,
+    'vaultSpentToday', 0,
+    'dataToday', 0,
+    'maintenanceToday', 0
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.base_default_mission_state(p_day text DEFAULT NULL)
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT jsonb_build_object(
+    'dailySeed', coalesce(p_day, current_date::text),
+    'completed', '{}'::jsonb,
+    'claimed', '{}'::jsonb
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.base_jsonb_int(j jsonb, k text, fallback integer DEFAULT 0)
+RETURNS integer
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT coalesce((j->>k)::integer, fallback);
+$$;
+
+CREATE OR REPLACE FUNCTION public.base_jsonb_num(j jsonb, k text, fallback numeric DEFAULT 0)
+RETURNS numeric
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT coalesce((j->>k)::numeric, fallback);
+$$;
+
+CREATE OR REPLACE FUNCTION public.base_jsonb_bool(j jsonb, k text, fallback boolean DEFAULT false)
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT coalesce((j->>k)::boolean, fallback);
+$$;
+
+CREATE OR REPLACE FUNCTION public.base_clamp_num(v numeric, vmin numeric, vmax numeric)
+RETURNS numeric
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT greatest(vmin, least(vmax, v));
+$$;
 
 CREATE OR REPLACE FUNCTION public.base_get_or_create_state(
   p_device_id text
@@ -83,42 +179,13 @@ BEGIN
   )
   VALUES (
     p_device_id,
-    5,
-    jsonb_build_object(
-      'ORE', 45,
-      'GOLD', 260,
-      'SCRAP', 12,
-      'ENERGY', 140,
-      'DATA', 6
-    ),
-    jsonb_build_object(
-      'hq', 1,
-      'quarry', 1,
-      'tradeHub', 0,
-      'salvage', 0,
-      'refinery', 0,
-      'powerCell', 0,
-      'minerControl', 0,
-      'arcadeHub', 0,
-      'expeditionBay', 0,
-      'logisticsCenter', 0,
-      'researchLab', 0,
-      'repairBay', 0
-    ),
+    6,
+    public.base_default_resources(),
+    public.base_default_buildings(),
     '{}'::jsonb,
     '{}'::jsonb,
-    jsonb_build_object(
-      'upgradesToday', 0,
-      'shippedToday', 0,
-      'expeditionsToday', 0,
-      'vaultSpentToday', 0,
-      'dataToday', 0,
-      'maintenanceToday', 0
-    ),
-    jsonb_build_object(
-      'completed', '{}'::jsonb,
-      'claimed', '{}'::jsonb
-    ),
+    public.base_default_stats(),
+    public.base_default_mission_state(current_date::text),
     '[]'::jsonb,
     now(),
     'engineer',
@@ -137,22 +204,8 @@ BEGIN
     SET
       last_day = current_date,
       sent_today = 0,
-      stats = jsonb_set(
-        jsonb_set(
-          jsonb_set(
-            jsonb_set(
-              jsonb_set(
-                jsonb_set(coalesce(stats, '{}'::jsonb), '{upgradesToday}', '0'::jsonb, true),
-                '{shippedToday}', '0'::jsonb, true
-              ),
-              '{expeditionsToday}', '0'::jsonb, true
-            ),
-            '{vaultSpentToday}', '0'::jsonb, true
-          ),
-          '{dataToday}', '0'::jsonb, true
-        ),
-        '{maintenanceToday}', '0'::jsonb, true
-      ),
+      stats = public.base_default_stats(),
+      mission_state = public.base_default_mission_state(current_date::text),
       updated_at = now()
     WHERE device_id = p_device_id;
 
@@ -167,36 +220,6 @@ BEGIN
 END;
 $$;
 
-ALTER TABLE public.base_device_state
-ADD COLUMN IF NOT EXISTS last_tick_at timestamptz NOT NULL DEFAULT now();
-
-ALTER TABLE public.base_device_state
-ADD COLUMN IF NOT EXISTS crew_role text DEFAULT 'engineer';
-
-ALTER TABLE public.base_device_state
-ADD COLUMN IF NOT EXISTS commander_path text DEFAULT 'industry';
-
-ALTER TABLE public.base_device_state
-ADD COLUMN IF NOT EXISTS total_missions_done bigint NOT NULL DEFAULT 0;
-
--- Update existing rows to have default values if NULL
-UPDATE public.base_device_state
-SET crew_role = 'engineer'
-WHERE crew_role IS NULL;
-
-UPDATE public.base_device_state
-SET commander_path = 'industry'
-WHERE commander_path IS NULL;
-
--- Now make them NOT NULL
-ALTER TABLE public.base_device_state
-ALTER COLUMN crew_role SET NOT NULL,
-ALTER COLUMN crew_role SET DEFAULT 'engineer';
-
-ALTER TABLE public.base_device_state
-ALTER COLUMN commander_path SET NOT NULL,
-ALTER COLUMN commander_path SET DEFAULT 'industry';
-
 CREATE OR REPLACE FUNCTION public.base_reconcile_state(
   p_device_id text
 )
@@ -209,33 +232,70 @@ DECLARE
   v_state public.base_device_state%ROWTYPE;
   v_now timestamptz := now();
   v_elapsed_seconds numeric := 0;
+
   v_resources jsonb;
   v_buildings jsonb;
   v_modules jsonb;
   v_research jsonb;
   v_stats jsonb;
-  v_energy_cap numeric := 140;
-  v_energy_regen numeric := 2.6;
-  v_efficiency numeric := 1.0;
+  v_mission_state jsonb;
+
   v_hq integer := 1;
   v_quarry integer := 1;
   v_trade integer := 0;
   v_salvage integer := 0;
   v_refinery integer := 0;
   v_power integer := 0;
-  v_arcade integer := 0;
   v_miner integer := 0;
-  v_banked numeric := 0;
-  v_ore_gain numeric := 0;
-  v_gold_gain numeric := 0;
-  v_scrap_gain numeric := 0;
-  v_data_gain numeric := 0;
+  v_arcade integer := 0;
+  v_expedition integer := 0;
+  v_logistics integer := 0;
+  v_research_lab integer := 0;
+  v_repair integer := 0;
+
+  v_crew integer := 0;
+  v_crew_role text := 'engineer';
+  v_commander_path text := 'industry';
+  v_blueprint integer := 0;
+
+  v_energy_cap numeric := 140;
+  v_energy_regen numeric := 2.6;
+  v_stability numeric := 100;
+  v_stability_factor numeric := 1.0;
+  v_worker_bonus numeric := 1.0;
+  v_hq_bonus numeric := 1.0;
+  v_miner_bonus numeric := 1.0;
+  v_arcade_bonus numeric := 1.0;
+  v_overclock numeric := 1.0;
+  v_bank_bonus numeric := 1.0;
+  v_data_mult numeric := 1.0;
+  v_ore_mult numeric := 1.0;
+  v_gold_mult numeric := 1.0;
+  v_scrap_mult numeric := 1.0;
+  v_mleo_mult numeric := 1.0;
+  v_maintenance_relief numeric := 1.0;
+  v_ship_cap numeric := 12000;
+  v_expedition_cooldown_seconds numeric := 90;
+
   v_energy_now numeric := 0;
   v_ore_now numeric := 0;
   v_gold_now numeric := 0;
   v_scrap_now numeric := 0;
   v_data_now numeric := 0;
-  v_stability numeric := 100;
+  v_banked_now numeric := 0;
+  v_sent_today numeric := 0;
+
+  v_ore_gain numeric := 0;
+  v_gold_gain numeric := 0;
+  v_scrap_gain numeric := 0;
+  v_data_gain numeric := 0;
+  v_raw_banked_gain numeric := 0;
+
+  v_ore_use numeric := 0;
+  v_scrap_use numeric := 0;
+  v_energy_use numeric := 0;
+
+  v_maintenance_due numeric := 0;
 BEGIN
   SELECT *
   INTO v_state
@@ -247,64 +307,23 @@ BEGIN
   WHERE device_id = p_device_id
   FOR UPDATE;
 
-  -- Reset old state (version < 5) to new starter pack values
-  IF v_state.version < 5 THEN
+  IF v_state.version < 6 THEN
     UPDATE public.base_device_state
     SET
-      version = 5,
-      resources = jsonb_build_object(
-        'ORE', 45,
-        'GOLD', 260,
-        'SCRAP', 12,
-        'ENERGY', 140,
-        'DATA', 6
-      ),
-      buildings = jsonb_build_object(
-        'hq', 1,
-        'quarry', 1,
-        'tradeHub', 0,
-        'salvage', 0,
-        'refinery', 0,
-        'powerCell', 0,
-        'minerControl', 0,
-        'arcadeHub', 0,
-        'expeditionBay', 0,
-        'logisticsCenter', 0,
-        'researchLab', 0,
-        'repairBay', 0
-      ),
-      modules = '{}'::jsonb,
-      research = '{}'::jsonb,
-      crew = 0,
-      crew_role = 'engineer',
-      commander_level = 1,
-      commander_xp = 0,
-      commander_path = 'industry',
-      blueprint_level = 0,
-      banked_mleo = 0,
-      sent_today = 0,
-      total_banked = 0,
-      total_shared_spent = 0,
-      total_missions_done = 0,
-      overclock_until = NULL,
-      expedition_ready_at = now(),
-      maintenance_due = 0,
-      stability = 100,
-      stats = jsonb_build_object(
-        'upgradesToday', 0,
-        'shippedToday', 0,
-        'expeditionsToday', 0,
-        'vaultSpentToday', 0,
-        'dataToday', 0,
-        'maintenanceToday', 0
-      ),
-      mission_state = jsonb_build_object(
-        'completed', '{}'::jsonb,
-        'claimed', '{}'::jsonb
-      ),
-      log = '[]'::jsonb,
-      last_tick_at = now(),
-      updated_at = now()
+      version = 6,
+      resources = coalesce(nullif(resources, '{}'::jsonb), public.base_default_resources()),
+      buildings = coalesce(nullif(buildings, '{}'::jsonb), public.base_default_buildings()),
+      stats = CASE
+        WHEN stats = '{}'::jsonb THEN public.base_default_stats()
+        ELSE stats
+      END,
+      mission_state = CASE
+        WHEN mission_state = '{}'::jsonb THEN public.base_default_mission_state(current_date::text)
+        ELSE mission_state
+      END,
+      crew_role = coalesce(crew_role, 'engineer'),
+      commander_path = coalesce(commander_path, 'industry'),
+      last_tick_at = coalesce(last_tick_at, now())
     WHERE device_id = p_device_id;
 
     SELECT *
@@ -328,82 +347,357 @@ BEGIN
     RETURN v_state;
   END IF;
 
-  v_elapsed_seconds := EXTRACT(EPOCH FROM (v_now - v_state.last_tick_at));
+  v_elapsed_seconds := extract(epoch FROM (v_now - v_state.last_tick_at));
   IF v_elapsed_seconds <= 0 THEN
     RETURN v_state;
   END IF;
 
-  v_resources := coalesce(v_state.resources, '{}'::jsonb);
-  v_buildings := coalesce(v_state.buildings, '{}'::jsonb);
+  v_resources := coalesce(v_state.resources, public.base_default_resources());
+  v_buildings := coalesce(v_state.buildings, public.base_default_buildings());
   v_modules := coalesce(v_state.modules, '{}'::jsonb);
   v_research := coalesce(v_state.research, '{}'::jsonb);
-  v_stats := coalesce(v_state.stats, '{}'::jsonb);
+  v_stats := coalesce(v_state.stats, public.base_default_stats());
+  v_mission_state := coalesce(v_state.mission_state, public.base_default_mission_state(current_date::text));
 
-  v_hq := greatest(1, coalesce((v_buildings->>'hq')::int, 1));
-  v_quarry := greatest(0, coalesce((v_buildings->>'quarry')::int, 0));
-  v_trade := greatest(0, coalesce((v_buildings->>'tradeHub')::int, 0));
-  v_salvage := greatest(0, coalesce((v_buildings->>'salvage')::int, 0));
-  v_refinery := greatest(0, coalesce((v_buildings->>'refinery')::int, 0));
-  v_power := greatest(0, coalesce((v_buildings->>'powerCell')::int, 0));
-  v_arcade := greatest(0, coalesce((v_buildings->>'arcadeHub')::int, 0));
-  v_miner := greatest(0, coalesce((v_buildings->>'minerControl')::int, 0));
+  IF coalesce(v_mission_state->>'dailySeed', '') <> current_date::text THEN
+    v_mission_state := public.base_default_mission_state(current_date::text);
+  END IF;
+
+  v_hq := greatest(1, public.base_jsonb_int(v_buildings, 'hq', 1));
+  v_quarry := greatest(0, public.base_jsonb_int(v_buildings, 'quarry', 0));
+  v_trade := greatest(0, public.base_jsonb_int(v_buildings, 'tradeHub', 0));
+  v_salvage := greatest(0, public.base_jsonb_int(v_buildings, 'salvage', 0));
+  v_refinery := greatest(0, public.base_jsonb_int(v_buildings, 'refinery', 0));
+  v_power := greatest(0, public.base_jsonb_int(v_buildings, 'powerCell', 0));
+  v_miner := greatest(0, public.base_jsonb_int(v_buildings, 'minerControl', 0));
+  v_arcade := greatest(0, public.base_jsonb_int(v_buildings, 'arcadeHub', 0));
+  v_expedition := greatest(0, public.base_jsonb_int(v_buildings, 'expeditionBay', 0));
+  v_logistics := greatest(0, public.base_jsonb_int(v_buildings, 'logisticsCenter', 0));
+  v_research_lab := greatest(0, public.base_jsonb_int(v_buildings, 'researchLab', 0));
+  v_repair := greatest(0, public.base_jsonb_int(v_buildings, 'repairBay', 0));
+
+  v_crew := greatest(0, coalesce(v_state.crew, 0));
+  v_crew_role := coalesce(v_state.crew_role, 'engineer');
+  v_commander_path := coalesce(v_state.commander_path, 'industry');
+  v_blueprint := greatest(0, coalesce(v_state.blueprint_level, 0));
+
+  v_stability := public.base_clamp_num(coalesce(v_state.stability, 100), 50, 100);
+  v_stability_factor := 0.75 + (v_stability / 100.0) * 0.25;
+
+  v_worker_bonus := 1 + v_crew * CASE
+    WHEN public.base_jsonb_bool(v_research, 'fieldOps', false) THEN 0.03
+    ELSE 0.02
+  END;
+
+  v_hq_bonus := 1 + v_hq * 0.03;
+  v_miner_bonus := 1 + v_miner * 0.04;
+  v_arcade_bonus := 1 + v_arcade * 0.03;
+
+  IF v_state.overclock_until IS NOT NULL AND v_state.overclock_until > v_now THEN
+    v_overclock := 1.35;
+  ELSE
+    v_overclock := 1.0;
+  END IF;
+
+  v_ore_mult := v_worker_bonus * v_overclock;
+  v_gold_mult := v_worker_bonus * v_overclock;
+  v_scrap_mult := v_worker_bonus * v_overclock;
+  v_mleo_mult := v_worker_bonus * v_overclock;
+  v_data_mult := (1 + v_research_lab * 0.06) * v_arcade_bonus;
+  v_bank_bonus := 1 + v_blueprint * 0.02 + v_logistics * 0.025;
+  v_maintenance_relief := 1 + v_repair * 0.08;
+
+  IF v_crew_role = 'engineer' THEN
+    v_maintenance_relief := v_maintenance_relief * 1.06;
+  ELSIF v_crew_role = 'logistician' THEN
+    v_bank_bonus := v_bank_bonus * 1.03;
+  ELSIF v_crew_role = 'researcher' THEN
+    v_data_mult := v_data_mult * 1.05;
+  ELSIF v_crew_role = 'scout' THEN
+    v_data_mult := v_data_mult * 1.02;
+  ELSIF v_crew_role = 'operations' THEN
+    v_gold_mult := v_gold_mult * 1.02;
+    v_scrap_mult := v_scrap_mult * 1.02;
+  END IF;
+
+  IF v_commander_path = 'industry' THEN
+    v_ore_mult := v_ore_mult * 1.03;
+    v_maintenance_relief := v_maintenance_relief * 1.03;
+  ELSIF v_commander_path = 'logistics' THEN
+    v_bank_bonus := v_bank_bonus * 1.04;
+  ELSIF v_commander_path = 'research' THEN
+    v_data_mult := v_data_mult * 1.06;
+  ELSIF v_commander_path = 'ecosystem' THEN
+    v_gold_mult := v_gold_mult * 1.01;
+    v_data_mult := v_data_mult * 1.02;
+  END IF;
+
+  IF public.base_jsonb_bool(v_modules, 'servoDrill', false) THEN
+    v_ore_mult := v_ore_mult * 1.15;
+  END IF;
+
+  IF public.base_jsonb_bool(v_modules, 'vaultCompressor', false) THEN
+    v_mleo_mult := v_mleo_mult * 1.04;
+    v_bank_bonus := v_bank_bonus * 1.08;
+  END IF;
+
+  IF public.base_jsonb_bool(v_modules, 'arcadeRelay', false) THEN
+    v_data_mult := v_data_mult * 1.12;
+  END IF;
+
+  IF public.base_jsonb_bool(v_modules, 'minerLink', false) THEN
+    v_ore_mult := v_ore_mult * 1.08;
+  END IF;
+
+  IF public.base_jsonb_bool(v_research, 'routing', false) THEN
+    v_bank_bonus := v_bank_bonus * 1.08;
+  END IF;
+
+  IF public.base_jsonb_bool(v_research, 'minerSync', false) THEN
+    v_ore_mult := v_ore_mult * 1.12;
+  END IF;
+
+  IF public.base_jsonb_bool(v_research, 'arcadeOps', false) THEN
+    v_data_mult := v_data_mult * 1.10;
+  END IF;
+
+  IF public.base_jsonb_bool(v_research, 'logistics', false) THEN
+    v_bank_bonus := v_bank_bonus * 1.10;
+  END IF;
+
+  IF public.base_jsonb_bool(v_research, 'deepScan', false) THEN
+    v_data_mult := v_data_mult * 1.18;
+  END IF;
+
+  IF public.base_jsonb_bool(v_research, 'tokenDiscipline', false) THEN
+    v_data_mult := v_data_mult * 1.22;
+    v_mleo_mult := v_mleo_mult * 0.88;
+    v_bank_bonus := v_bank_bonus * 1.10;
+  END IF;
+
+  IF public.base_jsonb_bool(v_research, 'predictiveMaintenance', false) THEN
+    v_maintenance_relief := v_maintenance_relief * 1.25;
+  END IF;
+
+  v_ore_mult := v_ore_mult * v_hq_bonus * v_miner_bonus * v_stability_factor;
+  v_gold_mult := v_gold_mult * v_hq_bonus * v_stability_factor;
+  v_scrap_mult := v_scrap_mult * v_hq_bonus * v_stability_factor;
+  v_mleo_mult := v_mleo_mult * v_hq_bonus * v_stability_factor;
+  v_data_mult := v_data_mult * v_hq_bonus * v_stability_factor;
 
   v_energy_cap := 140 + (v_power * 24);
   v_energy_regen := 2.6 + (v_power * 0.35);
-  v_efficiency := 1 + ((v_hq - 1) * 0.03);
 
-  IF coalesce((v_modules->>'vaultCompressor')::boolean, false) THEN
-    v_efficiency := v_efficiency + 0.08;
+  IF public.base_jsonb_bool(v_research, 'coolant', false) THEN
+    v_energy_cap := v_energy_cap + 15;
+    v_energy_regen := v_energy_regen + 0.8;
   END IF;
 
-  IF coalesce((v_research->>'routing')::boolean, false) THEN
-    v_efficiency := v_efficiency + 0.10;
+  v_ship_cap := 12000 + (v_blueprint * 1200) + (v_logistics * 900);
+  IF public.base_jsonb_bool(v_research, 'routing', false) THEN
+    v_ship_cap := v_ship_cap + 5000;
   END IF;
 
-  IF v_state.overclock_until IS NOT NULL AND v_state.overclock_until > v_now THEN
-    v_efficiency := v_efficiency + 0.18;
+  v_expedition_cooldown_seconds := 90;
+  IF public.base_jsonb_bool(v_research, 'fieldOps', false) THEN
+    v_expedition_cooldown_seconds := 72;
   END IF;
 
-  v_stability := least(100, greatest(0, coalesce(v_state.stability, 100)));
-  v_efficiency := v_efficiency * least(1.0, greatest(0.45, v_stability / 100.0));
+  v_energy_now := greatest(0, public.base_jsonb_num(v_resources, 'ENERGY', 0));
+  v_ore_now := greatest(0, public.base_jsonb_num(v_resources, 'ORE', 0));
+  v_gold_now := greatest(0, public.base_jsonb_num(v_resources, 'GOLD', 0));
+  v_scrap_now := greatest(0, public.base_jsonb_num(v_resources, 'SCRAP', 0));
+  v_data_now := greatest(0, public.base_jsonb_num(v_resources, 'DATA', 0));
+  v_banked_now := greatest(0, coalesce(v_state.banked_mleo, 0));
+  v_sent_today := greatest(0, coalesce(v_state.sent_today, 0));
+  v_maintenance_due := greatest(0, coalesce(v_state.maintenance_due, 0));
 
-  v_ore_gain := (v_quarry * 2.0 * v_efficiency) * (v_elapsed_seconds / 60.0);
-  v_gold_gain := (v_trade * 1.0 * v_efficiency) * (v_elapsed_seconds / 60.0);
-  v_scrap_gain := (v_salvage * 0.8 * v_efficiency) * (v_elapsed_seconds / 60.0);
-  v_data_gain := ((v_arcade * 0.12) + (v_miner * 0.15)) * v_efficiency * (v_elapsed_seconds / 60.0);
-  v_banked := (v_refinery * 0.10 * v_efficiency) * (v_elapsed_seconds / 60.0);
+  v_energy_now := least(v_energy_cap, v_energy_now + (v_energy_regen * v_elapsed_seconds));
 
-  v_energy_now := least(
-    v_energy_cap,
-    greatest(0, coalesce((v_resources->>'ENERGY')::numeric, 0) + (v_energy_regen * (v_elapsed_seconds / 60.0)))
-  );
+  v_ore_gain := (v_quarry * 2.0) * v_ore_mult;
+  v_gold_gain := (v_trade * 1.0) * v_gold_mult;
+  v_scrap_gain := (v_salvage * 0.8) * v_scrap_mult;
+  v_data_gain :=
+      ((v_miner * 0.15) + (v_arcade * 0.12) + (v_logistics * 0.06) + (v_research_lab * 0.22))
+      * v_data_mult;
 
-  v_ore_now := greatest(0, coalesce((v_resources->>'ORE')::numeric, 0) + v_ore_gain);
-  v_gold_now := greatest(0, coalesce((v_resources->>'GOLD')::numeric, 0) + v_gold_gain);
-  v_scrap_now := greatest(0, coalesce((v_resources->>'SCRAP')::numeric, 0) + v_scrap_gain);
-  v_data_now := greatest(0, coalesce((v_resources->>'DATA')::numeric, 0) + v_data_gain);
+  v_energy_use :=
+      (v_quarry * 1.1)
+    + (v_trade * 1.4)
+    + (v_salvage * 1.8)
+    + (v_refinery * 3.2)
+    + (v_miner * 0.6)
+    + (v_arcade * 0.8)
+    + (v_expedition * 1.2)
+    + (v_logistics * 0.7)
+    + (v_research_lab * 1.0)
+    + (v_repair * 0.8);
 
-  UPDATE public.base_device_state
-  SET
-    resources = jsonb_build_object(
+  IF v_energy_now < (v_energy_use * v_elapsed_seconds) THEN
+    IF v_energy_use > 0 THEN
+      v_elapsed_seconds := greatest(0, floor(v_energy_now / v_energy_use));
+    ELSE
+      v_elapsed_seconds := 0;
+    END IF;
+  END IF;
+
+  IF v_elapsed_seconds > 0 THEN
+    v_energy_now := greatest(0, v_energy_now - (v_energy_use * v_elapsed_seconds));
+
+    v_ore_now := v_ore_now + (v_ore_gain * v_elapsed_seconds);
+    v_gold_now := v_gold_now + (v_gold_gain * v_elapsed_seconds);
+    v_scrap_now := v_scrap_now + (v_scrap_gain * v_elapsed_seconds);
+    v_data_now := v_data_now + (v_data_gain * v_elapsed_seconds);
+
+    v_ore_use := (v_refinery * 1.8) * v_elapsed_seconds;
+    v_scrap_use := (v_refinery * 0.7) * v_elapsed_seconds;
+
+    IF v_ore_now > 0 AND v_scrap_now > 0 AND v_refinery > 0 THEN
+      IF v_ore_now < v_ore_use THEN
+        v_ore_use := v_ore_now;
+      END IF;
+
+      IF v_scrap_now < v_scrap_use THEN
+        v_scrap_use := v_scrap_now;
+      END IF;
+
+      IF (v_refinery * 1.8) > 0 AND (v_refinery * 0.7) > 0 THEN
+        v_raw_banked_gain := least(
+          v_ore_use / 1.8,
+          v_scrap_use / 0.7
+        ) * 0.10 * v_mleo_mult * v_bank_bonus;
+      ELSE
+        v_raw_banked_gain := 0;
+      END IF;
+
+      v_ore_now := greatest(0, v_ore_now - (least(v_ore_use / 1.8, v_scrap_use / 0.7) * 1.8));
+      v_scrap_now := greatest(0, v_scrap_now - (least(v_ore_use / 1.8, v_scrap_use / 0.7) * 0.7));
+      v_banked_now := v_banked_now + v_raw_banked_gain;
+    END IF;
+
+    v_maintenance_due := v_maintenance_due + (
+      (
+        (v_quarry * 0.004)
+        + (v_trade * 0.003)
+        + (v_salvage * 0.005)
+        + (v_refinery * 0.010)
+        + (v_miner * 0.004)
+        + (v_arcade * 0.003)
+        + (v_expedition * 0.004)
+        + (v_logistics * 0.003)
+        + (v_research_lab * 0.005)
+        + (v_repair * 0.002)
+      ) / greatest(v_maintenance_relief, 1)
+    ) * v_elapsed_seconds;
+
+    v_stability := public.base_clamp_num(
+      v_stability - (
+        (
+          greatest(v_maintenance_due - 100, 0) * 0.003
+        ) + (
+          v_refinery * CASE
+            WHEN public.base_jsonb_bool(v_modules, 'minerLink', false) THEN 0.0008
+            ELSE 0.0010
+          END
+        ) * v_elapsed_seconds
+      ),
+      50,
+      100
+    );
+
+    IF v_repair > 0 THEN
+      v_stability := public.base_clamp_num(
+        v_stability + ((v_repair * 0.0015) * v_elapsed_seconds),
+        50,
+        100
+      );
+    END IF;
+
+    v_resources := jsonb_build_object(
       'ORE', floor(v_ore_now),
       'GOLD', floor(v_gold_now),
       'SCRAP', floor(v_scrap_now),
       'ENERGY', floor(v_energy_now),
       'DATA', floor(v_data_now)
-    ),
-    banked_mleo = greatest(0, coalesce(banked_mleo, 0) + floor(v_banked)::bigint),
-    maintenance_due = greatest(0, coalesce(maintenance_due, 0) + ((v_elapsed_seconds / 3600.0) * 1.2)),
-    stability = greatest(35, least(100, coalesce(stability, 100) - ((v_elapsed_seconds / 3600.0) * 0.35))),
-    last_tick_at = v_now,
-    updated_at = v_now
-  WHERE device_id = p_device_id;
-  
+    );
+
+    v_stats := jsonb_set(
+      coalesce(v_stats, public.base_default_stats()),
+      '{dataToday}',
+      to_jsonb(coalesce((v_stats->>'dataToday')::numeric, 0) + floor(v_data_gain * v_elapsed_seconds)),
+      true
+    );
+
+    v_mission_state := jsonb_set(
+      jsonb_set(
+        jsonb_set(coalesce(v_mission_state, public.base_default_mission_state(current_date::text)), '{dailySeed}', to_jsonb(current_date::text), true),
+        '{completed,generate_data}',
+        to_jsonb(
+          least(
+            coalesce((v_stats->>'dataToday')::numeric, 0),
+            12
+          )
+        ),
+        true
+      ),
+      '{completed,ship_mleo}',
+      to_jsonb(coalesce((v_stats->>'shippedToday')::numeric, 0)),
+      true
+    );
+
+    v_mission_state := jsonb_set(
+      jsonb_set(
+        jsonb_set(
+          jsonb_set(
+            v_mission_state,
+            '{completed,upgrade_building}',
+            to_jsonb(coalesce((v_stats->>'upgradesToday')::numeric, 0)),
+            true
+          ),
+          '{completed,run_expedition}',
+          to_jsonb(coalesce((v_stats->>'expeditionsToday')::numeric, 0)),
+          true
+        ),
+        '{completed,double_expedition}',
+        to_jsonb(coalesce((v_stats->>'expeditionsToday')::numeric, 0)),
+        true
+      ),
+      '{completed,perform_maintenance}',
+      to_jsonb(coalesce((v_stats->>'maintenanceToday')::numeric, 0)),
+      true
+    );
+
+    v_mission_state := jsonb_set(
+      v_mission_state,
+      '{completed,spend_vault}',
+      to_jsonb(coalesce((v_stats->>'vaultSpentToday')::numeric, 0)),
+      true
+    );
+
+    UPDATE public.base_device_state
+    SET
+      resources = v_resources,
+      stats = v_stats,
+      mission_state = v_mission_state,
+      banked_mleo = floor(v_banked_now),
+      maintenance_due = v_maintenance_due,
+      stability = v_stability,
+      last_tick_at = v_now,
+      updated_at = now()
+    WHERE device_id = p_device_id;
+  ELSE
+    UPDATE public.base_device_state
+    SET
+      last_tick_at = v_now,
+      updated_at = now()
+    WHERE device_id = p_device_id;
+  END IF;
+
   SELECT *
   INTO v_state
   FROM public.base_device_state
   WHERE device_id = p_device_id;
-  
+
   RETURN v_state;
 END;
 $$;
@@ -444,11 +738,12 @@ BEGIN
   FOR UPDATE;
 
   v_resources := coalesce(v_state.resources, '{}'::jsonb);
-  v_stats := coalesce(v_state.stats, '{}'::jsonb);
-  v_mission_state := coalesce(
-    v_state.mission_state,
-    jsonb_build_object('completed', '{}'::jsonb, 'claimed', '{}'::jsonb)
-  );
+  v_stats := coalesce(v_state.stats, public.base_default_stats());
+  v_mission_state := coalesce(v_state.mission_state, public.base_default_mission_state(current_date::text));
+
+  IF coalesce(v_mission_state->>'dailySeed', '') <> current_date::text THEN
+    v_mission_state := public.base_default_mission_state(current_date::text);
+  END IF;
 
   v_claimed := coalesce((v_mission_state->'claimed'->>p_mission_key)::boolean, false);
 
@@ -500,7 +795,7 @@ BEGIN
   END IF;
 
   v_mission_state := jsonb_set(
-    v_mission_state,
+    jsonb_set(v_mission_state, '{dailySeed}', to_jsonb(current_date::text), true),
     ARRAY['claimed', p_mission_key],
     'true'::jsonb,
     true
