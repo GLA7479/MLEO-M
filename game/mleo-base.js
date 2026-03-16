@@ -2313,7 +2313,7 @@ export default function MleoBase() {
           Choose a command identity for your base. This changes specialization, not the core economy.
         </div>
 
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
+        <div className="mt-3 grid gap-2 lg:grid-cols-2">
           {COMMANDER_PATHS.map((path) => {
             const active = commanderPath === path.key;
             return (
@@ -2334,7 +2334,7 @@ export default function MleoBase() {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 xl:grid-cols-2">
         {MODULES.map((module) => {
           const owned = !!state.modules[module.key];
           return (
@@ -2440,7 +2440,7 @@ export default function MleoBase() {
               </div>
             </div>
 
-            <div className="mt-2 h-[60px] overflow-hidden text-xs leading-5 text-white/60">
+            <div className="mt-2 min-h-[40px] text-xs leading-5 text-white/60">
               {building.desc}
             </div>
 
@@ -2453,12 +2453,8 @@ export default function MleoBase() {
               </div>
             </div>
 
-            <div className="mt-2 text-[11px] text-white/45">
-              {buildingRiskTag(building.key)}
-            </div>
-
-            <div className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-white/65">
-              Status: {sectorStatusForBuilding(building.key, state).toUpperCase()}
+            <div className="mt-3 inline-flex w-fit rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/65">
+              {sectorStatusForBuilding(building.key, state).toUpperCase()}
             </div>
 
             <div className="mt-2 flex h-5 items-center text-xs font-medium text-cyan-200/85">
@@ -2500,28 +2496,37 @@ export default function MleoBase() {
   );
 
   const progressSummaryContent = (
-    <div className="space-y-3 text-sm text-white/75">
+    <div className="grid gap-3 md:grid-cols-2">
       <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
         <div className="font-semibold text-white">Totals</div>
-        <div className="mt-2 space-y-1 text-white/70">
-          <div>Total shipped: {fmt(state.totalBanked)} MLEO</div>
-          <div>Total vault spent: {fmt(state.totalSharedSpent)} MLEO</div>
-          <div>Total expeditions: {fmt(state.totalExpeditions)}</div>
-          <div>Total missions claimed: {fmt(state.totalMissionsDone)}</div>
-          <div>Crew role: {crewRoleInfo.name}</div>
-          <div>Commander path: {commanderPathInfo.name}</div>
-          <div>System state: {systemMeta.label}</div>
+        <div className="mt-3 grid grid-cols-2 gap-3 text-sm text-white/70">
+          <div>
+            <div className="text-white/45 text-xs uppercase tracking-[0.16em]">Shipped</div>
+            <div className="mt-1 font-semibold text-white">{fmt(state.totalBanked)} MLEO</div>
+          </div>
+          <div>
+            <div className="text-white/45 text-xs uppercase tracking-[0.16em]">Vault Spent</div>
+            <div className="mt-1 font-semibold text-white">{fmt(state.totalSharedSpent)} MLEO</div>
+          </div>
+          <div>
+            <div className="text-white/45 text-xs uppercase tracking-[0.16em]">Expeditions</div>
+            <div className="mt-1 font-semibold text-white">{fmt(state.totalExpeditions)}</div>
+          </div>
+          <div>
+            <div className="text-white/45 text-xs uppercase tracking-[0.16em]">Missions</div>
+            <div className="mt-1 font-semibold text-white">{fmt(state.totalMissionsDone)}</div>
+          </div>
         </div>
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-        <div className="font-semibold text-white">Why MLEO BASE is stronger as a support layer</div>
-        <ul className="mt-2 space-y-2 text-sm text-white/65">
-          <li>It uses the same shared vault via adapter, instead of raw localStorage writes.</li>
-          <li>It adds missions, commander level, crew specialization and command identity.</li>
-          <li>It shifts rewards toward progression, decision-making and sinks, not just direct MLEO output.</li>
-          <li>It now feels more like a live command center than a passive dashboard.</li>
-        </ul>
+        <div className="font-semibold text-white">Identity Snapshot</div>
+        <div className="mt-3 space-y-2 text-sm text-white/70">
+          <div><span className="text-white/45">Crew role:</span> {crewRoleInfo.name}</div>
+          <div><span className="text-white/45">Commander path:</span> {commanderPathInfo.name}</div>
+          <div><span className="text-white/45">System state:</span> {systemMeta.label}</div>
+          <div><span className="text-white/45">Base profile:</span> {state.crew >= 5 ? "Developed Command" : state.crew >= 2 ? "Growing Outpost" : "Early Outpost"}</div>
+        </div>
       </div>
     </div>
   );
@@ -2537,8 +2542,8 @@ export default function MleoBase() {
         </Link>
       </div>
       <div className="space-y-2">
-        {(state.log || []).slice(0, 8).map((entry) => (
-          <div key={entry.id} className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/75">
+        {(state.log || []).slice(0, 4).map((entry) => (
+          <div key={entry.id} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/75">
             <div>{entry.text}</div>
             <div className="mt-1 text-xs text-white/40">{new Date(entry.ts).toLocaleTimeString()}</div>
           </div>
@@ -2592,19 +2597,37 @@ export default function MleoBase() {
             </div>
           </div>
 
+          {alerts.length ? (
+            <div className="mt-4 space-y-2">
+              {alerts.map((alert) => (
+                <div
+                  key={alert.key}
+                  className={`rounded-2xl border px-4 py-3 ${alertToneClasses(alert.tone)}`}
+                >
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="text-sm font-bold">{alert.title}</div>
+                      <div className="text-xs text-white/75">{alert.text}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           {/* Mobile */}
           <div className="mt-6 space-y-3 sm:hidden">
             <div className="grid grid-cols-1 gap-3">
               <MetricCard
                 label="Shared Vault"
                 value={`${fmt(sharedVault)} MLEO`}
-                note="Same balance used by Miners, Arcade and Online."
+                note="Shared across the MLEO ecosystem."
                 accent="emerald"
               />
               <MetricCard
                 label="Base Banked"
                 value={`${fmt(state.bankedMleo)} MLEO`}
-                note="Refined here, then shipped into the shared vault."
+                note="Refined here, then shipped."
                 accent="violet"
               />
             </div>
@@ -2615,30 +2638,6 @@ export default function MleoBase() {
                 value={`Lv ${state.commanderLevel}`}
                 note={`${fmt(state.commanderXp)} / ${fmt(xpForLevel(state.commanderLevel))} XP`}
                 accent="sky"
-                compact
-              />
-
-              <MetricCard
-                label="Ore"
-                value={fmt(state.resources.ORE)}
-                note={`x${derived.oreMult.toFixed(2)} output`}
-                accent="cyan"
-                compact
-              />
-
-              <MetricCard
-                label="Gold"
-                value={fmt(state.resources.GOLD)}
-                note={`x${derived.goldMult.toFixed(2)} output`}
-                accent="amber"
-                compact
-              />
-
-              <MetricCard
-                label="Scrap"
-                value={fmt(state.resources.SCRAP)}
-                note={`x${derived.scrapMult.toFixed(2)} output`}
-                accent="rose"
                 compact
               />
 
@@ -2670,19 +2669,50 @@ export default function MleoBase() {
                 />
               </div>
             </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Ore</div>
+                <div className="mt-1 text-sm font-bold text-white">{fmt(state.resources.ORE)}</div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Gold</div>
+                <div className="mt-1 text-sm font-bold text-white">{fmt(state.resources.GOLD)}</div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Scrap</div>
+                <div className="mt-1 text-sm font-bold text-white">{fmt(state.resources.SCRAP)}</div>
+              </div>
+            </div>
           </div>
 
           {/* Desktop */}
-          <div className="mt-6 hidden gap-3 sm:grid xl:grid-cols-9 xl:items-stretch">
-            <MetricCard label="Shared Vault" value={`${fmt(sharedVault)} MLEO`} note="Same balance used by Miners, Arcade and Online." accent="emerald" />
-            <MetricCard label="Base Banked" value={`${fmt(state.bankedMleo)} MLEO`} note="Refined here, then shipped into the shared vault." accent="violet" />
-            <MetricCard label="Commander" value={`Lv ${state.commanderLevel}`} note={`${fmt(state.commanderXp)} / ${fmt(xpForLevel(state.commanderLevel))} XP`} accent="sky" />
-            <MetricCard label="Ore" value={fmt(state.resources.ORE)} note={`x${derived.oreMult.toFixed(2)} output`} accent="cyan" />
-            <MetricCard label="Gold" value={fmt(state.resources.GOLD)} note={`x${derived.goldMult.toFixed(2)} output`} accent="amber" />
-            <MetricCard label="Scrap" value={fmt(state.resources.SCRAP)} note={`x${derived.scrapMult.toFixed(2)} output`} accent="rose" />
-            <MetricCard label="Data" value={fmt(state.resources.DATA)} note={`x${derived.dataMult.toFixed(2)} progression`} accent="sky" />
+          <div className="mt-6 hidden gap-3 xl:grid xl:grid-cols-6 xl:items-stretch">
+            <MetricCard
+              label="Shared Vault"
+              value={`${fmt(sharedVault)} MLEO`}
+              note="Shared across Miners, Arcade and Online."
+              accent="emerald"
+            />
+            <MetricCard
+              label="Base Banked"
+              value={`${fmt(state.bankedMleo)} MLEO`}
+              note="Refined here, then shipped."
+              accent="violet"
+            />
+            <MetricCard
+              label="Commander"
+              value={`Lv ${state.commanderLevel}`}
+              note={`${fmt(state.commanderXp)} / ${fmt(xpForLevel(state.commanderLevel))} XP`}
+              accent="sky"
+            />
             <div className={`h-full w-full ${highlightCard((state.resources.ENERGY || 0) <= derived.energyCap * 0.25, "warning")}`}>
-              <MetricCard label="Energy" value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`} note={`Regen ${derived.energyRegen.toFixed(2)}/s`} accent="slate" />
+              <MetricCard
+                label="Energy"
+                value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
+                note={`Regen ${derived.energyRegen.toFixed(2)}/s`}
+                accent="slate"
+              />
             </div>
             <div className={`h-full w-full ${highlightCard(systemState === "critical", "critical") || highlightCard(systemState === "warning", "warning")}`}>
               <MetricCard
@@ -2691,6 +2721,30 @@ export default function MleoBase() {
                 note={systemMeta.label}
                 accent={systemMeta.accent}
               />
+            </div>
+            <MetricCard
+              label="Data"
+              value={fmt(state.resources.DATA)}
+              note={`x${derived.dataMult.toFixed(2)} progression`}
+              accent="sky"
+            />
+          </div>
+
+          <div className="mt-3 hidden xl:grid xl:grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Ore</div>
+              <div className="mt-1 text-lg font-bold text-white">{fmt(state.resources.ORE)}</div>
+              <div className="mt-1 text-xs text-white/55">x{derived.oreMult.toFixed(2)} output</div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Gold</div>
+              <div className="mt-1 text-lg font-bold text-white">{fmt(state.resources.GOLD)}</div>
+              <div className="mt-1 text-xs text-white/55">x{derived.goldMult.toFixed(2)} output</div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Scrap</div>
+              <div className="mt-1 text-lg font-bold text-white">{fmt(state.resources.SCRAP)}</div>
+              <div className="mt-1 text-xs text-white/55">x{derived.scrapMult.toFixed(2)} output</div>
             </div>
           </div>
 
@@ -2718,107 +2772,84 @@ export default function MleoBase() {
             </div>
           </div>
 
-          <div className={`mt-4 rounded-3xl border p-4 ${systemMeta.panel}`}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-xs uppercase tracking-[0.18em] text-white/70">
-                  Base System State
+          {activeEvent || nextShipBonus > 0 ? (
+            <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">
+                    Live Command Event
+                  </div>
+                  <div className="mt-1 text-lg font-bold text-white">
+                    {activeEvent ? activeEvent.title : "Logistics boost active"}
+                  </div>
+                  <div className="mt-1 text-sm text-white/70">
+                    {activeEvent
+                      ? activeEvent.text
+                      : "A previous command decision improved your next vault shipment."}
+                  </div>
                 </div>
-                <div className="mt-1 text-lg font-bold text-white">{systemMeta.label}</div>
-                <div className="mt-1 text-sm text-white/70">{systemMeta.text}</div>
-              </div>
-              <div className="rounded-2xl bg-black/20 px-4 py-3 text-sm text-white/75">
-                Stability {fmt(state.stability)}%
-              </div>
-            </div>
-          </div>
 
-          <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">
-                  Live Command Event
-                </div>
-                <div className="mt-1 text-lg font-bold text-white">
-                  {activeEvent ? activeEvent.title : "No active event"}
-                </div>
-                <div className="mt-1 text-sm text-white/70">
-                  {activeEvent
-                    ? activeEvent.text
-                    : "Base stable. Awaiting next signal from operations, logistics or field crews."}
-                </div>
+                {nextShipBonus > 0 ? (
+                  <div className="rounded-2xl bg-emerald-500/15 px-4 py-3 text-sm text-emerald-200">
+                    Next ship bonus: +{Math.round(nextShipBonus * 100)}%
+                  </div>
+                ) : null}
               </div>
 
-              {nextShipBonus > 0 ? (
-                <div className="rounded-2xl bg-emerald-500/15 px-4 py-3 text-sm text-emerald-200">
-                  Next ship bonus: +{Math.round(nextShipBonus * 100)}%
+              {activeEvent ? (
+                <div className="mt-4 grid gap-2 md:grid-cols-3">
+                  {activeEvent.choices.map((choice) => {
+                    const allowed = canApplyEventChoice(state, choice, derived);
+                    return (
+                      <button
+                        key={choice.key}
+                        onClick={() => resolveLiveEventChoice(choice)}
+                        disabled={!allowed}
+                        className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <div>{choice.label}</div>
+                      </button>
+                    );
+                  })}
                 </div>
               ) : null}
             </div>
+          ) : null}
 
-            {activeEvent ? (
-              <div className="mt-4 grid gap-2 md:grid-cols-3">
-                {activeEvent.choices.map((choice) => {
-                  const allowed = canApplyEventChoice(state, choice, derived);
-                  return (
-                    <button
-                      key={choice.key}
-                      onClick={() => resolveLiveEventChoice(choice)}
-                      disabled={!allowed}
-                      className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <div>{choice.label}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-4 grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
             <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/55">Crew Role</div>
-              <div className="mt-1 text-lg font-bold text-white">{crewRoleInfo.name}</div>
-              <div className="mt-1 text-sm text-white/65">{crewRoleInfo.desc}</div>
-              <div className="mt-2 text-xs text-cyan-200/80">{roleBonusText}</div>
-            </div>
+              <div className="text-xs uppercase tracking-[0.18em] text-white/55">Command Identity</div>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="text-sm font-semibold text-white">{crewRoleInfo.name}</div>
+                  <div className="mt-1 text-xs text-white/60">{crewRoleInfo.desc}</div>
+                  <div className="mt-2 text-xs text-cyan-200/80">{roleBonusText}</div>
+                </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/55">Commander Path</div>
-              <div className="mt-1 text-lg font-bold text-white">{commanderPathInfo.name}</div>
-              <div className="mt-1 text-sm text-white/65">{commanderPathInfo.desc}</div>
-              <div className="mt-2 text-xs text-cyan-200/80">{commanderPathText}</div>
-            </div>
-
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/55">Ship Discipline</div>
-              <div className="mt-1 text-lg font-bold text-white">
-                {fmt(state.sentToday)} / {fmt(derived.shipCap)}
-              </div>
-              <div className="mt-1 text-sm text-white/65">
-                Daily export pressure remains controlled by softcut and cap logic.
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="text-sm font-semibold text-white">{commanderPathInfo.name}</div>
+                  <div className="mt-1 text-xs text-white/60">{commanderPathInfo.desc}</div>
+                  <div className="mt-2 text-xs text-cyan-200/80">{commanderPathText}</div>
+                </div>
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-4 xl:block">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/55">Base Profile</div>
-              <div className="mt-1 text-lg font-bold text-white">
-                {state.crew >= 5 ? "Developed Command" : state.crew >= 2 ? "Growing Outpost" : "Early Outpost"}
-              </div>
-              <div className="mt-1 text-sm text-white/65">
-                Buildings, role choice and commander path now shape the identity of your base.
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 xl:hidden">
             <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-white/55">Base Profile</div>
               <div className="mt-1 text-lg font-bold text-white">
                 {state.crew >= 5 ? "Developed Command" : state.crew >= 2 ? "Growing Outpost" : "Early Outpost"}
               </div>
-              <div className="mt-1 text-sm text-white/65">
+              <div className="mt-2 text-sm text-white/65">
                 Buildings, role choice and commander path now shape the identity of your base.
+              </div>
+              <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3">
+                <div className="text-xs uppercase tracking-[0.18em] text-white/45">Ship Discipline</div>
+                <div className="mt-1 text-base font-bold text-white">
+                  {fmt(state.sentToday)} / {fmt(derived.shipCap)}
+                </div>
+                <div className="mt-1 text-xs text-white/60">
+                  Daily export pressure remains controlled by softcut and cap logic.
+                </div>
               </div>
             </div>
           </div>
@@ -2878,7 +2909,7 @@ export default function MleoBase() {
                 </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
                 {[
                   { key: "hq", label: "HQ Core" },
                   { key: "refinery", label: "Refinery Sector" },
@@ -2990,8 +3021,8 @@ export default function MleoBase() {
           <div className="mt-4 xl:hidden">
             <AccordionSection
               title="Operations Console"
-              subtitle={`Ship cap today: ${fmt(state.sentToday)} / ${fmt(derived.shipCap)} MLEO. Blueprints, contracts, specialization and utilities turn BASE into a real command layer instead of a passive reward tab.`}
-              defaultOpen={true}
+              subtitle={`Ship cap today: ${fmt(state.sentToday)} / ${fmt(derived.shipCap)} MLEO. Utilities and exports keep BASE productive without becoming an uncontrolled faucet.`}
+              defaultOpen={false}
             >
                 <div className="grid gap-3 md:grid-cols-2">
                   <div
@@ -3114,7 +3145,7 @@ export default function MleoBase() {
             <div className="hidden xl:block">
               <Section
                 title="Operations Console"
-                subtitle={`Ship cap today: ${fmt(state.sentToday)} / ${fmt(derived.shipCap)} MLEO. Blueprints, contracts, specialization and utilities turn BASE into a real command layer instead of a passive reward tab.`}
+                subtitle={`Ship cap today: ${fmt(state.sentToday)} / ${fmt(derived.shipCap)} MLEO. Utilities and exports keep BASE productive without becoming an uncontrolled faucet.`}
               >
                 <div className="grid gap-3 md:grid-cols-2">
                   <div
@@ -3246,7 +3277,7 @@ export default function MleoBase() {
             <AccordionSection
               title="Daily Missions"
               subtitle="Daily goals give players direction without turning BASE into an aggressive faucet."
-              defaultOpen={true}
+              defaultOpen={false}
             >
               {dailyMissionsContent}
             </AccordionSection>
@@ -3265,7 +3296,7 @@ export default function MleoBase() {
             <div className="hidden xl:block">
               <Section
                 title="Crew, Modules & Research"
-                subtitle="Everything here strengthens the support loop around Miners and Arcade without opening a second uncontrolled faucet."
+                subtitle="Shape your long-term command identity through crew, modules and research."
               >
                 {crewModulesResearchContent}
               </Section>
@@ -3275,7 +3306,7 @@ export default function MleoBase() {
               <AccordionSection
                 title="Base Structures"
                 subtitle="Upgrade your base and unlock stronger systems."
-                defaultOpen={true}
+                defaultOpen={false}
               >
                 {baseStructuresContent}
               </AccordionSection>
@@ -3283,14 +3314,14 @@ export default function MleoBase() {
             <div className="hidden xl:block">
               <Section
                 title="Base Structures"
-                subtitle="MLEO BASE is tuned as a support-management game: it produces slowly, rewards planning, and feeds the main shared vault in measured batches."
+                subtitle="Upgrade structures, unlock stronger systems and shape your command base."
               >
                 {baseStructuresContent}
               </Section>
             </div>
           </div>
 
-          <div className="mt-4 grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+          <div className="mt-4 grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
             <div className="xl:hidden">
               <AccordionSection
                 title="Progress Summary"
@@ -3319,7 +3350,7 @@ export default function MleoBase() {
               </AccordionSection>
             </div>
             <div className="hidden xl:block">
-              <Section title="Activity Log" subtitle="Live operational feed from your command room.">
+              <Section title="Activity Log" subtitle="Recent system activity.">
                 {activityLogContent}
               </Section>
             </div>
