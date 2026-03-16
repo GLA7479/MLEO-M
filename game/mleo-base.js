@@ -1600,6 +1600,7 @@ export default function MleoBase() {
   const [mobileDailyMissionsOpen, setMobileDailyMissionsOpen] = useState(false);
   const [mobileDevelopmentOpen, setMobileDevelopmentOpen] = useState(false);
   const [mobileBaseStructuresOpen, setMobileBaseStructuresOpen] = useState(false);
+  const [mobileBuildSupportOpen, setMobileBuildSupportOpen] = useState(false);
   const [mobileProgressSummaryOpen, setMobileProgressSummaryOpen] = useState(false);
   const [mobileActivityLogOpen, setMobileActivityLogOpen] = useState(false);
 
@@ -1904,8 +1905,7 @@ export default function MleoBase() {
 
   const operationsReadyCount =
     Number(canExpeditionNow) +
-    Number(needsRefillNow) +
-    Number(needsMaintenanceNow);
+    Number(canShipNow);
 
   const expeditionLeft = Math.max(0, (state.expeditionReadyAt || 0) - Date.now());
   const overclockLeft = Math.max(0, (state.overclockUntil || 0) - Date.now());
@@ -2795,12 +2795,12 @@ export default function MleoBase() {
       ) : null}
 
       {devTab === "modules" ? (
-        <div className="grid gap-3 xl:grid-cols-2">
+        <div className="grid gap-2.5 xl:grid-cols-2">
         {MODULES.map((module) => {
           const owned = !!state.modules[module.key];
           return (
-            <div key={module.key} className="flex h-full flex-col gap-3 rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="flex min-h-[96px] flex-col">
+            <div key={module.key} className="flex h-full flex-col gap-2 rounded-2xl border border-white/10 bg-black/20 p-3.5">
+              <div className="flex min-h-0 flex-col">
                 <div className="text-sm font-semibold">{module.name}</div>
                 <div className="mt-1 text-xs text-white/60">{module.desc}</div>
                 <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
@@ -2811,7 +2811,7 @@ export default function MleoBase() {
               <button
                 onClick={() => buyModule(module.key)}
                 disabled={owned}
-                className={`mt-auto w-full rounded-xl px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${owned ? "bg-white/10" : canCoverCost(state.resources, module.cost) ? "bg-white/10" : "bg-white/10 opacity-70"}`}
+                className={`mt-auto w-full rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${owned ? "bg-white/10" : canCoverCost(state.resources, module.cost) ? "bg-white/10" : "bg-white/10 opacity-70"}`}
               >
                 {owned ? "Installed" : "Install"}
               </button>
@@ -2822,12 +2822,12 @@ export default function MleoBase() {
       ) : null}
 
       {devTab === "research" ? (
-      <div className="grid gap-3">
+      <div className="grid gap-2.5">
         {RESEARCH.map((item) => {
           const done = !!state.research[item.key];
           const locked = item.requires?.some((key) => !state.research[key]);
           return (
-            <div key={item.key} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div key={item.key} className="rounded-2xl border border-white/10 bg-black/20 p-3.5">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="text-sm font-semibold">{item.name}</div>
@@ -2840,7 +2840,7 @@ export default function MleoBase() {
                 <button
                   onClick={() => buyResearch(item.key)}
                   disabled={done || locked}
-                  className={`rounded-xl px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${done || locked ? "bg-white/10" : canCoverCost(state.resources, item.cost) ? "bg-white/10" : "bg-white/10 opacity-70"}`}
+                  className={`shrink-0 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${done || locked ? "bg-white/10" : canCoverCost(state.resources, item.cost) ? "bg-white/10" : "bg-white/10 opacity-70"}`}
                 >
                   {done ? "Done" : locked ? "Locked" : "Research"}
                 </button>
@@ -2892,7 +2892,7 @@ export default function MleoBase() {
         return (
           <div
             key={building.key}
-            className="flex min-h-[210px] flex-col rounded-xl border border-white/10 bg-black/20 p-3"
+            className="flex min-h-[180px] flex-col rounded-xl border border-white/10 bg-black/20 p-3"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
@@ -2932,11 +2932,11 @@ export default function MleoBase() {
             </div>
             <ResourceCostRow cost={cost} resources={state.resources} />
 
-            <div className="mt-auto flex min-h-[52px] flex-col justify-end pt-3">
+            <div className="mt-auto flex min-h-[44px] flex-col justify-end pt-2.5">
               <button
                 onClick={() => buyBuilding(building.key)}
                 disabled={!ready}
-                className={`w-full rounded-xl px-3 py-2 text-xs font-semibold transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${canCoverCost(state.resources, cost) ? "bg-white/10" : "bg-white/10 opacity-70"}`}
+                className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${canCoverCost(state.resources, cost) ? "bg-white/10" : "bg-white/10 opacity-70"}`}
               >
                 {buttonText}
               </button>
@@ -2956,6 +2956,51 @@ export default function MleoBase() {
           </div>
         );
       })}
+    </div>
+  );
+
+  const buildSupportSystemsContent = (
+    <div className="space-y-3">
+      <div className="rounded-2xl border border-white/10 bg-black/20 p-3.5">
+        <div className="text-base font-bold text-white">Blueprint Cache</div>
+        <div className="mt-1 text-sm text-white/65">
+          Upgrade your shipment capacity and long-term bank efficiency.
+        </div>
+        <div className="mt-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
+          Cost
+        </div>
+        <div className="mt-1 text-xs font-semibold text-white/80">
+          {fmt(blueprintCost)} shared MLEO
+        </div>
+        <button
+          onClick={buyBlueprint}
+          className="mt-3 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-white/15"
+        >
+          Buy Blueprint Lv {Number(state.blueprintLevel || 0) + 1}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={activateOverclock}
+          className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3.5 text-sm font-extrabold text-white hover:bg-white/15"
+        >
+          Overclock
+        </button>
+        <button
+          onClick={refillEnergy}
+          className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3.5 text-sm font-extrabold text-white hover:bg-white/15"
+        >
+          Refill
+        </button>
+      </div>
+
+      <button
+        onClick={performMaintenance}
+        className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3.5 text-sm font-extrabold text-white hover:bg-white/15"
+      >
+        Maintain
+      </button>
     </div>
   );
 
@@ -3358,7 +3403,7 @@ export default function MleoBase() {
           {mobilePanel ? (
             <div className="fixed inset-0 z-[115] bg-black/55 backdrop-blur-sm sm:hidden">
               <div className="absolute inset-x-0 bottom-0 top-[84px] rounded-t-[28px] border border-white/10 bg-[#0b1526] shadow-2xl">
-                <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-4">
+                <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
                   <div className="min-w-0">
                     <div className="text-lg font-bold text-white">{mobilePanelTitle}</div>
                   </div>
@@ -3366,7 +3411,7 @@ export default function MleoBase() {
                     <WindowBankedBadge value={state.bankedMleo || 0} />
                     <button
                       onClick={closeMobilePanel}
-                      className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-base font-bold text-white/90 hover:bg-white/10"
+                      className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-bold text-white/90 hover:bg-white/10"
                     >
                       Close
                     </button>
@@ -3601,52 +3646,10 @@ export default function MleoBase() {
                             </button>
 
                             <button
-                              onClick={refillEnergy}
-                              className={`${opButtonClass(needsRefillNow, !needsRefillNow)} w-full px-4 py-4 text-base font-extrabold`}
-                            >
-                              <div className="flex items-center justify-center gap-2">
-                                <span>Refill</span>
-                                {needsRefillNow ? (
-                                  <span className="rounded-full bg-slate-950/12 px-2 py-0.5 text-[10px] font-black tracking-[0.16em]">
-                                    READY
-                                  </span>
-                                ) : null}
-                              </div>
-                            </button>
-
-                            <button
-                              onClick={performMaintenance}
-                              className={`${opButtonClass(needsMaintenanceNow, !needsMaintenanceNow)} w-full px-4 py-4 text-base font-extrabold`}
-                            >
-                              <div className="flex items-center justify-center gap-2">
-                                <span>Maintain</span>
-                                {needsMaintenanceNow ? (
-                                  <span className="rounded-full bg-slate-950/12 px-2 py-0.5 text-[10px] font-black tracking-[0.16em]">
-                                    READY
-                                  </span>
-                                ) : null}
-                              </div>
-                            </button>
-
-                            <button
                               onClick={bankToSharedVault}
                               className={`${opButtonClass(false, !canShipNow)} w-full px-4 py-4 text-base font-extrabold`}
                             >
                               Ship {fmt(state.bankedMleo || 0)} MLEO
-                            </button>
-
-                            <button
-                              onClick={buyBlueprint}
-                              className={`${opButtonClass(false, false)} w-full px-4 py-4 text-base font-extrabold`}
-                            >
-                              Buy Blueprint Lv {Number(state.blueprintLevel || 0) + 1}
-                            </button>
-
-                            <button
-                              onClick={activateOverclock}
-                              className={`${opButtonClass(false, false)} w-full px-4 py-4 text-base font-extrabold`}
-                            >
-                              Overclock
                             </button>
                           </div>
                         )}
@@ -3686,7 +3689,7 @@ export default function MleoBase() {
                         compact
                         showBanked={false}
                       />
-                      <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <div className="rounded-3xl border border-white/10 bg-white/5 p-3.5">
                         <div className="flex items-center justify-between">
                           <div className="text-lg font-bold text-white">Development</div>
                           <button
@@ -3697,11 +3700,11 @@ export default function MleoBase() {
                           </button>
                         </div>
                         {mobileDevelopmentOpen && (
-                          <div className="mt-4">{crewModulesResearchContent}</div>
+                          <div className="mt-3">{crewModulesResearchContent}</div>
                         )}
                       </div>
 
-                      <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <div className="rounded-3xl border border-white/10 bg-white/5 p-3.5">
                         <div className="flex items-center justify-between">
                           <div className="text-lg font-bold text-white">Base Structures</div>
                           <button
@@ -3712,8 +3715,29 @@ export default function MleoBase() {
                           </button>
                         </div>
                         {mobileBaseStructuresOpen && (
-                          <div className="mt-4">{baseStructuresContent}</div>
+                          <div className="mt-3">{baseStructuresContent}</div>
                         )}
+                      </div>
+
+                      <div
+                        className={`rounded-3xl border p-3.5 transition ${
+                          mobileBuildSupportOpen
+                            ? "border-cyan-400/30 bg-cyan-500/6 shadow-[0_0_18px_rgba(34,211,238,0.08)]"
+                            : "border-white/10 bg-white/5"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-lg font-bold text-white">Support Systems</div>
+                          <button
+                            onClick={() => setMobileBuildSupportOpen(!mobileBuildSupportOpen)}
+                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                          >
+                            {mobileBuildSupportOpen ? "CLOSE" : "OPEN"}
+                          </button>
+                        </div>
+                        {mobileBuildSupportOpen ? (
+                          <div className="mt-3">{buildSupportSystemsContent}</div>
+                        ) : null}
                       </div>
                     </div>
                   ) : null}
