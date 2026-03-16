@@ -2705,7 +2705,7 @@ export default function MleoBase() {
 
   return (
     <Layout title="MLEO BASE">
-      <main className="min-h-screen bg-[#07111f] text-white overflow-hidden sm:overflow-visible">
+      <main className="min-h-screen overflow-x-hidden bg-[#07111f] text-white">
         <div className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -2835,7 +2835,7 @@ export default function MleoBase() {
           </div>
 
           {/* Mobile */}
-          <div className="mt-6 space-y-3 sm:hidden pb-28">
+          <div className="mt-6 space-y-3 sm:hidden pb-2">
 
             <div
               onClick={() => {
