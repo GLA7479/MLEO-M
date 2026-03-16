@@ -2755,7 +2755,7 @@ export default function MleoBase() {
           </div>
 
           {alerts.length ? (
-            <div className="mt-4 space-y-2">
+            <div className="mt-4 hidden space-y-2 sm:block">
               {alerts.map((alert) => (
                 <div
                   key={alert.key}
