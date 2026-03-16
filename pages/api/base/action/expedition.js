@@ -61,15 +61,21 @@ export default async function handler(req, res) {
     }
 
     const result = Array.isArray(rpcData) ? rpcData[0] : rpcData;
-    if (!result) {
-      return res.status(400).json({ success: false, code: "BASE_EXPEDITION_FAILED", message: "RPC returned no data" });
+    const state = result?.state || result || null;
+
+    if (!state) {
+      return res.status(400).json({
+        success: false,
+        code: "BASE_EXPEDITION_FAILED",
+        message: "RPC returned no data",
+      });
     }
 
     return res.status(200).json({
       success: true,
-      state: result.state,
-      loot: result.loot,
-      xp_gain: Number(result.xp_gain || 0),
+      state,
+      loot: result?.loot || null,
+      xp_gain: Number(result?.xp_gain || 0),
     });
   } catch (error) {
     console.error("base/action/expedition failed", error);

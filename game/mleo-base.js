@@ -1696,9 +1696,9 @@ export default function MleoBase() {
     }));
   }, [state, derived, claimedContracts]);
 
-  const readyItems = useMemo(() => {
-    const items = [];
+  const missionProgress = getMissionProgress(state);
 
+  const readyCounts = useMemo(() => {
     const expeditionReadyNow =
       Number(state.expeditionReadyAt || 0) <= Date.now() &&
       Number(state.resources?.DATA || 0) >= 4;
@@ -1707,41 +1707,71 @@ export default function MleoBase() {
       (c) => c.done && !c.claimed
     ).length;
 
+    const claimableMissionsCount = DAILY_MISSIONS.filter((mission) => {
+      const progress = missionProgress[mission.key] || 0;
+      const done = progress >= mission.target;
+      const claimed = !!state.missionState?.claimed?.[mission.key];
+      return done && !claimed;
+    }).length;
+
     const bankedReady = Number(state.bankedMleo || 0) >= 120;
 
-    if (expeditionReadyNow) {
+    return {
+      expedition: expeditionReadyNow ? 1 : 0,
+      contracts: claimableContractsCount,
+      missions: claimableMissionsCount,
+      shipment: bankedReady ? 1 : 0,
+      total: (expeditionReadyNow ? 1 : 0) + claimableContractsCount + claimableMissionsCount + (bankedReady ? 1 : 0),
+    };
+  }, [state, liveContracts, missionProgress]);
+
+  const readyItems = useMemo(() => {
+    const items = [];
+
+    if (readyCounts.expedition > 0) {
       items.push({
         key: "expedition",
         title: "Expedition ready",
         text: "Field team is available for deployment.",
+        count: readyCounts.expedition,
       });
     }
 
-    if (claimableContractsCount > 0) {
+    if (readyCounts.contracts > 0) {
       items.push({
         key: "contracts",
         title: "Contract reward ready",
-        text: `${claimableContractsCount} command contract${claimableContractsCount > 1 ? "s are" : " is"} ready to claim.`,
+        text: `${readyCounts.contracts} command contract${readyCounts.contracts > 1 ? "s are" : " is"} ready to claim.`,
+        count: readyCounts.contracts,
       });
     }
 
-    if (bankedReady) {
+    if (readyCounts.missions > 0) {
+      items.push({
+        key: "missions",
+        title: "Mission reward ready",
+        text: `${readyCounts.missions} daily mission${readyCounts.missions > 1 ? "s are" : " is"} ready to claim.`,
+        count: readyCounts.missions,
+      });
+    }
+
+    if (readyCounts.shipment > 0) {
       items.push({
         key: "shipment",
         title: "Shipment opportunity",
         text: "Banked MLEO is ready for a measured shipment.",
+        count: readyCounts.shipment,
       });
     }
 
     return items;
-  }, [state, liveContracts]);
+  }, [readyCounts]);
   const blueprintCost = useMemo(
     () => Math.floor(CONFIG.blueprintBaseCost * Math.pow(CONFIG.blueprintGrowth, state.blueprintLevel)),
     [state.blueprintLevel]
   );
   const expeditionLeft = Math.max(0, (state.expeditionReadyAt || 0) - Date.now());
   const overclockLeft = Math.max(0, (state.overclockUntil || 0) - Date.now());
-  const missionProgress = getMissionProgress(state);
   const alerts = useMemo(
     () => getAlerts(state, derived, systemState, liveContracts),
     [state, derived, systemState, liveContracts]
@@ -2468,12 +2498,29 @@ export default function MleoBase() {
 
   const dailyMissionsContent = (
     <div className="space-y-3">
-      {DAILY_MISSIONS.map((mission) => {
+      {[...DAILY_MISSIONS].sort((a, b) => {
+        const aProgress = missionProgress[a.key] || 0;
+        const aDone = aProgress >= a.target;
+        const aClaimed = !!state.missionState?.claimed?.[a.key];
+        const aReady = aDone && !aClaimed ? 1 : 0;
+        
+        const bProgress = missionProgress[b.key] || 0;
+        const bDone = bProgress >= b.target;
+        const bClaimed = !!state.missionState?.claimed?.[b.key];
+        const bReady = bDone && !bClaimed ? 1 : 0;
+        
+        return bReady - aReady;
+      }).map((mission) => {
         const progress = missionProgress[mission.key] || 0;
         const done = progress >= mission.target;
         const claimed = !!state.missionState?.claimed?.[mission.key];
+        const ready = done && !claimed;
         return (
-          <div key={mission.key} className="rounded-xl border border-white/10 bg-black/20 p-2.5">
+          <div key={mission.key} className={`rounded-xl border p-2.5 ${
+            ready
+              ? "border-cyan-400/40 bg-cyan-500/10"
+              : "border-white/10 bg-black/20"
+          }`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="text-xs font-semibold">{mission.name}</div>
@@ -2485,7 +2532,11 @@ export default function MleoBase() {
               <button
                 onClick={() => claimMission(mission.key)}
                 disabled={!done || claimed}
-                className="rounded-xl bg-white/10 px-3 py-1.5 text-[11px] font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+                className={`rounded-xl px-3 py-1.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
+                  ready
+                    ? "bg-cyan-500 text-white hover:bg-cyan-400"
+                    : "bg-white/10 hover:bg-white/20"
+                }`}
               >
                 {claimed ? "Claimed" : done ? "Claim" : "In Progress"}
               </button>
@@ -2888,15 +2939,25 @@ export default function MleoBase() {
               <div className="mt-3 flex items-center justify-between sm:block">
                 <h1 className="text-3xl font-black tracking-tight sm:text-4xl">{CONFIG.title}</h1>
                 <div className="flex items-center gap-2 sm:hidden">
-                  <Link href="/mining" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10">
+                  <Link href="/mining" className="relative rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10">
                     Hub
+                    {readyCounts.total > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-cyan-400 px-1 text-[10px] font-bold text-black">
+                        {readyCounts.total}
+                      </span>
+                    )}
                   </Link>
                   <button
                     onClick={() => setMobileMenuOpen(true)}
-                    className="flex h-[46px] w-[46px] items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
+                    className="relative flex h-[46px] w-[46px] items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
                     aria-label="Open menu"
                   >
                     <span className="text-[22px] leading-none">☰</span>
+                    {readyCounts.total > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-cyan-400 px-1 text-[10px] font-bold text-black">
+                        {readyCounts.total}
+                      </span>
+                    )}
                   </button>
                 </div>
               </div>
@@ -3012,28 +3073,44 @@ export default function MleoBase() {
 
             <div
               onClick={() => {
-                if (readyItems.length) setShowReadyPanel(true);
+                if (readyCounts.total > 0) setShowReadyPanel(true);
               }}
-              className={`rounded-2xl border px-4 py-3 transition ${
-                readyItems.length
-                  ? "cursor-pointer border-cyan-400/25 bg-cyan-500/10 hover:bg-cyan-500/15"
+              className={`relative rounded-2xl border px-4 py-3 transition ${
+                readyCounts.total > 0
+                  ? "cursor-pointer border-cyan-400/60 bg-cyan-500/10 shadow-[0_0_24px_rgba(34,211,238,0.18)] hover:bg-cyan-500/15 hover:border-cyan-400/80"
                   : "border-white/10 bg-white/5"
-              }`}
+              } ${readyCounts.total > 0 ? "animate-pulse" : ""}`}
             >
+              {readyCounts.total > 0 && (
+                <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-cyan-400 text-[10px] font-bold text-black">
+                  !
+                </div>
+              )}
               <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-bold text-white">
-                    {readyItems.length ? "Ready actions available" : "Base is stable"}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-bold text-white">
+                      {readyCounts.total > 0 ? `${readyCounts.total} Ready Action${readyCounts.total > 1 ? "s" : ""}` : "Base is stable"}
+                    </div>
+                    {readyCounts.total > 0 && (
+                      <span className="inline-flex min-w-[24px] items-center justify-center rounded-full bg-cyan-400 px-1.5 py-0.5 text-[10px] font-bold text-black">
+                        {readyCounts.total}
+                      </span>
+                    )}
                   </div>
-                  <div className="text-xs text-white/75">
-                    {readyItems.length
-                      ? `${readyItems.length} item${readyItems.length > 1 ? "s" : ""} waiting`
+                  <div className="mt-0.5 text-xs text-white/75">
+                    {readyCounts.total > 0
+                      ? "Open command hub to collect"
                       : "Nothing needs attention right now."}
                   </div>
                 </div>
 
-                <div className="shrink-0 rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white/80">
-                  {readyItems.length ? "OPEN" : "OK"}
+                <div className={`shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                  readyCounts.total > 0
+                    ? "bg-cyan-500 text-white hover:bg-cyan-400"
+                    : "bg-white/10 text-white/80"
+                }`}>
+                  {readyCounts.total > 0 ? "OPEN" : "OK"}
                 </div>
               </div>
             </div>
@@ -3111,23 +3188,28 @@ export default function MleoBase() {
           <div className="fixed inset-x-0 bottom-0 z-[110] border-t border-white/10 bg-[#07111f]/95 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3 backdrop-blur sm:hidden">
             <div className="grid grid-cols-4 gap-2">
               {[
-                { key: "overview", label: "Overview" },
-                { key: "ops", label: "Operations" },
-                { key: "build", label: "Build" },
-                { key: "intel", label: "Intel" },
+                { key: "overview", label: "Overview", count: readyCounts.contracts + readyCounts.missions },
+                { key: "ops", label: "Operations", count: readyCounts.expedition + readyCounts.shipment },
+                { key: "build", label: "Build", count: 0 },
+                { key: "intel", label: "Intel", count: 0 },
               ].map((tab) => {
                 const active = mobilePanel === tab.key;
                 return (
                   <button
                     key={tab.key}
                     onClick={() => openMobilePanel(tab.key)}
-                    className={`rounded-2xl px-3 py-3 text-xs font-bold transition ${
+                    className={`relative rounded-2xl px-3 py-3 text-xs font-bold transition ${
                       active
                         ? "bg-cyan-500 text-white"
                         : "border border-white/10 bg-white/5 text-white/70"
                     }`}
                   >
                     {tab.label}
+                    {tab.count > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-cyan-400 px-1 text-[10px] font-bold text-black">
+                        {tab.count}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -3149,6 +3231,67 @@ export default function MleoBase() {
                 </div>
 
                 <div className="h-[calc(100%-73px)] overflow-y-auto px-4 py-4">
+                  {/* Ready Now Summary Block */}
+                  {readyCounts.total > 0 && (
+                    <div className="mb-4 rounded-2xl border border-cyan-400/40 bg-cyan-400/10 p-3">
+                      <div className="mb-2 text-sm font-semibold text-cyan-200">Ready now</div>
+                      <div className="space-y-2">
+                        {readyCounts.missions > 0 && (
+                          <button
+                            onClick={() => {
+                              setMobileDailyMissionsOpen(true);
+                              if (mobilePanel !== "overview") {
+                                setMobilePanel("overview");
+                              }
+                            }}
+                            className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-left text-sm font-medium text-white hover:bg-white/10"
+                          >
+                            {readyCounts.missions} Mission{readyCounts.missions > 1 ? "s" : ""} ready
+                          </button>
+                        )}
+                        {readyCounts.contracts > 0 && (
+                          <button
+                            onClick={() => {
+                              setMobileLiveContractsOpen(true);
+                              if (mobilePanel !== "overview") {
+                                setMobilePanel("overview");
+                              }
+                            }}
+                            className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-left text-sm font-medium text-white hover:bg-white/10"
+                          >
+                            {readyCounts.contracts} Contract{readyCounts.contracts > 1 ? "s" : ""} ready
+                          </button>
+                        )}
+                        {readyCounts.expedition > 0 && (
+                          <button
+                            onClick={() => {
+                              setMobileOperationsConsoleOpen(true);
+                              if (mobilePanel !== "ops") {
+                                setMobilePanel("ops");
+                              }
+                            }}
+                            className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-left text-sm font-medium text-white hover:bg-white/10"
+                          >
+                            Expedition ready
+                          </button>
+                        )}
+                        {readyCounts.shipment > 0 && (
+                          <button
+                            onClick={() => {
+                              setMobileOperationsConsoleOpen(true);
+                              if (mobilePanel !== "ops") {
+                                setMobilePanel("ops");
+                              }
+                            }}
+                            className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-left text-sm font-medium text-white hover:bg-white/10"
+                          >
+                            Shipment opportunity
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {mobilePanel === "overview" ? (
                     <div className="space-y-4">
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
@@ -3175,7 +3318,14 @@ export default function MleoBase() {
 
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                         <div className="flex items-center justify-between">
-                          <div className="text-lg font-bold text-white">Live Contracts</div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-lg font-bold text-white">Live Contracts</div>
+                            {readyCounts.contracts > 0 && (
+                              <span className="inline-flex min-w-[24px] items-center justify-center rounded-full bg-cyan-400 px-1.5 py-0.5 text-[11px] font-bold text-black">
+                                {readyCounts.contracts}
+                              </span>
+                            )}
+                          </div>
                           <button
                             onClick={() => setMobileLiveContractsOpen(!mobileLiveContractsOpen)}
                             className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
@@ -3185,7 +3335,11 @@ export default function MleoBase() {
                         </div>
                         {mobileLiveContractsOpen && (
                           <div className="mt-3 grid gap-2">
-                            {liveContracts.map((contract) => (
+                            {[...liveContracts].sort((a, b) => {
+                              const aReady = a.done && !a.claimed ? 1 : 0;
+                              const bReady = b.done && !b.claimed ? 1 : 0;
+                              return bReady - aReady;
+                            }).map((contract) => (
                               <div
                                 key={contract.key}
                                 className={`rounded-2xl border border-white/10 bg-black/20 p-3 ${
@@ -3278,7 +3432,14 @@ export default function MleoBase() {
 
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                         <div className="flex items-center justify-between">
-                          <div className="text-lg font-bold text-white">Daily Missions</div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-lg font-bold text-white">Daily Missions</div>
+                            {readyCounts.missions > 0 && (
+                              <span className="inline-flex min-w-[24px] items-center justify-center rounded-full bg-cyan-400 px-1.5 py-0.5 text-[11px] font-bold text-black">
+                                {readyCounts.missions}
+                              </span>
+                            )}
+                          </div>
                           <button
                             onClick={() => setMobileDailyMissionsOpen(!mobileDailyMissionsOpen)}
                             className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
@@ -3486,8 +3647,13 @@ export default function MleoBase() {
 
                           if (item.key === "expedition" || item.key === "shipment") {
                             setMobilePanel("ops");
+                            setMobileOperationsConsoleOpen(true);
                           } else if (item.key === "contracts") {
                             setMobilePanel("overview");
+                            setMobileLiveContractsOpen(true);
+                          } else if (item.key === "missions") {
+                            setMobilePanel("overview");
+                            setMobileDailyMissionsOpen(true);
                           }
                         }}
                         className="block w-full rounded-2xl border border-white/10 bg-black/20 p-3 text-left hover:bg-white/10"
@@ -3505,6 +3671,39 @@ export default function MleoBase() {
               </div>
             </div>
           ) : null}
+
+          {/* Desktop - Ready Actions Card */}
+          {readyCounts.total > 0 && (
+            <div
+              onClick={() => {
+                // Scroll to relevant section or open panel
+                const element = document.getElementById("ready-actions-section");
+                if (element) {
+                  element.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+              }}
+              className="mt-4 hidden cursor-pointer rounded-3xl border border-cyan-400/60 bg-cyan-500/10 p-4 shadow-[0_0_24px_rgba(34,211,238,0.18)] transition hover:bg-cyan-500/15 hover:border-cyan-400/80 sm:block"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="text-lg font-bold text-white">
+                      {readyCounts.total} Ready Action{readyCounts.total > 1 ? "s" : ""}
+                    </div>
+                    <span className="inline-flex min-w-[28px] items-center justify-center rounded-full bg-cyan-400 px-2 py-1 text-xs font-bold text-black">
+                      {readyCounts.total}
+                    </span>
+                  </div>
+                  <div className="text-sm text-white/75">
+                    Claim available rewards
+                  </div>
+                </div>
+                <div className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-400">
+                  View
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Desktop - Next Recommended Step & Live Event */}
           <div
