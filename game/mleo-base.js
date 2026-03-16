@@ -1773,11 +1773,11 @@ export default function MleoBase() {
 
   function opButtonClass(isReady, isMuted = false) {
     if (isReady) {
-      return "relative overflow-hidden rounded-2xl border border-cyan-300/60 bg-cyan-400 text-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.25)]";
+      return "relative rounded-2xl border border-cyan-300/50 bg-cyan-400/85 text-slate-950 shadow-[0_0_16px_rgba(34,211,238,0.18)]";
     }
 
     if (isMuted) {
-      return "rounded-2xl border border-white/10 bg-white/5 text-white/45";
+      return "rounded-2xl border border-white/10 bg-white/6 text-white/45";
     }
 
     return "rounded-2xl border border-white/10 bg-white/10 text-white/85";
@@ -1791,6 +1791,11 @@ export default function MleoBase() {
     Number(sharedVault || 0) >= blueprintCost;
   const needsRefillNow = Number(state.resources?.ENERGY || 0) < Math.max(35, Math.floor((derived.energyCap || 140) * 0.35));
   const needsMaintenanceNow = Number(state.stability || 100) <= 82;
+
+  const operationsReadyCount =
+    Number(canExpeditionNow) +
+    Number(needsRefillNow) +
+    Number(needsMaintenanceNow);
 
   const expeditionLeft = Math.max(0, (state.expeditionReadyAt || 0) - Date.now());
   const overclockLeft = Math.max(0, (state.overclockUntil || 0) - Date.now());
@@ -3420,9 +3425,22 @@ export default function MleoBase() {
 
                   {mobilePanel === "ops" ? (
                     <div className="space-y-4">
-                      <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <div
+                        className={`rounded-3xl border p-4 transition ${
+                          operationsReadyCount > 0
+                            ? "border-cyan-400/30 bg-cyan-500/6 shadow-[0_0_18px_rgba(34,211,238,0.08)]"
+                            : "border-white/10 bg-white/5"
+                        }`}
+                      >
                         <div className="flex items-center justify-between">
-                          <div className="text-lg font-bold text-white">Operations Console</div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-lg font-bold text-white">Operations Console</div>
+                            {operationsReadyCount > 0 ? (
+                              <span className="inline-flex min-w-6 h-6 items-center justify-center rounded-full bg-cyan-400 px-2 text-[11px] font-black text-slate-950">
+                                {operationsReadyCount}
+                              </span>
+                            ) : null}
+                          </div>
                           <button
                             onClick={() => setMobileOperationsConsoleOpen(!mobileOperationsConsoleOpen)}
                             className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
@@ -3432,116 +3450,69 @@ export default function MleoBase() {
                         </div>
                         {mobileOperationsConsoleOpen && (
                           <div className="mt-4 grid gap-3">
-                            {canExpeditionNow && (
-                              <button
-                                onClick={handleLaunchExpedition}
-                                disabled={state.resources.ENERGY < CONFIG.expeditionCost}
-                                className={`${opButtonClass(true, false)} w-full px-4 py-4 text-sm font-extrabold disabled:opacity-40`}
-                              >
-                                <div className="flex items-center justify-center gap-2">
-                                  <span>Launch Expedition</span>
-                                  <span className="rounded-full bg-slate-950/15 px-2 py-0.5 text-[10px] font-black tracking-[0.18em]">
-                                    READY
-                                  </span>
-                                </div>
-                              </button>
-                            )}
-
-                            {canShipNow && (
-                              <button
-                                onClick={bankToSharedVault}
-                                className={`${opButtonClass(true, false)} w-full px-4 py-4 text-sm font-extrabold`}
-                              >
-                                <div className="flex items-center justify-center gap-2">
-                                  <span>Ship {fmt(state.bankedMleo)} MLEO</span>
-                                  <span className="rounded-full bg-slate-950/15 px-2 py-0.5 text-[10px] font-black tracking-[0.18em]">
-                                    READY
-                                  </span>
-                                </div>
-                              </button>
-                            )}
-
-                            {needsMaintenanceNow && (
-                              <button
-                                onClick={performMaintenance}
-                                className={`${opButtonClass(true, false)} w-full px-4 py-4 text-sm font-extrabold`}
-                              >
-                                <div className="flex items-center justify-center gap-2">
-                                  <span>Maintain</span>
-                                  <span className="rounded-full bg-slate-950/15 px-2 py-0.5 text-[10px] font-black tracking-[0.18em]">
-                                    READY
-                                  </span>
-                                </div>
-                              </button>
-                            )}
-
-                            {needsRefillNow && (
-                              <button
-                                onClick={refillEnergy}
-                                className={`${opButtonClass(true, false)} w-full px-4 py-4 text-sm font-extrabold`}
-                              >
-                                <div className="flex items-center justify-center gap-2">
-                                  <span>Refill</span>
-                                  <span className="rounded-full bg-slate-950/15 px-2 py-0.5 text-[10px] font-black tracking-[0.18em]">
-                                    READY
-                                  </span>
-                                </div>
-                              </button>
-                            )}
-
-                            {!canExpeditionNow && (
-                              <button
-                                onClick={handleLaunchExpedition}
-                                disabled={expeditionLeft > 0 || state.resources.ENERGY < CONFIG.expeditionCost}
-                                className={`${opButtonClass(false, true)} w-full px-4 py-4 text-sm font-extrabold disabled:opacity-40`}
-                              >
-                                {expeditionLeft > 0 ? `Ready in ${Math.ceil(expeditionLeft / 1000)}s` : "Launch Expedition"}
-                              </button>
-                            )}
-
-                            {!canShipNow && (
-                              <button
-                                onClick={bankToSharedVault}
-                                className={`${opButtonClass(false, true)} w-full px-4 py-4 text-sm font-extrabold`}
-                              >
-                                Ship {fmt(state.bankedMleo)} MLEO
-                              </button>
-                            )}
-
                             <button
-                              onClick={buyBlueprint}
-                              className={`${opButtonClass(false, !canBuyBlueprintNow)} w-full px-4 py-4 text-sm font-bold`}
+                              onClick={handleLaunchExpedition}
+                              disabled={state.resources.ENERGY < CONFIG.expeditionCost}
+                              className={`${opButtonClass(canExpeditionNow, !canExpeditionNow)} w-full px-4 py-4 text-base font-extrabold disabled:opacity-40`}
                             >
                               <div className="flex items-center justify-center gap-2">
-                                <span>Buy Blueprint Lv {state.blueprintLevel + 1}</span>
+                                <span>Launch Expedition</span>
+                                {canExpeditionNow ? (
+                                  <span className="rounded-full bg-slate-950/12 px-2 py-0.5 text-[10px] font-black tracking-[0.16em]">
+                                    READY
+                                  </span>
+                                ) : null}
                               </div>
                             </button>
 
-                            <div className="grid grid-cols-2 gap-2">
-                              <button
-                                onClick={activateOverclock}
-                                className={`${opButtonClass(false, false)} px-3 py-3 text-sm font-bold`}
-                              >
-                                Overclock
-                              </button>
-                              {!needsRefillNow && (
-                                <button
-                                  onClick={refillEnergy}
-                                  className={`${opButtonClass(false, true)} px-3 py-3 text-sm font-bold`}
-                                >
-                                  Refill
-                                </button>
-                              )}
-                            </div>
+                            <button
+                              onClick={refillEnergy}
+                              className={`${opButtonClass(needsRefillNow, !needsRefillNow)} w-full px-4 py-4 text-base font-extrabold`}
+                            >
+                              <div className="flex items-center justify-center gap-2">
+                                <span>Refill</span>
+                                {needsRefillNow ? (
+                                  <span className="rounded-full bg-slate-950/12 px-2 py-0.5 text-[10px] font-black tracking-[0.16em]">
+                                    READY
+                                  </span>
+                                ) : null}
+                              </div>
+                            </button>
 
-                            {!needsMaintenanceNow && (
-                              <button
-                                onClick={performMaintenance}
-                                className={`${opButtonClass(false, true)} w-full px-3 py-3 text-sm font-bold`}
-                              >
-                                Maintain
-                              </button>
-                            )}
+                            <button
+                              onClick={performMaintenance}
+                              className={`${opButtonClass(needsMaintenanceNow, !needsMaintenanceNow)} w-full px-4 py-4 text-base font-extrabold`}
+                            >
+                              <div className="flex items-center justify-center gap-2">
+                                <span>Maintain</span>
+                                {needsMaintenanceNow ? (
+                                  <span className="rounded-full bg-slate-950/12 px-2 py-0.5 text-[10px] font-black tracking-[0.16em]">
+                                    READY
+                                  </span>
+                                ) : null}
+                              </div>
+                            </button>
+
+                            <button
+                              onClick={bankToSharedVault}
+                              className={`${opButtonClass(false, !canShipNow)} w-full px-4 py-4 text-base font-extrabold`}
+                            >
+                              Ship {fmt(state.bankedMleo || 0)} MLEO
+                            </button>
+
+                            <button
+                              onClick={buyBlueprint}
+                              className={`${opButtonClass(false, false)} w-full px-4 py-4 text-base font-extrabold`}
+                            >
+                              Buy Blueprint Lv {Number(state.blueprintLevel || 0) + 1}
+                            </button>
+
+                            <button
+                              onClick={activateOverclock}
+                              className={`${opButtonClass(false, false)} w-full px-4 py-4 text-base font-extrabold`}
+                            >
+                              Overclock
+                            </button>
                           </div>
                         )}
                       </div>
