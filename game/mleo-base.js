@@ -1408,6 +1408,7 @@ export default function MleoBase() {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState(null);
+  const [showReadyPanel, setShowReadyPanel] = useState(false);
   
   // Mobile internal panels state (all closed by default)
   const [mobileLiveContractsOpen, setMobileLiveContractsOpen] = useState(false);
@@ -1631,6 +1632,46 @@ export default function MleoBase() {
       claimed: !!claimedContracts[contract.key],
     }));
   }, [state, derived, claimedContracts]);
+
+  const readyItems = useMemo(() => {
+    const items = [];
+
+    const expeditionReadyNow =
+      Number(state.expeditionReadyAt || 0) <= Date.now() &&
+      Number(state.resources?.DATA || 0) >= 4;
+
+    const claimableContractsCount = liveContracts.filter(
+      (c) => c.done && !c.claimed
+    ).length;
+
+    const bankedReady = Number(state.bankedMleo || 0) >= 120;
+
+    if (expeditionReadyNow) {
+      items.push({
+        key: "expedition",
+        title: "Expedition ready",
+        text: "Field team is available for deployment.",
+      });
+    }
+
+    if (claimableContractsCount > 0) {
+      items.push({
+        key: "contracts",
+        title: "Contract reward ready",
+        text: `${claimableContractsCount} command contract${claimableContractsCount > 1 ? "s are" : " is"} ready to claim.`,
+      });
+    }
+
+    if (bankedReady) {
+      items.push({
+        key: "shipment",
+        title: "Shipment opportunity",
+        text: "Banked MLEO is ready for a measured shipment.",
+      });
+    }
+
+    return items;
+  }, [state, liveContracts]);
   const blueprintCost = useMemo(
     () => Math.floor(CONFIG.blueprintBaseCost * Math.pow(CONFIG.blueprintGrowth, state.blueprintLevel)),
     [state.blueprintLevel]
@@ -2794,21 +2835,35 @@ export default function MleoBase() {
           </div>
 
           {/* Mobile */}
-          <div className="mt-6 space-y-3 sm:hidden pb-24">
+          <div className="mt-6 space-y-3 sm:hidden pb-28">
 
-            {alerts.length ? (
-              <div className="space-y-2">
-                {alerts.slice(0, 1).map((alert) => (
-                  <div
-                    key={alert.key}
-                    className={`rounded-2xl border px-4 py-3 ${alertToneClasses(alert.tone)}`}
-                  >
-                    <div className="text-sm font-bold">{alert.title}</div>
-                    <div className="text-xs text-white/75">{alert.text}</div>
+            <div
+              onClick={() => {
+                if (readyItems.length) setShowReadyPanel(true);
+              }}
+              className={`rounded-2xl border px-4 py-3 transition ${
+                readyItems.length
+                  ? "cursor-pointer border-cyan-400/25 bg-cyan-500/10 hover:bg-cyan-500/15"
+                  : "border-white/10 bg-white/5"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-white">
+                    {readyItems.length ? "Ready actions available" : "Base is stable"}
                   </div>
-                ))}
+                  <div className="text-xs text-white/75">
+                    {readyItems.length
+                      ? `${readyItems.length} item${readyItems.length > 1 ? "s" : ""} waiting`
+                      : "Nothing needs attention right now."}
+                  </div>
+                </div>
+
+                <div className="shrink-0 rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white/80">
+                  {readyItems.length ? "OPEN" : "OK"}
+                </div>
               </div>
-            ) : null}
+            </div>
 
             <div className="grid grid-cols-1 gap-3">
               <MetricCard
@@ -3217,6 +3272,62 @@ export default function MleoBase() {
                   >
                     Reset Game
                   </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Mobile Ready Panel */}
+          {showReadyPanel ? (
+            <div
+              className="fixed inset-0 z-[117] bg-black/60 backdrop-blur-sm sm:hidden"
+              onClick={() => setShowReadyPanel(false)}
+            >
+              <div
+                className="absolute inset-x-4 top-[110px] rounded-3xl border border-white/10 bg-[#0b1526] p-4 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-lg font-bold text-white">Ready Now</div>
+                    <div className="mt-1 text-xs text-white/60">
+                      Live actions and rewards currently available.
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setShowReadyPanel(false)}
+                    className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {readyItems.length ? (
+                    readyItems.map((item) => (
+                      <button
+                        key={item.key}
+                        onClick={() => {
+                          setShowReadyPanel(false);
+
+                          if (item.key === "expedition" || item.key === "shipment") {
+                            setMobilePanel("ops");
+                          } else if (item.key === "contracts") {
+                            setMobilePanel("overview");
+                          }
+                        }}
+                        className="block w-full rounded-2xl border border-white/10 bg-black/20 p-3 text-left hover:bg-white/10"
+                      >
+                        <div className="text-sm font-semibold text-white">{item.title}</div>
+                        <div className="mt-1 text-xs text-white/65">{item.text}</div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
+                      Nothing is ready right now.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
