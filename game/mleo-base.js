@@ -3415,35 +3415,41 @@ export default function MleoBase() {
             </div>
           </div>
 
-          {/* Mobile Bottom Nav */}
-          <div className="fixed inset-x-0 bottom-0 z-[110] border-t border-white/10 bg-[#07111f]/95 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3 backdrop-blur sm:hidden">
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                { key: "overview", label: "Overview", count: readyCounts.contracts + readyCounts.missions },
-                { key: "ops", label: "Operations", count: readyCounts.expedition + readyCounts.shipment },
-                { key: "build", label: "Build", count: 0 },
-                { key: "intel", label: "Intel", count: 0 },
-              ].map((tab) => {
-                const active = mobilePanel === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    onClick={() => openMobilePanel(tab.key)}
-                    className={`relative rounded-2xl px-3 py-3 text-xs font-bold transition ${
-                      active
-                        ? "bg-cyan-500 text-white"
-                        : "border border-white/10 bg-white/5 text-white/70"
-                    }`}
-                  >
-                    {tab.label}
-                    {tab.count > 0 && (
-                      <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-cyan-400 px-1 text-[10px] font-bold text-black">
-                        {tab.count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+          {/* Mobile Bottom Nav - fixed above panels so switching doesn't require closing */}
+          <div className="fixed inset-x-0 bottom-0 z-[120] px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 sm:hidden">
+            <div className="mx-auto max-w-md rounded-3xl border border-white/10 bg-slate-950/88 p-2 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { key: "overview", label: "Overview", badge: readyCounts.contracts + readyCounts.missions },
+                  { key: "ops", label: "Operations", badge: readyCounts.expedition + readyCounts.shipment },
+                  { key: "build", label: "Build", badge: 0 },
+                  { key: "intel", label: "Intel", badge: 0 },
+                ].map((tab) => {
+                  const active = mobilePanel === tab.key;
+                  const hasBadge = Number(tab.badge || 0) > 0;
+
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => openMobilePanel(tab.key)}
+                      className={`relative rounded-2xl px-3 py-3 text-xs font-bold transition ${
+                        active
+                          ? "bg-cyan-500 text-white"
+                          : hasBadge
+                          ? "border border-cyan-400/40 bg-cyan-500/10 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.12)]"
+                          : "border border-white/10 bg-white/5 text-white/70"
+                      }`}
+                    >
+                      {tab.label}
+                      {hasBadge ? (
+                        <span className="absolute -right-1 -top-1 inline-flex min-w-5 h-5 items-center justify-center rounded-full bg-cyan-400 px-1 text-[10px] font-black text-slate-950">
+                          {tab.badge}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -3466,7 +3472,7 @@ export default function MleoBase() {
                   </div>
                 </div>
 
-                <div className="h-[calc(100%-73px)] overflow-y-auto px-4 py-4">
+                <div className="h-[calc(100%-73px)] overflow-y-auto px-4 py-4 pb-28">
                   {/* Ready Now Summary Block */}
                   {readyCounts.total > 0 && (
                     <div className="mb-4 rounded-2xl border border-cyan-400/40 bg-cyan-400/10 p-3">
