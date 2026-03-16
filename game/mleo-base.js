@@ -1408,6 +1408,15 @@ export default function MleoBase() {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState(null);
+  
+  // Mobile internal panels state (all closed by default)
+  const [mobileLiveContractsOpen, setMobileLiveContractsOpen] = useState(false);
+  const [mobileOperationsConsoleOpen, setMobileOperationsConsoleOpen] = useState(false);
+  const [mobileDailyMissionsOpen, setMobileDailyMissionsOpen] = useState(false);
+  const [mobileDevelopmentOpen, setMobileDevelopmentOpen] = useState(false);
+  const [mobileBaseStructuresOpen, setMobileBaseStructuresOpen] = useState(false);
+  const [mobileProgressSummaryOpen, setMobileProgressSummaryOpen] = useState(false);
+  const [mobileActivityLogOpen, setMobileActivityLogOpen] = useState(false);
 
   const [activeEvent, setActiveEvent] = useState(null);
   const [eventCooldownUntil, setEventCooldownUntil] = useState(0);
@@ -2937,27 +2946,37 @@ export default function MleoBase() {
                       </div>
 
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <div className="text-lg font-bold text-white">Live Contracts</div>
-                        <div className="mt-3 grid gap-2">
-                          {liveContracts.map((contract) => (
-                            <div
-                              key={contract.key}
-                              className={`rounded-2xl border border-white/10 bg-black/20 p-3 ${
-                                contract.done && !contract.claimed ? highlightCard(true, "success") : ""
-                              }`}
-                            >
-                              <div className="text-sm font-semibold text-white">{contract.title}</div>
-                              <div className="mt-1 text-xs text-white/60">{contract.rewardText}</div>
-                              <button
-                                onClick={() => claimContract(contract.key)}
-                                disabled={!contract.done || contract.claimed}
-                                className="mt-3 w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:opacity-40"
-                              >
-                                {contract.claimed ? "Claimed" : contract.done ? "Claim" : "In Progress"}
-                              </button>
-                            </div>
-                          ))}
+                        <div className="flex items-center justify-between">
+                          <div className="text-lg font-bold text-white">Live Contracts</div>
+                          <button
+                            onClick={() => setMobileLiveContractsOpen(!mobileLiveContractsOpen)}
+                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                          >
+                            {mobileLiveContractsOpen ? "CLOSE" : "OPEN"}
+                          </button>
                         </div>
+                        {mobileLiveContractsOpen && (
+                          <div className="mt-3 grid gap-2">
+                            {liveContracts.map((contract) => (
+                              <div
+                                key={contract.key}
+                                className={`rounded-2xl border border-white/10 bg-black/20 p-3 ${
+                                  contract.done && !contract.claimed ? highlightCard(true, "success") : ""
+                                }`}
+                              >
+                                <div className="text-sm font-semibold text-white">{contract.title}</div>
+                                <div className="mt-1 text-xs text-white/60">{contract.rewardText}</div>
+                                <button
+                                  onClick={() => claimContract(contract.key)}
+                                  disabled={!contract.done || contract.claimed}
+                                  className="mt-3 w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:opacity-40"
+                                >
+                                  {contract.claimed ? "Claimed" : contract.done ? "Claim" : "In Progress"}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : null}
@@ -2965,63 +2984,83 @@ export default function MleoBase() {
                   {mobilePanel === "ops" ? (
                     <div className="space-y-4">
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <div className="text-lg font-bold text-white">Operations Console</div>
-                        <div className="mt-4 grid gap-3">
+                        <div className="flex items-center justify-between">
+                          <div className="text-lg font-bold text-white">Operations Console</div>
                           <button
-                            onClick={bankToSharedVault}
-                            className="w-full rounded-2xl bg-emerald-600 px-4 py-4 text-sm font-extrabold hover:bg-emerald-500"
+                            onClick={() => setMobileOperationsConsoleOpen(!mobileOperationsConsoleOpen)}
+                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
-                            Ship {fmt(state.bankedMleo)} MLEO
-                          </button>
-
-                          <button
-                            onClick={handleLaunchExpedition}
-                            disabled={expeditionLeft > 0 || state.resources.ENERGY < CONFIG.expeditionCost}
-                            className="w-full rounded-2xl bg-cyan-600 px-4 py-4 text-sm font-extrabold hover:bg-cyan-500 disabled:opacity-40"
-                          >
-                            {expeditionLeft > 0 ? `Ready in ${Math.ceil(expeditionLeft / 1000)}s` : "Launch Expedition"}
-                          </button>
-
-                          <button
-                            onClick={buyBlueprint}
-                            className="w-full rounded-2xl bg-fuchsia-600 px-4 py-4 text-sm font-bold hover:bg-fuchsia-500"
-                          >
-                            Buy Blueprint Lv {state.blueprintLevel + 1}
-                          </button>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <button
-                              onClick={activateOverclock}
-                              className="rounded-xl bg-amber-600 px-3 py-3 text-sm font-bold hover:bg-amber-500"
-                            >
-                              Overclock
-                            </button>
-                            <button
-                              onClick={refillEnergy}
-                              className="rounded-xl bg-white/10 px-3 py-3 text-sm font-bold hover:bg-white/20"
-                            >
-                              Refill
-                            </button>
-                          </div>
-
-                          <button
-                            onClick={performMaintenance}
-                            className={`w-full rounded-xl px-3 py-3 text-sm font-bold ${
-                              systemState === "critical"
-                                ? "bg-rose-600 hover:bg-rose-500"
-                                : systemState === "warning"
-                                ? "bg-amber-600 hover:bg-amber-500"
-                                : "bg-white/10 hover:bg-white/20"
-                            }`}
-                          >
-                            Maintain
+                            {mobileOperationsConsoleOpen ? "CLOSE" : "OPEN"}
                           </button>
                         </div>
+                        {mobileOperationsConsoleOpen && (
+                          <div className="mt-4 grid gap-3">
+                            <button
+                              onClick={bankToSharedVault}
+                              className="w-full rounded-2xl bg-emerald-600 px-4 py-4 text-sm font-extrabold hover:bg-emerald-500"
+                            >
+                              Ship {fmt(state.bankedMleo)} MLEO
+                            </button>
+
+                            <button
+                              onClick={handleLaunchExpedition}
+                              disabled={expeditionLeft > 0 || state.resources.ENERGY < CONFIG.expeditionCost}
+                              className="w-full rounded-2xl bg-cyan-600 px-4 py-4 text-sm font-extrabold hover:bg-cyan-500 disabled:opacity-40"
+                            >
+                              {expeditionLeft > 0 ? `Ready in ${Math.ceil(expeditionLeft / 1000)}s` : "Launch Expedition"}
+                            </button>
+
+                            <button
+                              onClick={buyBlueprint}
+                              className="w-full rounded-2xl bg-fuchsia-600 px-4 py-4 text-sm font-bold hover:bg-fuchsia-500"
+                            >
+                              Buy Blueprint Lv {state.blueprintLevel + 1}
+                            </button>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                onClick={activateOverclock}
+                                className="rounded-xl bg-amber-600 px-3 py-3 text-sm font-bold hover:bg-amber-500"
+                              >
+                                Overclock
+                              </button>
+                              <button
+                                onClick={refillEnergy}
+                                className="rounded-xl bg-white/10 px-3 py-3 text-sm font-bold hover:bg-white/20"
+                              >
+                                Refill
+                              </button>
+                            </div>
+
+                            <button
+                              onClick={performMaintenance}
+                              className={`w-full rounded-xl px-3 py-3 text-sm font-bold ${
+                                systemState === "critical"
+                                  ? "bg-rose-600 hover:bg-rose-500"
+                                  : systemState === "warning"
+                                  ? "bg-amber-600 hover:bg-amber-500"
+                                  : "bg-white/10 hover:bg-white/20"
+                              }`}
+                            >
+                              Maintain
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <div className="text-lg font-bold text-white">Daily Missions</div>
-                        <div className="mt-4">{dailyMissionsContent}</div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-lg font-bold text-white">Daily Missions</div>
+                          <button
+                            onClick={() => setMobileDailyMissionsOpen(!mobileDailyMissionsOpen)}
+                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                          >
+                            {mobileDailyMissionsOpen ? "CLOSE" : "OPEN"}
+                          </button>
+                        </div>
+                        {mobileDailyMissionsOpen && (
+                          <div className="mt-4">{dailyMissionsContent}</div>
+                        )}
                       </div>
                     </div>
                   ) : null}
@@ -3029,13 +3068,33 @@ export default function MleoBase() {
                   {mobilePanel === "build" ? (
                     <div className="space-y-4">
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <div className="text-lg font-bold text-white">Development</div>
-                        <div className="mt-4">{crewModulesResearchContent}</div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-lg font-bold text-white">Development</div>
+                          <button
+                            onClick={() => setMobileDevelopmentOpen(!mobileDevelopmentOpen)}
+                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                          >
+                            {mobileDevelopmentOpen ? "CLOSE" : "OPEN"}
+                          </button>
+                        </div>
+                        {mobileDevelopmentOpen && (
+                          <div className="mt-4">{crewModulesResearchContent}</div>
+                        )}
                       </div>
 
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <div className="text-lg font-bold text-white">Base Structures</div>
-                        <div className="mt-4">{baseStructuresContent}</div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-lg font-bold text-white">Base Structures</div>
+                          <button
+                            onClick={() => setMobileBaseStructuresOpen(!mobileBaseStructuresOpen)}
+                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                          >
+                            {mobileBaseStructuresOpen ? "CLOSE" : "OPEN"}
+                          </button>
+                        </div>
+                        {mobileBaseStructuresOpen && (
+                          <div className="mt-4">{baseStructuresContent}</div>
+                        )}
                       </div>
                     </div>
                   ) : null}
@@ -3043,13 +3102,33 @@ export default function MleoBase() {
                   {mobilePanel === "intel" ? (
                     <div className="space-y-4">
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <div className="text-lg font-bold text-white">Progress Summary</div>
-                        <div className="mt-4">{progressSummaryContent}</div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-lg font-bold text-white">Progress Summary</div>
+                          <button
+                            onClick={() => setMobileProgressSummaryOpen(!mobileProgressSummaryOpen)}
+                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                          >
+                            {mobileProgressSummaryOpen ? "CLOSE" : "OPEN"}
+                          </button>
+                        </div>
+                        {mobileProgressSummaryOpen && (
+                          <div className="mt-4">{progressSummaryContent}</div>
+                        )}
                       </div>
 
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <div className="text-lg font-bold text-white">Activity Log</div>
-                        <div className="mt-4">{activityLogContent}</div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-lg font-bold text-white">Activity Log</div>
+                          <button
+                            onClick={() => setMobileActivityLogOpen(!mobileActivityLogOpen)}
+                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                          >
+                            {mobileActivityLogOpen ? "CLOSE" : "OPEN"}
+                          </button>
+                        </div>
+                        {mobileActivityLogOpen && (
+                          <div className="mt-4">{activityLogContent}</div>
+                        )}
                       </div>
                     </div>
                   ) : null}
