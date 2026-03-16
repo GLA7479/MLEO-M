@@ -1498,9 +1498,9 @@ export default function MleoBase() {
   const [nextShipBonus, setNextShipBonus] = useState(0);
 
   const [expeditionMode, setExpeditionMode] = useState("balanced");
-  const [crewRole, setCrewRole] = useState("engineer");
-  const [commanderPath, setCommanderPath] = useState("industry");
-  const [claimedContracts, setClaimedContracts] = useState({});
+  const [crewRole, setCrewRole] = useState(() => loadJson("mleo_base_profile_v1", {})?.crewRole || "engineer");
+  const [commanderPath, setCommanderPath] = useState(() => loadJson("mleo_base_profile_v1", {})?.commanderPath || "industry");
+  const [claimedContracts, setClaimedContracts] = useState(() => loadJson("mleo_base_claimed_contracts_v1", {}));
   const [devTab, setDevTab] = useState("crew");
 
   useEffect(() => {
@@ -1534,6 +1534,15 @@ export default function MleoBase() {
         const initial =
           saved && !shouldReset ? normalizeServerState(saved) : seed;
 
+        const localProfile = loadJson("mleo_base_profile_v1", null);
+        const initialMerged = localProfile
+          ? {
+              ...initial,
+              crewRole: localProfile.crewRole || initial.crewRole,
+              commanderPath: localProfile.commanderPath || initial.commanderPath,
+            }
+          : initial;
+
         if (!alive) return;
 
         // Clear reset flags after state is set (if they were used)
@@ -1543,7 +1552,7 @@ export default function MleoBase() {
         }
 
         setMounted(true);
-        setState(initial);
+        setState(initialMerged);
 
         const bal = await readVaultSafe();
         if (alive) setSharedVault(bal);
@@ -1580,25 +1589,24 @@ export default function MleoBase() {
         const serverState = res?.state;
         if (!alive || !serverState) return;
 
+        const normalized = normalizeServerState(serverState);
+
         setState((prev) =>
           applyLevelUps({
             ...prev,
-            ...normalizeServerState(serverState),
+            ...normalized,
             missionState: {
               dailySeed:
-                serverState?.missionState?.dailySeed ||
-                serverState?.mission_state?.dailySeed ||
+                normalized?.missionState?.dailySeed ||
                 prev?.missionState?.dailySeed ||
                 todayKey(),
               completed: {
                 ...(prev?.missionState?.completed || {}),
-                ...(serverState?.missionState?.completed || {}),
-                ...(serverState?.mission_state?.completed || {}),
+                ...(normalized?.missionState?.completed || {}),
               },
               claimed: {
                 ...(prev?.missionState?.claimed || {}),
-                ...(serverState?.missionState?.claimed || {}),
-                ...(serverState?.mission_state?.claimed || {}),
+                ...(normalized?.missionState?.claimed || {}),
               },
             },
           })
@@ -1643,6 +1651,19 @@ export default function MleoBase() {
       window.removeEventListener("storage", onStorage);
     };
   }, [mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    saveJson("mleo_base_claimed_contracts_v1", claimedContracts);
+  }, [mounted, claimedContracts]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    saveJson("mleo_base_profile_v1", {
+      crewRole: state.crewRole,
+      commanderPath: state.commanderPath,
+    });
+  }, [mounted, state.crewRole, state.commanderPath]);
 
   const derived = useMemo(() => derive(state), [state]);
   const systemState = useMemo(() => getSystemState(state.stability), [state.stability]);
@@ -1883,22 +1904,26 @@ export default function MleoBase() {
   const buyBuilding = async (key) => {
     const def = BUILDINGS.find((item) => item.key === key);
     if (!def) return;
+
     const level = state.buildings[key] || 0;
     if (!unlocked(def, state)) {
       showToast("Unlock earlier systems first.");
       return;
     }
+
     const cost = buildingCost(def, level);
     if (!canAfford(state.resources, cost)) {
       showToast("Not enough resources.");
       return;
     }
+
     try {
       const res = await buildBuilding(key);
+
       if (res?.success && res?.state) {
-        const serverState = res.state;
+        const base = normalizeServerState(res.state);
+
         setState((prev) => {
-          const base = normalizeServerState(serverState);
           const next = applyLevelUps({
             ...prev,
             ...base,
@@ -1917,34 +1942,39 @@ export default function MleoBase() {
               },
             },
           });
+
           next.log = pushLog(
             next.log,
             `${def.name} upgraded to level ${res.new_level || level + 1}.`
           );
           return next;
         });
+
         showToast(`${def.name} upgraded to level ${res.new_level || level + 1}.`);
       } else {
         showToast(res?.message || "Build failed.");
       }
     } catch (error) {
       console.error("Build failed", error);
-      showToast("Build action failed. Try again.");
+      showToast(error?.message || "Build action failed.");
     }
   };
 
   const hireCrew = async () => {
     const cost = crewCost(state.crew);
+
     if (!canAfford(state.resources, cost)) {
       showToast("Crew hiring needs more supplies.");
       return;
     }
+
     try {
       const res = await hireCrewAction();
+
       if (res?.success && res?.state) {
-        const serverState = res.state;
+        const base = normalizeServerState(res.state);
+
         setState((prev) => {
-          const base = normalizeServerState(serverState);
           const next = applyLevelUps({
             ...prev,
             ...base,
@@ -1963,39 +1993,45 @@ export default function MleoBase() {
               },
             },
           });
+
           next.log = pushLog(
             next.log,
             `Crew hired. Team size is now ${res.new_crew || prev.crew + 1}.`
           );
           return next;
         });
+
         showToast(`Crew hired. Team size is now ${res.new_crew || state.crew + 1}.`);
       } else {
-        showToast(res?.message || "Hire failed.");
+        showToast(res?.message || "Crew action failed.");
       }
     } catch (error) {
-      console.error("Hire crew failed", error);
-      showToast("Hire action failed. Try again.");
+      console.error("Crew action failed", error);
+      showToast(error?.message || "Crew action failed.");
     }
   };
 
   const buyModule = async (key) => {
     const moduleDef = MODULES.find((item) => item.key === key);
     if (!moduleDef) return;
+
     if (state.modules[key]) {
       showToast("Module already installed.");
       return;
     }
+
     if (!canAfford(state.resources, moduleDef.cost)) {
       showToast("Module cost is not covered yet.");
       return;
     }
+
     try {
       const res = await installModule(key);
+
       if (res?.success && res?.state) {
-        const serverState = res.state;
+        const base = normalizeServerState(res.state);
+
         setState((prev) => {
-          const base = normalizeServerState(serverState);
           const next = applyLevelUps({
             ...prev,
             ...base,
@@ -2014,40 +2050,47 @@ export default function MleoBase() {
               },
             },
           });
+
           next.log = pushLog(next.log, `${moduleDef.name} installed.`);
           return next;
         });
+
         showToast(`${moduleDef.name} installed.`);
       } else {
         showToast(res?.message || "Module install failed.");
       }
     } catch (error) {
       console.error("Module install failed", error);
-      showToast("Module install failed. Try again.");
+      showToast(error?.message || "Module install failed.");
     }
   };
 
   const buyResearch = async (key) => {
     const def = RESEARCH.find((item) => item.key === key);
     if (!def) return;
+
     if (state.research[key]) {
       showToast("Research already completed.");
       return;
     }
+
     if (def.requires?.some((item) => !state.research[item])) {
       showToast("Complete the prerequisite research first.");
       return;
     }
+
     if (!canAfford(state.resources, def.cost)) {
       showToast("Research lab needs more materials.");
       return;
     }
+
     try {
       const res = await researchTech(key);
+
       if (res?.success && res?.state) {
-        const serverState = res.state;
+        const base = normalizeServerState(res.state);
+
         setState((prev) => {
-          const base = normalizeServerState(serverState);
           const next = applyLevelUps({
             ...prev,
             ...base,
@@ -2066,16 +2109,18 @@ export default function MleoBase() {
               },
             },
           });
+
           next.log = pushLog(next.log, `${def.name} research completed.`);
           return next;
         });
+
         showToast(`${def.name} research completed.`);
       } else {
         showToast(res?.message || "Research failed.");
       }
     } catch (error) {
       console.error("Research failed", error);
-      showToast("Research action failed. Try again.");
+      showToast(error?.message || "Research action failed.");
     }
   };
 
@@ -2384,33 +2429,31 @@ export default function MleoBase() {
 
   const claimMission = async (missionKey) => {
     try {
-      setBusy(true);
-
       const payload = await claimBaseMission(missionKey);
       const serverState = payload?.state;
+
       if (!serverState) {
         throw new Error("Missing updated base state");
       }
 
+      const normalized = normalizeServerState(serverState);
+
       setState((prev) =>
         applyLevelUps({
-          ...prev,
-          ...normalizeServerState(serverState),
-          missionState: {
+        ...prev,
+          ...normalized,
+        missionState: {
             dailySeed:
-              serverState?.missionState?.dailySeed ||
-              serverState?.mission_state?.dailySeed ||
+              normalized?.missionState?.dailySeed ||
               prev?.missionState?.dailySeed ||
               todayKey(),
             completed: {
               ...(prev?.missionState?.completed || {}),
-              ...(serverState?.missionState?.completed || {}),
-              ...(serverState?.mission_state?.completed || {}),
+              ...(normalized?.missionState?.completed || {}),
             },
             claimed: {
               ...(prev?.missionState?.claimed || {}),
-              ...(serverState?.missionState?.claimed || {}),
-              ...(serverState?.mission_state?.claimed || {}),
+              ...(normalized?.missionState?.claimed || {}),
             },
           },
         })
@@ -2420,8 +2463,6 @@ export default function MleoBase() {
     } catch (error) {
       console.error("Mission claim failed", error);
       showToast(error?.message || "Mission claim failed");
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -2907,21 +2948,21 @@ export default function MleoBase() {
           {/* Desktop */}
           <div className="mt-6 hidden gap-3 xl:grid xl:grid-cols-6 xl:items-stretch">
               <MetricCard
-              label="Shared Vault"
-              value={`${fmt(sharedVault)} MLEO`}
+                label="Shared Vault"
+                value={`${fmt(sharedVault)} MLEO`}
               note="Shared across Miners, Arcade and Online."
-              accent="emerald"
-            />
-            <MetricCard
-              label="Base Banked"
-              value={`${fmt(state.bankedMleo)} MLEO`}
+                accent="emerald"
+              />
+              <MetricCard
+                label="Base Banked"
+                value={`${fmt(state.bankedMleo)} MLEO`}
               note="Refined here, then shipped."
-              accent="violet"
-            />
-            <MetricCard
-              label="Commander"
-              value={`Lv ${state.commanderLevel}`}
-              note={`${fmt(state.commanderXp)} / ${fmt(xpForLevel(state.commanderLevel))} XP`}
+                accent="violet"
+              />
+              <MetricCard
+                label="Commander"
+                value={`Lv ${state.commanderLevel}`}
+                note={`${fmt(state.commanderXp)} / ${fmt(xpForLevel(state.commanderLevel))} XP`}
                 accent="sky"
               />
             <div className={`h-full w-full ${highlightCard((state.resources.ENERGY || 0) <= derived.energyCap * 0.25, "warning")}`}>
@@ -3030,14 +3071,14 @@ export default function MleoBase() {
               />
 
               <div className={`w-full ${highlightCard((state.resources.ENERGY || 0) <= derived.energyCap * 0.25, "warning")}`}>
-                <MetricCard
-                  label="Energy"
-                  value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
-                  note={`Regen ${derived.energyRegen.toFixed(2)}/s`}
-                  accent="slate"
-                  compact
-                />
-              </div>
+              <MetricCard
+                label="Energy"
+                value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
+                note={`Regen ${derived.energyRegen.toFixed(2)}/s`}
+                accent="slate"
+                compact
+              />
+            </div>
 
               <div className={`w-full ${highlightCard(systemState === "critical", "critical") || highlightCard(systemState === "warning", "warning")}`}>
                 <MetricCard
@@ -3045,10 +3086,10 @@ export default function MleoBase() {
                   value={`${fmt(state.stability)}%`}
                   note={systemMeta.label}
                   accent={systemMeta.accent}
-                  compact
-                />
-              </div>
+                compact
+              />
             </div>
+          </div>
 
             <div className="mt-auto grid grid-cols-3 gap-2">
               <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
@@ -3705,7 +3746,7 @@ export default function MleoBase() {
                           {mode.toUpperCase()}
                         </button>
                       ))}
-                    </div>
+                  </div>
 
                     <div className="mt-2 text-xs text-white/55">
                       Current mode: {expeditionMode.toUpperCase()}
@@ -3780,42 +3821,42 @@ export default function MleoBase() {
             </Section>
 
             <Section
-              title="Daily Missions"
-              subtitle="Daily goals give players direction without turning BASE into an aggressive faucet."
-            >
-              {dailyMissionsContent}
-            </Section>
+                title="Daily Missions"
+                subtitle="Daily goals give players direction without turning BASE into an aggressive faucet."
+              >
+                {dailyMissionsContent}
+              </Section>
           </div>
 
           {/* Desktop - Development + Base Structures */}
           <div className="mt-4 hidden xl:grid xl:grid-cols-[1fr_1fr] gap-4">
-            <Section
-              title="Crew, Modules & Research"
+              <Section
+                title="Crew, Modules & Research"
               subtitle="Shape your long-term command identity through crew, modules and research."
-            >
-              {crewModulesResearchContent}
-            </Section>
+              >
+                {crewModulesResearchContent}
+              </Section>
 
-            <Section
-              title="Base Structures"
+              <Section
+                title="Base Structures"
               subtitle="Upgrade structures, unlock stronger systems and shape your command base."
-            >
-              {baseStructuresContent}
-            </Section>
+              >
+                {baseStructuresContent}
+              </Section>
           </div>
 
           {/* Desktop - Progress + Log */}
           <div className="mt-4 hidden xl:grid xl:grid-cols-[1fr_0.85fr] gap-4">
-            <Section
-              title="Progress Summary"
+              <Section
+                title="Progress Summary"
               subtitle="BASE should feel like a live control room with sectors, contracts, identity and operational pressure."
-            >
-              {progressSummaryContent}
-            </Section>
+              >
+                {progressSummaryContent}
+              </Section>
 
             <Section title="Activity Log" subtitle="Recent system activity.">
-              {activityLogContent}
-            </Section>
+                {activityLogContent}
+              </Section>
           </div>
         </div>
 

@@ -71,6 +71,7 @@ export default async function handler(req, res) {
     }
 
     const supabase = getSupabaseAdmin();
+
     const { data, error } = await supabase.rpc("base_claim_mission_reward", {
       p_device_id: deviceId,
       p_mission_key: mission_key,
@@ -84,8 +85,10 @@ export default async function handler(req, res) {
       });
     }
 
-    const result = Array.isArray(data) ? data[0] : data;
-    if (!result?.state) {
+    const row = Array.isArray(data) ? data[0] : data;
+    const state = row?.state || row || null;
+
+    if (!state) {
       return res.status(400).json({
         success: false,
         code: "BASE_MISSION_CLAIM_FAILED",
@@ -95,7 +98,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      state: result.state,
+      state,
       mission_key,
     });
   } catch (error) {
@@ -107,4 +110,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
