@@ -13,97 +13,144 @@ function crewCost(count) {
   };
 }
 
-function canAfford(resources, cost) {
-  for (const [key, value] of Object.entries(cost)) {
-    if ((resources[key] || 0) < value) return false;
-  }
-  return true;
-}
-
-function pay(resources, cost) {
-  const next = { ...resources };
-  for (const [key, value] of Object.entries(cost)) {
-    next[key] = Math.max(0, (next[key] || 0) - value);
-  }
-  return next;
-}
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
-    return res.status(405).json({ success: false, code: "METHOD_NOT_ALLOWED", message: "Method not allowed" });
+    return res.status(405).json({
+      success: false,
+      code: "METHOD_NOT_ALLOWED",
+      message: "Method not allowed",
+    });
   }
 
   try {
     if (!validateCsrfToken(req)) {
       logCsrfFailure(req);
-      return res.status(403).json({ success: false, code: "CSRF_INVALID", message: "Invalid CSRF token" });
+      return res.status(403).json({
+        success: false,
+        code: "CSRF_INVALID",
+        message: "Invalid CSRF token",
+      });
     }
 
     const ipRate = await checkIpRateLimit(req, 60, 60_000);
     if (!ipRate.allowed) {
       logIpRateLimitExceeded(req, 60);
-      return res.status(429).json({ success: false, code: "RATE_LIMIT_IP", message: "Too many requests from this IP" });
+      return res.status(429).json({
+        success: false,
+        code: "RATE_LIMIT_IP",
+        message: "Too many requests from this IP",
+      });
     }
 
     const deviceId = getArcadeDevice(req);
     if (!deviceId) {
-      return res.status(401).json({ success: false, code: "DEVICE_NOT_INITIALIZED", message: "Device not initialized" });
+      return res.status(401).json({
+        success: false,
+        code: "DEVICE_NOT_INITIALIZED",
+        message: "Device not initialized",
+      });
     }
 
-    const rateLimit = await checkArcadeRateLimit("base-action-crew", deviceId, 20, 60_000);
+    const rateLimit = await checkArcadeRateLimit(
+      "base-action-crew",
+      deviceId,
+      30,
+      60_000
+    );
     if (!rateLimit.allowed) {
-      return res.status(429).json({ success: false, code: "RATE_LIMIT_DEVICE", message: "Too many crew requests" });
+      return res.status(429).json({
+        success: false,
+        code: "RATE_LIMIT_DEVICE",
+        message: "Too many crew requests",
+      });
     }
 
     const supabase = getSupabaseAdmin();
 
-    const { data: freshStateData, error: freshStateError } = await supabase
+    await supabase.rpc("base_reconcile_state", { p_device_id: deviceId });
+
+    const { data: row, error } = await supabase
       .from("base_device_state")
       .select("*")
       .eq("device_id", deviceId)
       .single();
 
-    if (freshStateError || !freshStateData) {
-      return res.status(400).json({ success: false, code: "BASE_STATE_LOAD_FAILED", message: "Failed to reload latest base state" });
+    if (error || !row) {
+      return res.status(400).json({
+        success: false,
+        code: "BASE_STATE_LOAD_FAILED",
+        message: error?.message || "Failed to load state",
+      });
     }
 
-    const state = freshStateData;
-    const crew = Number(state.crew || 0);
-    const resources = state.resources || {};
-
+    const resources = row.resources || {};
+    const crew = Number(row.crew || 0);
     const cost = crewCost(crew);
-    if (!canAfford(resources, cost)) {
-      return res.status(400).json({ success: false, code: "BASE_INSUFFICIENT_RESOURCES", message: "Crew hiring needs more supplies" });
+
+    for (const [key, value] of Object.entries(cost)) {
+      if (Number(resources[key] || 0) < value) {
+        return res.status(400).json({
+          success: false,
+          code: "BASE_INSUFFICIENT_RESOURCES",
+          message: "Crew hiring needs more supplies",
+        });
+      }
     }
 
-    const newResources = pay(resources, cost);
-    const newCrew = crew + 1;
-    const commanderXp = Number(state.commander_xp || 0) + 10;
+    const nextResources = { ...resources };
+    for (const [key, value] of Object.entries(cost)) {
+      nextResources[key] = Math.max(
+        0,
+        Number(nextResources[key] || 0) - Number(value || 0)
+      );
+    }
 
-    const { data: updateData, error: updateError } = await supabase
+    const nextCrew = crew + 1;
+
+    const { error: updateError } = await supabase
       .from("base_device_state")
       .update({
-        crew: newCrew,
-        resources: newResources,
-        commander_xp: commanderXp,
+        crew: nextCrew,
+        resources: nextResources,
         updated_at: new Date().toISOString(),
       })
-      .eq("device_id", deviceId)
-      .select("*")
-      .single();
+      .eq("device_id", deviceId);
 
     if (updateError) {
-      return res.status(400).json({ success: false, code: "BASE_STATE_UPDATE_FAILED", message: updateError.message || "Failed to update state" });
+      return res.status(400).json({
+        success: false,
+        code: "BASE_STATE_UPDATE_FAILED",
+        message: updateError.message || "Failed to update state",
+      });
     }
+
+    const { data: finalState, error: finalError } = await supabase.rpc(
+      "base_reconcile_state",
+      { p_device_id: deviceId }
+    );
+
+    if (finalError) {
+      return res.status(400).json({
+        success: false,
+        code: "BASE_RECONCILE_FAILED",
+        message: finalError.message || "Failed to reconcile final state",
+      });
+    }
+
+    const state = Array.isArray(finalState) ? finalState[0] : finalState;
 
     return res.status(200).json({
       success: true,
-      state: updateData,
-      new_crew: newCrew,
+      state,
+      new_crew: nextCrew,
     });
   } catch (error) {
     console.error("base/action/crew failed", error);
-    return res.status(500).json({ success: false, code: "BASE_CREW_INTERNAL_ERROR", message: "Crew action failed" });
+    return res.status(500).json({
+      success: false,
+      code: "BASE_CREW_INTERNAL_ERROR",
+      message: "Crew action failed",
+    });
   }
 }
