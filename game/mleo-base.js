@@ -3263,20 +3263,20 @@ export default function MleoBase() {
                         {readyCounts.missions > 0 && (
                           <button
                             onClick={() => {
+                              setMobilePanel("ops");
+                              setMobileOperationsConsoleOpen(false);
+                              setMobileLiveContractsOpen(false);
                               setMobileDailyMissionsOpen(true);
-                              if (mobilePanel !== "overview") {
-                                setMobilePanel("overview");
-                              }
                             }}
                             className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
                           >
                             <div className="flex items-center justify-between gap-3">
                               <div>
                                 <div className="text-sm font-bold text-white">
-                                  {readyCounts.missions} Mission{readyCounts.missions > 1 ? "s" : ""} ready
+                                  {readyCounts.missions} Mission reward{readyCounts.missions > 1 ? "s" : ""} ready
                                 </div>
                                 <div className="mt-1 text-xs text-white/60">
-                                  Daily mission rewards available.
+                                  Open Daily Missions to claim it.
                                 </div>
                               </div>
                               <span className="text-cyan-300 text-lg font-bold">›</span>
@@ -3286,10 +3286,10 @@ export default function MleoBase() {
                         {readyCounts.contracts > 0 && (
                           <button
                             onClick={() => {
+                              setMobilePanel("overview");
+                              setMobileOperationsConsoleOpen(false);
+                              setMobileDailyMissionsOpen(false);
                               setMobileLiveContractsOpen(true);
-                              if (mobilePanel !== "overview") {
-                                setMobilePanel("overview");
-                              }
                             }}
                             className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
                           >
@@ -3299,7 +3299,7 @@ export default function MleoBase() {
                                   {readyCounts.contracts} Contract{readyCounts.contracts > 1 ? "s" : ""} ready
                                 </div>
                                 <div className="mt-1 text-xs text-white/60">
-                                  Command contract rewards available.
+                                  Open Live Contracts to claim.
                                 </div>
                               </div>
                               <span className="text-cyan-300 text-lg font-bold">›</span>
@@ -3309,10 +3309,10 @@ export default function MleoBase() {
                         {readyCounts.expedition > 0 && (
                           <button
                             onClick={() => {
+                              setMobilePanel("ops");
+                              setMobileDailyMissionsOpen(false);
+                              setMobileLiveContractsOpen(false);
                               setMobileOperationsConsoleOpen(true);
-                              if (mobilePanel !== "ops") {
-                                setMobilePanel("ops");
-                              }
                             }}
                             className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
                           >
@@ -3320,7 +3320,7 @@ export default function MleoBase() {
                               <div>
                                 <div className="text-sm font-bold text-white">Expedition ready</div>
                                 <div className="mt-1 text-xs text-white/60">
-                                  Field team is available for deployment.
+                                  Open Operations Console to launch.
                                 </div>
                               </div>
                               <span className="text-cyan-300 text-lg font-bold">›</span>
@@ -3330,10 +3330,10 @@ export default function MleoBase() {
                         {readyCounts.shipment > 0 && (
                           <button
                             onClick={() => {
+                              setMobilePanel("ops");
+                              setMobileDailyMissionsOpen(false);
+                              setMobileLiveContractsOpen(false);
                               setMobileOperationsConsoleOpen(true);
-                              if (mobilePanel !== "ops") {
-                                setMobilePanel("ops");
-                              }
                             }}
                             className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
                           >
@@ -3341,7 +3341,7 @@ export default function MleoBase() {
                               <div>
                                 <div className="text-sm font-bold text-white">Shipment opportunity</div>
                                 <div className="mt-1 text-xs text-white/60">
-                                  Banked MLEO is ready for a measured shipment.
+                                  Open Operations Console to ship.
                                 </div>
                               </div>
                               <span className="text-cyan-300 text-lg font-bold">›</span>
@@ -3734,12 +3734,18 @@ export default function MleoBase() {
 
                           if (item.key === "expedition" || item.key === "shipment") {
                             setMobilePanel("ops");
+                            setMobileDailyMissionsOpen(false);
+                            setMobileLiveContractsOpen(false);
                             setMobileOperationsConsoleOpen(true);
                           } else if (item.key === "contracts") {
                             setMobilePanel("overview");
+                            setMobileOperationsConsoleOpen(false);
+                            setMobileDailyMissionsOpen(false);
                             setMobileLiveContractsOpen(true);
                           } else if (item.key === "missions") {
-                            setMobilePanel("overview");
+                            setMobilePanel("ops");
+                            setMobileOperationsConsoleOpen(false);
+                            setMobileLiveContractsOpen(false);
                             setMobileDailyMissionsOpen(true);
                           }
                         }}
