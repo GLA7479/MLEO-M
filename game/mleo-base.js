@@ -2677,7 +2677,7 @@ export default function MleoBase() {
                   </button>
                 </div>
               </div>
-              <p className="mt-2 max-w-2xl text-sm text-white/70 sm:text-base">
+              <p className="hidden sm:block mt-2 max-w-2xl text-sm text-white/70 sm:text-base">
                 {CONFIG.subtitle} Build a live command identity through sectors, contracts, specialization and controlled support systems.
               </p>
             </div>
