@@ -56,44 +56,44 @@ const BUILDINGS = [
     key: "tradeHub",
     name: "Trade Hub",
     desc: "Keeps the base liquid with steady Gold income.",
-    baseCost: { GOLD: 100, ORE: 30 },
-    growth: 1.2,
+    baseCost: { GOLD: 75, ORE: 20 },
+    growth: 1.18,
     energyUse: 1.4,
     outputs: { GOLD: 1.0 },
-    requires: [{ key: "quarry", lvl: 2 }],
+    requires: [{ key: "quarry", lvl: 1 }],
   },
   {
     key: "salvage",
     name: "Salvage Yard",
     desc: "Recovers Scrap for advanced systems.",
-    baseCost: { GOLD: 150, ORE: 90 },
-    growth: 1.22,
+    baseCost: { GOLD: 110, ORE: 55 },
+    growth: 1.20,
     energyUse: 1.8,
     outputs: { SCRAP: 0.8 },
-    requires: [{ key: "quarry", lvl: 3 }],
+    requires: [{ key: "quarry", lvl: 2 }],
   },
   {
     key: "refinery",
     name: "Refinery",
     desc: "Converts Ore + Scrap into bankable MLEO.",
-    baseCost: { GOLD: 280, ORE: 180, SCRAP: 35 },
+    baseCost: { GOLD: 180, ORE: 110, SCRAP: 20 },
     growth: 1.25,
     energyUse: 3.2,
-    convert: { ORE: 1.8, SCRAP: 0.7, MLEO: 0.12 },
+    convert: { ORE: 1.8, SCRAP: 0.7, MLEO: 0.10 },
     requires: [
-      { key: "salvage", lvl: 2 },
-      { key: "tradeHub", lvl: 2 },
+      { key: "salvage", lvl: 1 },
+      { key: "tradeHub", lvl: 1 },
     ],
   },
   {
     key: "powerCell",
     name: "Power Cell",
     desc: "Boosts Energy cap and regeneration.",
-    baseCost: { GOLD: 240, SCRAP: 45 },
-    growth: 1.24,
+    baseCost: { GOLD: 140, SCRAP: 24 },
+    growth: 1.22,
     energyUse: 0,
     power: { cap: 24, regen: 0.35 },
-    requires: [{ key: "tradeHub", lvl: 2 }],
+    requires: [{ key: "tradeHub", lvl: 1 }],
   },
   {
     key: "minerControl",
@@ -260,58 +260,58 @@ const DAILY_MISSIONS = [
     key: "upgrade_building",
     name: "Upgrade 1 building",
     target: 1,
-    reward: { XP: 30, DATA: 8 },
-  },
-  {
-    key: "ship_mleo",
-    name: "Ship 250 MLEO",
-    target: 250,
-    reward: { XP: 40, GOLD: 180 },
+    reward: { XP: 30, DATA: 10 },
   },
   {
     key: "run_expedition",
     name: "Complete 1 expedition",
     target: 1,
-    reward: { XP: 35, SCRAP: 20 },
-  },
-  {
-    key: "spend_vault",
-    name: "Spend 150 MLEO from vault",
-    target: 150,
-    reward: { XP: 50, DATA: 12 },
+    reward: { XP: 35, SCRAP: 24 },
   },
   {
     key: "generate_data",
-    name: "Generate 40 DATA",
-    target: 40,
-    reward: { XP: 35, GOLD: 120 },
+    name: "Generate 12 DATA",
+    target: 12,
+    reward: { XP: 30, GOLD: 90 },
   },
   {
     key: "perform_maintenance",
     name: "Perform 1 maintenance",
     target: 1,
-    reward: { XP: 45, DATA: 10 },
+    reward: { XP: 35, DATA: 8 },
   },
   {
     key: "double_expedition",
     name: "Launch 2 expeditions",
     target: 2,
-    reward: { XP: 45, SCRAP: 30 },
+    reward: { XP: 40, SCRAP: 28 },
+  },
+  {
+    key: "ship_mleo",
+    name: "Ship 60 MLEO",
+    target: 60,
+    reward: { XP: 45, GOLD: 140 },
+  },
+  {
+    key: "spend_vault",
+    name: "Spend 50 MLEO from vault",
+    target: 50,
+    reward: { XP: 45, DATA: 10 },
   },
 ];
 
 const CONFIG = {
   title: "MLEO BASE",
   subtitle: "Command your MLEO base, connect Miners + Arcade, and grow your shared vault.",
-  startingGold: 140,
-  baseEnergyCap: 120,
-  baseEnergyRegen: 2.2,
+  startingGold: 260,
+  baseEnergyCap: 140,
+  baseEnergyRegen: 2.6,
   dailyShipCap: 12_000,
-  expeditionCost: 36,
-  expeditionCooldownMs: 120_000,
+  expeditionCost: 18,
+  expeditionCooldownMs: 90_000,
   overclockCost: 900,
   overclockDurationMs: 8 * 60 * 1000,
-  refillCost: 300,
+  refillCost: 180,
   blueprintBaseCost: 2_500,
   blueprintGrowth: 1.85,
 };
@@ -880,16 +880,16 @@ function getMissionProgress(state) {
 
 function freshState() {
   return {
-    version: 4,
+    version: 5,
     lastDay: todayKey(),
     lastTickAt: Date.now(),
     lastHiddenAt: 0,
     resources: {
-      ORE: 0,
+      ORE: 45,
       GOLD: CONFIG.startingGold,
-      SCRAP: 0,
+      SCRAP: 12,
       ENERGY: CONFIG.baseEnergyCap,
-      DATA: 0,
+      DATA: 6,
     },
     buildings: {
       hq: 1,
@@ -1333,38 +1333,31 @@ function getNextStep(state, derived, systemState, liveContracts = []) {
     };
   }
 
-  if ((b.quarry || 0) < 2) {
-    return {
-      title: "Upgrade Quarry",
-      text: "Quarry is your first core producer. Push it to level 2 to unlock stronger early progression.",
-    };
-  }
-
   if ((b.tradeHub || 0) < 1) {
     return {
       title: "Unlock Trade Hub",
-      text: "Trade Hub stabilizes your Gold income and helps your base grow faster.",
+      text: "Trade Hub is your first real economy step. It gives Gold flow and makes the base feel alive.",
     };
   }
 
   if ((b.salvage || 0) < 1) {
     return {
       title: "Unlock Salvage Yard",
-      text: "You need Scrap to move into stronger systems and prepare for Refinery.",
+      text: "Salvage gives you Scrap and opens the road toward your first Refinery.",
     };
   }
 
   if ((b.powerCell || 0) < 1) {
     return {
       title: "Build Power Cell",
-      text: "Your energy economy is too important to ignore. Increase cap and regeneration early.",
+      text: "Power Cell keeps your base active longer and helps remove early energy frustration.",
     };
   }
 
   if ((b.refinery || 0) < 1) {
     return {
-      title: "Work toward Refinery",
-      text: "Refinery is what turns your base into a real MLEO support system.",
+      title: "Build your first Refinery",
+      text: "Your first Refinery is the moment BASE starts becoming a real MLEO support layer.",
     };
   }
 
@@ -1433,7 +1426,15 @@ export default function MleoBase() {
         const serverRes = await getBaseState();
         const saved = serverRes?.state || null;
 
-        const initial = saved
+        // Reset state if version is less than 5 (new starter pack) or reset flag is set
+        const resetFlag = typeof window !== "undefined" ? window.localStorage.getItem("base_reset_flag") === "true" : false;
+        const resetVersion = typeof window !== "undefined" ? window.localStorage.getItem("base_reset_version") : null;
+        
+        // If reset flag is set, treat saved version as 0 to force reset
+        const savedVersion = resetFlag && resetVersion ? Number(resetVersion) : (saved ? Number(saved.version || 0) : 0);
+        const shouldReset = savedVersion < 5 || resetFlag;
+
+        const initial = saved && !shouldReset
           ? {
               ...seed,
               version: Number(saved.version || seed.version),
@@ -1470,6 +1471,12 @@ export default function MleoBase() {
           : seed;
 
         if (!alive) return;
+
+        // Clear reset flags after state is set (if they were used)
+        if (resetFlag && typeof window !== "undefined") {
+          window.localStorage.removeItem("base_reset_flag");
+          window.localStorage.removeItem("base_reset_version");
+        }
 
         setMounted(true);
         setState(initial);
@@ -2564,6 +2571,32 @@ export default function MleoBase() {
     </div>
   );
 
+  const handleResetGame = async () => {
+    if (!confirm("Are you sure you want to reset the game? This will start fresh with the new starter pack.")) {
+      return;
+    }
+    
+    try {
+      // Set flag in localStorage to force reset on next load
+      // Also set version to 0 to force reset even if server has version 5
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("base_reset_flag", "true");
+        window.localStorage.setItem("base_reset_version", "0");
+      }
+      
+      // Reset local state immediately
+      const fresh = freshState();
+      setState(fresh);
+      setToast("Game reset! Reloading...");
+      
+      // Reload page immediately to apply reset
+      window.location.reload();
+    } catch (error) {
+      console.error("Reset failed", error);
+      setToast("Reset failed. Please refresh the page.");
+    }
+  };
+
   const activityLogContent = (
     <>
       <div className="mb-4 flex flex-wrap gap-2">
@@ -2573,6 +2606,12 @@ export default function MleoBase() {
         <Link href="/arcade" className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-2 text-sm font-semibold text-sky-200 hover:bg-sky-500/20">
           Open Arcade
         </Link>
+        <button
+          onClick={handleResetGame}
+          className="rounded-xl border border-rose-500/25 bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-200 hover:bg-rose-500/20"
+        >
+          Reset Game
+        </button>
       </div>
       <div className="space-y-2">
         {(state.log || []).slice(0, 4).map((entry) => (
@@ -3761,6 +3800,16 @@ export default function MleoBase() {
                     Your job is to run a live command room: build infrastructure, manage system pressure, refine resources,
                     respond to alerts, complete support contracts and decide when shipping is actually smart.
                   </p>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                  <h3 className="text-base font-bold text-white">Quick Start</h3>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-white/80">
+                    <li>Build Trade Hub first to start Gold flow</li>
+                    <li>Then unlock Salvage Yard for Scrap</li>
+                    <li>Build Power Cell to reduce energy pressure</li>
+                    <li>Your first Refinery opens the road to Banked MLEO</li>
+                  </ul>
                 </div>
 
                 <section>
