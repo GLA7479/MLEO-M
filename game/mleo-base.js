@@ -164,6 +164,24 @@ const BUILDINGS = [
   },
 ];
 
+const STRUCTURES_TAB_A = [
+  "hq",
+  "quarry",
+  "tradeHub",
+  "salvage",
+  "refinery",
+  "powerCell",
+];
+
+const STRUCTURES_TAB_B = [
+  "minerControl",
+  "arcadeHub",
+  "expeditionBay",
+  "logisticsCenter",
+  "researchLab",
+  "repairBay",
+];
+
 const MODULES = [
   {
     key: "servoDrill",
@@ -1603,6 +1621,7 @@ export default function MleoBase() {
   const [mobileBuildSupportOpen, setMobileBuildSupportOpen] = useState(false);
   const [mobileProgressSummaryOpen, setMobileProgressSummaryOpen] = useState(false);
   const [mobileActivityLogOpen, setMobileActivityLogOpen] = useState(false);
+  const [structuresTab, setStructuresTab] = useState("core");
 
   const [activeEvent, setActiveEvent] = useState(null);
   const [eventCooldownUntil, setEventCooldownUntil] = useState(0);
@@ -2853,9 +2872,37 @@ export default function MleoBase() {
     </div>
   );
 
+  const visibleStructures =
+    structuresTab === "core"
+      ? BUILDINGS.filter((item) => STRUCTURES_TAB_A.includes(item.key))
+      : BUILDINGS.filter((item) => STRUCTURES_TAB_B.includes(item.key));
+
   const baseStructuresContent = (
-    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-      {BUILDINGS.map((building) => {
+    <div>
+      <div className="mb-4 flex gap-2">
+        <button
+          onClick={() => setStructuresTab("core")}
+          className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+            structuresTab === "core"
+              ? "bg-cyan-400 text-slate-950"
+              : "border border-white/10 bg-white/5 text-white/75"
+          }`}
+        >
+          Core
+        </button>
+        <button
+          onClick={() => setStructuresTab("expansion")}
+          className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+            structuresTab === "expansion"
+              ? "bg-cyan-400 text-slate-950"
+              : "border border-white/10 bg-white/5 text-white/75"
+          }`}
+        >
+          Expansion
+        </button>
+      </div>
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      {visibleStructures.map((building) => {
         const level = state.buildings[building.key] || 0;
         const nextLevel = level + 1;
         const cost = buildingCost(building, level);
@@ -2956,6 +3003,7 @@ export default function MleoBase() {
           </div>
         );
       })}
+      </div>
     </div>
   );
 
