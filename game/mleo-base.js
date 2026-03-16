@@ -1406,6 +1406,9 @@ export default function MleoBase() {
   const [toast, setToast] = useState("");
   const [showHowToPlay, setShowHowToPlay] = useState(false);
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState(null);
+
   const [activeEvent, setActiveEvent] = useState(null);
   const [eventCooldownUntil, setEventCooldownUntil] = useState(0);
   const [nextShipBonus, setNextShipBonus] = useState(0);
@@ -1414,7 +1417,6 @@ export default function MleoBase() {
   const [crewRole, setCrewRole] = useState("engineer");
   const [commanderPath, setCommanderPath] = useState("industry");
   const [claimedContracts, setClaimedContracts] = useState({});
-  const [mobileTab, setMobileTab] = useState("overview");
   const [devTab, setDevTab] = useState("crew");
 
   useEffect(() => {
@@ -2597,6 +2599,25 @@ export default function MleoBase() {
     }
   };
 
+  const openMobilePanel = (panel) => {
+    setMobilePanel(panel);
+  };
+
+  const closeMobilePanel = () => {
+    setMobilePanel(null);
+  };
+
+  const mobilePanelTitle =
+    mobilePanel === "overview"
+      ? "Overview"
+      : mobilePanel === "ops"
+      ? "Operations"
+      : mobilePanel === "build"
+      ? "Build"
+      : mobilePanel === "intel"
+      ? "Intel"
+      : "";
+
   const activityLogContent = (
     <>
       <div className="mb-4 flex flex-wrap gap-2">
@@ -2687,102 +2708,6 @@ export default function MleoBase() {
             </div>
           ) : null}
 
-          {/* Mobile */}
-          <div className="mt-6 space-y-3 sm:hidden">
-            <div className="grid grid-cols-1 gap-3">
-              <MetricCard
-                label="Shared Vault"
-                value={`${fmt(sharedVault)} MLEO`}
-                note="Shared across the MLEO ecosystem."
-                accent="emerald"
-              />
-              <MetricCard
-                label="Base Banked"
-                value={`${fmt(state.bankedMleo)} MLEO`}
-                note="Refined here, then shipped."
-                accent="violet"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <MetricCard
-                label="Commander"
-                value={`Lv ${state.commanderLevel}`}
-                note={`${fmt(state.commanderXp)} / ${fmt(xpForLevel(state.commanderLevel))} XP`}
-                accent="sky"
-                compact
-              />
-
-              <MetricCard
-                label="Data"
-                value={fmt(state.resources.DATA)}
-                note={`x${derived.dataMult.toFixed(2)} progression`}
-                accent="sky"
-                compact
-              />
-
-              <div className={`w-full ${highlightCard((state.resources.ENERGY || 0) <= derived.energyCap * 0.25, "warning")}`}>
-              <MetricCard
-                  label="Energy"
-                  value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
-                  note={`Regen ${derived.energyRegen.toFixed(2)}/s`}
-                  accent="slate"
-                compact
-              />
-              </div>
-
-              <div className={`w-full ${highlightCard(systemState === "critical", "critical") || highlightCard(systemState === "warning", "warning")}`}>
-              <MetricCard
-                  label="Stability"
-                  value={`${fmt(state.stability)}%`}
-                  note={systemMeta.label}
-                  accent={systemMeta.accent}
-                compact
-              />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Ore</div>
-                <div className="mt-1 text-sm font-bold text-white">{fmt(state.resources.ORE)}</div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Gold</div>
-                <div className="mt-1 text-sm font-bold text-white">{fmt(state.resources.GOLD)}</div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Scrap</div>
-                <div className="mt-1 text-sm font-bold text-white">{fmt(state.resources.SCRAP)}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Mobile Tab Bar */}
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-1 sm:hidden">
-            {[
-              { key: "overview", label: "Overview" },
-              { key: "ops", label: "Operations" },
-              { key: "build", label: "Build" },
-              { key: "intel", label: "Intel" },
-            ].map((tab) => {
-              const active = mobileTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setMobileTab(tab.key)}
-                  className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                    active
-                      ? "bg-cyan-500 text-white"
-                      : "border border-white/10 bg-white/5 text-white/70"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-
           {/* Desktop */}
           <div className="mt-6 hidden gap-3 xl:grid xl:grid-cols-6 xl:items-stretch">
               <MetricCard
@@ -2845,8 +2770,467 @@ export default function MleoBase() {
             </div>
           </div>
 
-          {/* Mobile Overview Tab */}
-          {mobileTab === "overview" ? (
+          {/* Mobile App Layout */}
+          <div className="sm:hidden">
+            <div className="fixed inset-0 overflow-hidden bg-[#07111f]">
+              {/* Top Bar */}
+              <div className="absolute inset-x-0 top-0 z-30 border-b border-white/10 bg-[#07111f]/95 backdrop-blur">
+                <div className="flex items-center justify-between px-4 pb-3 pt-4">
+                  <Link
+                    href="/mining"
+                    className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10"
+                  >
+                    Hub
+                  </Link>
+
+                  <button
+                    onClick={() => setMobileMenuOpen(true)}
+                    className="flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
+                    aria-label="Open menu"
+                  >
+                    <span className="text-xl leading-none">☰</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Home Screen */}
+              <div className="absolute inset-x-0 bottom-[84px] top-[72px] overflow-hidden px-4 pb-4 pt-3">
+                <div className="flex h-full flex-col gap-3">
+                  <div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold text-cyan-200">
+                      MLEO ecosystem command hub
+                    </div>
+                    <h1 className="mt-3 text-3xl font-black tracking-tight text-white">
+                      {CONFIG.title}
+                    </h1>
+                  </div>
+
+                  {alerts.length ? (
+                    <div className="space-y-2">
+                      {alerts.slice(0, 1).map((alert) => (
+                        <div
+                          key={alert.key}
+                          className={`rounded-2xl border px-4 py-3 ${alertToneClasses(alert.tone)}`}
+                        >
+                          <div className="text-sm font-bold">{alert.title}</div>
+                          <div className="text-xs text-white/75">{alert.text}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <div className="grid grid-cols-1 gap-3">
+                    <MetricCard
+                      label="Shared Vault"
+                      value={`${fmt(sharedVault)} MLEO`}
+                      note="Shared across the MLEO ecosystem."
+                      accent="emerald"
+                    />
+                    <MetricCard
+                      label="Base Banked"
+                      value={`${fmt(state.bankedMleo)} MLEO`}
+                      note="Refined here, then shipped."
+                      accent="violet"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <MetricCard
+                      label="Commander"
+                      value={`Lv ${state.commanderLevel}`}
+                      note={`${fmt(state.commanderXp)} / ${fmt(xpForLevel(state.commanderLevel))} XP`}
+                      accent="sky"
+                      compact
+                    />
+
+                    <MetricCard
+                      label="Data"
+                      value={fmt(state.resources.DATA)}
+                      note={`x${derived.dataMult.toFixed(2)} progression`}
+                      accent="sky"
+                      compact
+                    />
+
+                    <div className={`w-full ${highlightCard((state.resources.ENERGY || 0) <= derived.energyCap * 0.25, "warning")}`}>
+                      <MetricCard
+                        label="Energy"
+                        value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
+                        note={`Regen ${derived.energyRegen.toFixed(2)}/s`}
+                        accent="slate"
+                        compact
+                      />
+                    </div>
+
+                    <div className={`w-full ${highlightCard(systemState === "critical", "critical") || highlightCard(systemState === "warning", "warning")}`}>
+                      <MetricCard
+                        label="Stability"
+                        value={`${fmt(state.stability)}%`}
+                        note={systemMeta.label}
+                        accent={systemMeta.accent}
+                        compact
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Ore</div>
+                      <div className="mt-1 text-sm font-bold text-white">{fmt(state.resources.ORE)}</div>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Gold</div>
+                      <div className="mt-1 text-sm font-bold text-white">{fmt(state.resources.GOLD)}</div>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Scrap</div>
+                      <div className="mt-1 text-sm font-bold text-white">{fmt(state.resources.SCRAP)}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-auto rounded-3xl border border-white/10 bg-white/5 p-4">
+                    <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">
+                      Next Recommended Step
+                    </div>
+                    <div className="mt-2 text-lg font-bold text-white">{nextStep.title}</div>
+                    <div className="mt-1 text-sm text-white/70">{nextStep.text}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Nav */}
+              <div className="absolute inset-x-0 bottom-0 z-30 border-t border-white/10 bg-[#07111f]/95 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3 backdrop-blur">
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { key: "overview", label: "Overview" },
+                    { key: "ops", label: "Operations" },
+                    { key: "build", label: "Build" },
+                    { key: "intel", label: "Intel" },
+                  ].map((tab) => {
+                    const active = mobilePanel === tab.key;
+                    return (
+                      <button
+                        key={tab.key}
+                        onClick={() => openMobilePanel(tab.key)}
+                        className={`rounded-2xl px-3 py-3 text-xs font-bold transition ${
+                          active
+                            ? "bg-cyan-500 text-white"
+                            : "border border-white/10 bg-white/5 text-white/70"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Slide Panel */}
+              {mobilePanel ? (
+                <div className="absolute inset-0 z-40 bg-black/55 backdrop-blur-sm">
+                  <div className="absolute inset-x-0 bottom-0 top-[72px] rounded-t-[28px] border border-white/10 bg-[#0b1526] shadow-2xl">
+                    <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
+                      <div className="text-lg font-bold text-white">{mobilePanelTitle}</div>
+                      <button
+                        onClick={closeMobilePanel}
+                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10"
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    <div className="h-[calc(100%-73px)] overflow-y-auto px-4 py-4">
+                      {mobilePanel === "overview" ? (
+                        <div className="space-y-4">
+                          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                            <div className="text-lg font-bold text-white">Command Identity</div>
+                            <div className="mt-3 grid gap-3">
+                              <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                                <div className="text-sm font-semibold text-white">{crewRoleInfo.name}</div>
+                                <div className="mt-1 text-xs text-white/60">{roleBonusText}</div>
+                              </div>
+                              <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                                <div className="text-sm font-semibold text-white">{commanderPathInfo.name}</div>
+                                <div className="mt-1 text-xs text-white/60">{commanderPathText}</div>
+                              </div>
+                              <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                                <div className="text-sm font-semibold text-white">
+                                  {state.crew >= 5 ? "Developed Command" : state.crew >= 2 ? "Growing Outpost" : "Early Outpost"}
+                                </div>
+                                <div className="mt-1 text-xs text-white/60">Current base identity.</div>
+                              </div>
+                              <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                                <div className="text-sm font-semibold text-white">
+                                  {fmt(state.sentToday)} / {fmt(derived.shipCap)}
+                                </div>
+                                <div className="mt-1 text-xs text-white/60">Daily ship discipline.</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                            <div className="text-lg font-bold text-white">Command Schematic</div>
+                            <div className="mt-3 grid grid-cols-2 gap-2">
+                              {[
+                                { key: "hq", label: "HQ" },
+                                { key: "refinery", label: "Refinery" },
+                                { key: "logisticsCenter", label: "Logistics" },
+                                { key: "researchLab", label: "Research" },
+                                { key: "repairBay", label: "Repair" },
+                                { key: "expeditionBay", label: "Expedition" },
+                                { key: "minerControl", label: "Miners" },
+                                { key: "arcadeHub", label: "Arcade" },
+                              ].map((sector) => {
+                                const status = sectorStatusForBuilding(sector.key, state);
+                                return (
+                                  <div
+                                    key={sector.key}
+                                    className={`rounded-xl border px-3 py-2 ${sectorStatusClasses(status)}`}
+                                  >
+                                    <div className="text-sm font-semibold">{sector.label}</div>
+                                    <div className="mt-1 text-[11px] uppercase">{status}</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                            <div className="text-lg font-bold text-white">Live Contracts</div>
+                            <div className="mt-3 grid gap-2">
+                              {liveContracts.map((contract) => (
+                                <div
+                                  key={contract.key}
+                                  className={`rounded-2xl border border-white/10 bg-black/20 p-3 ${
+                                    contract.done && !contract.claimed ? highlightCard(true, "success") : ""
+                                  }`}
+                                >
+                                  <div className="text-sm font-semibold text-white">{contract.title}</div>
+                                  <div className="mt-1 text-xs text-white/60">{contract.rewardText}</div>
+                                  <button
+                                    onClick={() => claimContract(contract.key)}
+                                    disabled={!contract.done || contract.claimed}
+                                    className="mt-3 w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:opacity-40"
+                                  >
+                                    {contract.claimed ? "Claimed" : contract.done ? "Claim" : "In Progress"}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {mobilePanel === "ops" ? (
+                        <div className="space-y-4">
+                          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                            <div className="text-lg font-bold text-white">Operations Console</div>
+                            <div className="mt-1 text-sm text-white/60">
+                              Ship cap today: {fmt(state.sentToday)} / {fmt(derived.shipCap)} MLEO
+                            </div>
+
+                            <div className="mt-4 grid gap-3">
+                              <button
+                                onClick={bankToSharedVault}
+                                className="w-full rounded-2xl bg-emerald-600 px-4 py-4 text-sm font-extrabold shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-500"
+                              >
+                                Ship {fmt(state.bankedMleo)} MLEO
+                              </button>
+
+                              <button
+                                onClick={handleLaunchExpedition}
+                                disabled={expeditionLeft > 0 || state.resources.ENERGY < CONFIG.expeditionCost}
+                                className="w-full rounded-2xl bg-cyan-600 px-4 py-4 text-sm font-extrabold shadow-lg shadow-cyan-900/30 transition hover:bg-cyan-500 disabled:opacity-40"
+                              >
+                                {expeditionLeft > 0 ? `Ready in ${Math.ceil(expeditionLeft / 1000)}s` : "Launch Expedition"}
+                              </button>
+
+                              <button
+                                onClick={buyBlueprint}
+                                className="w-full rounded-2xl bg-fuchsia-600 px-4 py-4 text-sm font-bold hover:bg-fuchsia-500"
+                              >
+                                Buy Blueprint Lv {state.blueprintLevel + 1}
+                              </button>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  onClick={activateOverclock}
+                                  className="rounded-xl bg-amber-600 px-3 py-3 text-sm font-bold hover:bg-amber-500"
+                                >
+                                  Overclock
+                                </button>
+                                <button
+                                  onClick={refillEnergy}
+                                  className="rounded-xl bg-white/10 px-3 py-3 text-sm font-bold hover:bg-white/20"
+                                >
+                                  Refill
+                                </button>
+                              </div>
+
+                              <button
+                                onClick={performMaintenance}
+                                className={`w-full rounded-xl px-3 py-3 text-sm font-bold ${
+                                  systemState === "critical"
+                                    ? "bg-rose-600 hover:bg-rose-500"
+                                    : systemState === "warning"
+                                    ? "bg-amber-600 hover:bg-amber-500"
+                                    : "bg-white/10 hover:bg-white/20"
+                                }`}
+                              >
+                                Maintain
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                            <div className="text-lg font-bold text-white">Daily Missions</div>
+                            <div className="mt-4">{dailyMissionsContent}</div>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {mobilePanel === "build" ? (
+                        <div className="space-y-4">
+                          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                            <div className="text-lg font-bold text-white">Development</div>
+
+                            <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+                              {[
+                                { key: "crew", label: "Crew" },
+                                { key: "modules", label: "Modules" },
+                                { key: "research", label: "Research" },
+                              ].map((tab) => {
+                                const active = devTab === tab.key;
+                                return (
+                                  <button
+                                    key={tab.key}
+                                    onClick={() => setDevTab(tab.key)}
+                                    className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                                      active
+                                        ? "bg-cyan-500 text-white"
+                                        : "border border-white/10 bg-white/5 text-white/70"
+                                    }`}
+                                  >
+                                    {tab.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <div className="mt-4">{crewModulesResearchContent}</div>
+                          </div>
+
+                          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                            <div className="text-lg font-bold text-white">Base Structures</div>
+                            <div className="mt-4">{baseStructuresContent}</div>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {mobilePanel === "intel" ? (
+                        <div className="space-y-4">
+                          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                            <div className="text-lg font-bold text-white">Progress Summary</div>
+                            <div className="mt-4">{progressSummaryContent}</div>
+                          </div>
+
+                          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                            <div className="text-lg font-bold text-white">Activity Log</div>
+                            <div className="mt-4">{activityLogContent}</div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Mobile Menu */}
+              {mobileMenuOpen ? (
+                <div
+                  className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <div
+                    className="absolute right-4 top-[78px] w-[88%] max-w-sm rounded-3xl border border-white/10 bg-[#0b1526] p-4 shadow-2xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="text-lg font-bold text-white">Menu</div>
+                      <button
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20"
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      <button
+                        onClick={() => {
+                          setShowHowToPlay(true);
+                          setMobileMenuOpen(false);
+                        }}
+                        className="w-full rounded-2xl border border-blue-500/25 bg-blue-500/10 px-4 py-3 text-left text-sm font-semibold text-blue-200 hover:bg-blue-500/20"
+                      >
+                        HOW TO PLAY
+                      </button>
+
+                      {isConnected ? (
+                        <button
+                          onClick={() => {
+                            openAccountModal?.();
+                            setMobileMenuOpen(false);
+                          }}
+                          className="w-full rounded-2xl bg-white/10 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-white/20"
+                        >
+                          Wallet: {address?.slice(0, 6)}…{address?.slice(-4)}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            openConnectModal?.();
+                            setMobileMenuOpen(false);
+                          }}
+                          className="w-full rounded-2xl bg-rose-600 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-rose-500"
+                        >
+                          Connect Wallet
+                        </button>
+                      )}
+
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <div className="text-xs uppercase tracking-[0.18em] text-white/45">Player</div>
+                        <div className="mt-2 text-sm text-white/80">Commander Lv {state.commanderLevel}</div>
+                        <div className="mt-1 text-xs text-white/55">{commanderPathInfo.name}</div>
+                        <div className="mt-1 text-xs text-white/55">{crewRoleInfo.name}</div>
+                      </div>
+
+                      <Link
+                        href="/arcade"
+                        className="block w-full rounded-2xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-left text-sm font-semibold text-sky-200 hover:bg-sky-500/20"
+                      >
+                        Open Arcade
+                      </Link>
+
+                      <Link
+                        href="/mleo-miners"
+                        className="block w-full rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-left text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20"
+                      >
+                        Open Miners
+                      </Link>
+
+                      <button
+                        onClick={handleResetGame}
+                        className="w-full rounded-2xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-left text-sm font-semibold text-rose-200 hover:bg-rose-500/20"
+                      >
+                        Reset Game
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
             <>
               <div className="mt-4 xl:hidden">
                 <AccordionSection
@@ -3033,158 +3417,6 @@ export default function MleoBase() {
                 </AccordionSection>
               </div>
             </>
-          ) : null}
-
-          {/* Mobile Operations Tab */}
-          {mobileTab === "ops" ? (
-            <>
-              <div className="mt-4 xl:hidden">
-                <AccordionSection
-                  title="Operations Console"
-                  subtitle={`Ship cap today: ${fmt(state.sentToday)} / ${fmt(derived.shipCap)} MLEO. Utilities and exports keep BASE productive without becoming an uncontrolled faucet.`}
-                  defaultOpen={false}
-                >
-                  <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                    <div className="mb-4">
-                      <h2 className="text-lg font-bold text-white">Operations Console</h2>
-                      <p className="mt-1 text-sm text-white/60">
-                        Ship cap today: {fmt(state.sentToday)} / {fmt(derived.shipCap)} MLEO
-                      </p>
-                    </div>
-                    <div className="grid gap-3">
-                  <div
-                    className={`flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
-                      highlightCard((state.bankedMleo || 0) >= 120, "success")
-                    }`}
-                  >
-                    <div className="flex min-h-[88px] flex-col">
-                      <div className="text-sm font-semibold text-emerald-200">Ship to Shared Vault</div>
-                      <p className="mt-1 text-sm text-white/70">
-                        Move refined MLEO into the main vault with a daily softcut, so BASE supports Miners instead of replacing it.
-                      </p>
-                    </div>
-                    <button
-                      onClick={bankToSharedVault}
-                      className="mt-auto w-full rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-extrabold shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-500"
-                    >
-                      Ship {fmt(state.bankedMleo)} MLEO
-                    </button>
-                  </div>
-
-                  <div
-                    className={`flex h-full flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 ${
-                      highlightCard(expeditionLeft <= 0 && (state.resources.DATA || 0) >= 4, "info")
-                    }`}
-                  >
-                    <div className="flex min-h-[88px] flex-col">
-                      <div className="text-sm font-semibold text-cyan-200">Field Expedition</div>
-                      <p className="mt-1 text-sm text-white/70">
-                        Spend {CONFIG.expeditionCost} energy for Ore, Gold, Scrap, DATA and only a small chance of banked MLEO.
-                      </p>
-                      <div className="mt-3 grid grid-cols-3 gap-2">
-                        {["balanced", "scan", "salvage"].map((mode) => (
-                          <button
-                            key={mode}
-                            onClick={() => setExpeditionMode(mode)}
-                            className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
-                              expeditionMode === mode
-                                ? "bg-cyan-500 text-white"
-                                : "bg-white/10 text-white/75 hover:bg-white/20"
-                            }`}
-                          >
-                            {mode.toUpperCase()}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleLaunchExpedition}
-                      disabled={expeditionLeft > 0 || state.resources.ENERGY < CONFIG.expeditionCost}
-                      className="mt-auto w-full rounded-2xl bg-cyan-600 px-4 py-3.5 text-sm font-extrabold shadow-lg shadow-cyan-900/30 transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {expeditionLeft > 0 ? `Ready in ${Math.ceil(expeditionLeft / 1000)}s` : "Launch Expedition"}
-                    </button>
-                  </div>
-
-                  <div className="flex h-full flex-col gap-3 rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4">
-                    <div className="flex min-h-[88px] flex-col">
-                      <div className="text-sm font-semibold text-fuchsia-200">Blueprint Cache</div>
-                      <p className="mt-1 text-sm text-white/70">
-                        Costs {fmt(blueprintCost)} shared MLEO. Raises banking efficiency and daily ship cap permanently.
-                      </p>
-                    </div>
-                    <button onClick={buyBlueprint} className="mt-auto w-full rounded-xl bg-fuchsia-600 px-4 py-3 text-sm font-bold hover:bg-fuchsia-500">
-                      Buy Blueprint Lv {state.blueprintLevel + 1}
-                    </button>
-                  </div>
-
-                  <div
-                    className={`flex h-full flex-col gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 ${
-                      systemState === "critical"
-                        ? highlightCard(true, "critical")
-                        : systemState === "warning"
-                        ? highlightCard(true, "warning")
-                        : ""
-                    }`}
-                  >
-                    <div className="flex min-h-[88px] flex-col">
-                      <div className="text-sm font-semibold text-amber-200">Shared Vault Utilities</div>
-                      <p className="mt-1 text-sm text-white/70">
-                        Spend shared MLEO on productivity instead of pure emissions. This creates healthy token sinks.
-                      </p>
-                      <p className="mt-2 text-xs text-white/55">
-                        Stability: {fmt(state.stability)}% · Maintenance keeps the base efficient over time.
-                      </p>
-                    </div>
-                    <div className="mt-auto grid grid-cols-2 gap-2 pt-1">
-                      <button onClick={activateOverclock} className="rounded-xl bg-amber-600 px-3 py-3 text-sm font-bold hover:bg-amber-500">
-                        {overclockLeft > 0 ? `Overclock ${Math.ceil(overclockLeft / 1000)}s` : `Overclock ${fmt(CONFIG.overclockCost)}`}
-                      </button>
-                      <button onClick={refillEnergy} className="rounded-xl bg-white/10 px-3 py-3 text-sm font-bold hover:bg-white/20">
-                        Refill {fmt(CONFIG.refillCost)}
-                      </button>
-                      <button
-                        onClick={performMaintenance}
-                        className={`col-span-2 rounded-xl px-3 py-3 text-sm font-bold ${
-                          systemState === "critical"
-                            ? "bg-rose-600 hover:bg-rose-500"
-                            : systemState === "warning"
-                            ? "bg-amber-600 hover:bg-amber-500"
-                            : "bg-white/10 hover:bg-white/20"
-                        }`}
-                      >
-                        {systemState === "critical"
-                          ? "Emergency Maintain"
-                          : systemState === "warning"
-                          ? "Priority Maintain"
-                          : "Maintain"}
-                      </button>
-                    </div>
-                  </div>
-                    </div>
-                  </div>
-                </AccordionSection>
-              </div>
-
-              <div className="mt-4 xl:hidden">
-                <AccordionSection
-                  title="Daily Missions"
-                  subtitle="Daily goals give players direction without turning BASE into an aggressive faucet."
-                  defaultOpen={false}
-                >
-                  <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                    <div className="mb-4">
-                      <h2 className="text-lg font-bold text-white">Daily Missions</h2>
-                      <p className="mt-1 text-sm text-white/60">
-                        Daily goals for healthy progression.
-                      </p>
-                    </div>
-                    {dailyMissionsContent}
-                  </div>
-                </AccordionSection>
-              </div>
-            </>
-          ) : null}
 
           {/* Desktop - Next Recommended Step & Live Event */}
           <div
@@ -3373,225 +3605,6 @@ export default function MleoBase() {
               </div>
             </div>
           </div>
-
-          {/* Mobile Operations Tab - already added above */}
-          
-          {/* Mobile Build Tab */}
-          {mobileTab === "build" ? (
-            <>
-              <div className="mt-4 xl:hidden">
-                <AccordionSection
-                  title="Crew, Modules & Research"
-                  subtitle="Shape your long-term command identity through crew, modules and research."
-                  defaultOpen={false}
-                >
-                  <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                    <div className="mb-4">
-                      <h2 className="text-lg font-bold text-white">Development</h2>
-                      <p className="mt-1 text-sm text-white/60">
-                        Crew, modules, research and structures.
-                      </p>
-                    </div>
-
-                    <div className="flex gap-2 overflow-x-auto pb-1">
-                      {[
-                        { key: "crew", label: "Crew" },
-                        { key: "modules", label: "Modules" },
-                        { key: "research", label: "Research" },
-                      ].map((tab) => {
-                        const active = devTab === tab.key;
-                        return (
-                          <button
-                            key={tab.key}
-                            onClick={() => setDevTab(tab.key)}
-                            className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                              active
-                                ? "bg-cyan-500 text-white"
-                                : "border border-white/10 bg-white/5 text-white/70"
-                            }`}
-                          >
-                            {tab.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="mt-4">
-                  {devTab === "crew" ? (
-                    <div className="space-y-3">
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-sm font-semibold text-white">Crew</div>
-                            <div className="text-xs text-white/60">
-                              {state.crew} workers · global output bonus {(state.research.fieldOps ? 3 : 2) * state.crew}%
-                            </div>
-                          </div>
-                          <button onClick={hireCrew} className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20">
-                            Hire
-                          </button>
-                        </div>
-                        <div className="mt-3 text-xs text-white/55">
-                          Next cost: {Object.entries(workerNextCost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
-                        </div>
-                        <div className="mt-3">
-                          <div className="mb-2 text-xs uppercase tracking-[0.18em] text-white/45">Crew Specialization</div>
-                          <div className="grid gap-2">
-                            {CREW_ROLES.map((role) => {
-                              const active = crewRole === role.key;
-                              return (
-                                <button
-                                  key={role.key}
-                                  onClick={() => handleCrewRoleChange(role.key)}
-                                  className={`rounded-2xl border px-3 py-3 text-left transition ${
-                                    active
-                                      ? "border-cyan-400/40 bg-cyan-500/15"
-                                      : "border-white/10 bg-white/5 hover:bg-white/10"
-                                  }`}
-                                >
-                                  <div className="text-sm font-semibold text-white">{role.name}</div>
-                                  <div className="mt-1 text-xs text-white/60">{role.desc}</div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        <div className="mt-3">
-                          <div className="text-sm font-semibold text-white">Commander Path</div>
-                          <div className="mt-1 text-xs text-white/60">
-                            Choose a command identity for your base.
-                          </div>
-                          <div className="mt-3 grid gap-2">
-                            {COMMANDER_PATHS.map((path) => {
-                              const active = commanderPath === path.key;
-                              return (
-                                <button
-                                  key={path.key}
-                                  onClick={() => handleCommanderPathChange(path.key)}
-                                  className={`rounded-2xl border px-3 py-3 text-left transition ${
-                                    active
-                                      ? "border-fuchsia-400/40 bg-fuchsia-500/15"
-                                      : "border-white/10 bg-white/5 hover:bg-white/10"
-                                  }`}
-                                >
-                                  <div className="text-sm font-semibold text-white">{path.name}</div>
-                                  <div className="mt-1 text-xs text-white/60">{path.desc}</div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {devTab === "modules" ? (
-                    <div className="grid gap-3">
-                      {MODULES.map((module) => {
-                        const owned = !!state.modules[module.key];
-                        return (
-                          <div key={module.key} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                            <div className="text-sm font-semibold text-white">{module.name}</div>
-                            <div className="mt-1 text-xs text-white/60">{module.desc}</div>
-                            <div className="mt-2 text-xs text-white/55">
-                              Cost: {Object.entries(module.cost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
-                            </div>
-                            <button
-                              onClick={() => buyModule(module.key)}
-                              disabled={owned}
-                              className="mt-3 w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:opacity-40"
-                            >
-                              {owned ? "Installed" : "Install"}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-
-                  {devTab === "research" ? (
-                    <div className="grid gap-3">
-                      {RESEARCH.map((item) => {
-                        const done = !!state.research[item.key];
-                        const locked = item.requires?.some((key) => !state.research[key]);
-                        return (
-                          <div key={item.key} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                            <div className="text-sm font-semibold text-white">{item.name}</div>
-                            <div className="mt-1 text-xs text-white/60">{item.desc}</div>
-                            <div className="mt-2 text-xs text-white/55">
-                              Cost: {Object.entries(item.cost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
-                            </div>
-                            <button
-                              onClick={() => buyResearch(item.key)}
-                              disabled={done || locked}
-                              className="mt-3 w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:opacity-40"
-                            >
-                              {done ? "Done" : locked ? "Locked" : "Research"}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                    </div>
-                  </div>
-                </AccordionSection>
-              </div>
-
-              <div className="mt-4 xl:hidden">
-                <AccordionSection
-                  title="Base Structures"
-                  subtitle="Upgrade structures, unlock stronger systems and shape your command base."
-                  defaultOpen={false}
-                >
-                  <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                    <div className="mb-4">
-                      <h2 className="text-lg font-bold text-white">Base Structures</h2>
-                      <p className="mt-1 text-sm text-white/60">Compact command structure grid.</p>
-                    </div>
-                    {baseStructuresContent}
-                  </div>
-                </AccordionSection>
-              </div>
-            </>
-          ) : null}
-
-          {/* Mobile Intel Tab */}
-          {mobileTab === "intel" ? (
-            <>
-              <div className="mt-4 xl:hidden">
-                <AccordionSection
-                  title="Progress Summary"
-                  subtitle="BASE should feel like a live control room with sectors, contracts, identity and operational pressure."
-                  defaultOpen={false}
-                >
-                  <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                    <div className="mb-4">
-                      <h2 className="text-lg font-bold text-white">Progress Summary</h2>
-                      <p className="mt-1 text-sm text-white/60">Long-term performance snapshot.</p>
-                    </div>
-                    {progressSummaryContent}
-                  </div>
-                </AccordionSection>
-              </div>
-
-              <div className="mt-4 xl:hidden">
-                <AccordionSection
-                  title="Activity Log"
-                  subtitle="Recent system activity."
-                  defaultOpen={false}
-                >
-                  <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                    <div className="mb-4">
-                      <h2 className="text-lg font-bold text-white">Activity Log</h2>
-                      <p className="mt-1 text-sm text-white/60">Recent system activity.</p>
-                    </div>
-                    {activityLogContent}
-                  </div>
-                </AccordionSection>
-              </div>
-            </>
-          ) : null}
 
 
           {/* Desktop - Operations + Missions */}

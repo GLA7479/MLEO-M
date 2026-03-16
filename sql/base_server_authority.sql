@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.base_device_state (
   device_id text PRIMARY KEY,
-  version integer NOT NULL DEFAULT 1,
+  version integer NOT NULL DEFAULT 5,
   last_day date NOT NULL DEFAULT current_date,
   banked_mleo bigint NOT NULL DEFAULT 0,
   sent_today bigint NOT NULL DEFAULT 0,
@@ -66,6 +66,7 @@ BEGIN
 
   INSERT INTO public.base_device_state (
     device_id,
+    version,
     resources,
     buildings,
     modules,
@@ -77,12 +78,13 @@ BEGIN
   )
   VALUES (
     p_device_id,
+    5,
     jsonb_build_object(
-      'ORE', 0,
-      'GOLD', 140,
-      'SCRAP', 0,
-      'ENERGY', 120,
-      'DATA', 0
+      'ORE', 45,
+      'GOLD', 260,
+      'SCRAP', 12,
+      'ENERGY', 140,
+      'DATA', 6
     ),
     jsonb_build_object(
       'hq', 1,
@@ -178,8 +180,8 @@ DECLARE
   v_modules jsonb;
   v_research jsonb;
   v_stats jsonb;
-  v_energy_cap numeric := 120;
-  v_energy_regen numeric := 0.8;
+  v_energy_cap numeric := 140;
+  v_energy_regen numeric := 2.6;
   v_efficiency numeric := 1.0;
   v_hq integer := 1;
   v_quarry integer := 1;
@@ -210,6 +212,72 @@ BEGIN
   FROM public.base_device_state
   WHERE device_id = p_device_id
   FOR UPDATE;
+
+  -- Reset old state (version < 5) to new starter pack values
+  IF v_state.version < 5 THEN
+    UPDATE public.base_device_state
+    SET
+      version = 5,
+      resources = jsonb_build_object(
+        'ORE', 45,
+        'GOLD', 260,
+        'SCRAP', 12,
+        'ENERGY', 140,
+        'DATA', 6
+      ),
+      buildings = jsonb_build_object(
+        'hq', 1,
+        'quarry', 1,
+        'tradeHub', 0,
+        'salvage', 0,
+        'refinery', 0,
+        'powerCell', 0,
+        'minerControl', 0,
+        'arcadeHub', 0,
+        'expeditionBay', 0,
+        'logisticsCenter', 0,
+        'researchLab', 0,
+        'repairBay', 0
+      ),
+      modules = '{}'::jsonb,
+      research = '{}'::jsonb,
+      crew = 0,
+      crew_role = 'engineer',
+      commander_level = 1,
+      commander_xp = 0,
+      commander_path = 'industry',
+      blueprint_level = 0,
+      banked_mleo = 0,
+      sent_today = 0,
+      total_banked = 0,
+      total_shared_spent = 0,
+      overclock_until = NULL,
+      expedition_ready_at = now(),
+      maintenance_due = 0,
+      stability = 100,
+      stats = jsonb_build_object(
+        'upgradesToday', 0,
+        'shippedToday', 0,
+        'expeditionsToday', 0,
+        'vaultSpentToday', 0,
+        'dataToday', 0,
+        'maintenanceToday', 0
+      ),
+      mission_state = jsonb_build_object(
+        'completed', '{}'::jsonb,
+        'claimed', '{}'::jsonb
+      ),
+      log = '[]'::jsonb,
+      last_tick_at = now(),
+      updated_at = now()
+    WHERE device_id = p_device_id;
+
+    SELECT *
+    INTO v_state
+    FROM public.base_device_state
+    WHERE device_id = p_device_id
+    FOR UPDATE;
+  END IF;
 
   IF v_state.last_tick_at IS NULL THEN
     UPDATE public.base_device_state
@@ -245,8 +313,8 @@ BEGIN
   v_arcade := greatest(0, coalesce((v_buildings->>'arcadeHub')::int, 0));
   v_miner := greatest(0, coalesce((v_buildings->>'minerControl')::int, 0));
 
-  v_energy_cap := 120 + (v_power * 24);
-  v_energy_regen := 0.8 + (v_power * 0.35);
+  v_energy_cap := 140 + (v_power * 24);
+  v_energy_regen := 2.6 + (v_power * 0.35);
   v_efficiency := 1 + ((v_hq - 1) * 0.03);
 
   IF coalesce((v_modules->>'optimizer')::boolean, false) THEN
@@ -268,7 +336,7 @@ BEGIN
   v_gold_gain := (v_trade * 1.0 * v_efficiency) * (v_elapsed_seconds / 60.0);
   v_scrap_gain := (v_salvage * 0.8 * v_efficiency) * (v_elapsed_seconds / 60.0);
   v_data_gain := ((v_arcade * 0.12) + (v_miner * 0.15)) * v_efficiency * (v_elapsed_seconds / 60.0);
-  v_banked := (v_refinery * 0.12 * v_efficiency) * (v_elapsed_seconds / 60.0);
+  v_banked := (v_refinery * 0.10 * v_efficiency) * (v_elapsed_seconds / 60.0);
 
   v_energy_now := least(
     v_energy_cap,
