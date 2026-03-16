@@ -15,6 +15,7 @@ import {
   spendFromVault,
   hireCrewAction,
   performMaintenanceAction,
+  claimBaseMission,
 } from "../lib/baseVaultClient";
 
 const MAX_LOG_ITEMS = 16;
@@ -1471,10 +1472,21 @@ export default function MleoBase() {
               research: { ...(saved.research || {}) },
               stats: { ...seed.stats, ...(saved.stats || {}) },
               missionState: {
-                ...seed.missionState,
-                ...(saved.mission_state || {}),
-                completed: { ...(saved.mission_state?.completed || {}) },
-                claimed: { ...(saved.mission_state?.claimed || {}) },
+                dailySeed:
+                  saved?.missionState?.dailySeed ||
+                  saved?.mission_state?.dailySeed ||
+                  seed?.missionState?.dailySeed ||
+                  todayKey(),
+                completed: {
+                  ...(seed?.missionState?.completed || {}),
+                  ...(saved?.missionState?.completed || {}),
+                  ...(saved?.mission_state?.completed || {}),
+                },
+                claimed: {
+                  ...(seed?.missionState?.claimed || {}),
+                  ...(saved?.missionState?.claimed || {}),
+                  ...(saved?.mission_state?.claimed || {}),
+                },
               },
               log: Array.isArray(saved.log) && saved.log.length ? saved.log : seed.log,
               lastTickAt: Date.now(),
@@ -1552,10 +1564,21 @@ export default function MleoBase() {
           research: serverState.research || prev.research,
           stats: { ...prev.stats, ...(serverState.stats || {}) },
           missionState: {
-            ...prev.missionState,
-            ...(serverState.mission_state || {}),
-            completed: { ...(serverState.mission_state?.completed || {}) },
-            claimed: { ...(serverState.mission_state?.claimed || {}) },
+            dailySeed:
+              serverState?.missionState?.dailySeed ||
+              serverState?.mission_state?.dailySeed ||
+              prev?.missionState?.dailySeed ||
+              todayKey(),
+            completed: {
+              ...(prev?.missionState?.completed || {}),
+              ...(serverState?.missionState?.completed || {}),
+              ...(serverState?.mission_state?.completed || {}),
+            },
+            claimed: {
+              ...(prev?.missionState?.claimed || {}),
+              ...(serverState?.missionState?.claimed || {}),
+              ...(serverState?.mission_state?.claimed || {}),
+            },
           },
           log: Array.isArray(serverState.log) && serverState.log.length ? serverState.log : prev.log,
           lastTickAt: Date.now(),
@@ -2264,33 +2287,43 @@ export default function MleoBase() {
     }
   };
 
-  const claimMission = (key) => {
-    const mission = DAILY_MISSIONS.find((item) => item.key === key);
-    if (!mission) return;
-    updateState((prev) => {
-      if (prev.missionState?.claimed?.[key]) return prev;
-      const progress = getMissionProgress(prev)[key] || 0;
-      if (progress < mission.target) {
-        showToast("Mission is not complete yet.");
-        return prev;
+  const claimMission = async (missionKey) => {
+    try {
+      setBusy(true);
+
+      const payload = await claimBaseMission(missionKey);
+      const serverState = payload?.state;
+      if (!serverState) {
+        throw new Error("Missing updated base state");
       }
-      const nextResources = { ...prev.resources };
-      for (const [rk, rv] of Object.entries(mission.reward || {})) {
-        if (rk === "XP") continue;
-        nextResources[rk] = (nextResources[rk] || 0) + rv;
-      }
-      return applyLevelUps({
+
+      setState((prev) => ({
         ...prev,
-        resources: nextResources,
-        commanderXp: prev.commanderXp + (mission.reward?.XP || 0),
-        totalMissionsDone: (prev.totalMissionsDone || 0) + 1,
+        ...serverState,
         missionState: {
-          ...prev.missionState,
-          claimed: { ...(prev.missionState?.claimed || {}), [key]: true },
+          dailySeed:
+            serverState?.missionState?.dailySeed ||
+            serverState?.mission_state?.dailySeed ||
+            prev?.missionState?.dailySeed ||
+            todayKey(),
+          completed: {
+            ...(prev?.missionState?.completed || {}),
+            ...(serverState?.missionState?.completed || {}),
+            ...(serverState?.mission_state?.completed || {}),
+          },
+          claimed: {
+            ...(prev?.missionState?.claimed || {}),
+            ...(serverState?.missionState?.claimed || {}),
+            ...(serverState?.mission_state?.claimed || {}),
+          },
         },
-        log: pushLog(prev.log, `Mission claimed: ${mission.name}.`),
-      });
-    });
+      }));
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || "Mission claim failed");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const dailyMissionsContent = (

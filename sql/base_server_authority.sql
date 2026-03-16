@@ -347,11 +347,11 @@ BEGIN
   v_energy_regen := 2.6 + (v_power * 0.35);
   v_efficiency := 1 + ((v_hq - 1) * 0.03);
 
-  IF coalesce((v_modules->>'optimizer')::boolean, false) THEN
+  IF coalesce((v_modules->>'vaultCompressor')::boolean, false) THEN
     v_efficiency := v_efficiency + 0.08;
   END IF;
 
-  IF coalesce((v_research->>'automation')::boolean, false) THEN
+  IF coalesce((v_research->>'routing')::boolean, false) THEN
     v_efficiency := v_efficiency + 0.10;
   END IF;
 
@@ -393,13 +393,127 @@ BEGIN
     last_tick_at = v_now,
     updated_at = v_now
   WHERE device_id = p_device_id;
-
+  
   SELECT *
   INTO v_state
   FROM public.base_device_state
   WHERE device_id = p_device_id;
-
+  
   RETURN v_state;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.base_claim_mission_reward(
+  p_device_id text,
+  p_mission_key text
+)
+RETURNS TABLE(state public.base_device_state)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_state public.base_device_state%ROWTYPE;
+  v_resources jsonb;
+  v_stats jsonb;
+  v_mission_state jsonb;
+  v_claimed boolean := false;
+  v_completed numeric := 0;
+  v_target numeric := 0;
+  v_xp_gain integer := 0;
+BEGIN
+  IF coalesce(trim(p_device_id), '') = '' THEN
+    RAISE EXCEPTION 'device_id is required';
+  END IF;
+
+  IF coalesce(trim(p_mission_key), '') = '' THEN
+    RAISE EXCEPTION 'mission_key is required';
+  END IF;
+
+  SELECT * INTO v_state
+  FROM public.base_reconcile_state(p_device_id);
+
+  SELECT * INTO v_state
+  FROM public.base_device_state
+  WHERE device_id = p_device_id
+  FOR UPDATE;
+
+  v_resources := coalesce(v_state.resources, '{}'::jsonb);
+  v_stats := coalesce(v_state.stats, '{}'::jsonb);
+  v_mission_state := coalesce(
+    v_state.mission_state,
+    jsonb_build_object('completed', '{}'::jsonb, 'claimed', '{}'::jsonb)
+  );
+
+  v_claimed := coalesce((v_mission_state->'claimed'->>p_mission_key)::boolean, false);
+
+  IF v_claimed THEN
+    RAISE EXCEPTION 'Mission already claimed';
+  END IF;
+
+  IF p_mission_key = 'upgrade_building' THEN
+    v_completed := coalesce((v_stats->>'upgradesToday')::numeric, 0);
+    v_target := 1;
+    v_resources := jsonb_set(v_resources, '{DATA}', to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 10), true);
+    v_xp_gain := 30;
+  ELSIF p_mission_key = 'run_expedition' THEN
+    v_completed := coalesce((v_stats->>'expeditionsToday')::numeric, 0);
+    v_target := 1;
+    v_resources := jsonb_set(v_resources, '{SCRAP}', to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 24), true);
+    v_xp_gain := 35;
+  ELSIF p_mission_key = 'generate_data' THEN
+    v_completed := coalesce((v_stats->>'dataToday')::numeric, 0);
+    v_target := 12;
+    v_resources := jsonb_set(v_resources, '{GOLD}', to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 90), true);
+    v_xp_gain := 30;
+  ELSIF p_mission_key = 'perform_maintenance' THEN
+    v_completed := coalesce((v_stats->>'maintenanceToday')::numeric, 0);
+    v_target := 1;
+    v_resources := jsonb_set(v_resources, '{DATA}', to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 8), true);
+    v_xp_gain := 35;
+  ELSIF p_mission_key = 'double_expedition' THEN
+    v_completed := coalesce((v_stats->>'expeditionsToday')::numeric, 0);
+    v_target := 2;
+    v_resources := jsonb_set(v_resources, '{SCRAP}', to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 28), true);
+    v_xp_gain := 40;
+  ELSIF p_mission_key = 'ship_mleo' THEN
+    v_completed := coalesce((v_stats->>'shippedToday')::numeric, 0);
+    v_target := 60;
+    v_resources := jsonb_set(v_resources, '{GOLD}', to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 140), true);
+    v_xp_gain := 45;
+  ELSIF p_mission_key = 'spend_vault' THEN
+    v_completed := coalesce((v_stats->>'vaultSpentToday')::numeric, 0);
+    v_target := 50;
+    v_resources := jsonb_set(v_resources, '{DATA}', to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 10), true);
+    v_xp_gain := 45;
+  ELSE
+    RAISE EXCEPTION 'Invalid mission key';
+  END IF;
+
+  IF v_completed < v_target THEN
+    RAISE EXCEPTION 'Mission not completed yet';
+  END IF;
+
+  v_mission_state := jsonb_set(
+    v_mission_state,
+    ARRAY['claimed', p_mission_key],
+    'true'::jsonb,
+    true
+  );
+
+  UPDATE public.base_device_state
+  SET
+    resources = v_resources,
+    mission_state = v_mission_state,
+    commander_xp = coalesce(commander_xp, 0) + v_xp_gain,
+    total_missions_done = coalesce(total_missions_done, 0) + 1,
+    updated_at = now()
+  WHERE device_id = p_device_id;
+
+  RETURN QUERY
+  SELECT *
+  FROM public.base_device_state
+  WHERE device_id = p_device_id;
 END;
 $$;
 
