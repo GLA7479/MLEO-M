@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS public.base_device_state (
   commander_xp bigint NOT NULL DEFAULT 0,
   blueprint_level integer NOT NULL DEFAULT 0,
   crew integer NOT NULL DEFAULT 0,
+  crew_role text NOT NULL DEFAULT 'engineer',
+  commander_path text NOT NULL DEFAULT 'industry',
   overclock_until timestamptz,
   expedition_ready_at timestamptz,
   maintenance_due numeric(10,2) NOT NULL DEFAULT 0,
@@ -74,7 +76,9 @@ BEGIN
     stats,
     mission_state,
     log,
-    expedition_ready_at
+    expedition_ready_at,
+    crew_role,
+    commander_path
   )
   VALUES (
     p_device_id,
@@ -115,7 +119,9 @@ BEGIN
       'claimed', '{}'::jsonb
     ),
     '[]'::jsonb,
-    now()
+    now(),
+    'engineer',
+    'industry'
   )
   ON CONFLICT (device_id) DO NOTHING;
 
@@ -162,6 +168,30 @@ $$;
 
 ALTER TABLE public.base_device_state
 ADD COLUMN IF NOT EXISTS last_tick_at timestamptz NOT NULL DEFAULT now();
+
+ALTER TABLE public.base_device_state
+ADD COLUMN IF NOT EXISTS crew_role text DEFAULT 'engineer';
+
+ALTER TABLE public.base_device_state
+ADD COLUMN IF NOT EXISTS commander_path text DEFAULT 'industry';
+
+-- Update existing rows to have default values if NULL
+UPDATE public.base_device_state
+SET crew_role = 'engineer'
+WHERE crew_role IS NULL;
+
+UPDATE public.base_device_state
+SET commander_path = 'industry'
+WHERE commander_path IS NULL;
+
+-- Now make them NOT NULL
+ALTER TABLE public.base_device_state
+ALTER COLUMN crew_role SET NOT NULL,
+ALTER COLUMN crew_role SET DEFAULT 'engineer';
+
+ALTER TABLE public.base_device_state
+ALTER COLUMN commander_path SET NOT NULL,
+ALTER COLUMN commander_path SET DEFAULT 'industry';
 
 CREATE OR REPLACE FUNCTION public.base_reconcile_state(
   p_device_id text
