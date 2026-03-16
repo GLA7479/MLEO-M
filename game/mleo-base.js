@@ -2662,13 +2662,27 @@ export default function MleoBase() {
               <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200">
                 MLEO ecosystem command hub
               </div>
-              <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{CONFIG.title}</h1>
+              <div className="mt-3 flex items-center justify-between sm:block">
+                <h1 className="text-3xl font-black tracking-tight sm:text-4xl">{CONFIG.title}</h1>
+                <div className="flex items-center gap-2 sm:hidden">
+                  <Link href="/mining" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10">
+                    Hub
+                  </Link>
+                  <button
+                    onClick={() => setMobileMenuOpen(true)}
+                    className="flex h-[46px] w-[46px] items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
+                    aria-label="Open menu"
+                  >
+                    <span className="text-[22px] leading-none">☰</span>
+                  </button>
+                </div>
+              </div>
               <p className="mt-2 max-w-2xl text-sm text-white/70 sm:text-base">
                 {CONFIG.subtitle} Build a live command identity through sectors, contracts, specialization and controlled support systems.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 sm:justify-start">
+            <div className="hidden sm:flex flex-wrap items-center gap-2 sm:justify-start">
               <Link href="/mining" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10">
                 Hub
               </Link>
@@ -2772,30 +2786,6 @@ export default function MleoBase() {
 
           {/* Mobile */}
           <div className="mt-6 space-y-3 sm:hidden pb-24">
-            {/* top actions בתוך אותה שורה, בלי שורה נוספת */}
-            <div className="flex items-center justify-between">
-              <Link
-                href="/mining"
-                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10"
-              >
-                Hub
-              </Link>
-
-              <button
-                onClick={() => setMobileMenuOpen(true)}
-                className="flex h-[46px] w-[46px] items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
-                aria-label="Open menu"
-              >
-                <span className="text-[22px] leading-none">☰</span>
-              </button>
-            </div>
-
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200">
-                MLEO ecosystem command hub
-              </div>
-              <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{CONFIG.title}</h1>
-            </div>
 
             {alerts.length ? (
               <div className="space-y-2">
