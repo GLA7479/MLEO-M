@@ -1400,6 +1400,63 @@ function Section({ title, subtitle, children }) {
   );
 }
 
+function AvailabilityBadge() {
+  return (
+    <span className="inline-flex items-center justify-center rounded-full bg-cyan-400 px-2 py-1 text-[10px] font-black tracking-[0.14em] text-slate-950">
+      AVAILABLE
+    </span>
+  );
+}
+
+function availabilityCardClass(isAvailable) {
+  return isAvailable
+    ? "border-cyan-400/30 bg-cyan-500/5"
+    : "border-white/10 bg-black/20";
+}
+
+function buildSectionHint(type, counts) {
+  if (type === "development") {
+    const parts = [];
+    if (counts.modules > 0) {
+      parts.push(`${counts.modules} module${counts.modules > 1 ? "s" : ""}`);
+    }
+    if (counts.research > 0) {
+      parts.push(`${counts.research} research`);
+    }
+    return parts.length ? `${parts.join(" · ")} available` : "Nothing available right now";
+  }
+
+  if (type === "structures") {
+    return counts.structures > 0
+      ? `${counts.structures} upgrade${counts.structures > 1 ? "s" : ""} available`
+      : "Nothing available right now";
+  }
+
+  if (type === "support") {
+    return counts.support > 0
+      ? "Blueprint ready"
+      : "Nothing available right now";
+  }
+
+  return "";
+}
+
+function SectionAvailabilityBadge({ count }) {
+  if (!count) return null;
+
+  return (
+    <span className="inline-flex min-w-6 h-6 items-center justify-center rounded-full bg-cyan-400 px-2 text-[11px] font-black text-slate-950">
+      {count}
+    </span>
+  );
+}
+
+function buildSectionCardClass(hasAvailable) {
+  return hasAvailable
+    ? "border-cyan-400/25 bg-cyan-500/6 shadow-[0_0_14px_rgba(34,211,238,0.06)]"
+    : "border-white/10 bg-white/5";
+}
+
 function WindowBankedBadge({ value }) {
   return (
     <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/8 px-2.5 py-1.5">
@@ -1937,6 +1994,42 @@ export default function MleoBase() {
     () => getNextStep(state, derived, systemState, liveContracts),
     [state, derived, systemState, liveContracts]
   );
+
+  const availableStructuresCount = useMemo(() => {
+    return BUILDINGS.filter((def) => {
+      const level = Number(state.buildings?.[def.key] || 0);
+      const cost = buildingCost(def, level);
+      return unlocked(def, state) && canCoverCost(state.resources, cost);
+    }).length;
+  }, [state.buildings, state.resources]);
+
+  const availableModulesCount = useMemo(() => {
+    return MODULES.filter((def) => {
+      return !state.modules?.[def.key] && canCoverCost(state.resources, def.cost);
+    }).length;
+  }, [state.modules, state.resources]);
+
+  const availableResearchCount = useMemo(() => {
+    return RESEARCH.filter((def) => {
+      const hasPrereqs = !def.requires?.length || def.requires.every((k) => state.research?.[k]);
+      return !state.research?.[def.key] && hasPrereqs && canCoverCost(state.resources, def.cost);
+    }).length;
+  }, [state.research, state.resources]);
+
+  const availableBlueprintCount = canBuyBlueprintNow ? 1 : 0;
+
+  const buildOpportunitiesCount =
+    availableStructuresCount +
+    availableModulesCount +
+    availableResearchCount +
+    availableBlueprintCount;
+
+  const developmentAvailableCount =
+    availableModulesCount + availableResearchCount;
+
+  const structuresAvailableCount = availableStructuresCount;
+
+  const supportAvailableCount = availableBlueprintCount;
 
   const showToast = (message) => setToast(message);
 
@@ -2817,10 +2910,14 @@ export default function MleoBase() {
         <div className="grid gap-2.5 xl:grid-cols-2">
         {MODULES.map((module) => {
           const owned = !!state.modules[module.key];
+          const moduleAvailable = !owned && canCoverCost(state.resources, module.cost);
           return (
-            <div key={module.key} className="flex h-full flex-col gap-2 rounded-2xl border border-white/10 bg-black/20 p-3.5">
+            <div key={module.key} className={`flex h-full flex-col gap-2 rounded-2xl border p-3.5 ${availabilityCardClass(moduleAvailable)}`}>
               <div className="flex min-h-0 flex-col">
-                <div className="text-sm font-semibold">{module.name}</div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="text-sm font-semibold">{module.name}</div>
+                  {moduleAvailable ? <AvailabilityBadge /> : null}
+                </div>
                 <div className="mt-1 text-xs text-white/60">{module.desc}</div>
                 <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
                   Cost
@@ -2845,11 +2942,15 @@ export default function MleoBase() {
         {RESEARCH.map((item) => {
           const done = !!state.research[item.key];
           const locked = item.requires?.some((key) => !state.research[key]);
+          const researchAvailable = !done && !locked && canCoverCost(state.resources, item.cost);
           return (
-            <div key={item.key} className="rounded-2xl border border-white/10 bg-black/20 p-3.5">
+            <div key={item.key} className={`rounded-2xl border p-3.5 ${availabilityCardClass(researchAvailable)}`}>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="text-sm font-semibold">{item.name}</div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-sm font-semibold">{item.name}</div>
+                    {researchAvailable ? <AvailabilityBadge /> : null}
+                  </div>
                   <div className="mt-1 text-xs text-white/60">{item.desc}</div>
                   <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
                     Cost
@@ -2939,17 +3040,19 @@ export default function MleoBase() {
         return (
           <div
             key={building.key}
-            className="flex min-h-[180px] flex-col rounded-xl border border-white/10 bg-black/20 p-3"
+            className={`flex min-h-[180px] flex-col rounded-xl border p-3 ${availabilityCardClass(ready)}`}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <div className="flex min-h-[28px] items-start text-sm font-semibold leading-5 text-white">
+                <div className="text-sm font-semibold leading-5 text-white">
                   {building.name}
                 </div>
               </div>
-
-              <div className="shrink-0 rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/65">
-                Lv {level}
+              <div className="shrink-0 flex flex-col items-end gap-1">
+                {ready ? <AvailabilityBadge /> : null}
+                <div className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/65">
+                  Lv {level}
+                </div>
               </div>
             </div>
 
@@ -3009,8 +3112,11 @@ export default function MleoBase() {
 
   const buildSupportSystemsContent = (
     <div className="space-y-3">
-      <div className="rounded-2xl border border-white/10 bg-black/20 p-3.5">
-        <div className="text-base font-bold text-white">Blueprint Cache</div>
+      <div className={`rounded-2xl border p-3.5 ${availabilityCardClass(canBuyBlueprintNow)}`}>
+        <div className="flex items-start justify-between gap-2">
+          <div className="text-base font-bold text-white">Blueprint Cache</div>
+          {canBuyBlueprintNow ? <AvailabilityBadge /> : null}
+        </div>
         <div className="mt-1 text-sm text-white/65">
           Upgrade your shipment capacity and long-term bank efficiency.
         </div>
@@ -3422,7 +3528,7 @@ export default function MleoBase() {
                 {[
                   { key: "overview", label: "Overview", badge: readyCounts.contracts + readyCounts.missions },
                   { key: "ops", label: "Operations", badge: readyCounts.expedition + readyCounts.shipment },
-                  { key: "build", label: "Build", badge: 0 },
+                  { key: "build", label: "Build", badge: buildOpportunitiesCount },
                   { key: "intel", label: "Intel", badge: 0 },
                 ].map((tab) => {
                   const active = mobilePanel === tab.key;
@@ -3588,6 +3694,31 @@ export default function MleoBase() {
                         </div>
                       </div>
 
+                      {buildOpportunitiesCount > 0 ? (
+                        <button
+                          onClick={() => openMobilePanel("build")}
+                          className="w-full rounded-3xl border border-cyan-400/20 bg-cyan-500/6 p-4 text-left shadow-[0_0_18px_rgba(34,211,238,0.06)]"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="text-lg font-extrabold text-white">Build opportunities</div>
+                              <div className="mt-1 text-sm text-cyan-100/75">
+                                {availableStructuresCount > 0 ? `${availableStructuresCount} structures` : null}
+                                {availableStructuresCount > 0 && availableModulesCount > 0 ? " · " : null}
+                                {availableModulesCount > 0 ? `${availableModulesCount} modules` : null}
+                                {(availableStructuresCount > 0 || availableModulesCount > 0) && availableResearchCount > 0 ? " · " : null}
+                                {availableResearchCount > 0 ? `${availableResearchCount} research` : null}
+                                {(availableStructuresCount > 0 || availableModulesCount > 0 || availableResearchCount > 0) && availableBlueprintCount > 0 ? " · " : null}
+                                {availableBlueprintCount > 0 ? "blueprint ready" : null}
+                              </div>
+                            </div>
+                            <span className="inline-flex min-w-7 h-7 items-center justify-center rounded-full bg-cyan-400 px-2 text-xs font-black text-slate-950">
+                              {buildOpportunitiesCount}
+                            </span>
+                          </div>
+                        </button>
+                      ) : null}
+
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                         <div className="text-lg font-bold text-white">Command Identity</div>
                         <div className="mt-3 grid gap-3">
@@ -3743,12 +3874,45 @@ export default function MleoBase() {
                         compact
                         showBanked={false}
                       />
-                      <div className="rounded-3xl border border-white/10 bg-white/5 p-3.5">
-                        <div className="flex items-center justify-between">
-                          <div className="text-lg font-bold text-white">Development</div>
+                      {buildOpportunitiesCount > 0 ? (
+                        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-white/45">
+                            Available now
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-white">
+                            {availableStructuresCount > 0 ? `${availableStructuresCount} structures` : null}
+                            {availableStructuresCount > 0 && availableModulesCount > 0 ? " · " : null}
+                            {availableModulesCount > 0 ? `${availableModulesCount} modules` : null}
+                            {(availableStructuresCount > 0 || availableModulesCount > 0) && availableResearchCount > 0 ? " · " : null}
+                            {availableResearchCount > 0 ? `${availableResearchCount} research` : null}
+                            {(availableStructuresCount > 0 || availableModulesCount > 0 || availableResearchCount > 0) && availableBlueprintCount > 0 ? " · " : null}
+                            {availableBlueprintCount > 0 ? "blueprint ready" : null}
+                          </div>
+                        </div>
+                      ) : null}
+                      <div
+                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                          developmentAvailableCount > 0
+                        )}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className="text-lg font-bold text-white">Development</div>
+                              <SectionAvailabilityBadge count={developmentAvailableCount} />
+                            </div>
+                            {!mobileDevelopmentOpen ? (
+                              <div className="mt-1 text-sm text-white/60">
+                                {buildSectionHint("development", {
+                                  modules: availableModulesCount,
+                                  research: availableResearchCount,
+                                })}
+                              </div>
+                            ) : null}
+                          </div>
                           <button
                             onClick={() => setMobileDevelopmentOpen(!mobileDevelopmentOpen)}
-                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
                             {mobileDevelopmentOpen ? "CLOSE" : "OPEN"}
                           </button>
@@ -3758,12 +3922,28 @@ export default function MleoBase() {
                         )}
                       </div>
 
-                      <div className="rounded-3xl border border-white/10 bg-white/5 p-3.5">
-                        <div className="flex items-center justify-between">
-                          <div className="text-lg font-bold text-white">Base Structures</div>
+                      <div
+                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                          structuresAvailableCount > 0
+                        )}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className="text-lg font-bold text-white">Base Structures</div>
+                              <SectionAvailabilityBadge count={structuresAvailableCount} />
+                            </div>
+                            {!mobileBaseStructuresOpen ? (
+                              <div className="mt-1 text-sm text-white/60">
+                                {buildSectionHint("structures", {
+                                  structures: availableStructuresCount,
+                                })}
+                              </div>
+                            ) : null}
+                          </div>
                           <button
                             onClick={() => setMobileBaseStructuresOpen(!mobileBaseStructuresOpen)}
-                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
                             {mobileBaseStructuresOpen ? "CLOSE" : "OPEN"}
                           </button>
@@ -3774,17 +3954,27 @@ export default function MleoBase() {
                       </div>
 
                       <div
-                        className={`rounded-3xl border p-3.5 transition ${
-                          mobileBuildSupportOpen
-                            ? "border-cyan-400/30 bg-cyan-500/6 shadow-[0_0_18px_rgba(34,211,238,0.08)]"
-                            : "border-white/10 bg-white/5"
-                        }`}
+                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                          supportAvailableCount > 0
+                        )}`}
                       >
                         <div className="flex items-center justify-between gap-3">
-                          <div className="text-lg font-bold text-white">Support Systems</div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className="text-lg font-bold text-white">Support Systems</div>
+                              <SectionAvailabilityBadge count={supportAvailableCount} />
+                            </div>
+                            {!mobileBuildSupportOpen ? (
+                              <div className="mt-1 text-sm text-white/60">
+                                {buildSectionHint("support", {
+                                  support: availableBlueprintCount,
+                                })}
+                              </div>
+                            ) : null}
+                          </div>
                           <button
                             onClick={() => setMobileBuildSupportOpen(!mobileBuildSupportOpen)}
-                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
                             {mobileBuildSupportOpen ? "CLOSE" : "OPEN"}
                           </button>
