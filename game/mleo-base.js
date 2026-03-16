@@ -1382,12 +1382,26 @@ function Section({ title, subtitle, children }) {
   );
 }
 
+function WindowBankedBadge({ value }) {
+  return (
+    <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/8 px-2.5 py-1.5">
+      <div className="text-[9px] font-black uppercase tracking-[0.12em] text-cyan-200/55">
+        Banked
+      </div>
+      <div className="text-xs font-extrabold text-cyan-100">
+        {formatResourceValue(value || 0)} MLEO
+      </div>
+    </div>
+  );
+}
+
 function BaseResourceBar({
   resources,
   energy,
   energyCap,
   bankedMleo = 0,
   compact = false,
+  showBanked = true,
 }) {
   const items = [
     { key: "ORE", label: "ORE", value: formatResourceValue(resources?.ORE || 0) },
@@ -1407,15 +1421,15 @@ function BaseResourceBar({
         compact ? "px-2 py-2" : "px-3 py-3"
       }`}
     >
-      <div className="flex gap-2 overflow-x-auto no-scrollbar">
+      <div className={`grid ${compact ? "grid-cols-5 gap-1.5" : showBanked ? "grid-cols-6 gap-2" : "grid-cols-5 gap-2"}`}>
         {items.map((item) => (
           <div
             key={item.key}
-            className={`shrink-0 rounded-xl border border-white/10 bg-white/5 ${
-              compact ? "px-2.5 py-1.5" : "px-3 py-2"
+            className={`rounded-xl border border-white/10 bg-white/5 ${
+              compact ? "px-2 py-1.5" : "px-3 py-2"
             }`}
           >
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">
+            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white/45">
               {item.label}
             </div>
             <div className={`${compact ? "text-xs" : "text-sm"} font-extrabold text-white`}>
@@ -1424,18 +1438,20 @@ function BaseResourceBar({
           </div>
         ))}
 
-        <div
-          className={`shrink-0 rounded-xl border border-cyan-400/20 bg-cyan-400/8 ${
-            compact ? "px-2.5 py-1.5" : "px-3 py-2"
-          }`}
-        >
-          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-200/55">
-            BANKED
+        {!compact && showBanked ? (
+          <div
+            className={`rounded-xl border border-cyan-400/20 bg-cyan-400/8 ${
+              compact ? "px-2 py-1.5" : "px-3 py-2"
+            }`}
+          >
+            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-cyan-200/55">
+              BANKED
+            </div>
+            <div className={`${compact ? "text-xs" : "text-sm"} font-extrabold text-cyan-100`}>
+              {formatResourceValue(bankedMleo || 0)} MLEO
+            </div>
           </div>
-          <div className={`${compact ? "text-xs" : "text-sm"} font-extrabold text-cyan-100`}>
-            {formatResourceValue(bankedMleo || 0)} MLEO
-          </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );
@@ -3342,14 +3358,19 @@ export default function MleoBase() {
           {mobilePanel ? (
             <div className="fixed inset-0 z-[115] bg-black/55 backdrop-blur-sm sm:hidden">
               <div className="absolute inset-x-0 bottom-0 top-[84px] rounded-t-[28px] border border-white/10 bg-[#0b1526] shadow-2xl">
-                <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
-                  <div className="text-lg font-bold text-white">{mobilePanelTitle}</div>
-                  <button
-                    onClick={closeMobilePanel}
-                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10"
-                  >
-                    Close
-                  </button>
+                <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-4">
+                  <div className="min-w-0">
+                    <div className="text-lg font-bold text-white">{mobilePanelTitle}</div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <WindowBankedBadge value={state.bankedMleo || 0} />
+                    <button
+                      onClick={closeMobilePanel}
+                      className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-base font-bold text-white/90 hover:bg-white/10"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
 
                 <div className="h-[calc(100%-73px)] overflow-y-auto px-4 py-4">
@@ -3458,6 +3479,7 @@ export default function MleoBase() {
                         energyCap={derived.energyCap || 140}
                         bankedMleo={state.bankedMleo || 0}
                         compact
+                        showBanked={false}
                       />
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                         <div className="text-lg font-bold text-white">Next Recommended Step</div>
@@ -3536,6 +3558,7 @@ export default function MleoBase() {
                         energyCap={derived.energyCap || 140}
                         bankedMleo={state.bankedMleo || 0}
                         compact
+                        showBanked={false}
                       />
                       <div
                         className={`rounded-3xl border p-4 transition ${
@@ -3661,6 +3684,7 @@ export default function MleoBase() {
                         energyCap={derived.energyCap || 140}
                         bankedMleo={state.bankedMleo || 0}
                         compact
+                        showBanked={false}
                       />
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                         <div className="flex items-center justify-between">
@@ -3702,6 +3726,7 @@ export default function MleoBase() {
                         energyCap={derived.energyCap || 140}
                         bankedMleo={state.bankedMleo || 0}
                         compact
+                        showBanked={false}
                       />
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                         <div className="flex items-center justify-between">
