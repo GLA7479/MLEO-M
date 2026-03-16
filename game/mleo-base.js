@@ -733,6 +733,41 @@ function fmt(value) {
   return `${Math.floor(n)}`;
 }
 
+function formatResourceValue(value) {
+  const n = Number(value || 0);
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+  return `${Math.floor(n)}`;
+}
+
+function costTone(current, needed) {
+  return Number(current || 0) >= Number(needed || 0)
+    ? "text-emerald-300"
+    : "text-rose-300";
+}
+
+function canCoverCost(resources, cost) {
+  return Object.entries(cost || {}).every(
+    ([key, value]) => Number(resources?.[key] || 0) >= Number(value || 0)
+  );
+}
+
+function ResourceCostRow({ cost, resources }) {
+  const entries = Object.entries(cost || {}).filter(([, value]) => Number(value || 0) > 0);
+
+  if (!entries.length) return null;
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold">
+      {entries.map(([key, value]) => (
+        <span key={key} className={costTone(resources?.[key], value)}>
+          {key} {formatResourceValue(value)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -1344,6 +1379,65 @@ function Section({ title, subtitle, children }) {
       </div>
       {children}
     </section>
+  );
+}
+
+function BaseResourceBar({
+  resources,
+  energy,
+  energyCap,
+  bankedMleo = 0,
+  compact = false,
+}) {
+  const items = [
+    { key: "ORE", label: "ORE", value: formatResourceValue(resources?.ORE || 0) },
+    { key: "GOLD", label: "GOLD", value: formatResourceValue(resources?.GOLD || 0) },
+    { key: "SCRAP", label: "SCRAP", value: formatResourceValue(resources?.SCRAP || 0) },
+    { key: "DATA", label: "DATA", value: formatResourceValue(resources?.DATA || 0) },
+    {
+      key: "ENERGY",
+      label: "ENERGY",
+      value: `${formatResourceValue(energy || 0)}/${formatResourceValue(energyCap || 0)}`,
+    },
+  ];
+
+  return (
+    <div
+      className={`sticky top-0 z-20 -mx-1 mb-3 rounded-2xl border border-white/10 bg-slate-950/88 backdrop-blur-md ${
+        compact ? "px-2 py-2" : "px-3 py-3"
+      }`}
+    >
+      <div className="flex gap-2 overflow-x-auto no-scrollbar">
+        {items.map((item) => (
+          <div
+            key={item.key}
+            className={`shrink-0 rounded-xl border border-white/10 bg-white/5 ${
+              compact ? "px-2.5 py-1.5" : "px-3 py-2"
+            }`}
+          >
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">
+              {item.label}
+            </div>
+            <div className={`${compact ? "text-xs" : "text-sm"} font-extrabold text-white`}>
+              {item.value}
+            </div>
+          </div>
+        ))}
+
+        <div
+          className={`shrink-0 rounded-xl border border-cyan-400/20 bg-cyan-400/8 ${
+            compact ? "px-2.5 py-1.5" : "px-3 py-2"
+          }`}
+        >
+          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-200/55">
+            BANKED
+          </div>
+          <div className={`${compact ? "text-xs" : "text-sm"} font-extrabold text-cyan-100`}>
+            {formatResourceValue(bankedMleo || 0)} MLEO
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -2617,14 +2711,18 @@ export default function MleoBase() {
               {state.crew} workers · global output bonus {(state.research.fieldOps ? 3 : 2) * state.crew}%
             </div>
           </div>
-          <button onClick={hireCrew} className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20">
+          <button
+            onClick={hireCrew}
+            className={`rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 ${canCoverCost(state.resources, workerNextCost) ? "" : "opacity-70"}`}
+          >
             Hire
           </button>
         </div>
 
-              <div className="text-xs text-white/55">
-          Next cost: {Object.entries(workerNextCost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
+              <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
+                Next Cost
               </div>
+              <ResourceCostRow cost={workerNextCost} resources={state.resources} />
 
               <div>
                 <div className="mb-2 text-xs uppercase tracking-[0.18em] text-white/45">Crew Specialization</div>
@@ -2689,14 +2787,15 @@ export default function MleoBase() {
               <div className="flex min-h-[96px] flex-col">
                 <div className="text-sm font-semibold">{module.name}</div>
                 <div className="mt-1 text-xs text-white/60">{module.desc}</div>
-                <div className="mt-2 text-xs text-white/55">
-                  Cost: {Object.entries(module.cost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
+                <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
+                  Cost
                 </div>
+                <ResourceCostRow cost={module.cost} resources={state.resources} />
               </div>
               <button
                 onClick={() => buyModule(module.key)}
                 disabled={owned}
-                className="mt-auto w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+                className={`mt-auto w-full rounded-xl px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${owned ? "bg-white/10" : canCoverCost(state.resources, module.cost) ? "bg-white/10" : "bg-white/10 opacity-70"}`}
               >
                 {owned ? "Installed" : "Install"}
               </button>
@@ -2717,14 +2816,15 @@ export default function MleoBase() {
                 <div>
                   <div className="text-sm font-semibold">{item.name}</div>
                   <div className="mt-1 text-xs text-white/60">{item.desc}</div>
-                  <div className="mt-2 text-xs text-white/55">
-                    Cost: {Object.entries(item.cost).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")}
+                  <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
+                    Cost
                   </div>
+                  <ResourceCostRow cost={item.cost} resources={state.resources} />
                 </div>
                 <button
                   onClick={() => buyResearch(item.key)}
                   disabled={done || locked}
-                  className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+                  className={`rounded-xl px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${done || locked ? "bg-white/10" : canCoverCost(state.resources, item.cost) ? "bg-white/10" : "bg-white/10 opacity-70"}`}
                 >
                   {done ? "Done" : locked ? "Locked" : "Research"}
                 </button>
@@ -2811,18 +2911,16 @@ export default function MleoBase() {
               Next Lv {nextLevel}
             </div>
 
-            <div className="mt-2 min-h-[28px] text-[11px] leading-4 text-white/55">
-              Cost:{" "}
-              {Object.entries(cost)
-                .map(([k, v]) => `${k} ${fmt(v)}`)
-                .join(" · ")}
+            <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
+              Cost
             </div>
+            <ResourceCostRow cost={cost} resources={state.resources} />
 
             <div className="mt-auto flex min-h-[52px] flex-col justify-end pt-3">
               <button
                 onClick={() => buyBuilding(building.key)}
                 disabled={!ready}
-                className="w-full rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+                className={`w-full rounded-xl px-3 py-2 text-xs font-semibold transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${canCoverCost(state.resources, cost) ? "bg-white/10" : "bg-white/10 opacity-70"}`}
               >
                 {buttonText}
               </button>
@@ -3354,6 +3452,13 @@ export default function MleoBase() {
 
                   {mobilePanel === "overview" ? (
                     <div className="space-y-4">
+                      <BaseResourceBar
+                        resources={state.resources}
+                        energy={state.resources?.ENERGY || 0}
+                        energyCap={derived.energyCap || 140}
+                        bankedMleo={state.bankedMleo || 0}
+                        compact
+                      />
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                         <div className="text-lg font-bold text-white">Next Recommended Step</div>
                         <div className="mt-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
@@ -3425,6 +3530,13 @@ export default function MleoBase() {
 
                   {mobilePanel === "ops" ? (
                     <div className="space-y-4">
+                      <BaseResourceBar
+                        resources={state.resources}
+                        energy={state.resources?.ENERGY || 0}
+                        energyCap={derived.energyCap || 140}
+                        bankedMleo={state.bankedMleo || 0}
+                        compact
+                      />
                       <div
                         className={`rounded-3xl border p-4 transition ${
                           operationsReadyCount > 0
@@ -3543,6 +3655,13 @@ export default function MleoBase() {
 
                   {mobilePanel === "build" ? (
                     <div className="space-y-4">
+                      <BaseResourceBar
+                        resources={state.resources}
+                        energy={state.resources?.ENERGY || 0}
+                        energyCap={derived.energyCap || 140}
+                        bankedMleo={state.bankedMleo || 0}
+                        compact
+                      />
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                         <div className="flex items-center justify-between">
                           <div className="text-lg font-bold text-white">Development</div>
@@ -3577,6 +3696,13 @@ export default function MleoBase() {
 
                   {mobilePanel === "intel" ? (
                     <div className="space-y-4">
+                      <BaseResourceBar
+                        resources={state.resources}
+                        energy={state.resources?.ENERGY || 0}
+                        energyCap={derived.energyCap || 140}
+                        bankedMleo={state.bankedMleo || 0}
+                        compact
+                      />
                       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                         <div className="flex items-center justify-between">
                           <div className="text-lg font-bold text-white">Progress Summary</div>
