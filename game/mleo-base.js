@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useAccount } from "wagmi";
 import { useAccountModal, useConnectModal } from "@rainbow-me/rainbowkit";
@@ -2010,6 +2010,8 @@ export default function MleoBase() {
   const [claimedContracts, setClaimedContracts] = useState(() => loadJson("mleo_base_claimed_contracts_v1", {}));
   const [devTab, setDevTab] = useState("crew");
 
+  const mobilePanelScrollRef = useRef(null);
+
   const activeInfo = openInfoKey ? INFO_COPY[openInfoKey] : null;
   const shownInfo = activeInfo || buildInfo;
 
@@ -2025,6 +2027,33 @@ export default function MleoBase() {
     if (STRUCTURES_TAB_A.includes(target)) return "core";
     if (STRUCTURES_TAB_B.includes(target)) return "expansion";
     return null;
+  }
+
+  function centerTargetInMobilePanel(targetEl) {
+    const container = mobilePanelScrollRef.current;
+    if (!container || !targetEl) return false;
+
+    const containerRect = container.getBoundingClientRect();
+    const targetRect = targetEl.getBoundingClientRect();
+
+    const currentScrollTop = container.scrollTop;
+    const targetTopInsideContainer =
+      targetRect.top - containerRect.top + currentScrollTop;
+
+    const targetCenter =
+      targetTopInsideContainer + targetRect.height / 2;
+
+    const visibleCenter =
+      container.clientHeight / 2;
+
+    const nextScrollTop = Math.max(0, targetCenter - visibleCenter);
+
+    container.scrollTo({
+      top: nextScrollTop,
+      behavior: "smooth",
+    });
+
+    return true;
   }
 
   function handleInfoNextStep() {
@@ -2152,15 +2181,36 @@ export default function MleoBase() {
 
     setTimeout(() => {
       setHighlightTarget(step.target);
+
       const el = document.querySelector(`[data-base-target="${step.target}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      if (!el) return;
+
+      const isMobile =
+        typeof window !== "undefined" &&
+        window.matchMedia("(max-width: 639px)").matches;
+
+      if (isMobile) {
+        const centered = centerTargetInMobilePanel(el);
+
+        if (!centered) {
+          el.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "nearest",
+          });
+        }
+      } else {
+        el.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+          inline: "nearest",
+        });
       }
-    }, 260);
+    }, 320);
 
     setTimeout(() => {
       setHighlightTarget(null);
-    }, 3200);
+    }, 4200);
   }
 
   useEffect(() => {
@@ -7180,7 +7230,10 @@ export default function MleoBase() {
                   </div>
                 </div>
 
-                <div className="h-[calc(100%-73px)] overflow-y-auto px-4 py-4 pb-28">
+                <div
+                  ref={mobilePanelScrollRef}
+                  className="h-[calc(100%-73px)] overflow-y-auto px-4 py-4 pb-28"
+                >
                   {/* Ready Now Summary Block */}
                   {readyCounts.total > 0 && (
                     <div className="mb-4 rounded-2xl border border-cyan-400/40 bg-cyan-400/10 p-3">
