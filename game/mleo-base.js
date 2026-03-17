@@ -777,15 +777,19 @@ function canCoverCost(resources, cost) {
 function ResourceCostRow({ cost, resources }) {
   const entries = Object.entries(cost || {}).filter(([, value]) => Number(value || 0) > 0);
 
-  if (!entries.length) return null;
-
   return (
-    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold">
-      {entries.map(([key, value]) => (
-        <span key={key} className={costTone(resources?.[key], value)}>
-          {key} {formatResourceValue(value)}
-        </span>
-      ))}
+    <div className="mt-1.5 min-h-[34px] max-h-[34px] overflow-hidden">
+      {entries.length ? (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-semibold leading-4">
+          {entries.slice(0, 3).map(([key, value]) => (
+            <span key={key} className={costTone(resources?.[key], value)}>
+              {key} {formatResourceValue(value)}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div className="h-[34px]" />
+      )}
     </div>
   );
 }
@@ -3481,55 +3485,62 @@ export default function MleoBase() {
             <div
               key={building.key}
               data-base-target={building.key}
-              className={`flex min-h-[156px] flex-col rounded-xl border p-3 ${availabilityCardClass(ready)} ${
+              className={`flex h-[252px] flex-col rounded-xl border p-3 ${availabilityCardClass(ready)} ${
                 highlightTarget === building.key
                   ? "border-cyan-300/70 ring-2 ring-cyan-300/35 shadow-[0_0_0_1px_rgba(103,232,249,0.25)]"
                   : ""
               }`}
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="text-[15px] font-semibold leading-5 text-white">
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="line-clamp-1 h-[20px] text-[15px] font-semibold leading-5 text-white">
                     {building.name}
                   </div>
                 </div>
 
                 <div className="shrink-0 flex flex-col items-end gap-1">
-                  {ready ? <AvailabilityBadge /> : null}
+                  <div className="h-[28px] flex items-center justify-end">
+                    {ready ? <AvailabilityBadge /> : <div className="h-[28px]" />}
+                  </div>
+
                   <div className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/65">
                     Lv {level}
                   </div>
                 </div>
               </div>
 
-              <div className="mt-1 text-[11px] leading-[1.2rem] text-white/60 line-clamp-2">
+              <div className="mt-1 h-[38px] overflow-hidden text-[11px] leading-[1.2rem] text-white/60 line-clamp-2">
                 {building.desc}
               </div>
 
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                <div className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/70">
-                  {buildingRoleTag(building.key)}
-                </div>
-                <div className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-200">
-                  {buildingSynergyTag(building.key)}
+              <div className="mt-1.5 min-h-[24px] max-h-[24px] overflow-hidden">
+                <div className="flex flex-wrap gap-1.5">
+                  <div className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/70">
+                    {buildingRoleTag(building.key)}
+                  </div>
+                  <div className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-200">
+                    {buildingSynergyTag(building.key)}
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-2 inline-flex w-fit rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] text-white/65">
-                {sectorStatusForBuilding(building.key, state).toUpperCase()}
+              <div className="mt-2 h-[22px]">
+                <div className="inline-flex w-fit rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] text-white/65">
+                  {sectorStatusForBuilding(building.key, state).toUpperCase()}
+                </div>
               </div>
 
-              <div className="mt-1.5 text-[11px] font-medium text-cyan-200/85">
+              <div className="mt-1.5 h-[18px] text-[11px] font-medium text-cyan-200/85">
                 Next Lv {nextLevel}
               </div>
 
-              <div className="mt-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white/40">
+              <div className="mt-1 h-[14px] text-[10px] font-black uppercase tracking-[0.18em] text-white/40">
                 Cost
               </div>
 
               <ResourceCostRow cost={cost} resources={state.resources} />
 
-              <div className="mt-auto flex min-h-[34px] flex-col justify-end pt-2">
+              <div className="mt-auto pt-2">
                 <button
                   onClick={() => buyBuilding(building.key)}
                   disabled={!ready}
@@ -3542,15 +3553,9 @@ export default function MleoBase() {
                   {buttonText}
                 </button>
 
-                <div className="mt-1 text-center text-[10px] leading-4 text-white/45">
-                  {!isUnlocked && requirementsText ? (
-                    <>Requires: {requirementsText}</>
-                  ) : ready ? (
-                    <>Ready to upgrade</>
-                  ) : isUnlocked ? (
-                    <>Need more resources</>
-                  ) : null}
-                </div>
+              <div className="mt-1 h-[28px] overflow-hidden text-center text-[10px] leading-4 text-white/45">
+                <div className="line-clamp-2 opacity-0">placeholder</div>
+              </div>
               </div>
             </div>
           );
