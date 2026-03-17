@@ -259,7 +259,7 @@ DECLARE
   v_blueprint integer := 0;
 
   v_energy_cap numeric := 140;
-  v_energy_regen numeric := 2.6;
+  v_energy_regen numeric := 3.2;
   v_stability numeric := 100;
   v_stability_factor numeric := 1.0;
   v_worker_bonus numeric := 1.0;
@@ -486,7 +486,7 @@ BEGIN
   v_data_mult := v_data_mult * v_hq_bonus * v_stability_factor;
 
   v_energy_cap := 140 + (v_power * 24);
-  v_energy_regen := 2.6 + (v_power * 0.35);
+  v_energy_regen := 3.2 + (v_power * 0.75);
 
   IF public.base_jsonb_bool(v_research, 'coolant', false) THEN
     v_energy_cap := v_energy_cap + 15;
@@ -517,14 +517,13 @@ BEGIN
 
   v_energy_use :=
       (v_quarry * 1.1)
-    + (v_trade * 1.4)
-    + (v_salvage * 1.8)
-    + (v_refinery * 3.2)
+    + (v_trade * 1.2)
+    + (v_salvage * 1.5)
+    + (v_refinery * 2.6)
     + (v_miner * 0.6)
     + (v_arcade * 0.8)
-    + (v_expedition * 1.2)
     + (v_logistics * 0.7)
-    + (v_research_lab * 1.0)
+    + (v_research_lab * 0.8)
     + (v_repair * 0.8);
 
   IF v_energy_now < (v_energy_use * v_elapsed_seconds) THEN

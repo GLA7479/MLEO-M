@@ -59,7 +59,7 @@ const BUILDINGS = [
     desc: "Keeps the base liquid with steady Gold income.",
     baseCost: { GOLD: 100, ORE: 30 },
     growth: 1.2,
-    energyUse: 1.4,
+    energyUse: 1.2,
     outputs: { GOLD: 1.0 },
     requires: [{ key: "quarry", lvl: 1 }],
   },
@@ -69,7 +69,7 @@ const BUILDINGS = [
     desc: "Recovers Scrap for advanced systems.",
     baseCost: { GOLD: 150, ORE: 90 },
     growth: 1.22,
-    energyUse: 1.8,
+    energyUse: 1.5,
     outputs: { SCRAP: 0.8 },
     requires: [{ key: "quarry", lvl: 2 }],
   },
@@ -79,7 +79,7 @@ const BUILDINGS = [
     desc: "Converts Ore + Scrap into bankable MLEO.",
     baseCost: { GOLD: 280, ORE: 180, SCRAP: 35 },
     growth: 1.25,
-    energyUse: 3.2,
+    energyUse: 2.6,
     convert: { ORE: 1.8, SCRAP: 0.7, MLEO: 0.10 },
     requires: [
       { key: "salvage", lvl: 1 },
@@ -93,7 +93,7 @@ const BUILDINGS = [
     baseCost: { GOLD: 240, SCRAP: 45 },
     growth: 1.24,
     energyUse: 0,
-    power: { cap: 24, regen: 0.35 },
+    power: { cap: 24, regen: 0.75 },
     requires: [{ key: "tradeHub", lvl: 1 }],
   },
   {
@@ -122,7 +122,7 @@ const BUILDINGS = [
     desc: "Unlocks stronger expeditions and better loot tables.",
     baseCost: { GOLD: 500, ORE: 180, SCRAP: 85 },
     growth: 1.26,
-    energyUse: 1.2,
+    energyUse: 0,
     outputs: {},
     requires: [
       { key: "hq", lvl: 3 },
@@ -147,7 +147,7 @@ const BUILDINGS = [
     baseCost: { ORE: 180, GOLD: 240, SCRAP: 110 },
     growth: 1.75,
     maxLevel: 15,
-    energyUse: 1.0,
+    energyUse: 0.8,
     outputs: { DATA: 0.22 },
     requires: [{ key: "hq", lvl: 2 }, { key: "minerControl", lvl: 1 }],
   },
@@ -324,7 +324,7 @@ const CONFIG = {
   subtitle: "Command your MLEO base, connect Miners + Arcade, and grow your shared vault.",
   startingGold: 260,
   baseEnergyCap: 140,
-  baseEnergyRegen: 2.6,
+  baseEnergyRegen: 3.2,
   dailyShipCap: 12_000,
   expeditionCost: 36,
   expeditionCooldownMs: 120_000,
@@ -1175,7 +1175,7 @@ function derive(state, now = Date.now()) {
 
   return {
     energyCap: CONFIG.baseEnergyCap + powerLevel * 24 + (state.research.coolant ? 15 : 0),
-    energyRegen: CONFIG.baseEnergyRegen + powerLevel * 0.35 + (state.research.coolant ? 0.8 : 0),
+    energyRegen: CONFIG.baseEnergyRegen + powerLevel * 0.75 + (state.research.coolant ? 0.8 : 0),
     oreMult,
     goldMult,
     scrapMult,
@@ -1255,7 +1255,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
   });
 
   runBuilding("salvage", (level) => {
-    const energyNeed = 1.8 * level * dt;
+    const energyNeed = 1.5 * level * dt;
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.SCRAP += 0.8 * level * d.scrapMult * effective;
@@ -1276,7 +1276,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
   });
 
   runBuilding("researchLab", (level) => {
-    const energyNeed = 1.0 * level * dt;
+    const energyNeed = 0.8 * level * dt;
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.22 * level * d.dataMult * effective;
@@ -1297,7 +1297,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
   });
 
   runBuilding("refinery", (level) => {
-    const energyNeed = 3.2 * level * dt;
+    const energyNeed = 2.6 * level * dt;
     const oreNeed = 1.8 * level * effective;
     const scrapNeed = 0.7 * level * effective;
     if (next.resources.ENERGY < energyNeed) return;
@@ -1305,7 +1305,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
     next.resources.ENERGY -= energyNeed;
     next.resources.ORE -= oreNeed;
     next.resources.SCRAP -= scrapNeed;
-    next.bankedMleo += 0.12 * level * d.mleoMult * effective;
+    next.bankedMleo += 0.10 * level * d.mleoMult * effective;
   });
 
   const elapsedMinutes = dt / 60;
@@ -1626,7 +1626,7 @@ function getNextStep(state, derived, systemState, liveContracts = []) {
   if (energyCap > 0 && energy <= energyCap * 0.25) {
     return {
       title: "Recover energy reserves",
-      text: "Low energy is becoming a bottleneck. Refill energy or improve your power support.",
+      text: "Low energy is becoming a bottleneck. Power Cell improves max Energy and regen, but it does not instantly refill current Energy. Use Refill or wait for regeneration.",
     };
   }
 
