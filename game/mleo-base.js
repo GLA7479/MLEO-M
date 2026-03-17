@@ -1695,47 +1695,127 @@ const INFO_COPY = {
   sharedVault: {
     title: "Shared Vault",
     text:
-      "This is your main MLEO balance across the MLEO ecosystem. You grow it mainly by shipping refined MLEO out of BASE. Shared Vault MLEO can later support other systems across the platform.",
+      "Shared Vault is your main MLEO balance across the ecosystem.\n\n" +
+      "How to grow it:\n" +
+      "• Build and upgrade the Refinery so BASE can produce banked MLEO.\n" +
+      "• Keep your Ore and Scrap production strong, because the Refinery converts those into banked MLEO.\n" +
+      "• Use shipping actions to move MLEO out of BASE into the Shared Vault.\n" +
+      "• Improve export quality with Logistics Center, logistics research, and vault/ship modules.\n\n" +
+      "Best way to get more:\n" +
+      "Focus on a full chain: Quarry -> Salvage Yard -> Refinery -> Shipping. If one part is weak, Shared Vault growth slows down.",
   },
+
   bankedMleo: {
     title: "Base Banked",
     text:
-      "Banked MLEO is produced inside BASE by the Refinery. It is still inside BASE and is not yet in your Shared Vault. The loop is: produce resources -> refine into banked MLEO -> decide whether to reinvest or ship part of it.",
+      "Banked MLEO is produced inside BASE by the Refinery. It is still inside BASE until you ship it to the Shared Vault.\n\n" +
+      "How to grow it:\n" +
+      "• Build the Refinery.\n" +
+      "• Increase Ore from Quarry.\n" +
+      "• Increase Scrap from Salvage Yard.\n" +
+      "• Keep enough Energy available so production stays active.\n" +
+      "• Improve bank/refinery efficiency with modules and research.\n\n" +
+      "Best way to get more:\n" +
+      "Upgrade Quarry, Salvage Yard, and Refinery together. Ore + Scrap are the fuel for banked MLEO, so raising only the Refinery is not enough.",
   },
+
   commander: {
     title: "Commander Level",
     text:
-      "Commander Level reflects your long-term progression in BASE. You increase it by playing the system: upgrading structures, completing missions, launching expeditions, maintaining the base, and growing your infrastructure.",
+      "Commander Level reflects your long-term progression in BASE.\n\n" +
+      "How to level up faster:\n" +
+      "• Upgrade buildings.\n" +
+      "• Complete daily missions.\n" +
+      "• Launch expeditions.\n" +
+      "• Perform maintenance when needed.\n" +
+      "• Keep the whole base active and progressing.\n\n" +
+      "Best way to get more:\n" +
+      "Mission rewards and expedition activity help a lot. Research such as Arcade Ops also boosts commander XP gain.",
   },
+
   data: {
     title: "DATA",
     text:
-      "DATA is a strategic progression resource. You mainly gain it from advanced buildings such as Miner Control, Arcade Hub and Research Lab, and also from some expeditions, missions and support systems. It is used for advanced upgrades, overclocking, blueprint progression and research.",
+      "DATA is your strategic progression resource.\n\n" +
+      "Main ways to gain DATA:\n" +
+      "• Build and upgrade Miner Control.\n" +
+      "• Build and upgrade Arcade Hub.\n" +
+      "• Build and upgrade Logistics Center.\n" +
+      "• Build and upgrade Research Lab.\n" +
+      "• Launch expeditions.\n" +
+      "• Complete daily missions that reward DATA.\n" +
+      "• Trigger useful live events such as salvage-style recovery rewards.\n\n" +
+      "Best way to get more:\n" +
+      "Use Arcade Relay for +10% DATA gain, upgrade Research Lab, and unlock research like Deep Scan and Token Discipline. These are the strongest ways to turn DATA into a real progression engine.",
   },
+
   energy: {
     title: "Energy",
     text:
-      "Energy powers the base. It regenerates automatically over time, and its cap and regeneration improve through systems like Power Cell and research. Energy is consumed by production, expeditions and active support actions.",
+      "Energy powers the whole base.\n\n" +
+      "How to get more Energy:\n" +
+      "• Wait for passive regeneration.\n" +
+      "• Build and upgrade Power Cell to increase cap and regeneration.\n" +
+      "• Unlock energy research such as Coolant Loops.\n" +
+      "• Avoid wasting energy on weak timing.\n\n" +
+      "How to protect Energy:\n" +
+      "• Many production systems and expeditions consume it.\n" +
+      "• If you expand too fast without improving Power Cell and research, Energy becomes your bottleneck.\n\n" +
+      "Best way to get more:\n" +
+      "Upgrade Power Cell early, then add energy-related research before pushing heavy production and expeditions.",
   },
+
   stability: {
     title: "Stability",
     text:
-      "Stability shows how healthy and efficient your base is. Maintenance, repair systems and safer decisions help keep it high. If stability drops too much, the base becomes weaker and less efficient.",
+      "Stability shows how healthy and efficient your base is.\n\n" +
+      "How to keep Stability high:\n" +
+      "• Perform maintenance regularly.\n" +
+      "• Build and improve Repair Bay.\n" +
+      "• Choose safer event options when the base is under pressure.\n" +
+      "• Avoid pushing risky output when your systems are already stressed.\n\n" +
+      "Best way to improve it:\n" +
+      "Maintenance is the immediate fix. Repair Bay and Predictive Maintenance research help in the long run by reducing pressure and slowing decay.",
   },
+
   ore: {
     title: "ORE",
     text:
-      "ORE is a core raw resource. It is mainly produced by the Quarry and improved by multipliers, modules, commander choices and research. ORE is used for structures, upgrades, research and refinery conversion.",
+      "ORE is one of the main raw resources in BASE.\n\n" +
+      "How to gain more ORE:\n" +
+      "• Build and upgrade Quarry.\n" +
+      "• Keep enough Energy available because Quarry turns energy into Ore.\n" +
+      "• Install Servo Drill for extra Ore output.\n" +
+      "• Use Miner Link for more Ore and better refinery support.\n" +
+      "• Unlock Miner Sync research for more Ore output.\n\n" +
+      "Best way to get more:\n" +
+      "Upgrade Quarry steadily, then stack Ore multipliers from modules and research. Ore is also needed for structures, research and refinery conversion, so strong Ore production supports almost the entire base.",
   },
+
   gold: {
     title: "GOLD",
     text:
-      "GOLD is a core economy resource. It is mainly generated by the Trade Hub, missions, contracts and some expeditions. GOLD is needed for structures, crew, upgrades and many progression systems.",
+      "GOLD is the main economy resource in BASE.\n\n" +
+      "How to gain more GOLD:\n" +
+      "• Build and upgrade Trade Hub.\n" +
+      "• Complete daily missions that reward GOLD.\n" +
+      "• Launch expeditions.\n" +
+      "• Use events and support actions that grant economy rewards.\n\n" +
+      "Best way to get more:\n" +
+      "Keep Trade Hub scaling with your base and do missions consistently. GOLD is needed for many buildings, modules, crew and upgrades, so weak GOLD production slows everything else.",
   },
+
   scrap: {
     title: "SCRAP",
     text:
-      "SCRAP is an advanced support resource. It is mainly recovered through the Salvage Yard, expeditions, missions and some event rewards. SCRAP is used for advanced buildings, maintenance, modules and refinery systems.",
+      "SCRAP is an advanced support resource.\n\n" +
+      "How to gain more SCRAP:\n" +
+      "• Build and upgrade Salvage Yard.\n" +
+      "• Run expeditions.\n" +
+      "• Complete daily missions that reward SCRAP.\n" +
+      "• Use salvage-related live events when they appear.\n\n" +
+      "Best way to get more:\n" +
+      "A stronger Salvage Yard plus regular expeditions is the safest long-term source. SCRAP is critical for advanced buildings, research, maintenance and refinery systems.",
   },
 };
 
@@ -3588,7 +3668,7 @@ export default function MleoBase() {
               onClick={() => setOpenInfoKey(null)}
             >
               <div
-                className="relative w-full max-w-md rounded-[28px] border border-cyan-400/20 bg-[linear-gradient(180deg,rgba(6,12,24,0.98)_0%,rgba(4,10,20,0.98)_100%)] px-6 py-5 shadow-[0_24px_90px_rgba(0,0,0,0.65),0_0_0_1px_rgba(34,211,238,0.05)]"
+                className="w-full max-w-md max-h-[78vh] overflow-y-auto rounded-3xl border border-cyan-400/20 bg-slate-950/95 p-5 shadow-[0_20px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/35 to-transparent" />
@@ -3614,7 +3694,9 @@ export default function MleoBase() {
                 </div>
 
                 <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4">
-                  <p className="text-[15px] leading-7 text-white/82">{activeInfo.text}</p>
+                  <p className="whitespace-pre-line text-[15px] leading-7 text-white/82">
+                    {activeInfo.text}
+                  </p>
                 </div>
 
                 <div className="mt-4 flex justify-end">
