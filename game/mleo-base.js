@@ -3771,49 +3771,45 @@ export default function MleoBase() {
                   </button>
                 </div>
 
-                <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4">
-                  <p className="whitespace-pre-line text-[15px] leading-7 text-white/82">
+                <div className="mt-4 rounded-2xl border border-white/12 bg-white/[0.025] p-5">
+                  <div className="whitespace-pre-line text-sm leading-7 text-white/80">
                     {activeInfo.text}
-                  </p>
-                </div>
-
-                {activeInfo?.tips ? (
-                  <div className="mt-4 rounded-2xl border border-cyan-400/15 bg-white/[0.03] p-4">
-                    <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-cyan-200/70">
-                      Best focus
-                    </div>
-
-                    <div className="mt-3 grid gap-2 text-sm text-white/85">
-                      <div>
-                        <span className="font-semibold text-white">Best building:</span>{" "}
-                        {activeInfo.tips.building}
-                      </div>
-                      <div>
-                        <span className="font-semibold text-white">Best research:</span>{" "}
-                        {activeInfo.tips.research}
-                      </div>
-                      <div>
-                        <span className="font-semibold text-white">Best module:</span>{" "}
-                        {activeInfo.tips.module}
-                      </div>
-                    </div>
-
-                    <div className="mt-4">
-                      <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-cyan-200/70">
-                        Quick actions
-                      </div>
-
-                      <ul className="mt-2 space-y-2 text-sm leading-6 text-white/80">
-                        {activeInfo.tips.actions.map((item) => (
-                          <li key={item} className="flex gap-2">
-                            <span className="mt-[6px] h-1.5 w-1.5 rounded-full bg-cyan-300" />
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
                   </div>
-                ) : null}
+
+                  {activeInfo?.tips ? (
+                    <div className="mt-4 border-t border-white/10 pt-4">
+                      <div className="grid gap-2 text-sm text-white/78">
+                        <div>
+                          <span className="font-semibold text-white">Best building:</span>{" "}
+                          {activeInfo.tips.building}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-white">Best research:</span>{" "}
+                          {activeInfo.tips.research}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-white">Best module:</span>{" "}
+                          {activeInfo.tips.module}
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-200/70">
+                          Quick actions
+                        </div>
+
+                        <ul className="mt-2 space-y-1.5 text-sm leading-6 text-white/78">
+                          {activeInfo.tips.actions.map((item) => (
+                            <li key={item} className="flex gap-2">
+                              <span className="mt-[8px] h-1.5 w-1.5 rounded-full bg-cyan-300/90" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
 
                 <div className="mt-4 flex justify-end">
                   <button
