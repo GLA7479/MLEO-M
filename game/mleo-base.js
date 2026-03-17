@@ -720,18 +720,37 @@ function getAlerts(state, derived, systemState, liveContracts = []) {
 }
 
 function alertToneClasses(tone) {
-  if (tone === "critical") return "border-rose-500/35 bg-rose-500/12 text-rose-200";
-  if (tone === "warning") return "border-amber-500/35 bg-amber-500/12 text-amber-200";
-  if (tone === "success") return "border-emerald-500/35 bg-emerald-500/12 text-emerald-200";
-  return "border-sky-500/35 bg-sky-500/12 text-sky-200";
+  if (tone === "critical") {
+    return "border-white/10 bg-white/[0.04] text-rose-200 shadow-[inset_0_0_0_1px_rgba(244,63,94,0.28)]";
+  }
+
+  if (tone === "warning") {
+    return "border-white/10 bg-white/[0.04] text-amber-200 shadow-[inset_0_0_0_1px_rgba(250,204,21,0.24)]";
+  }
+
+  if (tone === "success") {
+    return "border-white/10 bg-white/[0.04] text-emerald-200 shadow-[inset_0_0_0_1px_rgba(52,211,153,0.24)]";
+  }
+
+  return "border-white/10 bg-white/[0.04] text-sky-200 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.22)]";
 }
 
 function highlightCard(condition, mode = "info") {
   if (!condition) return "";
-  if (mode === "critical") return "ring-2 ring-rose-400/40 shadow-[0_0_0_1px_rgba(251,113,133,0.15)]";
-  if (mode === "warning") return "ring-2 ring-amber-400/35 shadow-[0_0_0_1px_rgba(251,191,36,0.12)]";
-  if (mode === "success") return "ring-2 ring-emerald-400/35 shadow-[0_0_0_1px_rgba(52,211,153,0.12)]";
-  return "ring-2 ring-cyan-400/30 shadow-[0_0_0_1px_rgba(34,211,238,0.12)]";
+
+  if (mode === "critical") {
+    return "border-white/10 bg-white/[0.03] shadow-[inset_0_0_0_1px_rgba(244,63,94,0.30),0_0_18px_rgba(244,63,94,0.08)]";
+  }
+
+  if (mode === "warning") {
+    return "border-white/10 bg-white/[0.03] shadow-[inset_0_0_0_1px_rgba(250,204,21,0.28),0_0_16px_rgba(250,204,21,0.07)]";
+  }
+
+  if (mode === "success") {
+    return "border-white/10 bg-white/[0.03] shadow-[inset_0_0_0_1px_rgba(52,211,153,0.26),0_0_16px_rgba(52,211,153,0.07)]";
+  }
+
+  return "border-white/10 bg-white/[0.03] shadow-[inset_0_0_0_1px_rgba(34,211,238,0.24),0_0_16px_rgba(34,211,238,0.07)]";
 }
 
 function clamp(n, min, max) {
@@ -6144,17 +6163,17 @@ export default function MleoBase() {
               />
             </div>
 
-            <div
-              className={`h-full w-full ${highlightCard(
-                (state.resources.ENERGY || 0) <= derived.energyCap * 0.25,
-                "warning"
-              )}`}
-            >
-              <div className="relative">
+            <div className="h-full w-full">
+              <div className="relative overflow-hidden rounded-2xl">
+                {(state.resources.ENERGY || 0) <= derived.energyCap * 0.25 && (
+                  <div className="absolute inset-x-0 top-0 z-10 h-[2px] bg-amber-300/85" />
+                )}
+
                 <InfoButton
                   infoKey="energy"
                   setOpenInfoKey={setOpenInfoKey}
                 />
+
                 <MetricCard
                   label="Energy"
                   value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
@@ -6164,17 +6183,21 @@ export default function MleoBase() {
               </div>
             </div>
 
-            <div
-              className={`h-full w-full ${
-                highlightCard(systemState === "critical", "critical") ||
-                highlightCard(systemState === "warning", "warning")
-              }`}
-            >
-              <div className="relative">
+            <div className="h-full w-full">
+              <div className="relative overflow-hidden rounded-2xl">
+                {systemState === "critical" && (
+                  <div className="absolute inset-x-0 top-0 z-10 h-[2px] bg-rose-400/90" />
+                )}
+
+                {systemState === "warning" && (
+                  <div className="absolute inset-x-0 top-0 z-10 h-[2px] bg-amber-300/85" />
+                )}
+
                 <InfoButton
                   infoKey="stability"
                   setOpenInfoKey={setOpenInfoKey}
                 />
+
                 <MetricCard
                   label="Stability"
                   value={`${fmt(state.stability)}%`}
@@ -7152,12 +7175,17 @@ export default function MleoBase() {
                 />
               </div>
 
-              <div className={`w-full ${highlightCard((state.resources.ENERGY || 0) <= derived.energyCap * 0.25, "warning")}`}>
-                <div className="relative">
+              <div className="w-full">
+                <div className="relative overflow-hidden rounded-2xl">
+                  {(state.resources.ENERGY || 0) <= derived.energyCap * 0.25 && (
+                    <div className="absolute inset-x-0 top-0 z-10 h-[2px] bg-amber-300/85" />
+                  )}
+
                   <InfoButton
                     infoKey="energy"
                     setOpenInfoKey={setOpenInfoKey}
                   />
+
                   <MetricCard
                     label="Energy"
                     value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
@@ -7168,12 +7196,21 @@ export default function MleoBase() {
                 </div>
             </div>
 
-              <div className={`w-full ${highlightCard(systemState === "critical", "critical") || highlightCard(systemState === "warning", "warning")}`}>
-                <div className="relative">
+              <div className="w-full">
+                <div className="relative overflow-hidden rounded-2xl">
+                  {systemState === "critical" && (
+                    <div className="absolute inset-x-0 top-0 z-10 h-[2px] bg-rose-400/90" />
+                  )}
+
+                  {systemState === "warning" && (
+                    <div className="absolute inset-x-0 top-0 z-10 h-[2px] bg-amber-300/85" />
+                  )}
+
                   <InfoButton
                     infoKey="stability"
                     setOpenInfoKey={setOpenInfoKey}
                   />
+
                   <MetricCard
                     label="Stability"
                     value={`${fmt(state.stability)}%`}
