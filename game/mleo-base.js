@@ -1989,18 +1989,9 @@ export default function MleoBase() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState(null);
   const [showReadyPanel, setShowReadyPanel] = useState(false);
-  
-  // Mobile internal panels state (all closed by default)
-  const [mobileOverviewRecommendationOpen, setMobileOverviewRecommendationOpen] = useState(true);
-  const [mobileOverviewIdentityOpen, setMobileOverviewIdentityOpen] = useState(true);
-  const [mobileLiveContractsOpen, setMobileLiveContractsOpen] = useState(false);
-  const [mobileOperationsConsoleOpen, setMobileOperationsConsoleOpen] = useState(false);
-  const [mobileDailyMissionsOpen, setMobileDailyMissionsOpen] = useState(false);
-  const [mobileDevelopmentOpen, setMobileDevelopmentOpen] = useState(false);
-  const [mobileBaseStructuresOpen, setMobileBaseStructuresOpen] = useState(false);
-  const [mobileBuildSupportOpen, setMobileBuildSupportOpen] = useState(false);
-  const [mobileProgressSummaryOpen, setMobileProgressSummaryOpen] = useState(false);
-  const [mobileActivityLogOpen, setMobileActivityLogOpen] = useState(false);
+
+  // One open inner panel at a time (mobile)
+  const [openInnerPanel, setOpenInnerPanel] = useState(null);
   const [structuresTab, setStructuresTab] = useState("core");
 
   const [activeEvent, setActiveEvent] = useState(null);
@@ -2014,6 +2005,10 @@ export default function MleoBase() {
   const [devTab, setDevTab] = useState("crew");
 
   const activeInfo = openInfoKey ? INFO_COPY[openInfoKey] : null;
+
+  function toggleInnerPanel(panelKey) {
+    setOpenInnerPanel((current) => (current === panelKey ? null : panelKey));
+  }
 
   function handleInfoNextStep() {
     if (!activeInfo?.nextStep) return;
@@ -2030,13 +2025,11 @@ export default function MleoBase() {
         openMobilePanel(tabKey);
 
         if (step.target === "shipping" || step.target === "maintenance") {
-          setMobileOperationsConsoleOpen(true);
-          setMobileDailyMissionsOpen(false);
+          setOpenInnerPanel("ops-console");
         } else if (step.target === "missions") {
-          setMobileDailyMissionsOpen(true);
-          setMobileOperationsConsoleOpen(false);
+          setOpenInnerPanel("ops-missions");
         } else if (tabKey === "build") {
-          setMobileBaseStructuresOpen(true);
+          setOpenInnerPanel("build-structures");
         }
       }
     } catch {
@@ -3590,10 +3583,12 @@ export default function MleoBase() {
   };
 
   const openMobilePanel = (panel) => {
+    setOpenInnerPanel(null);
     setMobilePanel(panel);
   };
 
   const closeMobilePanel = () => {
+    setOpenInnerPanel(null);
     setMobilePanel(null);
   };
 
@@ -4187,10 +4182,8 @@ export default function MleoBase() {
                         {readyCounts.missions > 0 && (
                           <button
                             onClick={() => {
-                              setMobilePanel("ops");
-                              setMobileOperationsConsoleOpen(false);
-                              setMobileLiveContractsOpen(false);
-                              setMobileDailyMissionsOpen(true);
+                              openMobilePanel("ops");
+                              setOpenInnerPanel("ops-missions");
                             }}
                             className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
                           >
@@ -4210,10 +4203,8 @@ export default function MleoBase() {
                         {readyCounts.contracts > 0 && (
                           <button
                             onClick={() => {
-                              setMobilePanel("overview");
-                              setMobileOperationsConsoleOpen(false);
-                              setMobileDailyMissionsOpen(false);
-                              setMobileLiveContractsOpen(true);
+                              openMobilePanel("overview");
+                              setOpenInnerPanel("overview-contracts");
                             }}
                             className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
                           >
@@ -4233,10 +4224,8 @@ export default function MleoBase() {
                         {readyCounts.expedition > 0 && (
                           <button
                             onClick={() => {
-                              setMobilePanel("ops");
-                              setMobileDailyMissionsOpen(false);
-                              setMobileLiveContractsOpen(false);
-                              setMobileOperationsConsoleOpen(true);
+                              openMobilePanel("ops");
+                              setOpenInnerPanel("ops-console");
                             }}
                             className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
                           >
@@ -4254,10 +4243,8 @@ export default function MleoBase() {
                         {readyCounts.shipment > 0 && (
                           <button
                             onClick={() => {
-                              setMobilePanel("ops");
-                              setMobileDailyMissionsOpen(false);
-                              setMobileLiveContractsOpen(false);
-                              setMobileOperationsConsoleOpen(true);
+                              openMobilePanel("ops");
+                              setOpenInnerPanel("ops-console");
                             }}
                             className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
                           >
@@ -4294,20 +4281,20 @@ export default function MleoBase() {
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <div className="text-lg font-bold text-white">Next Recommended Step</div>
-                            {!mobileOverviewRecommendationOpen ? (
+                            {openInnerPanel !== "overview-recommendation" ? (
                               <div className="mt-1 text-sm text-white/60">
                                 Suggested next action for your base
                               </div>
                             ) : null}
                           </div>
                           <button
-                            onClick={() => setMobileOverviewRecommendationOpen(!mobileOverviewRecommendationOpen)}
+                            onClick={() => toggleInnerPanel("overview-recommendation")}
                             className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
-                            {mobileOverviewRecommendationOpen ? "CLOSE" : "OPEN"}
+                            {openInnerPanel === "overview-recommendation" ? "CLOSE" : "OPEN"}
                           </button>
                         </div>
-                        {mobileOverviewRecommendationOpen && (
+                        {openInnerPanel === "overview-recommendation" && (
                           <div className="mt-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
                             <div className="text-base font-bold text-white">{nextStep.title}</div>
                             <div className="mt-1 text-sm text-white/70">{nextStep.text}</div>
@@ -4348,20 +4335,20 @@ export default function MleoBase() {
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <div className="text-lg font-bold text-white">Command Identity</div>
-                            {!mobileOverviewIdentityOpen ? (
+                            {openInnerPanel !== "overview-identity" ? (
                               <div className="mt-1 text-sm text-white/60">
                                 Current crew role and commander path
                               </div>
                             ) : null}
                           </div>
                           <button
-                            onClick={() => setMobileOverviewIdentityOpen(!mobileOverviewIdentityOpen)}
+                            onClick={() => toggleInnerPanel("overview-identity")}
                             className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
-                            {mobileOverviewIdentityOpen ? "CLOSE" : "OPEN"}
+                            {openInnerPanel === "overview-identity" ? "CLOSE" : "OPEN"}
                           </button>
                         </div>
-                        {mobileOverviewIdentityOpen && (
+                        {openInnerPanel === "overview-identity" && (
                           <div className="mt-3 grid gap-3">
                             <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
                               <div className="text-sm font-semibold text-white">{crewRoleInfo.name}</div>
@@ -4386,7 +4373,7 @@ export default function MleoBase() {
                               <div className="text-lg font-bold text-white">Live Contracts</div>
                               <SectionAvailabilityBadge count={liveContractsAvailableCount} />
                             </div>
-                            {!mobileLiveContractsOpen ? (
+                            {openInnerPanel !== "overview-contracts" ? (
                               <div className="mt-1 text-sm text-white/60">
                                 {liveContractsAvailableCount > 0
                                   ? `${liveContractsAvailableCount} contract reward${liveContractsAvailableCount > 1 ? "s" : ""} ready`
@@ -4395,13 +4382,13 @@ export default function MleoBase() {
                             ) : null}
                           </div>
                           <button
-                            onClick={() => setMobileLiveContractsOpen(!mobileLiveContractsOpen)}
+                            onClick={() => toggleInnerPanel("overview-contracts")}
                             className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
-                            {mobileLiveContractsOpen ? "CLOSE" : "OPEN"}
+                            {openInnerPanel === "overview-contracts" ? "CLOSE" : "OPEN"}
                           </button>
                         </div>
-                        {mobileLiveContractsOpen && (
+                        {openInnerPanel === "overview-contracts" && (
                           <div className="mt-3 grid gap-2">
                             {[...liveContracts].sort((a, b) => {
                               const aReady = a.done && !a.claimed ? 1 : 0;
@@ -4452,7 +4439,7 @@ export default function MleoBase() {
                               <div className="text-lg font-bold text-white">Operations Console</div>
                               <SectionAvailabilityBadge count={operationsConsoleAvailableCount} />
                             </div>
-                            {!mobileOperationsConsoleOpen ? (
+                            {openInnerPanel !== "ops-console" ? (
                               <div className="mt-1 text-sm text-white/60">
                                 {sectionStatusHint("operations-console", {
                                   expedition: canExpeditionNow,
@@ -4464,13 +4451,13 @@ export default function MleoBase() {
                             ) : null}
                           </div>
                           <button
-                            onClick={() => setMobileOperationsConsoleOpen(!mobileOperationsConsoleOpen)}
+                            onClick={() => toggleInnerPanel("ops-console")}
                             className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
-                            {mobileOperationsConsoleOpen ? "CLOSE" : "OPEN"}
+                            {openInnerPanel === "ops-console" ? "CLOSE" : "OPEN"}
                           </button>
                         </div>
-                        {mobileOperationsConsoleOpen && (
+                        {openInnerPanel === "ops-console" && (
                           <div className="mt-3 grid gap-3">
                             <button
                               onClick={handleLaunchExpedition}
@@ -4508,7 +4495,7 @@ export default function MleoBase() {
                               <div className="text-lg font-bold text-white">Daily Missions</div>
                               <SectionAvailabilityBadge count={dailyMissionsAvailableCount} />
                             </div>
-                            {!mobileDailyMissionsOpen ? (
+                            {openInnerPanel !== "ops-missions" ? (
                               <div className="mt-1 text-sm text-white/60">
                                 {sectionStatusHint("daily-missions", {
                                   count: dailyMissionsAvailableCount,
@@ -4517,13 +4504,13 @@ export default function MleoBase() {
                             ) : null}
                           </div>
                           <button
-                            onClick={() => setMobileDailyMissionsOpen(!mobileDailyMissionsOpen)}
+                            onClick={() => toggleInnerPanel("ops-missions")}
                             className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
-                            {mobileDailyMissionsOpen ? "CLOSE" : "OPEN"}
+                            {openInnerPanel === "ops-missions" ? "CLOSE" : "OPEN"}
                           </button>
                         </div>
-                        {mobileDailyMissionsOpen && (
+                        {openInnerPanel === "ops-missions" && (
                           <div className="mt-3">{dailyMissionsContent}</div>
                         )}
                       </div>
@@ -4551,7 +4538,7 @@ export default function MleoBase() {
                               <div className="text-lg font-bold text-white">Development</div>
                               <SectionAvailabilityBadge count={developmentAvailableCount} />
                             </div>
-                            {!mobileDevelopmentOpen ? (
+                            {openInnerPanel !== "build-development" ? (
                               <div className="mt-1 text-sm text-white/60">
                                 {buildSectionHint("development", {
                                   modules: availableModulesCount,
@@ -4561,13 +4548,13 @@ export default function MleoBase() {
                             ) : null}
                           </div>
                           <button
-                            onClick={() => setMobileDevelopmentOpen(!mobileDevelopmentOpen)}
+                            onClick={() => toggleInnerPanel("build-development")}
                             className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
-                            {mobileDevelopmentOpen ? "CLOSE" : "OPEN"}
+                            {openInnerPanel === "build-development" ? "CLOSE" : "OPEN"}
                           </button>
                         </div>
-                        {mobileDevelopmentOpen && (
+                        {openInnerPanel === "build-development" && (
                           <div className="mt-3">{crewModulesResearchContent}</div>
                         )}
                       </div>
@@ -4583,7 +4570,7 @@ export default function MleoBase() {
                               <div className="text-lg font-bold text-white">Base Structures</div>
                               <SectionAvailabilityBadge count={structuresAvailableCount} />
                             </div>
-                            {!mobileBaseStructuresOpen ? (
+                            {openInnerPanel !== "build-structures" ? (
                               <div className="mt-1 text-sm text-white/60">
                                 {buildSectionHint("structures", {
                                   structures: availableStructuresCount,
@@ -4592,13 +4579,13 @@ export default function MleoBase() {
                             ) : null}
                           </div>
                           <button
-                            onClick={() => setMobileBaseStructuresOpen(!mobileBaseStructuresOpen)}
+                            onClick={() => toggleInnerPanel("build-structures")}
                             className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
-                            {mobileBaseStructuresOpen ? "CLOSE" : "OPEN"}
+                            {openInnerPanel === "build-structures" ? "CLOSE" : "OPEN"}
                           </button>
                         </div>
-                        {mobileBaseStructuresOpen && (
+                        {openInnerPanel === "build-structures" && (
                           <div className="mt-3">{baseStructuresContent}</div>
                         )}
                       </div>
@@ -4614,7 +4601,7 @@ export default function MleoBase() {
                               <div className="text-lg font-bold text-white">Support Systems</div>
                               <SectionAvailabilityBadge count={supportAvailableCount} />
                             </div>
-                            {!mobileBuildSupportOpen ? (
+                            {openInnerPanel !== "build-support" ? (
                               <div className="mt-1 text-sm text-white/60">
                                 {buildSectionHint("support", {
                                   support: availableBlueprintCount,
@@ -4623,13 +4610,13 @@ export default function MleoBase() {
                             ) : null}
                           </div>
                           <button
-                            onClick={() => setMobileBuildSupportOpen(!mobileBuildSupportOpen)}
+                            onClick={() => toggleInnerPanel("build-support")}
                             className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
-                            {mobileBuildSupportOpen ? "CLOSE" : "OPEN"}
+                            {openInnerPanel === "build-support" ? "CLOSE" : "OPEN"}
                           </button>
                         </div>
-                        {mobileBuildSupportOpen ? (
+                        {openInnerPanel === "build-support" ? (
                           <div className="mt-3">{buildSupportSystemsContent}</div>
                         ) : null}
                       </div>
@@ -4654,20 +4641,20 @@ export default function MleoBase() {
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <div className="text-lg font-bold text-white">Progress Summary</div>
-                            {!mobileProgressSummaryOpen ? (
+                            {openInnerPanel !== "intel-summary" ? (
                               <div className="mt-1 text-sm text-white/60">
                                 Key progress and identity data
                               </div>
                             ) : null}
                           </div>
                           <button
-                            onClick={() => setMobileProgressSummaryOpen(!mobileProgressSummaryOpen)}
+                            onClick={() => toggleInnerPanel("intel-summary")}
                             className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
-                            {mobileProgressSummaryOpen ? "CLOSE" : "OPEN"}
+                            {openInnerPanel === "intel-summary" ? "CLOSE" : "OPEN"}
                           </button>
                         </div>
-                        {mobileProgressSummaryOpen && (
+                        {openInnerPanel === "intel-summary" && (
                           <div className="mt-3">{progressSummaryContent}</div>
                         )}
                       </div>
@@ -4680,20 +4667,20 @@ export default function MleoBase() {
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <div className="text-lg font-bold text-white">Activity Log</div>
-                            {!mobileActivityLogOpen ? (
+                            {openInnerPanel !== "intel-log" ? (
                               <div className="mt-1 text-sm text-white/60">
                                 Recent events and milestones
                               </div>
                             ) : null}
                           </div>
                           <button
-                            onClick={() => setMobileActivityLogOpen(!mobileActivityLogOpen)}
+                            onClick={() => toggleInnerPanel("intel-log")}
                             className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
-                            {mobileActivityLogOpen ? "CLOSE" : "OPEN"}
+                            {openInnerPanel === "intel-log" ? "CLOSE" : "OPEN"}
                           </button>
                         </div>
-                        {mobileActivityLogOpen && (
+                        {openInnerPanel === "intel-log" && (
                           <div className="mt-3">{activityLogContent}</div>
                         )}
                       </div>
@@ -4824,20 +4811,14 @@ export default function MleoBase() {
                           setShowReadyPanel(false);
 
                           if (item.key === "expedition" || item.key === "shipment") {
-                            setMobilePanel("ops");
-                            setMobileDailyMissionsOpen(false);
-                            setMobileLiveContractsOpen(false);
-                            setMobileOperationsConsoleOpen(true);
+                            openMobilePanel("ops");
+                            setOpenInnerPanel("ops-console");
                           } else if (item.key === "contracts") {
-                            setMobilePanel("overview");
-                            setMobileOperationsConsoleOpen(false);
-                            setMobileDailyMissionsOpen(false);
-                            setMobileLiveContractsOpen(true);
+                            openMobilePanel("overview");
+                            setOpenInnerPanel("overview-contracts");
                           } else if (item.key === "missions") {
-                            setMobilePanel("ops");
-                            setMobileOperationsConsoleOpen(false);
-                            setMobileLiveContractsOpen(false);
-                            setMobileDailyMissionsOpen(true);
+                            openMobilePanel("ops");
+                            setOpenInnerPanel("ops-missions");
                           }
                         }}
                         className="block w-full rounded-2xl border border-white/10 bg-black/20 p-3 text-left hover:bg-white/10"
