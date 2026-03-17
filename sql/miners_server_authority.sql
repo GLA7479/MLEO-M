@@ -150,8 +150,8 @@ BEGIN
   FOR v_row IN
     SELECT x FROM jsonb_array_elements(coalesce(v_cfg, '[]'::jsonb)) AS x
   LOOP
-    IF v_ratio <= coalesce((v_row->>'upto')::numeric, 999999) THEN
-      v_result := coalesce((v_row->>'factor')::numeric, 1);
+    IF v_ratio <= coalesce((v_row.x->>'upto')::numeric, 999999) THEN
+      v_result := coalesce((v_row.x->>'factor')::numeric, 1);
       RETURN greatest(0, v_result);
     END IF;
   END LOOP;

@@ -85,8 +85,8 @@ BEGIN
   IF v_ship_cap > 0 THEN
     FOR v_step IN SELECT * FROM jsonb_array_elements(v_softcut_steps)
     LOOP
-      IF (v_sent_today::numeric / v_ship_cap::numeric) <= (v_step->>'upto')::numeric THEN
-        v_factor := (v_step->>'factor')::numeric;
+      IF (v_sent_today::numeric / v_ship_cap::numeric) <= (v_step.value->>'upto')::numeric THEN
+        v_factor := (v_step.value->>'factor')::numeric;
         EXIT;
       END IF;
     END LOOP;
