@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAccount } from "wagmi";
 import { useAccountModal, useConnectModal } from "@rainbow-me/rainbowkit";
@@ -1739,44 +1739,22 @@ const INFO_COPY = {
   },
 };
 
-function InfoButton({ infoKey, openInfoKey, setOpenInfoKey }) {
-  const isOpen = openInfoKey === infoKey;
+function InfoButton({ infoKey, setOpenInfoKey }) {
   const info = INFO_COPY[infoKey];
-
   if (!info) return null;
 
   return (
-    <div className="absolute right-3 top-3 z-30">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpenInfoKey(isOpen ? null : infoKey);
-        }}
-        className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/30 bg-black/30 text-xs font-bold text-cyan-200 backdrop-blur-sm transition hover:bg-cyan-500/20"
-        aria-label={`About ${info.title}`}
-      >
-        i
-      </button>
-
-      {isOpen ? (
-        <div
-          className="absolute right-0 mt-2 w-[min(18rem,78vw)] rounded-2xl border border-cyan-400/20 bg-slate-950/95 p-3 shadow-[0_10px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="mb-1 text-sm font-bold text-white">{info.title}</div>
-          <div className="text-xs leading-5 text-white/75">{info.text}</div>
-
-          <button
-            type="button"
-            onClick={() => setOpenInfoKey(null)}
-            className="mt-3 rounded-lg border border-white/10 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/85 transition hover:bg-white/20"
-          >
-            Close
-          </button>
-        </div>
-      ) : null}
-    </div>
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        setOpenInfoKey(infoKey);
+      }}
+      className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-cyan-400/30 bg-slate-950/55 text-sm font-black text-cyan-200 shadow-[0_0_18px_rgba(34,211,238,0.08)] backdrop-blur-md transition hover:scale-105 hover:bg-cyan-500/18"
+      aria-label={`About ${info.title}`}
+    >
+      i
+    </button>
   );
 }
 
@@ -1791,7 +1769,6 @@ export default function MleoBase() {
   const [toast, setToast] = useState("");
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [openInfoKey, setOpenInfoKey] = useState(null);
-  const infoLayerRef = useRef(null);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState(null);
@@ -1820,14 +1797,7 @@ export default function MleoBase() {
   const [claimedContracts, setClaimedContracts] = useState(() => loadJson("mleo_base_claimed_contracts_v1", {}));
   const [devTab, setDevTab] = useState("crew");
 
-  useEffect(() => {
-    const handleWindowClick = () => {
-      setOpenInfoKey(null);
-    };
-
-    window.addEventListener("click", handleWindowClick);
-    return () => window.removeEventListener("click", handleWindowClick);
-  }, []);
+  const activeInfo = openInfoKey ? INFO_COPY[openInfoKey] : null;
 
   useEffect(() => {
     let alive = true;
@@ -3489,17 +3459,36 @@ export default function MleoBase() {
 
           {/* Desktop */}
           <div className="mt-6 hidden gap-3 xl:grid xl:grid-cols-6 xl:items-stretch">
+            <div className="relative">
+              <InfoButton
+                infoKey="sharedVault"
+                setOpenInfoKey={setOpenInfoKey}
+              />
               <MetricCard
                 label="Shared Vault"
                 value={`${fmt(sharedVault)} MLEO`}
-              note="Shared across Miners, Arcade and Online."
+                note="Shared across Miners, Arcade and Online."
                 accent="emerald"
+              />
+            </div>
+
+            <div className="relative">
+              <InfoButton
+                infoKey="bankedMleo"
+                setOpenInfoKey={setOpenInfoKey}
               />
               <MetricCard
                 label="Base Banked"
                 value={`${fmt(state.bankedMleo)} MLEO`}
-              note="Refined here, then shipped."
+                note="Refined here, then shipped."
                 accent="violet"
+              />
+            </div>
+
+            <div className="relative">
+              <InfoButton
+                infoKey="commander"
+                setOpenInfoKey={setOpenInfoKey}
               />
               <MetricCard
                 label="Commander"
@@ -3507,50 +3496,142 @@ export default function MleoBase() {
                 note={`${fmt(state.commanderXp)} / ${fmt(xpForLevel(state.commanderLevel))} XP`}
                 accent="sky"
               />
-            <div className={`h-full w-full ${highlightCard((state.resources.ENERGY || 0) <= derived.energyCap * 0.25, "warning")}`}>
+            </div>
+
+            <div
+              className={`h-full w-full ${highlightCard(
+                (state.resources.ENERGY || 0) <= derived.energyCap * 0.25,
+                "warning"
+              )}`}
+            >
+              <div className="relative">
+                <InfoButton
+                  infoKey="energy"
+                  setOpenInfoKey={setOpenInfoKey}
+                />
+                <MetricCard
+                  label="Energy"
+                  value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
+                  note={`Regen ${derived.energyRegen.toFixed(2)}/s`}
+                  accent="slate"
+                />
+              </div>
+            </div>
+
+            <div
+              className={`h-full w-full ${
+                highlightCard(systemState === "critical", "critical") ||
+                highlightCard(systemState === "warning", "warning")
+              }`}
+            >
+              <div className="relative">
+                <InfoButton
+                  infoKey="stability"
+                  setOpenInfoKey={setOpenInfoKey}
+                />
+                <MetricCard
+                  label="Stability"
+                  value={`${fmt(state.stability)}%`}
+                  note={systemMeta.label}
+                  accent={systemMeta.accent}
+                />
+              </div>
+            </div>
+
+            <div className="relative">
+              <InfoButton
+                infoKey="data"
+                setOpenInfoKey={setOpenInfoKey}
+              />
               <MetricCard
-                label="Energy"
-                value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
-                note={`Regen ${derived.energyRegen.toFixed(2)}/s`}
-                accent="slate"
+                label="Data"
+                value={fmt(state.resources.DATA)}
+                note={`x${derived.dataMult.toFixed(2)} progression`}
+                accent="sky"
               />
             </div>
-            <div className={`h-full w-full ${highlightCard(systemState === "critical", "critical") || highlightCard(systemState === "warning", "warning")}`}>
-              <MetricCard
-                label="Stability"
-                value={`${fmt(state.stability)}%`}
-                note={systemMeta.label}
-                accent={systemMeta.accent}
-              />
-            </div>
-            <MetricCard
-              label="Data"
-              value={fmt(state.resources.DATA)}
-              note={`x${derived.dataMult.toFixed(2)} progression`}
-              accent="sky"
-            />
           </div>
 
           <div className="mt-3 hidden xl:grid xl:grid-cols-3 gap-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+            <div className="relative rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+              <InfoButton
+                infoKey="ore"
+                setOpenInfoKey={setOpenInfoKey}
+              />
               <div className="text-xs uppercase tracking-[0.18em] text-white/45">Ore</div>
               <div className="mt-1 text-lg font-bold text-white">{fmt(state.resources.ORE)}</div>
               <div className="mt-1 text-xs text-white/55">x{derived.oreMult.toFixed(2)} output</div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+            <div className="relative rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+              <InfoButton
+                infoKey="gold"
+                setOpenInfoKey={setOpenInfoKey}
+              />
               <div className="text-xs uppercase tracking-[0.18em] text-white/45">Gold</div>
               <div className="mt-1 text-lg font-bold text-white">{fmt(state.resources.GOLD)}</div>
               <div className="mt-1 text-xs text-white/55">x{derived.goldMult.toFixed(2)} output</div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+            <div className="relative rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+              <InfoButton
+                infoKey="scrap"
+                setOpenInfoKey={setOpenInfoKey}
+              />
               <div className="text-xs uppercase tracking-[0.18em] text-white/45">Scrap</div>
               <div className="mt-1 text-lg font-bold text-white">{fmt(state.resources.SCRAP)}</div>
               <div className="mt-1 text-xs text-white/55">x{derived.scrapMult.toFixed(2)} output</div>
             </div>
           </div>
 
+          {activeInfo ? (
+            <div
+              className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/78 backdrop-blur-sm px-4"
+              onClick={() => setOpenInfoKey(null)}
+            >
+              <div
+                className="relative w-full max-w-md rounded-[28px] border border-cyan-400/20 bg-[linear-gradient(180deg,rgba(6,12,24,0.98)_0%,rgba(4,10,20,0.98)_100%)] px-6 py-5 shadow-[0_24px_90px_rgba(0,0,0,0.65),0_0_0_1px_rgba(34,211,238,0.05)]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/35 to-transparent" />
+
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-200/55">
+                      MLEO BASE INFO
+                    </div>
+                    <h3 className="mt-2 text-[28px] font-black leading-none text-white">
+                      {activeInfo.title}
+                    </h3>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setOpenInfoKey(null)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-lg font-bold text-white/75 transition hover:bg-white/10 hover:text-white"
+                    aria-label="Close info"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4">
+                  <p className="text-[15px] leading-7 text-white/82">{activeInfo.text}</p>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setOpenInfoKey(null)}
+                    className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-2 text-sm font-bold text-cyan-100 transition hover:bg-cyan-500/18"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {/* Mobile */}
-          <div ref={infoLayerRef} className="relative mt-4 space-y-3 sm:hidden overscroll-none pb-0">
+          <div className="relative mt-4 space-y-3 sm:hidden overscroll-none pb-0">
 
             <div
               onClick={() => {
@@ -3595,7 +3676,6 @@ export default function MleoBase() {
               <div className="relative">
                 <InfoButton
                   infoKey="sharedVault"
-                  openInfoKey={openInfoKey}
                   setOpenInfoKey={setOpenInfoKey}
                 />
                 <MetricCard
@@ -3608,7 +3688,6 @@ export default function MleoBase() {
               <div className="relative">
                 <InfoButton
                   infoKey="bankedMleo"
-                  openInfoKey={openInfoKey}
                   setOpenInfoKey={setOpenInfoKey}
                 />
                 <MetricCard
@@ -3624,7 +3703,6 @@ export default function MleoBase() {
               <div className="relative">
                 <InfoButton
                   infoKey="commander"
-                  openInfoKey={openInfoKey}
                   setOpenInfoKey={setOpenInfoKey}
                 />
                 <MetricCard
@@ -3639,7 +3717,6 @@ export default function MleoBase() {
               <div className="relative">
                 <InfoButton
                   infoKey="data"
-                  openInfoKey={openInfoKey}
                   setOpenInfoKey={setOpenInfoKey}
                 />
                 <MetricCard
@@ -3655,7 +3732,6 @@ export default function MleoBase() {
                 <div className="relative">
                   <InfoButton
                     infoKey="energy"
-                    openInfoKey={openInfoKey}
                     setOpenInfoKey={setOpenInfoKey}
                   />
                   <MetricCard
@@ -3672,7 +3748,6 @@ export default function MleoBase() {
                 <div className="relative">
                   <InfoButton
                     infoKey="stability"
-                    openInfoKey={openInfoKey}
                     setOpenInfoKey={setOpenInfoKey}
                   />
                   <MetricCard
@@ -3690,7 +3765,6 @@ export default function MleoBase() {
               <div className="relative rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
                 <InfoButton
                   infoKey="ore"
-                  openInfoKey={openInfoKey}
                   setOpenInfoKey={setOpenInfoKey}
                 />
                 <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Ore</div>
@@ -3699,7 +3773,6 @@ export default function MleoBase() {
               <div className="relative rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
                 <InfoButton
                   infoKey="gold"
-                  openInfoKey={openInfoKey}
                   setOpenInfoKey={setOpenInfoKey}
                 />
                 <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Gold</div>
@@ -3708,7 +3781,6 @@ export default function MleoBase() {
               <div className="relative rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
                 <InfoButton
                   infoKey="scrap"
-                  openInfoKey={openInfoKey}
                   setOpenInfoKey={setOpenInfoKey}
                 />
                 <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Scrap</div>
