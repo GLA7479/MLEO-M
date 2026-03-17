@@ -1955,7 +1955,7 @@ const INFO_COPY = {
   },
 };
 
-function InfoButton({ infoKey, setOpenInfoKey }) {
+function InfoButton({ infoKey, setOpenInfoKey, className = "" }) {
   const info = INFO_COPY[infoKey];
   if (!info) return null;
 
@@ -1966,7 +1966,7 @@ function InfoButton({ infoKey, setOpenInfoKey }) {
         e.stopPropagation();
         setOpenInfoKey(infoKey);
       }}
-      className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-cyan-400/30 bg-slate-950/55 text-sm font-black text-cyan-200 shadow-[0_0_18px_rgba(34,211,238,0.08)] backdrop-blur-md transition hover:scale-105 hover:bg-cyan-500/18"
+      className={`absolute right-2.5 top-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/30 bg-slate-950/70 text-[12px] font-black text-cyan-200 shadow-[0_0_18px_rgba(34,211,238,0.08)] backdrop-blur-md transition hover:scale-105 hover:bg-cyan-500/18 ${className}`}
       aria-label={`About ${info.title}`}
     >
       i
@@ -3363,7 +3363,7 @@ export default function MleoBase() {
           Expansion
         </button>
       </div>
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
       {visibleStructures.map((building) => {
         const level = state.buildings[building.key] || 0;
         const nextLevel = level + 1;
@@ -3402,13 +3402,34 @@ export default function MleoBase() {
           <div
             key={building.key}
             data-base-target={building.key}
-            className={`flex min-h-[180px] flex-col rounded-xl border p-3 ${availabilityCardClass(ready)} ${
+            className={`relative flex min-h-[168px] flex-col rounded-2xl border p-3 ${availabilityCardClass(ready)} ${
               highlightTarget === building.key ? "border-cyan-300/70 ring-2 ring-cyan-300/35 shadow-[0_0_0_1px_rgba(103,232,249,0.25)]" : ""
             }`}
           >
+            <InfoButton
+              infoKey={
+                building.key === "quarry"
+                  ? "ore"
+                  : building.key === "tradeHub"
+                  ? "gold"
+                  : building.key === "salvage"
+                  ? "scrap"
+                  : building.key === "refinery"
+                  ? "bankedMleo"
+                  : building.key === "powerCell"
+                  ? "energy"
+                  : building.key === "researchLab" || building.key === "minerControl" || building.key === "arcadeHub"
+                  ? "data"
+                  : building.key === "repairBay"
+                  ? "stability"
+                  : null
+              }
+              setOpenInfoKey={setOpenInfoKey}
+              className="right-2.5 top-2.5 h-6 w-6 text-[11px]"
+            />
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold leading-5 text-white">
+              <div className="min-w-0 flex-1 pr-8">
+                <div className="text-[15px] font-semibold leading-5 text-white">
                   {building.name}
                 </div>
               </div>
@@ -3420,11 +3441,11 @@ export default function MleoBase() {
               </div>
             </div>
 
-            <div className="mt-1 text-[11px] leading-4 text-white/60 line-clamp-2">
+            <div className="mt-1 text-[11px] leading-4 text-white/60 line-clamp-2 pr-2">
               {building.desc}
             </div>
 
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="mt-2 flex flex-wrap gap-1.5 pr-1">
               <div className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/70">
                 {buildingRoleTag(building.key)}
               </div>
@@ -3623,6 +3644,37 @@ export default function MleoBase() {
       : mobilePanel === "intel"
       ? "Intel"
       : "";
+
+  const desktopHudItems = [
+    { label: "ORE", value: fmt(state.resources?.ORE || 0), tone: "normal", infoKey: "ore" },
+    { label: "GOLD", value: fmt(state.resources?.GOLD || 0), tone: "normal", infoKey: "gold" },
+    { label: "SCRAP", value: fmt(state.resources?.SCRAP || 0), tone: "normal", infoKey: "scrap" },
+    { label: "DATA", value: fmt(state.resources?.DATA || 0), tone: "normal", infoKey: "data" },
+    {
+      label: "ENERGY",
+      value: `${fmt(Math.floor(state.resources?.ENERGY || 0))}/${fmt(derived.energyCap || 0)}`,
+      tone: "focus",
+      infoKey: "energy",
+    },
+    {
+      label: "MLEO",
+      value: fmt(state.bankedMleo || 0),
+      tone: "focus",
+      infoKey: "bankedMleo",
+    },
+    {
+      label: "STAB",
+      value: `${fmt(state.stability || 0)}%`,
+      tone: "focus",
+      infoKey: "stability",
+    },
+    {
+      label: "READY",
+      value: fmt(readyCounts.total || 0),
+      tone: "focus",
+      infoKey: null,
+    },
+  ];
 
   const activityLogContent = (
     <>
@@ -3829,9 +3881,9 @@ export default function MleoBase() {
           {/* Removed: desktop duplicate ORE/GOLD/SCRAP metric cards */}
 
           {/* Desktop Command Center */}
-          <div className="mt-4 hidden lg:flex lg:min-h-[680px] lg:max-h-[calc(100vh-110px)] lg:gap-4">
+          <div className="mt-4 hidden lg:flex lg:min-h-[640px] lg:max-h-[calc(100vh-104px)] lg:gap-3">
             {/* LEFT SIDEBAR */}
-            <aside className="w-[200px] shrink-0 lg:flex lg:h-full lg:flex-col lg:gap-2.5">
+            <aside className="w-[184px] shrink-0 lg:flex lg:h-full lg:flex-col lg:gap-2">
               <div className="space-y-2.5">
                 <div className="rounded-[28px] border border-white/10 bg-slate-950/75 p-3 backdrop-blur-xl">
                   <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-300/70">
@@ -3952,38 +4004,35 @@ export default function MleoBase() {
             </aside>
 
             {/* MAIN AREA */}
-            <section className="min-w-0 flex-1 rounded-[32px] border border-white/10 bg-slate-950/75 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.28)] lg:flex lg:flex-col lg:min-h-0">
+            <section className="min-w-0 flex-1 rounded-[28px] border border-white/10 bg-slate-950/75 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.28)] lg:flex lg:flex-col lg:min-h-0">
               {/* TOP HUD */}
-              <div className="border-b border-white/10 px-4 py-3">
+              <div className="border-b border-white/10 px-3 py-2.5">
                 <div className="grid grid-cols-4 gap-2 xl:grid-cols-8">
-                  {[
-                    { label: "ORE", value: fmt(state.resources?.ORE || 0), tone: "normal" },
-                    { label: "GOLD", value: fmt(state.resources?.GOLD || 0), tone: "normal" },
-                    { label: "SCRAP", value: fmt(state.resources?.SCRAP || 0), tone: "normal" },
-                    { label: "DATA", value: fmt(state.resources?.DATA || 0), tone: "normal" },
-                    {
-                      label: "ENERGY",
-                      value: `${fmt(Math.floor(state.resources?.ENERGY || 0))}/${fmt(derived.energyCap || 0)}`,
-                      tone: "focus",
-                    },
-                    { label: "MLEO", value: fmt(state.bankedMleo || 0), tone: "focus" },
-                    { label: "STAB", value: `${fmt(state.stability || 0)}%`, tone: "focus" },
-                    { label: "READY", value: fmt(readyCounts.total || 0), tone: "focus" },
-                  ].map((item) => {
+                  {desktopHudItems.map((item) => {
                     const focus = item.tone === "focus";
+
                     return (
                       <div
                         key={item.label}
-                        className={`rounded-2xl border ${
+                        className={`relative min-h-[64px] rounded-2xl border ${
                           focus
                             ? "border-cyan-400/20 bg-cyan-400/8"
                             : "border-white/10 bg-white/5"
                         } px-3 py-2`}
                       >
-                        <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">
+                        {item.infoKey ? (
+                          <InfoButton
+                            infoKey={item.infoKey}
+                            setOpenInfoKey={setOpenInfoKey}
+                            className="right-2 top-2 h-6 w-6 text-[11px]"
+                          />
+                        ) : null}
+
+                        <div className="pr-7 text-[10px] font-black uppercase tracking-[0.16em] text-white/40">
                           {item.label}
                         </div>
-                        <div className="mt-1 text-sm font-extrabold text-white xl:text-[15px]">
+
+                        <div className="mt-1 pr-6 text-sm font-extrabold text-white xl:text-[15px]">
                           {item.value}
                         </div>
                       </div>
@@ -3993,7 +4042,7 @@ export default function MleoBase() {
               </div>
 
               {/* PANEL HEADER */}
-              <div className="grid grid-cols-3 items-center gap-4 border-b border-white/10 px-4 py-3">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-b border-white/10 px-3.5 py-2.5">
                 <div className="min-w-0">
                   <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-300/70">
                     Desktop Command Center
@@ -4033,9 +4082,9 @@ export default function MleoBase() {
               </div>
 
               {/* PANEL BODY */}
-              <div className="min-h-0 flex-1 overflow-y-auto p-4 pr-3 pb-6">
+              <div className="min-h-0 flex-1 overflow-y-auto p-3.5 pr-2.5 pb-4">
                 {desktopPanel === "overview" ? (
-                  <div className="grid gap-4 xl:grid-cols-2">
+                  <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                       <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
                         Next Step
@@ -4305,37 +4354,7 @@ export default function MleoBase() {
                 ) : null}
 
                 {desktopPanel === "build" ? (
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <div className="mb-3 flex items-center justify-between">
-                        <div>
-                          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                            Development
-                          </div>
-                          <div className="mt-1 text-lg font-black text-white">Modules & Research</div>
-                        </div>
-                        <button
-                          onClick={() =>
-                            setOpenInnerPanel(openInnerPanel === "build-development" ? null : "build-development")
-                          }
-                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
-                        >
-                          {openInnerPanel === "build-development" ? "CLOSE" : "OPEN"}
-                        </button>
-                      </div>
-
-                      {openInnerPanel === "build-development" || !desktopCompact ? (
-                        <div>{crewModulesResearchContent}</div>
-                      ) : (
-                        <div className="text-sm text-white/65">
-                          {buildSectionHint("development", {
-                            modules: availableModulesCount,
-                            research: availableResearchCount,
-                          })}
-                        </div>
-                      )}
-                    </div>
-
+                  <div className="grid gap-4">
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                       <div className="mb-3 flex items-center justify-between">
                         <div>
@@ -4363,11 +4382,43 @@ export default function MleoBase() {
                       )}
                     </div>
 
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3 xl:col-span-2">
-                      <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                        Support Systems
+                    <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                        <div className="mb-3 flex items-center justify-between">
+                          <div>
+                            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                              Development
+                            </div>
+                            <div className="mt-1 text-lg font-black text-white">Modules & Research</div>
+                          </div>
+                          <button
+                            onClick={() =>
+                              setOpenInnerPanel(openInnerPanel === "build-development" ? null : "build-development")
+                            }
+                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
+                          >
+                            {openInnerPanel === "build-development" ? "CLOSE" : "OPEN"}
+                          </button>
+                        </div>
+
+                        {openInnerPanel === "build-development" || !desktopCompact ? (
+                          <div>{crewModulesResearchContent}</div>
+                        ) : (
+                          <div className="text-sm text-white/65">
+                            {buildSectionHint("development", {
+                              modules: availableModulesCount,
+                              research: availableResearchCount,
+                            })}
+                          </div>
+                        )}
                       </div>
-                      <div>{buildSupportSystemsContent}</div>
+
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                        <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                          Support Systems
+                        </div>
+                        <div>{buildSupportSystemsContent}</div>
+                      </div>
                     </div>
                   </div>
                 ) : null}
@@ -4478,11 +4529,11 @@ export default function MleoBase() {
 
           {activeInfo ? (
             <div
-              className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/78 backdrop-blur-sm px-4"
+              className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/78 backdrop-blur-sm px-4 lg:items-stretch lg:justify-end lg:px-0"
               onClick={() => setOpenInfoKey(null)}
             >
               <div
-                className="w-full max-w-md max-h-[78vh] overflow-y-auto rounded-3xl border border-cyan-400/20 bg-slate-950/95 p-5 shadow-[0_20px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl"
+                className="relative w-full max-w-md max-h-[78vh] overflow-y-auto rounded-3xl border border-cyan-400/20 bg-slate-950/95 p-5 shadow-[0_20px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl lg:max-h-none lg:h-full lg:w-[430px] lg:max-w-none lg:rounded-none lg:rounded-l-[28px] lg:border-y-0 lg:border-r-0 lg:border-l lg:p-6"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
@@ -4494,7 +4545,7 @@ export default function MleoBase() {
                   ×
                 </button>
 
-                <div className="sticky top-0 z-20 -mx-5 -mt-5 mb-4 border-b border-white/10 bg-slate-950/92 px-5 pt-5 pb-3 backdrop-blur-xl">
+                <div className="sticky top-0 z-20 -mx-5 -mt-5 mb-4 border-b border-white/10 bg-slate-950/92 px-5 pt-5 pb-3 backdrop-blur-xl lg:-mx-6 lg:-mt-6 lg:px-6 lg:pt-6">
                   <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-cyan-200/70">
                     MLEO BASE INFO
                   </div>
@@ -4583,7 +4634,7 @@ export default function MleoBase() {
                   ) : null}
                 </div>
 
-                <div className="sticky bottom-0 z-20 -mx-5 mt-5 flex justify-end bg-transparent px-5 pb-6 pt-3 pointer-events-none">
+                <div className="sticky bottom-0 z-20 -mx-5 mt-5 flex justify-end bg-transparent px-5 pb-6 pt-3 pointer-events-none lg:-mx-6 lg:px-6">
                   <button
                     type="button"
                     onClick={() => setOpenInfoKey(null)}
