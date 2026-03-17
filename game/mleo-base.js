@@ -897,6 +897,15 @@ async function readVaultSafe() {
   }
 }
 
+/** Blueprint is paid from shared vault MLEO + DATA; not state.resources ORE/GOLD/SCRAP. */
+function canAffordBlueprint(state, sharedVault, cost, dataCost) {
+  const vault = Number(
+    sharedVault ?? state?.sharedMleo ?? state?.sharedVault ?? state?.vaultMleo ?? 0
+  );
+  const data = Number(state?.resources?.DATA || 0);
+  return vault >= Number(cost || 0) && data >= Number(dataCost || 0);
+}
+
 async function addToVault(amount, gameId = "mleo-base") {
   const delta = Math.max(0, Math.floor(Number(amount || 0)));
   if (!delta) return { ok: true, skipped: true };
@@ -1414,6 +1423,37 @@ function availabilityCardClass(isAvailable) {
     : "border-white/10 bg-black/20";
 }
 
+function sectionStatusHint(type, data = {}) {
+  if (type === "operations-console") {
+    const parts = [];
+    if (data.expedition) parts.push("expedition ready");
+    if (data.ship) parts.push("shipment ready");
+    if (data.refill) parts.push("refill available");
+    if (data.maintain) parts.push("maintenance available");
+    return parts.length ? parts.join(" · ") : "Nothing available right now";
+  }
+
+  if (type === "daily-missions") {
+    return data.count > 0
+      ? `${data.count} mission reward${data.count > 1 ? "s" : ""} ready`
+      : "Nothing available right now";
+  }
+
+  if (type === "intel-summary") {
+    return data.count > 0
+      ? "Key progress and identity data available"
+      : "No tracked progress yet";
+  }
+
+  if (type === "intel-log") {
+    return data.count > 0
+      ? `${data.count} recent log entr${data.count > 1 ? "ies" : "y"}`
+      : "No log entries yet";
+  }
+
+  return "";
+}
+
 function buildSectionHint(type, counts) {
   if (type === "development") {
     const parts = [];
@@ -1670,6 +1710,8 @@ export default function MleoBase() {
   const [showReadyPanel, setShowReadyPanel] = useState(false);
   
   // Mobile internal panels state (all closed by default)
+  const [mobileOverviewRecommendationOpen, setMobileOverviewRecommendationOpen] = useState(true);
+  const [mobileOverviewIdentityOpen, setMobileOverviewIdentityOpen] = useState(true);
   const [mobileLiveContractsOpen, setMobileLiveContractsOpen] = useState(false);
   const [mobileOperationsConsoleOpen, setMobileOperationsConsoleOpen] = useState(false);
   const [mobileDailyMissionsOpen, setMobileDailyMissionsOpen] = useState(false);
@@ -1974,8 +2016,14 @@ export default function MleoBase() {
   const canExpeditionNow =
     Number(state.expeditionReadyAt || 0) <= Date.now() &&
     Number(state.resources?.DATA || 0) >= 4;
-  const canBuyBlueprintNow =
-    Number(sharedVault || 0) >= blueprintCost;
+
+  const blueprintDataCost = 20 + Number(state.blueprintLevel || 0) * 6;
+  const canBuyBlueprintNow = canAffordBlueprint(
+    state,
+    sharedVault,
+    blueprintCost,
+    blueprintDataCost
+  );
   const needsRefillNow = Number(state.resources?.ENERGY || 0) < Math.max(35, Math.floor((derived.energyCap || 140) * 0.35));
   const needsMaintenanceNow = Number(state.stability || 100) <= 82;
 
@@ -2030,6 +2078,28 @@ export default function MleoBase() {
   const structuresAvailableCount = availableStructuresCount;
 
   const supportAvailableCount = availableBlueprintCount;
+
+  const operationsConsoleAvailableCount =
+    Number(canExpeditionNow) +
+    Number(canShipNow);
+
+  const dailyMissionsAvailableCount = readyCounts.missions;
+
+  const intelSummaryAvailableCount = [
+    Number(state.totalMissionsDone || 0) > 0,
+    Number(state.totalExpeditions || 0) > 0,
+    Number(state.totalSharedSpent || 0) > 0,
+    Number(state.totalBanked || 0) > 0,
+  ].filter(Boolean).length;
+
+  const intelLogAvailableCount = Math.min(
+    Array.isArray(state.log) ? state.log.length : 0,
+    99
+  );
+
+  const overviewRecommendationCount = 1;
+  const overviewIdentityCount = 1;
+  const liveContractsAvailableCount = readyCounts.contracts;
 
   const showToast = (message) => setToast(message);
 
@@ -3124,7 +3194,7 @@ export default function MleoBase() {
           Cost
         </div>
         <div className="mt-1 text-xs font-semibold text-white/80">
-          {fmt(blueprintCost)} shared MLEO
+          {fmt(blueprintCost)} shared MLEO · DATA {fmt(blueprintDataCost)}
         </div>
         <button
           onClick={buyBlueprint}
@@ -3132,6 +3202,9 @@ export default function MleoBase() {
         >
           Buy Blueprint Lv {Number(state.blueprintLevel || 0) + 1}
         </button>
+        <div className="mt-1 min-h-[20px] text-center text-[10px] leading-4 text-white/45">
+          {canBuyBlueprintNow ? "Ready to purchase" : "Need more shared MLEO or DATA"}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -3677,7 +3750,7 @@ export default function MleoBase() {
                   )}
 
                   {mobilePanel === "overview" ? (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <BaseResourceBar
                         resources={state.resources}
                         energy={state.resources?.ENERGY || 0}
@@ -3686,12 +3759,33 @@ export default function MleoBase() {
                         compact
                         showBanked={false}
                       />
-                      <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <div className="text-lg font-bold text-white">Next Recommended Step</div>
-                        <div className="mt-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
-                          <div className="text-base font-bold text-white">{nextStep.title}</div>
-                          <div className="mt-1 text-sm text-white/70">{nextStep.text}</div>
+                      <div
+                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                          overviewRecommendationCount > 0
+                        )}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-lg font-bold text-white">Next Recommended Step</div>
+                            {!mobileOverviewRecommendationOpen ? (
+                              <div className="mt-1 text-sm text-white/60">
+                                Suggested next action for your base
+                              </div>
+                            ) : null}
+                          </div>
+                          <button
+                            onClick={() => setMobileOverviewRecommendationOpen(!mobileOverviewRecommendationOpen)}
+                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                          >
+                            {mobileOverviewRecommendationOpen ? "CLOSE" : "OPEN"}
+                          </button>
                         </div>
+                        {mobileOverviewRecommendationOpen && (
+                          <div className="mt-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+                            <div className="text-base font-bold text-white">{nextStep.title}</div>
+                            <div className="mt-1 text-sm text-white/70">{nextStep.text}</div>
+                          </div>
+                        )}
                       </div>
 
                       {buildOpportunitiesCount > 0 ? (
@@ -3719,33 +3813,63 @@ export default function MleoBase() {
                         </button>
                       ) : null}
 
-                      <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <div className="text-lg font-bold text-white">Command Identity</div>
-                        <div className="mt-3 grid gap-3">
-                          <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                            <div className="text-sm font-semibold text-white">{crewRoleInfo.name}</div>
-                            <div className="mt-1 text-xs text-white/60">{roleBonusText}</div>
+                      <div
+                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                          overviewIdentityCount > 0
+                        )}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-lg font-bold text-white">Command Identity</div>
+                            {!mobileOverviewIdentityOpen ? (
+                              <div className="mt-1 text-sm text-white/60">
+                                Current crew role and commander path
+                              </div>
+                            ) : null}
                           </div>
-                          <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                            <div className="text-sm font-semibold text-white">{commanderPathInfo.name}</div>
-                            <div className="mt-1 text-xs text-white/60">{commanderPathText}</div>
-                          </div>
+                          <button
+                            onClick={() => setMobileOverviewIdentityOpen(!mobileOverviewIdentityOpen)}
+                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                          >
+                            {mobileOverviewIdentityOpen ? "CLOSE" : "OPEN"}
+                          </button>
                         </div>
+                        {mobileOverviewIdentityOpen && (
+                          <div className="mt-3 grid gap-3">
+                            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                              <div className="text-sm font-semibold text-white">{crewRoleInfo.name}</div>
+                              <div className="mt-1 text-xs text-white/60">{roleBonusText}</div>
+                            </div>
+                            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                              <div className="text-sm font-semibold text-white">{commanderPathInfo.name}</div>
+                              <div className="mt-1 text-xs text-white/60">{commanderPathText}</div>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="text-lg font-bold text-white">Live Contracts</div>
-                            {readyCounts.contracts > 0 && (
-                              <span className="inline-flex min-w-[24px] items-center justify-center rounded-full bg-cyan-400 px-1.5 py-0.5 text-[11px] font-bold text-black">
-                                {readyCounts.contracts}
-                              </span>
-                            )}
+                      <div
+                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                          liveContractsAvailableCount > 0
+                        )}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className="text-lg font-bold text-white">Live Contracts</div>
+                              <SectionAvailabilityBadge count={liveContractsAvailableCount} />
+                            </div>
+                            {!mobileLiveContractsOpen ? (
+                              <div className="mt-1 text-sm text-white/60">
+                                {liveContractsAvailableCount > 0
+                                  ? `${liveContractsAvailableCount} contract reward${liveContractsAvailableCount > 1 ? "s" : ""} ready`
+                                  : "No contract rewards ready right now"}
+                              </div>
+                            ) : null}
                           </div>
                           <button
                             onClick={() => setMobileLiveContractsOpen(!mobileLiveContractsOpen)}
-                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
                             {mobileLiveContractsOpen ? "CLOSE" : "OPEN"}
                           </button>
@@ -3781,7 +3905,7 @@ export default function MleoBase() {
                   ) : null}
 
                   {mobilePanel === "ops" ? (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <BaseResourceBar
                         resources={state.resources}
                         energy={state.resources?.ENERGY || 0}
@@ -3791,30 +3915,36 @@ export default function MleoBase() {
                         showBanked={false}
                       />
                       <div
-                        className={`rounded-3xl border p-4 transition ${
-                          operationsReadyCount > 0
-                            ? "border-cyan-400/30 bg-cyan-500/6 shadow-[0_0_18px_rgba(34,211,238,0.08)]"
-                            : "border-white/10 bg-white/5"
-                        }`}
+                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                          operationsConsoleAvailableCount > 0
+                        )}`}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="text-lg font-bold text-white">Operations Console</div>
-                            {operationsReadyCount > 0 ? (
-                              <span className="inline-flex min-w-6 h-6 items-center justify-center rounded-full bg-cyan-400 px-2 text-[11px] font-black text-slate-950">
-                                {operationsReadyCount}
-                              </span>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className="text-lg font-bold text-white">Operations Console</div>
+                              <SectionAvailabilityBadge count={operationsConsoleAvailableCount} />
+                            </div>
+                            {!mobileOperationsConsoleOpen ? (
+                              <div className="mt-1 text-sm text-white/60">
+                                {sectionStatusHint("operations-console", {
+                                  expedition: canExpeditionNow,
+                                  ship: canShipNow,
+                                  refill: needsRefillNow,
+                                  maintain: needsMaintenanceNow,
+                                })}
+                              </div>
                             ) : null}
                           </div>
                           <button
                             onClick={() => setMobileOperationsConsoleOpen(!mobileOperationsConsoleOpen)}
-                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
                             {mobileOperationsConsoleOpen ? "CLOSE" : "OPEN"}
                           </button>
                         </div>
                         {mobileOperationsConsoleOpen && (
-                          <div className="mt-4 grid gap-3">
+                          <div className="mt-3 grid gap-3">
                             <button
                               onClick={handleLaunchExpedition}
                               disabled={state.resources.ENERGY < CONFIG.expeditionCost}
@@ -3840,32 +3970,41 @@ export default function MleoBase() {
                         )}
                       </div>
 
-                      <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="text-lg font-bold text-white">Daily Missions</div>
-                            {readyCounts.missions > 0 && (
-                              <span className="inline-flex min-w-[24px] items-center justify-center rounded-full bg-cyan-400 px-1.5 py-0.5 text-[11px] font-bold text-black">
-                                {readyCounts.missions}
-                              </span>
-                            )}
+                      <div
+                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                          dailyMissionsAvailableCount > 0
+                        )}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className="text-lg font-bold text-white">Daily Missions</div>
+                              <SectionAvailabilityBadge count={dailyMissionsAvailableCount} />
+                            </div>
+                            {!mobileDailyMissionsOpen ? (
+                              <div className="mt-1 text-sm text-white/60">
+                                {sectionStatusHint("daily-missions", {
+                                  count: dailyMissionsAvailableCount,
+                                })}
+                              </div>
+                            ) : null}
                           </div>
                           <button
                             onClick={() => setMobileDailyMissionsOpen(!mobileDailyMissionsOpen)}
-                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
                             {mobileDailyMissionsOpen ? "CLOSE" : "OPEN"}
                           </button>
                         </div>
                         {mobileDailyMissionsOpen && (
-                          <div className="mt-4">{dailyMissionsContent}</div>
+                          <div className="mt-3">{dailyMissionsContent}</div>
                         )}
                       </div>
                     </div>
                   ) : null}
 
                   {mobilePanel === "build" ? (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <BaseResourceBar
                         resources={state.resources}
                         energy={state.resources?.ENERGY || 0}
@@ -3874,22 +4013,6 @@ export default function MleoBase() {
                         compact
                         showBanked={false}
                       />
-                      {buildOpportunitiesCount > 0 ? (
-                        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-white/45">
-                            Available now
-                          </div>
-                          <div className="mt-1 text-sm font-semibold text-white">
-                            {availableStructuresCount > 0 ? `${availableStructuresCount} structures` : null}
-                            {availableStructuresCount > 0 && availableModulesCount > 0 ? " · " : null}
-                            {availableModulesCount > 0 ? `${availableModulesCount} modules` : null}
-                            {(availableStructuresCount > 0 || availableModulesCount > 0) && availableResearchCount > 0 ? " · " : null}
-                            {availableResearchCount > 0 ? `${availableResearchCount} research` : null}
-                            {(availableStructuresCount > 0 || availableModulesCount > 0 || availableResearchCount > 0) && availableBlueprintCount > 0 ? " · " : null}
-                            {availableBlueprintCount > 0 ? "blueprint ready" : null}
-                          </div>
-                        </div>
-                      ) : null}
                       <div
                         className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
                           developmentAvailableCount > 0
@@ -3987,7 +4110,7 @@ export default function MleoBase() {
                   ) : null}
 
                   {mobilePanel === "intel" ? (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <BaseResourceBar
                         resources={state.resources}
                         energy={state.resources?.ENERGY || 0}
@@ -3996,33 +4119,55 @@ export default function MleoBase() {
                         compact
                         showBanked={false}
                       />
-                      <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="text-lg font-bold text-white">Progress Summary</div>
+                      <div
+                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                          intelSummaryAvailableCount > 0
+                        )}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-lg font-bold text-white">Progress Summary</div>
+                            {!mobileProgressSummaryOpen ? (
+                              <div className="mt-1 text-sm text-white/60">
+                                Key progress and identity data
+                              </div>
+                            ) : null}
+                          </div>
                           <button
                             onClick={() => setMobileProgressSummaryOpen(!mobileProgressSummaryOpen)}
-                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
                             {mobileProgressSummaryOpen ? "CLOSE" : "OPEN"}
                           </button>
                         </div>
                         {mobileProgressSummaryOpen && (
-                          <div className="mt-4">{progressSummaryContent}</div>
+                          <div className="mt-3">{progressSummaryContent}</div>
                         )}
                       </div>
 
-                      <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="text-lg font-bold text-white">Activity Log</div>
+                      <div
+                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                          intelLogAvailableCount > 0
+                        )}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-lg font-bold text-white">Activity Log</div>
+                            {!mobileActivityLogOpen ? (
+                              <div className="mt-1 text-sm text-white/60">
+                                Recent events and milestones
+                              </div>
+                            ) : null}
+                          </div>
                           <button
                             onClick={() => setMobileActivityLogOpen(!mobileActivityLogOpen)}
-                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
                           >
                             {mobileActivityLogOpen ? "CLOSE" : "OPEN"}
                           </button>
                         </div>
                         {mobileActivityLogOpen && (
-                          <div className="mt-4">{activityLogContent}</div>
+                          <div className="mt-3">{activityLogContent}</div>
                         )}
                       </div>
                     </div>
