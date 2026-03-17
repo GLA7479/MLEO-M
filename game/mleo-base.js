@@ -3325,14 +3325,40 @@ export default function MleoBase() {
                       <button
                         key={role.key}
                         onClick={() => handleCrewRoleChange(role.key)}
-                        className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                        className={`relative rounded-xl border px-3 py-2.5 text-left transition ${
                           active
-                            ? "border-cyan-400/40 bg-cyan-500/15"
+                            ? "border-cyan-400/60 bg-cyan-500/15"
                             : "border-white/10 bg-white/5 hover:bg-white/10"
                         }`}
                       >
-                        <div className="text-sm font-semibold text-white">{role.name}</div>
-                        <div className="mt-1 text-xs text-white/60">{role.desc}</div>
+                        <div className="absolute right-2 top-2 z-10">
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setBuildInfo(getCrewInfo(role));
+                              setOpenInfoKey(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setBuildInfo(getCrewInfo(role));
+                                setOpenInfoKey(null);
+                              }
+                            }}
+                            className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[12px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                            aria-label={`Open info for ${role.name}`}
+                            title={`Info about ${role.name}`}
+                          >
+                            i
+                          </span>
+                        </div>
+                        <div className="pr-8">
+                          <div className="text-sm font-semibold text-white">{role.name}</div>
+                          <div className="mt-1 text-xs text-white/60">{role.desc}</div>
+                        </div>
                       </button>
                     );
                   })}
@@ -3354,14 +3380,40 @@ export default function MleoBase() {
                   <button
                     key={path.key}
                     onClick={() => handleCommanderPathChange(path.key)}
-                    className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                    className={`relative rounded-xl border px-3 py-2.5 text-left transition ${
                       active
-                        ? "border-fuchsia-400/40 bg-fuchsia-500/15"
+                        ? "border-cyan-400/60 bg-cyan-500/15"
                         : "border-white/10 bg-white/5 hover:bg-white/10"
                     }`}
                   >
-                    <div className="text-sm font-semibold text-white">{path.name}</div>
-                    <div className="mt-1 text-xs text-white/60">{path.desc}</div>
+                    <div className="absolute right-2 top-2 z-10">
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setBuildInfo(getCommanderPathInfo(path));
+                          setOpenInfoKey(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setBuildInfo(getCommanderPathInfo(path));
+                            setOpenInfoKey(null);
+                          }
+                        }}
+                        className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[12px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                        aria-label={`Open info for ${path.name}`}
+                        title={`Info about ${path.name}`}
+                      >
+                        i
+                      </span>
+                    </div>
+                    <div className="pr-8">
+                      <div className="text-sm font-semibold text-white">{path.name}</div>
+                      <div className="mt-1 text-xs text-white/60">{path.desc}</div>
+                    </div>
                   </button>
                 );
               })}
@@ -4553,6 +4605,513 @@ export default function MleoBase() {
     };
   }
 
+  const CREW_INFO_COPY = {
+    engineer: {
+      title: "Engineer",
+      focus: "Stability + maintenance support",
+      text:
+        "Engineer is the safest crew specialization for keeping the base healthy.\n\n" +
+        "What it does:\n" +
+        "• Helps with stability-focused play.\n" +
+        "• Makes maintenance-oriented progression feel stronger.\n" +
+        "• Good when the base starts becoming larger and more fragile.\n\n" +
+        "Best use:\n" +
+        "Choose Engineer when your base often drops into warning state or when safe scaling matters more than aggression.",
+      tips: {
+        building: "Repair Bay",
+        research: "Predictive Maintenance",
+        module: "Miner Link",
+        actions: [
+          "Best for players who want fewer risky moments.",
+          "Very useful when Refinery and active systems are growing.",
+          "Good default role for safer long-term expansion.",
+        ],
+      },
+      nextStep: {
+        label: "Open Repair Bay",
+        tab: "build",
+        target: "repairBay",
+        why: "Engineer fits best into a maintenance-first base style.",
+      },
+    },
+
+    logistician: {
+      title: "Logistician",
+      focus: "Shipping + export discipline",
+      text:
+        "Logistician is the best crew role for vault movement and export rhythm.\n\n" +
+        "What it does:\n" +
+        "• Supports shipment preparation.\n" +
+        "• Helps you think around ship timing and export flow.\n" +
+        "• Good when BASE is already producing enough to ship consistently.\n\n" +
+        "Best use:\n" +
+        "Choose it when shipping is central to your strategy and you want smoother Shared Vault support.",
+      tips: {
+        building: "Logistics Center",
+        research: "Logistics",
+        module: "Vault Compressor",
+        actions: [
+          "Best when Refinery is already feeding banked MLEO.",
+          "Strong for players focused on shared vault growth.",
+          "Less useful early if shipping is still weak.",
+        ],
+      },
+      nextStep: {
+        label: "Open Logistics Center",
+        tab: "build",
+        target: "logisticsCenter",
+        why: "This role shines once your shipping pipeline is developed.",
+      },
+    },
+
+    researcher: {
+      title: "Researcher",
+      focus: "DATA + system analysis",
+      text:
+        "Researcher is the smartest specialization for long-term scaling and DATA-focused progression.\n\n" +
+        "What it does:\n" +
+        "• Improves the value of DATA-centered play.\n" +
+        "• Supports advanced research identity.\n" +
+        "• Helps long-term optimization more than raw early speed.\n\n" +
+        "Best use:\n" +
+        "Choose it when you want better strategic growth instead of only direct production.",
+      tips: {
+        building: "Research Lab",
+        research: "Deep Scan",
+        module: "Arcade Relay",
+        actions: [
+          "Strongest in mid-game and later.",
+          "Good when expeditions and DATA both matter.",
+          "Ideal for advanced and smarter base pacing.",
+        ],
+      },
+      nextStep: {
+        label: "Open Research Lab",
+        tab: "build",
+        target: "researchLab",
+        why: "Researcher works best with a true DATA engine behind it.",
+      },
+    },
+
+    scout: {
+      title: "Scout",
+      focus: "Expedition identity + field awareness",
+      text:
+        "Scout is the field-operations role of the base.\n\n" +
+        "What it does:\n" +
+        "• Supports expedition identity.\n" +
+        "• Fits flexible play with more field activity.\n" +
+        "• Good for players who like mixed rewards instead of only static production.\n\n" +
+        "Best use:\n" +
+        "Choose Scout when expeditions are a regular part of your loop and you want the base to feel more active.",
+      tips: {
+        building: "Expedition Bay",
+        research: "Arcade Ops",
+        module: "Arcade Relay",
+        actions: [
+          "Strong for mixed utility progression.",
+          "Great when Scrap and DATA are often needed.",
+          "Not ideal if you mostly play passively.",
+        ],
+      },
+      nextStep: {
+        label: "Open Expedition",
+        tab: "operations",
+        target: "expedition",
+        why: "Scout is felt best through repeated expedition use.",
+      },
+    },
+
+    operations: {
+      title: "Operations Chief",
+      focus: "Balanced control room rhythm",
+      text:
+        "Operations Chief is the most balanced crew role.\n\n" +
+        "What it does:\n" +
+        "• Supports overall command rhythm.\n" +
+        "• Helps when you want a flexible identity instead of one narrow specialization.\n" +
+        "• Fits broad play across production, maintenance and field actions.\n\n" +
+        "Best use:\n" +
+        "Choose it when you want an all-round command style and are still learning what your strongest path is.",
+      tips: {
+        building: "HQ",
+        research: "Field Ops",
+        module: "",
+        actions: [
+          "Good default pick when unsure.",
+          "Useful for mixed and evolving builds.",
+          "A strong role while learning the game flow.",
+        ],
+      },
+      nextStep: {
+        label: "Open HQ",
+        tab: "build",
+        target: "hq",
+        why: "Operations Chief matches a broad command-centered identity.",
+      },
+    },
+  };
+
+  const COMMANDER_PATH_INFO_COPY = {
+    industry: {
+      title: "Commander Path: Industry",
+      focus: "Production-first base identity",
+      text:
+        "Industry is a production-focused command path.\n\n" +
+        "What it means:\n" +
+        "• Stronger emphasis on infrastructure and output.\n" +
+        "• Better fit for stable production growth.\n" +
+        "• Good when you want the base to feel like a resource engine first.",
+      tips: {
+        building: "Quarry",
+        research: "Miner Sync",
+        module: "Servo Drill",
+        actions: [
+          "Best for resource-heavy players.",
+          "Good when Ore and processing are your main bottlenecks.",
+          "Strong early and mid-game path.",
+        ],
+      },
+      nextStep: {
+        label: "Open Quarry",
+        tab: "build",
+        target: "quarry",
+        why: "Industry starts with stronger raw production foundations.",
+      },
+    },
+
+    logistics: {
+      title: "Commander Path: Logistics",
+      focus: "Shipment timing + vault movement",
+      text:
+        "Logistics is a commander path centered on exports and timing.\n\n" +
+        "What it means:\n" +
+        "• Stronger identity around shipping and vault support.\n" +
+        "• Better fit for disciplined export cycles.\n" +
+        "• Good when BASE exists mainly to support the wider MLEO ecosystem.",
+      tips: {
+        building: "Logistics Center",
+        research: "Logistics",
+        module: "Vault Compressor",
+        actions: [
+          "Best once banked MLEO is already consistent.",
+          "Very useful for shared vault-focused players.",
+          "Less important if exports are still weak.",
+        ],
+      },
+      nextStep: {
+        label: "Open Shipping",
+        tab: "operations",
+        target: "shipping",
+        why: "This path matters most when shipment decisions are already central.",
+      },
+    },
+
+    research: {
+      title: "Commander Path: Research",
+      focus: "DATA + smart long-term optimization",
+      text:
+        "Research is a slower but smarter command identity.\n\n" +
+        "What it means:\n" +
+        "• Focuses on DATA, system analysis and advanced scaling.\n" +
+        "• Better for players who like planning and optimization.\n" +
+        "• Less about raw speed and more about quality of progression.",
+      tips: {
+        building: "Research Lab",
+        research: "Deep Scan",
+        module: "Arcade Relay",
+        actions: [
+          "Best for strategic players.",
+          "Works well with expeditions and DATA loops.",
+          "A strong late-oriented identity.",
+        ],
+      },
+      nextStep: {
+        label: "Open Research Lab",
+        tab: "build",
+        target: "researchLab",
+        why: "Research path is built around DATA-driven progression.",
+      },
+    },
+
+    ecosystem: {
+      title: "Commander Path: Ecosystem",
+      focus: "Synergy with Miners, Arcade and wider MLEO structure",
+      text:
+        "Ecosystem is the most connected commander path.\n\n" +
+        "What it means:\n" +
+        "• Supports broader MLEO identity.\n" +
+        "• Fits players who want BASE to feel connected to the rest of the project.\n" +
+        "• Best for synergy-minded progression rather than narrow specialization.",
+      tips: {
+        building: "Arcade Hub",
+        research: "Arcade Ops",
+        module: "Arcade Relay",
+        actions: [
+          "Great for cross-system identity.",
+          "Best when you want BASE to feel like part of a larger ecosystem.",
+          "Strong thematic path for project cohesion.",
+        ],
+      },
+      nextStep: {
+        label: "Open Arcade Hub",
+        tab: "build",
+        target: "arcadeHub",
+        why: "Ecosystem path is felt most clearly through connected systems.",
+      },
+    },
+  };
+
+  const CONTRACT_INFO_COPY = {
+    stability_watch: {
+      title: "Contract: Stability Watch",
+      focus: "Keep stability at 85%+",
+      text:
+        "This contract rewards safe base management.\n\n" +
+        "How to complete it:\n" +
+        "• Keep stability at or above 85%.\n" +
+        "• Avoid risky event choices when already under pressure.\n" +
+        "• Use maintenance before things slip too far.",
+      tips: {
+        building: "Repair Bay",
+        research: "Predictive Maintenance",
+        module: "Miner Link",
+        actions: [
+          "Preventing instability is easier than repairing it later.",
+          "Engineer role also fits this contract well.",
+          "Good contract for safer steady growth.",
+        ],
+      },
+      nextStep: {
+        label: "Open Maintenance",
+        tab: "operations",
+        target: "maintenance",
+        why: "Maintenance is the most direct way to protect this contract.",
+      },
+    },
+
+    energy_ready: {
+      title: "Contract: Energy Reserve",
+      focus: "Keep energy above 45% of cap",
+      text:
+        "This contract rewards stable Energy control.\n\n" +
+        "How to complete it:\n" +
+        "• Keep current Energy above 45% of your cap.\n" +
+        "• Avoid wasting Energy on too many expeditions.\n" +
+        "• Improve cap and regeneration so the reserve is easier to maintain.",
+      tips: {
+        building: "Power Cell",
+        research: "Coolant Loops",
+        module: "",
+        actions: [
+          "Best done with stronger regen, not only with refill.",
+          "Refill can save the contract, but should not be the whole plan.",
+          "Good contract for disciplined play.",
+        ],
+      },
+      nextStep: {
+        label: "Open Power Cell",
+        tab: "build",
+        target: "powerCell",
+        why: "Power Cell is the long-term answer for better energy reserve.",
+      },
+    },
+
+    banking_cycle: {
+      title: "Contract: Banking Cycle",
+      focus: "Reach 120 banked MLEO before shipping",
+      text:
+        "This contract teaches patience and timing.\n\n" +
+        "How to complete it:\n" +
+        "• Let banked MLEO build up to at least 120.\n" +
+        "• Do not ship too early.\n" +
+        "• Use Refinery and supporting systems first, then export.",
+      tips: {
+        building: "Refinery",
+        research: "Logistics",
+        module: "Vault Compressor",
+        actions: [
+          "This contract is about timing, not just production.",
+          "Great for teaching better shipment discipline.",
+          "Best with Logistician role or Logistics path.",
+        ],
+      },
+      nextStep: {
+        label: "Open Refinery",
+        tab: "build",
+        target: "refinery",
+        why: "Refinery output is what makes this contract possible.",
+      },
+    },
+
+    field_readiness: {
+      title: "Contract: Field Readiness",
+      focus: "Be expedition-ready with 4+ DATA",
+      text:
+        "This contract rewards balanced field preparation.\n\n" +
+        "How to complete it:\n" +
+        "• Keep expedition off cooldown.\n" +
+        "• Hold at least 4 DATA.\n" +
+        "• Avoid spending DATA too aggressively before you are ready.",
+      tips: {
+        building: "Expedition Bay",
+        research: "Arcade Ops",
+        module: "Arcade Relay",
+        actions: [
+          "Great contract for active expedition players.",
+          "Requires both readiness and resource discipline.",
+          "Scout and Researcher styles both fit well here.",
+        ],
+      },
+      nextStep: {
+        label: "Open Expedition",
+        tab: "operations",
+        target: "expedition",
+        why: "This contract depends directly on expedition readiness.",
+      },
+    },
+  };
+
+  const EVENT_INFO_COPY = {
+    reactor_surge: {
+      title: "Event: Reactor Surge",
+      focus: "Stability vs short-term power spike",
+      text:
+        "Reactor Surge is a classic risk-versus-reward event.\n\n" +
+        "What it means:\n" +
+        "• Safe choice protects stability.\n" +
+        "• Aggressive choice gives short-term output but hurts stability.\n" +
+        "• Best decision depends on your current system state.",
+      tips: {
+        building: "Power Cell",
+        research: "Predictive Maintenance",
+        module: "",
+        actions: [
+          "Choose safe when already near warning or critical state.",
+          "Choose aggressive only when systems are healthy enough.",
+          "This event teaches stability discipline.",
+        ],
+      },
+      nextStep: {
+        label: "Open Power Cell",
+        tab: "build",
+        target: "powerCell",
+        why: "Power-related systems are central to handling this event well.",
+      },
+    },
+
+    salvage_signal: {
+      title: "Event: Salvage Signal",
+      focus: "Field opportunity with risk/reward choice",
+      text:
+        "Salvage Signal is a field decision event.\n\n" +
+        "What it means:\n" +
+        "• One choice is usually safer and more controlled.\n" +
+        "• Another can be more rewarding but may cost stability or resources.\n" +
+        "• Best when you understand your current resource pressure.",
+      tips: {
+        building: "Salvage",
+        research: "",
+        module: "",
+        actions: [
+          "Safer choice is better when the base is under pressure.",
+          "Aggressive choice is better only when you can absorb downside.",
+          "Good event for flexible resource players.",
+        ],
+      },
+    },
+
+    crew_dispute: {
+      title: "Event: Crew Dispute",
+      focus: "Crew harmony vs short-term resource tradeoff",
+      text:
+        "Crew Dispute is about command leadership.\n\n" +
+        "What it means:\n" +
+        "• Some choices protect stability and team rhythm.\n" +
+        "• Others save resources now but can weaken control.\n" +
+        "• The right choice depends on how pressured your base already is.",
+      tips: {
+        building: "HQ",
+        research: "Field Ops",
+        module: "",
+        actions: [
+          "Safer leadership is better when the base is already unstable.",
+          "Aggressive saving is only good when you have room for risk.",
+          "This event reinforces command identity.",
+        ],
+      },
+      nextStep: {
+        label: "Open HQ",
+        tab: "build",
+        target: "hq",
+        why: "Crew and leadership choices connect naturally to HQ progression.",
+      },
+    },
+
+    logistics_window: {
+      title: "Event: Logistics Window",
+      focus: "Temporary shipment opportunity",
+      text:
+        "Logistics Window is a timing event around shipping value.\n\n" +
+        "What it means:\n" +
+        "• It can improve the next shipment if used well.\n" +
+        "• Sometimes skipping is smarter if you are not ready to capitalize.\n" +
+        "• Best decision depends on your current banked MLEO and ship timing.",
+      tips: {
+        building: "Logistics Center",
+        research: "Logistics",
+        module: "Vault Compressor",
+        actions: [
+          "Best used when shipment is already close and meaningful.",
+          "Skipping is fine if your pipeline is not ready.",
+          "This event rewards export discipline.",
+        ],
+      },
+      nextStep: {
+        label: "Open Shipping",
+        tab: "operations",
+        target: "shipping",
+        why: "This event matters most when your next shipment timing is relevant.",
+      },
+    },
+  };
+
+  function getCrewInfo(role) {
+    return CREW_INFO_COPY[role.key] || {
+      title: role.name,
+      focus: "Crew Role",
+      text: role.desc,
+      tips: { building: "", research: "", module: "", actions: [] },
+    };
+  }
+
+  function getCommanderPathInfo(path) {
+    return COMMANDER_PATH_INFO_COPY[path.key] || {
+      title: path.name,
+      focus: "Commander Path",
+      text: path.desc,
+      tips: { building: "", research: "", module: "", actions: [] },
+    };
+  }
+
+  function getContractInfo(contract) {
+    return CONTRACT_INFO_COPY[contract.key] || {
+      title: contract.title,
+      focus: "Live Contract",
+      text: contract.desc,
+      tips: { building: "", research: "", module: "", actions: [] },
+    };
+  }
+
+  function getEventInfo(event) {
+    return EVENT_INFO_COPY[event.key] || {
+      title: event.title,
+      focus: "Live Event",
+      text: event.text,
+      tips: { building: "", research: "", module: "", actions: [] },
+    };
+  }
+
   const getBuildingInfo = (building) => {
     const level = Number(state.buildings?.[building.key] || 0);
     const info = BUILDING_INFO_COPY[building.key];
@@ -5499,12 +6058,31 @@ export default function MleoBase() {
                       </div>
 
                       {(activeEvent || nextShipBonus > 0) && !desktopCompact ? (
-                        <div className="mt-4 rounded-2xl border border-fuchsia-400/20 bg-fuchsia-500/10 p-3">
-                          <div className="text-sm font-bold text-white">
-                            {activeEvent ? activeEvent.title : "Logistics boost active"}
-                          </div>
-                          <div className="mt-1 text-xs text-white/70">
-                            {activeEvent ? activeEvent.text : "A previous command decision improved your next vault shipment."}
+                        <div className="relative mt-4 rounded-2xl border border-fuchsia-400/20 bg-fuchsia-500/10 p-3">
+                          {activeEvent ? (
+                            <div className="absolute right-3 top-3 z-10">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setBuildInfo(getEventInfo(activeEvent));
+                                  setOpenInfoKey(null);
+                                }}
+                                className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                                aria-label={`Open info for ${activeEvent.title}`}
+                                title={`Info about ${activeEvent.title}`}
+                              >
+                                i
+                              </button>
+                            </div>
+                          ) : null}
+                          <div className={activeEvent ? "pr-8" : ""}>
+                            <div className="text-sm font-bold text-white">
+                              {activeEvent ? activeEvent.title : "Logistics boost active"}
+                            </div>
+                            <div className="mt-1 text-xs text-white/70">
+                              {activeEvent ? activeEvent.text : "A previous command decision improved your next vault shipment."}
+                            </div>
                           </div>
 
                           {nextShipBonus > 0 ? (
@@ -5557,13 +6135,30 @@ export default function MleoBase() {
                           {liveContracts.map((contract) => (
                             <div
                               key={contract.key}
-                              className="rounded-2xl border border-white/10 bg-black/20 p-3"
+                              className="relative rounded-2xl border border-white/10 bg-black/20 p-3"
                             >
-                              <div className="text-sm font-bold text-white">{contract.title}</div>
-                              {!desktopCompact ? (
-                                <div className="mt-1 text-xs text-white/65">{contract.desc}</div>
-                              ) : null}
-                              <div className="mt-1 text-xs text-cyan-200/80">{contract.rewardText}</div>
+                              <div className="absolute right-3 top-3 z-10">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setBuildInfo(getContractInfo(contract));
+                                    setOpenInfoKey(null);
+                                  }}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                                  aria-label={`Open info for ${contract.title}`}
+                                  title={`Info about ${contract.title}`}
+                                >
+                                  i
+                                </button>
+                              </div>
+                              <div className="pr-8">
+                                <div className="text-sm font-bold text-white">{contract.title}</div>
+                                {!desktopCompact ? (
+                                  <div className="mt-1 text-xs text-white/65">{contract.desc}</div>
+                                ) : null}
+                                <div className="mt-1 text-xs text-cyan-200/80">{contract.rewardText}</div>
+                              </div>
                               <button
                                 onClick={() => claimContract(contract.key)}
                                 disabled={!contract.done || contract.claimed}
@@ -5585,15 +6180,49 @@ export default function MleoBase() {
 
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-3 xl:col-span-2">
                       <div className="grid gap-4 md:grid-cols-4">
-                        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Crew Role</div>
-                          <div className="mt-1 text-sm font-bold text-white">{crewRoleInfo.name}</div>
-                          <div className="mt-1 text-xs text-white/60">{roleBonusText}</div>
+                        <div className="relative rounded-2xl border border-white/10 bg-black/20 p-3">
+                          <div className="absolute right-2 top-2 z-10">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setBuildInfo(getCrewInfo(crewRoleInfo));
+                                setOpenInfoKey(null);
+                              }}
+                              className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                              aria-label={`Open info for ${crewRoleInfo.name}`}
+                              title={`Info about ${crewRoleInfo.name}`}
+                            >
+                              i
+                            </button>
+                          </div>
+                          <div className="pr-7">
+                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Crew Role</div>
+                            <div className="mt-1 text-sm font-bold text-white">{crewRoleInfo.name}</div>
+                            <div className="mt-1 text-xs text-white/60">{roleBonusText}</div>
+                          </div>
                         </div>
-                        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Commander Path</div>
-                          <div className="mt-1 text-sm font-bold text-white">{commanderPathInfo.name}</div>
-                          <div className="mt-1 text-xs text-white/60">{commanderPathText}</div>
+                        <div className="relative rounded-2xl border border-white/10 bg-black/20 p-3">
+                          <div className="absolute right-2 top-2 z-10">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setBuildInfo(getCommanderPathInfo(commanderPathInfo));
+                                setOpenInfoKey(null);
+                              }}
+                              className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                              aria-label={`Open info for ${commanderPathInfo.name}`}
+                              title={`Info about ${commanderPathInfo.name}`}
+                            >
+                              i
+                            </button>
+                          </div>
+                          <div className="pr-7">
+                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Commander Path</div>
+                            <div className="mt-1 text-sm font-bold text-white">{commanderPathInfo.name}</div>
+                            <div className="mt-1 text-xs text-white/60">{commanderPathText}</div>
+                          </div>
                         </div>
                         <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
                           <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Base Profile</div>
@@ -7163,9 +7792,26 @@ export default function MleoBase() {
               </div>
 
               {activeEvent || nextShipBonus > 0 ? (
-                <div className="mt-4 hidden rounded-3xl border border-white/10 bg-white/5 p-4 sm:block">
+                <div className="relative mt-4 hidden rounded-3xl border border-white/10 bg-white/5 p-4 sm:block">
+                  {activeEvent ? (
+                    <div className="absolute right-3 top-3 z-10">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setBuildInfo(getEventInfo(activeEvent));
+                          setOpenInfoKey(null);
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                        aria-label={`Open info for ${activeEvent.title}`}
+                        title={`Info about ${activeEvent.title}`}
+                      >
+                        i
+                      </button>
+                    </div>
+                  ) : null}
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
+                    <div className={activeEvent ? "pr-8" : ""}>
                       <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">
                         Live Command Event
                       </div>
@@ -7207,16 +7853,50 @@ export default function MleoBase() {
               ) : null}
 
               <div className="mt-4 hidden xl:grid xl:grid-cols-4 gap-3">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-white/45">Crew Role</div>
-                  <div className="mt-1 text-lg font-bold text-white">{crewRoleInfo.name}</div>
-                  <div className="mt-1 text-xs text-white/60">{roleBonusText}</div>
+                <div className="relative rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="absolute right-3 top-3 z-10">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBuildInfo(getCrewInfo(crewRoleInfo));
+                        setOpenInfoKey(null);
+                      }}
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                      aria-label={`Open info for ${crewRoleInfo.name}`}
+                      title={`Info about ${crewRoleInfo.name}`}
+                    >
+                      i
+                    </button>
+                  </div>
+                  <div className="pr-8">
+                    <div className="text-xs uppercase tracking-[0.18em] text-white/45">Crew Role</div>
+                    <div className="mt-1 text-lg font-bold text-white">{crewRoleInfo.name}</div>
+                    <div className="mt-1 text-xs text-white/60">{roleBonusText}</div>
+                  </div>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-white/45">Commander Path</div>
-                  <div className="mt-1 text-lg font-bold text-white">{commanderPathInfo.name}</div>
-                  <div className="mt-1 text-xs text-white/60">{commanderPathText}</div>
+                <div className="relative rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="absolute right-3 top-3 z-10">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBuildInfo(getCommanderPathInfo(commanderPathInfo));
+                        setOpenInfoKey(null);
+                      }}
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                      aria-label={`Open info for ${commanderPathInfo.name}`}
+                      title={`Info about ${commanderPathInfo.name}`}
+                    >
+                      i
+                    </button>
+                  </div>
+                  <div className="pr-8">
+                    <div className="text-xs uppercase tracking-[0.18em] text-white/45">Commander Path</div>
+                    <div className="mt-1 text-lg font-bold text-white">{commanderPathInfo.name}</div>
+                    <div className="mt-1 text-xs text-white/60">{commanderPathText}</div>
+                  </div>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -7302,12 +7982,29 @@ export default function MleoBase() {
                     {liveContracts.map((contract) => (
                       <div
                         key={contract.key}
-                        className={`flex min-h-[180px] flex-col rounded-2xl border border-white/10 bg-black/20 p-4 ${
+                        className={`relative flex min-h-[180px] flex-col rounded-2xl border border-white/10 bg-black/20 p-4 ${
                           contract.done && !contract.claimed ? highlightCard(true, "success") : ""
                         }`}
                       >
-                        <div className="text-sm font-semibold text-white">{contract.title}</div>
-                        <div className="mt-1 text-xs text-white/60">{contract.desc}</div>
+                        <div className="absolute right-3 top-3 z-10">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setBuildInfo(getContractInfo(contract));
+                              setOpenInfoKey(null);
+                            }}
+                            className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                            aria-label={`Open info for ${contract.title}`}
+                            title={`Info about ${contract.title}`}
+                          >
+                            i
+                          </button>
+                        </div>
+                        <div className="pr-8">
+                          <div className="text-sm font-semibold text-white">{contract.title}</div>
+                          <div className="mt-1 text-xs text-white/60">{contract.desc}</div>
+                        </div>
 
                         <div className="mt-auto">
                           <div className="mb-3 text-xs text-cyan-200/80">{contract.rewardText}</div>
