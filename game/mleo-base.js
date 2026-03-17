@@ -1698,25 +1698,43 @@ const INFO_COPY = {
       "Shared Vault is your main MLEO balance across the ecosystem.\n\n" +
       "How to grow it:\n" +
       "• Build and upgrade the Refinery so BASE can produce banked MLEO.\n" +
-      "• Keep your Ore and Scrap production strong, because the Refinery converts those into banked MLEO.\n" +
-      "• Use shipping actions to move MLEO out of BASE into the Shared Vault.\n" +
-      "• Improve export quality with Logistics Center, logistics research, and vault/ship modules.\n\n" +
-      "Best way to get more:\n" +
-      "Focus on a full chain: Quarry -> Salvage Yard -> Refinery -> Shipping. If one part is weak, Shared Vault growth slows down.",
+      "• Keep Ore and Scrap production strong, because the Refinery converts them into banked MLEO.\n" +
+      "• Ship MLEO out of BASE into the Shared Vault.\n" +
+      "• Improve shipment quality with Logistics Center, logistics research, and ship/bank efficiency tools.",
+    tips: {
+      building: "Refinery + Logistics Center",
+      research: "Logistics",
+      module: "Vault Compressor",
+      actions: [
+        "Upgrade Refinery",
+        "Upgrade Logistics Center",
+        "Ship regularly",
+        "Keep Ore + Scrap production high",
+      ],
+    },
   },
 
   bankedMleo: {
     title: "Base Banked",
     text:
-      "Banked MLEO is produced inside BASE by the Refinery. It is still inside BASE until you ship it to the Shared Vault.\n\n" +
+      "Banked MLEO is produced inside BASE by the Refinery. It stays in BASE until you ship it to the Shared Vault.\n\n" +
       "How to grow it:\n" +
       "• Build the Refinery.\n" +
       "• Increase Ore from Quarry.\n" +
       "• Increase Scrap from Salvage Yard.\n" +
       "• Keep enough Energy available so production stays active.\n" +
-      "• Improve bank/refinery efficiency with modules and research.\n\n" +
-      "Best way to get more:\n" +
-      "Upgrade Quarry, Salvage Yard, and Refinery together. Ore + Scrap are the fuel for banked MLEO, so raising only the Refinery is not enough.",
+      "• Improve bank efficiency with research and modules.",
+    tips: {
+      building: "Refinery",
+      research: "Routing AI",
+      module: "Vault Compressor",
+      actions: [
+        "Upgrade Quarry",
+        "Upgrade Salvage Yard",
+        "Upgrade Refinery",
+        "Do not let Energy stay too low",
+      ],
+    },
   },
 
   commander: {
@@ -1728,9 +1746,18 @@ const INFO_COPY = {
       "• Complete daily missions.\n" +
       "• Launch expeditions.\n" +
       "• Perform maintenance when needed.\n" +
-      "• Keep the whole base active and progressing.\n\n" +
-      "Best way to get more:\n" +
-      "Mission rewards and expedition activity help a lot. Research such as Arcade Ops also boosts commander XP gain.",
+      "• Keep the whole base active and progressing.",
+    tips: {
+      building: "Arcade Hub",
+      research: "Arcade Ops",
+      module: "Arcade Relay",
+      actions: [
+        "Claim daily missions",
+        "Launch expeditions often",
+        "Keep upgrading structures",
+        "Do maintenance instead of ignoring stability",
+      ],
+    },
   },
 
   data: {
@@ -1744,9 +1771,18 @@ const INFO_COPY = {
       "• Build and upgrade Research Lab.\n" +
       "• Launch expeditions.\n" +
       "• Complete daily missions that reward DATA.\n" +
-      "• Trigger useful live events such as salvage-style recovery rewards.\n\n" +
-      "Best way to get more:\n" +
-      "Use Arcade Relay for +10% DATA gain, upgrade Research Lab, and unlock research like Deep Scan and Token Discipline. These are the strongest ways to turn DATA into a real progression engine.",
+      "• Use live events that grant DATA.",
+    tips: {
+      building: "Research Lab",
+      research: "Deep Scan / Token Discipline",
+      module: "Arcade Relay",
+      actions: [
+        "Upgrade Research Lab first",
+        "Then scale Miner Control + Arcade Hub",
+        "Run expeditions for extra DATA",
+        "Complete DATA-related daily missions",
+      ],
+    },
   },
 
   energy: {
@@ -1756,13 +1792,20 @@ const INFO_COPY = {
       "How to get more Energy:\n" +
       "• Wait for passive regeneration.\n" +
       "• Build and upgrade Power Cell to increase cap and regeneration.\n" +
-      "• Unlock energy research such as Coolant Loops.\n" +
+      "• Unlock energy research.\n" +
       "• Avoid wasting energy on weak timing.\n\n" +
-      "How to protect Energy:\n" +
-      "• Many production systems and expeditions consume it.\n" +
-      "• If you expand too fast without improving Power Cell and research, Energy becomes your bottleneck.\n\n" +
-      "Best way to get more:\n" +
-      "Upgrade Power Cell early, then add energy-related research before pushing heavy production and expeditions.",
+      "If you expand too fast without improving Power Cell and research, Energy becomes your bottleneck.",
+    tips: {
+      building: "Power Cell",
+      research: "Coolant Loops",
+      module: "None directly",
+      actions: [
+        "Upgrade Power Cell early",
+        "Unlock Coolant Loops quickly",
+        "Do not overrun energy-heavy systems",
+        "Pause big pushes when Energy is drained",
+      ],
+    },
   },
 
   stability: {
@@ -1773,9 +1816,18 @@ const INFO_COPY = {
       "• Perform maintenance regularly.\n" +
       "• Build and improve Repair Bay.\n" +
       "• Choose safer event options when the base is under pressure.\n" +
-      "• Avoid pushing risky output when your systems are already stressed.\n\n" +
-      "Best way to improve it:\n" +
-      "Maintenance is the immediate fix. Repair Bay and Predictive Maintenance research help in the long run by reducing pressure and slowing decay.",
+      "• Avoid risky pushes when systems are stressed.",
+    tips: {
+      building: "Repair Bay",
+      research: "Predictive Maintenance",
+      module: "Miner Link",
+      actions: [
+        "Use maintenance before stability gets low",
+        "Upgrade Repair Bay",
+        "Choose safe event outcomes when unstable",
+        "Avoid overpushing during weak stability windows",
+      ],
+    },
   },
 
   ore: {
@@ -1784,12 +1836,20 @@ const INFO_COPY = {
       "ORE is one of the main raw resources in BASE.\n\n" +
       "How to gain more ORE:\n" +
       "• Build and upgrade Quarry.\n" +
-      "• Keep enough Energy available because Quarry turns energy into Ore.\n" +
-      "• Install Servo Drill for extra Ore output.\n" +
-      "• Use Miner Link for more Ore and better refinery support.\n" +
-      "• Unlock Miner Sync research for more Ore output.\n\n" +
-      "Best way to get more:\n" +
-      "Upgrade Quarry steadily, then stack Ore multipliers from modules and research. Ore is also needed for structures, research and refinery conversion, so strong Ore production supports almost the entire base.",
+      "• Keep enough Energy available because Quarry turns Energy into Ore.\n" +
+      "• Install Ore-focused modules.\n" +
+      "• Unlock Ore-focused research.",
+    tips: {
+      building: "Quarry",
+      research: "Miner Sync",
+      module: "Servo Drill",
+      actions: [
+        "Upgrade Quarry steadily",
+        "Keep Energy available",
+        "Install Servo Drill",
+        "Unlock Miner Sync as soon as possible",
+      ],
+    },
   },
 
   gold: {
@@ -1800,9 +1860,18 @@ const INFO_COPY = {
       "• Build and upgrade Trade Hub.\n" +
       "• Complete daily missions that reward GOLD.\n" +
       "• Launch expeditions.\n" +
-      "• Use events and support actions that grant economy rewards.\n\n" +
-      "Best way to get more:\n" +
-      "Keep Trade Hub scaling with your base and do missions consistently. GOLD is needed for many buildings, modules, crew and upgrades, so weak GOLD production slows everything else.",
+      "• Use economy-related events and support actions.",
+    tips: {
+      building: "Trade Hub",
+      research: "Field Ops",
+      module: "None directly",
+      actions: [
+        "Upgrade Trade Hub often",
+        "Claim GOLD-reward missions",
+        "Run expeditions consistently",
+        "Do not let GOLD lag behind other resources",
+      ],
+    },
   },
 
   scrap: {
@@ -1813,9 +1882,18 @@ const INFO_COPY = {
       "• Build and upgrade Salvage Yard.\n" +
       "• Run expeditions.\n" +
       "• Complete daily missions that reward SCRAP.\n" +
-      "• Use salvage-related live events when they appear.\n\n" +
-      "Best way to get more:\n" +
-      "A stronger Salvage Yard plus regular expeditions is the safest long-term source. SCRAP is critical for advanced buildings, research, maintenance and refinery systems.",
+      "• Use salvage-related live events when they appear.",
+    tips: {
+      building: "Salvage Yard",
+      research: "Deep Scan",
+      module: "Miner Link",
+      actions: [
+        "Upgrade Salvage Yard",
+        "Run expeditions often",
+        "Take salvage event rewards",
+        "Keep Scrap strong for refinery and advanced systems",
+      ],
+    },
   },
 };
 
@@ -3698,6 +3776,44 @@ export default function MleoBase() {
                     {activeInfo.text}
                   </p>
                 </div>
+
+                {activeInfo?.tips ? (
+                  <div className="mt-4 rounded-2xl border border-cyan-400/15 bg-white/[0.03] p-4">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-cyan-200/70">
+                      Best focus
+                    </div>
+
+                    <div className="mt-3 grid gap-2 text-sm text-white/85">
+                      <div>
+                        <span className="font-semibold text-white">Best building:</span>{" "}
+                        {activeInfo.tips.building}
+                      </div>
+                      <div>
+                        <span className="font-semibold text-white">Best research:</span>{" "}
+                        {activeInfo.tips.research}
+                      </div>
+                      <div>
+                        <span className="font-semibold text-white">Best module:</span>{" "}
+                        {activeInfo.tips.module}
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-cyan-200/70">
+                        Quick actions
+                      </div>
+
+                      <ul className="mt-2 space-y-2 text-sm leading-6 text-white/80">
+                        {activeInfo.tips.actions.map((item) => (
+                          <li key={item} className="flex gap-2">
+                            <span className="mt-[6px] h-1.5 w-1.5 rounded-full bg-cyan-300" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="mt-4 flex justify-end">
                   <button
