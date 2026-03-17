@@ -698,15 +698,6 @@ function getAlerts(state, derived, systemState, liveContracts = []) {
     });
   }
 
-  if (banked >= 120) {
-    alerts.push({
-      key: "banked-ready",
-      tone: "info",
-      title: "Banked MLEO ready",
-      text: "Refined reserves are building up. You may want to ship strategically.",
-    });
-  }
-
   if (shipCap > 0 && sentToday / shipCap >= 0.8) {
     alerts.push({
       key: "ship-pressure",
@@ -2350,14 +2341,12 @@ export default function MleoBase() {
       return done && !claimed;
     }).length;
 
-    const bankedReady = Number(state.bankedMleo || 0) >= 120;
-
     return {
       expedition: expeditionReadyNow ? 1 : 0,
       contracts: claimableContractsCount,
       missions: claimableMissionsCount,
-      shipment: bankedReady ? 1 : 0,
-      total: (expeditionReadyNow ? 1 : 0) + claimableContractsCount + claimableMissionsCount + (bankedReady ? 1 : 0),
+      shipment: 0,
+      total: (expeditionReadyNow ? 1 : 0) + claimableContractsCount + claimableMissionsCount,
     };
   }, [state, liveContracts, missionProgress]);
 
@@ -2452,17 +2441,6 @@ export default function MleoBase() {
         title: "Expedition ready",
         text: "Field team is available for deployment.",
         count: readyCounts.expedition,
-      });
-    }
-
-    if (readyCounts.shipment > 0) {
-      items.push({
-        key: "shipment",
-        type: "ready",
-        tone: "info",
-        title: "Shipment opportunity",
-        text: "Banked MLEO is ready for a measured shipment.",
-        count: readyCounts.shipment,
       });
     }
 
@@ -3243,13 +3221,28 @@ export default function MleoBase() {
         const claimed = !!state.missionState?.claimed?.[mission.key];
         const ready = done && !claimed;
         return (
-          <div key={mission.key} className={`rounded-xl border p-2.5 ${
+          <div key={mission.key} className={`relative rounded-xl border p-2.5 ${
             ready
               ? "border-cyan-400/40 bg-cyan-500/10"
               : "border-white/10 bg-black/20"
           }`}>
+            <div className="absolute right-2.5 top-2.5 z-10">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setBuildInfo(getMissionInfo(mission));
+                  setOpenInfoKey(null);
+                }}
+                className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                aria-label={`Open info for ${mission.name}`}
+                title={`Info about ${mission.name}`}
+              >
+                i
+              </button>
+            </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
+              <div className="pr-8">
                 <div className="text-xs font-semibold">{mission.name}</div>
                 <div className="mt-1 text-[11px] text-white/60">
                   Progress: {fmt(progress)} / {fmt(mission.target)}
@@ -3259,7 +3252,7 @@ export default function MleoBase() {
               <button
                 onClick={() => claimMission(mission.key)}
                 disabled={!done || claimed}
-                className={`rounded-xl px-3 py-1.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
+                className={`shrink-0 rounded-xl px-3 py-1.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
                   ready
                     ? "bg-cyan-500 text-white hover:bg-cyan-400"
                     : "bg-white/10 hover:bg-white/20"
@@ -3409,34 +3402,33 @@ export default function MleoBase() {
                 </button>
               </div>
 
-              <div className="flex min-h-0 flex-col pr-8">
+              <div className="flex min-h-0 flex-1 flex-col pr-8">
                 <div className="flex items-start justify-between gap-2">
                   <div className="text-sm font-semibold">{module.name}</div>
                   {moduleAvailable ? <AvailabilityBadge /> : null}
                 </div>
-
                 <div className="mt-1 text-xs text-white/60">{module.desc}</div>
-
-                <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
-                  Cost
-                </div>
-
-                <ResourceCostRow cost={module.cost} resources={state.resources} />
               </div>
 
-              <button
-                onClick={() => buyModule(module.key)}
-                disabled={owned}
-                className={`mt-auto w-full rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
-                  owned
-                    ? "bg-white/10"
-                    : canCoverCost(state.resources, module.cost)
-                    ? "bg-white/10"
-                    : "bg-white/10 opacity-70"
-                }`}
-              >
-                {owned ? "Installed" : "Install"}
-              </button>
+              <div className="mt-auto shrink-0 border-t border-white/10 pt-3">
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
+                  Cost
+                </div>
+                <ResourceCostRow cost={module.cost} resources={state.resources} />
+                <button
+                  onClick={() => buyModule(module.key)}
+                  disabled={owned}
+                  className={`mt-3 w-full rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
+                    owned
+                      ? "bg-white/10"
+                      : canCoverCost(state.resources, module.cost)
+                      ? "bg-white/10"
+                      : "bg-white/10 opacity-70"
+                  }`}
+                >
+                  {owned ? "Installed" : "Install"}
+                </button>
+              </div>
             </div>
           );
         })}
@@ -4239,6 +4231,325 @@ export default function MleoBase() {
           "Use the recommended next step to jump to the right panel.",
         ],
       },
+    };
+  }
+
+  const OPERATIONS_INFO_COPY = {
+    shipping: {
+      title: "Ship to Shared Vault",
+      focus: "Move BASE profit into your main MLEO vault",
+      text:
+        "Shipping transfers banked MLEO from BASE into the Shared Vault.\n\n" +
+        "What it does:\n" +
+        "• Converts BASE progress into real usable vault balance.\n" +
+        "• Lets BASE support the wider MLEO ecosystem.\n" +
+        "• Uses a daily softcut so the system stays balanced.\n\n" +
+        "Best use:\n" +
+        "Ship when your banked MLEO is healthy and you want to move progress out of BASE without sitting on it too long.",
+      tips: {
+        building: "Logistics Center",
+        research: "Logistics",
+        module: "Vault Compressor",
+        actions: [
+          "Refinery must produce banked MLEO first.",
+          "Shipping is stronger when Logistics Center is upgraded.",
+          "Do not confuse banked MLEO with Shared Vault MLEO.",
+        ],
+      },
+      nextStep: {
+        label: "Open Refinery",
+        tab: "build",
+        target: "refinery",
+        why: "Shipping becomes useful only after Refinery is feeding banked MLEO.",
+      },
+    },
+
+    expedition: {
+      title: "Field Expedition",
+      focus: "Spend Energy to gain mixed rewards",
+      text:
+        "Field Expedition is a controlled action that trades Energy for resource rewards.\n\n" +
+        "What it does:\n" +
+        "• Consumes Energy.\n" +
+        "• Can return Ore, Gold, Scrap and DATA.\n" +
+        "• Only has a small chance to add banked MLEO directly.\n\n" +
+        "Best use:\n" +
+        "Run expeditions when Energy is healthy and you want flexible resource growth, especially Scrap and DATA support.",
+      tips: {
+        building: "Expedition Bay",
+        research: "Arcade Ops",
+        module: "Arcade Relay",
+        actions: [
+          "Do not waste expeditions when Energy is low.",
+          "Expeditions are better for mixed utility than direct MLEO farming.",
+          "Use them to support missions, DATA flow and resource recovery.",
+        ],
+      },
+      nextStep: {
+        label: "Open Expedition Bay",
+        tab: "build",
+        target: "expeditionBay",
+        why: "Expedition Bay improves this action and makes expedition play more valuable.",
+      },
+    },
+
+    refill: {
+      title: "Emergency Refill",
+      focus: "Buy back Energy when your base is stalled",
+      text:
+        "Emergency Refill restores Energy by spending Gold.\n\n" +
+        "What it does:\n" +
+        "• Gives immediate Energy back.\n" +
+        "• Helps restart production or action loops.\n" +
+        "• Costs Gold, so it is a recovery tool and not something to spam.\n\n" +
+        "Best use:\n" +
+        "Use it when Energy is your bottleneck and the refill helps you unlock better actions than the Gold you spend.",
+      tips: {
+        building: "Power Cell",
+        research: "Coolant Loops",
+        module: "",
+        actions: [
+          "Prefer better Energy scaling before relying on refill too often.",
+          "Use refill to recover tempo, not as your default Energy economy.",
+          "Power Cell + Coolant Loops reduce how often you need it.",
+        ],
+      },
+      nextStep: {
+        label: "Open Power Cell",
+        tab: "build",
+        target: "powerCell",
+        why: "Power Cell is the long-term solution when refill is needed too often.",
+      },
+    },
+
+    maintenance: {
+      title: "Maintenance Cycle",
+      focus: "Protect base stability and avoid system pressure",
+      text:
+        "Maintenance keeps your BASE stable and prevents performance problems.\n\n" +
+        "What it does:\n" +
+        "• Restores or protects stability.\n" +
+        "• Helps prevent warning or critical states.\n" +
+        "• Makes larger bases safer to run.\n\n" +
+        "Best use:\n" +
+        "Use maintenance before stability drops too far. It is much better as prevention than as a late emergency fix.",
+      tips: {
+        building: "Repair Bay",
+        research: "Predictive Maintenance",
+        module: "Miner Link",
+        actions: [
+          "Do not wait for critical state before maintaining.",
+          "Refinery and active systems make stability more important.",
+          "Repair Bay and maintenance research make this much stronger.",
+        ],
+      },
+      nextStep: {
+        label: "Open Repair Bay",
+        tab: "build",
+        target: "repairBay",
+        why: "Repair Bay is the structure that best supports stable long-term base growth.",
+      },
+    },
+  };
+
+  const MISSION_INFO_COPY = {
+    upgrade_building: {
+      title: "Mission: Upgrade 1 building",
+      focus: "Progress the base by improving any structure",
+      text:
+        "This mission completes when you upgrade any building by one level.\n\n" +
+        "Good ways to finish it:\n" +
+        "• Upgrade cheap early structures.\n" +
+        "• Use it together with your current bottleneck.\n" +
+        "• Do not force an expensive upgrade only for the mission if it slows your economy.",
+      tips: {
+        building: "HQ",
+        research: "",
+        module: "",
+        actions: [
+          "Cheap structures are often the fastest mission completion.",
+          "Use this mission to push real progression, not random spending.",
+          "Good early options are Quarry, Trade Hub or Power Cell.",
+        ],
+      },
+      nextStep: {
+        label: "Open Structures",
+        tab: "build",
+        target: "hq",
+        why: "Any structure upgrade can complete this mission.",
+      },
+    },
+
+    run_expedition: {
+      title: "Mission: Complete 1 expedition",
+      focus: "Use Operations to gain mixed rewards",
+      text:
+        "This mission completes after launching and resolving one expedition.\n\n" +
+        "Good for:\n" +
+        "• Scrap and DATA support.\n" +
+        "• Flexible progression.\n" +
+        "• Combining mission progress with resource gain.",
+      tips: {
+        building: "Expedition Bay",
+        research: "Arcade Ops",
+        module: "Arcade Relay",
+        actions: [
+          "Make sure Energy is high enough first.",
+          "This mission is usually efficient because it also gives useful loot.",
+          "Very good when you also need Scrap or DATA.",
+        ],
+      },
+      nextStep: {
+        label: "Open Expedition",
+        tab: "operations",
+        target: "expedition",
+        why: "This is the exact action that completes the mission.",
+      },
+    },
+
+    generate_data: {
+      title: "Mission: Generate 12 DATA",
+      focus: "Grow your research and advanced progression",
+      text:
+        "This mission tracks DATA generation over time.\n\n" +
+        "Best ways to do it:\n" +
+        "• Upgrade Research Lab.\n" +
+        "• Use Miner Control and Arcade Hub.\n" +
+        "• Run expeditions and DATA-support systems.",
+      tips: {
+        building: "Research Lab",
+        research: "Deep Scan",
+        module: "Arcade Relay",
+        actions: [
+          "Research Lab is the clearest DATA structure.",
+          "Expeditions can help finish this mission faster.",
+          "DATA is more valuable later, so this mission is strong long-term.",
+        ],
+      },
+      nextStep: {
+        label: "Open Research Lab",
+        tab: "build",
+        target: "researchLab",
+        why: "Research Lab is one of the best ways to improve DATA flow.",
+      },
+    },
+
+    perform_maintenance: {
+      title: "Mission: Perform 1 maintenance",
+      focus: "Protect stability and keep systems healthy",
+      text:
+        "This mission completes when you run one maintenance action.\n\n" +
+        "Why it matters:\n" +
+        "• Encourages safer base management.\n" +
+        "• Helps avoid losing momentum through instability.\n" +
+        "• Rewards good control, not only expansion.",
+      tips: {
+        building: "Repair Bay",
+        research: "Predictive Maintenance",
+        module: "",
+        actions: [
+          "Best done before stability gets dangerous.",
+          "A healthy base grows better than a rushed unstable base.",
+          "Use this mission as a reminder to maintain regularly.",
+        ],
+      },
+      nextStep: {
+        label: "Open Maintenance",
+        tab: "operations",
+        target: "maintenance",
+        why: "Maintenance action completes this mission directly.",
+      },
+    },
+
+    double_expedition: {
+      title: "Mission: Launch 2 expeditions",
+      focus: "Spend Energy for repeated field progress",
+      text:
+        "This mission needs two expeditions, so it is more demanding than the basic expedition mission.\n\n" +
+        "Best use:\n" +
+        "Complete it when your Energy economy is stable and you want extra field rewards anyway.",
+      tips: {
+        building: "Expedition Bay",
+        research: "Arcade Ops",
+        module: "Arcade Relay",
+        actions: [
+          "Avoid this when your Energy economy is weak.",
+          "Much better once Power Cell and regen are stronger.",
+          "Good mission when you need Scrap and DATA together.",
+        ],
+      },
+      nextStep: {
+        label: "Open Expedition",
+        tab: "operations",
+        target: "expedition",
+        why: "You need repeated expedition usage to finish this mission.",
+      },
+    },
+
+    ship_mleo: {
+      title: "Mission: Ship 60 MLEO",
+      focus: "Move base value into the shared vault",
+      text:
+        "This mission tracks shipped MLEO from BASE into the Shared Vault.\n\n" +
+        "To complete it:\n" +
+        "• Produce banked MLEO with Refinery.\n" +
+        "• Keep enough output ready.\n" +
+        "• Use shipping when the amount is available.",
+      tips: {
+        building: "Refinery",
+        research: "Logistics",
+        module: "Vault Compressor",
+        actions: [
+          "This mission depends on your production loop, not only on clicking ship.",
+          "Refinery + shipping upgrades make it much easier.",
+          "Good mission because it also strengthens your main vault.",
+        ],
+      },
+      nextStep: {
+        label: "Open Shipping",
+        tab: "operations",
+        target: "shipping",
+        why: "Shipping is the action that converts banked MLEO into mission progress.",
+      },
+    },
+
+    spend_vault: {
+      title: "Mission: Spend 50 MLEO from vault",
+      focus: "Use shared vault resources strategically",
+      text:
+        "This mission completes when you spend MLEO from the Shared Vault.\n\n" +
+        "What it teaches:\n" +
+        "• Vault MLEO is not only for saving.\n" +
+        "• Some progression systems are worth reinvesting into.\n" +
+        "• Smart spending can be part of progress, not a loss.",
+      tips: {
+        building: "",
+        research: "",
+        module: "",
+        actions: [
+          "Do not spend vault blindly only for the mission.",
+          "Use it when the upgrade or action is actually useful.",
+          "Best when combined with systems that need vault investment.",
+        ],
+      },
+    },
+  };
+
+  function getOperationsInfo(key) {
+    return OPERATIONS_INFO_COPY[key] || {
+      title: "Operations",
+      focus: "Operations action",
+      text: "This action is part of your BASE operations loop.",
+      tips: { building: "", research: "", module: "", actions: [] },
+    };
+  }
+
+  function getMissionInfo(mission) {
+    return MISSION_INFO_COPY[mission.key] || {
+      title: mission.name,
+      focus: "Daily Mission",
+      text: `This mission tracks your daily BASE progress.\n\nTarget: ${mission.target}`,
+      tips: { building: "", research: "", module: "", actions: [] },
     };
   }
 
@@ -6027,25 +6338,6 @@ export default function MleoBase() {
                             </div>
                           </button>
                         )}
-                        {readyCounts.shipment > 0 && (
-                          <button
-                            onClick={() => {
-                              openMobilePanel("ops");
-                              setOpenInnerPanel("ops-console");
-                            }}
-                            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <div className="text-sm font-bold text-white">Shipment opportunity</div>
-                                <div className="mt-1 text-xs text-white/60">
-                                  Open Operations Console to ship.
-                                </div>
-                              </div>
-                              <span className="text-cyan-300 text-lg font-bold">›</span>
-                            </div>
-                          </button>
-                        )}
                       </div>
                     </div>
                   )}
@@ -6248,7 +6540,7 @@ export default function MleoBase() {
                           <div className="mt-3 grid gap-3">
                             <div
                               data-base-target="shipping"
-                              className={`rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
+                              className={`relative rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
                                 highlightCard((state.bankedMleo || 0) >= 120, "success")
                               } ${
                                 isHighlightedTarget("shipping", highlightTarget)
@@ -6256,7 +6548,22 @@ export default function MleoBase() {
                                   : ""
                               }`}
                             >
-                              <div className="flex min-h-[84px] flex-col">
+                              <div className="absolute right-3 top-3 z-10">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setBuildInfo(getOperationsInfo("shipping"));
+                                    setOpenInfoKey(null);
+                                  }}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                                  aria-label="Open shipping info"
+                                  title="Info about shipping"
+                                >
+                                  i
+                                </button>
+                              </div>
+                              <div className="flex min-h-[84px] flex-col pr-8">
                                 <div className="text-sm font-semibold text-emerald-200">
                                   Ship to Shared Vault
                                 </div>
@@ -6281,7 +6588,7 @@ export default function MleoBase() {
 
                             <div
                               data-base-target="expedition"
-                              className={`rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 ${
+                              className={`relative rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 ${
                                 highlightCard(
                                   expeditionLeft <= 0 && (state.resources.DATA || 0) >= 4,
                                   "info"
@@ -6292,7 +6599,22 @@ export default function MleoBase() {
                                   : ""
                               }`}
                             >
-                              <div className="flex min-h-[84px] flex-col">
+                              <div className="absolute right-3 top-3 z-10">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setBuildInfo(getOperationsInfo("expedition"));
+                                    setOpenInfoKey(null);
+                                  }}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                                  aria-label="Open expedition info"
+                                  title="Info about expedition"
+                                >
+                                  i
+                                </button>
+                              </div>
+                              <div className="flex min-h-[84px] flex-col pr-8">
                                 <div className="text-sm font-semibold text-cyan-200">
                                   Field Expedition
                                 </div>
@@ -6369,7 +6691,7 @@ export default function MleoBase() {
 
                             <div
                               data-base-target="maintenance"
-                              className={`rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 ${
+                              className={`relative rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 ${
                                 systemState === "critical"
                                   ? highlightCard(true, "critical")
                                   : systemState === "warning"
@@ -6381,7 +6703,35 @@ export default function MleoBase() {
                                   : ""
                               }`}
                             >
-                              <div className="flex min-h-[84px] flex-col">
+                              <div className="absolute right-3 top-3 z-10 flex gap-1">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setBuildInfo(getOperationsInfo("refill"));
+                                    setOpenInfoKey(null);
+                                  }}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                                  aria-label="Open refill info"
+                                  title="Info about refill"
+                                >
+                                  i
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setBuildInfo(getOperationsInfo("maintenance"));
+                                    setOpenInfoKey(null);
+                                  }}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                                  aria-label="Open maintenance info"
+                                  title="Info about maintenance"
+                                >
+                                  i
+                                </button>
+                              </div>
+                              <div className="flex min-h-[84px] flex-col pr-8">
                                 <div className="text-sm font-semibold text-amber-200">
                                   Shared Vault Utilities
                                 </div>
@@ -6984,7 +7334,7 @@ export default function MleoBase() {
                   <div className="grid gap-3 md:grid-cols-2">
                     <div
                       data-base-target="shipping"
-                      className={`flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
+                      className={`relative flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
                         highlightCard((state.bankedMleo || 0) >= 120, "success")
                       } ${
                         isHighlightedTarget("shipping", highlightTarget)
@@ -6992,7 +7342,22 @@ export default function MleoBase() {
                           : ""
                       }`}
                     >
-                      <div className="flex min-h-[88px] flex-col">
+                      <div className="absolute right-3 top-3 z-10">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBuildInfo(getOperationsInfo("shipping"));
+                            setOpenInfoKey(null);
+                          }}
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                          aria-label="Open shipping info"
+                          title="Info about shipping"
+                        >
+                          i
+                        </button>
+                      </div>
+                      <div className="flex min-h-[88px] flex-col pr-8">
                         <div className="text-sm font-semibold text-emerald-200">Ship to Shared Vault</div>
                         <p className="mt-1 text-sm text-white/70">
                           Move refined MLEO into the main vault with a daily softcut, so BASE supports Miners instead of replacing it.
@@ -7008,7 +7373,7 @@ export default function MleoBase() {
 
                     <div
                       data-base-target="expedition"
-                      className={`flex h-full flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 ${
+                      className={`relative flex h-full flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 ${
                         highlightCard(expeditionLeft <= 0 && (state.resources.DATA || 0) >= 4, "info")
                       } ${
                         isHighlightedTarget("expedition", highlightTarget)
@@ -7016,7 +7381,22 @@ export default function MleoBase() {
                           : ""
                       }`}
                     >
-                      <div className="flex min-h-[88px] flex-col">
+                      <div className="absolute right-3 top-3 z-10">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBuildInfo(getOperationsInfo("expedition"));
+                            setOpenInfoKey(null);
+                          }}
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                          aria-label="Open expedition info"
+                          title="Info about expedition"
+                        >
+                          i
+                        </button>
+                      </div>
+                      <div className="flex min-h-[88px] flex-col pr-8">
                         <div className="text-sm font-semibold text-cyan-200">Field Expedition</div>
                         <p className="mt-1 text-sm text-white/70">
                           Spend {CONFIG.expeditionCost} energy for Ore, Gold, Scrap, DATA and only a small chance of banked MLEO.
@@ -7074,7 +7454,7 @@ export default function MleoBase() {
 
                     <div
                       data-base-target="maintenance"
-                      className={`flex h-full flex-col gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 ${
+                      className={`relative flex h-full flex-col gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 ${
                         systemState === "critical"
                           ? highlightCard(true, "critical")
                           : systemState === "warning"
@@ -7086,7 +7466,35 @@ export default function MleoBase() {
                           : ""
                       }`}
                     >
-                      <div className="flex min-h-[88px] flex-col">
+                      <div className="absolute right-3 top-3 z-10 flex gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBuildInfo(getOperationsInfo("refill"));
+                            setOpenInfoKey(null);
+                          }}
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                          aria-label="Open refill info"
+                          title="Info about refill"
+                        >
+                          i
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBuildInfo(getOperationsInfo("maintenance"));
+                            setOpenInfoKey(null);
+                          }}
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                          aria-label="Open maintenance info"
+                          title="Info about maintenance"
+                        >
+                          i
+                        </button>
+                      </div>
+                      <div className="flex min-h-[88px] flex-col pr-8">
                         <div className="text-sm font-semibold text-amber-200">Shared Vault Utilities</div>
                         <p className="mt-1 text-sm text-white/70">
                           Spend shared MLEO on productivity instead of pure emissions.
