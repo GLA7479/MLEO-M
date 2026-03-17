@@ -2021,6 +2021,12 @@ export default function MleoBase() {
     return highlightTarget === target;
   }
 
+  function getStructuresTabForTarget(target) {
+    if (STRUCTURES_TAB_A.includes(target)) return "core";
+    if (STRUCTURES_TAB_B.includes(target)) return "expansion";
+    return null;
+  }
+
   function handleInfoNextStep() {
     const info = shownInfo;
     if (!info?.nextStep) return;
@@ -2094,16 +2100,14 @@ export default function MleoBase() {
         return "build-development";
       }
 
-      if (step.target === "crew") {
-        return "build-development";
-      }
-
-      if (step.target === "paths") {
+      if (step.target === "crew" || step.target === "paths") {
         return "build-development";
       }
 
       return null;
     })();
+
+    const targetStructuresTab = getStructuresTabForTarget(step.target);
 
     try {
       const isMobile =
@@ -2116,6 +2120,10 @@ export default function MleoBase() {
 
       if (step.target === "paths") {
         setDevTab("paths");
+      }
+
+      if (targetStructuresTab) {
+        setStructuresTab(targetStructuresTab);
       }
 
       if (isMobile) {
@@ -2148,11 +2156,11 @@ export default function MleoBase() {
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
       }
-    }, 220);
+    }, 260);
 
     setTimeout(() => {
       setHighlightTarget(null);
-    }, 2800);
+    }, 3200);
   }
 
   useEffect(() => {
