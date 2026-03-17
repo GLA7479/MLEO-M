@@ -5044,306 +5044,132 @@ export default function MleoBase() {
           </div>
 
           {shownInfo ? (
-            <>
-              {/* Desktop Info Panel */}
+            <div
+              className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/78 backdrop-blur-sm px-4 lg:items-stretch lg:justify-end lg:px-0"
+              onClick={() => {
+                setOpenInfoKey(null);
+                setBuildInfo(null);
+              }}
+            >
               <div
-                className="pointer-events-auto fixed inset-y-0 right-0 z-[90] hidden w-[420px] max-w-[92vw] md:block"
-                onClick={() => {
-                  setOpenInfoKey(null);
-                  setBuildInfo(null);
-                }}
+                className="relative w-full max-w-md max-h-[78vh] overflow-y-auto rounded-3xl border border-cyan-400/20 bg-slate-950/95 p-5 shadow-[0_20px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl lg:max-h-none lg:h-full lg:w-[430px] lg:max-w-none lg:rounded-none lg:rounded-l-[28px] lg:border-y-0 lg:border-r-0 lg:border-l lg:p-6"
+                onClick={(e) => e.stopPropagation()}
               >
-                <div
-                  className="absolute inset-y-0 right-0 w-full border-l border-cyan-400/15 bg-slate-950/92 shadow-[-18px_0_50px_rgba(0,0,0,0.42)] backdrop-blur-xl"
-                  onClick={(e) => e.stopPropagation()}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenInfoKey(null);
+                    setBuildInfo(null);
+                  }}
+                  className="absolute right-4 top-4 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-2xl font-bold text-white/85 backdrop-blur-md transition hover:bg-white/10"
+                  aria-label="Close info"
                 >
+                  ×
+                </button>
+
+                <div className="sticky top-0 z-20 -mx-5 -mt-5 mb-4 border-b border-white/10 bg-slate-950/92 px-5 pt-5 pb-3 backdrop-blur-xl lg:-mx-6 lg:-mt-6 lg:px-6 lg:pt-6">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-cyan-200/70">
+                    MLEO BASE INFO
+                  </div>
+
+                  <div className="mt-2 pr-16 text-4xl font-black leading-none text-white">
+                    {shownInfo.title}
+                  </div>
+
+                  {shownInfo?.focus ? (
+                    <div className="mt-2 pr-16 text-sm leading-6 text-cyan-200/80">
+                      <span className="font-semibold text-white">Focus:</span>{" "}
+                      {shownInfo.focus}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                  <div className="whitespace-pre-line text-sm leading-7 text-white/80">
+                    {shownInfo.text}
+                  </div>
+
+                  {shownInfo?.tips ? (
+                    <div className="mt-4 border-t border-white/10 pt-4">
+                      <div className="grid gap-2 text-sm text-white/78">
+                        {shownInfo?.tips?.building ? (
+                          <div>
+                            <span className="font-semibold text-white">Best building:</span>{" "}
+                            {shownInfo.tips.building}
+                          </div>
+                        ) : null}
+
+                        {shownInfo?.tips?.research ? (
+                          <div>
+                            <span className="font-semibold text-white">Best research:</span>{" "}
+                            {shownInfo.tips.research}
+                          </div>
+                        ) : null}
+
+                        {shownInfo?.tips?.module ? (
+                          <div>
+                            <span className="font-semibold text-white">Best module:</span>{" "}
+                            {shownInfo.tips.module}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-4">
+                        <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-200/70">
+                          Quick actions
+                        </div>
+
+                        <ul className="mt-2 space-y-1.5 text-sm leading-6 text-white/78">
+                          {shownInfo.tips.actions.map((item) => (
+                            <li key={item} className="flex gap-2">
+                              <span className="mt-[8px] h-1.5 w-1.5 rounded-full bg-cyan-300/90" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {shownInfo?.nextStep ? (
+                    <button
+                      type="button"
+                      onClick={handleInfoNextStep}
+                      className="mt-4 flex w-full items-start justify-between rounded-2xl border border-cyan-400/20 bg-cyan-500/8 px-4 py-3 text-left transition hover:bg-cyan-500/14"
+                    >
+                      <div>
+                        <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-200/70">
+                          Recommended next step
+                        </div>
+                        <div className="mt-1 text-base font-semibold text-white">
+                          {shownInfo.nextStep.label}
+                        </div>
+                        {shownInfo.nextStep.why ? (
+                          <div className="mt-1 text-sm text-white/68">
+                            Why: {shownInfo.nextStep.why}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="ml-4 pt-1 text-cyan-200/80">→</div>
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="sticky bottom-0 z-20 -mx-5 mt-5 flex justify-end bg-transparent px-5 pb-6 pt-3 pointer-events-none lg:-mx-6 lg:px-6">
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() => {
                       setOpenInfoKey(null);
                       setBuildInfo(null);
                     }}
-                    className="absolute right-4 top-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xl font-bold text-white/85 transition hover:bg-white/10"
-                    aria-label="Close info"
+                    className="pointer-events-auto rounded-2xl border border-cyan-400/20 bg-slate-950/85 px-5 py-3 text-base font-semibold text-white shadow-[0_6px_18px_rgba(0,0,0,0.18)] backdrop-blur-md transition hover:bg-cyan-500/15"
                   >
-                    ×
+                    Close
                   </button>
-
-                  <div className="flex h-full flex-col overflow-hidden">
-                    <div className="border-b border-white/10 bg-gradient-to-b from-cyan-500/10 to-transparent px-5 pb-5 pt-5">
-                      <div className="mb-2 flex items-center gap-2">
-                        <span className="rounded-full border border-cyan-400/25 bg-cyan-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200">
-                          MLEO BASE INFO
-                        </span>
-                        {shownInfo?.focus ? (
-                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/60">
-                            {shownInfo.focus}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <div className="text-2xl font-black leading-tight text-white">
-                        {shownInfo.title}
-                      </div>
-
-                      <div className="mt-2 text-sm leading-6 text-white/65">
-                        Structured info panel for this system, upgrade or building.
-                      </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto px-5 py-5">
-                      <div className="space-y-4">
-                        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_8px_22px_rgba(0,0,0,0.18)]">
-                          <div className="mb-2 text-[11px] font-black uppercase tracking-[0.24em] text-cyan-300/80">
-                            Main breakdown
-                          </div>
-                          <div className="text-sm leading-7 text-white/85">
-                            {shownInfo.text}
-                          </div>
-                        </div>
-
-                        {shownInfo?.tips ? (
-                          <div className="grid gap-3">
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 md:grid-cols-1">
-                              {shownInfo?.tips?.building ? (
-                                <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/10 p-4">
-                                  <div className="mb-1 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-200/80">
-                                    Best building
-                                  </div>
-                                  <div className="text-sm font-bold text-white">
-                                    {shownInfo.tips.building}
-                                  </div>
-                                </div>
-                              ) : null}
-
-                              {shownInfo?.tips?.research ? (
-                                <div className="rounded-2xl border border-violet-400/15 bg-violet-500/10 p-4">
-                                  <div className="mb-1 text-[10px] font-black uppercase tracking-[0.22em] text-violet-200/80">
-                                    Best research
-                                  </div>
-                                  <div className="text-sm font-bold text-white">
-                                    {shownInfo.tips.research}
-                                  </div>
-                                </div>
-                              ) : null}
-
-                              {shownInfo?.tips?.module ? (
-                                <div className="rounded-2xl border border-amber-400/15 bg-amber-500/10 p-4">
-                                  <div className="mb-1 text-[10px] font-black uppercase tracking-[0.22em] text-amber-200/80">
-                                    Best module
-                                  </div>
-                                  <div className="text-sm font-bold text-white">
-                                    {shownInfo.tips.module}
-                                  </div>
-                                </div>
-                              ) : null}
-                            </div>
-
-                            {shownInfo?.tips?.actions?.length ? (
-                              <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-                                <div className="mb-3 text-[11px] font-black uppercase tracking-[0.24em] text-cyan-300/80">
-                                  Quick actions
-                                </div>
-
-                                <div className="space-y-2">
-                                  {shownInfo.tips.actions.map((item, idx) => (
-                                    <div
-                                      key={`${item}-${idx}`}
-                                      className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3"
-                                    >
-                                      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 text-[11px] font-black text-cyan-200">
-                                        {idx + 1}
-                                      </div>
-                                      <div className="text-sm leading-6 text-white/82">
-                                        {item}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                        ) : null}
-
-                        {shownInfo?.nextStep ? (
-                          <button
-                            type="button"
-                            onClick={handleInfoNextStep}
-                            className="w-full rounded-3xl border border-cyan-400/20 bg-cyan-500/10 p-4 text-left transition hover:bg-cyan-500/15"
-                          >
-                            <div className="mb-1 text-[11px] font-black uppercase tracking-[0.24em] text-cyan-200/80">
-                              Recommended next step
-                            </div>
-                            <div className="text-base font-black text-white">
-                              {shownInfo.nextStep.label}
-                            </div>
-                            {shownInfo.nextStep.why ? (
-                              <div className="mt-2 text-sm leading-6 text-white/70">
-                                {shownInfo.nextStep.why}
-                              </div>
-                            ) : null}
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="border-t border-white/10 px-5 py-4">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOpenInfoKey(null);
-                          setBuildInfo(null);
-                        }}
-                        className="w-full rounded-2xl border border-cyan-400/20 bg-slate-900/85 px-5 py-3 text-sm font-semibold text-white transition hover:bg-cyan-500/15"
-                      >
-                        Close
-                      </button>
-                    </div>
-                  </div>
                 </div>
               </div>
-
-              {/* Mobile Info Modal */}
-              <div
-                className="fixed inset-0 z-[95] bg-black/70 backdrop-blur-sm md:hidden"
-                onClick={() => {
-                  setOpenInfoKey(null);
-                  setBuildInfo(null);
-                }}
-              >
-                <div
-                  className="absolute inset-x-3 bottom-3 top-16 overflow-hidden rounded-[28px] border border-cyan-400/20 bg-slate-950/96 shadow-[0_20px_60px_rgba(0,0,0,0.45)]"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex items-center justify-between border-b border-white/10 bg-gradient-to-b from-cyan-500/10 to-transparent px-4 pb-4 pt-4">
-                    <div className="min-w-0 pr-3">
-                      <div className="mb-1 flex flex-wrap items-center gap-2">
-                        <span className="rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-cyan-200">
-                          MLEO BASE INFO
-                        </span>
-                        {shownInfo?.focus ? (
-                          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-white/65">
-                            {shownInfo.focus}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="truncate text-lg font-black text-white">
-                        {shownInfo.title}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOpenInfoKey(null);
-                        setBuildInfo(null);
-                      }}
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-lg font-bold text-white/85"
-                      aria-label="Close info"
-                    >
-                      ×
-                    </button>
-                  </div>
-
-                  <div className="h-[calc(100%-76px)] overflow-y-auto px-4 py-4">
-                    <div className="space-y-3">
-                      <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-                        <div className="mb-2 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300/80">
-                          Main breakdown
-                        </div>
-                        <div className="text-sm leading-7 text-white/85">
-                          {shownInfo.text}
-                        </div>
-                      </div>
-
-                      {shownInfo?.tips ? (
-                        <>
-                          <div className="grid grid-cols-1 gap-3">
-                            {shownInfo?.tips?.building ? (
-                              <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/10 p-4">
-                                <div className="mb-1 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-200/80">
-                                  Best building
-                                </div>
-                                <div className="text-sm font-bold text-white">
-                                  {shownInfo.tips.building}
-                                </div>
-                              </div>
-                            ) : null}
-
-                            {shownInfo?.tips?.research ? (
-                              <div className="rounded-2xl border border-violet-400/15 bg-violet-500/10 p-4">
-                                <div className="mb-1 text-[10px] font-black uppercase tracking-[0.22em] text-violet-200/80">
-                                  Best research
-                                </div>
-                                <div className="text-sm font-bold text-white">
-                                  {shownInfo.tips.research}
-                                </div>
-                              </div>
-                            ) : null}
-
-                            {shownInfo?.tips?.module ? (
-                              <div className="rounded-2xl border border-amber-400/15 bg-amber-500/10 p-4">
-                                <div className="mb-1 text-[10px] font-black uppercase tracking-[0.22em] text-amber-200/80">
-                                  Best module
-                                </div>
-                                <div className="text-sm font-bold text-white">
-                                  {shownInfo.tips.module}
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-
-                          {shownInfo?.tips?.actions?.length ? (
-                            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-                              <div className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300/80">
-                                Quick actions
-                              </div>
-
-                              <div className="space-y-2">
-                                {shownInfo.tips.actions.map((item, idx) => (
-                                  <div
-                                    key={`${item}-${idx}`}
-                                    className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3"
-                                  >
-                                    <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 text-[11px] font-black text-cyan-200">
-                                      {idx + 1}
-                                    </div>
-                                    <div className="text-sm leading-6 text-white/82">
-                                      {item}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : null}
-
-                          {shownInfo?.nextStep ? (
-                            <button
-                              type="button"
-                              onClick={handleInfoNextStep}
-                              className="w-full rounded-3xl border border-cyan-400/20 bg-cyan-500/10 p-4 text-left"
-                            >
-                              <div className="mb-1 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200/80">
-                                Recommended next step
-                              </div>
-                              <div className="text-sm font-black text-white">
-                                {shownInfo.nextStep.label}
-                              </div>
-                              {shownInfo.nextStep.why ? (
-                                <div className="mt-2 text-sm leading-6 text-white/72">
-                                  {shownInfo.nextStep.why}
-                                </div>
-                              ) : null}
-                            </button>
-                          ) : null}
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </>
+            </div>
           ) : null}
 
           {/* Mobile */}
