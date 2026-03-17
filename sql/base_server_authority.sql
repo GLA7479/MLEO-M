@@ -485,8 +485,8 @@ BEGIN
   v_mleo_mult := v_mleo_mult * v_hq_bonus * v_stability_factor;
   v_data_mult := v_data_mult * v_hq_bonus * v_stability_factor;
 
-  v_energy_cap := 140 + (v_power * 24);
-  v_energy_regen := 3.2 + (v_power * 0.75);
+  v_energy_cap := 140 + (v_power * 30);
+  v_energy_regen := 3.2 + (v_power * 1.1);
 
   IF public.base_jsonb_bool(v_research, 'coolant', false) THEN
     v_energy_cap := v_energy_cap + 15;
@@ -516,15 +516,15 @@ BEGIN
       * v_data_mult;
 
   v_energy_use :=
-      (v_quarry * 1.1)
+      (v_quarry * 0.9)
     + (v_trade * 1.2)
-    + (v_salvage * 1.5)
-    + (v_refinery * 2.6)
-    + (v_miner * 0.6)
-    + (v_arcade * 0.8)
-    + (v_logistics * 0.7)
-    + (v_research_lab * 0.8)
-    + (v_repair * 0.8);
+    + (v_salvage * 1.15)
+    + (v_refinery * 2.2)
+    + (v_miner * 0.45)
+    + (v_arcade * 0.55)
+    + (v_logistics * 0.45)
+    + (v_research_lab * 0.55)
+    + (v_repair * 0.45);
 
   IF v_energy_now < (v_energy_use * v_elapsed_seconds) THEN
     IF v_energy_use > 0 THEN
@@ -570,16 +570,15 @@ BEGIN
 
     v_maintenance_due := v_maintenance_due + (
       (
-        (v_quarry * 0.004)
-        + (v_trade * 0.003)
-        + (v_salvage * 0.005)
-        + (v_refinery * 0.010)
-        + (v_miner * 0.004)
-        + (v_arcade * 0.003)
-        + (v_expedition * 0.004)
-        + (v_logistics * 0.003)
-        + (v_research_lab * 0.005)
-        + (v_repair * 0.002)
+        (v_quarry * 0.003)
+        + (v_trade * 0.002)
+        + (v_salvage * 0.0035)
+        + (v_refinery * 0.007)
+        + (v_miner * 0.0025)
+        + (v_arcade * 0.002)
+        + (v_logistics * 0.002)
+        + (v_research_lab * 0.003)
+        + (v_repair * 0.0015)
       ) / greatest(v_maintenance_relief, 1)
     ) * v_elapsed_seconds;
 

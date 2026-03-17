@@ -93,7 +93,7 @@ const BUILDINGS = [
     baseCost: { GOLD: 240, SCRAP: 45 },
     growth: 1.24,
     energyUse: 0,
-    power: { cap: 24, regen: 0.75 },
+    power: { cap: 30, regen: 1.1 },
     requires: [{ key: "tradeHub", lvl: 1 }],
   },
   {
@@ -573,10 +573,10 @@ const LIVE_CONTRACTS = [
   {
     key: "energy_ready",
     title: "Energy Reserve",
-    desc: "Keep energy above 70% of cap.",
+    desc: "Keep energy above 45% of cap.",
     rewardText: "Reward: GOLD 80 · XP 15",
     check: (state, derived) =>
-      Number(state.resources?.ENERGY || 0) >= Math.floor((derived.energyCap || 0) * 0.7),
+      Number(state.resources?.ENERGY || 0) >= Math.floor((derived.energyCap || 0) * 0.45),
     reward: { GOLD: 80, XP: 15 },
   },
   {
@@ -676,12 +676,12 @@ function getAlerts(state, derived, systemState, liveContracts = []) {
     });
   }
 
-  if (energyCap > 0 && energy <= energyCap * 0.25) {
+  if (energyCap > 0 && energy <= energyCap * 0.12) {
     alerts.push({
       key: "low-energy",
       tone: "warning",
-      title: "Low energy reserve",
-      text: "Production may stall soon. Consider refill or reducing pressure.",
+      title: "Critical energy reserve",
+      text: "Energy reserve is critically low. Refill now or allow systems to recover.",
     });
   }
 
@@ -1230,6 +1230,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
   const dt = clamp(elapsedMs / 1000, 0, 60 * 60 * 12);
   const effective = dt * efficiency;
   const d = derive(next, now);
+  const reserveEnergy = Math.max(24, Math.floor(d.energyCap * 0.18));
   const dataBefore = next.resources.DATA || 0;
 
   next.resources.ENERGY = clamp(next.resources.ENERGY + d.energyRegen * dt, 0, d.energyCap);
@@ -1241,66 +1242,66 @@ function simulate(state, elapsedMs, efficiency = 1) {
   };
 
   runBuilding("quarry", (level) => {
-    const energyNeed = 1.1 * level * dt;
+    const energyNeed = 0.9 * level * dt;
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.ORE += 2.0 * level * d.oreMult * effective;
   });
 
   runBuilding("tradeHub", (level) => {
-    const energyNeed = 1.4 * level * dt;
+    const energyNeed = 1.2 * level * dt;
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.GOLD += 1.0 * level * d.goldMult * effective;
   });
 
   runBuilding("salvage", (level) => {
-    const energyNeed = 1.5 * level * dt;
+    const energyNeed = 1.15 * level * dt;
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.SCRAP += 0.8 * level * d.scrapMult * effective;
   });
 
   runBuilding("minerControl", (level) => {
-    const energyNeed = 0.6 * level * dt;
-    if (next.resources.ENERGY < energyNeed) return;
+    const energyNeed = 0.45 * level * dt;
+    if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
+    next.resources.ENERGY -= energyNeed;
+    next.resources.DATA += 0.18 * level * d.dataMult * effective;
+  });
+
+  runBuilding("arcadeHub", (level) => {
+    const energyNeed = 0.55 * level * dt;
+    if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.15 * level * d.dataMult * effective;
   });
 
-  runBuilding("arcadeHub", (level) => {
-    const energyNeed = 0.8 * level * dt;
-    if (next.resources.ENERGY < energyNeed) return;
-    next.resources.ENERGY -= energyNeed;
-    next.resources.DATA += 0.12 * level * d.dataMult * effective;
-  });
-
   runBuilding("researchLab", (level) => {
-    const energyNeed = 0.8 * level * dt;
-    if (next.resources.ENERGY < energyNeed) return;
+    const energyNeed = 0.55 * level * dt;
+    if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
-    next.resources.DATA += 0.22 * level * d.dataMult * effective;
+    next.resources.DATA += 0.28 * level * d.dataMult * effective;
   });
 
   runBuilding("logisticsCenter", (level) => {
-    const energyNeed = 0.7 * level * dt;
-    if (next.resources.ENERGY < energyNeed) return;
+    const energyNeed = 0.45 * level * dt;
+    if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
-    next.resources.DATA += 0.06 * level * d.dataMult * effective;
+    next.resources.DATA += 0.08 * level * d.dataMult * effective;
   });
 
   runBuilding("repairBay", (level) => {
-    const energyNeed = 0.8 * level * dt;
+    const energyNeed = 0.45 * level * dt;
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.stability = Math.min(100, (next.stability || 100) + 0.02 * level * effective);
   });
 
   runBuilding("refinery", (level) => {
-    const energyNeed = 2.6 * level * dt;
+    const energyNeed = 2.2 * level * dt;
     const oreNeed = 1.8 * level * effective;
     const scrapNeed = 0.7 * level * effective;
-    if (next.resources.ENERGY < energyNeed) return;
+    if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     if (next.resources.ORE < oreNeed || next.resources.SCRAP < scrapNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.ORE -= oreNeed;
@@ -1623,10 +1624,10 @@ function getNextStep(state, derived, systemState, liveContracts = []) {
     };
   }
 
-  if (energyCap > 0 && energy <= energyCap * 0.25) {
+  if (energyCap > 0 && energy <= energyCap * 0.12) {
     return {
       title: "Recover energy reserves",
-      text: "Low energy is becoming a bottleneck. Power Cell improves max Energy and regen, but it does not instantly refill current Energy. Use Refill or wait for regeneration.",
+      text: "Energy reserve is critically low. Refill now or allow systems to recover.",
     };
   }
 
