@@ -3956,7 +3956,19 @@ export default function MleoBase() {
 
                 <div className="shrink-0 flex flex-col items-end gap-1">
                   <div className="h-[28px] flex items-center justify-end">
-                    {ready ? <AvailabilityBadge /> : <div className="h-[28px]" />}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBuildInfo(getBuildingInfo(building));
+                        setOpenInfoKey(null);
+                      }}
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                      aria-label={`Open info for ${building.name}`}
+                      title={`Info about ${building.name}`}
+                    >
+                      i
+                    </button>
                   </div>
                 </div>
               </div>
@@ -3966,19 +3978,9 @@ export default function MleoBase() {
                   Lv {level}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setBuildInfo(getBuildingInfo(building));
-                    setOpenInfoKey(null);
-                  }}
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-                  aria-label={`Open info for ${building.name}`}
-                  title={`Info about ${building.name}`}
-                >
-                  i
-                </button>
+                <div className="h-[24px] flex items-center">
+                  {ready ? <AvailabilityBadge /> : null}
+                </div>
               </div>
 
               <div className="mt-1 h-[38px] overflow-hidden text-[11px] leading-[1.2rem] text-white/60 line-clamp-2">
