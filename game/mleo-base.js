@@ -2360,47 +2360,7 @@ export default function MleoBase() {
     };
   }, [state, liveContracts, missionProgress]);
 
-  const readyItems = useMemo(() => {
-    const items = [];
-
-    if (readyCounts.expedition > 0) {
-      items.push({
-        key: "expedition",
-        title: "Expedition ready",
-        text: "Field team is available for deployment.",
-        count: readyCounts.expedition,
-      });
-    }
-
-    if (readyCounts.contracts > 0) {
-      items.push({
-        key: "contracts",
-        title: "Contract reward ready",
-        text: `${readyCounts.contracts} command contract${readyCounts.contracts > 1 ? "s are" : " is"} ready to claim.`,
-        count: readyCounts.contracts,
-      });
-    }
-
-    if (readyCounts.missions > 0) {
-      items.push({
-        key: "missions",
-        title: "Mission reward ready",
-        text: `${readyCounts.missions} daily mission${readyCounts.missions > 1 ? "s are" : " is"} ready to claim.`,
-        count: readyCounts.missions,
-      });
-    }
-
-    if (readyCounts.shipment > 0) {
-      items.push({
-        key: "shipment",
-        title: "Shipment opportunity",
-        text: "Banked MLEO is ready for a measured shipment.",
-        count: readyCounts.shipment,
-      });
-    }
-
-    return items;
-  }, [readyCounts]);
+  // command hub items use alerts; define after alerts below
   const blueprintCost = useMemo(
     () => Math.floor(CONFIG.blueprintBaseCost * Math.pow(CONFIG.blueprintGrowth, state.blueprintLevel)),
     [state.blueprintLevel]
@@ -2445,6 +2405,71 @@ export default function MleoBase() {
     [state, derived, systemState, liveContracts]
   );
   const desktopPriorityAlert = alerts[0] || null;
+
+  const commandHubItems = useMemo(() => {
+    const items = [];
+
+    alerts.forEach((alert) => {
+      items.push({
+        key: `alert-${alert.key}`,
+        type: "alert",
+        tone: alert.tone || "info",
+        alertKey: alert.key,
+        title: alert.title,
+        text: alert.text,
+        count: 0,
+      });
+    });
+
+    if (readyCounts.contracts > 0) {
+      items.push({
+        key: "contracts",
+        type: "ready",
+        tone: "success",
+        title: "Contract reward ready",
+        text: `${readyCounts.contracts} command contract${readyCounts.contracts > 1 ? "s are" : " is"} ready to claim.`,
+        count: readyCounts.contracts,
+      });
+    }
+
+    if (readyCounts.missions > 0) {
+      items.push({
+        key: "missions",
+        type: "ready",
+        tone: "success",
+        title: "Mission reward ready",
+        text: `${readyCounts.missions} daily mission${readyCounts.missions > 1 ? "s are" : " is"} ready to claim.`,
+        count: readyCounts.missions,
+      });
+    }
+
+    if (readyCounts.expedition > 0) {
+      items.push({
+        key: "expedition",
+        type: "ready",
+        tone: "info",
+        title: "Expedition ready",
+        text: "Field team is available for deployment.",
+        count: readyCounts.expedition,
+      });
+    }
+
+    if (readyCounts.shipment > 0) {
+      items.push({
+        key: "shipment",
+        type: "ready",
+        tone: "info",
+        title: "Shipment opportunity",
+        text: "Banked MLEO is ready for a measured shipment.",
+        count: readyCounts.shipment,
+      });
+    }
+
+    return items;
+  }, [alerts, readyCounts]);
+
+  const primaryCommandItem = commandHubItems[0] || null;
+  const commandHubCount = commandHubItems.length;
 
   const nextStep = useMemo(
     () => getNextStep(state, derived, systemState, liveContracts),
@@ -4129,6 +4154,55 @@ export default function MleoBase() {
     setMobilePanel(panel);
   };
 
+  const openCommandHubTarget = (item) => {
+    if (!item) return;
+
+    setShowReadyPanel(false);
+
+    if (item.key === "expedition" || item.key === "shipment") {
+      openMobilePanel("ops");
+      setOpenInnerPanel("ops-console");
+      return;
+    }
+
+    if (item.key === "contracts") {
+      openMobilePanel("overview");
+      setOpenInnerPanel("overview-contracts");
+      return;
+    }
+
+    if (item.key === "missions") {
+      openMobilePanel("ops");
+      setOpenInnerPanel("ops-missions");
+      return;
+    }
+
+    if (item.type === "alert") {
+      if (
+        item.alertKey === "critical-stability" ||
+        item.alertKey === "warning-stability" ||
+        item.alertKey === "low-energy" ||
+        item.alertKey === "ship-pressure"
+      ) {
+        openMobilePanel("ops");
+        setOpenInnerPanel("ops-console");
+        return;
+      }
+
+      if (item.alertKey === "expedition-ready" || item.alertKey === "banked-ready") {
+        openMobilePanel("ops");
+        setOpenInnerPanel("ops-console");
+        return;
+      }
+
+      if (item.alertKey === "contracts-ready") {
+        openMobilePanel("overview");
+        setOpenInnerPanel("overview-contracts");
+        return;
+      }
+    }
+  };
+
   const closeMobilePanel = () => {
     setOpenInnerPanel(null);
     setMobilePanel(null);
@@ -4281,23 +4355,7 @@ export default function MleoBase() {
             </div>
           </div>
 
-          {alerts.length ? (
-            <div className="mt-4 space-y-2 lg:hidden">
-              {alerts.map((alert) => (
-                <div
-                  key={alert.key}
-                  className={`rounded-2xl border px-4 py-3 ${alertToneClasses(alert.tone)}`}
-                >
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <div className="text-sm font-bold">{alert.title}</div>
-                      <div className="text-xs text-white/75">{alert.text}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
+          {null}
 
           {/* Desktop */}
           <div className="mt-6 hidden sm:grid grid-cols-2 lg:hidden gap-3 xl:items-stretch">
@@ -5177,39 +5235,43 @@ export default function MleoBase() {
 
             <div
               onClick={() => {
-                if (readyCounts.total > 0) setShowReadyPanel(true);
+                if (commandHubCount > 0) setShowReadyPanel(true);
               }}
               className={`rounded-2xl border px-4 py-3 transition ${
-                readyCounts.total > 0
-                  ? "cursor-pointer border-cyan-400/60 bg-cyan-500/10 shadow-[0_0_24px_rgba(34,211,238,0.18)] hover:bg-cyan-500/15 hover:border-cyan-400/80"
+                commandHubCount > 0
+                  ? `cursor-pointer shadow-[0_0_24px_rgba(34,211,238,0.18)] hover:border-cyan-400/80 ${
+                      primaryCommandItem?.type === "alert"
+                        ? alertToneClasses(primaryCommandItem.tone)
+                        : "border-cyan-400/60 bg-cyan-500/10 hover:bg-cyan-500/15"
+                    }`
                   : "border-white/10 bg-white/5"
-              } ${readyCounts.total > 0 ? "animate-pulse" : ""}`}
+              } ${commandHubCount > 0 ? "animate-pulse" : ""}`}
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <div className="text-sm font-bold text-white">
-                      {readyCounts.total > 0 ? `${readyCounts.total} Ready Action${readyCounts.total > 1 ? "s" : ""}` : "Base is stable"}
+                      {primaryCommandItem?.title || "Base is stable"}
                     </div>
-                    {readyCounts.total > 0 && (
+                    {commandHubCount > 0 && (
                       <span className="inline-flex min-w-[24px] items-center justify-center rounded-full bg-cyan-400 px-1.5 py-0.5 text-[10px] font-bold text-black">
-                        {readyCounts.total}
+                        {commandHubCount}
                       </span>
                     )}
                   </div>
                   <div className="mt-0.5 text-xs text-white/75">
-                    {readyCounts.total > 0
-                      ? "Open command hub to collect"
-                      : "Nothing needs attention right now."}
+                    {primaryCommandItem?.text || "Nothing needs attention right now."}
                   </div>
                 </div>
 
-                <div className={`shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                  readyCounts.total > 0
-                    ? "bg-cyan-500 text-white hover:bg-cyan-400"
-                    : "bg-white/10 text-white/80"
-                }`}>
-                  {readyCounts.total > 0 ? "OPEN" : "OK"}
+                <div
+                  className={`shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                    commandHubCount > 0
+                      ? "bg-cyan-500 text-white hover:bg-cyan-400"
+                      : "bg-white/10 text-white/80"
+                  }`}
+                >
+                  {commandHubCount > 0 ? "OPEN" : "OK"}
                 </div>
               </div>
             </div>
@@ -6003,9 +6065,9 @@ export default function MleoBase() {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-lg font-bold text-white">Ready Now</div>
+                    <div className="text-lg font-bold text-white">Command Hub</div>
                     <div className="mt-1 text-xs text-white/60">
-                      Live actions and rewards currently available.
+                      Alerts, rewards and live actions currently available.
                     </div>
                   </div>
 
@@ -6018,33 +6080,37 @@ export default function MleoBase() {
                 </div>
 
                 <div className="mt-4 space-y-3">
-                  {readyItems.length ? (
-                    readyItems.map((item) => (
+                  {commandHubItems.length ? (
+                    commandHubItems.map((item) => (
                       <button
                         key={item.key}
-                        onClick={() => {
-                          setShowReadyPanel(false);
-
-                          if (item.key === "expedition" || item.key === "shipment") {
-                            openMobilePanel("ops");
-                            setOpenInnerPanel("ops-console");
-                          } else if (item.key === "contracts") {
-                            openMobilePanel("overview");
-                            setOpenInnerPanel("overview-contracts");
-                          } else if (item.key === "missions") {
-                            openMobilePanel("ops");
-                            setOpenInnerPanel("ops-missions");
-                          }
-                        }}
-                        className="block w-full rounded-2xl border border-white/10 bg-black/20 p-3 text-left hover:bg-white/10"
+                        onClick={() => openCommandHubTarget(item)}
+                        className={`block w-full rounded-2xl border p-3 text-left hover:bg-white/10 ${
+                          item.type === "alert"
+                            ? alertToneClasses(item.tone)
+                            : "border-white/10 bg-black/20"
+                        }`}
                       >
-                        <div className="text-sm font-semibold text-white">{item.title}</div>
-                        <div className="mt-1 text-xs text-white/65">{item.text}</div>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-white">{item.title}</div>
+                            <div className="mt-1 text-xs text-white/65">{item.text}</div>
+                          </div>
+
+                          <div className="shrink-0 flex items-center gap-2">
+                            {item.count > 0 ? (
+                              <span className="inline-flex min-w-[22px] items-center justify-center rounded-full bg-cyan-400 px-1.5 py-0.5 text-[10px] font-bold text-black">
+                                {item.count}
+                              </span>
+                            ) : null}
+                            <span className="text-cyan-300 text-lg font-bold">›</span>
+                          </div>
+                        </div>
                       </button>
                     ))
                   ) : (
                     <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
-                      Nothing is ready right now.
+                      Nothing needs attention right now.
                     </div>
                   )}
                 </div>
