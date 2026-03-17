@@ -1994,6 +1994,9 @@ export default function MleoBase() {
   const [openInnerPanel, setOpenInnerPanel] = useState(null);
   const [structuresTab, setStructuresTab] = useState("core");
 
+  const [desktopPanel, setDesktopPanel] = useState("ops");
+  const [desktopCompact, setDesktopCompact] = useState(true);
+
   const [activeEvent, setActiveEvent] = useState(null);
   const [eventCooldownUntil, setEventCooldownUntil] = useState(0);
   const [nextShipBonus, setNextShipBonus] = useState(0);
@@ -3592,6 +3595,22 @@ export default function MleoBase() {
     setMobilePanel(null);
   };
 
+  const openDesktopPanel = (panel, inner = null) => {
+    setDesktopPanel(panel);
+    setOpenInnerPanel(inner || null);
+  };
+
+  const desktopPanelTitle =
+    desktopPanel === "overview"
+      ? "Overview"
+      : desktopPanel === "ops"
+      ? "Operations"
+      : desktopPanel === "build"
+      ? "Build"
+      : desktopPanel === "intel"
+      ? "Intel"
+      : "";
+
   const mobilePanelTitle =
     mobilePanel === "overview"
       ? "Overview"
@@ -3713,7 +3732,7 @@ export default function MleoBase() {
           ) : null}
 
           {/* Desktop */}
-          <div className="mt-6 hidden gap-3 xl:grid xl:grid-cols-6 xl:items-stretch">
+          <div className="mt-6 hidden sm:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 xl:items-stretch">
             <div className="relative">
               <InfoButton
                 infoKey="sharedVault"
@@ -3835,6 +3854,622 @@ export default function MleoBase() {
               <div className="mt-1 text-lg font-bold text-white">{fmt(state.resources.SCRAP)}</div>
               <div className="mt-1 text-xs text-white/55">x{derived.scrapMult.toFixed(2)} output</div>
             </div>
+          </div>
+
+          {/* Desktop Command Center */}
+          <div className="mt-4 hidden lg:flex lg:h-[calc(100vh-150px)] lg:min-h-[700px] lg:max-h-[860px] lg:gap-4 lg:overflow-hidden">
+            {/* LEFT SIDEBAR */}
+            <aside className="w-[230px] shrink-0 space-y-3">
+              <div className="rounded-[28px] border border-white/10 bg-slate-950/75 p-3 backdrop-blur-xl">
+                <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-300/70">
+                  Command
+                </div>
+                <div className="mt-2 space-y-2">
+                  {[
+                    { key: "overview", label: "Overview" },
+                    { key: "ops", label: "Operations" },
+                    { key: "build", label: "Build" },
+                    { key: "intel", label: "Intel" },
+                  ].map((item) => {
+                    const active = desktopPanel === item.key;
+                    return (
+                      <button
+                        key={item.key}
+                        onClick={() => openDesktopPanel(item.key)}
+                        className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                          active
+                            ? "bg-cyan-400 text-slate-950"
+                            : "border border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>{item.label}</span>
+                        {item.key === "overview" && liveContractsAvailableCount > 0 ? (
+                          <span className="rounded-full bg-black/15 px-2 py-0.5 text-[11px] font-bold">
+                            {liveContractsAvailableCount}
+                          </span>
+                        ) : null}
+                        {item.key === "ops" && readyCounts.total > 0 ? (
+                          <span className="rounded-full bg-black/15 px-2 py-0.5 text-[11px] font-bold">
+                            {readyCounts.total}
+                          </span>
+                        ) : null}
+                        {item.key === "build" && buildOpportunitiesCount > 0 ? (
+                          <span className="rounded-full bg-black/15 px-2 py-0.5 text-[11px] font-bold">
+                            {buildOpportunitiesCount}
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-cyan-400/25 bg-cyan-500/10 p-4 backdrop-blur-xl">
+                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200/70">
+                  Ready Now
+                </div>
+                <div className="mt-2 text-3xl font-black text-white">
+                  {readyCounts.total}
+                </div>
+                <div className="mt-1 text-xs text-white/65">
+                  Immediate actions and rewards available
+                </div>
+
+                <div className="mt-3 flex flex-col gap-2">
+                  <button
+                    onClick={() => {
+                      if (canExpeditionNow || canShipNow || needsRefillNow || needsMaintenanceNow) {
+                        openDesktopPanel("ops", "ops-console");
+                      } else if (dailyMissionsAvailableCount > 0) {
+                        openDesktopPanel("ops", "ops-missions");
+                      } else if (liveContractsAvailableCount > 0) {
+                        openDesktopPanel("overview", "overview-contracts");
+                      } else if (buildOpportunitiesCount > 0) {
+                        openDesktopPanel("build", "build-structures");
+                      } else {
+                        openDesktopPanel("overview");
+                      }
+                    }}
+                    className="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-bold text-slate-950 hover:bg-cyan-300"
+                  >
+                    Open Ready
+                  </button>
+
+                  <button
+                    onClick={() => setDesktopCompact((v) => !v)}
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"
+                  >
+                    {desktopCompact ? "Detailed View" : "Compact View"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-white/10 bg-slate-950/75 p-4 backdrop-blur-xl">
+                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                  Commander
+                </div>
+                <div className="mt-2 text-base font-black text-white">
+                  Lv {state.commanderLevel}
+                </div>
+                <div className="mt-1 text-sm text-white/75">{commanderPathInfo.name}</div>
+                <div className="mt-1 text-xs text-white/55">{crewRoleInfo.name}</div>
+
+                <div className="mt-4 grid grid-cols-1 gap-2">
+                  <Link
+                    href="/arcade"
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-white/10"
+                  >
+                    Open Arcade
+                  </Link>
+                  <Link
+                    href="/mleo-miners"
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-white/10"
+                  >
+                    Open Miners
+                  </Link>
+                  <button
+                    onClick={handleResetGame}
+                    className="rounded-2xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-200 hover:bg-rose-500/20"
+                  >
+                    Reset Game
+                  </button>
+                </div>
+              </div>
+            </aside>
+
+            {/* MAIN AREA */}
+            <section className="min-w-0 flex-1 overflow-hidden rounded-[32px] border border-white/10 bg-slate-950/75 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
+              {/* TOP HUD */}
+              <div className="border-b border-white/10 px-4 py-3">
+                <div className="grid grid-cols-4 gap-2 xl:grid-cols-8">
+                  {[
+                    { label: "ORE", value: fmt(state.resources?.ORE || 0) },
+                    { label: "GOLD", value: fmt(state.resources?.GOLD || 0) },
+                    { label: "SCRAP", value: fmt(state.resources?.SCRAP || 0) },
+                    { label: "DATA", value: fmt(state.resources?.DATA || 0) },
+                    { label: "ENERGY", value: `${fmt(state.resources?.ENERGY || 0)}/${fmt(derived.energyCap || 0)}` },
+                    { label: "MLEO", value: fmt(state.bankedMleo || 0) },
+                    { label: "STABILITY", value: `${fmt(state.stability || 0)}%` },
+                    { label: "READY", value: fmt(readyCounts.total || 0) },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
+                    >
+                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">
+                        {item.label}
+                      </div>
+                      <div className="mt-1 truncate text-sm font-black text-white xl:text-base">
+                        {item.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* PANEL HEADER */}
+              <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-300/70">
+                    Desktop Command Center
+                  </div>
+                  <div className="mt-1 text-2xl font-black text-white">
+                    {desktopPanelTitle}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setOpenInnerPanel(null)}
+                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
+                  >
+                    Reset Section
+                  </button>
+                </div>
+              </div>
+
+              {/* PANEL BODY */}
+              <div className="h-[calc(100%-138px)] overflow-y-auto p-4">
+                {desktopPanel === "overview" ? (
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                        Next Step
+                      </div>
+                      <div className="mt-2 text-xl font-black text-white">{nextStep.title}</div>
+                      <div className="mt-2 text-sm text-white/70">{nextStep.text}</div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          onClick={() => openDesktopPanel("ops", "ops-console")}
+                          className="rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-bold text-white hover:bg-cyan-400"
+                        >
+                          Open Ops
+                        </button>
+                        <button
+                          onClick={() => openDesktopPanel("build", "build-structures")}
+                          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"
+                        >
+                          Open Build
+                        </button>
+                      </div>
+
+                      {(activeEvent || nextShipBonus > 0) && !desktopCompact ? (
+                        <div className="mt-4 rounded-2xl border border-fuchsia-400/20 bg-fuchsia-500/10 p-4">
+                          <div className="text-sm font-bold text-white">
+                            {activeEvent ? activeEvent.title : "Logistics boost active"}
+                          </div>
+                          <div className="mt-1 text-xs text-white/70">
+                            {activeEvent ? activeEvent.text : "A previous command decision improved your next vault shipment."}
+                          </div>
+
+                          {nextShipBonus > 0 ? (
+                            <div className="mt-2 text-xs font-bold text-fuchsia-200">
+                              Next ship bonus: +{Math.round(nextShipBonus * 100)}%
+                            </div>
+                          ) : null}
+
+                          {activeEvent ? (
+                            <div className="mt-3 grid gap-2">
+                              {activeEvent.choices.map((choice) => {
+                                const allowed = canApplyEventChoice(state, choice, derived);
+                                return (
+                                  <button
+                                    key={choice.key}
+                                    onClick={() => resolveLiveEventChoice(choice)}
+                                    disabled={!allowed}
+                                    className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-40"
+                                  >
+                                    {choice.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <div>
+                          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                            Contracts
+                          </div>
+                          <div className="mt-1 text-lg font-black text-white">Live Objectives</div>
+                        </div>
+                        <button
+                          onClick={() =>
+                            setOpenInnerPanel(openInnerPanel === "overview-contracts" ? null : "overview-contracts")
+                          }
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
+                        >
+                          {openInnerPanel === "overview-contracts" ? "CLOSE" : "OPEN"}
+                        </button>
+                      </div>
+
+                      {openInnerPanel === "overview-contracts" || !desktopCompact ? (
+                        <div className="grid gap-3">
+                          {liveContracts.map((contract) => (
+                            <div
+                              key={contract.key}
+                              className="rounded-2xl border border-white/10 bg-black/20 p-3"
+                            >
+                              <div className="text-sm font-bold text-white">{contract.title}</div>
+                              {!desktopCompact ? (
+                                <div className="mt-1 text-xs text-white/65">{contract.desc}</div>
+                              ) : null}
+                              <div className="mt-1 text-xs text-cyan-200/80">{contract.rewardText}</div>
+                              <button
+                                onClick={() => claimContract(contract.key)}
+                                disabled={!contract.done || contract.claimed}
+                                className="mt-3 w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:opacity-40"
+                              >
+                                {contract.claimed ? "Claimed" : contract.done ? "Claim Contract" : "In Progress"}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-white/65">
+                          {liveContractsAvailableCount > 0
+                            ? `${liveContractsAvailableCount} contract reward${liveContractsAvailableCount > 1 ? "s" : ""} ready`
+                            : "No contract rewards ready right now"}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4 xl:col-span-2">
+                      <div className="grid gap-4 md:grid-cols-4">
+                        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Crew Role</div>
+                          <div className="mt-1 text-sm font-bold text-white">{crewRoleInfo.name}</div>
+                          <div className="mt-1 text-xs text-white/60">{roleBonusText}</div>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Commander Path</div>
+                          <div className="mt-1 text-sm font-bold text-white">{commanderPathInfo.name}</div>
+                          <div className="mt-1 text-xs text-white/60">{commanderPathText}</div>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Base Profile</div>
+                          <div className="mt-1 text-sm font-bold text-white">
+                            {state.crew >= 5 ? "Developed Command" : state.crew >= 2 ? "Growing Outpost" : "Early Outpost"}
+                          </div>
+                          <div className="mt-1 text-xs text-white/60">Identity shaped by buildings, role and path.</div>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Ship Discipline</div>
+                          <div className="mt-1 text-sm font-bold text-white">
+                            {fmt(state.sentToday)} / {fmt(derived.shipCap)}
+                          </div>
+                          <div className="mt-1 text-xs text-white/60">Softcut and cap remain active.</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {desktopPanel === "ops" ? (
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <div className={`rounded-3xl border border-white/10 bg-white/5 p-4 ${highlightTarget === "shipping" ? "ring-2 ring-cyan-300/35" : ""}`}>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                        Shipping
+                      </div>
+                      <div className="mt-1 text-lg font-black text-white">Ship to Shared Vault</div>
+                      <div className="mt-2 text-sm text-white/65">
+                        Move refined MLEO into the shared vault with the daily softcut still active.
+                      </div>
+                      <button
+                        onClick={bankToSharedVault}
+                        disabled={!canShipNow}
+                        className="mt-4 w-full rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-bold text-white hover:bg-cyan-400 disabled:opacity-40"
+                      >
+                        Ship {fmt(state.bankedMleo)} MLEO
+                      </button>
+                    </div>
+
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                        Expedition
+                      </div>
+                      <div className="mt-1 text-lg font-black text-white">Field Expedition</div>
+                      <div className="mt-2 text-sm text-white/65">
+                        Spend {CONFIG.expeditionCost} energy for resources, DATA and rare findings.
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {["balanced", "scan", "salvage"].map((mode) => (
+                          <button
+                            key={mode}
+                            onClick={() => setExpeditionMode(mode)}
+                            className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
+                              expeditionMode === mode
+                                ? "bg-cyan-500 text-white"
+                                : "bg-white/10 text-white/75 hover:bg-white/20"
+                            }`}
+                          >
+                            {mode.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={handleLaunchExpedition}
+                        disabled={expeditionLeft > 0 || !canExpeditionNow}
+                        className="mt-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/20 disabled:opacity-40"
+                      >
+                        {expeditionLeft > 0 ? `Ready in ${Math.ceil(expeditionLeft / 1000)}s` : "Launch Expedition"}
+                      </button>
+                    </div>
+
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                        Blueprint
+                      </div>
+                      <div className="mt-1 text-lg font-black text-white">Blueprint Cache</div>
+                      <div className="mt-2 text-sm text-white/65">
+                        Costs {fmt(blueprintCost)} shared MLEO and improves long-term efficiency.
+                      </div>
+                      <button
+                        onClick={buyBlueprint}
+                        disabled={!canBuyBlueprintNow}
+                        className="mt-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/20 disabled:opacity-40"
+                      >
+                        Buy Blueprint Lv {state.blueprintLevel + 1}
+                      </button>
+                    </div>
+
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                        Utilities
+                      </div>
+                      <div className="mt-1 text-lg font-black text-white">Base Support</div>
+                      <div className="mt-2 text-sm text-white/65">
+                        Stability: {fmt(state.stability)}% · keep systems healthy and productive.
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-3 gap-2">
+                        <button
+                          onClick={activateOverclock}
+                          className="rounded-xl bg-white/10 px-3 py-3 text-xs font-bold text-white hover:bg-white/20"
+                        >
+                          {overclockLeft > 0 ? `Overclock ${Math.ceil(overclockLeft / 1000)}s` : `Overclock ${fmt(CONFIG.overclockCost)}`}
+                        </button>
+                        <button
+                          onClick={refillEnergy}
+                          className="rounded-xl bg-white/10 px-3 py-3 text-xs font-bold text-white hover:bg-white/20"
+                        >
+                          Refill {fmt(CONFIG.refillCost)}
+                        </button>
+                        <button
+                          onClick={performMaintenance}
+                          className="rounded-xl bg-white/10 px-3 py-3 text-xs font-bold text-white hover:bg-white/20"
+                        >
+                          Maintain
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4 xl:col-span-2">
+                      <div className="mb-3 flex items-center justify-between">
+                        <div>
+                          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                            Daily Missions
+                          </div>
+                          <div className="mt-1 text-lg font-black text-white">Mission Queue</div>
+                        </div>
+                        <button
+                          onClick={() =>
+                            setOpenInnerPanel(openInnerPanel === "ops-missions" ? null : "ops-missions")
+                          }
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
+                        >
+                          {openInnerPanel === "ops-missions" ? "CLOSE" : "OPEN"}
+                        </button>
+                      </div>
+
+                      {openInnerPanel === "ops-missions" || !desktopCompact ? (
+                        <div>{dailyMissionsContent}</div>
+                      ) : (
+                        <div className="text-sm text-white/65">
+                          {sectionStatusHint("daily-missions", { count: dailyMissionsAvailableCount })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {desktopPanel === "build" ? (
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <div>
+                          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                            Development
+                          </div>
+                          <div className="mt-1 text-lg font-black text-white">Modules & Research</div>
+                        </div>
+                        <button
+                          onClick={() =>
+                            setOpenInnerPanel(openInnerPanel === "build-development" ? null : "build-development")
+                          }
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
+                        >
+                          {openInnerPanel === "build-development" ? "CLOSE" : "OPEN"}
+                        </button>
+                      </div>
+
+                      {openInnerPanel === "build-development" || !desktopCompact ? (
+                        <div>{crewModulesResearchContent}</div>
+                      ) : (
+                        <div className="text-sm text-white/65">
+                          {buildSectionHint("development", {
+                            modules: availableModulesCount,
+                            research: availableResearchCount,
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <div>
+                          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                            Structures
+                          </div>
+                          <div className="mt-1 text-lg font-black text-white">Base Upgrades</div>
+                        </div>
+                        <button
+                          onClick={() =>
+                            setOpenInnerPanel(openInnerPanel === "build-structures" ? null : "build-structures")
+                          }
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
+                        >
+                          {openInnerPanel === "build-structures" ? "CLOSE" : "OPEN"}
+                        </button>
+                      </div>
+
+                      {openInnerPanel === "build-structures" || !desktopCompact ? (
+                        <div>{baseStructuresContent}</div>
+                      ) : (
+                        <div className="text-sm text-white/65">
+                          {buildSectionHint("structures", { structures: availableStructuresCount })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4 xl:col-span-2">
+                      <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                        Support Systems
+                      </div>
+                      <div>{buildSupportSystemsContent}</div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {desktopPanel === "intel" ? (
+                  <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                        Command Schematic
+                      </div>
+                      <div className="mt-1 text-lg font-black text-white">Base Sectors</div>
+                      <div className="mt-2 grid gap-3">
+                        {[
+                          { key: "hq", label: "HQ Core" },
+                          { key: "refinery", label: "Refinery Sector" },
+                          { key: "logisticsCenter", label: "Logistics Sector" },
+                          { key: "researchLab", label: "Research Sector" },
+                          { key: "repairBay", label: "Repair Sector" },
+                          { key: "expeditionBay", label: "Expedition Sector" },
+                          { key: "minerControl", label: "Miner Link Sector" },
+                          { key: "arcadeHub", label: "Arcade Link Sector" },
+                        ].map((sector) => {
+                          const status = sectorStatusForBuilding(sector.key, state);
+                          const level = Number(state.buildings?.[sector.key] || 0);
+                          return (
+                            <div
+                              key={sector.key}
+                              className="rounded-2xl border border-white/10 bg-black/20 p-3"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <div className="text-sm font-bold text-white">{sector.label}</div>
+                                  <div className="mt-1 text-xs text-white/60">
+                                    {buildingSynergyTag(sector.key)}
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-xs font-bold text-white/70">Lv {level}</div>
+                                  <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-cyan-200/70">
+                                    {status}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4">
+                      <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <div>
+                            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                              Progress
+                            </div>
+                            <div className="mt-1 text-lg font-black text-white">Summary</div>
+                          </div>
+                          <button
+                            onClick={() =>
+                              setOpenInnerPanel(openInnerPanel === "intel-summary" ? null : "intel-summary")
+                            }
+                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
+                          >
+                            {openInnerPanel === "intel-summary" ? "CLOSE" : "OPEN"}
+                          </button>
+                        </div>
+
+                        {openInnerPanel === "intel-summary" || !desktopCompact ? (
+                          <div>{progressSummaryContent}</div>
+                        ) : (
+                          <div className="text-sm text-white/65">Key progress and identity data.</div>
+                        )}
+                      </div>
+
+                      <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <div>
+                            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
+                              Activity Log
+                            </div>
+                            <div className="mt-1 text-lg font-black text-white">Recent Events</div>
+                          </div>
+                          <button
+                            onClick={() =>
+                              setOpenInnerPanel(openInnerPanel === "intel-log" ? null : "intel-log")
+                            }
+                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
+                          >
+                            {openInnerPanel === "intel-log" ? "CLOSE" : "OPEN"}
+                          </button>
+                        </div>
+
+                        {openInnerPanel === "intel-log" || !desktopCompact ? (
+                          <div>{activityLogContent}</div>
+                        ) : (
+                          <div className="text-sm text-white/65">
+                            Recent events and milestones.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </section>
           </div>
 
           {activeInfo ? (
@@ -4837,398 +5472,368 @@ export default function MleoBase() {
             </div>
           ) : null}
 
-          {/* Desktop - Ready Actions Card */}
-          {readyCounts.total > 0 && (
-            <div
-              onClick={() => {
-                // Scroll to relevant section or open panel
-                const element = document.getElementById("ready-actions-section");
-                if (element) {
-                  element.scrollIntoView({ behavior: "smooth", block: "start" });
-                }
-              }}
-              className="mt-4 hidden cursor-pointer rounded-3xl border border-cyan-400/60 bg-cyan-500/10 p-4 shadow-[0_0_24px_rgba(34,211,238,0.18)] transition hover:bg-cyan-500/15 hover:border-cyan-400/80 sm:block"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <div className="text-lg font-bold text-white">
-                      {readyCounts.total} Ready Action{readyCounts.total > 1 ? "s" : ""}
+          {false && (
+            <>
+              {/* Desktop - Next Recommended Step & Live Event */}
+              <div
+                className={`mt-4 hidden rounded-3xl border p-4 sm:block ${
+                  systemState === "critical"
+                    ? "border-rose-500/25 bg-rose-500/10"
+                    : systemState === "warning"
+                    ? "border-amber-500/25 bg-amber-500/10"
+                    : "border-cyan-500/20 bg-cyan-500/10"
+                }`}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">
+                      Next Recommended Step
                     </div>
-                    <span className="inline-flex min-w-[28px] items-center justify-center rounded-full bg-cyan-400 px-2 py-1 text-xs font-bold text-black">
-                      {readyCounts.total}
-                    </span>
+                    <div className="mt-1 text-lg font-bold text-white">{nextStep.title}</div>
+                    <div className="mt-1 text-sm text-white/70">{nextStep.text}</div>
                   </div>
-                  <div className="text-sm text-white/75">
-                    Claim available rewards
-                  </div>
-                </div>
-                <div className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-400">
-                  View
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Desktop - Next Recommended Step & Live Event */}
-          <div
-            className={`mt-4 hidden rounded-3xl border p-4 sm:block ${
-              systemState === "critical"
-                ? "border-rose-500/25 bg-rose-500/10"
-                : systemState === "warning"
-                ? "border-amber-500/25 bg-amber-500/10"
-                : "border-cyan-500/20 bg-cyan-500/10"
-            }`}
-          >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">
-                  Next Recommended Step
-                </div>
-                <div className="mt-1 text-lg font-bold text-white">{nextStep.title}</div>
-                <div className="mt-1 text-sm text-white/70">{nextStep.text}</div>
-              </div>
-              <div className="rounded-2xl bg-black/20 px-4 py-3 text-sm text-white/75">
-                <div>Commander Lv {state.commanderLevel}</div>
-                <div className="mt-1 text-xs text-white/55">{commanderPathInfo.name}</div>
-              </div>
-            </div>
-          </div>
-
-          {activeEvent || nextShipBonus > 0 ? (
-            <div className="mt-4 hidden rounded-3xl border border-white/10 bg-white/5 p-4 sm:block">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">
-                    Live Command Event
-                  </div>
-                  <div className="mt-1 text-lg font-bold text-white">
-                    {activeEvent ? activeEvent.title : "Logistics boost active"}
-                  </div>
-                  <div className="mt-1 text-sm text-white/70">
-                    {activeEvent
-                      ? activeEvent.text
-                      : "A previous command decision improved your next vault shipment."}
+                  <div className="rounded-2xl bg-black/20 px-4 py-3 text-sm text-white/75">
+                    <div>Commander Lv {state.commanderLevel}</div>
+                    <div className="mt-1 text-xs text-white/55">{commanderPathInfo.name}</div>
                   </div>
                 </div>
-
-                {nextShipBonus > 0 ? (
-                  <div className="rounded-2xl bg-emerald-500/15 px-4 py-3 text-sm text-emerald-200">
-                    Next ship bonus: +{Math.round(nextShipBonus * 100)}%
-                  </div>
-                ) : null}
               </div>
 
-              {activeEvent ? (
-                <div className="mt-4 grid gap-2 md:grid-cols-3">
-                  {activeEvent.choices.map((choice) => {
-                    const allowed = canApplyEventChoice(state, choice, derived);
-                    return (
-                      <button
-                        key={choice.key}
-                        onClick={() => resolveLiveEventChoice(choice)}
-                        disabled={!allowed}
-                        className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <div>{choice.label}</div>
-                      </button>
-                    );
-                  })}
+              {activeEvent || nextShipBonus > 0 ? (
+                <div className="mt-4 hidden rounded-3xl border border-white/10 bg-white/5 p-4 sm:block">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">
+                        Live Command Event
+                      </div>
+                      <div className="mt-1 text-lg font-bold text-white">
+                        {activeEvent ? activeEvent.title : "Logistics boost active"}
+                      </div>
+                      <div className="mt-1 text-sm text-white/70">
+                        {activeEvent
+                          ? activeEvent.text
+                          : "A previous command decision improved your next vault shipment."}
+                      </div>
+                    </div>
+
+                    {nextShipBonus > 0 ? (
+                      <div className="rounded-2xl bg-emerald-500/15 px-4 py-3 text-sm text-emerald-200">
+                        Next ship bonus: +{Math.round(nextShipBonus * 100)}%
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {activeEvent ? (
+                    <div className="mt-4 grid gap-2 md:grid-cols-3">
+                      {activeEvent.choices.map((choice) => {
+                        const allowed = canApplyEventChoice(state, choice, derived);
+                        return (
+                          <button
+                            key={choice.key}
+                            onClick={() => resolveLiveEventChoice(choice)}
+                            disabled={!allowed}
+                            className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <div>{choice.label}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
-            </div>
-          ) : null}
 
-          <div className="mt-4 hidden xl:grid xl:grid-cols-4 gap-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Crew Role</div>
-              <div className="mt-1 text-lg font-bold text-white">{crewRoleInfo.name}</div>
-              <div className="mt-1 text-xs text-white/60">{roleBonusText}</div>
-            </div>
+              <div className="mt-4 hidden xl:grid xl:grid-cols-4 gap-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-white/45">Crew Role</div>
+                  <div className="mt-1 text-lg font-bold text-white">{crewRoleInfo.name}</div>
+                  <div className="mt-1 text-xs text-white/60">{roleBonusText}</div>
+                </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Commander Path</div>
-              <div className="mt-1 text-lg font-bold text-white">{commanderPathInfo.name}</div>
-              <div className="mt-1 text-xs text-white/60">{commanderPathText}</div>
-            </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-white/45">Commander Path</div>
+                  <div className="mt-1 text-lg font-bold text-white">{commanderPathInfo.name}</div>
+                  <div className="mt-1 text-xs text-white/60">{commanderPathText}</div>
+                </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Base Profile</div>
-              <div className="mt-1 text-lg font-bold text-white">
-                {state.crew >= 5 ? "Developed Command" : state.crew >= 2 ? "Growing Outpost" : "Early Outpost"}
-              </div>
-              <div className="mt-1 text-xs text-white/60">Identity shaped by buildings, role and path.</div>
-            </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-white/45">Base Profile</div>
+                  <div className="mt-1 text-lg font-bold text-white">
+                    {state.crew >= 5 ? "Developed Command" : state.crew >= 2 ? "Growing Outpost" : "Early Outpost"}
+                  </div>
+                  <div className="mt-1 text-xs text-white/60">Identity shaped by buildings, role and path.</div>
+                </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Ship Discipline</div>
-              <div className="mt-1 text-lg font-bold text-white">
-                {fmt(state.sentToday)} / {fmt(derived.shipCap)}
-              </div>
-              <div className="mt-1 text-xs text-white/60">Softcut and cap remain active.</div>
-            </div>
-          </div>
-
-          {/* Desktop - Command Schematic */}
-          <div className="hidden xl:block">
-            <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
-              <div className="mb-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-white/55">Command Schematic</div>
-                <div className="mt-1 text-lg font-bold text-white">Base Sectors</div>
-                <div className="mt-1 text-sm text-white/65">
-                  A live overview of core sectors, support links and current operational state.
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-white/45">Ship Discipline</div>
+                  <div className="mt-1 text-lg font-bold text-white">
+                    {fmt(state.sentToday)} / {fmt(derived.shipCap)}
+                  </div>
+                  <div className="mt-1 text-xs text-white/60">Softcut and cap remain active.</div>
                 </div>
               </div>
 
-              <div className="grid gap-3 xl:grid-cols-4">
-                {[
-                  { key: "hq", label: "HQ Core" },
-                  { key: "refinery", label: "Refinery Sector" },
-                  { key: "logisticsCenter", label: "Logistics Sector" },
-                  { key: "researchLab", label: "Research Sector" },
-                  { key: "repairBay", label: "Repair Sector" },
-                  { key: "expeditionBay", label: "Expedition Sector" },
-                  { key: "minerControl", label: "Miner Link Sector" },
-                  { key: "arcadeHub", label: "Arcade Link Sector" },
-                ].map((sector) => {
-                  const status = sectorStatusForBuilding(sector.key, state);
-                  const level = Number(state.buildings?.[sector.key] || 0);
+              {/* Desktop - Command Schematic */}
+              <div className="hidden xl:block">
+                <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+                  <div className="mb-4">
+                    <div className="text-xs uppercase tracking-[0.18em] text-white/55">Command Schematic</div>
+                    <div className="mt-1 text-lg font-bold text-white">Base Sectors</div>
+                    <div className="mt-1 text-sm text-white/65">
+                      A live overview of core sectors, support links and current operational state.
+                    </div>
+                  </div>
 
-                  return (
+                  <div className="grid gap-3 xl:grid-cols-4">
+                    {[
+                      { key: "hq", label: "HQ Core" },
+                      { key: "refinery", label: "Refinery Sector" },
+                      { key: "logisticsCenter", label: "Logistics Sector" },
+                      { key: "researchLab", label: "Research Sector" },
+                      { key: "repairBay", label: "Repair Sector" },
+                      { key: "expeditionBay", label: "Expedition Sector" },
+                      { key: "minerControl", label: "Miner Link Sector" },
+                      { key: "arcadeHub", label: "Arcade Link Sector" },
+                    ].map((sector) => {
+                      const status = sectorStatusForBuilding(sector.key, state);
+                      const level = Number(state.buildings?.[sector.key] || 0);
+
+                      return (
+                        <div
+                          key={sector.key}
+                          className={`rounded-2xl border px-4 py-3 ${sectorStatusClasses(status)}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="text-sm font-semibold">{sector.label}</div>
+                            <div className="rounded-full bg-black/20 px-2 py-1 text-[11px] font-bold">
+                              Lv {level}
+                            </div>
+                          </div>
+
+                          <div className="mt-2 text-xs uppercase tracking-[0.14em]">
+                            {status}
+                          </div>
+
+                          <div className="mt-2 text-xs text-white/70">
+                            {buildingSynergyTag(sector.key)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop - Live Contracts */}
+              <div className="hidden xl:block">
+                <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+                  <div className="mb-4">
+                    <div className="text-xs uppercase tracking-[0.18em] text-white/55">Live Contracts</div>
+                    <div className="mt-1 text-lg font-bold text-white">Command Objectives</div>
+                    <div className="mt-1 text-sm text-white/65">
+                      Short support contracts that reward healthy base behavior without turning BASE into an aggressive faucet.
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    {liveContracts.map((contract) => (
+                      <div
+                        key={contract.key}
+                        className={`flex min-h-[180px] flex-col rounded-2xl border border-white/10 bg-black/20 p-4 ${
+                          contract.done && !contract.claimed ? highlightCard(true, "success") : ""
+                        }`}
+                      >
+                        <div className="text-sm font-semibold text-white">{contract.title}</div>
+                        <div className="mt-1 text-xs text-white/60">{contract.desc}</div>
+
+                        <div className="mt-auto">
+                          <div className="mb-3 text-xs text-cyan-200/80">{contract.rewardText}</div>
+                          <button
+                            onClick={() => claimContract(contract.key)}
+                            disabled={!contract.done || contract.claimed}
+                            className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {contract.claimed ? "Claimed" : contract.done ? "Claim Contract" : "In Progress"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop - Operations + Missions */}
+              <div className="mt-4 hidden xl:grid xl:grid-cols-[1fr_0.92fr] gap-4">
+                <Section
+                  title="Operations Console"
+                  subtitle={`Ship cap today: ${fmt(state.sentToday)} / ${fmt(derived.shipCap)} MLEO. Utilities and exports keep BASE productive without becoming an uncontrolled faucet.`}
+                >
+                  <div className="grid gap-3 md:grid-cols-2">
                     <div
-                      key={sector.key}
-                      className={`rounded-2xl border px-4 py-3 ${sectorStatusClasses(status)}`}
+                      data-base-target="shipping"
+                      className={`flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
+                        highlightCard((state.bankedMleo || 0) >= 120, "success")
+                      } ${highlightTarget === "shipping" ? "ring-2 ring-cyan-300/35" : ""}`}
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-sm font-semibold">{sector.label}</div>
-                        <div className="rounded-full bg-black/20 px-2 py-1 text-[11px] font-bold">
-                          Lv {level}
+                      <div className="flex min-h-[88px] flex-col">
+                        <div className="text-sm font-semibold text-emerald-200">Ship to Shared Vault</div>
+                        <p className="mt-1 text-sm text-white/70">
+                          Move refined MLEO into the main vault with a daily softcut, so BASE supports Miners instead of replacing it.
+                        </p>
+                      </div>
+                      <button
+                        onClick={bankToSharedVault}
+                        className="mt-auto w-full rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-extrabold shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-500"
+                      >
+                        Ship {fmt(state.bankedMleo)} MLEO
+                      </button>
+                    </div>
+
+                    <div
+                      className={`flex h-full flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 ${
+                        highlightCard(expeditionLeft <= 0 && (state.resources.DATA || 0) >= 4, "info")
+                      }`}
+                    >
+                      <div className="flex min-h-[88px] flex-col">
+                        <div className="text-sm font-semibold text-cyan-200">Field Expedition</div>
+                        <p className="mt-1 text-sm text-white/70">
+                          Spend {CONFIG.expeditionCost} energy for Ore, Gold, Scrap, DATA and only a small chance of banked MLEO.
+                        </p>
+
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          {["balanced", "scan", "salvage"].map((mode) => (
+                            <button
+                              key={mode}
+                              onClick={() => setExpeditionMode(mode)}
+                              className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
+                                expeditionMode === mode
+                                  ? "bg-cyan-500 text-white"
+                                  : "bg-white/10 text-white/75 hover:bg-white/20"
+                              }`}
+                            >
+                              {mode.toUpperCase()}
+                            </button>
+                          ))}
+                      </div>
+
+                        <div className="mt-2 text-xs text-white/55">
+                          Current mode: {expeditionMode.toUpperCase()}
                         </div>
                       </div>
 
-                      <div className="mt-2 text-xs uppercase tracking-[0.14em]">
-                        {status}
-                      </div>
-
-                      <div className="mt-2 text-xs text-white/70">
-                        {buildingSynergyTag(sector.key)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop - Live Contracts */}
-          <div className="hidden xl:block">
-            <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
-              <div className="mb-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-white/55">Live Contracts</div>
-                <div className="mt-1 text-lg font-bold text-white">Command Objectives</div>
-                <div className="mt-1 text-sm text-white/65">
-                  Short support contracts that reward healthy base behavior without turning BASE into an aggressive faucet.
-                </div>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {liveContracts.map((contract) => (
-                  <div
-                    key={contract.key}
-                    className={`flex min-h-[180px] flex-col rounded-2xl border border-white/10 bg-black/20 p-4 ${
-                      contract.done && !contract.claimed ? highlightCard(true, "success") : ""
-                    }`}
-                  >
-                    <div className="text-sm font-semibold text-white">{contract.title}</div>
-                    <div className="mt-1 text-xs text-white/60">{contract.desc}</div>
-
-                    <div className="mt-auto">
-                      <div className="mb-3 text-xs text-cyan-200/80">{contract.rewardText}</div>
                       <button
-                        onClick={() => claimContract(contract.key)}
-                        disabled={!contract.done || contract.claimed}
-                        className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+                        onClick={handleLaunchExpedition}
+                        disabled={!canExpeditionNow}
+                        className="mt-auto w-full rounded-2xl bg-cyan-600 px-4 py-3.5 text-sm font-extrabold shadow-lg shadow-cyan-900/30 transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        {contract.claimed ? "Claimed" : contract.done ? "Claim Contract" : "In Progress"}
+                        {expeditionLeft > 0 ? `Ready in ${Math.ceil(expeditionLeft / 1000)}s` : "Launch Expedition"}
                       </button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
 
+                    <div className="flex h-full flex-col gap-3 rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4">
+                      <div className="flex min-h-[88px] flex-col">
+                        <div className="text-sm font-semibold text-fuchsia-200">Blueprint Cache</div>
+                        <p className="mt-1 text-sm text-white/70">
+                          Costs {fmt(blueprintCost)} shared MLEO. Raises banking efficiency and daily ship cap permanently.
+                        </p>
+                      </div>
+                      <button
+                        onClick={buyBlueprint}
+                        className="mt-auto w-full rounded-xl bg-fuchsia-600 px-4 py-3 text-sm font-bold hover:bg-fuchsia-500"
+                      >
+                        Buy Blueprint Lv {state.blueprintLevel + 1}
+                      </button>
+                    </div>
 
-          {/* Desktop - Operations + Missions */}
-          <div className="mt-4 hidden xl:grid xl:grid-cols-[1fr_0.92fr] gap-4">
-            <Section
-              title="Operations Console"
-              subtitle={`Ship cap today: ${fmt(state.sentToday)} / ${fmt(derived.shipCap)} MLEO. Utilities and exports keep BASE productive without becoming an uncontrolled faucet.`}
-            >
-              <div className="grid gap-3 md:grid-cols-2">
-                <div
-                  data-base-target="shipping"
-                  className={`flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
-                    highlightCard((state.bankedMleo || 0) >= 120, "success")
-                  } ${highlightTarget === "shipping" ? "ring-2 ring-cyan-300/35" : ""}`}
-                >
-                  <div className="flex min-h-[88px] flex-col">
-                    <div className="text-sm font-semibold text-emerald-200">Ship to Shared Vault</div>
-                    <p className="mt-1 text-sm text-white/70">
-                      Move refined MLEO into the main vault with a daily softcut, so BASE supports Miners instead of replacing it.
-                    </p>
-                  </div>
-                  <button
-                    onClick={bankToSharedVault}
-                    className="mt-auto w-full rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-extrabold shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-500"
-                  >
-                    Ship {fmt(state.bankedMleo)} MLEO
-                  </button>
-                </div>
+                    <div
+                      data-base-target="maintenance"
+                      className={`flex h-full flex-col gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 ${
+                        systemState === "critical"
+                          ? highlightCard(true, "critical")
+                          : systemState === "warning"
+                          ? highlightCard(true, "warning")
+                          : ""
+                      } ${highlightTarget === "maintenance" ? "ring-2 ring-cyan-300/35" : ""}`}
+                    >
+                      <div className="flex min-h-[88px] flex-col">
+                        <div className="text-sm font-semibold text-amber-200">Shared Vault Utilities</div>
+                        <p className="mt-1 text-sm text-white/70">
+                          Spend shared MLEO on productivity instead of pure emissions.
+                        </p>
+                        <p className="mt-2 text-xs text-white/55">
+                          Stability: {fmt(state.stability)}%
+                        </p>
+                      </div>
 
-                <div
-                  className={`flex h-full flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 ${
-                    highlightCard(expeditionLeft <= 0 && (state.resources.DATA || 0) >= 4, "info")
-                  }`}
-                >
-                  <div className="flex min-h-[88px] flex-col">
-                    <div className="text-sm font-semibold text-cyan-200">Field Expedition</div>
-                    <p className="mt-1 text-sm text-white/70">
-                      Spend {CONFIG.expeditionCost} energy for Ore, Gold, Scrap, DATA and only a small chance of banked MLEO.
-                    </p>
-
-                    <div className="mt-3 grid grid-cols-3 gap-2">
-                      {["balanced", "scan", "salvage"].map((mode) => (
+                      <div className="mt-auto grid grid-cols-3 gap-2 pt-1">
+                        <button onClick={activateOverclock} className="rounded-xl bg-amber-600 px-3 py-3 text-sm font-bold hover:bg-amber-500">
+                          {overclockLeft > 0 ? `Overclock ${Math.ceil(overclockLeft / 1000)}s` : `Overclock ${fmt(CONFIG.overclockCost)}`}
+                        </button>
+                        <button onClick={refillEnergy} className="rounded-xl bg-white/10 px-3 py-3 text-sm font-bold hover:bg-white/20">
+                          Refill {fmt(CONFIG.refillCost)}
+                        </button>
                         <button
-                          key={mode}
-                          onClick={() => setExpeditionMode(mode)}
-                          className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
-                            expeditionMode === mode
-                              ? "bg-cyan-500 text-white"
-                              : "bg-white/10 text-white/75 hover:bg-white/20"
+                          onClick={performMaintenance}
+                          className={`rounded-xl px-3 py-3 text-sm font-bold ${
+                            systemState === "critical"
+                              ? "bg-rose-600 hover:bg-rose-500"
+                              : systemState === "warning"
+                              ? "bg-amber-600 hover:bg-amber-500"
+                              : "bg-white/10 hover:bg-white/20"
                           }`}
                         >
-                          {mode.toUpperCase()}
+                          Maintain
                         </button>
-                      ))}
-                  </div>
-
-                    <div className="mt-2 text-xs text-white/55">
-                      Current mode: {expeditionMode.toUpperCase()}
+                      </div>
                     </div>
                   </div>
-
-                  <button
-                    onClick={handleLaunchExpedition}
-                    disabled={!canExpeditionNow}
-                    className="mt-auto w-full rounded-2xl bg-cyan-600 px-4 py-3.5 text-sm font-extrabold shadow-lg shadow-cyan-900/30 transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {expeditionLeft > 0 ? `Ready in ${Math.ceil(expeditionLeft / 1000)}s` : "Launch Expedition"}
-                  </button>
-                </div>
-
-                <div className="flex h-full flex-col gap-3 rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4">
-                  <div className="flex min-h-[88px] flex-col">
-                    <div className="text-sm font-semibold text-fuchsia-200">Blueprint Cache</div>
-                    <p className="mt-1 text-sm text-white/70">
-                      Costs {fmt(blueprintCost)} shared MLEO. Raises banking efficiency and daily ship cap permanently.
-                    </p>
-                  </div>
-                  <button
-                    onClick={buyBlueprint}
-                    className="mt-auto w-full rounded-xl bg-fuchsia-600 px-4 py-3 text-sm font-bold hover:bg-fuchsia-500"
-                  >
-                    Buy Blueprint Lv {state.blueprintLevel + 1}
-                  </button>
-                </div>
+                </Section>
 
                 <div
-                  data-base-target="maintenance"
-                  className={`flex h-full flex-col gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 ${
-                    systemState === "critical"
-                      ? highlightCard(true, "critical")
-                      : systemState === "warning"
-                      ? highlightCard(true, "warning")
-                      : ""
-                  } ${highlightTarget === "maintenance" ? "ring-2 ring-cyan-300/35" : ""}`}
+                  data-base-target="missions"
+                  className={highlightTarget === "missions" ? "rounded-3xl ring-2 ring-cyan-300/35" : ""}
                 >
-                  <div className="flex min-h-[88px] flex-col">
-                    <div className="text-sm font-semibold text-amber-200">Shared Vault Utilities</div>
-                    <p className="mt-1 text-sm text-white/70">
-                      Spend shared MLEO on productivity instead of pure emissions.
-                    </p>
-                    <p className="mt-2 text-xs text-white/55">
-                      Stability: {fmt(state.stability)}%
-                    </p>
-                  </div>
-
-                  <div className="mt-auto grid grid-cols-3 gap-2 pt-1">
-                    <button onClick={activateOverclock} className="rounded-xl bg-amber-600 px-3 py-3 text-sm font-bold hover:bg-amber-500">
-                      {overclockLeft > 0 ? `Overclock ${Math.ceil(overclockLeft / 1000)}s` : `Overclock ${fmt(CONFIG.overclockCost)}`}
-                    </button>
-                    <button onClick={refillEnergy} className="rounded-xl bg-white/10 px-3 py-3 text-sm font-bold hover:bg-white/20">
-                      Refill {fmt(CONFIG.refillCost)}
-                    </button>
-                    <button
-                      onClick={performMaintenance}
-                      className={`rounded-xl px-3 py-3 text-sm font-bold ${
-                        systemState === "critical"
-                          ? "bg-rose-600 hover:bg-rose-500"
-                          : systemState === "warning"
-                          ? "bg-amber-600 hover:bg-amber-500"
-                          : "bg-white/10 hover:bg-white/20"
-                      }`}
-                    >
-                      Maintain
-                    </button>
-                  </div>
+                  <Section
+                    title="Daily Missions"
+                    subtitle="Daily goals give players direction without turning BASE into an aggressive faucet."
+                  >
+                    {dailyMissionsContent}
+                  </Section>
                 </div>
               </div>
-            </Section>
 
-            <div
-              data-base-target="missions"
-              className={highlightTarget === "missions" ? "rounded-3xl ring-2 ring-cyan-300/35" : ""}
-            >
-              <Section
-                title="Daily Missions"
-                subtitle="Daily goals give players direction without turning BASE into an aggressive faucet."
-              >
-                {dailyMissionsContent}
-              </Section>
-            </div>
-          </div>
+              {/* Desktop - Development + Base Structures */}
+              <div className="mt-4 hidden xl:grid xl:grid-cols-[1fr_1fr] gap-4">
+                  <Section
+                    title="Crew, Modules & Research"
+                  subtitle="Shape your long-term command identity through crew, modules and research."
+                  >
+                    {crewModulesResearchContent}
+                  </Section>
 
-          {/* Desktop - Development + Base Structures */}
-          <div className="mt-4 hidden xl:grid xl:grid-cols-[1fr_1fr] gap-4">
-              <Section
-                title="Crew, Modules & Research"
-              subtitle="Shape your long-term command identity through crew, modules and research."
-              >
-                {crewModulesResearchContent}
-              </Section>
+                  <Section
+                    title="Base Structures"
+                  subtitle="Upgrade structures, unlock stronger systems and shape your command base."
+                  >
+                    {baseStructuresContent}
+                  </Section>
+              </div>
 
-              <Section
-                title="Base Structures"
-              subtitle="Upgrade structures, unlock stronger systems and shape your command base."
-              >
-                {baseStructuresContent}
-              </Section>
-          </div>
+              {/* Desktop - Progress + Log */}
+              <div className="mt-4 hidden xl:grid xl:grid-cols-[1fr_0.85fr] gap-4">
+                  <Section
+                    title="Progress Summary"
+                  subtitle="BASE should feel like a live control room with sectors, contracts, identity and operational pressure."
+                  >
+                    {progressSummaryContent}
+                  </Section>
 
-          {/* Desktop - Progress + Log */}
-          <div className="mt-4 hidden xl:grid xl:grid-cols-[1fr_0.85fr] gap-4">
-              <Section
-                title="Progress Summary"
-              subtitle="BASE should feel like a live control room with sectors, contracts, identity and operational pressure."
-              >
-                {progressSummaryContent}
-              </Section>
-
-            <Section title="Activity Log" subtitle="Recent system activity.">
-                {activityLogContent}
-              </Section>
-          </div>
+                <Section title="Activity Log" subtitle="Recent system activity.">
+                    {activityLogContent}
+                  </Section>
+              </div>
+            </>
+          )}
         </div>
 
         {toast ? (
