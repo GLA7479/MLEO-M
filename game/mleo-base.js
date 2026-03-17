@@ -3540,11 +3540,11 @@ export default function MleoBase() {
 
               <ResourceCostRow cost={cost} resources={state.resources} />
 
-              <div className="mt-auto pt-2">
+              <div className="mt-auto flex flex-col justify-end pt-0 pb-0">
                 <button
                   onClick={() => buyBuilding(building.key)}
                   disabled={!ready}
-                  className={`w-full rounded-xl px-3 py-2 text-xs font-semibold transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
+                  className={`w-full rounded-xl px-3 py-2 text-xs font-semibold leading-none transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
                     canCoverCost(state.resources, cost)
                       ? "bg-white/10"
                       : "bg-white/10 opacity-70"
@@ -3553,7 +3553,7 @@ export default function MleoBase() {
                   {buttonText}
                 </button>
 
-              <div className="mt-1 h-[28px] overflow-hidden text-center text-[10px] leading-4 text-white/45">
+                <div className="mt-0.5 h-[14px] overflow-hidden text-center text-[10px] leading-4 text-white/45">
                 <div className="line-clamp-2 opacity-0">placeholder</div>
               </div>
               </div>
