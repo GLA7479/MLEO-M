@@ -7,9 +7,10 @@ import { validateCsrfToken } from "../../../../lib/server/csrf";
 import { logIpRateLimitExceeded, logSuspiciousActivity, logCsrfFailure } from "../../../../lib/server/securityLogger";
 
 const MAX_BASE_DELTA = 5_000_000;
+// Ship and spend are handled by atomic RPCs (/api/base/action/ship, spend). Do not use this endpoint for them.
+const DEPRECATED_REASONS = new Set(["mleo-base-ship", "mleo-base-spend"]);
 const ALLOWED_REASONS = new Set([
-  "mleo-base-ship",
-  "mleo-base-spend",
+  "mleo-base-logistics-bonus", // client addToVault after ship; consider moving to server later
 ]);
 
 function extractRow(data) {
@@ -53,6 +54,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, message: "Invalid delta" });
     }
 
+    if (DEPRECATED_REASONS.has(reasonKey)) {
+      return res.status(410).json({
+        success: false,
+        code: "USE_ACTION_API",
+        message: "Use /api/base/action/ship or /api/base/action/spend instead",
+      });
+    }
     if (!ALLOWED_REASONS.has(reasonKey)) {
       return res.status(400).json({ success: false, message: "Invalid reason" });
     }

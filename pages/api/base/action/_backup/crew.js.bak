@@ -3,10 +3,15 @@ import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { checkIpRateLimit } from "../../../../lib/server/ipRateLimit";
 import { validateCsrfToken } from "../../../../lib/server/csrf";
-import {
-  logCsrfFailure,
-  logIpRateLimitExceeded,
-} from "../../../../lib/server/securityLogger";
+import { logCsrfFailure, logIpRateLimitExceeded } from "../../../../lib/server/securityLogger";
+
+function crewCost(count) {
+  return {
+    GOLD: Math.ceil(120 * Math.pow(1.16, count)),
+    ORE: Math.ceil(55 * Math.pow(1.14, count)),
+    SCRAP: Math.ceil(18 * Math.pow(1.16, count)),
+  };
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -63,43 +68,82 @@ export default async function handler(req, res) {
 
     const supabase = getSupabaseAdmin();
 
-    const { data: rpcData, error: rpcError } = await supabase.rpc(
-      "base_hire_crew",
-      { p_device_id: deviceId }
-    );
+    await supabase.rpc("base_reconcile_state", { p_device_id: deviceId });
 
-    if (rpcError) {
-      const errorMessage = rpcError.message || "Crew action failed";
+    const { data: row, error } = await supabase
+      .from("base_device_state")
+      .select("*")
+      .eq("device_id", deviceId)
+      .single();
 
-      if (errorMessage.includes("Insufficient resources")) {
+    if (error || !row) {
+      return res.status(400).json({
+        success: false,
+        code: "BASE_STATE_LOAD_FAILED",
+        message: error?.message || "Failed to load state",
+      });
+    }
+
+    const resources = row.resources || {};
+    const crew = Number(row.crew || 0);
+    const cost = crewCost(crew);
+
+    for (const [key, value] of Object.entries(cost)) {
+      if (Number(resources[key] || 0) < value) {
         return res.status(400).json({
           success: false,
           code: "BASE_INSUFFICIENT_RESOURCES",
           message: "Crew hiring needs more supplies",
         });
       }
+    }
 
+    const nextResources = { ...resources };
+    for (const [key, value] of Object.entries(cost)) {
+      nextResources[key] = Math.max(
+        0,
+        Number(nextResources[key] || 0) - Number(value || 0)
+      );
+    }
+
+    const nextCrew = crew + 1;
+
+    const { error: updateError } = await supabase
+      .from("base_device_state")
+      .update({
+        crew: nextCrew,
+        resources: nextResources,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("device_id", deviceId);
+
+    if (updateError) {
       return res.status(400).json({
         success: false,
-        code: "BASE_CREW_FAILED",
-        message: errorMessage,
+        code: "BASE_STATE_UPDATE_FAILED",
+        message: updateError.message || "Failed to update state",
       });
     }
 
-    const result = Array.isArray(rpcData) ? rpcData[0] : rpcData;
-    if (!result) {
+    const { data: finalState, error: finalError } = await supabase.rpc(
+      "base_reconcile_state",
+      { p_device_id: deviceId }
+    );
+
+    if (finalError) {
       return res.status(400).json({
         success: false,
-        code: "BASE_CREW_FAILED",
-        message: "RPC returned no data",
+        code: "BASE_RECONCILE_FAILED",
+        message: finalError.message || "Failed to reconcile final state",
       });
     }
+
+    const state = Array.isArray(finalState) ? finalState[0] : finalState;
 
     return res.status(200).json({
       success: true,
-      state: result.state,
-      new_crew: Number(result.new_crew || 0),
-      cost: result.cost || null,
+      state,
+      new_crew: nextCrew,
     });
   } catch (error) {
     console.error("base/action/crew failed", error);

@@ -3,10 +3,14 @@ import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { checkIpRateLimit } from "../../../../lib/server/ipRateLimit";
 import { validateCsrfToken } from "../../../../lib/server/csrf";
-import {
-  logCsrfFailure,
-  logIpRateLimitExceeded,
-} from "../../../../lib/server/securityLogger";
+import { logCsrfFailure, logIpRateLimitExceeded } from "../../../../lib/server/securityLogger";
+
+const MODULES = {
+  servoDrill: { GOLD: 320, SCRAP: 50 },
+  vaultCompressor: { GOLD: 420, ORE: 120, SCRAP: 70 },
+  arcadeRelay: { GOLD: 520, ORE: 160, SCRAP: 90 },
+  minerLink: { GOLD: 700, ORE: 260, SCRAP: 110 },
+};
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -70,64 +74,100 @@ export default async function handler(req, res) {
       });
     }
 
+    const def = MODULES[module_key];
+    if (!def) {
+      return res.status(400).json({
+        success: false,
+        code: "BASE_MODULE_NOT_FOUND",
+        message: "Invalid module key",
+      });
+    }
+
     const supabase = getSupabaseAdmin();
 
-    const { data: rpcData, error: rpcError } = await supabase.rpc(
-      "base_install_module",
-      {
-        p_device_id: deviceId,
-        p_module_key: module_key,
-      }
-    );
+    await supabase.rpc("base_reconcile_state", { p_device_id: deviceId });
 
-    if (rpcError) {
-      const errorMessage = rpcError.message || "Module action failed";
+    const { data: row, error } = await supabase
+      .from("base_device_state")
+      .select("*")
+      .eq("device_id", deviceId)
+      .single();
 
-      if (errorMessage.includes("Invalid module key")) {
-        return res.status(400).json({
-          success: false,
-          code: "BASE_MODULE_NOT_FOUND",
-          message: errorMessage,
-        });
-      }
+    if (error || !row) {
+      return res.status(400).json({
+        success: false,
+        code: "BASE_STATE_LOAD_FAILED",
+        message: error?.message || "Failed to load state",
+      });
+    }
 
-      if (errorMessage.includes("already installed")) {
-        return res.status(400).json({
-          success: false,
-          code: "BASE_MODULE_ALREADY_INSTALLED",
-          message: errorMessage,
-        });
-      }
+    const modules = row.modules || {};
+    const resources = row.resources || {};
 
-      if (errorMessage.includes("Insufficient resources")) {
+    if (modules[module_key]) {
+      return res.status(400).json({
+        success: false,
+        code: "BASE_MODULE_ALREADY_INSTALLED",
+        message: "Module already installed",
+      });
+    }
+
+    for (const [key, value] of Object.entries(def)) {
+      if (Number(resources[key] || 0) < value) {
         return res.status(400).json({
           success: false,
           code: "BASE_INSUFFICIENT_RESOURCES",
-          message: "Not enough resources",
+          message: `Not enough ${key}`,
         });
       }
+    }
 
+    const nextResources = { ...resources };
+    for (const [key, value] of Object.entries(def)) {
+      nextResources[key] = Math.max(
+        0,
+        Number(nextResources[key] || 0) - Number(value || 0)
+      );
+    }
+
+    const nextModules = { ...modules, [module_key]: true };
+
+    const { error: updateError } = await supabase
+      .from("base_device_state")
+      .update({
+        resources: nextResources,
+        modules: nextModules,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("device_id", deviceId);
+
+    if (updateError) {
       return res.status(400).json({
         success: false,
-        code: "BASE_MODULE_FAILED",
-        message: errorMessage,
+        code: "BASE_STATE_UPDATE_FAILED",
+        message: updateError.message || "Failed to update state",
       });
     }
 
-    const result = Array.isArray(rpcData) ? rpcData[0] : rpcData;
-    if (!result) {
+    const { data: finalState, error: finalError } = await supabase.rpc(
+      "base_reconcile_state",
+      { p_device_id: deviceId }
+    );
+
+    if (finalError) {
       return res.status(400).json({
         success: false,
-        code: "BASE_MODULE_FAILED",
-        message: "RPC returned no data",
+        code: "BASE_RECONCILE_FAILED",
+        message: finalError.message || "Failed to reconcile final state",
       });
     }
+
+    const state = Array.isArray(finalState) ? finalState[0] : finalState;
 
     return res.status(200).json({
       success: true,
-      state: result.state,
-      module_key: result.module_key,
-      cost: result.cost || null,
+      state,
+      module_key,
     });
   } catch (error) {
     console.error("base/action/module failed", error);

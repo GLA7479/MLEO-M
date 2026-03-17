@@ -3,32 +3,10 @@ import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { checkIpRateLimit } from "../../../../lib/server/ipRateLimit";
 import { validateCsrfToken } from "../../../../lib/server/csrf";
-import { logCsrfFailure, logIpRateLimitExceeded } from "../../../../lib/server/securityLogger";
-
-const BUILDINGS = {
-  hq: { GOLD: 80, ORE: 40, growth: 1.18 },
-  quarry: { GOLD: 60, growth: 1.18 },
-  tradeHub: { GOLD: 75, ORE: 20, growth: 1.18 },
-  salvage: { GOLD: 110, ORE: 55, growth: 1.2 },
-  refinery: { GOLD: 180, ORE: 110, SCRAP: 20, growth: 1.25 },
-  powerCell: { GOLD: 140, SCRAP: 24, growth: 1.22 },
-  minerControl: { GOLD: 320, ORE: 120, SCRAP: 40, growth: 1.22 },
-  arcadeHub: { GOLD: 360, ORE: 90, SCRAP: 50, growth: 1.24 },
-  expeditionBay: { GOLD: 500, ORE: 180, SCRAP: 85, growth: 1.26 },
-  logisticsCenter: { ORE: 220, GOLD: 180, SCRAP: 90, growth: 1.7 },
-  researchLab: { ORE: 180, GOLD: 240, SCRAP: 110, growth: 1.75 },
-  repairBay: { ORE: 160, GOLD: 160, SCRAP: 140, growth: 1.7 },
-};
-
-function buildingCost(def, level) {
-  const factor = Math.pow(def.growth || 1, level);
-  const out = {};
-  for (const [k, v] of Object.entries(def)) {
-    if (k === "growth") continue;
-    out[k] = Math.ceil(v * factor);
-  }
-  return out;
-}
+import {
+  logCsrfFailure,
+  logIpRateLimitExceeded,
+} from "../../../../lib/server/securityLogger";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -92,106 +70,65 @@ export default async function handler(req, res) {
       });
     }
 
-    const def = BUILDINGS[building_key];
-    if (!def) {
-      return res.status(400).json({
-        success: false,
-        code: "BASE_BUILDING_NOT_FOUND",
-        message: "Invalid building key",
-      });
-    }
-
     const supabase = getSupabaseAdmin();
 
-    await supabase.rpc("base_reconcile_state", { p_device_id: deviceId });
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      "base_build_upgrade",
+      {
+        p_device_id: deviceId,
+        p_building_key: building_key,
+      }
+    );
 
-    const { data: row, error: readError } = await supabase
-      .from("base_device_state")
-      .select("*")
-      .eq("device_id", deviceId)
-      .single();
+    if (rpcError) {
+      const errorMessage = rpcError.message || "Build failed";
 
-    if (readError || !row) {
-      return res.status(400).json({
-        success: false,
-        code: "BASE_STATE_LOAD_FAILED",
-        message: readError?.message || "Failed to load state",
-      });
-    }
+      if (errorMessage.includes("Invalid building key")) {
+        return res.status(400).json({
+          success: false,
+          code: "BASE_BUILDING_NOT_FOUND",
+          message: errorMessage,
+        });
+      }
 
-    const buildings = row.buildings || {};
-    const resources = row.resources || {};
-    const stats = row.stats || {};
+      if (errorMessage.includes("max level")) {
+        return res.status(400).json({
+          success: false,
+          code: "BASE_BUILDING_MAX_LEVEL",
+          message: errorMessage,
+        });
+      }
 
-    const currentLevel = Number(buildings[building_key] || 0);
-    const cost = buildingCost(def, currentLevel);
-
-    for (const [key, value] of Object.entries(cost)) {
-      if (Number(resources[key] || 0) < value) {
+      if (errorMessage.includes("Insufficient resources")) {
         return res.status(400).json({
           success: false,
           code: "BASE_INSUFFICIENT_RESOURCES",
-          message: `Not enough ${key}`,
+          message: errorMessage,
         });
       }
-    }
 
-    const nextResources = { ...resources };
-    for (const [key, value] of Object.entries(cost)) {
-      nextResources[key] = Math.max(
-        0,
-        Number(nextResources[key] || 0) - Number(value || 0)
-      );
-    }
-
-    const nextBuildings = {
-      ...buildings,
-      [building_key]: currentLevel + 1,
-    };
-
-    const nextStats = {
-      ...stats,
-      upgradesToday: Number(stats.upgradesToday || 0) + 1,
-    };
-
-    const { error: updateError } = await supabase
-      .from("base_device_state")
-      .update({
-        resources: nextResources,
-        buildings: nextBuildings,
-        stats: nextStats,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("device_id", deviceId);
-
-    if (updateError) {
       return res.status(400).json({
         success: false,
-        code: "BASE_STATE_UPDATE_FAILED",
-        message: updateError.message || "Failed to update state",
+        code: "BASE_BUILD_FAILED",
+        message: errorMessage,
       });
     }
 
-    const { data: finalState, error: finalError } = await supabase.rpc(
-      "base_reconcile_state",
-      { p_device_id: deviceId }
-    );
-
-    if (finalError) {
+    const result = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+    if (!result) {
       return res.status(400).json({
         success: false,
-        code: "BASE_RECONCILE_FAILED",
-        message: finalError.message || "Failed to reconcile final state",
+        code: "BASE_BUILD_FAILED",
+        message: "RPC returned no data",
       });
     }
-
-    const state = Array.isArray(finalState) ? finalState[0] : finalState;
 
     return res.status(200).json({
       success: true,
-      state,
+      state: result.state,
       building_key,
-      new_level: currentLevel + 1,
+      new_level: Number(result.new_level || 0),
+      cost: result.cost || null,
     });
   } catch (error) {
     console.error("base/action/build failed", error);

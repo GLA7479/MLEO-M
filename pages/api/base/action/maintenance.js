@@ -3,30 +3,10 @@ import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { checkIpRateLimit } from "../../../../lib/server/ipRateLimit";
 import { validateCsrfToken } from "../../../../lib/server/csrf";
-import { logCsrfFailure, logIpRateLimitExceeded } from "../../../../lib/server/securityLogger";
-
-const MAINTENANCE_COST = { GOLD: 60, SCRAP: 35, DATA: 10 };
-const STABILITY_GAIN = 18;
-const XP_GAIN = 20;
-
-function canAfford(resources, cost) {
-  for (const [key, value] of Object.entries(cost)) {
-    if ((resources[key] || 0) < value) return false;
-  }
-  return true;
-}
-
-function pay(resources, cost) {
-  const next = { ...resources };
-  for (const [key, value] of Object.entries(cost)) {
-    next[key] = Math.max(0, (next[key] || 0) - value);
-  }
-  return next;
-}
-
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n));
-}
+import {
+  logCsrfFailure,
+  logIpRateLimitExceeded,
+} from "../../../../lib/server/securityLogger";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -83,80 +63,44 @@ export default async function handler(req, res) {
 
     const supabase = getSupabaseAdmin();
 
-    await supabase.rpc("base_reconcile_state", { p_device_id: deviceId });
-
-    const { data: state, error: freshStateError } = await supabase
-      .from("base_device_state")
-      .select("*")
-      .eq("device_id", deviceId)
-      .single();
-
-    if (freshStateError || !state) {
-      return res.status(400).json({
-        success: false,
-        code: "BASE_STATE_LOAD_FAILED",
-        message: "Failed to reload latest base state",
-      });
-    }
-
-    const resources = state.resources || {};
-    const stability = Number(state.stability || 100);
-
-    if (!canAfford(resources, MAINTENANCE_COST)) {
-      return res.status(400).json({
-        success: false,
-        code: "BASE_INSUFFICIENT_RESOURCES",
-        message: "Need GOLD, SCRAP and DATA for maintenance",
-      });
-    }
-
-    const newResources = pay(resources, MAINTENANCE_COST);
-    const newStability = clamp(stability + STABILITY_GAIN, 55, 100);
-    const commanderXp = Number(state.commander_xp || 0) + XP_GAIN;
-    const newStats = {
-      ...(state.stats || {}),
-      maintenanceToday: Number(state.stats?.maintenanceToday || 0) + 1,
-    };
-
-    const { error: updateError } = await supabase
-      .from("base_device_state")
-      .update({
-        resources: newResources,
-        stability: newStability,
-        stats: newStats,
-        commander_xp: commanderXp,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("device_id", deviceId);
-
-    if (updateError) {
-      return res.status(400).json({
-        success: false,
-        code: "BASE_STATE_UPDATE_FAILED",
-        message: updateError.message || "Failed to update state",
-      });
-    }
-
-    const { data: finalState, error: finalError } = await supabase.rpc(
-      "base_reconcile_state",
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      "base_perform_maintenance",
       { p_device_id: deviceId }
     );
 
-    if (finalError) {
+    if (rpcError) {
+      const errorMessage = rpcError.message || "Maintenance action failed";
+
+      if (errorMessage.includes("Insufficient resources")) {
+        return res.status(400).json({
+          success: false,
+          code: "BASE_INSUFFICIENT_RESOURCES",
+          message: "Need GOLD, SCRAP and DATA for maintenance",
+        });
+      }
+
       return res.status(400).json({
         success: false,
-        code: "BASE_RECONCILE_FAILED",
-        message: finalError.message || "Failed to reconcile final state",
+        code: "BASE_MAINTENANCE_FAILED",
+        message: errorMessage,
       });
     }
 
-    const row = Array.isArray(finalState) ? finalState[0] : finalState;
+    const result = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+    if (!result) {
+      return res.status(400).json({
+        success: false,
+        code: "BASE_MAINTENANCE_FAILED",
+        message: "RPC returned no data",
+      });
+    }
 
     return res.status(200).json({
       success: true,
-      state: row,
-      stability_gain: STABILITY_GAIN,
-      new_stability: newStability,
+      state: result.state,
+      stability_gain: Number(result.stability_gain || 0),
+      new_stability: Number(result.new_stability || 0),
+      cost: result.cost || null,
     });
   } catch (error) {
     console.error("base/action/maintenance failed", error);

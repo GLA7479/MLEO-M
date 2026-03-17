@@ -3,19 +3,10 @@ import { checkArcadeRateLimit } from "../../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { checkIpRateLimit } from "../../../../lib/server/ipRateLimit";
 import { validateCsrfToken } from "../../../../lib/server/csrf";
-import { logCsrfFailure, logIpRateLimitExceeded } from "../../../../lib/server/securityLogger";
-
-const RESEARCH = {
-  coolant: { ORE: 240, SCRAP: 70 },
-  routing: { ORE: 400, GOLD: 260, SCRAP: 120 },
-  fieldOps: { ORE: 650, GOLD: 420, SCRAP: 180 },
-  minerSync: { ORE: 520, GOLD: 300, SCRAP: 130, DATA: 20 },
-  arcadeOps: { ORE: 600, GOLD: 420, SCRAP: 180, DATA: 30 },
-  logistics: { ORE: 700, GOLD: 460, SCRAP: 220, DATA: 40 },
-  predictiveMaintenance: { ORE: 620, GOLD: 420, SCRAP: 260, DATA: 36 },
-  deepScan: { ORE: 760, GOLD: 520, SCRAP: 240, DATA: 48 },
-  tokenDiscipline: { ORE: 820, GOLD: 580, SCRAP: 280, DATA: 52 },
-};
+import {
+  logCsrfFailure,
+  logIpRateLimitExceeded,
+} from "../../../../lib/server/securityLogger";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -79,100 +70,72 @@ export default async function handler(req, res) {
       });
     }
 
-    const cost = RESEARCH[research_key];
-    if (!cost) {
-      return res.status(400).json({
-        success: false,
-        code: "BASE_RESEARCH_NOT_FOUND",
-        message: "Invalid research key",
-      });
-    }
-
     const supabase = getSupabaseAdmin();
 
-    await supabase.rpc("base_reconcile_state", { p_device_id: deviceId });
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      "base_unlock_research",
+      {
+        p_device_id: deviceId,
+        p_research_key: research_key,
+      }
+    );
 
-    const { data: row, error } = await supabase
-      .from("base_device_state")
-      .select("*")
-      .eq("device_id", deviceId)
-      .single();
+    if (rpcError) {
+      const errorMessage = rpcError.message || "Research action failed";
 
-    if (error || !row) {
-      return res.status(400).json({
-        success: false,
-        code: "BASE_STATE_LOAD_FAILED",
-        message: error?.message || "Failed to load state",
-      });
-    }
+      if (errorMessage.includes("Invalid research key")) {
+        return res.status(400).json({
+          success: false,
+          code: "BASE_RESEARCH_NOT_FOUND",
+          message: errorMessage,
+        });
+      }
 
-    const research = row.research || {};
-    const resources = row.resources || {};
+      if (errorMessage.includes("already completed")) {
+        return res.status(400).json({
+          success: false,
+          code: "BASE_RESEARCH_ALREADY_COMPLETED",
+          message: errorMessage,
+        });
+      }
 
-    if (research[research_key]) {
-      return res.status(400).json({
-        success: false,
-        code: "BASE_RESEARCH_ALREADY_COMPLETED",
-        message: "Research already completed",
-      });
-    }
+      if (errorMessage.includes("Missing prerequisite")) {
+        return res.status(400).json({
+          success: false,
+          code: "BASE_PREREQ_NOT_MET",
+          message: errorMessage,
+        });
+      }
 
-    for (const [key, value] of Object.entries(cost)) {
-      if (Number(resources[key] || 0) < value) {
+      if (errorMessage.includes("Insufficient resources")) {
         return res.status(400).json({
           success: false,
           code: "BASE_INSUFFICIENT_RESOURCES",
-          message: `Not enough ${key}`,
+          message: "Not enough resources",
         });
       }
-    }
 
-    const nextResources = { ...resources };
-    for (const [key, value] of Object.entries(cost)) {
-      nextResources[key] = Math.max(
-        0,
-        Number(nextResources[key] || 0) - Number(value || 0)
-      );
-    }
-
-    const nextResearch = { ...research, [research_key]: true };
-
-    const { error: updateError } = await supabase
-      .from("base_device_state")
-      .update({
-        resources: nextResources,
-        research: nextResearch,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("device_id", deviceId);
-
-    if (updateError) {
       return res.status(400).json({
         success: false,
-        code: "BASE_STATE_UPDATE_FAILED",
-        message: updateError.message || "Failed to update state",
+        code: "BASE_RESEARCH_FAILED",
+        message: errorMessage,
       });
     }
 
-    const { data: finalState, error: finalError } = await supabase.rpc(
-      "base_reconcile_state",
-      { p_device_id: deviceId }
-    );
-
-    if (finalError) {
+    const result = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+    if (!result) {
       return res.status(400).json({
         success: false,
-        code: "BASE_RECONCILE_FAILED",
-        message: finalError.message || "Failed to reconcile final state",
+        code: "BASE_RESEARCH_FAILED",
+        message: "RPC returned no data",
       });
     }
-
-    const state = Array.isArray(finalState) ? finalState[0] : finalState;
 
     return res.status(200).json({
       success: true,
-      state,
-      research_key,
+      state: result.state,
+      research_key: result.research_key,
+      cost: result.cost || null,
     });
   } catch (error) {
     console.error("base/action/research failed", error);

@@ -275,7 +275,7 @@ DECLARE
   v_mleo_mult numeric := 1.0;
   v_maintenance_relief numeric := 1.0;
   v_ship_cap numeric := 12000;
-  v_expedition_cooldown_seconds numeric := 90;
+  v_expedition_cooldown_seconds numeric := 120;
 
   v_energy_now numeric := 0;
   v_ore_now numeric := 0;
@@ -493,15 +493,9 @@ BEGIN
     v_energy_regen := v_energy_regen + 0.8;
   END IF;
 
-  v_ship_cap := 12000 + (v_blueprint * 1200) + (v_logistics * 900);
-  IF public.base_jsonb_bool(v_research, 'routing', false) THEN
-    v_ship_cap := v_ship_cap + 5000;
-  END IF;
+  v_ship_cap := 12000 + (v_blueprint * 5000);
 
-  v_expedition_cooldown_seconds := 90;
-  IF public.base_jsonb_bool(v_research, 'fieldOps', false) THEN
-    v_expedition_cooldown_seconds := 72;
-  END IF;
+  v_expedition_cooldown_seconds := 120;
 
   v_energy_now := greatest(0, public.base_jsonb_num(v_resources, 'ENERGY', 0));
   v_ore_now := greatest(0, public.base_jsonb_num(v_resources, 'ORE', 0));

@@ -57,8 +57,8 @@ const BUILDINGS = [
     key: "tradeHub",
     name: "Trade Hub",
     desc: "Keeps the base liquid with steady Gold income.",
-    baseCost: { GOLD: 75, ORE: 20 },
-    growth: 1.18,
+    baseCost: { GOLD: 100, ORE: 30 },
+    growth: 1.2,
     energyUse: 1.4,
     outputs: { GOLD: 1.0 },
     requires: [{ key: "quarry", lvl: 1 }],
@@ -67,8 +67,8 @@ const BUILDINGS = [
     key: "salvage",
     name: "Salvage Yard",
     desc: "Recovers Scrap for advanced systems.",
-    baseCost: { GOLD: 110, ORE: 55 },
-    growth: 1.20,
+    baseCost: { GOLD: 150, ORE: 90 },
+    growth: 1.22,
     energyUse: 1.8,
     outputs: { SCRAP: 0.8 },
     requires: [{ key: "quarry", lvl: 2 }],
@@ -77,7 +77,7 @@ const BUILDINGS = [
     key: "refinery",
     name: "Refinery",
     desc: "Converts Ore + Scrap into bankable MLEO.",
-    baseCost: { GOLD: 180, ORE: 110, SCRAP: 20 },
+    baseCost: { GOLD: 280, ORE: 180, SCRAP: 35 },
     growth: 1.25,
     energyUse: 3.2,
     convert: { ORE: 1.8, SCRAP: 0.7, MLEO: 0.10 },
@@ -90,8 +90,8 @@ const BUILDINGS = [
     key: "powerCell",
     name: "Power Cell",
     desc: "Boosts Energy cap and regeneration.",
-    baseCost: { GOLD: 140, SCRAP: 24 },
-    growth: 1.22,
+    baseCost: { GOLD: 240, SCRAP: 45 },
+    growth: 1.24,
     energyUse: 0,
     power: { cap: 24, regen: 0.35 },
     requires: [{ key: "tradeHub", lvl: 1 }],
@@ -326,11 +326,11 @@ const CONFIG = {
   baseEnergyCap: 140,
   baseEnergyRegen: 2.6,
   dailyShipCap: 12_000,
-  expeditionCost: 18,
-  expeditionCooldownMs: 90_000,
+  expeditionCost: 36,
+  expeditionCooldownMs: 120_000,
   overclockCost: 900,
   overclockDurationMs: 8 * 60 * 1000,
-  refillCost: 180,
+  refillCost: 300,
   blueprintBaseCost: 2_500,
   blueprintGrowth: 1.85,
 };
@@ -1162,9 +1162,7 @@ function derive(state, now = Date.now()) {
 
   const shipCap =
     CONFIG.dailyShipCap +
-    state.blueprintLevel * 1200 +
-    logisticsLevel * 900 +
-    (state.research.routing ? 5000 : 0);
+    state.blueprintLevel * 5000;
 
   const minersBonus = {
     offlineRetention: minerLink * 0.015,
@@ -1190,7 +1188,7 @@ function derive(state, now = Date.now()) {
     stability,
     minersBonus,
     arcadeSupport,
-    expeditionCooldownMs: hasFieldOps ? 60000 : CONFIG.expeditionCooldownMs,
+    expeditionCooldownMs: CONFIG.expeditionCooldownMs,
   };
 }
 
@@ -2607,39 +2605,6 @@ export default function MleoBase() {
       const errorMessage = error?.message || "Nothing ready to ship yet.";
       showToast(errorMessage);
     }
-  };
-
-  const handleVaultSpend = async (cost, label, applyUpdate, successMessage) => {
-    const delta = Math.max(0, Math.floor(Number(cost || 0)));
-    if (!delta) return false;
-    const current = await readVaultSafe();
-    if (current < delta) {
-      showToast("Shared vault balance is too low.");
-      return false;
-    }
-    const res = await applyBaseVaultDelta(-delta, "mleo-base-spend");
-    if (!res?.ok) {
-      showToast("Shared vault balance is too low.");
-      return false;
-    }
-    const latestVault = await readVaultSafe();
-    setSharedVault(latestVault);
-    setState((prev) => {
-      const updated = applyUpdate(prev);
-
-      return applyLevelUps({
-        ...updated,
-        totalSharedSpent: (prev.totalSharedSpent || 0) + cost,
-        commanderXp: (updated.commanderXp || prev.commanderXp) + Math.max(5, Math.floor(cost / 40)),
-        stats: {
-          ...(updated.stats || prev.stats),
-          vaultSpentToday: (prev.stats?.vaultSpentToday || 0) + cost,
-        },
-        log: pushLog(prev.log, `${label} purchased for ${fmt(cost)} MLEO.`),
-      });
-    });
-    if (successMessage) showToast(successMessage);
-    return true;
   };
 
   const buyBlueprint = async () => {

@@ -480,7 +480,7 @@ END;
 $$;
 
 -- ============================================================================
--- 4) base_build_upgrade - Build/upgrade building (ATOMIC) with prerequisites
+-- 4) base_build_upgrade - Build/upgrade building (ATOMIC)
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.base_build_upgrade(
@@ -514,40 +514,40 @@ DECLARE
   v_new_buildings jsonb;
   v_commander_xp bigint;
   v_building_config jsonb;
-  v_requires jsonb;
-  v_req jsonb;
   kv record;
 BEGIN
+  -- Building configurations (must match client)
   v_building_config := '{
-    "hq": {"baseCost": {"GOLD": 80, "ORE": 40}, "growth": 1.18, "maxLevel": null, "requires": []},
-    "quarry": {"baseCost": {"GOLD": 60}, "growth": 1.18, "maxLevel": null, "requires": []},
-    "tradeHub": {"baseCost": {"GOLD": 100, "ORE": 30}, "growth": 1.2, "maxLevel": null, "requires": [{"key":"quarry","lvl":1}]},
-    "salvage": {"baseCost": {"GOLD": 150, "ORE": 90}, "growth": 1.22, "maxLevel": null, "requires": [{"key":"quarry","lvl":2}]},
-    "refinery": {"baseCost": {"GOLD": 280, "ORE": 180, "SCRAP": 35}, "growth": 1.25, "maxLevel": null, "requires": [{"key":"salvage","lvl":1},{"key":"tradeHub","lvl":1}]},
-    "powerCell": {"baseCost": {"GOLD": 240, "SCRAP": 45}, "growth": 1.24, "maxLevel": null, "requires": [{"key":"tradeHub","lvl":1}]},
-    "minerControl": {"baseCost": {"GOLD": 320, "ORE": 120, "SCRAP": 40}, "growth": 1.22, "maxLevel": null, "requires": [{"key":"hq","lvl":2}]},
-    "arcadeHub": {"baseCost": {"GOLD": 360, "ORE": 90, "SCRAP": 50}, "growth": 1.24, "maxLevel": null, "requires": [{"key":"hq","lvl":2}]},
-    "expeditionBay": {"baseCost": {"GOLD": 500, "ORE": 180, "SCRAP": 85}, "growth": 1.26, "maxLevel": null, "requires": [{"key":"hq","lvl":3},{"key":"salvage","lvl":2}]},
-    "logisticsCenter": {"baseCost": {"ORE": 220, "GOLD": 180, "SCRAP": 90}, "growth": 1.7, "maxLevel": 15, "requires": [{"key":"hq","lvl":2},{"key":"tradeHub","lvl":2}]},
-    "researchLab": {"baseCost": {"ORE": 180, "GOLD": 240, "SCRAP": 110}, "growth": 1.75, "maxLevel": 15, "requires": [{"key":"hq","lvl":2},{"key":"minerControl","lvl":1}]},
-    "repairBay": {"baseCost": {"ORE": 160, "GOLD": 160, "SCRAP": 140}, "growth": 1.7, "maxLevel": 15, "requires": [{"key":"hq","lvl":2},{"key":"powerCell","lvl":1}]}
+    "hq": {"baseCost": {"GOLD": 80, "ORE": 40}, "growth": 1.18, "maxLevel": null},
+    "quarry": {"baseCost": {"GOLD": 60}, "growth": 1.18, "maxLevel": null},
+    "tradeHub": {"baseCost": {"GOLD": 100, "ORE": 30}, "growth": 1.2, "maxLevel": null},
+    "salvage": {"baseCost": {"GOLD": 150, "ORE": 90}, "growth": 1.22, "maxLevel": null},
+    "refinery": {"baseCost": {"GOLD": 280, "ORE": 180, "SCRAP": 35}, "growth": 1.25, "maxLevel": null},
+    "powerCell": {"baseCost": {"GOLD": 240, "SCRAP": 45}, "growth": 1.24, "maxLevel": null},
+    "minerControl": {"baseCost": {"GOLD": 320, "ORE": 120, "SCRAP": 40}, "growth": 1.22, "maxLevel": null},
+    "arcadeHub": {"baseCost": {"GOLD": 360, "ORE": 90, "SCRAP": 50}, "growth": 1.24, "maxLevel": null},
+    "expeditionBay": {"baseCost": {"GOLD": 500, "ORE": 180, "SCRAP": 85}, "growth": 1.26, "maxLevel": null},
+    "logisticsCenter": {"baseCost": {"ORE": 220, "GOLD": 180, "SCRAP": 90}, "growth": 1.7, "maxLevel": 15},
+    "researchLab": {"baseCost": {"ORE": 180, "GOLD": 240, "SCRAP": 110}, "growth": 1.75, "maxLevel": 15},
+    "repairBay": {"baseCost": {"ORE": 160, "GOLD": 160, "SCRAP": 140}, "growth": 1.7, "maxLevel": 15}
   }'::jsonb;
 
+  -- Validate building_key
   IF NOT (v_building_config ? p_building_key) THEN
     RAISE EXCEPTION 'Invalid building key: %', p_building_key;
   END IF;
 
+  -- Get building config
   v_base_cost := v_building_config->p_building_key->'baseCost';
   v_growth := (v_building_config->p_building_key->>'growth')::numeric;
-  v_requires := coalesce(v_building_config->p_building_key->'requires', '[]'::jsonb);
-
-  v_max_level := CASE
+  v_max_level := CASE 
     WHEN (v_building_config->p_building_key->>'maxLevel') IS NULL THEN NULL
     ELSE (v_building_config->p_building_key->>'maxLevel')::integer
   END;
 
+  -- Get and lock state
   v_state := public.base_get_or_create_state(p_device_id);
-
+  
   SELECT *
   INTO v_state
   FROM public.base_device_state
@@ -559,55 +559,51 @@ BEGIN
   v_stats := coalesce(v_state.stats, '{}'::jsonb);
   v_current_level := coalesce((v_buildings->>p_building_key)::integer, 0);
 
+  -- Check max level
   IF v_max_level IS NOT NULL AND v_current_level >= v_max_level THEN
     RAISE EXCEPTION 'Building is at max level';
   END IF;
 
-  FOR v_req IN SELECT * FROM jsonb_array_elements(v_requires)
-  LOOP
-    IF coalesce((v_buildings->>(v_req->>'key'))::integer, 0) < coalesce((v_req->>'lvl')::integer, 0) THEN
-      RAISE EXCEPTION 'Missing prerequisite: % lvl %',
-        (v_req->>'key'),
-        (v_req->>'lvl');
-    END IF;
-  END LOOP;
-
+  -- Calculate cost
   v_cost := '{}'::jsonb;
   FOR kv IN SELECT key, value FROM jsonb_each(v_base_cost)
   LOOP
     v_cost := jsonb_set(
       v_cost,
       ARRAY[kv.key],
-      to_jsonb(floor((kv.value::text::numeric) * power(v_growth, v_current_level))::bigint),
-      true
+      to_jsonb(floor((kv.value::text::numeric) * power(v_growth, v_current_level))::bigint)
     );
   END LOOP;
 
+  -- Validate resources
+  FOR kv IN SELECT key, value FROM jsonb_each(v_cost)
+  LOOP
+    IF coalesce((v_resources->>kv.key)::integer, 0) < (kv.value::text::bigint) THEN
+      RAISE EXCEPTION 'Insufficient resources';
+    END IF;
+  END LOOP;
+
+  -- Calculate new resources
   v_new_resources := v_resources;
   FOR kv IN SELECT key, value FROM jsonb_each(v_cost)
   LOOP
-    IF coalesce((v_new_resources->>kv.key)::bigint, 0) < (kv.value::text::bigint) THEN
-      RAISE EXCEPTION 'Insufficient resources';
-    END IF;
-
     v_new_resources := jsonb_set(
       v_new_resources,
       ARRAY[kv.key],
-      to_jsonb(greatest(0, coalesce((v_new_resources->>kv.key)::bigint, 0) - (kv.value::text::bigint))),
-      true
+      to_jsonb(greatest(0, coalesce((v_resources->>kv.key)::integer, 0) - (kv.value::text::bigint)))
     );
   END LOOP;
 
+  -- Update building level
   v_new_level := v_current_level + 1;
-  v_new_buildings := jsonb_set(v_buildings, ARRAY[p_building_key], to_jsonb(v_new_level), true);
+  v_new_buildings := jsonb_set(v_buildings, ARRAY[p_building_key], to_jsonb(v_new_level));
 
+  -- Update stats and XP
   v_stats := jsonb_set(
     v_stats,
     '{upgradesToday}',
-    to_jsonb(coalesce((v_stats->>'upgradesToday')::bigint, 0) + 1),
-    true
+    to_jsonb(coalesce((v_stats->>'upgradesToday')::bigint, 0) + 1)
   );
-
   v_commander_xp := coalesce(v_state.commander_xp, 0) + 18;
 
   UPDATE public.base_device_state
@@ -632,367 +628,6 @@ END;
 $$;
 
 -- ============================================================================
--- 5) base_hire_crew - Hire crew (ATOMIC)
--- ============================================================================
-
-CREATE OR REPLACE FUNCTION public.base_hire_crew(
-  p_device_id text
-)
-RETURNS TABLE(
-  new_crew integer,
-  cost jsonb,
-  new_resources jsonb,
-  state jsonb
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_state public.base_device_state%ROWTYPE;
-  v_resources jsonb;
-  v_crew integer;
-  v_cost jsonb;
-  kv record;
-BEGIN
-  v_state := public.base_get_or_create_state(p_device_id);
-
-  SELECT *
-  INTO v_state
-  FROM public.base_device_state
-  WHERE device_id = p_device_id
-  FOR UPDATE;
-
-  v_resources := coalesce(v_state.resources, '{}'::jsonb);
-  v_crew := coalesce(v_state.crew, 0);
-
-  v_cost := jsonb_build_object(
-    'GOLD', ceil(120 * power(1.16, v_crew))::bigint,
-    'ORE', ceil(55 * power(1.14, v_crew))::bigint,
-    'SCRAP', ceil(18 * power(1.16, v_crew))::bigint
-  );
-
-  FOR kv IN SELECT key, value FROM jsonb_each(v_cost)
-  LOOP
-    IF coalesce((v_resources->>kv.key)::bigint, 0) < (kv.value::text::bigint) THEN
-      RAISE EXCEPTION 'Insufficient resources';
-    END IF;
-  END LOOP;
-
-  FOR kv IN SELECT key, value FROM jsonb_each(v_cost)
-  LOOP
-    v_resources := jsonb_set(
-      v_resources,
-      ARRAY[kv.key],
-      to_jsonb(greatest(0, coalesce((v_resources->>kv.key)::bigint, 0) - (kv.value::text::bigint))),
-      true
-    );
-  END LOOP;
-
-  UPDATE public.base_device_state
-  SET
-    crew = v_crew + 1,
-    resources = v_resources,
-    updated_at = now()
-  WHERE device_id = p_device_id
-  RETURNING * INTO v_state;
-
-  RETURN QUERY
-  SELECT
-    coalesce(v_state.crew, 0),
-    v_cost,
-    v_resources,
-    to_jsonb(v_state);
-END;
-$$;
-
--- ============================================================================
--- 6) base_perform_maintenance - Maintenance (ATOMIC)
--- ============================================================================
-
-CREATE OR REPLACE FUNCTION public.base_perform_maintenance(
-  p_device_id text
-)
-RETURNS TABLE(
-  stability_gain integer,
-  new_stability numeric,
-  cost jsonb,
-  new_resources jsonb,
-  new_commander_xp bigint,
-  state jsonb
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_state public.base_device_state%ROWTYPE;
-  v_resources jsonb;
-  v_stats jsonb;
-  v_cost jsonb := jsonb_build_object('GOLD', 60, 'SCRAP', 35, 'DATA', 10);
-  v_stability_gain integer := 18;
-  v_xp_gain bigint := 20;
-  v_new_stability numeric;
-  v_new_commander_xp bigint;
-  kv record;
-BEGIN
-  v_state := public.base_get_or_create_state(p_device_id);
-
-  SELECT *
-  INTO v_state
-  FROM public.base_device_state
-  WHERE device_id = p_device_id
-  FOR UPDATE;
-
-  v_resources := coalesce(v_state.resources, '{}'::jsonb);
-  v_stats := coalesce(v_state.stats, '{}'::jsonb);
-
-  FOR kv IN SELECT key, value FROM jsonb_each(v_cost)
-  LOOP
-    IF coalesce((v_resources->>kv.key)::bigint, 0) < (kv.value::text::bigint) THEN
-      RAISE EXCEPTION 'Insufficient resources';
-    END IF;
-  END LOOP;
-
-  FOR kv IN SELECT key, value FROM jsonb_each(v_cost)
-  LOOP
-    v_resources := jsonb_set(
-      v_resources,
-      ARRAY[kv.key],
-      to_jsonb(greatest(0, coalesce((v_resources->>kv.key)::bigint, 0) - (kv.value::text::bigint))),
-      true
-    );
-  END LOOP;
-
-  v_new_stability := least(100, greatest(55, coalesce(v_state.stability, 100) + v_stability_gain));
-  v_new_commander_xp := coalesce(v_state.commander_xp, 0) + v_xp_gain;
-
-  v_stats := jsonb_set(
-    v_stats,
-    '{maintenanceToday}',
-    to_jsonb(coalesce((v_stats->>'maintenanceToday')::bigint, 0) + 1),
-    true
-  );
-
-  UPDATE public.base_device_state
-  SET
-    resources = v_resources,
-    stability = v_new_stability,
-    stats = v_stats,
-    commander_xp = v_new_commander_xp,
-    updated_at = now()
-  WHERE device_id = p_device_id
-  RETURNING * INTO v_state;
-
-  RETURN QUERY
-  SELECT
-    v_stability_gain,
-    v_new_stability,
-    v_cost,
-    v_resources,
-    v_new_commander_xp,
-    to_jsonb(v_state);
-END;
-$$;
-
--- ============================================================================
--- 7) base_install_module - Install module (ATOMIC)
--- ============================================================================
-
-CREATE OR REPLACE FUNCTION public.base_install_module(
-  p_device_id text,
-  p_module_key text
-)
-RETURNS TABLE(
-  module_key text,
-  cost jsonb,
-  new_resources jsonb,
-  new_modules jsonb,
-  state jsonb
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_state public.base_device_state%ROWTYPE;
-  v_resources jsonb;
-  v_modules jsonb;
-  v_module_config jsonb;
-  v_cost jsonb;
-  kv record;
-BEGIN
-  v_module_config := '{
-    "servoDrill": {"cost": {"GOLD": 320, "SCRAP": 50}},
-    "vaultCompressor": {"cost": {"GOLD": 420, "ORE": 120, "SCRAP": 70}},
-    "arcadeRelay": {"cost": {"GOLD": 520, "ORE": 160, "SCRAP": 90}},
-    "minerLink": {"cost": {"GOLD": 700, "ORE": 260, "SCRAP": 110}}
-  }'::jsonb;
-
-  IF NOT (v_module_config ? p_module_key) THEN
-    RAISE EXCEPTION 'Invalid module key: %', p_module_key;
-  END IF;
-
-  v_state := public.base_get_or_create_state(p_device_id);
-
-  SELECT *
-  INTO v_state
-  FROM public.base_device_state
-  WHERE device_id = p_device_id
-  FOR UPDATE;
-
-  v_resources := coalesce(v_state.resources, '{}'::jsonb);
-  v_modules := coalesce(v_state.modules, '{}'::jsonb);
-  v_cost := v_module_config->p_module_key->'cost';
-
-  IF coalesce((v_modules->>p_module_key)::boolean, false) THEN
-    RAISE EXCEPTION 'Module already installed';
-  END IF;
-
-  FOR kv IN SELECT key, value FROM jsonb_each(v_cost)
-  LOOP
-    IF coalesce((v_resources->>kv.key)::bigint, 0) < (kv.value::text::bigint) THEN
-      RAISE EXCEPTION 'Insufficient resources';
-    END IF;
-  END LOOP;
-
-  FOR kv IN SELECT key, value FROM jsonb_each(v_cost)
-  LOOP
-    v_resources := jsonb_set(
-      v_resources,
-      ARRAY[kv.key],
-      to_jsonb(greatest(0, coalesce((v_resources->>kv.key)::bigint, 0) - (kv.value::text::bigint))),
-      true
-    );
-  END LOOP;
-
-  v_modules := jsonb_set(v_modules, ARRAY[p_module_key], 'true'::jsonb, true);
-
-  UPDATE public.base_device_state
-  SET
-    resources = v_resources,
-    modules = v_modules,
-    updated_at = now()
-  WHERE device_id = p_device_id
-  RETURNING * INTO v_state;
-
-  RETURN QUERY
-  SELECT
-    p_module_key,
-    v_cost,
-    v_resources,
-    v_modules,
-    to_jsonb(v_state);
-END;
-$$;
-
--- ============================================================================
--- 8) base_unlock_research - Unlock research (ATOMIC)
--- ============================================================================
-
-CREATE OR REPLACE FUNCTION public.base_unlock_research(
-  p_device_id text,
-  p_research_key text
-)
-RETURNS TABLE(
-  research_key text,
-  cost jsonb,
-  new_resources jsonb,
-  new_research jsonb,
-  state jsonb
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_state public.base_device_state%ROWTYPE;
-  v_resources jsonb;
-  v_research jsonb;
-  v_research_config jsonb;
-  v_cost jsonb;
-  v_requires jsonb;
-  v_req text;
-  kv record;
-BEGIN
-  v_research_config := '{
-    "coolant": {"cost": {"ORE": 240, "SCRAP": 70}, "requires": []},
-    "routing": {"cost": {"ORE": 400, "GOLD": 260, "SCRAP": 120}, "requires": ["coolant"]},
-    "fieldOps": {"cost": {"ORE": 650, "GOLD": 420, "SCRAP": 180}, "requires": ["routing"]},
-    "minerSync": {"cost": {"ORE": 520, "GOLD": 300, "SCRAP": 130, "DATA": 20}, "requires": ["routing"]},
-    "arcadeOps": {"cost": {"ORE": 600, "GOLD": 420, "SCRAP": 180, "DATA": 30}, "requires": ["fieldOps"]},
-    "logistics": {"cost": {"ORE": 700, "GOLD": 460, "SCRAP": 220, "DATA": 40}, "requires": ["routing"]},
-    "predictiveMaintenance": {"cost": {"ORE": 620, "GOLD": 420, "SCRAP": 260, "DATA": 36}, "requires": ["fieldOps"]},
-    "deepScan": {"cost": {"ORE": 760, "GOLD": 520, "SCRAP": 240, "DATA": 48}, "requires": ["arcadeOps"]},
-    "tokenDiscipline": {"cost": {"ORE": 820, "GOLD": 560, "SCRAP": 280, "DATA": 60}, "requires": ["logistics", "deepScan"]}
-  }'::jsonb;
-
-  IF NOT (v_research_config ? p_research_key) THEN
-    RAISE EXCEPTION 'Invalid research key: %', p_research_key;
-  END IF;
-
-  v_state := public.base_get_or_create_state(p_device_id);
-
-  SELECT *
-  INTO v_state
-  FROM public.base_device_state
-  WHERE device_id = p_device_id
-  FOR UPDATE;
-
-  v_resources := coalesce(v_state.resources, '{}'::jsonb);
-  v_research := coalesce(v_state.research, '{}'::jsonb);
-  v_cost := v_research_config->p_research_key->'cost';
-  v_requires := coalesce(v_research_config->p_research_key->'requires', '[]'::jsonb);
-
-  IF coalesce((v_research->>p_research_key)::boolean, false) THEN
-    RAISE EXCEPTION 'Research already completed';
-  END IF;
-
-  FOR v_req IN SELECT jsonb_array_elements_text(v_requires)
-  LOOP
-    IF NOT coalesce((v_research->>v_req)::boolean, false) THEN
-      RAISE EXCEPTION 'Missing prerequisite: %', v_req;
-    END IF;
-  END LOOP;
-
-  FOR kv IN SELECT key, value FROM jsonb_each(v_cost)
-  LOOP
-    IF coalesce((v_resources->>kv.key)::bigint, 0) < (kv.value::text::bigint) THEN
-      RAISE EXCEPTION 'Insufficient resources';
-    END IF;
-  END LOOP;
-
-  FOR kv IN SELECT key, value FROM jsonb_each(v_cost)
-  LOOP
-    v_resources := jsonb_set(
-      v_resources,
-      ARRAY[kv.key],
-      to_jsonb(greatest(0, coalesce((v_resources->>kv.key)::bigint, 0) - (kv.value::text::bigint))),
-      true
-    );
-  END LOOP;
-
-  v_research := jsonb_set(v_research, ARRAY[p_research_key], 'true'::jsonb, true);
-
-  UPDATE public.base_device_state
-  SET
-    resources = v_resources,
-    research = v_research,
-    updated_at = now()
-  WHERE device_id = p_device_id
-  RETURNING * INTO v_state;
-
-  RETURN QUERY
-  SELECT
-    p_research_key,
-    v_cost,
-    v_resources,
-    v_research,
-    to_jsonb(v_state);
-END;
-$$;
-
--- ============================================================================
 -- Security: Revoke from PUBLIC and anon/authenticated, grant to service_role
 -- ============================================================================
 
@@ -1000,18 +635,10 @@ REVOKE EXECUTE ON FUNCTION public.base_ship_to_vault(text) FROM PUBLIC, anon, au
 REVOKE EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text, integer) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_launch_expedition(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_build_upgrade(text, text) FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.base_hire_crew(text) FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.base_perform_maintenance(text) FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.base_install_module(text, text) FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.base_unlock_research(text, text) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.base_ship_to_vault(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text, integer) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_launch_expedition(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_build_upgrade(text, text) TO service_role;
-GRANT EXECUTE ON FUNCTION public.base_hire_crew(text) TO service_role;
-GRANT EXECUTE ON FUNCTION public.base_perform_maintenance(text) TO service_role;
-GRANT EXECUTE ON FUNCTION public.base_install_module(text, text) TO service_role;
-GRANT EXECUTE ON FUNCTION public.base_unlock_research(text, text) TO service_role;
 
 COMMIT;
