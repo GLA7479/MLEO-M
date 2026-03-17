@@ -685,7 +685,11 @@ function getAlerts(state, derived, systemState, liveContracts = []) {
     });
   }
 
-  if (expeditionReady && Number(state.resources?.DATA || 0) >= 4) {
+  if (
+    expeditionReady &&
+    Number(state.resources?.DATA || 0) >= 4 &&
+    Number(state.resources?.ENERGY || 0) >= CONFIG.expeditionCost
+  ) {
     alerts.push({
       key: "expedition-ready",
       tone: "info",
@@ -1656,7 +1660,11 @@ function getNextStep(state, derived, systemState, liveContracts = []) {
     };
   }
 
-  if (expeditionReady && Number(state.resources?.DATA || 0) >= 4) {
+  if (
+    expeditionReady &&
+    Number(state.resources?.DATA || 0) >= 4 &&
+    Number(state.resources?.ENERGY || 0) >= CONFIG.expeditionCost
+  ) {
     return {
       title: "Launch expedition",
       text: "Your field team is ready. Expeditions are a good way to keep progression moving.",
@@ -1919,7 +1927,8 @@ export default function MleoBase() {
   const readyCounts = useMemo(() => {
     const expeditionReadyNow =
       Number(state.expeditionReadyAt || 0) <= Date.now() &&
-      Number(state.resources?.DATA || 0) >= 4;
+      Number(state.resources?.DATA || 0) >= 4 &&
+      Number(state.resources?.ENERGY || 0) >= CONFIG.expeditionCost;
 
     const claimableContractsCount = liveContracts.filter(
       (c) => c.done && !c.claimed
@@ -2004,7 +2013,8 @@ export default function MleoBase() {
   const canShipNow = Number(state.bankedMleo || 0) >= 120;
   const canExpeditionNow =
     Number(state.expeditionReadyAt || 0) <= Date.now() &&
-    Number(state.resources?.DATA || 0) >= 4;
+    Number(state.resources?.DATA || 0) >= 4 &&
+    Number(state.resources?.ENERGY || 0) >= CONFIG.expeditionCost;
 
   const blueprintDataCost = 20 + Number(state.blueprintLevel || 0) * 6;
   const canBuyBlueprintNow = canAffordBlueprint(
@@ -3903,7 +3913,7 @@ export default function MleoBase() {
                           <div className="mt-3 grid gap-3">
                             <button
                               onClick={handleLaunchExpedition}
-                              disabled={state.resources.ENERGY < CONFIG.expeditionCost}
+                              disabled={!canExpeditionNow}
                               className={`${opButtonClass(canExpeditionNow, !canExpeditionNow)} w-full px-4 py-4 text-base font-extrabold disabled:opacity-40`}
                             >
                               <div className="flex items-center justify-center gap-2">
@@ -4567,7 +4577,7 @@ export default function MleoBase() {
 
                   <button
                     onClick={handleLaunchExpedition}
-                    disabled={expeditionLeft > 0 || state.resources.ENERGY < CONFIG.expeditionCost}
+                    disabled={!canExpeditionNow}
                     className="mt-auto w-full rounded-2xl bg-cyan-600 px-4 py-3.5 text-sm font-extrabold shadow-lg shadow-cyan-900/30 transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {expeditionLeft > 0 ? `Ready in ${Math.ceil(expeditionLeft / 1000)}s` : "Launch Expedition"}
