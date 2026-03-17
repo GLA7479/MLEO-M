@@ -1694,13 +1694,14 @@ function getNextStep(state, derived, systemState, liveContracts = []) {
 const INFO_COPY = {
   sharedVault: {
     title: "Shared Vault",
+    focus: "Refinery + shipping + logistics",
     text:
       "Shared Vault is your main MLEO balance across the ecosystem.\n\n" +
       "How to grow it:\n" +
-      "• Build and upgrade the Refinery so BASE can produce banked MLEO.\n" +
-      "• Keep Ore and Scrap production strong, because the Refinery converts them into banked MLEO.\n" +
-      "• Ship MLEO out of BASE into the Shared Vault.\n" +
-      "• Improve shipment quality with Logistics Center, logistics research, and ship/bank efficiency tools.",
+      "• Produce banked MLEO in the Refinery.\n" +
+      "• Keep Ore and Scrap production strong.\n" +
+      "• Ship MLEO into the Shared Vault.\n" +
+      "• Improve logistics and shipment quality.",
     tips: {
       building: "Refinery + Logistics Center",
       research: "Logistics",
@@ -1716,14 +1717,14 @@ const INFO_COPY = {
 
   bankedMleo: {
     title: "Base Banked",
+    focus: "Refinery + Ore + Scrap",
     text:
-      "Banked MLEO is produced inside BASE by the Refinery. It stays in BASE until you ship it to the Shared Vault.\n\n" +
-      "How to grow it:\n" +
-      "• Build the Refinery.\n" +
-      "• Increase Ore from Quarry.\n" +
-      "• Increase Scrap from Salvage Yard.\n" +
-      "• Keep enough Energy available so production stays active.\n" +
-      "• Improve bank efficiency with research and modules.",
+      "Banked MLEO is produced inside BASE by the Refinery and stays here until shipped.\n\n" +
+      "How to gain more banked MLEO:\n" +
+      "• Upgrade Refinery.\n" +
+      "• Increase Ore production.\n" +
+      "• Increase Scrap production.\n" +
+      "• Keep enough Energy available.",
     tips: {
       building: "Refinery",
       research: "Routing AI",
@@ -1732,21 +1733,21 @@ const INFO_COPY = {
         "Upgrade Quarry",
         "Upgrade Salvage Yard",
         "Upgrade Refinery",
-        "Do not let Energy stay too low",
+        "Keep Energy from stalling production",
       ],
     },
   },
 
   commander: {
     title: "Commander Level",
+    focus: "Upgrades + missions + expeditions",
     text:
       "Commander Level reflects your long-term progression in BASE.\n\n" +
       "How to level up faster:\n" +
       "• Upgrade buildings.\n" +
       "• Complete daily missions.\n" +
       "• Launch expeditions.\n" +
-      "• Perform maintenance when needed.\n" +
-      "• Keep the whole base active and progressing.",
+      "• Keep the base active and maintained.",
     tips: {
       building: "Arcade Hub",
       research: "Arcade Ops",
@@ -1762,16 +1763,14 @@ const INFO_COPY = {
 
   data: {
     title: "DATA",
+    focus: "Research Lab + expeditions + daily missions",
     text:
       "DATA is your strategic progression resource.\n\n" +
       "Main ways to gain DATA:\n" +
-      "• Build and upgrade Miner Control.\n" +
-      "• Build and upgrade Arcade Hub.\n" +
-      "• Build and upgrade Logistics Center.\n" +
-      "• Build and upgrade Research Lab.\n" +
-      "• Launch expeditions.\n" +
-      "• Complete daily missions that reward DATA.\n" +
-      "• Use live events that grant DATA.",
+      "• Upgrade Research Lab.\n" +
+      "• Upgrade Miner Control and Arcade Hub.\n" +
+      "• Run expeditions.\n" +
+      "• Complete DATA-related daily missions.",
     tips: {
       building: "Research Lab",
       research: "Deep Scan / Token Discipline",
@@ -1780,65 +1779,67 @@ const INFO_COPY = {
         "Upgrade Research Lab first",
         "Then scale Miner Control + Arcade Hub",
         "Run expeditions for extra DATA",
-        "Complete DATA-related daily missions",
+        "Complete DATA missions every day",
       ],
     },
   },
 
   energy: {
     title: "Energy",
+    focus: "Power Cell + Coolant Loops",
     text:
       "Energy powers the whole base.\n\n" +
       "How to get more Energy:\n" +
       "• Wait for passive regeneration.\n" +
-      "• Build and upgrade Power Cell to increase cap and regeneration.\n" +
+      "• Upgrade Power Cell.\n" +
       "• Unlock energy research.\n" +
-      "• Avoid wasting energy on weak timing.\n\n" +
-      "If you expand too fast without improving Power Cell and research, Energy becomes your bottleneck.",
+      "• Avoid draining energy on weak timing.",
     tips: {
       building: "Power Cell",
       research: "Coolant Loops",
-      module: "None directly",
+      module: "",
       actions: [
         "Upgrade Power Cell early",
         "Unlock Coolant Loops quickly",
         "Do not overrun energy-heavy systems",
-        "Pause big pushes when Energy is drained",
+        "Recover before big pushes",
       ],
     },
   },
 
   stability: {
     title: "Stability",
+    focus: "Maintenance + Repair Bay + safe choices",
     text:
       "Stability shows how healthy and efficient your base is.\n\n" +
       "How to keep Stability high:\n" +
       "• Perform maintenance regularly.\n" +
-      "• Build and improve Repair Bay.\n" +
-      "• Choose safer event options when the base is under pressure.\n" +
-      "• Avoid risky pushes when systems are stressed.",
+      "• Upgrade Repair Bay.\n" +
+      "• Choose safer event outcomes.\n" +
+      "• Avoid risky pushes when the base is stressed.",
     tips: {
       building: "Repair Bay",
       research: "Predictive Maintenance",
       module: "Miner Link",
       actions: [
-        "Use maintenance before stability gets low",
+        "Use maintenance before Stability gets low",
         "Upgrade Repair Bay",
-        "Choose safe event outcomes when unstable",
-        "Avoid overpushing during weak stability windows",
+        "Choose safe event outcomes",
+        "Avoid overpushing during weak Stability",
       ],
     },
   },
 
   ore: {
     title: "ORE",
+    focus: "Quarry + Energy + Miner Sync",
     text:
       "ORE is one of the main raw resources in BASE.\n\n" +
       "How to gain more ORE:\n" +
       "• Build and upgrade Quarry.\n" +
-      "• Keep enough Energy available because Quarry turns Energy into Ore.\n" +
-      "• Install Ore-focused modules.\n" +
-      "• Unlock Ore-focused research.",
+      "• Keep enough Energy available.\n" +
+      "• Install ORE-focused modules.\n" +
+      "• Unlock ORE-focused research.",
     tips: {
       building: "Quarry",
       research: "Miner Sync",
@@ -1847,42 +1848,44 @@ const INFO_COPY = {
         "Upgrade Quarry steadily",
         "Keep Energy available",
         "Install Servo Drill",
-        "Unlock Miner Sync as soon as possible",
+        "Unlock Miner Sync early",
       ],
     },
   },
 
   gold: {
     title: "GOLD",
+    focus: "Trade Hub + missions + expeditions",
     text:
       "GOLD is the main economy resource in BASE.\n\n" +
       "How to gain more GOLD:\n" +
-      "• Build and upgrade Trade Hub.\n" +
-      "• Complete daily missions that reward GOLD.\n" +
+      "• Upgrade Trade Hub.\n" +
+      "• Complete GOLD-reward daily missions.\n" +
       "• Launch expeditions.\n" +
-      "• Use economy-related events and support actions.",
+      "• Use economy-related events.",
     tips: {
       building: "Trade Hub",
       research: "Field Ops",
-      module: "None directly",
+      module: "",
       actions: [
         "Upgrade Trade Hub often",
         "Claim GOLD-reward missions",
         "Run expeditions consistently",
-        "Do not let GOLD lag behind other resources",
+        "Keep GOLD balanced with other resources",
       ],
     },
   },
 
   scrap: {
     title: "SCRAP",
+    focus: "Salvage Yard + expeditions",
     text:
       "SCRAP is an advanced support resource.\n\n" +
       "How to gain more SCRAP:\n" +
       "• Build and upgrade Salvage Yard.\n" +
       "• Run expeditions.\n" +
-      "• Complete daily missions that reward SCRAP.\n" +
-      "• Use salvage-related live events when they appear.",
+      "• Complete SCRAP-reward missions.\n" +
+      "• Take salvage-related event rewards.",
     tips: {
       building: "Salvage Yard",
       research: "Deep Scan",
@@ -1890,8 +1893,8 @@ const INFO_COPY = {
       actions: [
         "Upgrade Salvage Yard",
         "Run expeditions often",
-        "Take salvage event rewards",
-        "Keep Scrap strong for refinery and advanced systems",
+        "Take salvage rewards when available",
+        "Keep SCRAP strong for refinery systems",
       ],
     },
   },
@@ -3759,6 +3762,12 @@ export default function MleoBase() {
                     <h3 className="mt-2 text-[28px] font-black leading-none text-white">
                       {activeInfo.title}
                     </h3>
+                    {activeInfo?.focus ? (
+                      <div className="mt-1 text-sm text-cyan-200/80">
+                        <span className="font-semibold text-white">Focus:</span>{" "}
+                        {activeInfo.focus}
+                      </div>
+                    ) : null}
                   </div>
 
                   <button
@@ -3771,7 +3780,7 @@ export default function MleoBase() {
                   </button>
                 </div>
 
-                <div className="mt-4 rounded-2xl border border-white/12 bg-white/[0.025] p-5">
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-5">
                   <div className="whitespace-pre-line text-sm leading-7 text-white/80">
                     {activeInfo.text}
                   </div>
@@ -3779,18 +3788,26 @@ export default function MleoBase() {
                   {activeInfo?.tips ? (
                     <div className="mt-4 border-t border-white/10 pt-4">
                       <div className="grid gap-2 text-sm text-white/78">
-                        <div>
-                          <span className="font-semibold text-white">Best building:</span>{" "}
-                          {activeInfo.tips.building}
-                        </div>
-                        <div>
-                          <span className="font-semibold text-white">Best research:</span>{" "}
-                          {activeInfo.tips.research}
-                        </div>
-                        <div>
-                          <span className="font-semibold text-white">Best module:</span>{" "}
-                          {activeInfo.tips.module}
-                        </div>
+                        {activeInfo?.tips?.building ? (
+                          <div>
+                            <span className="font-semibold text-white">Best building:</span>{" "}
+                            {activeInfo.tips.building}
+                          </div>
+                        ) : null}
+
+                        {activeInfo?.tips?.research ? (
+                          <div>
+                            <span className="font-semibold text-white">Best research:</span>{" "}
+                            {activeInfo.tips.research}
+                          </div>
+                        ) : null}
+
+                        {activeInfo?.tips?.module ? (
+                          <div>
+                            <span className="font-semibold text-white">Best module:</span>{" "}
+                            {activeInfo.tips.module}
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="mt-4">
@@ -3811,11 +3828,11 @@ export default function MleoBase() {
                   ) : null}
                 </div>
 
-                <div className="mt-4 flex justify-end">
+                <div className="sticky bottom-0 mt-5 flex justify-end bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent pt-4">
                   <button
                     type="button"
                     onClick={() => setOpenInfoKey(null)}
-                    className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-2 text-sm font-bold text-cyan-100 transition hover:bg-cyan-500/18"
+                    className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500/20"
                   >
                     Close
                   </button>
