@@ -1989,6 +1989,7 @@ export default function MleoBase() {
   const [toast, setToast] = useState("");
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [openInfoKey, setOpenInfoKey] = useState(null);
+  const [buildInfo, setBuildInfo] = useState(null);
   const [highlightTarget, setHighlightTarget] = useState(null);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -2013,6 +2014,7 @@ export default function MleoBase() {
   const [devTab, setDevTab] = useState("crew");
 
   const activeInfo = openInfoKey ? INFO_COPY[openInfoKey] : null;
+  const shownInfo = activeInfo || buildInfo;
 
   function toggleInnerPanel(panelKey) {
     setOpenInnerPanel((current) => (current === panelKey ? null : panelKey));
@@ -3416,6 +3418,250 @@ export default function MleoBase() {
     </div>
   );
 
+  const getBuildingInfo = (building) => {
+    const level = Number(state.buildings?.[building.key] || 0);
+    const nextLevel = level + 1;
+
+    const outputEntries = Object.entries(building.outputs || {});
+    const convertEntries = building.convert
+      ? Object.entries(building.convert).filter(([key]) => key !== "MLEO")
+      : [];
+
+    const currentOutputText = outputEntries.length
+      ? outputEntries
+          .map(([key, value]) => `${key} ${fmt(value * Math.max(level, 1))}`)
+          .join(" · ")
+      : "No direct passive output yet";
+
+    const nextOutputText = outputEntries.length
+      ? outputEntries
+          .map(([key, value]) => `${key} ${fmt(value * nextLevel)}`)
+          .join(" · ")
+      : "No direct passive output change";
+
+    const currentConvertText = building.convert
+      ? [
+          convertEntries.length
+            ? `Consumes ${convertEntries
+                .map(([key, value]) => `${key} ${fmt(value * Math.max(level, 1))}`)
+                .join(" · ")}`
+            : null,
+          building.convert.MLEO
+            ? `Banked MLEO potential ${fmt(
+                building.convert.MLEO * Math.max(level, 1)
+              )}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : "";
+
+    const nextConvertText = building.convert
+      ? [
+          convertEntries.length
+            ? `Consumes ${convertEntries
+                .map(([key, value]) => `${key} ${fmt(value * nextLevel)}`)
+                .join(" · ")}`
+            : null,
+          building.convert.MLEO
+            ? `Banked MLEO potential ${fmt(building.convert.MLEO * nextLevel)}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : "";
+
+    const currentPowerText = building.power
+      ? `Energy cap +${fmt(
+          building.power.cap * Math.max(level, 1)
+        )} · Energy regen +${fmt(building.power.regen * Math.max(level, 1))}`
+      : "";
+
+    const nextPowerText = building.power
+      ? `Energy cap +${fmt(building.power.cap * nextLevel)} · Energy regen +${fmt(
+          building.power.regen * nextLevel
+        )}`
+      : "";
+
+    const linkedSystems = [
+      building.outputs?.ORE ? "ORE production" : null,
+      building.outputs?.GOLD ? "GOLD economy" : null,
+      building.outputs?.SCRAP ? "SCRAP support" : null,
+      building.outputs?.DATA ? "DATA / progression" : null,
+      building.convert ? "Refining / banked MLEO" : null,
+      building.power ? "Energy cap / regen" : null,
+      building.key === "minerControl" ? "Miners synergy" : null,
+      building.key === "arcadeHub" ? "Arcade synergy" : null,
+      building.key === "expeditionBay" ? "Expeditions" : null,
+      building.key === "logisticsCenter" ? "Shipping / vault flow" : null,
+      building.key === "researchLab" ? "Research paths" : null,
+      building.key === "repairBay" ? "Stability / maintenance" : null,
+      building.key === "hq" ? "Global unlock path" : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    const whyMap = {
+      hq: "HQ is the central progression gate. It unlocks stronger structures and raises the overall quality of your base path.",
+      quarry:
+        "Quarry is your raw material backbone. Without strong Ore flow, the whole build chain slows down.",
+      tradeHub:
+        "Trade Hub keeps Gold flowing and makes the early economy feel stable instead of stuck.",
+      salvage:
+        "Salvage Yard feeds Scrap, which is required by many advanced systems and future upgrades.",
+      refinery:
+        "Refinery is the structure that turns infrastructure into actual banked MLEO support.",
+      powerCell:
+        "Power Cell reduces early frustration by improving energy capacity and regeneration.",
+      minerControl:
+        "Miner Control strengthens the connection between BASE and Miners, improving synergy and smarter progression.",
+      arcadeHub:
+        "Arcade Hub connects play activity to BASE growth and helps the ecosystem feel unified.",
+      expeditionBay:
+        "Expedition Bay improves your field loop and opens stronger recovery / loot progression.",
+      logisticsCenter:
+        "Logistics Center improves shipment quality and helps BASE support the shared vault more efficiently.",
+      researchLab:
+        "Research Lab increases DATA pressure in a good way and supports long-term optimization.",
+      repairBay:
+        "Repair Bay helps keep the base healthy, reducing the chance that instability becomes your bottleneck.",
+    };
+
+    const impactMap = {
+      hq: "Higher HQ means faster access to stronger systems, so your overall progression curve becomes smoother.",
+      quarry:
+        "More Quarry levels increase raw Ore flow, which speeds up most construction chains.",
+      tradeHub:
+        "More Gold flow means easier building tempo and less economic downtime.",
+      salvage:
+        "More Scrap flow unlocks advanced upgrades earlier and supports mid-game growth.",
+      refinery:
+        "More refining strength improves the path from raw resources into banked MLEO support.",
+      powerCell:
+        "Better energy support means less waiting, fewer dead moments, and more active progression.",
+      minerControl:
+        "This improves cross-system synergy, helping BASE feel more connected to Miners.",
+      arcadeHub:
+        "This strengthens ecosystem progression by making Arcade-linked advancement more meaningful.",
+      expeditionBay:
+        "Stronger expedition support improves side rewards and keeps progression moving between upgrades.",
+      logisticsCenter:
+        "This improves shipment flow and makes late-game BASE support more efficient.",
+      researchLab:
+        "Higher DATA support accelerates advanced decisions and long-term optimization.",
+      repairBay:
+        "Better stability control keeps efficiency healthier for longer and reduces recovery pressure.",
+    };
+
+    const nextGainParts = [
+      outputEntries.length ? `Output becomes: ${nextOutputText}` : null,
+      nextConvertText ? nextConvertText : null,
+      nextPowerText ? nextPowerText : null,
+      building.energyUse
+        ? `Energy demand scales with this structure, so support matters more as it grows.`
+        : null,
+    ].filter(Boolean);
+
+    const currentGainParts = [
+      outputEntries.length ? `Current output: ${currentOutputText}` : null,
+      currentConvertText ? currentConvertText : null,
+      currentPowerText ? currentPowerText : null,
+      building.energyUse
+        ? `Current energy pressure: ${fmt(building.energyUse * Math.max(level, 1))}`
+        : null,
+    ].filter(Boolean);
+
+    return {
+      title: `${building.name} · Lv ${level}`,
+      focus: "Build Structure",
+      text: (
+        <div className="space-y-4 text-sm leading-7 text-white/85">
+          <div>
+            <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
+              1. What it gives now
+            </div>
+            <div>{currentGainParts.length ? currentGainParts.join(" | ") : "This structure is still at base state."}</div>
+          </div>
+
+          <div>
+            <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
+              2. What the next upgrade gives
+            </div>
+            <div>{nextGainParts.length ? nextGainParts.join(" | ") : "Next level mainly improves progression positioning."}</div>
+          </div>
+
+          <div>
+            <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
+              3. Why upgrade it
+            </div>
+            <div>{whyMap[building.key] || "This upgrade improves your base progression and supports a stronger economy."}</div>
+          </div>
+
+          <div>
+            <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
+              4. Linked resources / systems
+            </div>
+            <div>{linkedSystems || "General base progression"}</div>
+          </div>
+
+          <div>
+            <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
+              5. Progression impact
+            </div>
+            <div>{impactMap[building.key] || "Improves long-term efficiency and progression pacing."}</div>
+          </div>
+        </div>
+      ),
+      tips: {
+        building: building.name,
+        research:
+          building.key === "powerCell"
+            ? "Coolant Loops"
+            : building.key === "logisticsCenter"
+            ? "Logistics"
+            : building.key === "researchLab"
+            ? "Deep Scan"
+            : building.key === "repairBay"
+            ? "Predictive Maintenance"
+            : building.key === "arcadeHub"
+            ? "Arcade Ops"
+            : building.key === "minerControl"
+            ? "Miner Sync"
+            : "Routing AI",
+        module:
+          building.key === "quarry" || building.key === "minerControl"
+            ? "Servo Drill"
+            : building.key === "arcadeHub"
+            ? "Arcade Relay"
+            : building.key === "refinery" || building.key === "logisticsCenter"
+            ? "Vault Compressor"
+            : "Miner Link",
+        actions: [
+          level === 0
+            ? `Build ${building.name} to open this part of the base economy.`
+            : `Upgrade ${building.name} to push this lane harder.`,
+          building.requires?.length
+            ? `Keep requirements healthy: ${building.requires
+                .map((req) => `${req.key} Lv ${req.lvl}`)
+                .join(" · ")}`
+            : "No structure requirements block this path.",
+          building.convert
+            ? "Pair this with Ore, Scrap and energy support so refining stays active."
+            : null,
+          building.power
+            ? "Use this when energy becomes a bottleneck."
+            : null,
+          building.key === "repairBay"
+            ? "Great when stability starts slipping."
+            : null,
+          building.key === "expeditionBay"
+            ? "Upgrade this when expeditions become part of your main loop."
+            : null,
+        ].filter(Boolean),
+      },
+    };
+  };
+
   const visibleStructures =
     structuresTab === "core"
       ? BUILDINGS.filter((item) => STRUCTURES_TAB_A.includes(item.key))
@@ -3502,11 +3748,27 @@ export default function MleoBase() {
                   <div className="h-[28px] flex items-center justify-end">
                     {ready ? <AvailabilityBadge /> : <div className="h-[28px]" />}
                   </div>
-
-                  <div className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/65">
-                    Lv {level}
-                  </div>
                 </div>
+              </div>
+
+              <div className="mt-1 flex items-center justify-between">
+                <div className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/65">
+                  Lv {level}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setBuildInfo(getBuildingInfo(building));
+                    setOpenInfoKey(null);
+                  }}
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                  aria-label={`Open info for ${building.name}`}
+                  title={`Info about ${building.name}`}
+                >
+                  i
+                </button>
               </div>
 
               <div className="mt-1 h-[38px] overflow-hidden text-[11px] leading-[1.2rem] text-white/60 line-clamp-2">
@@ -3540,7 +3802,7 @@ export default function MleoBase() {
 
               <ResourceCostRow cost={cost} resources={state.resources} />
 
-              <div className="mt-auto flex flex-col justify-end pt-0 pb-0">
+              <div className="mt-auto flex flex-col justify-end pt-0 pb-2">
                 <button
                   onClick={() => buyBuilding(building.key)}
                   disabled={!ready}
@@ -3553,7 +3815,7 @@ export default function MleoBase() {
                   {buttonText}
                 </button>
 
-                <div className="mt-0.5 h-[14px] overflow-hidden text-center text-[10px] leading-4 text-white/45">
+                <div className="mt-0.5 h-[10px] overflow-hidden text-center text-[10px] leading-4 text-white/45">
                 <div className="line-clamp-2 opacity-0">placeholder</div>
               </div>
               </div>
@@ -4596,10 +4858,13 @@ export default function MleoBase() {
             </section>
           </div>
 
-          {activeInfo ? (
+          {shownInfo ? (
             <div
               className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/78 backdrop-blur-sm px-4 lg:items-stretch lg:justify-end lg:px-0"
-              onClick={() => setOpenInfoKey(null)}
+              onClick={() => {
+                setOpenInfoKey(null);
+                setBuildInfo(null);
+              }}
             >
               <div
                 className="relative w-full max-w-md max-h-[78vh] overflow-y-auto rounded-3xl border border-cyan-400/20 bg-slate-950/95 p-5 shadow-[0_20px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl lg:max-h-none lg:h-full lg:w-[430px] lg:max-w-none lg:rounded-none lg:rounded-l-[28px] lg:border-y-0 lg:border-r-0 lg:border-l lg:p-6"
@@ -4607,7 +4872,10 @@ export default function MleoBase() {
               >
                 <button
                   type="button"
-                  onClick={() => setOpenInfoKey(null)}
+                  onClick={() => {
+                    setOpenInfoKey(null);
+                    setBuildInfo(null);
+                  }}
                   className="absolute right-4 top-4 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-2xl font-bold text-white/85 backdrop-blur-md transition hover:bg-white/10"
                   aria-label="Close info"
                 >
@@ -4620,43 +4888,43 @@ export default function MleoBase() {
                   </div>
 
                   <div className="mt-2 pr-16 text-4xl font-black leading-none text-white">
-                    {activeInfo.title}
+                    {shownInfo.title}
                   </div>
 
-                  {activeInfo?.focus ? (
+                  {shownInfo?.focus ? (
                     <div className="mt-2 pr-16 text-sm leading-6 text-cyan-200/80">
                       <span className="font-semibold text-white">Focus:</span>{" "}
-                      {activeInfo.focus}
+                      {shownInfo.focus}
                     </div>
                   ) : null}
                 </div>
 
                 <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-5">
                   <div className="whitespace-pre-line text-sm leading-7 text-white/80">
-                    {activeInfo.text}
+                    {shownInfo.text}
                   </div>
 
-                  {activeInfo?.tips ? (
+                  {shownInfo?.tips ? (
                     <div className="mt-4 border-t border-white/10 pt-4">
                       <div className="grid gap-2 text-sm text-white/78">
-                        {activeInfo?.tips?.building ? (
+                        {shownInfo?.tips?.building ? (
                           <div>
                             <span className="font-semibold text-white">Best building:</span>{" "}
-                            {activeInfo.tips.building}
+                            {shownInfo.tips.building}
                           </div>
                         ) : null}
 
-                        {activeInfo?.tips?.research ? (
+                        {shownInfo?.tips?.research ? (
                           <div>
                             <span className="font-semibold text-white">Best research:</span>{" "}
-                            {activeInfo.tips.research}
+                            {shownInfo.tips.research}
                           </div>
                         ) : null}
 
-                        {activeInfo?.tips?.module ? (
+                        {shownInfo?.tips?.module ? (
                           <div>
                             <span className="font-semibold text-white">Best module:</span>{" "}
-                            {activeInfo.tips.module}
+                            {shownInfo.tips.module}
                           </div>
                         ) : null}
                       </div>
@@ -4667,7 +4935,7 @@ export default function MleoBase() {
                         </div>
 
                         <ul className="mt-2 space-y-1.5 text-sm leading-6 text-white/78">
-                          {activeInfo.tips.actions.map((item) => (
+                          {shownInfo.tips.actions.map((item) => (
                             <li key={item} className="flex gap-2">
                               <span className="mt-[8px] h-1.5 w-1.5 rounded-full bg-cyan-300/90" />
                               <span>{item}</span>
@@ -4678,7 +4946,7 @@ export default function MleoBase() {
                     </div>
                   ) : null}
 
-                  {activeInfo?.nextStep ? (
+                  {shownInfo?.nextStep ? (
                     <button
                       type="button"
                       onClick={handleInfoNextStep}
@@ -4689,11 +4957,11 @@ export default function MleoBase() {
                           Recommended next step
                         </div>
                         <div className="mt-1 text-base font-semibold text-white">
-                          {activeInfo.nextStep.label}
+                          {shownInfo.nextStep.label}
                         </div>
-                        {activeInfo.nextStep.why ? (
+                        {shownInfo.nextStep.why ? (
                           <div className="mt-1 text-sm text-white/68">
-                            Why: {activeInfo.nextStep.why}
+                            Why: {shownInfo.nextStep.why}
                           </div>
                         ) : null}
                       </div>
@@ -4706,7 +4974,10 @@ export default function MleoBase() {
                 <div className="sticky bottom-0 z-20 -mx-5 mt-5 flex justify-end bg-transparent px-5 pb-6 pt-3 pointer-events-none lg:-mx-6 lg:px-6">
                   <button
                     type="button"
-                    onClick={() => setOpenInfoKey(null)}
+                    onClick={() => {
+                      setOpenInfoKey(null);
+                      setBuildInfo(null);
+                    }}
                     className="pointer-events-auto rounded-2xl border border-cyan-400/20 bg-slate-950/85 px-5 py-3 text-base font-semibold text-white shadow-[0_6px_18px_rgba(0,0,0,0.18)] backdrop-blur-md transition hover:bg-cyan-500/15"
                   >
                     Close
