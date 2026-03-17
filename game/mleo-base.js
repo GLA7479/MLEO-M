@@ -3752,32 +3752,30 @@ export default function MleoBase() {
                 className="w-full max-w-md max-h-[78vh] overflow-y-auto rounded-3xl border border-cyan-400/20 bg-slate-950/95 p-5 shadow-[0_20px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/35 to-transparent" />
+                <button
+                  type="button"
+                  onClick={() => setOpenInfoKey(null)}
+                  className="absolute right-4 top-4 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-2xl font-bold text-white/85 backdrop-blur-md transition hover:bg-white/10"
+                  aria-label="Close info"
+                >
+                  ×
+                </button>
 
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-200/55">
-                      MLEO BASE INFO
-                    </div>
-                    <h3 className="mt-2 text-[28px] font-black leading-none text-white">
-                      {activeInfo.title}
-                    </h3>
-                    {activeInfo?.focus ? (
-                      <div className="mt-1 text-sm text-cyan-200/80">
-                        <span className="font-semibold text-white">Focus:</span>{" "}
-                        {activeInfo.focus}
-                      </div>
-                    ) : null}
+                <div className="sticky top-0 z-20 -mx-5 -mt-5 mb-4 border-b border-white/10 bg-slate-950/92 px-5 pt-5 pb-3 backdrop-blur-xl">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-cyan-200/70">
+                    MLEO BASE INFO
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setOpenInfoKey(null)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-lg font-bold text-white/75 transition hover:bg-white/10 hover:text-white"
-                    aria-label="Close info"
-                  >
-                    ×
-                  </button>
+                  <div className="mt-2 pr-16 text-4xl font-black leading-none text-white">
+                    {activeInfo.title}
+                  </div>
+
+                  {activeInfo?.focus ? (
+                    <div className="mt-2 pr-16 text-sm leading-6 text-cyan-200/80">
+                      <span className="font-semibold text-white">Focus:</span>{" "}
+                      {activeInfo.focus}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-5">
