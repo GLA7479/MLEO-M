@@ -2029,6 +2029,35 @@ export default function MleoBase() {
     return null;
   }
 
+  function getAlertNavigationTarget(item) {
+    const key = item?.alertKey || item?.key;
+
+    switch (key) {
+      case "critical-stability":
+      case "warning-stability":
+      case "low-energy":
+      case "ship-pressure":
+        return { tab: "operations", target: "maintenance" };
+
+      case "expedition-ready":
+      case "expedition":
+        return { tab: "operations", target: "expedition" };
+
+      case "banked-ready":
+        return { tab: "operations", target: "shipping" };
+
+      case "contracts-ready":
+      case "contracts":
+        return { tab: "overview", target: "contracts" };
+
+      case "missions":
+        return { tab: "operations", target: "missions" };
+
+      default:
+        return { tab: "overview", target: "alerts" };
+    }
+  }
+
   function centerTargetInMobilePanel(targetEl) {
     const container = mobilePanelScrollRef.current;
     if (!container || !targetEl) return false;
@@ -2043,10 +2072,10 @@ export default function MleoBase() {
     const targetCenter =
       targetTopInsideContainer + targetRect.height / 2;
 
-    const visibleCenter =
-      container.clientHeight / 2;
+    const visibleAnchor =
+      container.clientHeight * 0.42;
 
-    const nextScrollTop = Math.max(0, targetCenter - visibleCenter);
+    const nextScrollTop = Math.max(0, targetCenter - visibleAnchor);
 
     container.scrollTo({
       top: nextScrollTop,
@@ -2056,11 +2085,8 @@ export default function MleoBase() {
     return true;
   }
 
-  function handleInfoNextStep() {
-    const info = shownInfo;
-    if (!info?.nextStep) return;
-
-    const step = info.nextStep;
+  function navigateToBaseTarget(step) {
+    if (!step?.target) return;
 
     const targetTab =
       step.tab === "operations"
@@ -2176,9 +2202,6 @@ export default function MleoBase() {
       // no-op
     }
 
-    setOpenInfoKey(null);
-    setBuildInfo(null);
-
     setTimeout(() => {
       setHighlightTarget(step.target);
 
@@ -2211,6 +2234,23 @@ export default function MleoBase() {
     setTimeout(() => {
       setHighlightTarget(null);
     }, 4200);
+  }
+
+  function handleInfoNextStep() {
+    const info = shownInfo;
+    if (!info?.nextStep) return;
+
+    setOpenInfoKey(null);
+    setBuildInfo(null);
+
+    navigateToBaseTarget(info.nextStep);
+  }
+
+  function handleCommandHubItemClick(item) {
+    const step = getAlertNavigationTarget(item);
+    if (!step) return;
+    setShowReadyPanel(false);
+    navigateToBaseTarget(step);
   }
 
   useEffect(() => {
@@ -7404,9 +7444,14 @@ export default function MleoBase() {
                       </div>
 
                       <div
+                        data-base-target="contracts"
                         className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
                           liveContractsAvailableCount > 0
-                        )}`}
+                        )} ${
+                          isHighlightedTarget("contracts", highlightTarget)
+                            ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                            : ""
+                        }`}
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
@@ -8073,16 +8118,31 @@ export default function MleoBase() {
                   </button>
                 </div>
 
-                <div className="mt-4 space-y-3">
+                <div
+                  data-base-target="alerts"
+                  className={`mt-4 space-y-3 ${
+                    isHighlightedTarget("alerts", highlightTarget)
+                      ? "rounded-3xl ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)] p-2"
+                      : ""
+                  }`}
+                >
                   {commandHubItems.length ? (
                     commandHubItems.map((item) => (
                       <button
                         key={item.key}
-                        onClick={() => openCommandHubTarget(item)}
-                        className={`block w-full rounded-2xl border p-3 text-left hover:bg-white/10 ${
+                        type="button"
+                        onClick={() => handleCommandHubItemClick(item)}
+                        className={`block w-full rounded-2xl border p-3 text-left transition hover:bg-white/10 ${
                           item.type === "alert"
                             ? alertToneClasses(item.tone)
                             : "border-white/10 bg-black/20"
+                        } ${
+                          isHighlightedTarget(
+                            getAlertNavigationTarget(item)?.target,
+                            highlightTarget
+                          )
+                            ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                            : ""
                         }`}
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -8317,7 +8377,14 @@ export default function MleoBase() {
 
               {/* Desktop - Live Contracts */}
               <div className="hidden xl:block">
-                <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+                <div
+                  data-base-target="contracts"
+                  className={`mt-4 rounded-3xl border border-white/10 bg-white/5 p-4 ${
+                    isHighlightedTarget("contracts", highlightTarget)
+                      ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                      : ""
+                  }`}
+                >
                   <div className="mb-4">
                     <div className="text-xs uppercase tracking-[0.18em] text-white/55">Live Contracts</div>
                     <div className="mt-1 text-lg font-bold text-white">Command Objectives</div>
