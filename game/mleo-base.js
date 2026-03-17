@@ -3831,117 +3831,119 @@ export default function MleoBase() {
           {/* Desktop Command Center */}
           <div className="mt-4 hidden lg:flex lg:min-h-[680px] lg:max-h-[calc(100vh-110px)] lg:gap-4">
             {/* LEFT SIDEBAR */}
-            <aside className="w-[200px] shrink-0 space-y-2.5">
-              <div className="rounded-[28px] border border-white/10 bg-slate-950/75 p-3 backdrop-blur-xl">
-                <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-300/70">
-                  Command
+            <aside className="w-[200px] shrink-0 lg:flex lg:h-full lg:flex-col lg:gap-2.5">
+              <div className="space-y-2.5">
+                <div className="rounded-[28px] border border-white/10 bg-slate-950/75 p-3 backdrop-blur-xl">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-300/70">
+                    Command
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {[
+                      { key: "overview", label: "Overview" },
+                      { key: "ops", label: "Operations" },
+                      { key: "build", label: "Build" },
+                      { key: "intel", label: "Intel" },
+                    ].map((item) => {
+                      const active = desktopPanel === item.key;
+                      return (
+                        <button
+                          key={item.key}
+                          onClick={() => openDesktopPanel(item.key)}
+                          className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ${
+                            active
+                              ? "bg-cyan-400 text-slate-950"
+                              : "border border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
+                          }`}
+                        >
+                          <span>{item.label}</span>
+                          {item.key === "overview" && liveContractsAvailableCount > 0 ? (
+                            <span className="rounded-full bg-black/15 px-2 py-0.5 text-[11px] font-bold">
+                              {liveContractsAvailableCount}
+                            </span>
+                          ) : null}
+                          {item.key === "ops" && readyCounts.total > 0 ? (
+                            <span className="rounded-full bg-black/15 px-2 py-0.5 text-[11px] font-bold">
+                              {readyCounts.total}
+                            </span>
+                          ) : null}
+                          {item.key === "build" && buildOpportunitiesCount > 0 ? (
+                            <span className="rounded-full bg-black/15 px-2 py-0.5 text-[11px] font-bold">
+                              {buildOpportunitiesCount}
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="mt-2 space-y-2">
-                  {[
-                    { key: "overview", label: "Overview" },
-                    { key: "ops", label: "Operations" },
-                    { key: "build", label: "Build" },
-                    { key: "intel", label: "Intel" },
-                  ].map((item) => {
-                    const active = desktopPanel === item.key;
-                    return (
-                      <button
-                        key={item.key}
-                        onClick={() => openDesktopPanel(item.key)}
-                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ${
-                          active
-                            ? "bg-cyan-400 text-slate-950"
-                            : "border border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
-                        }`}
-                      >
-                        <span>{item.label}</span>
-                        {item.key === "overview" && liveContractsAvailableCount > 0 ? (
-                          <span className="rounded-full bg-black/15 px-2 py-0.5 text-[11px] font-bold">
-                            {liveContractsAvailableCount}
-                          </span>
-                        ) : null}
-                        {item.key === "ops" && readyCounts.total > 0 ? (
-                          <span className="rounded-full bg-black/15 px-2 py-0.5 text-[11px] font-bold">
-                            {readyCounts.total}
-                          </span>
-                        ) : null}
-                        {item.key === "build" && buildOpportunitiesCount > 0 ? (
-                          <span className="rounded-full bg-black/15 px-2 py-0.5 text-[11px] font-bold">
-                            {buildOpportunitiesCount}
-                          </span>
-                        ) : null}
-                      </button>
-                    );
-                  })}
+
+                <div className="rounded-[28px] border border-cyan-400/25 bg-cyan-500/10 p-3.5 backdrop-blur-xl">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200/70">
+                    Ready Now
+                  </div>
+                  <div className="mt-2 text-3xl font-black text-white">
+                    {readyCounts.total}
+                  </div>
+                  <div className="mt-1 text-xs text-white/65">
+                    Immediate actions and rewards available
+                  </div>
+
+                  <div className="mt-3 flex flex-col gap-2">
+                    <button
+                      onClick={() => {
+                        if (canExpeditionNow || canShipNow || needsRefillNow || needsMaintenanceNow) {
+                          openDesktopPanel("ops", "ops-console");
+                        } else if (dailyMissionsAvailableCount > 0) {
+                          openDesktopPanel("ops", "ops-missions");
+                        } else if (liveContractsAvailableCount > 0) {
+                          openDesktopPanel("overview", "overview-contracts");
+                        } else if (buildOpportunitiesCount > 0) {
+                          openDesktopPanel("build", "build-structures");
+                        } else {
+                          openDesktopPanel("overview");
+                        }
+                      }}
+                      className="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-bold text-slate-950 hover:bg-cyan-300"
+                    >
+                      Open Ready
+                    </button>
+
+                    <button
+                      onClick={() => setDesktopCompact((v) => !v)}
+                      className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"
+                    >
+                      {desktopCompact ? "Detailed View" : "Compact View"}
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-cyan-400/25 bg-cyan-500/10 p-3.5 backdrop-blur-xl">
-                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200/70">
-                  Ready Now
-                </div>
-                <div className="mt-2 text-3xl font-black text-white">
-                  {readyCounts.total}
-                </div>
-                <div className="mt-1 text-xs text-white/65">
-                  Immediate actions and rewards available
-                </div>
-
-                <div className="mt-3 flex flex-col gap-2">
-                  <button
-                    onClick={() => {
-                      if (canExpeditionNow || canShipNow || needsRefillNow || needsMaintenanceNow) {
-                        openDesktopPanel("ops", "ops-console");
-                      } else if (dailyMissionsAvailableCount > 0) {
-                        openDesktopPanel("ops", "ops-missions");
-                      } else if (liveContractsAvailableCount > 0) {
-                        openDesktopPanel("overview", "overview-contracts");
-                      } else if (buildOpportunitiesCount > 0) {
-                        openDesktopPanel("build", "build-structures");
-                      } else {
-                        openDesktopPanel("overview");
-                      }
-                    }}
-                    className="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-bold text-slate-950 hover:bg-cyan-300"
-                  >
-                    Open Ready
-                  </button>
-
-                  <button
-                    onClick={() => setDesktopCompact((v) => !v)}
-                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"
-                  >
-                    {desktopCompact ? "Detailed View" : "Compact View"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="rounded-[28px] border border-white/10 bg-slate-950/75 p-3.5 backdrop-blur-xl">
+              <div className="mt-auto rounded-[28px] border border-white/10 bg-slate-950/75 p-3 backdrop-blur-xl">
                 <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
                   Commander
                 </div>
-                <div className="mt-2 text-base font-black text-white">
+                <div className="mt-1.5 text-[28px] font-black leading-none text-white">
                   Lv {state.commanderLevel}
                 </div>
-                <div className="mt-1 text-sm text-white/75">{commanderPathInfo.name}</div>
-                <div className="mt-1 text-xs text-white/55">{crewRoleInfo.name}</div>
+                <div className="mt-2 text-sm text-white/75">{commanderPathInfo.name}</div>
+                <div className="mt-0.5 text-xs text-white/55">{crewRoleInfo.name}</div>
 
-                <div className="mt-4 grid grid-cols-1 gap-2">
+                <div className="mt-3 grid grid-cols-1 gap-1.5">
                   <Link
                     href="/arcade"
-                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-center text-[13px] font-semibold text-white hover:bg-white/10"
+                    className="flex h-10 w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white hover:bg-white/10"
                   >
                     Open Arcade
                   </Link>
                   <Link
                     href="/mleo-miners"
-                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-center text-[13px] font-semibold text-white hover:bg-white/10"
+                    className="flex h-10 w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white hover:bg-white/10"
                   >
                     Open Miners
                   </Link>
                   <button
                     onClick={handleResetGame}
-                    className="rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-2.5 text-[13px] font-semibold text-rose-200 hover:bg-rose-500/20"
+                    className="flex h-10 w-full items-center justify-center rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 text-sm font-semibold text-rose-200 hover:bg-rose-500/20"
                   >
                     Reset Game
                   </button>
