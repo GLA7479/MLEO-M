@@ -219,14 +219,14 @@ const RESEARCH = [
   {
     key: "routing",
     name: "Routing AI",
-    desc: "+8% bank efficiency and +5K daily ship cap.",
+    desc: "+8% bank efficiency.",
     cost: { ORE: 400, GOLD: 260, SCRAP: 120 },
     requires: ["coolant"],
   },
   {
     key: "fieldOps",
     name: "Field Ops",
-    desc: "Crew bonus increases and expeditions refresh faster.",
+    desc: "Crew bonus increases.",
     cost: { ORE: 650, GOLD: 420, SCRAP: 180 },
     requires: ["routing"],
   },
@@ -1081,7 +1081,6 @@ function derive(state, now = Date.now()) {
   const hqLevel = state.buildings.hq || 1;
   const minerLink = state.buildings.minerControl || 0;
   const arcadeLink = state.buildings.arcadeHub || 0;
-  const logisticsLevel = state.buildings.logisticsCenter || 0;
   const researchLabLevel = state.buildings.researchLab || 0;
   const repairBayLevel = state.buildings.repairBay || 0;
   const hasFieldOps = !!state.research.fieldOps;
@@ -1101,13 +1100,11 @@ function derive(state, now = Date.now()) {
   let scrapMult = workerBonus * overclock;
   let mleoMult = workerBonus * overclock;
   let dataMult = (1 + researchLabLevel * 0.06) * arcadeBonus;
-  let bankBonus = 1 + state.blueprintLevel * 0.02 + logisticsLevel * 0.025;
+  let bankBonus = 1 + state.blueprintLevel * 0.08;
   let maintenanceRelief = 1 + repairBayLevel * 0.08;
 
   if (crewRole === "engineer") {
     maintenanceRelief *= 1.06;
-  } else if (crewRole === "logistician") {
-    bankBonus *= 1.03;
   } else if (crewRole === "researcher") {
     dataMult *= 1.05;
   } else if (crewRole === "scout") {
@@ -1120,8 +1117,6 @@ function derive(state, now = Date.now()) {
   if (commanderPath === "industry") {
     oreMult *= 1.03;
     maintenanceRelief *= 1.03;
-  } else if (commanderPath === "logistics") {
-    bankBonus *= 1.04;
   } else if (commanderPath === "research") {
     dataMult *= 1.06;
   } else if (commanderPath === "ecosystem") {
@@ -1132,7 +1127,6 @@ function derive(state, now = Date.now()) {
   if (state.modules.servoDrill) oreMult *= 1.15;
   if (state.modules.vaultCompressor) {
     mleoMult *= 1.04;
-    bankBonus *= 1.08;
   }
   if (state.modules.arcadeRelay) {
     dataMult *= 1.12;
@@ -1140,15 +1134,12 @@ function derive(state, now = Date.now()) {
   if (state.modules.minerLink) {
     oreMult *= 1.08;
   }
-  if (state.research.routing) bankBonus *= 1.08;
   if (state.research.minerSync) oreMult *= 1.12;
   if (state.research.arcadeOps) dataMult *= 1.10;
-  if (state.research.logistics) bankBonus *= 1.10;
   if (state.research.deepScan) dataMult *= 1.18;
   if (state.research.tokenDiscipline) {
     dataMult *= 1.22;
     mleoMult *= 0.88;
-    bankBonus *= 1.10;
   }
   if (state.research.predictiveMaintenance) {
     maintenanceRelief *= 1.25;
