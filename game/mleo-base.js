@@ -322,17 +322,17 @@ const DAILY_MISSIONS = [
 const CONFIG = {
   title: "MLEO BASE",
   subtitle: "Command your MLEO base, connect Miners + Arcade, and grow your shared vault.",
-  startingGold: 260,
+  startingGold: 320,
   baseEnergyCap: 140,
-  baseEnergyRegen: 3.2,
+  baseEnergyRegen: 3.8,
   dailyShipCap: 12_000,
   expeditionCost: 36,
   expeditionCooldownMs: 120_000,
   overclockCost: 900,
   overclockDurationMs: 8 * 60 * 1000,
-  refillCost: 300,
-  blueprintBaseCost: 2_500,
-  blueprintGrowth: 1.85,
+  refillCost: 180,
+  blueprintBaseCost: 1800,
+  blueprintGrowth: 1.65,
 };
 
 const EVENT_COOLDOWN_MS = 2 * 60 * 1000;
@@ -447,8 +447,8 @@ const LIVE_EVENTS = [
 
 function getSystemState(stability) {
   const value = Number(stability || 100);
-  if (value < 60) return "critical";
-  if (value < 85) return "warning";
+  if (value < 50) return "critical";
+  if (value < 70) return "warning";
   return "normal";
 }
 
@@ -637,8 +637,8 @@ function sectorStatusForBuilding(key, state) {
   const stability = Number(state.stability || 100);
 
   if (level <= 0) return "offline";
-  if (stability < 60 && ["refinery", "researchLab", "logisticsCenter"].includes(key)) return "critical";
-  if (stability < 85 && ["repairBay", "powerCell", "refinery"].includes(key)) return "warning";
+  if (stability < 50 && ["refinery", "researchLab", "logisticsCenter"].includes(key)) return "critical";
+  if (stability < 70 && ["repairBay", "powerCell", "refinery"].includes(key)) return "warning";
   return "active";
 }
 
@@ -978,11 +978,11 @@ function freshState() {
     lastTickAt: Date.now(),
     lastHiddenAt: 0,
     resources: {
-      ORE: 45,
+      ORE: 70,
       GOLD: CONFIG.startingGold,
-      SCRAP: 12,
+      SCRAP: 22,
       ENERGY: CONFIG.baseEnergyCap,
-      DATA: 6,
+      DATA: 10,
     },
     buildings: {
       hq: 1,
@@ -1190,7 +1190,7 @@ function derive(state, now = Date.now()) {
 
   return {
     energyCap: CONFIG.baseEnergyCap + powerLevel * 24 + (state.research.coolant ? 15 : 0),
-    energyRegen: CONFIG.baseEnergyRegen + powerLevel * 0.75 + (state.research.coolant ? 0.8 : 0),
+    energyRegen: CONFIG.baseEnergyRegen + powerLevel * 1.2 + (state.research.coolant ? 0.8 : 0),
     oreMult,
     goldMult,
     scrapMult,
@@ -3298,7 +3298,7 @@ export default function MleoBase() {
   };
 
   const performMaintenance = async () => {
-    const cost = { GOLD: 60, SCRAP: 35, DATA: 10 };
+    const cost = { GOLD: 50, SCRAP: 28, DATA: 6 };
 
     if (!hasResources(state.resources, cost)) {
       showToast("Need GOLD, SCRAP and DATA for maintenance.");

@@ -729,8 +729,8 @@ DECLARE
   v_state public.base_device_state%ROWTYPE;
   v_resources jsonb;
   v_stats jsonb;
-  v_cost jsonb := jsonb_build_object('GOLD', 60, 'SCRAP', 35, 'DATA', 10);
-  v_stability_gain integer := 18;
+  v_cost jsonb := jsonb_build_object('GOLD', 50, 'SCRAP', 28, 'DATA', 6);
+  v_stability_gain integer := 22;
   v_xp_gain bigint := 20;
   v_new_stability numeric;
   v_new_commander_xp bigint;
