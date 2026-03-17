@@ -135,7 +135,7 @@ DECLARE
   v_cfg jsonb;
   v_ratio numeric := 0;
   v_result numeric := 1;
-  v_row jsonb;
+  v_elem record;
 BEGIN
   IF p_cap IS NULL OR p_cap <= 0 THEN
     RETURN 1;
@@ -147,11 +147,11 @@ BEGIN
 
   v_ratio := greatest(0, coalesce(p_used, 0)::numeric) / p_cap::numeric;
 
-  FOR v_row IN
+  FOR v_elem IN
     SELECT x FROM jsonb_array_elements(coalesce(v_cfg, '[]'::jsonb)) AS x
   LOOP
-    IF v_ratio <= coalesce((v_row.x->>'upto')::numeric, 999999) THEN
-      v_result := coalesce((v_row.x->>'factor')::numeric, 1);
+    IF v_ratio <= coalesce((v_elem.x->>'upto')::numeric, 999999) THEN
+      v_result := coalesce((v_elem.x->>'factor')::numeric, 1);
       RETURN greatest(0, v_result);
     END IF;
   END LOOP;
