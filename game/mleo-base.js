@@ -2014,43 +2014,121 @@ export default function MleoBase() {
     setOpenInnerPanel((current) => (current === panelKey ? null : panelKey));
   }
 
+  function isHighlightedTarget(target, highlightTarget) {
+    return highlightTarget === target;
+  }
+
   function handleInfoNextStep() {
     if (!activeInfo?.nextStep) return;
 
     const step = activeInfo.nextStep;
 
-    // Mobile tab routing (desktop shows all sections anyway)
+    const targetTab =
+      step.tab === "operations"
+        ? "ops"
+        : step.tab === "build"
+        ? "build"
+        : step.tab === "intel"
+        ? "intel"
+        : "overview";
+
+    const targetInnerPanel = (() => {
+      if (step.target === "shipping" || step.target === "maintenance" || step.target === "expedition") {
+        return "ops-console";
+      }
+
+      if (step.target === "missions") {
+        return "ops-missions";
+      }
+
+      if (step.target === "contracts") {
+        return "overview-contracts";
+      }
+
+      if (step.target === "alerts") {
+        return "overview-alerts";
+      }
+
+      if (step.target === "recommendation") {
+        return "overview-recommendation";
+      }
+
+      if (
+        step.target === "quarry" ||
+        step.target === "tradeHub" ||
+        step.target === "salvage" ||
+        step.target === "refinery" ||
+        step.target === "powerCell" ||
+        step.target === "hq" ||
+        step.target === "minerControl" ||
+        step.target === "arcadeHub" ||
+        step.target === "expeditionBay" ||
+        step.target === "logisticsCenter" ||
+        step.target === "researchLab" ||
+        step.target === "repairBay"
+      ) {
+        return "build-structures";
+      }
+
+      if (
+        step.target === "servoDrill" ||
+        step.target === "vaultCompressor" ||
+        step.target === "arcadeRelay" ||
+        step.target === "minerLink" ||
+        step.target === "coolant" ||
+        step.target === "routing" ||
+        step.target === "fieldOps" ||
+        step.target === "minerSync" ||
+        step.target === "arcadeOps" ||
+        step.target === "logistics" ||
+        step.target === "predictiveMaintenance" ||
+        step.target === "deepScan" ||
+        step.target === "tokenDiscipline"
+      ) {
+        return "build-development";
+      }
+
+      return null;
+    })();
+
     try {
-      const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches;
+      const isMobile =
+        typeof window !== "undefined" &&
+        window.matchMedia("(max-width: 639px)").matches;
+
       if (isMobile) {
-        const tabKey =
-          step.tab === "operations" ? "ops" : step.tab === "build" ? "build" : step.tab === "intel" ? "intel" : "overview";
+        openMobilePanel(targetTab);
 
-        openMobilePanel(tabKey);
+        if (targetInnerPanel) {
+          setOpenInnerPanel(targetInnerPanel);
+        } else if (targetTab === "build") {
+          setOpenInnerPanel("build-structures");
+        }
+      } else {
+        setDesktopPanel(targetTab);
 
-        if (step.target === "shipping" || step.target === "maintenance") {
-          setOpenInnerPanel("ops-console");
-        } else if (step.target === "missions") {
-          setOpenInnerPanel("ops-missions");
-        } else if (tabKey === "build") {
+        if (targetInnerPanel) {
+          setOpenInnerPanel(targetInnerPanel);
+        } else if (targetTab === "build") {
           setOpenInnerPanel("build-structures");
         }
       }
     } catch {
       // no-op
     }
-
-    setHighlightTarget(step.target);
     setOpenInfoKey(null);
 
     setTimeout(() => {
+      setHighlightTarget(step.target);
       const el = document.querySelector(`[data-base-target="${step.target}"]`);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 120);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      }
+    }, 220);
 
     setTimeout(() => {
       setHighlightTarget(null);
-    }, 2200);
+    }, 2800);
   }
 
   useEffect(() => {
@@ -3402,33 +3480,14 @@ export default function MleoBase() {
           <div
             key={building.key}
             data-base-target={building.key}
-            className={`relative flex min-h-[168px] flex-col rounded-2xl border p-3 ${availabilityCardClass(ready)} ${
-              highlightTarget === building.key ? "border-cyan-300/70 ring-2 ring-cyan-300/35 shadow-[0_0_0_1px_rgba(103,232,249,0.25)]" : ""
+            className={`relative flex min-h-[168px] flex-col rounded-2xl border p-3 transition-all duration-300 ${availabilityCardClass(ready)} ${
+              isHighlightedTarget(building.key, highlightTarget)
+                ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                : ""
             }`}
           >
-            <InfoButton
-              infoKey={
-                building.key === "quarry"
-                  ? "ore"
-                  : building.key === "tradeHub"
-                  ? "gold"
-                  : building.key === "salvage"
-                  ? "scrap"
-                  : building.key === "refinery"
-                  ? "bankedMleo"
-                  : building.key === "powerCell"
-                  ? "energy"
-                  : building.key === "researchLab" || building.key === "minerControl" || building.key === "arcadeHub"
-                  ? "data"
-                  : building.key === "repairBay"
-                  ? "stability"
-                  : null
-              }
-              setOpenInfoKey={setOpenInfoKey}
-              className="right-2.5 top-2.5 h-6 w-6 text-[11px]"
-            />
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1 pr-8">
+              <div className="min-w-0 flex-1">
                 <div className="text-[15px] font-semibold leading-5 text-white">
                   {building.name}
                 </div>
@@ -3441,11 +3500,11 @@ export default function MleoBase() {
               </div>
             </div>
 
-            <div className="mt-1 text-[11px] leading-4 text-white/60 line-clamp-2 pr-2">
+            <div className="mt-1 text-[11px] leading-4 text-white/60 line-clamp-2">
               {building.desc}
             </div>
 
-            <div className="mt-2 flex flex-wrap gap-1.5 pr-1">
+            <div className="mt-2 flex flex-wrap gap-1.5">
               <div className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/70">
                 {buildingRoleTag(building.key)}
               </div>
@@ -5728,7 +5787,11 @@ export default function MleoBase() {
                       data-base-target="shipping"
                       className={`flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
                         highlightCard((state.bankedMleo || 0) >= 120, "success")
-                      } ${highlightTarget === "shipping" ? "ring-2 ring-cyan-300/35" : ""}`}
+                      } ${
+                        isHighlightedTarget("shipping", highlightTarget)
+                          ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                          : ""
+                      }`}
                     >
                       <div className="flex min-h-[88px] flex-col">
                         <div className="text-sm font-semibold text-emerald-200">Ship to Shared Vault</div>
@@ -5745,8 +5808,13 @@ export default function MleoBase() {
                     </div>
 
                     <div
+                      data-base-target="expedition"
                       className={`flex h-full flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 ${
                         highlightCard(expeditionLeft <= 0 && (state.resources.DATA || 0) >= 4, "info")
+                      } ${
+                        isHighlightedTarget("expedition", highlightTarget)
+                          ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                          : ""
                       }`}
                     >
                       <div className="flex min-h-[88px] flex-col">
@@ -5808,7 +5876,11 @@ export default function MleoBase() {
                           : systemState === "warning"
                           ? highlightCard(true, "warning")
                           : ""
-                      } ${highlightTarget === "maintenance" ? "ring-2 ring-cyan-300/35" : ""}`}
+                      } ${
+                        isHighlightedTarget("maintenance", highlightTarget)
+                          ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                          : ""
+                      }`}
                     >
                       <div className="flex min-h-[88px] flex-col">
                         <div className="text-sm font-semibold text-amber-200">Shared Vault Utilities</div>
@@ -5846,7 +5918,11 @@ export default function MleoBase() {
 
                 <div
                   data-base-target="missions"
-                  className={highlightTarget === "missions" ? "rounded-3xl ring-2 ring-cyan-300/35" : ""}
+                  className={`${
+                    isHighlightedTarget("missions", highlightTarget)
+                      ? "rounded-3xl ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                      : ""
+                  }`}
                 >
                   <Section
                     title="Daily Missions"
