@@ -808,6 +808,18 @@ function saveJson(key, value) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
+function saveBaseProfilePatch(patch) {
+  if (typeof window === "undefined") return;
+  const current = loadJson("mleo_base_profile_v1", {}) || {};
+  window.localStorage.setItem(
+    "mleo_base_profile_v1",
+    JSON.stringify({
+      ...current,
+      ...patch,
+    })
+  );
+}
+
 function pushLog(log, text) {
   const next = [{ id: `${Date.now()}-${Math.random()}`, ts: Date.now(), text }, ...(log || [])];
   return next.slice(0, MAX_LOG_ITEMS);
@@ -1002,76 +1014,69 @@ function freshState() {
   };
 }
 
-function normalizeServerState(raw) {
-  if (!raw) return freshState();
-
+function normalizeServerState(raw, prevState = null) {
   const seed = freshState();
+  const prev = prevState || null;
+
+  if (!raw) {
+    return prev ? { ...seed, ...prev } : seed;
+  }
 
   const lastTick =
     raw.lastTickAt ??
-    (raw.last_tick_at ? new Date(raw.last_tick_at).getTime() : Date.now());
+    (raw.last_tick_at ? new Date(raw.last_tick_at).getTime() : prev?.lastTickAt ?? Date.now());
 
   const expeditionReady =
     raw.expeditionReadyAt ??
     (raw.expedition_ready_at
       ? new Date(raw.expedition_ready_at).getTime()
-      : Date.now());
+      : prev?.expeditionReadyAt ?? Date.now());
 
   const overclockUntil =
     raw.overclockUntil ??
-    (raw.overclock_until ? new Date(raw.overclock_until).getTime() : 0);
+    (raw.overclock_until ? new Date(raw.overclock_until).getTime() : prev?.overclockUntil ?? 0);
 
   return {
     ...seed,
+    ...(prev || {}),
     ...raw,
-    version: Number(raw.version ?? seed.version),
-    lastDay: raw.lastDay || raw.last_day || seed.lastDay,
+
+    version: Number(raw.version ?? prev?.version ?? seed.version),
+    lastDay: raw.lastDay || raw.last_day || prev?.lastDay || seed.lastDay,
+
     lastTickAt: lastTick,
     lastHiddenAt: 0,
-    resources: raw.resources || seed.resources,
-    buildings: raw.buildings || seed.buildings,
-    modules: raw.modules || {},
-    research: raw.research || {},
-    crew: Number(raw.crew ?? 0),
-    crewRole: raw.crewRole || raw.crew_role || "engineer",
-    commanderPath: raw.commanderPath || raw.commander_path || "industry",
-    bankedMleo: Number(raw.bankedMleo ?? raw.banked_mleo ?? 0),
-    sentToday: Number(raw.sentToday ?? raw.sent_today ?? 0),
-    totalBanked: Number(raw.totalBanked ?? raw.total_banked ?? 0),
+
+    resources: raw.resources || prev?.resources || seed.resources,
+    buildings: raw.buildings || prev?.buildings || seed.buildings,
+    modules: raw.modules || prev?.modules || {},
+    research: raw.research || prev?.research || {},
+
+    crew: Number(raw.crew ?? prev?.crew ?? 0),
+    crewRole:
+      raw.crewRole ??
+      raw.crew_role ??
+      prev?.crewRole ??
+      "engineer",
+    commanderPath:
+      raw.commanderPath ??
+      raw.commander_path ??
+      prev?.commanderPath ??
+      "industry",
+
+    bankedMleo: Number(raw.bankedMleo ?? raw.banked_mleo ?? prev?.bankedMleo ?? 0),
+    sentToday: Number(raw.sentToday ?? raw.sent_today ?? prev?.sentToday ?? 0),
+    totalBanked: Number(raw.totalBanked ?? raw.total_banked ?? prev?.totalBanked ?? 0),
     totalSharedSpent: Number(
-      raw.totalSharedSpent ?? raw.total_shared_spent ?? 0
+      raw.totalSharedSpent ?? raw.total_shared_spent ?? prev?.totalSharedSpent ?? 0
     ),
-    totalMissionsDone: Number(
-      raw.totalMissionsDone ?? raw.total_missions_done ?? 0
-    ),
-    totalExpeditions: Number(
-      raw.totalExpeditions ?? raw.total_expeditions ?? 0
-    ),
-    blueprintLevel: Number(raw.blueprintLevel ?? raw.blueprint_level ?? 0),
-    overclockUntil,
+
+    stability: Number(raw.stability ?? prev?.stability ?? 100),
     expeditionReadyAt: expeditionReady,
-    maintenanceDue: Number(raw.maintenanceDue ?? raw.maintenance_due ?? 0),
-    stability: Number(raw.stability ?? seed.stability),
-    commanderXp: Number(raw.commanderXp ?? raw.commander_xp ?? 0),
-    commanderLevel: Number(
-      raw.commanderLevel ?? raw.commander_level ?? seed.commanderLevel
-    ),
-    stats: raw.stats || seed.stats,
-    missionState: {
-      dailySeed:
-        raw?.missionState?.dailySeed ||
-        raw?.mission_state?.dailySeed ||
-        todayKey(),
-      completed: {
-        ...(raw?.missionState?.completed || {}),
-        ...(raw?.mission_state?.completed || {}),
-      },
-      claimed: {
-        ...(raw?.missionState?.claimed || {}),
-        ...(raw?.mission_state?.claimed || {}),
-      },
-    },
-    log: Array.isArray(raw.log) ? raw.log : seed.log,
+    overclockUntil,
+
+    missionState: raw.missionState || raw.mission_state || prev?.missionState || seed.missionState,
+    log: raw.log || prev?.log || seed.log,
   };
 }
 
@@ -2017,14 +2022,17 @@ export default function MleoBase() {
   }
 
   function handleInfoNextStep() {
-    if (!activeInfo?.nextStep) return;
+    const info = shownInfo;
+    if (!info?.nextStep) return;
 
-    const step = activeInfo.nextStep;
+    const step = info.nextStep;
 
     const targetTab =
       step.tab === "operations"
         ? "ops"
         : step.tab === "build"
+        ? "build"
+        : step.tab === "development"
         ? "build"
         : step.tab === "intel"
         ? "intel"
@@ -2086,6 +2094,14 @@ export default function MleoBase() {
         return "build-development";
       }
 
+      if (step.target === "crew") {
+        return "build-development";
+      }
+
+      if (step.target === "paths") {
+        return "build-development";
+      }
+
       return null;
     })();
 
@@ -2093,6 +2109,14 @@ export default function MleoBase() {
       const isMobile =
         typeof window !== "undefined" &&
         window.matchMedia("(max-width: 639px)").matches;
+
+      if (step.target === "crew") {
+        setDevTab("crew");
+      }
+
+      if (step.target === "paths") {
+        setDevTab("paths");
+      }
 
       if (isMobile) {
         openMobilePanel(targetTab);
@@ -2114,7 +2138,9 @@ export default function MleoBase() {
     } catch {
       // no-op
     }
+
     setOpenInfoKey(null);
+    setBuildInfo(null);
 
     setTimeout(() => {
       setHighlightTarget(step.target);
@@ -2158,7 +2184,7 @@ export default function MleoBase() {
         const shouldReset = savedVersion < 6 || resetFlag;
 
         const initial =
-          saved && !shouldReset ? normalizeServerState(saved) : seed;
+          saved && !shouldReset ? normalizeServerState(saved, seed) : seed;
 
         const localProfile = loadJson("mleo_base_profile_v1", null);
         const initialMerged = localProfile
@@ -2215,12 +2241,24 @@ export default function MleoBase() {
         const serverState = res?.state;
         if (!alive || !serverState) return;
 
-        const normalized = normalizeServerState(serverState);
+        setState((prev) => {
+          const normalized = normalizeServerState(serverState, prev);
 
-        setState((prev) =>
-          applyLevelUps({
+          return applyLevelUps({
             ...prev,
             ...normalized,
+            crewRole:
+              serverState?.crewRole ??
+              serverState?.crew_role ??
+              normalized?.crewRole ??
+              prev?.crewRole ??
+              "engineer",
+            commanderPath:
+              serverState?.commanderPath ??
+              serverState?.commander_path ??
+              normalized?.commanderPath ??
+              prev?.commanderPath ??
+              "industry",
             missionState: {
               dailySeed:
                 normalized?.missionState?.dailySeed ||
@@ -2235,8 +2273,8 @@ export default function MleoBase() {
                 ...(normalized?.missionState?.claimed || {}),
               },
             },
-          })
-        );
+          });
+        });
       } catch (error) {
         console.error("BASE refresh failed", error);
       }
@@ -2616,6 +2654,7 @@ export default function MleoBase() {
       crewRole: roleKey,
       log: pushLog(prev.log, `Crew specialization changed to ${crewRoleMeta(roleKey).name}.`),
     }));
+    saveBaseProfilePatch({ crewRole: roleKey });
     showToast(`Crew role: ${crewRoleMeta(roleKey).name}`);
   };
 
@@ -2626,6 +2665,7 @@ export default function MleoBase() {
       commanderPath: pathKey,
       log: pushLog(prev.log, `Commander path set to ${commanderPathMeta(pathKey).name}.`),
     }));
+    saveBaseProfilePatch({ commanderPath: pathKey });
     showToast(`Commander path: ${commanderPathMeta(pathKey).name}`);
   };
 
@@ -2682,12 +2722,14 @@ export default function MleoBase() {
       const res = await buildBuilding(key);
 
       if (res?.success && res?.state) {
-        const base = normalizeServerState(res.state);
-
         setState((prev) => {
+          const base = normalizeServerState(res.state, prev);
+
           const next = applyLevelUps({
             ...prev,
             ...base,
+            crewRole: base?.crewRole ?? prev?.crewRole ?? "engineer",
+            commanderPath: base?.commanderPath ?? prev?.commanderPath ?? "industry",
             missionState: {
               dailySeed:
                 base?.missionState?.dailySeed ||
@@ -2733,12 +2775,14 @@ export default function MleoBase() {
       const res = await hireCrewAction();
 
       if (res?.success && res?.state) {
-        const base = normalizeServerState(res.state);
-
         setState((prev) => {
+          const base = normalizeServerState(res.state, prev);
+
           const next = applyLevelUps({
             ...prev,
             ...base,
+            crewRole: base?.crewRole ?? prev?.crewRole ?? "engineer",
+            commanderPath: base?.commanderPath ?? prev?.commanderPath ?? "industry",
             missionState: {
               dailySeed:
                 base?.missionState?.dailySeed ||
@@ -2790,12 +2834,14 @@ export default function MleoBase() {
       const res = await installModule(key);
 
       if (res?.success && res?.state) {
-        const base = normalizeServerState(res.state);
-
         setState((prev) => {
+          const base = normalizeServerState(res.state, prev);
+
           const next = applyLevelUps({
             ...prev,
             ...base,
+            crewRole: base?.crewRole ?? prev?.crewRole ?? "engineer",
+            commanderPath: base?.commanderPath ?? prev?.commanderPath ?? "industry",
             missionState: {
               dailySeed:
                 base?.missionState?.dailySeed ||
@@ -2849,12 +2895,14 @@ export default function MleoBase() {
       const res = await researchTech(key);
 
       if (res?.success && res?.state) {
-        const base = normalizeServerState(res.state);
-
         setState((prev) => {
+          const base = normalizeServerState(res.state, prev);
+
           const next = applyLevelUps({
             ...prev,
             ...base,
+            crewRole: base?.crewRole ?? prev?.crewRole ?? "engineer",
+            commanderPath: base?.commanderPath ?? prev?.commanderPath ?? "industry",
             missionState: {
               dailySeed:
                 base?.missionState?.dailySeed ||
@@ -2907,10 +2955,12 @@ export default function MleoBase() {
         const loot = res.loot || {};
 
         setState((prev) => {
-          const base = normalizeServerState(serverState);
+          const base = normalizeServerState(serverState, prev);
           const next = applyLevelUps({
             ...prev,
             ...base,
+            crewRole: base?.crewRole ?? prev?.crewRole ?? "engineer",
+            commanderPath: base?.commanderPath ?? prev?.commanderPath ?? "industry",
             expeditionReadyAt: base.expeditionReadyAt || prev.expeditionReadyAt,
             totalExpeditions: (prev.totalExpeditions || 0) + 1,
             missionState: {
@@ -2976,10 +3026,12 @@ export default function MleoBase() {
         }
 
         setState((prev) => {
-          const base = normalizeServerState(serverState);
+          const base = normalizeServerState(serverState, prev);
           const next = applyLevelUps({
             ...prev,
             ...base,
+            crewRole: base?.crewRole ?? prev?.crewRole ?? "engineer",
+            commanderPath: base?.commanderPath ?? prev?.commanderPath ?? "industry",
             missionState: {
               dailySeed:
                 base?.missionState?.dailySeed ||
@@ -3171,13 +3223,25 @@ export default function MleoBase() {
         throw new Error("Missing updated base state");
       }
 
-      const normalized = normalizeServerState(serverState);
+      setState((prev) => {
+        const normalized = normalizeServerState(serverState, prev);
 
-      setState((prev) =>
-        applyLevelUps({
-        ...prev,
+        return applyLevelUps({
+          ...prev,
           ...normalized,
-        missionState: {
+          crewRole:
+            serverState?.crewRole ??
+            serverState?.crew_role ??
+            normalized?.crewRole ??
+            prev?.crewRole ??
+            "engineer",
+          commanderPath:
+            serverState?.commanderPath ??
+            serverState?.commander_path ??
+            normalized?.commanderPath ??
+            prev?.commanderPath ??
+            "industry",
+          missionState: {
             dailySeed:
               normalized?.missionState?.dailySeed ||
               prev?.missionState?.dailySeed ||
@@ -3191,8 +3255,8 @@ export default function MleoBase() {
               ...(normalized?.missionState?.claimed || {}),
             },
           },
-        })
-      );
+        });
+      });
 
       showToast("Mission reward claimed.");
     } catch (error) {
@@ -5585,19 +5649,36 @@ export default function MleoBase() {
 
   const buildSupportSystemsContent = (
     <div className="space-y-3">
-      <div className={`rounded-2xl border p-3.5 ${availabilityCardClass(canBuyBlueprintNow)}`}>
-        <div className="flex items-start justify-between gap-2">
-          <div className="text-base font-bold text-white">Blueprint Cache</div>
-          {canBuyBlueprintNow ? <AvailabilityBadge /> : null}
+      <div className={`relative rounded-2xl border p-3.5 ${availabilityCardClass(canBuyBlueprintNow)}`}>
+        <div className="absolute right-2 top-2 z-10">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setBuildInfo(getSystemInfo("blueprint"));
+              setOpenInfoKey(null);
+            }}
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+            aria-label="Open blueprint info"
+            title="Info about blueprint"
+          >
+            i
+          </button>
         </div>
-        <div className="mt-1 text-sm text-white/65">
-          Upgrade your shipment capacity and long-term bank efficiency.
-        </div>
-        <div className="mt-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
-          Cost
-        </div>
-        <div className="mt-1 text-xs font-semibold text-white/80">
-          {fmt(blueprintCost)} shared MLEO · DATA {fmt(blueprintDataCost)}
+        <div className="flex min-h-[20px] flex-col pr-8">
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-base font-bold text-white">Blueprint Cache</div>
+            {canBuyBlueprintNow ? <AvailabilityBadge /> : null}
+          </div>
+          <div className="mt-1 text-sm text-white/65">
+            Upgrade your shipment capacity and long-term bank efficiency.
+          </div>
+          <div className="mt-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
+            Cost
+          </div>
+          <div className="mt-1 text-xs font-semibold text-white/80">
+            {fmt(blueprintCost)} shared MLEO · DATA {fmt(blueprintDataCost)}
+          </div>
         </div>
         <button
           onClick={buyBlueprint}
