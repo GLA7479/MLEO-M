@@ -4351,21 +4351,41 @@ export default function MleoBase() {
             </div>
 
             <div className="hidden sm:flex flex-wrap items-center gap-2 sm:justify-start">
-              <Link href="/mining" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10">
+              <Link
+                href="/mining"
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10"
+              >
                 Hub
               </Link>
+
               <button
                 onClick={() => setShowHowToPlay(true)}
                 className="rounded-xl border border-blue-500/25 bg-blue-500/10 px-4 py-2.5 text-sm font-semibold text-blue-200 hover:bg-blue-500/20"
               >
                 HOW TO PLAY
               </button>
+
+              <button
+                type="button"
+                onClick={() => setOpenInfoKey("sharedVault")}
+                className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20"
+                title="Shared Vault"
+              >
+                VAULT {fmt(sharedVault)} MLEO
+              </button>
+
               {isConnected ? (
-                <button onClick={() => openAccountModal?.()} className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-white/20">
+                <button
+                  onClick={() => openAccountModal?.()}
+                  className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-white/20"
+                >
                   {address?.slice(0, 6)}…{address?.slice(-4)}
                 </button>
               ) : (
-                <button onClick={() => openConnectModal?.()} className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold hover:bg-rose-500">
+                <button
+                  onClick={() => openConnectModal?.()}
+                  className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold hover:bg-rose-500"
+                >
                   Connect
                 </button>
               )}
@@ -4873,12 +4893,16 @@ export default function MleoBase() {
                       </div>
                       <div className="mt-1 text-lg font-black text-white">Blueprint Cache</div>
                       <div className="mt-2 text-sm text-white/65">
-                        Costs {fmt(blueprintCost)} shared MLEO and improves long-term efficiency.
+                        Costs {fmt(blueprintCost)} shared MLEO + {fmt(blueprintDataCost)} DATA and improves long-term efficiency.
                       </div>
                       <button
                         onClick={buyBlueprint}
-                        disabled={!canBuyBlueprintNow}
-                        className="mt-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/20 disabled:opacity-40"
+                        disabled={!canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)}
+                        className={`mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold transition ${
+                          canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)
+                            ? "bg-fuchsia-600 text-white hover:bg-fuchsia-500"
+                            : "bg-white/10 text-white/45"
+                        }`}
                       >
                         Buy Blueprint Lv {state.blueprintLevel + 1}
                       </button>
@@ -5840,7 +5864,7 @@ export default function MleoBase() {
                               data-base-target="blueprint"
                               className={`rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4 ${
                                 highlightCard(
-                                  canAffordBlueprint(state, sharedVault, blueprintCost, 12),
+                                  canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost),
                                   "info"
                                 )
                               } ${
@@ -5854,7 +5878,7 @@ export default function MleoBase() {
                                   Blueprint Cache
                                 </div>
                                 <p className="mt-1 text-sm text-white/70">
-                                  Costs {fmt(blueprintCost)} shared MLEO + 12 DATA. Raises banking
+                                  Costs {fmt(blueprintCost)} shared MLEO + {fmt(blueprintDataCost)} DATA. Raises banking
                                   efficiency and daily ship cap permanently.
                                 </p>
                               </div>
@@ -5862,10 +5886,10 @@ export default function MleoBase() {
                               <button
                                 onClick={buyBlueprint}
                                 disabled={
-                                  !canAffordBlueprint(state, sharedVault, blueprintCost, 12)
+                                  !canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)
                                 }
                                 className={`mt-4 w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold transition ${
-                                  canAffordBlueprint(state, sharedVault, blueprintCost, 12)
+                                  canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)
                                     ? "bg-fuchsia-600 text-white hover:bg-fuchsia-500"
                                     : "bg-white/10 text-white/45"
                                 }`}
@@ -6563,12 +6587,17 @@ export default function MleoBase() {
                       <div className="flex min-h-[88px] flex-col">
                         <div className="text-sm font-semibold text-fuchsia-200">Blueprint Cache</div>
                         <p className="mt-1 text-sm text-white/70">
-                          Costs {fmt(blueprintCost)} shared MLEO. Raises banking efficiency and daily ship cap permanently.
+                          Costs {fmt(blueprintCost)} shared MLEO + {fmt(blueprintDataCost)} DATA. Raises banking efficiency and daily ship cap permanently.
                         </p>
                       </div>
                       <button
                         onClick={buyBlueprint}
-                        className="mt-auto w-full rounded-xl bg-fuchsia-600 px-4 py-3 text-sm font-bold hover:bg-fuchsia-500"
+                        disabled={!canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)}
+                        className={`mt-auto w-full rounded-xl px-4 py-3 text-sm font-bold transition ${
+                          canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)
+                            ? "bg-fuchsia-600 hover:bg-fuchsia-500"
+                            : "bg-white/10 text-white/45"
+                        }`}
                       >
                         Buy Blueprint Lv {state.blueprintLevel + 1}
                       </button>
