@@ -5112,6 +5112,197 @@ export default function MleoBase() {
     };
   }
 
+  const SYSTEM_INFO_COPY = {
+    blueprint: {
+      title: "Blueprint Cache",
+      focus: "Permanent support upgrade for shipping and banking",
+      text:
+        "Blueprint Cache is a long-term investment system.\n\n" +
+        "What it does:\n" +
+        "• Costs Shared Vault MLEO and DATA.\n" +
+        "• Permanently improves banking efficiency.\n" +
+        "• Permanently raises your daily ship cap.\n\n" +
+        "Best use:\n" +
+        "Buy Blueprint when you already have a stable BASE loop and want stronger long-term export performance instead of only short-term gains.",
+      tips: {
+        building: "Refinery",
+        research: "Logistics",
+        module: "Vault Compressor",
+        actions: [
+          "Blueprint is a reinvestment tool, not a panic button.",
+          "Best when shipping already matters to your economy.",
+          "Good for players who want stronger long-term BASE value.",
+        ],
+      },
+      nextStep: {
+        label: "Open Shipping",
+        tab: "operations",
+        target: "shipping",
+        why: "Blueprint matters most when you actively use your shipping pipeline.",
+      },
+    },
+
+    crewSummary: {
+      title: "Crew Role Summary",
+      focus: "Your active command specialization",
+      text:
+        "This card shows the crew role currently shaping your base style.\n\n" +
+        "What it means:\n" +
+        "• Your role reflects how your command team approaches the base.\n" +
+        "• It helps define whether your build feels safer, smarter, more export-focused or more field-focused.\n" +
+        "• It is part of your identity layer, not just flavor text.",
+      tips: {
+        building: "HQ",
+        research: "Field Ops",
+        module: "",
+        actions: [
+          "Use this card to remember what style your base is currently leaning into.",
+          "Change role when your bottlenecks change.",
+          "This summary works together with Commander Path.",
+        ],
+      },
+      nextStep: {
+        label: "Open Development",
+        tab: "development",
+        target: "crew",
+        why: "Crew Role belongs to your development identity controls.",
+      },
+    },
+
+    commanderSummary: {
+      title: "Commander Path Summary",
+      focus: "Your strategic base identity",
+      text:
+        "This card shows the strategic direction of your command path.\n\n" +
+        "What it means:\n" +
+        "• It reflects whether your base is leaning toward Industry, Logistics, Research or Ecosystem.\n" +
+        "• It helps define how the base should feel overall.\n" +
+        "• It is a strategy identity marker for the player.",
+      tips: {
+        building: "HQ",
+        research: "Field Ops",
+        module: "",
+        actions: [
+          "Use this as your high-level strategic reminder.",
+          "Path should match what systems you are investing in most.",
+          "Role and Path together explain your base identity.",
+        ],
+      },
+      nextStep: {
+        label: "Open Development",
+        tab: "development",
+        target: "paths",
+        why: "Commander Path is part of your development planning layer.",
+      },
+    },
+
+    baseProfile: {
+      title: "Base Profile",
+      focus: "A simple label for your current stage of growth",
+      text:
+        "Base Profile is a readable summary of how developed your outpost currently is.\n\n" +
+        "What it means:\n" +
+        "• Early Outpost means the base is still in its first growth stage.\n" +
+        "• Growing Outpost means the command structure is maturing.\n" +
+        "• Developed Command means your base has enough depth to feel like a real command center.\n\n" +
+        "Best use:\n" +
+        "This is not a direct stat bonus card. It helps the player understand the current maturity of the base.",
+      tips: {
+        building: "HQ",
+        research: "",
+        module: "",
+        actions: [
+          "Think of this as a stage label, not a currency.",
+          "It helps players feel progression in a readable way.",
+          "Useful for understanding whether you are still early or already structured.",
+        ],
+      },
+    },
+
+    shipDiscipline: {
+      title: "Ship Discipline",
+      focus: "Tracks daily shipment pressure and efficiency",
+      text:
+        "Ship Discipline shows how much you have already shipped today compared to your cap.\n\n" +
+        "What it means:\n" +
+        "• The left value is how much you already sent today.\n" +
+        "• The right value is your current daily ship cap.\n" +
+        "• Softcut still applies, so shipping too aggressively can become less efficient.\n\n" +
+        "Best use:\n" +
+        "Use this card to decide whether it is worth shipping now or waiting for a better moment.",
+      tips: {
+        building: "Logistics Center",
+        research: "Logistics",
+        module: "Vault Compressor",
+        actions: [
+          "Do not treat cap as the only rule; timing still matters.",
+          "Blueprint upgrades make this card more forgiving over time.",
+          "Very useful for teaching better shipping discipline.",
+        ],
+      },
+      nextStep: {
+        label: "Open Shipping",
+        tab: "operations",
+        target: "shipping",
+        why: "This card exists to support your shipping timing decisions.",
+      },
+    },
+
+    commandAlerts: {
+      title: "Command Alerts",
+      focus: "Why the game is warning or guiding you right now",
+      text:
+        "Command Alerts summarize what currently needs your attention.\n\n" +
+        "What they usually mean:\n" +
+        "• Energy pressure.\n" +
+        "• Stability risk.\n" +
+        "• Shipping opportunity.\n" +
+        "• Contract or mission progress.\n\n" +
+        "Best use:\n" +
+        "Treat alerts as guidance, not as strict orders. They are there to help players understand what matters right now.",
+      tips: {
+        building: "HQ",
+        research: "",
+        module: "",
+        actions: [
+          "Good for new players who are not sure where to focus next.",
+          "Alerts should support decisions, not replace strategy.",
+          "Useful when the game starts feeling overloaded.",
+        ],
+      },
+    },
+
+    nextStepCard: {
+      title: "Recommended Next Step",
+      focus: "The game's current guidance for your best move",
+      text:
+        "This card gives the player a suggested next move based on the current base state.\n\n" +
+        "What it means:\n" +
+        "• It points to the most helpful immediate action.\n" +
+        "• It reduces confusion during complex progression.\n" +
+        "• It should explain why that step matters now.",
+      tips: {
+        building: "HQ",
+        research: "",
+        module: "",
+        actions: [
+          "This is especially helpful in early and mid-game.",
+          "Players should feel guided without losing freedom.",
+          "Good candidate for a permanent info button because the game is complex.",
+        ],
+      },
+    },
+  };
+
+  function getSystemInfo(key) {
+    return SYSTEM_INFO_COPY[key] || {
+      title: "System Info",
+      focus: "Game system",
+      text: "This panel explains an important system in your BASE interface.",
+      tips: { building: "", research: "", module: "", actions: [] },
+    };
+  }
+
   const getBuildingInfo = (building) => {
     const level = Number(state.buildings?.[building.key] || 0);
     const info = BUILDING_INFO_COPY[building.key];
@@ -6186,12 +6377,12 @@ export default function MleoBase() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setBuildInfo(getCrewInfo(crewRoleInfo));
+                                setBuildInfo(getSystemInfo("crewSummary"));
                                 setOpenInfoKey(null);
                               }}
                               className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-                              aria-label={`Open info for ${crewRoleInfo.name}`}
-                              title={`Info about ${crewRoleInfo.name}`}
+                              aria-label="Open crew role summary info"
+                              title="Info about crew role"
                             >
                               i
                             </button>
@@ -6208,12 +6399,12 @@ export default function MleoBase() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setBuildInfo(getCommanderPathInfo(commanderPathInfo));
+                                setBuildInfo(getSystemInfo("commanderSummary"));
                                 setOpenInfoKey(null);
                               }}
                               className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-                              aria-label={`Open info for ${commanderPathInfo.name}`}
-                              title={`Info about ${commanderPathInfo.name}`}
+                              aria-label="Open commander path summary info"
+                              title="Info about commander path"
                             >
                               i
                             </button>
@@ -7282,7 +7473,7 @@ export default function MleoBase() {
 
                             <div
                               data-base-target="blueprint"
-                              className={`rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4 ${
+                              className={`relative rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4 ${
                                 highlightCard(
                                   canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost),
                                   "info"
@@ -7293,7 +7484,22 @@ export default function MleoBase() {
                                   : ""
                               }`}
                             >
-                              <div className="flex min-h-[84px] flex-col">
+                              <div className="absolute right-3 top-3 z-10">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setBuildInfo(getSystemInfo("blueprint"));
+                                    setOpenInfoKey(null);
+                                  }}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                                  aria-label="Open blueprint info"
+                                  title="Info about blueprint"
+                                >
+                                  i
+                                </button>
+                              </div>
+                              <div className="flex min-h-[84px] flex-col pr-8">
                                 <div className="text-sm font-semibold text-fuchsia-200">
                                   Blueprint Cache
                                 </div>
@@ -8129,8 +8335,23 @@ export default function MleoBase() {
                       </button>
                     </div>
 
-                    <div className="flex h-full flex-col gap-3 rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4">
-                      <div className="flex min-h-[88px] flex-col">
+                    <div className="relative flex h-full flex-col gap-3 rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4">
+                      <div className="absolute right-3 top-3 z-10">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBuildInfo(getSystemInfo("blueprint"));
+                            setOpenInfoKey(null);
+                          }}
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                          aria-label="Open blueprint info"
+                          title="Info about blueprint"
+                        >
+                          i
+                        </button>
+                      </div>
+                      <div className="flex min-h-[88px] flex-col pr-8">
                         <div className="text-sm font-semibold text-fuchsia-200">Blueprint Cache</div>
                         <p className="mt-1 text-sm text-white/70">
                           Costs {fmt(blueprintCost)} shared MLEO + {fmt(blueprintDataCost)} DATA. Raises banking efficiency and daily ship cap permanently.
