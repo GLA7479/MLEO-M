@@ -5739,27 +5739,184 @@ export default function MleoBase() {
                         </div>
                         {openInnerPanel === "ops-console" && (
                           <div className="mt-3 grid gap-3">
-                            <button
-                              onClick={handleLaunchExpedition}
-                              disabled={!canExpeditionNow}
-                              className={`${opButtonClass(canExpeditionNow, !canExpeditionNow)} w-full px-4 py-4 text-base font-extrabold disabled:opacity-40`}
+                            <div
+                              data-base-target="shipping"
+                              className={`rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
+                                highlightCard((state.bankedMleo || 0) >= 120, "success")
+                              } ${
+                                isHighlightedTarget("shipping", highlightTarget)
+                                  ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                                  : ""
+                              }`}
                             >
-                              <div className="flex items-center justify-center gap-2">
-                                <span>Launch Expedition</span>
-                                {canExpeditionNow ? (
-                                  <span className="rounded-full bg-slate-950/12 px-2 py-0.5 text-[10px] font-black tracking-[0.16em]">
-                                    READY
-                                  </span>
-                                ) : null}
+                              <div className="flex min-h-[84px] flex-col">
+                                <div className="text-sm font-semibold text-emerald-200">
+                                  Ship to Shared Vault
+                                </div>
+                                <p className="mt-1 text-sm text-white/70">
+                                  Move refined MLEO into the main vault with a daily softcut, so BASE
+                                  supports Miners instead of replacing it.
+                                </p>
                               </div>
-                            </button>
 
-                            <button
-                              onClick={bankToSharedVault}
-                              className={`${opButtonClass(false, !canShipNow)} w-full px-4 py-4 text-base font-extrabold`}
+                              <button
+                                onClick={bankToSharedVault}
+                                disabled={!canShipNow}
+                                className={`mt-4 w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold transition ${
+                                  canShipNow
+                                    ? "bg-emerald-600 text-white hover:bg-emerald-500"
+                                    : "bg-white/10 text-white/45"
+                                }`}
+                              >
+                                Ship {fmt(state.bankedMleo || 0)} MLEO
+                              </button>
+                            </div>
+
+                            <div
+                              data-base-target="expedition"
+                              className={`rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 ${
+                                highlightCard(
+                                  expeditionLeft <= 0 && (state.resources.DATA || 0) >= 4,
+                                  "info"
+                                )
+                              } ${
+                                isHighlightedTarget("expedition", highlightTarget)
+                                  ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                                  : ""
+                              }`}
                             >
-                              Ship {fmt(state.bankedMleo || 0)} MLEO
-                            </button>
+                              <div className="flex min-h-[84px] flex-col">
+                                <div className="text-sm font-semibold text-cyan-200">
+                                  Field Expedition
+                                </div>
+                                <p className="mt-1 text-sm text-white/70">
+                                  Spend {CONFIG.expeditionCost} energy for Ore, Gold, Scrap, DATA and
+                                  only a small chance of banked MLEO.
+                                </p>
+
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white/75">
+                                    BALANCED
+                                  </span>
+                                  <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white/75">
+                                    SCAN
+                                  </span>
+                                  <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white/75">
+                                    SALVAGE
+                                  </span>
+                                </div>
+                              </div>
+
+                              <button
+                                onClick={handleLaunchExpedition}
+                                disabled={!canExpeditionNow}
+                                className={`mt-4 w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold transition ${
+                                  canExpeditionNow
+                                    ? "bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+                                    : "bg-white/10 text-white/45"
+                                }`}
+                              >
+                                {expeditionLeft > 0
+                                  ? `Expedition ${Math.ceil(expeditionLeft / 1000)}s`
+                                  : "Launch Expedition"}
+                              </button>
+                            </div>
+
+                            <div
+                              data-base-target="blueprint"
+                              className={`rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4 ${
+                                highlightCard(
+                                  canAffordBlueprint(state, sharedVault, blueprintCost, 12),
+                                  "info"
+                                )
+                              } ${
+                                isHighlightedTarget("blueprint", highlightTarget)
+                                  ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                                  : ""
+                              }`}
+                            >
+                              <div className="flex min-h-[84px] flex-col">
+                                <div className="text-sm font-semibold text-fuchsia-200">
+                                  Blueprint Cache
+                                </div>
+                                <p className="mt-1 text-sm text-white/70">
+                                  Costs {fmt(blueprintCost)} shared MLEO + 12 DATA. Raises banking
+                                  efficiency and daily ship cap permanently.
+                                </p>
+                              </div>
+
+                              <button
+                                onClick={buyBlueprint}
+                                disabled={
+                                  !canAffordBlueprint(state, sharedVault, blueprintCost, 12)
+                                }
+                                className={`mt-4 w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold transition ${
+                                  canAffordBlueprint(state, sharedVault, blueprintCost, 12)
+                                    ? "bg-fuchsia-600 text-white hover:bg-fuchsia-500"
+                                    : "bg-white/10 text-white/45"
+                                }`}
+                              >
+                                Buy Blueprint Lv {state.blueprintLevel + 1}
+                              </button>
+                            </div>
+
+                            <div
+                              data-base-target="maintenance"
+                              className={`rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 ${
+                                systemState === "critical"
+                                  ? highlightCard(true, "critical")
+                                  : systemState === "warning"
+                                  ? highlightCard(true, "warning")
+                                  : ""
+                              } ${
+                                isHighlightedTarget("maintenance", highlightTarget)
+                                  ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                                  : ""
+                              }`}
+                            >
+                              <div className="flex min-h-[84px] flex-col">
+                                <div className="text-sm font-semibold text-amber-200">
+                                  Shared Vault Utilities
+                                </div>
+                                <p className="mt-1 text-sm text-white/70">
+                                  Spend shared MLEO on productivity instead of pure emissions.
+                                </p>
+                                <p className="mt-2 text-xs text-white/55">
+                                  Stability: {fmt(state.stability)}%
+                                </p>
+                              </div>
+
+                              <div className="mt-4 grid grid-cols-3 gap-2">
+                                <button
+                                  onClick={activateOverclock}
+                                  className="rounded-xl bg-amber-600 px-3 py-3 text-xs font-bold text-white hover:bg-amber-500"
+                                >
+                                  {overclockLeft > 0
+                                    ? `Overclock ${Math.ceil(overclockLeft / 1000)}s`
+                                    : `Overclock ${fmt(CONFIG.overclockCost)}`}
+                                </button>
+
+                                <button
+                                  onClick={refillEnergy}
+                                  className="rounded-xl bg-white/10 px-3 py-3 text-xs font-bold text-white hover:bg-white/20"
+                                >
+                                  Refill {fmt(CONFIG.refillCost)}
+                                </button>
+
+                                <button
+                                  onClick={performMaintenance}
+                                  className={`rounded-xl px-3 py-3 text-xs font-bold text-white ${
+                                    systemState === "critical"
+                                      ? "bg-rose-600 hover:bg-rose-500"
+                                      : systemState === "warning"
+                                      ? "bg-amber-600 hover:bg-amber-500"
+                                      : "bg-white/10 hover:bg-white/20"
+                                  }`}
+                                >
+                                  Maintain
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
