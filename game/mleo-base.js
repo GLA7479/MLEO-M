@@ -3419,7 +3419,7 @@ export default function MleoBase() {
 
   const baseStructuresContent = (
     <div>
-      <div className="mb-4 flex gap-2">
+      <div className="mb-3 flex gap-2">
         <button
           onClick={() => setStructuresTab("core")}
           className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
@@ -3441,115 +3441,120 @@ export default function MleoBase() {
           Expansion
         </button>
       </div>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
-      {visibleStructures.map((building) => {
-        const level = state.buildings[building.key] || 0;
-        const nextLevel = level + 1;
-        const cost = buildingCost(building, level);
-        const isUnlocked = unlocked(building, state);
-        const ready = isUnlocked && canAfford(state.resources, cost);
 
-        const reqNameMap = {
-          hq: "HQ",
-          quarry: "Quarry",
-          tradeHub: "Trade Hub",
-          salvage: "Salvage",
-          refinery: "Refinery",
-          powerCell: "Power Cell",
-          minerControl: "Miner Ctrl",
-          arcadeHub: "Arcade Hub",
-          expeditionBay: "Expedition Bay",
-          logisticsCenter: "Logistics",
-          researchLab: "Research Lab",
-          repairBay: "Repair Bay",
-        };
+      <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+        {visibleStructures.map((building) => {
+          const level = state.buildings[building.key] || 0;
+          const nextLevel = level + 1;
+          const cost = buildingCost(building, level);
+          const isUnlocked = unlocked(building, state);
+          const ready = isUnlocked && canAfford(state.resources, cost);
 
-        const requirementsText = building.requires?.length
-          ? building.requires
-              .map((req) => `${reqNameMap[req.key] || req.key} Lv ${req.lvl}`)
-              .join(" · ")
-          : "";
+          const reqNameMap = {
+            hq: "HQ",
+            quarry: "Quarry",
+            tradeHub: "Trade Hub",
+            salvage: "Salvage",
+            refinery: "Refinery",
+            powerCell: "Power Cell",
+            minerControl: "Miner Ctrl",
+            arcadeHub: "Arcade Hub",
+            expeditionBay: "Expedition Bay",
+            logisticsCenter: "Logistics",
+            researchLab: "Research Lab",
+            repairBay: "Repair Bay",
+          };
 
-        const buttonText = ready
-          ? "Upgrade"
-          : isUnlocked
-          ? "Need resources"
-          : "Need requirements";
+          const requirementsText = building.requires?.length
+            ? building.requires
+                .map((req) => `${reqNameMap[req.key] || req.key} Lv ${req.lvl}`)
+                .join(" · ")
+            : "";
 
-        return (
-          <div
-            key={building.key}
-            data-base-target={building.key}
-            className={`relative flex min-h-[168px] flex-col rounded-2xl border p-3 transition-all duration-300 ${availabilityCardClass(ready)} ${
-              isHighlightedTarget(building.key, highlightTarget)
-                ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
-                : ""
-            }`}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="text-[15px] font-semibold leading-5 text-white">
-                  {building.name}
+          const buttonText = ready
+            ? "Upgrade"
+            : isUnlocked
+            ? "Need resources"
+            : "Need requirements";
+
+          return (
+            <div
+              key={building.key}
+              data-base-target={building.key}
+              className={`flex min-h-[156px] flex-col rounded-xl border p-3 ${availabilityCardClass(ready)} ${
+                highlightTarget === building.key
+                  ? "border-cyan-300/70 ring-2 ring-cyan-300/35 shadow-[0_0_0_1px_rgba(103,232,249,0.25)]"
+                  : ""
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[15px] font-semibold leading-5 text-white">
+                    {building.name}
+                  </div>
+                </div>
+
+                <div className="shrink-0 flex flex-col items-end gap-1">
+                  {ready ? <AvailabilityBadge /> : null}
+                  <div className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/65">
+                    Lv {level}
+                  </div>
                 </div>
               </div>
-              <div className="shrink-0 flex flex-col items-end gap-1">
-                {ready ? <AvailabilityBadge /> : null}
-                <div className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/65">
-                  Lv {level}
+
+              <div className="mt-1 text-[11px] leading-[1.2rem] text-white/60 line-clamp-2">
+                {building.desc}
+              </div>
+
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <div className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/70">
+                  {buildingRoleTag(building.key)}
+                </div>
+                <div className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-200">
+                  {buildingSynergyTag(building.key)}
+                </div>
+              </div>
+
+              <div className="mt-2 inline-flex w-fit rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] text-white/65">
+                {sectorStatusForBuilding(building.key, state).toUpperCase()}
+              </div>
+
+              <div className="mt-1.5 text-[11px] font-medium text-cyan-200/85">
+                Next Lv {nextLevel}
+              </div>
+
+              <div className="mt-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white/40">
+                Cost
+              </div>
+
+              <ResourceCostRow cost={cost} resources={state.resources} />
+
+              <div className="mt-auto flex min-h-[34px] flex-col justify-end pt-2">
+                <button
+                  onClick={() => buyBuilding(building.key)}
+                  disabled={!ready}
+                  className={`w-full rounded-xl px-3 py-2 text-xs font-semibold transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
+                    canCoverCost(state.resources, cost)
+                      ? "bg-white/10"
+                      : "bg-white/10 opacity-70"
+                  }`}
+                >
+                  {buttonText}
+                </button>
+
+                <div className="mt-1 text-center text-[10px] leading-4 text-white/45">
+                  {!isUnlocked && requirementsText ? (
+                    <>Requires: {requirementsText}</>
+                  ) : ready ? (
+                    <>Ready to upgrade</>
+                  ) : isUnlocked ? (
+                    <>Need more resources</>
+                  ) : null}
                 </div>
               </div>
             </div>
-
-            <div className="mt-1 text-[11px] leading-4 text-white/60 line-clamp-2">
-              {building.desc}
-            </div>
-
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <div className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/70">
-                {buildingRoleTag(building.key)}
-              </div>
-              <div className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-200">
-                {buildingSynergyTag(building.key)}
-              </div>
-            </div>
-
-            <div className="mt-3 inline-flex w-fit rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/65">
-              {sectorStatusForBuilding(building.key, state).toUpperCase()}
-            </div>
-
-            <div className="mt-2 text-[11px] font-medium text-cyan-200/85">
-              Next Lv {nextLevel}
-            </div>
-
-            <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
-              Cost
-            </div>
-            <ResourceCostRow cost={cost} resources={state.resources} />
-
-            <div className="mt-auto flex min-h-[44px] flex-col justify-end pt-2.5">
-              <button
-                onClick={() => buyBuilding(building.key)}
-                disabled={!ready}
-                className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${canCoverCost(state.resources, cost) ? "bg-white/10" : "bg-white/10 opacity-70"}`}
-              >
-                {buttonText}
-              </button>
-
-              <div className="mt-1 min-h-[24px] text-center text-[10px] leading-4 text-white/45">
-                {!isUnlocked && requirementsText ? (
-                  <>Requires: {requirementsText}</>
-                ) : ready ? (
-                  <>Ready to upgrade</>
-                ) : isUnlocked ? (
-                  <>Need more resources</>
-                ) : (
-                  <>&nbsp;</>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
       </div>
     </div>
   );
