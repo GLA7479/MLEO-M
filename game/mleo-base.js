@@ -3418,158 +3418,389 @@ export default function MleoBase() {
     </div>
   );
 
+  const BUILDING_INFO_COPY = {
+    hq: {
+      now(level) {
+        return level <= 0
+          ? "HQ is still at base state. Right now it mainly represents your command core and overall progression gate."
+          : `HQ is currently level ${level}. It already improves your global base progression path and supports access to stronger systems.`;
+      },
+      next(level) {
+        const next = level + 1;
+        return `HQ level ${next} will push your command core forward, making advanced structures feel more natural to unlock and improving the overall quality of your progression route.`;
+      },
+      why: "HQ is one of the most important upgrades in the whole game because it controls access to stronger systems. When HQ is weak, the entire base feels slower and more limited.",
+      linked: "Global progression · unlocking advanced structures · overall build pacing",
+      impact: "A stronger HQ makes the whole base develop more smoothly. It does not just help one resource — it improves how fast your whole command center matures.",
+      tips: {
+        building: "Trade Hub",
+        research: "Routing AI",
+        module: "Miner Link",
+        actions: [
+          "Upgrade HQ when you feel your build path is starting to bottleneck.",
+          "Use HQ upgrades to prepare for stronger mid-game structures.",
+          "HQ is a progression anchor, not just a cosmetic level.",
+        ],
+      },
+    },
+
+    quarry: {
+      now(level) {
+        return level <= 0
+          ? "Quarry is not built yet, so your base is missing a stable raw Ore engine."
+          : `Quarry is currently level ${level}. It is already producing raw Ore and feeding your industrial chain.`;
+      },
+      next(level, building) {
+        const next = level + 1;
+        const ore = fmt((building.outputs?.ORE || 0) * next);
+        return `Quarry level ${next} will raise your Ore flow to about ${ore}, which directly improves your construction rhythm.`;
+      },
+      why: "Quarry is your raw material backbone. If Ore production is weak, many other structures and upgrades will start feeling expensive and slow.",
+      linked: "ORE production · construction economy · refinery support · long-term industrial growth",
+      impact: "More Quarry levels speed up nearly everything that depends on Ore, so this is one of the best tempo upgrades in early and mid game.",
+      tips: {
+        building: "Trade Hub",
+        research: "Miner Sync",
+        module: "Servo Drill",
+        actions: [
+          "Build Quarry early if you want the base to feel active instead of stalled.",
+          "Keep Quarry healthy before pushing expensive structures.",
+          "Quarry pairs especially well with Refinery and Miner Control.",
+        ],
+      },
+    },
+
+    tradeHub: {
+      now(level) {
+        return level <= 0
+          ? "Trade Hub is not built yet, so your base still lacks a stable Gold loop."
+          : `Trade Hub is currently level ${level}. It already creates steady Gold income for construction and upgrades.`;
+      },
+      next(level, building) {
+        const next = level + 1;
+        const gold = fmt((building.outputs?.GOLD || 0) * next);
+        return `Trade Hub level ${next} will raise Gold flow to about ${gold}, helping your economy stay liquid.`;
+      },
+      why: "Trade Hub reduces the feeling of being stuck. Gold is needed across the whole base, so stronger Gold flow makes the entire game feel smoother.",
+      linked: "GOLD economy · building costs · unlock chain · support for Power Cell and Refinery",
+      impact: "This upgrade improves economy stability. It makes future upgrades easier to sustain instead of forcing long waiting periods.",
+      tips: {
+        building: "Power Cell",
+        research: "Routing AI",
+        module: "Vault Compressor",
+        actions: [
+          "Trade Hub is one of the best upgrades when your base feels starved for spending power.",
+          "Use it to support expansion into Scrap, Power and Refinery paths.",
+          "A healthy Gold loop makes all other decisions easier.",
+        ],
+      },
+    },
+
+    salvage: {
+      now(level) {
+        return level <= 0
+          ? "Salvage Yard is not built yet, so Scrap is still a weak point in your economy."
+          : `Salvage Yard is currently level ${level}. It is already recovering Scrap for support systems and advanced builds.`;
+      },
+      next(level, building) {
+        const next = level + 1;
+        const scrap = fmt((building.outputs?.SCRAP || 0) * next);
+        return `Salvage Yard level ${next} will improve Scrap recovery to about ${scrap}, making support upgrades easier to afford.`;
+      },
+      why: "Scrap becomes increasingly important as the base matures. Without Salvage, advanced structures and support systems start feeling blocked.",
+      linked: "SCRAP recovery · advanced systems · Refinery input · expedition support",
+      impact: "More Scrap improves your mid-game stability because many important upgrades depend on it.",
+      tips: {
+        building: "Refinery",
+        research: "Field Ops",
+        module: "Miner Link",
+        actions: [
+          "Upgrade Salvage when advanced structures start asking for more Scrap than you can comfortably supply.",
+          "This is a strong bridge between early economy and mid-game systems.",
+          "Salvage has especially good synergy with Refinery and Expedition Bay.",
+        ],
+      },
+    },
+
+    refinery: {
+      now(level, building) {
+        if (level <= 0) {
+          return "Refinery is not built yet, so your base still cannot properly convert raw materials into banked MLEO.";
+        }
+        const ore = fmt((building.convert?.ORE || 0) * level);
+        const scrap = fmt((building.convert?.SCRAP || 0) * level);
+        const mleo = fmt((building.convert?.MLEO || 0) * level);
+        return `Refinery is currently level ${level}. It is consuming about ${ore} ORE and ${scrap} SCRAP to support roughly ${mleo} banked MLEO potential.`;
+      },
+      next(level, building) {
+        const next = level + 1;
+        const ore = fmt((building.convert?.ORE || 0) * next);
+        const scrap = fmt((building.convert?.SCRAP || 0) * next);
+        const mleo = fmt((building.convert?.MLEO || 0) * next);
+        return `Refinery level ${next} will increase conversion pressure to about ${ore} ORE and ${scrap} SCRAP, while raising banked MLEO potential to about ${mleo}.`;
+      },
+      why: "Refinery is the main bridge from infrastructure into banked MLEO. It should feel valuable, but still controlled — exactly what this game loop needs.",
+      linked: "ORE + SCRAP conversion · banked MLEO · shipping strategy · vault support",
+      impact: "A stronger Refinery increases your ability to support the shared vault, but only if the rest of your economy can feed it.",
+      tips: {
+        building: "Logistics Center",
+        research: "Token Discipline",
+        module: "Vault Compressor",
+        actions: [
+          "Only push Refinery hard if Ore, Scrap and energy support are already healthy.",
+          "Refinery is strongest inside a balanced economy, not by itself.",
+          "Pair it with Logistics if shipping becomes an important part of your loop.",
+        ],
+      },
+    },
+
+    powerCell: {
+      now(level, building) {
+        if (level <= 0) {
+          return "Power Cell is not built yet, so your base is relying only on the default Energy cap and regeneration.";
+        }
+        const cap = fmt((building.power?.cap || 0) * level);
+        const regen = fmt((building.power?.regen || 0) * level);
+        return `Power Cell is currently level ${level}. It is adding about +${cap} Energy cap and +${regen} Energy regeneration.`;
+      },
+      next(level, building) {
+        const next = level + 1;
+        const cap = fmt((building.power?.cap || 0) * next);
+        const regen = fmt((building.power?.regen || 0) * next);
+        return `Power Cell level ${next} will raise this support to about +${cap} Energy cap and +${regen} Energy regeneration.`;
+      },
+      why: "Power Cell is one of the best comfort upgrades in the game. It reduces waiting, reduces pressure, and helps the whole base feel more alive.",
+      linked: "ENERGY cap · ENERGY regen · action uptime · support for Quarry, Refinery and expeditions",
+      impact: "Better energy support means less downtime and smoother progression. It is one of the cleanest upgrades for improving overall gameplay feel.",
+      tips: {
+        building: "Repair Bay",
+        research: "Coolant Loops",
+        module: "Miner Link",
+        actions: [
+          "Upgrade Power Cell when energy starts feeling like the main bottleneck.",
+          "This is especially valuable if you are expanding production and expeditions together.",
+          "Power Cell improves both efficiency and player comfort.",
+        ],
+      },
+    },
+
+    minerControl: {
+      now(level, building) {
+        if (level <= 0) {
+          return "Miner Control is not built yet, so synergy with Miners is still limited.";
+        }
+        const data = fmt((building.outputs?.DATA || 0) * level);
+        return `Miner Control is currently level ${level}. It is already improving Miners synergy and adding about ${data} DATA support.`;
+      },
+      next(level, building) {
+        const next = level + 1;
+        const data = fmt((building.outputs?.DATA || 0) * next);
+        return `Miner Control level ${next} will push Miners synergy further and improve DATA support to about ${data}.`;
+      },
+      why: "This building is important because BASE should feel connected to Miners, not isolated from it. Miner Control makes that ecosystem link stronger.",
+      linked: "Miners synergy · DATA support · ore conversion quality · ecosystem cohesion",
+      impact: "The upgrade strengthens cross-system progression and makes BASE feel more integrated into the wider MLEO loop.",
+      tips: {
+        building: "Research Lab",
+        research: "Miner Sync",
+        module: "Servo Drill",
+        actions: [
+          "Upgrade Miner Control if you want BASE and Miners to feel more connected.",
+          "This is a strategic upgrade, not just a raw output upgrade.",
+          "Very strong when combined with Quarry and Research Lab.",
+        ],
+      },
+    },
+
+    arcadeHub: {
+      now(level, building) {
+        if (level <= 0) {
+          return "Arcade Hub is not built yet, so the connection between activity and BASE progression is still weak.";
+        }
+        const data = fmt((building.outputs?.DATA || 0) * level);
+        return `Arcade Hub is currently level ${level}. It is already helping convert activity into BASE progression and adds about ${data} DATA support.`;
+      },
+      next(level, building) {
+        const next = level + 1;
+        const data = fmt((building.outputs?.DATA || 0) * next);
+        return `Arcade Hub level ${next} will improve that activity link and raise DATA support to about ${data}.`;
+      },
+      why: "Arcade Hub is valuable because it helps the whole MLEO ecosystem feel unified. It gives BASE a meaningful relationship with gameplay activity.",
+      linked: "Arcade synergy · mission rewards · DATA flow · ecosystem progression",
+      impact: "This makes BASE progression feel more connected to the rest of the project instead of being a separate screen with isolated upgrades.",
+      tips: {
+        building: "Expedition Bay",
+        research: "Arcade Ops",
+        module: "Arcade Relay",
+        actions: [
+          "Upgrade Arcade Hub when you want stronger ecosystem identity.",
+          "Useful if missions and activity-based progression are becoming part of your main loop.",
+          "Arcade Hub works especially well with DATA-focused growth.",
+        ],
+      },
+    },
+
+    expeditionBay: {
+      now(level) {
+        return level <= 0
+          ? "Expedition Bay is not built yet, so expedition progression is still limited."
+          : `Expedition Bay is currently level ${level}. It is already supporting stronger expeditions and better loot potential.`;
+      },
+      next(level) {
+        const next = level + 1;
+        return `Expedition Bay level ${next} will further improve expedition strength and reward quality, helping side progression feel more meaningful.`;
+      },
+      why: "Expedition Bay matters because expeditions are one of the best ways to keep the game loop interesting beyond passive production alone.",
+      linked: "Expeditions · loot quality · side progression · resource recovery",
+      impact: "This upgrade improves your side economy and keeps progression moving between larger infrastructure milestones.",
+      tips: {
+        building: "Repair Bay",
+        research: "Deep Scan",
+        module: "Arcade Relay",
+        actions: [
+          "Upgrade Expedition Bay when expeditions are part of your active routine.",
+          "Strong choice if you want more varied progression instead of only passive growth.",
+          "Pairs very well with DATA and Scrap-focused play.",
+        ],
+      },
+    },
+
+    logisticsCenter: {
+      now(level, building) {
+        if (level <= 0) {
+          return "Logistics Center is not built yet, so shipment quality and export flow are still underdeveloped.";
+        }
+        const data = fmt((building.outputs?.DATA || 0) * level);
+        return `Logistics Center is currently level ${level}. It is already improving shipment handling, export flow and adds about ${data} DATA support.`;
+      },
+      next(level, building) {
+        const next = level + 1;
+        const data = fmt((building.outputs?.DATA || 0) * next);
+        return `Logistics Center level ${next} will improve shipment discipline further and raise DATA support to about ${data}.`;
+      },
+      why: "If BASE is going to support the shared vault in a controlled way, Logistics Center is a key structure. It makes shipping feel smarter, not just bigger.",
+      linked: "Shipping quality · export handling · shared vault support · efficiency discipline",
+      impact: "This upgrade improves late-game control and makes the path from banked MLEO to shipped value more stable and strategic.",
+      tips: {
+        building: "Refinery",
+        research: "Logistics",
+        module: "Vault Compressor",
+        actions: [
+          "Upgrade Logistics Center when shipping becomes a meaningful part of your economy.",
+          "This is a control upgrade, not just a production upgrade.",
+          "Best used alongside Refinery and Blueprint progression.",
+        ],
+      },
+    },
+
+    researchLab: {
+      now(level, building) {
+        if (level <= 0) {
+          return "Research Lab is not built yet, so your DATA generation and advanced path support are still limited.";
+        }
+        const data = fmt((building.outputs?.DATA || 0) * level);
+        return `Research Lab is currently level ${level}. It is already generating about ${data} DATA and supporting advanced progression paths.`;
+      },
+      next(level, building) {
+        const next = level + 1;
+        const data = fmt((building.outputs?.DATA || 0) * next);
+        return `Research Lab level ${next} will improve DATA generation to about ${data} and strengthen your long-term optimization path.`;
+      },
+      why: "Research Lab is important because DATA gives depth to the economy. It helps the game scale through smarter progression instead of only more emissions.",
+      linked: "DATA generation · advanced research · long-term optimization · strategy depth",
+      impact: "A stronger Research Lab improves your ability to unlock advanced systems and keeps progression feeling intelligent instead of flat.",
+      tips: {
+        building: "Miner Control",
+        research: "Deep Scan",
+        module: "Arcade Relay",
+        actions: [
+          "Upgrade Research Lab when you want stronger long-term progression tools.",
+          "Very useful if advanced research paths are becoming your next milestone.",
+          "One of the best structures for strategic scaling.",
+        ],
+      },
+    },
+
+    repairBay: {
+      now(level) {
+        return level <= 0
+          ? "Repair Bay is not built yet, so your base has less support against maintenance pressure and stability loss."
+          : `Repair Bay is currently level ${level}. It is already helping the base stay healthier and reducing maintenance pressure.`;
+      },
+      next(level) {
+        const next = level + 1;
+        return `Repair Bay level ${next} will strengthen stability support even more, making recovery easier and pressure safer to manage.`;
+      },
+      why: "Repair Bay is one of the best defensive upgrades in the game. It helps protect long-term efficiency instead of only chasing more output.",
+      linked: "Stability · maintenance pressure · system health · safe scaling",
+      impact: "A stronger Repair Bay keeps the base performing well over time and reduces the chance that instability becomes your real bottleneck.",
+      tips: {
+        building: "Power Cell",
+        research: "Predictive Maintenance",
+        module: "Miner Link",
+        actions: [
+          "Upgrade Repair Bay when your base starts feeling fragile under growth.",
+          "Great choice if you are pushing multiple systems at once.",
+          "Helps protect long-term efficiency and player comfort.",
+        ],
+      },
+    },
+  };
+
   const getBuildingInfo = (building) => {
     const level = Number(state.buildings?.[building.key] || 0);
-    const nextLevel = level + 1;
+    const info = BUILDING_INFO_COPY[building.key];
 
-    const outputEntries = Object.entries(building.outputs || {});
-    const convertEntries = building.convert
-      ? Object.entries(building.convert).filter(([key]) => key !== "MLEO")
-      : [];
+    if (!info) {
+      return {
+        title: `${building.name} · Lv ${level}`,
+        focus: "Build Structure",
+        text: (
+          <div className="space-y-4 text-sm leading-7 text-white/85">
+            <div>
+              <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
+                1. What it gives now
+              </div>
+              <div>{building.desc}</div>
+            </div>
 
-    const currentOutputText = outputEntries.length
-      ? outputEntries
-          .map(([key, value]) => `${key} ${fmt(value * Math.max(level, 1))}`)
-          .join(" · ")
-      : "No direct passive output yet";
+            <div>
+              <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
+                2. What the next upgrade gives
+              </div>
+              <div>Improves this structure further and supports stronger progression.</div>
+            </div>
 
-    const nextOutputText = outputEntries.length
-      ? outputEntries
-          .map(([key, value]) => `${key} ${fmt(value * nextLevel)}`)
-          .join(" · ")
-      : "No direct passive output change";
+            <div>
+              <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
+                3. Why upgrade it
+              </div>
+              <div>Supports long-term base growth.</div>
+            </div>
 
-    const currentConvertText = building.convert
-      ? [
-          convertEntries.length
-            ? `Consumes ${convertEntries
-                .map(([key, value]) => `${key} ${fmt(value * Math.max(level, 1))}`)
-                .join(" · ")}`
-            : null,
-          building.convert.MLEO
-            ? `Banked MLEO potential ${fmt(
-                building.convert.MLEO * Math.max(level, 1)
-              )}`
-            : null,
-        ]
-          .filter(Boolean)
-          .join(" · ")
-      : "";
+            <div>
+              <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
+                4. Linked resources / systems
+              </div>
+              <div>General base progression</div>
+            </div>
 
-    const nextConvertText = building.convert
-      ? [
-          convertEntries.length
-            ? `Consumes ${convertEntries
-                .map(([key, value]) => `${key} ${fmt(value * nextLevel)}`)
-                .join(" · ")}`
-            : null,
-          building.convert.MLEO
-            ? `Banked MLEO potential ${fmt(building.convert.MLEO * nextLevel)}`
-            : null,
-        ]
-          .filter(Boolean)
-          .join(" · ")
-      : "";
-
-    const currentPowerText = building.power
-      ? `Energy cap +${fmt(
-          building.power.cap * Math.max(level, 1)
-        )} · Energy regen +${fmt(building.power.regen * Math.max(level, 1))}`
-      : "";
-
-    const nextPowerText = building.power
-      ? `Energy cap +${fmt(building.power.cap * nextLevel)} · Energy regen +${fmt(
-          building.power.regen * nextLevel
-        )}`
-      : "";
-
-    const linkedSystems = [
-      building.outputs?.ORE ? "ORE production" : null,
-      building.outputs?.GOLD ? "GOLD economy" : null,
-      building.outputs?.SCRAP ? "SCRAP support" : null,
-      building.outputs?.DATA ? "DATA / progression" : null,
-      building.convert ? "Refining / banked MLEO" : null,
-      building.power ? "Energy cap / regen" : null,
-      building.key === "minerControl" ? "Miners synergy" : null,
-      building.key === "arcadeHub" ? "Arcade synergy" : null,
-      building.key === "expeditionBay" ? "Expeditions" : null,
-      building.key === "logisticsCenter" ? "Shipping / vault flow" : null,
-      building.key === "researchLab" ? "Research paths" : null,
-      building.key === "repairBay" ? "Stability / maintenance" : null,
-      building.key === "hq" ? "Global unlock path" : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-
-    const whyMap = {
-      hq: "HQ is the central progression gate. It unlocks stronger structures and raises the overall quality of your base path.",
-      quarry:
-        "Quarry is your raw material backbone. Without strong Ore flow, the whole build chain slows down.",
-      tradeHub:
-        "Trade Hub keeps Gold flowing and makes the early economy feel stable instead of stuck.",
-      salvage:
-        "Salvage Yard feeds Scrap, which is required by many advanced systems and future upgrades.",
-      refinery:
-        "Refinery is the structure that turns infrastructure into actual banked MLEO support.",
-      powerCell:
-        "Power Cell reduces early frustration by improving energy capacity and regeneration.",
-      minerControl:
-        "Miner Control strengthens the connection between BASE and Miners, improving synergy and smarter progression.",
-      arcadeHub:
-        "Arcade Hub connects play activity to BASE growth and helps the ecosystem feel unified.",
-      expeditionBay:
-        "Expedition Bay improves your field loop and opens stronger recovery / loot progression.",
-      logisticsCenter:
-        "Logistics Center improves shipment quality and helps BASE support the shared vault more efficiently.",
-      researchLab:
-        "Research Lab increases DATA pressure in a good way and supports long-term optimization.",
-      repairBay:
-        "Repair Bay helps keep the base healthy, reducing the chance that instability becomes your bottleneck.",
-    };
-
-    const impactMap = {
-      hq: "Higher HQ means faster access to stronger systems, so your overall progression curve becomes smoother.",
-      quarry:
-        "More Quarry levels increase raw Ore flow, which speeds up most construction chains.",
-      tradeHub:
-        "More Gold flow means easier building tempo and less economic downtime.",
-      salvage:
-        "More Scrap flow unlocks advanced upgrades earlier and supports mid-game growth.",
-      refinery:
-        "More refining strength improves the path from raw resources into banked MLEO support.",
-      powerCell:
-        "Better energy support means less waiting, fewer dead moments, and more active progression.",
-      minerControl:
-        "This improves cross-system synergy, helping BASE feel more connected to Miners.",
-      arcadeHub:
-        "This strengthens ecosystem progression by making Arcade-linked advancement more meaningful.",
-      expeditionBay:
-        "Stronger expedition support improves side rewards and keeps progression moving between upgrades.",
-      logisticsCenter:
-        "This improves shipment flow and makes late-game BASE support more efficient.",
-      researchLab:
-        "Higher DATA support accelerates advanced decisions and long-term optimization.",
-      repairBay:
-        "Better stability control keeps efficiency healthier for longer and reduces recovery pressure.",
-    };
-
-    const nextGainParts = [
-      outputEntries.length ? `Output becomes: ${nextOutputText}` : null,
-      nextConvertText ? nextConvertText : null,
-      nextPowerText ? nextPowerText : null,
-      building.energyUse
-        ? `Energy demand scales with this structure, so support matters more as it grows.`
-        : null,
-    ].filter(Boolean);
-
-    const currentGainParts = [
-      outputEntries.length ? `Current output: ${currentOutputText}` : null,
-      currentConvertText ? currentConvertText : null,
-      currentPowerText ? currentPowerText : null,
-      building.energyUse
-        ? `Current energy pressure: ${fmt(building.energyUse * Math.max(level, 1))}`
-        : null,
-    ].filter(Boolean);
+            <div>
+              <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
+                5. Progression impact
+              </div>
+              <div>Improves long-term efficiency and pacing.</div>
+            </div>
+          </div>
+        ),
+        tips: {
+          building: "HQ",
+          research: "Routing AI",
+          module: "Miner Link",
+          actions: ["Upgrade when this lane becomes important to your progression."],
+        },
+      };
+    }
 
     return {
       title: `${building.name} · Lv ${level}`,
@@ -3580,85 +3811,39 @@ export default function MleoBase() {
             <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
               1. What it gives now
             </div>
-            <div>{currentGainParts.length ? currentGainParts.join(" | ") : "This structure is still at base state."}</div>
+            <div>{info.now(level, building)}</div>
           </div>
 
           <div>
             <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
               2. What the next upgrade gives
             </div>
-            <div>{nextGainParts.length ? nextGainParts.join(" | ") : "Next level mainly improves progression positioning."}</div>
+            <div>{info.next(level, building)}</div>
           </div>
 
           <div>
             <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
               3. Why upgrade it
             </div>
-            <div>{whyMap[building.key] || "This upgrade improves your base progression and supports a stronger economy."}</div>
+            <div>{info.why}</div>
           </div>
 
           <div>
             <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
               4. Linked resources / systems
             </div>
-            <div>{linkedSystems || "General base progression"}</div>
+            <div>{info.linked}</div>
           </div>
 
           <div>
             <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
               5. Progression impact
             </div>
-            <div>{impactMap[building.key] || "Improves long-term efficiency and progression pacing."}</div>
+            <div>{info.impact}</div>
           </div>
         </div>
       ),
-      tips: {
-        building: building.name,
-        research:
-          building.key === "powerCell"
-            ? "Coolant Loops"
-            : building.key === "logisticsCenter"
-            ? "Logistics"
-            : building.key === "researchLab"
-            ? "Deep Scan"
-            : building.key === "repairBay"
-            ? "Predictive Maintenance"
-            : building.key === "arcadeHub"
-            ? "Arcade Ops"
-            : building.key === "minerControl"
-            ? "Miner Sync"
-            : "Routing AI",
-        module:
-          building.key === "quarry" || building.key === "minerControl"
-            ? "Servo Drill"
-            : building.key === "arcadeHub"
-            ? "Arcade Relay"
-            : building.key === "refinery" || building.key === "logisticsCenter"
-            ? "Vault Compressor"
-            : "Miner Link",
-        actions: [
-          level === 0
-            ? `Build ${building.name} to open this part of the base economy.`
-            : `Upgrade ${building.name} to push this lane harder.`,
-          building.requires?.length
-            ? `Keep requirements healthy: ${building.requires
-                .map((req) => `${req.key} Lv ${req.lvl}`)
-                .join(" · ")}`
-            : "No structure requirements block this path.",
-          building.convert
-            ? "Pair this with Ore, Scrap and energy support so refining stays active."
-            : null,
-          building.power
-            ? "Use this when energy becomes a bottleneck."
-            : null,
-          building.key === "repairBay"
-            ? "Great when stability starts slipping."
-            : null,
-          building.key === "expeditionBay"
-            ? "Upgrade this when expeditions become part of your main loop."
-            : null,
-        ].filter(Boolean),
-      },
+      tips: info.tips,
     };
   };
 
