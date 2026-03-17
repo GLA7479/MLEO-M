@@ -3382,23 +3382,58 @@ export default function MleoBase() {
         {MODULES.map((module) => {
           const owned = !!state.modules[module.key];
           const moduleAvailable = !owned && canCoverCost(state.resources, module.cost);
+
           return (
-            <div key={module.key} className={`flex h-full flex-col gap-2 rounded-2xl border p-3.5 ${availabilityCardClass(moduleAvailable)}`}>
-              <div className="flex min-h-0 flex-col">
+            <div
+              key={module.key}
+              data-base-target={module.key}
+              className={`relative flex h-full flex-col gap-2 rounded-2xl border p-3.5 ${availabilityCardClass(moduleAvailable)} ${
+                highlightTarget === module.key
+                  ? "border-cyan-300/70 ring-2 ring-cyan-300/35 shadow-[0_0_0_1px_rgba(103,232,249,0.25)]"
+                  : ""
+              }`}
+            >
+              <div className="absolute right-2.5 top-2.5 z-10">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setBuildInfo(getDevelopmentInfo(module));
+                    setOpenInfoKey(null);
+                  }}
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                  aria-label={`Open info for ${module.name}`}
+                  title={`Info about ${module.name}`}
+                >
+                  i
+                </button>
+              </div>
+
+              <div className="flex min-h-0 flex-col pr-8">
                 <div className="flex items-start justify-between gap-2">
                   <div className="text-sm font-semibold">{module.name}</div>
                   {moduleAvailable ? <AvailabilityBadge /> : null}
                 </div>
+
                 <div className="mt-1 text-xs text-white/60">{module.desc}</div>
+
                 <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
                   Cost
                 </div>
+
                 <ResourceCostRow cost={module.cost} resources={state.resources} />
               </div>
+
               <button
                 onClick={() => buyModule(module.key)}
                 disabled={owned}
-                className={`mt-auto w-full rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${owned ? "bg-white/10" : canCoverCost(state.resources, module.cost) ? "bg-white/10" : "bg-white/10 opacity-70"}`}
+                className={`mt-auto w-full rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
+                  owned
+                    ? "bg-white/10"
+                    : canCoverCost(state.resources, module.cost)
+                    ? "bg-white/10"
+                    : "bg-white/10 opacity-70"
+                }`}
               >
                 {owned ? "Installed" : "Install"}
               </button>
@@ -3414,24 +3449,59 @@ export default function MleoBase() {
           const done = !!state.research[item.key];
           const locked = item.requires?.some((key) => !state.research[key]);
           const researchAvailable = !done && !locked && canCoverCost(state.resources, item.cost);
+
           return (
-            <div key={item.key} className={`rounded-2xl border p-3.5 ${availabilityCardClass(researchAvailable)}`}>
+            <div
+              key={item.key}
+              data-base-target={item.key}
+              className={`relative rounded-2xl border p-3.5 ${availabilityCardClass(researchAvailable)} ${
+                highlightTarget === item.key
+                  ? "border-cyan-300/70 ring-2 ring-cyan-300/35 shadow-[0_0_0_1px_rgba(103,232,249,0.25)]"
+                  : ""
+              }`}
+            >
+              <div className="absolute right-2.5 top-2.5 z-10">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setBuildInfo(getDevelopmentInfo(item));
+                    setOpenInfoKey(null);
+                  }}
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                  aria-label={`Open info for ${item.name}`}
+                  title={`Info about ${item.name}`}
+                >
+                  i
+                </button>
+              </div>
+
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
+                <div className="pr-8">
                   <div className="flex items-start justify-between gap-2">
                     <div className="text-sm font-semibold">{item.name}</div>
                     {researchAvailable ? <AvailabilityBadge /> : null}
                   </div>
+
                   <div className="mt-1 text-xs text-white/60">{item.desc}</div>
+
                   <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
                     Cost
                   </div>
+
                   <ResourceCostRow cost={item.cost} resources={state.resources} />
                 </div>
+
                 <button
                   onClick={() => buyResearch(item.key)}
                   disabled={done || locked}
-                  className={`shrink-0 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${done || locked ? "bg-white/10" : canCoverCost(state.resources, item.cost) ? "bg-white/10" : "bg-white/10 opacity-70"}`}
+                  className={`shrink-0 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
+                    done || locked
+                      ? "bg-white/10"
+                      : canCoverCost(state.resources, item.cost)
+                      ? "bg-white/10"
+                      : "bg-white/10 opacity-70"
+                  }`}
                 >
                   {done ? "Done" : locked ? "Locked" : "Research"}
                 </button>
@@ -3772,6 +3842,405 @@ export default function MleoBase() {
       },
     },
   };
+
+  const DEVELOPMENT_INFO_COPY = {
+    servoDrill: {
+      title: "Servo Drill",
+      focus: "Ore production boost",
+      text:
+        "Servo Drill is a production module focused on Quarry efficiency.\n\n" +
+        "What it does:\n" +
+        "• Increases Ore output.\n" +
+        "• Helps early and mid-game resource flow.\n" +
+        "• Makes Refinery support easier because Ore becomes more stable.\n\n" +
+        "Best use:\n" +
+        "Install it when Ore is your bottleneck or when you want to prepare for stronger Refinery cycles.",
+      tips: {
+        building: "Quarry",
+        research: "Miner Sync",
+        module: "Servo Drill",
+        actions: [
+          "Upgrade Quarry first if Ore is still weak.",
+          "Install Servo Drill when you want smoother Ore flow.",
+          "Use it to support Refinery and future upgrades.",
+        ],
+      },
+      nextStep: {
+        label: "Open Quarry",
+        tab: "build",
+        target: "quarry",
+        why: "Servo Drill is strongest when Quarry production is already active.",
+      },
+    },
+
+    vaultCompressor: {
+      title: "Vault Compressor",
+      focus: "Bank efficiency + shipping support",
+      text:
+        "Vault Compressor is an economy module focused on better MLEO flow.\n\n" +
+        "What it does:\n" +
+        "• Improves bank efficiency.\n" +
+        "• Adds support to shipment quality.\n" +
+        "• Helps turn BASE progress into stronger Shared Vault results.\n\n" +
+        "Best use:\n" +
+        "Very good once your Refinery is active and you are shipping regularly.",
+      tips: {
+        building: "Refinery",
+        research: "Logistics",
+        module: "Vault Compressor",
+        actions: [
+          "Build Refinery first.",
+          "Ship regularly to feel the value of this module.",
+          "Pair it with Logistics research for stronger export flow.",
+        ],
+      },
+      nextStep: {
+        label: "Open Shipping",
+        tab: "operations",
+        target: "shipping",
+        why: "This module matters most when banked MLEO is already moving into the Shared Vault.",
+      },
+    },
+
+    arcadeRelay: {
+      title: "Arcade Relay",
+      focus: "XP + DATA support",
+      text:
+        "Arcade Relay is a progression module that supports missions and strategic growth.\n\n" +
+        "What it does:\n" +
+        "• Improves mission XP.\n" +
+        "• Improves DATA gain.\n" +
+        "• Helps BASE feel more connected to wider progression systems.\n\n" +
+        "Best use:\n" +
+        "Install it when you want faster commander growth and smarter long-term scaling.",
+      tips: {
+        building: "Arcade Hub",
+        research: "Arcade Ops",
+        module: "Arcade Relay",
+        actions: [
+          "Run missions consistently.",
+          "Use it when commander XP matters more.",
+          "Pair it with Arcade Hub and Research Lab progression.",
+        ],
+      },
+      nextStep: {
+        label: "Open Daily Missions",
+        tab: "operations",
+        target: "missions",
+        why: "Arcade Relay is most noticeable when you actively claim mission rewards.",
+      },
+    },
+
+    minerLink: {
+      title: "Miner Link",
+      focus: "Ore quality + refinery stability",
+      text:
+        "Miner Link is a synergy module between raw resource growth and safer processing.\n\n" +
+        "What it does:\n" +
+        "• Improves Ore output.\n" +
+        "• Supports Refinery stability.\n" +
+        "• Helps the whole production loop feel smoother.\n\n" +
+        "Best use:\n" +
+        "Great when your economy starts depending on both Quarry and Refinery at the same time.",
+      tips: {
+        building: "Miner Control",
+        research: "Miner Sync",
+        module: "Miner Link",
+        actions: [
+          "Use it once your base becomes more production-heavy.",
+          "Excellent before bigger Refinery scaling.",
+          "Best when Ore and stability both matter.",
+        ],
+      },
+      nextStep: {
+        label: "Open Miner Control",
+        tab: "build",
+        target: "minerControl",
+        why: "Miner Link works best as part of your wider Miners synergy path.",
+      },
+    },
+
+    coolant: {
+      title: "Coolant Loops",
+      focus: "Energy cap + regeneration",
+      text:
+        "Coolant Loops is one of the most useful early research upgrades in BASE.\n\n" +
+        "What it does:\n" +
+        "• Increases Energy regeneration.\n" +
+        "• Increases Energy cap.\n" +
+        "• Makes the whole base feel less stalled.\n\n" +
+        "Best use:\n" +
+        "Research this early if you often feel that Energy is slowing everything down.",
+      tips: {
+        building: "Power Cell",
+        research: "Coolant Loops",
+        module: "",
+        actions: [
+          "Take this early if Energy feels frustrating.",
+          "Pair it with Power Cell upgrades.",
+          "Use it before scaling multiple active systems.",
+        ],
+      },
+      nextStep: {
+        label: "Open Power Cell",
+        tab: "build",
+        target: "powerCell",
+        why: "Power Cell and Coolant Loops are your main Energy foundation.",
+      },
+    },
+
+    routing: {
+      title: "Routing AI",
+      focus: "Bank efficiency",
+      text:
+        "Routing AI improves how efficiently your BASE economy converts progress into useful output.\n\n" +
+        "What it does:\n" +
+        "• Improves bank efficiency.\n" +
+        "• Helps economy flow feel smarter and cleaner.\n" +
+        "• Unlocks stronger follow-up research paths.\n\n" +
+        "Best use:\n" +
+        "Strong choice once you want a more optimized economy instead of only raw production.",
+      tips: {
+        building: "Refinery",
+        research: "Routing AI",
+        module: "Vault Compressor",
+        actions: [
+          "Use it after stabilizing your basic production.",
+          "Good before deep economy scaling.",
+          "Helps unlock several stronger research branches.",
+        ],
+      },
+      nextStep: {
+        label: "Open Refinery",
+        tab: "build",
+        target: "refinery",
+        why: "Bank efficiency becomes more meaningful once Refinery flow is active.",
+      },
+    },
+
+    fieldOps: {
+      title: "Field Ops",
+      focus: "Crew bonus scaling",
+      text:
+        "Field Ops improves how effective your crew becomes over time.\n\n" +
+        "What it does:\n" +
+        "• Increases crew bonus value.\n" +
+        "• Strengthens progression through command identity.\n" +
+        "• Supports stronger mid-game scaling.\n\n" +
+        "Best use:\n" +
+        "Research it when crew investment is becoming part of your main plan.",
+      tips: {
+        building: "HQ",
+        research: "Field Ops",
+        module: "",
+        actions: [
+          "Hire crew before expecting full value.",
+          "Useful once command growth matters more.",
+          "Helps multiple systems at once through crew scaling.",
+        ],
+      },
+      nextStep: {
+        label: "Open HQ",
+        tab: "build",
+        target: "hq",
+        why: "Field Ops fits best into a stronger command-centered base.",
+      },
+    },
+
+    minerSync: {
+      title: "Miner Sync",
+      focus: "Ore output + mission support",
+      text:
+        "Miner Sync is a research path for better Ore momentum and stronger daily progression.\n\n" +
+        "What it does:\n" +
+        "• Improves Ore output.\n" +
+        "• Adds support to daily mission flow.\n" +
+        "• Makes the base feel more productive and active.\n\n" +
+        "Best use:\n" +
+        "Great when Ore demand is rising and you want better progression rhythm.",
+      tips: {
+        building: "Quarry",
+        research: "Miner Sync",
+        module: "Servo Drill",
+        actions: [
+          "Use it when Ore keeps running short.",
+          "Excellent together with Servo Drill.",
+          "Helpful before stronger Refinery expansion.",
+        ],
+      },
+      nextStep: {
+        label: "Open Quarry",
+        tab: "build",
+        target: "quarry",
+        why: "Miner Sync is strongest when Quarry is already part of your main economy.",
+      },
+    },
+
+    arcadeOps: {
+      title: "Arcade Ops",
+      focus: "Commander XP + expedition rewards",
+      text:
+        "Arcade Ops improves strategic progression and reward quality.\n\n" +
+        "What it does:\n" +
+        "• Increases commander XP gains.\n" +
+        "• Improves expedition rewards.\n" +
+        "• Supports wider ecosystem progression.\n\n" +
+        "Best use:\n" +
+        "Take it when you want BASE to feel more rewarding beyond raw resources.",
+      tips: {
+        building: "Arcade Hub",
+        research: "Arcade Ops",
+        module: "Arcade Relay",
+        actions: [
+          "Best for XP-focused progression.",
+          "Use it if expeditions are part of your main routine.",
+          "Strong long-term growth research.",
+        ],
+      },
+      nextStep: {
+        label: "Open Expedition",
+        tab: "operations",
+        target: "expedition",
+        why: "Arcade Ops becomes more visible when you actively run expeditions.",
+      },
+    },
+
+    logistics: {
+      title: "Logistics",
+      focus: "Ship efficiency",
+      text:
+        "Logistics is a direct shipment research upgrade.\n\n" +
+        "What it does:\n" +
+        "• Improves ship efficiency.\n" +
+        "• Makes export flow smoother.\n" +
+        "• Helps Shared Vault growth feel cleaner and more efficient.\n\n" +
+        "Best use:\n" +
+        "Very useful once you are shipping often and want better return from each export cycle.",
+      tips: {
+        building: "Logistics Center",
+        research: "Logistics",
+        module: "Vault Compressor",
+        actions: [
+          "Use it once you ship regularly.",
+          "Very strong with Logistics Center upgrades.",
+          "Supports long-term Shared Vault growth.",
+        ],
+      },
+      nextStep: {
+        label: "Open Logistics Center",
+        tab: "build",
+        target: "logisticsCenter",
+        why: "This research is most valuable when your shipment system is already developed.",
+      },
+    },
+
+    predictiveMaintenance: {
+      title: "Predictive Maintenance",
+      focus: "Slower decay + safer base",
+      text:
+        "Predictive Maintenance is a defensive research that protects long-term performance.\n\n" +
+        "What it does:\n" +
+        "• Slows maintenance decay.\n" +
+        "• Improves Repair Bay value.\n" +
+        "• Makes large bases easier to manage.\n\n" +
+        "Best use:\n" +
+        "Excellent when the base starts feeling fragile or you are juggling many active systems.",
+      tips: {
+        building: "Repair Bay",
+        research: "Predictive Maintenance",
+        module: "Miner Link",
+        actions: [
+          "Take it when stability starts slipping more often.",
+          "Very useful for safer scaling.",
+          "Great with Repair Bay upgrades.",
+        ],
+      },
+      nextStep: {
+        label: "Open Repair Bay",
+        tab: "build",
+        target: "repairBay",
+        why: "This research has the best impact when Repair Bay is part of your setup.",
+      },
+    },
+
+    deepScan: {
+      title: "Deep Scan",
+      focus: "More DATA + better rare findings",
+      text:
+        "Deep Scan is a research path for stronger strategic rewards.\n\n" +
+        "What it does:\n" +
+        "• Improves DATA from expeditions.\n" +
+        "• Improves rare discovery quality.\n" +
+        "• Strengthens advanced progression routes.\n\n" +
+        "Best use:\n" +
+        "Good for players who want more strategic value from expeditions instead of only basic rewards.",
+      tips: {
+        building: "Research Lab",
+        research: "Deep Scan",
+        module: "Arcade Relay",
+        actions: [
+          "Use it if expeditions are frequent.",
+          "Very good for DATA-focused progression.",
+          "Supports advanced research pacing.",
+        ],
+      },
+      nextStep: {
+        label: "Open Expedition",
+        tab: "operations",
+        target: "expedition",
+        why: "Deep Scan is felt most clearly through active expedition loops.",
+      },
+    },
+
+    tokenDiscipline: {
+      title: "Token Discipline",
+      focus: "Lower raw MLEO + stronger DATA + better ship quality",
+      text:
+        "Token Discipline is an advanced balancing research.\n\n" +
+        "What it does:\n" +
+        "• Reduces raw banked MLEO output.\n" +
+        "• Increases DATA output.\n" +
+        "• Improves shipment quality.\n\n" +
+        "Best use:\n" +
+        "This is for a smarter, more controlled economy. It is less about raw speed and more about healthier long-term scaling.",
+      tips: {
+        building: "Research Lab",
+        research: "Token Discipline",
+        module: "Vault Compressor",
+        actions: [
+          "Take it when you want strategic depth over raw output.",
+          "Good for controlled long-term economy balance.",
+          "Best for advanced BASE identity.",
+        ],
+      },
+      nextStep: {
+        label: "Open Research Lab",
+        tab: "build",
+        target: "researchLab",
+        why: "Token Discipline belongs to a more advanced DATA-driven build path.",
+      },
+    },
+  };
+
+  function getDevelopmentInfo(item) {
+    return DEVELOPMENT_INFO_COPY[item.key] || {
+      title: item.name,
+      focus: "Development",
+      text:
+        `${item.name} is part of your BASE development layer.\n\n` +
+        `Description:\n${item.desc}`,
+      tips: {
+        building: "",
+        research: "",
+        module: "",
+        actions: [
+          "Use this upgrade when it fits your current bottleneck.",
+          "Pair it with related structures for better value.",
+          "Use the recommended next step to jump to the right panel.",
+        ],
+      },
+    };
+  }
 
   const getBuildingInfo = (building) => {
     const level = Number(state.buildings?.[building.key] || 0);
