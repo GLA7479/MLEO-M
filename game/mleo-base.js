@@ -739,18 +739,18 @@ function highlightCard(condition, mode = "info") {
   if (!condition) return "";
 
   if (mode === "critical") {
-    return "border-white/10 bg-white/[0.03] shadow-[inset_0_0_0_1px_rgba(244,63,94,0.30),0_0_18px_rgba(244,63,94,0.08)]";
+    return "rounded-2xl border border-rose-400/50 bg-rose-500/12 shadow-[0_0_0_1px_rgba(244,63,94,0.10),0_0_14px_rgba(244,63,94,0.06)]";
   }
 
   if (mode === "warning") {
-    return "border-white/10 bg-white/[0.03] shadow-[inset_0_0_0_1px_rgba(250,204,21,0.28),0_0_16px_rgba(250,204,21,0.07)]";
+    return "rounded-2xl border border-amber-400/45 bg-amber-500/12 shadow-[0_0_0_1px_rgba(250,204,21,0.09),0_0_12px_rgba(250,204,21,0.05)]";
   }
 
   if (mode === "success") {
-    return "border-white/10 bg-white/[0.03] shadow-[inset_0_0_0_1px_rgba(52,211,153,0.26),0_0_16px_rgba(52,211,153,0.07)]";
+    return "rounded-2xl border border-emerald-400/28 bg-white/[0.02] shadow-[0_0_0_1px_rgba(52,211,153,0.09),0_0_12px_rgba(52,211,153,0.05)]";
   }
 
-  return "border-white/10 bg-white/[0.03] shadow-[inset_0_0_0_1px_rgba(34,211,238,0.24),0_0_16px_rgba(34,211,238,0.07)]";
+  return "rounded-2xl border border-cyan-400/24 bg-white/[0.02] shadow-[0_0_0_1px_rgba(34,211,238,0.08),0_0_12px_rgba(34,211,238,0.04)]";
 }
 
 function clamp(n, min, max) {
@@ -6163,12 +6163,13 @@ export default function MleoBase() {
               />
             </div>
 
-            <div className="h-full w-full">
-              <div className="relative overflow-hidden rounded-2xl">
-                {(state.resources.ENERGY || 0) <= derived.energyCap * 0.25 && (
-                  <div className="absolute inset-x-0 top-0 z-10 h-[2px] bg-amber-300/85" />
-                )}
-
+            <div
+              className={`h-full w-full ${highlightCard(
+                (state.resources.ENERGY || 0) <= derived.energyCap * 0.25,
+                "warning"
+              )}`}
+            >
+              <div className="relative">
                 <InfoButton
                   infoKey="energy"
                   setOpenInfoKey={setOpenInfoKey}
@@ -6183,16 +6184,13 @@ export default function MleoBase() {
               </div>
             </div>
 
-            <div className="h-full w-full">
-              <div className="relative overflow-hidden rounded-2xl">
-                {systemState === "critical" && (
-                  <div className="absolute inset-x-0 top-0 z-10 h-[2px] bg-rose-400/90" />
-                )}
-
-                {systemState === "warning" && (
-                  <div className="absolute inset-x-0 top-0 z-10 h-[2px] bg-amber-300/85" />
-                )}
-
+            <div
+              className={`h-full w-full ${
+                highlightCard(systemState === "critical", "critical") ||
+                highlightCard(systemState === "warning", "warning")
+              }`}
+            >
+              <div className="relative">
                 <InfoButton
                   infoKey="stability"
                   setOpenInfoKey={setOpenInfoKey}
@@ -7175,12 +7173,13 @@ export default function MleoBase() {
                 />
               </div>
 
-              <div className="w-full">
-                <div className="relative overflow-hidden rounded-2xl">
-                  {(state.resources.ENERGY || 0) <= derived.energyCap * 0.25 && (
-                    <div className="absolute inset-x-0 top-0 z-10 h-[2px] bg-amber-300/85" />
-                  )}
-
+              <div
+                className={`w-full ${highlightCard(
+                  (state.resources.ENERGY || 0) <= derived.energyCap * 0.25,
+                  "warning"
+                )}`}
+              >
+                <div className="relative">
                   <InfoButton
                     infoKey="energy"
                     setOpenInfoKey={setOpenInfoKey}
@@ -7196,16 +7195,13 @@ export default function MleoBase() {
                 </div>
             </div>
 
-              <div className="w-full">
-                <div className="relative overflow-hidden rounded-2xl">
-                  {systemState === "critical" && (
-                    <div className="absolute inset-x-0 top-0 z-10 h-[2px] bg-rose-400/90" />
-                  )}
-
-                  {systemState === "warning" && (
-                    <div className="absolute inset-x-0 top-0 z-10 h-[2px] bg-amber-300/85" />
-                  )}
-
+              <div
+                className={`w-full ${
+                  highlightCard(systemState === "critical", "critical") ||
+                  highlightCard(systemState === "warning", "warning")
+                }`}
+              >
+                <div className="relative">
                   <InfoButton
                     infoKey="stability"
                     setOpenInfoKey={setOpenInfoKey}
