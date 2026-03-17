@@ -512,7 +512,7 @@ BEGIN
   v_gold_gain := (v_trade * 1.0) * v_gold_mult;
   v_scrap_gain := (v_salvage * 0.8) * v_scrap_mult;
   v_data_gain :=
-      ((v_miner * 0.15) + (v_arcade * 0.12) + (v_logistics * 0.06) + (v_research_lab * 0.22))
+      ((v_miner * 0.18) + (v_arcade * 0.15) + (v_logistics * 0.08) + (v_research_lab * 0.28))
       * v_data_mult;
 
   v_energy_use :=
@@ -777,8 +777,8 @@ BEGIN
   ELSIF p_mission_key = 'spend_vault' THEN
     v_completed := coalesce((v_stats->>'vaultSpentToday')::numeric, 0);
     v_target := 50;
-    v_resources := jsonb_set(v_resources, '{DATA}', to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 10), true);
-    v_xp_gain := 45;
+  v_resources := jsonb_set(v_resources, '{DATA}', to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 14), true);
+  v_xp_gain := 55;
   ELSE
     RAISE EXCEPTION 'Invalid mission key';
   END IF;

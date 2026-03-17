@@ -103,7 +103,7 @@ const BUILDINGS = [
     baseCost: { GOLD: 320, ORE: 120, SCRAP: 40 },
     growth: 1.22,
     energyUse: 0.6,
-    outputs: { DATA: 0.15 },
+    outputs: { DATA: 0.18 },
     requires: [{ key: "hq", lvl: 2 }],
   },
   {
@@ -113,7 +113,7 @@ const BUILDINGS = [
     baseCost: { GOLD: 360, ORE: 90, SCRAP: 50 },
     growth: 1.24,
     energyUse: 0.8,
-    outputs: { DATA: 0.12 },
+    outputs: { DATA: 0.15 },
     requires: [{ key: "hq", lvl: 2 }],
   },
   {
@@ -137,7 +137,7 @@ const BUILDINGS = [
     growth: 1.7,
     maxLevel: 15,
     energyUse: 0.7,
-    outputs: { DATA: 0.06 },
+    outputs: { DATA: 0.08 },
     requires: [{ key: "hq", lvl: 2 }, { key: "tradeHub", lvl: 2 }],
   },
   {
@@ -148,7 +148,7 @@ const BUILDINGS = [
     growth: 1.75,
     maxLevel: 15,
     energyUse: 0.8,
-    outputs: { DATA: 0.22 },
+    outputs: { DATA: 0.28 },
     requires: [{ key: "hq", lvl: 2 }, { key: "minerControl", lvl: 1 }],
   },
   {
@@ -1790,10 +1790,10 @@ const INFO_COPY = {
     text:
       "DATA is your strategic progression resource.\n\n" +
       "Main ways to gain DATA:\n" +
-      "• Upgrade Research Lab.\n" +
-      "• Upgrade Miner Control and Arcade Hub.\n" +
-      "• Run expeditions.\n" +
-      "• Complete DATA-related daily missions.",
+      "• Research Lab is your strongest long-term DATA generator.\n" +
+      "• Miner Control and Arcade Hub add supporting DATA income.\n" +
+      "• Expeditions give burst DATA and rare findings.\n" +
+      "• Daily missions help smooth early progression.",
     tips: {
       building: "Research Lab",
       research: "Deep Scan / Token Discipline",
@@ -3067,7 +3067,7 @@ export default function MleoBase() {
           };
           return applyLevelUps(next);
         });
-        showToast("Blueprint cache secured. Banking efficiency improved.");
+        showToast("Blueprint upgraded. Daily shipping cap increased and banking efficiency improved.");
       } else {
         showToast(res?.message || "Blueprint purchase failed.");
       }
@@ -4807,7 +4807,7 @@ export default function MleoBase() {
                       </div>
                       <div className="mt-1 text-lg font-black text-white">Ship to Shared Vault</div>
                       <div className="mt-2 text-sm text-white/65">
-                        Move refined MLEO into the shared vault with the daily softcut still active.
+                        Move refined MLEO into the shared vault. Daily cap and softcut apply, so later shipments may convert less efficiently.
                       </div>
                       <button
                         onClick={bankToSharedVault}

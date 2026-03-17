@@ -196,11 +196,11 @@ DECLARE
   v_stats jsonb;
   v_vault_balance bigint;
   v_vault_delta_result record;
-  v_blueprint_base_cost bigint := 2500;
-  v_blueprint_growth numeric := 1.85;
+  v_blueprint_base_cost bigint := 1800;
+  v_blueprint_growth numeric := 1.65;
   v_overclock_cost bigint := 900;
   v_overclock_duration_ms bigint := 480000; -- 8 minutes
-  v_refill_cost bigint := 300;
+  v_refill_cost bigint := 180;
   v_energy_cap integer;
 BEGIN
   -- Validate spend_type
