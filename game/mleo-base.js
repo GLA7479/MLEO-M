@@ -4028,9 +4028,23 @@ export default function MleoBase() {
                   {buttonText}
                 </button>
 
-                <div className="mt-0.5 h-[10px] overflow-hidden text-center text-[10px] leading-4 text-white/45">
-                <div className="line-clamp-2 opacity-0">placeholder</div>
-              </div>
+                <div
+                  className={`mt-1.5 min-h-[18px] text-[11px] font-semibold ${
+                    !isUnlocked
+                      ? "text-amber-300"
+                      : ready
+                      ? "text-emerald-300"
+                      : "text-white/55"
+                  }`}
+                >
+                  {!isUnlocked && requirementsText
+                    ? `Requires: ${requirementsText}`
+                    : ready
+                    ? "Ready to upgrade"
+                    : isUnlocked
+                    ? "Need more resources"
+                    : ""}
+                </div>
               </div>
             </div>
           );
