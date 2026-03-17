@@ -3826,11 +3826,11 @@ export default function MleoBase() {
                   ) : null}
                 </div>
 
-                <div className="sticky bottom-0 mt-5 flex justify-end bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent pt-4">
+                <div className="sticky bottom-0 z-20 -mx-5 -mb-5 mt-5 flex justify-end bg-transparent px-5 pb-5 pt-3 pointer-events-none">
                   <button
                     type="button"
                     onClick={() => setOpenInfoKey(null)}
-                    className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500/20"
+                    className="pointer-events-auto rounded-2xl border border-cyan-400/20 bg-slate-950/90 px-5 py-3 text-base font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.32)] backdrop-blur-md transition hover:bg-cyan-500/15"
                   >
                     Close
                   </button>
