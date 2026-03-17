@@ -1713,6 +1713,12 @@ const INFO_COPY = {
         "Keep Ore + Scrap production high",
       ],
     },
+    nextStep: {
+      label: "Open Logistics / Shipping",
+      tab: "operations",
+      target: "shipping",
+      why: "Shipping is how banked MLEO reaches Shared Vault.",
+    },
   },
 
   bankedMleo: {
@@ -1735,6 +1741,12 @@ const INFO_COPY = {
         "Upgrade Refinery",
         "Keep Energy from stalling production",
       ],
+    },
+    nextStep: {
+      label: "Upgrade Refinery",
+      tab: "build",
+      target: "refinery",
+      why: "Refinery converts Ore and Scrap into banked MLEO.",
     },
   },
 
@@ -1759,6 +1771,12 @@ const INFO_COPY = {
         "Do maintenance instead of ignoring stability",
       ],
     },
+    nextStep: {
+      label: "Open Daily Missions",
+      tab: "operations",
+      target: "missions",
+      why: "Missions are one of the fastest repeatable XP sources.",
+    },
   },
 
   data: {
@@ -1781,6 +1799,12 @@ const INFO_COPY = {
         "Run expeditions for extra DATA",
         "Complete DATA missions every day",
       ],
+    },
+    nextStep: {
+      label: "Upgrade Research Lab",
+      tab: "build",
+      target: "researchLab",
+      why: "Research Lab is your strongest direct DATA generator.",
     },
   },
 
@@ -1805,6 +1829,12 @@ const INFO_COPY = {
         "Recover before big pushes",
       ],
     },
+    nextStep: {
+      label: "Upgrade Power Cell",
+      tab: "build",
+      target: "powerCell",
+      why: "Power Cell increases Energy cap and regeneration.",
+    },
   },
 
   stability: {
@@ -1827,6 +1857,12 @@ const INFO_COPY = {
         "Choose safe event outcomes",
         "Avoid overpushing during weak Stability",
       ],
+    },
+    nextStep: {
+      label: "Perform maintenance",
+      tab: "operations",
+      target: "maintenance",
+      why: "Maintenance is the fastest direct way to recover Stability.",
     },
   },
 
@@ -1851,6 +1887,12 @@ const INFO_COPY = {
         "Unlock Miner Sync early",
       ],
     },
+    nextStep: {
+      label: "Upgrade Quarry",
+      tab: "build",
+      target: "quarry",
+      why: "Quarry is the main direct source of ORE.",
+    },
   },
 
   gold: {
@@ -1874,6 +1916,12 @@ const INFO_COPY = {
         "Keep GOLD balanced with other resources",
       ],
     },
+    nextStep: {
+      label: "Upgrade Trade Hub",
+      tab: "build",
+      target: "tradeHub",
+      why: "Trade Hub is your strongest direct GOLD source.",
+    },
   },
 
   scrap: {
@@ -1896,6 +1944,12 @@ const INFO_COPY = {
         "Take salvage rewards when available",
         "Keep SCRAP strong for refinery systems",
       ],
+    },
+    nextStep: {
+      label: "Upgrade Salvage Yard",
+      tab: "build",
+      target: "salvage",
+      why: "Salvage Yard is your main long-term SCRAP source.",
     },
   },
 };
@@ -1930,6 +1984,7 @@ export default function MleoBase() {
   const [toast, setToast] = useState("");
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [openInfoKey, setOpenInfoKey] = useState(null);
+  const [highlightTarget, setHighlightTarget] = useState(null);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState(null);
@@ -1959,6 +2014,47 @@ export default function MleoBase() {
   const [devTab, setDevTab] = useState("crew");
 
   const activeInfo = openInfoKey ? INFO_COPY[openInfoKey] : null;
+
+  function handleInfoNextStep() {
+    if (!activeInfo?.nextStep) return;
+
+    const step = activeInfo.nextStep;
+
+    // Mobile tab routing (desktop shows all sections anyway)
+    try {
+      const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches;
+      if (isMobile) {
+        const tabKey =
+          step.tab === "operations" ? "ops" : step.tab === "build" ? "build" : step.tab === "intel" ? "intel" : "overview";
+
+        openMobilePanel(tabKey);
+
+        if (step.target === "shipping" || step.target === "maintenance") {
+          setMobileOperationsConsoleOpen(true);
+          setMobileDailyMissionsOpen(false);
+        } else if (step.target === "missions") {
+          setMobileDailyMissionsOpen(true);
+          setMobileOperationsConsoleOpen(false);
+        } else if (tabKey === "build") {
+          setMobileBaseStructuresOpen(true);
+        }
+      }
+    } catch {
+      // no-op
+    }
+
+    setHighlightTarget(step.target);
+    setOpenInfoKey(null);
+
+    setTimeout(() => {
+      const el = document.querySelector(`[data-base-target="${step.target}"]`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+
+    setTimeout(() => {
+      setHighlightTarget(null);
+    }, 2200);
+  }
 
   useEffect(() => {
     let alive = true;
@@ -3307,7 +3403,10 @@ export default function MleoBase() {
         return (
           <div
             key={building.key}
-            className={`flex min-h-[180px] flex-col rounded-xl border p-3 ${availabilityCardClass(ready)}`}
+            data-base-target={building.key}
+            className={`flex min-h-[180px] flex-col rounded-xl border p-3 ${availabilityCardClass(ready)} ${
+              highlightTarget === building.key ? "border-cyan-300/70 ring-2 ring-cyan-300/35 shadow-[0_0_0_1px_rgba(103,232,249,0.25)]" : ""
+            }`}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
@@ -3823,6 +3922,30 @@ export default function MleoBase() {
                         </ul>
                       </div>
                     </div>
+                  ) : null}
+
+                  {activeInfo?.nextStep ? (
+                    <button
+                      type="button"
+                      onClick={handleInfoNextStep}
+                      className="mt-4 flex w-full items-start justify-between rounded-2xl border border-cyan-400/20 bg-cyan-500/8 px-4 py-3 text-left transition hover:bg-cyan-500/14"
+                    >
+                      <div>
+                        <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-200/70">
+                          Recommended next step
+                        </div>
+                        <div className="mt-1 text-base font-semibold text-white">
+                          {activeInfo.nextStep.label}
+                        </div>
+                        {activeInfo.nextStep.why ? (
+                          <div className="mt-1 text-sm text-white/68">
+                            Why: {activeInfo.nextStep.why}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="ml-4 pt-1 text-cyan-200/80">→</div>
+                    </button>
                   ) : null}
                 </div>
 
@@ -4963,9 +5086,10 @@ export default function MleoBase() {
             >
               <div className="grid gap-3 md:grid-cols-2">
                 <div
+                  data-base-target="shipping"
                   className={`flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
                     highlightCard((state.bankedMleo || 0) >= 120, "success")
-                  }`}
+                  } ${highlightTarget === "shipping" ? "ring-2 ring-cyan-300/35" : ""}`}
                 >
                   <div className="flex min-h-[88px] flex-col">
                     <div className="text-sm font-semibold text-emerald-200">Ship to Shared Vault</div>
@@ -5038,13 +5162,14 @@ export default function MleoBase() {
                 </div>
 
                 <div
+                  data-base-target="maintenance"
                   className={`flex h-full flex-col gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 ${
                     systemState === "critical"
                       ? highlightCard(true, "critical")
                       : systemState === "warning"
                       ? highlightCard(true, "warning")
                       : ""
-                  }`}
+                  } ${highlightTarget === "maintenance" ? "ring-2 ring-cyan-300/35" : ""}`}
                 >
                   <div className="flex min-h-[88px] flex-col">
                     <div className="text-sm font-semibold text-amber-200">Shared Vault Utilities</div>
@@ -5080,12 +5205,17 @@ export default function MleoBase() {
               </div>
             </Section>
 
-            <Section
+            <div
+              data-base-target="missions"
+              className={highlightTarget === "missions" ? "rounded-3xl ring-2 ring-cyan-300/35" : ""}
+            >
+              <Section
                 title="Daily Missions"
                 subtitle="Daily goals give players direction without turning BASE into an aggressive faucet."
               >
                 {dailyMissionsContent}
               </Section>
+            </div>
           </div>
 
           {/* Desktop - Development + Base Structures */}
