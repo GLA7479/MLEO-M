@@ -220,7 +220,7 @@ BEGIN
   v_resources := coalesce(v_state.resources, '{}'::jsonb);
   v_blueprint_level := coalesce(v_state.blueprint_level, 0);
   v_stats := coalesce(v_state.stats, '{}'::jsonb);
-  v_energy_cap := coalesce(p_energy_cap, 120);
+  v_energy_cap := coalesce(p_energy_cap, 140);
 
   -- Calculate cost and validate resources based on spend_type
   IF p_spend_type = 'blueprint' THEN
@@ -628,13 +628,13 @@ END;
 $$;
 
 -- ============================================================================
--- Security: Revoke from anon/authenticated, grant to service_role
+-- Security: Revoke from PUBLIC and anon/authenticated, grant to service_role
 -- ============================================================================
 
-REVOKE EXECUTE ON FUNCTION public.base_ship_to_vault(text) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text, integer) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.base_launch_expedition(text) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.base_build_upgrade(text, text) FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_ship_to_vault(text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text, integer) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_launch_expedition(text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_build_upgrade(text, text) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.base_ship_to_vault(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text, integer) TO service_role;

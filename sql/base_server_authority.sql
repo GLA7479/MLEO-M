@@ -817,4 +817,16 @@ BEGIN
 END;
 $$;
 
+-- ============================================================================
+-- Security: Revoke from PUBLIC and anon/authenticated, grant to service_role
+-- ============================================================================
+
+REVOKE EXECUTE ON FUNCTION public.base_get_or_create_state(text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_reconcile_state(text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_claim_mission_reward(text, text) FROM PUBLIC, anon, authenticated;
+
+GRANT EXECUTE ON FUNCTION public.base_get_or_create_state(text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.base_reconcile_state(text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.base_claim_mission_reward(text, text) TO service_role;
+
 COMMIT;

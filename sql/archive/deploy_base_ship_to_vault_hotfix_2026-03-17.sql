@@ -1,3 +1,6 @@
+-- ARCHIVED: One-off hotfix for base_ship_to_vault (v_step.value->>'upto'/'factor').
+-- The corrected function is now in base_atomic_rpc.sql. Do not run this as normal deploy.
+
 -- Run this in Supabase SQL Editor to fix base_ship_to_vault in the live DB.
 -- Fix: v_step is a record from jsonb_array_elements(); use v_step.value->>'upto' and v_step.value->>'factor'.
 
