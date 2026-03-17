@@ -1526,22 +1526,22 @@ function BaseResourceBar({
 
   return (
     <div
-      className={`sticky top-0 z-20 -mx-1 mb-2 rounded-xl border border-white/10 bg-slate-950/90 backdrop-blur-md ${
-        compact ? "px-1.5 py-1.5" : "px-2 py-2"
+      className={`sticky top-0 z-20 -mx-1 mb-3 rounded-2xl border border-white/10 bg-slate-950/90 backdrop-blur-md ${
+        compact ? "px-2 py-2" : "px-3 py-2.5"
       }`}
     >
-      <div className="flex flex-wrap gap-1.5">
+      <div className="grid grid-cols-5 gap-2">
         {items.map((item) => (
           <div
             key={item.key}
-            className={`rounded-lg border ${
+            className={`rounded-xl border ${
               item.focus ? "border-cyan-400/20 bg-cyan-400/8" : "border-white/10 bg-white/5"
-            } ${compact ? "px-2 py-1" : "px-2.5 py-1.5"}`}
+            } ${compact ? "px-2.5 py-1.5" : "px-3 py-2"}`}
           >
-            <div className="text-[9px] font-black uppercase tracking-[0.1em] text-white/40">
+            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white/40">
               {item.label}
             </div>
-            <div className={`${compact ? "text-[11px]" : "text-xs"} font-extrabold text-white leading-4`}>
+            <div className={`${compact ? "text-xs" : "text-sm"} font-extrabold text-white leading-5`}>
               {item.value}
             </div>
           </div>
@@ -1549,14 +1549,14 @@ function BaseResourceBar({
 
         {showBanked ? (
           <div
-            className={`rounded-lg border border-cyan-400/20 bg-cyan-400/8 ${
-              compact ? "px-2 py-1" : "px-2.5 py-1.5"
+            className={`rounded-xl border border-cyan-400/20 bg-cyan-400/8 ${
+              compact ? "px-2.5 py-1.5" : "px-3 py-2"
             }`}
           >
-            <div className="text-[9px] font-black uppercase tracking-[0.1em] text-cyan-200/50">
+            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-cyan-200/50">
               BANKED
             </div>
-            <div className={`${compact ? "text-[11px]" : "text-xs"} font-extrabold text-cyan-100 leading-4`}>
+            <div className={`${compact ? "text-xs" : "text-sm"} font-extrabold text-cyan-100 leading-5`}>
               {formatResourceValue(bankedMleo || 0)} MLEO
             </div>
           </div>
@@ -2360,6 +2360,7 @@ export default function MleoBase() {
     () => getAlerts(state, derived, systemState, liveContracts),
     [state, derived, systemState, liveContracts]
   );
+  const desktopPriorityAlert = alerts[0] || null;
 
   const nextStep = useMemo(
     () => getNextStep(state, derived, systemState, liveContracts),
@@ -3687,9 +3688,7 @@ export default function MleoBase() {
                   </button>
                 </div>
               </div>
-              <p className="hidden sm:block mt-2 max-w-2xl text-sm text-white/70 sm:text-base">
-                {CONFIG.subtitle} Build a live command identity through sectors, contracts, specialization and controlled support systems.
-              </p>
+              {/* subtitle removed */}
             </div>
 
             <div className="hidden sm:flex flex-wrap items-center gap-2 sm:justify-start">
@@ -3715,7 +3714,7 @@ export default function MleoBase() {
           </div>
 
           {alerts.length ? (
-            <div className="mt-4 hidden space-y-2 sm:block">
+            <div className="mt-4 space-y-2 lg:hidden">
               {alerts.map((alert) => (
                 <div
                   key={alert.key}
@@ -3827,38 +3826,10 @@ export default function MleoBase() {
             </div>
           </div>
 
-          <div className="mt-3 hidden lg:hidden xl:grid xl:grid-cols-3 gap-3">
-            <div className="relative rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-              <InfoButton
-                infoKey="ore"
-                setOpenInfoKey={setOpenInfoKey}
-              />
-              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Ore</div>
-              <div className="mt-1 text-lg font-bold text-white">{fmt(state.resources.ORE)}</div>
-              <div className="mt-1 text-xs text-white/55">x{derived.oreMult.toFixed(2)} output</div>
-            </div>
-            <div className="relative rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-              <InfoButton
-                infoKey="gold"
-                setOpenInfoKey={setOpenInfoKey}
-              />
-              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Gold</div>
-              <div className="mt-1 text-lg font-bold text-white">{fmt(state.resources.GOLD)}</div>
-              <div className="mt-1 text-xs text-white/55">x{derived.goldMult.toFixed(2)} output</div>
-            </div>
-            <div className="relative rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-              <InfoButton
-                infoKey="scrap"
-                setOpenInfoKey={setOpenInfoKey}
-              />
-              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Scrap</div>
-              <div className="mt-1 text-lg font-bold text-white">{fmt(state.resources.SCRAP)}</div>
-              <div className="mt-1 text-xs text-white/55">x{derived.scrapMult.toFixed(2)} output</div>
-            </div>
-          </div>
+          {/* Removed: desktop duplicate ORE/GOLD/SCRAP metric cards */}
 
           {/* Desktop Command Center */}
-          <div className="mt-4 hidden lg:flex lg:h-[calc(100vh-150px)] lg:min-h-[700px] lg:max-h-[860px] lg:gap-4 lg:overflow-hidden">
+          <div className="mt-4 hidden lg:flex lg:min-h-[680px] lg:max-h-[calc(100vh-110px)] lg:gap-4">
             {/* LEFT SIDEBAR */}
             <aside className="w-[200px] shrink-0 space-y-2.5">
               <div className="rounded-[28px] border border-white/10 bg-slate-950/75 p-3 backdrop-blur-xl">
@@ -3905,7 +3876,7 @@ export default function MleoBase() {
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-cyan-400/25 bg-cyan-500/10 p-4 backdrop-blur-xl">
+              <div className="rounded-[28px] border border-cyan-400/25 bg-cyan-500/10 p-3.5 backdrop-blur-xl">
                 <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200/70">
                   Ready Now
                 </div>
@@ -3945,7 +3916,7 @@ export default function MleoBase() {
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-white/10 bg-slate-950/75 p-4 backdrop-blur-xl">
+              <div className="rounded-[28px] border border-white/10 bg-slate-950/75 p-3.5 backdrop-blur-xl">
                 <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
                   Commander
                 </div>
@@ -3979,10 +3950,10 @@ export default function MleoBase() {
             </aside>
 
             {/* MAIN AREA */}
-            <section className="min-w-0 flex-1 overflow-hidden rounded-[32px] border border-white/10 bg-slate-950/75 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
+            <section className="min-w-0 flex-1 rounded-[32px] border border-white/10 bg-slate-950/75 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.28)] lg:flex lg:flex-col lg:min-h-0">
               {/* TOP HUD */}
-              <div className="border-b border-white/10 px-3 py-2.5">
-                <div className="flex flex-wrap items-center gap-2">
+              <div className="border-b border-white/10 px-4 py-3">
+                <div className="grid grid-cols-4 gap-2 xl:grid-cols-8">
                   {[
                     { label: "ORE", value: fmt(state.resources?.ORE || 0), tone: "normal" },
                     { label: "GOLD", value: fmt(state.resources?.GOLD || 0), tone: "normal" },
@@ -4001,16 +3972,16 @@ export default function MleoBase() {
                     return (
                       <div
                         key={item.label}
-                        className={`rounded-xl border ${
+                        className={`rounded-2xl border ${
                           focus
                             ? "border-cyan-400/20 bg-cyan-400/8"
                             : "border-white/10 bg-white/5"
-                        } px-2.5 py-1.5`}
+                        } px-3 py-2`}
                       >
-                        <div className="text-[9px] font-black uppercase tracking-[0.14em] text-white/40">
+                        <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">
                           {item.label}
                         </div>
-                        <div className="mt-0.5 text-xs font-extrabold text-white">
+                        <div className="mt-1 text-sm font-extrabold text-white xl:text-[15px]">
                           {item.value}
                         </div>
                       </div>
@@ -4020,17 +3991,36 @@ export default function MleoBase() {
               </div>
 
               {/* PANEL HEADER */}
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-                <div>
-                  <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-300/70">
-                    Desktop Command Center
+              <div className="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3">
+                <div className="min-w-0 flex items-center gap-4">
+                  <div className="shrink-0">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-300/70">
+                      Desktop Command Center
+                    </div>
+                    <div className="mt-0.5 text-xl font-black text-white">
+                      {desktopPanelTitle}
+                    </div>
                   </div>
-                  <div className="mt-0.5 text-xl font-black text-white">
-                    {desktopPanelTitle}
-                  </div>
+
+                  {desktopPriorityAlert ? (
+                    <div
+                      className={`hidden xl:flex min-w-0 max-w-[420px] items-center rounded-2xl border px-3 py-2 ${alertToneClasses(
+                        desktopPriorityAlert.tone
+                      )}`}
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-bold">
+                          {desktopPriorityAlert.title}
+                        </div>
+                        <div className="truncate text-[11px] text-white/75">
+                          {desktopPriorityAlert.text}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   <button
                     onClick={() => setOpenInnerPanel(null)}
                     className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
@@ -4041,7 +4031,7 @@ export default function MleoBase() {
               </div>
 
               {/* PANEL BODY */}
-              <div className="h-[calc(100%-138px)] overflow-y-auto p-3">
+              <div className="min-h-0 flex-1 overflow-y-auto p-4 pr-3 pb-6">
                 {desktopPanel === "overview" ? (
                   <div className="grid gap-4 xl:grid-cols-2">
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
