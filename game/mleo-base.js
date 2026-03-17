@@ -3991,17 +3991,26 @@ export default function MleoBase() {
               </div>
 
               {/* PANEL HEADER */}
-              <div className="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3">
-                <div className="min-w-0 flex items-center gap-4">
-                  <div className="shrink-0">
-                    <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-300/70">
-                      Desktop Command Center
-                    </div>
-                    <div className="mt-0.5 text-xl font-black text-white">
-                      {desktopPanelTitle}
-                    </div>
+              <div className="grid grid-cols-3 items-center gap-4 border-b border-white/10 px-4 py-3">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-300/70">
+                    Desktop Command Center
                   </div>
+                  <div className="mt-0.5 text-xl font-black text-white">
+                    {desktopPanelTitle}
+                  </div>
+                </div>
 
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => setOpenInnerPanel(null)}
+                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
+                  >
+                    Reset Section
+                  </button>
+                </div>
+
+                <div className="flex justify-end">
                   {desktopPriorityAlert ? (
                     <div
                       className={`hidden xl:flex min-w-0 max-w-[420px] items-center rounded-2xl border px-3 py-2 ${alertToneClasses(
@@ -4018,15 +4027,6 @@ export default function MleoBase() {
                       </div>
                     </div>
                   ) : null}
-                </div>
-
-                <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    onClick={() => setOpenInnerPanel(null)}
-                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
-                  >
-                    Reset Section
-                  </button>
                 </div>
               </div>
 
