@@ -7681,6 +7681,57 @@ export default function MleoBase() {
       if (!isDesktopViewport) {
         setOpenInfoKey(null);
         setBuildInfo(null);
+
+        // Highlight + scroll the exact building card inside the build panel.
+        // This matches the OLD mobile behavior: jumping to the relevant upgrade and
+        // showing a temporary glow for a few seconds.
+        setHighlightTarget(target);
+        setTimeout(() => {
+          const el = document.querySelector(`[data-base-target="${target}"]`);
+          if (!el) return;
+
+          const centered = centerTargetInMobilePanel(el);
+          if (!centered) {
+            el.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+              inline: "nearest",
+            });
+          }
+        }, 320);
+
+        setTimeout(() => setHighlightTarget(null), 4200);
+      } else {
+        // Desktop: only highlight + scroll the exact upgrade card.
+        // Info window must open only via the "i" button (not from the flow map click).
+        setOpenInfoKey(null);
+        setBuildInfo(null);
+
+        setHighlightTarget(target);
+        setTimeout(() => {
+          const selector = `[data-base-target="${target}"]`;
+          let attempts = 0;
+          const maxAttempts = 8;
+
+          const tryScroll = () => {
+            const el = document.querySelector(selector);
+            if (el) {
+              el.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+                inline: "nearest",
+              });
+              return;
+            }
+
+            attempts += 1;
+            if (attempts <= maxAttempts) setTimeout(tryScroll, 160);
+          };
+
+          tryScroll();
+        }, 320);
+
+        setTimeout(() => setHighlightTarget(null), 4200);
       }
 
       return;
@@ -8998,6 +9049,123 @@ export default function MleoBase() {
                 </div>
               </div>
           </>
+
+          {shownInfo ? (
+            <div
+              className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/78 backdrop-blur-sm px-4 lg:items-stretch lg:justify-end lg:px-0"
+              onClick={() => {
+                setOpenInfoKey(null);
+                setBuildInfo(null);
+              }}
+            >
+              <div
+                className="relative w-full max-w-md max-h-[78vh] overflow-y-auto rounded-3xl border border-cyan-400/20 bg-slate-950/95 p-5 shadow-[0_20px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl lg:max-h-none lg:h-full lg:w-[430px] lg:max-w-none lg:rounded-none lg:rounded-l-[28px] lg:border-y-0 lg:border-r-0 lg:border-l lg:p-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenInfoKey(null);
+                    setBuildInfo(null);
+                  }}
+                  className="absolute right-4 top-4 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-2xl font-bold text-white/85 backdrop-blur-md transition hover:bg-white/10"
+                  aria-label="Close info"
+                >
+                  ×
+                </button>
+
+                <div className="sticky top-0 z-20 -mx-5 -mt-5 mb-4 border-b border-white/10 bg-slate-950/92 px-5 pt-5 pb-3 backdrop-blur-xl lg:-mx-6 lg:-mt-6 lg:px-6 lg:pt-6">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-cyan-200/70">
+                    MLEO BASE INFO
+                  </div>
+
+                  <div className="mt-2 pr-16 text-4xl font-black leading-none text-white">
+                    {shownInfo.title}
+                  </div>
+
+                  {shownInfo?.focus ? (
+                    <div className="mt-2 pr-16 text-sm leading-6 text-cyan-200/80">
+                      <span className="font-semibold text-white">Focus:</span> {shownInfo.focus}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                  <div className="whitespace-pre-line text-sm leading-7 text-white/80">
+                    {shownInfo.text}
+                  </div>
+
+                  {hasInfoTipContent(shownInfo?.tips) ? (
+                    <div className="mt-4 border-t border-white/10 pt-4">
+                      <div className="grid gap-2 text-sm text-white/78">
+                        {renderInfoTipRow("Main building", shownInfo?.tips?.building)}
+                        {renderInfoTipRow("Support buildings", shownInfo?.tips?.supportBuildings)}
+                        {renderInfoTipRow("Main research", shownInfo?.tips?.research)}
+                        {renderInfoTipRow("Support research", shownInfo?.tips?.supportResearch)}
+                        {renderInfoTipRow("Best module", shownInfo?.tips?.module)}
+                        {renderInfoTipRow("Best operation", shownInfo?.tips?.operation)}
+                        {renderInfoTipRow("Watch out", shownInfo?.tips?.watch)}
+                      </div>
+
+                      {normalizeInfoTipItems(shownInfo?.tips?.actions).length ? (
+                        <div className="mt-4">
+                          <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-200/70">
+                            Quick actions
+                          </div>
+
+                          <ul className="mt-2 space-y-1.5 text-sm leading-6 text-white/78">
+                            {normalizeInfoTipItems(shownInfo?.tips?.actions).map((item) => (
+                              <li key={item} className="flex gap-2">
+                                <span className="mt-[8px] h-1.5 w-1.5 rounded-full bg-cyan-300/90" />
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {shownInfo?.nextStep ? (
+                    <button
+                      type="button"
+                      onClick={handleInfoNextStep}
+                      className="mt-4 flex w-full items-start justify-between rounded-2xl border border-cyan-400/20 bg-cyan-500/8 px-4 py-3 text-left transition hover:bg-cyan-500/14"
+                    >
+                      <div>
+                        <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-200/70">
+                          Recommended next step
+                        </div>
+                        <div className="mt-1 text-base font-semibold text-white">
+                          {shownInfo.nextStep.label}
+                        </div>
+                        {shownInfo.nextStep.why ? (
+                          <div className="mt-1 text-sm text-white/68">
+                            Why: {shownInfo.nextStep.why}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="ml-4 pt-1 text-cyan-200/80">→</div>
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="sticky bottom-0 z-20 -mx-5 mt-5 flex justify-end bg-transparent px-5 pb-6 pt-3 pointer-events-none lg:-mx-6 lg:px-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenInfoKey(null);
+                      setBuildInfo(null);
+                    }}
+                    className="pointer-events-auto rounded-2xl border border-cyan-400/20 bg-slate-950/85 px-5 py-3 text-base font-semibold text-white shadow-[0_6px_18px_rgba(0,0,0,0.18)] backdrop-blur-md transition hover:bg-cyan-500/15"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {/* Mobile */}
           <div
