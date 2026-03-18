@@ -2333,16 +2333,16 @@ const BASE_HOME_SCENE_POSITIONS_MOBILE = {
   hq: { x: 50, y: 40 },
 
   powerCell: { x: 80, y: 8 },
-  researchLab: { x: 67, y: 17 },
+  researchLab: { x: 51, y: 10 }, // LAB
 
   tradeHub: { x: 20, y: 5 },
 
   salvage: { x: 15, y: 31 },
-  arcadeHub: { x: 26, y: 25 },
-  minerControl: { x: 33, y: 17 },
+  arcadeHub: { x: 50, y: 61 },   // ARC
+  minerControl: { x: 16, y: 18 }, // MIN
 
-  refinery: { x: 21, y: 50 },
-  quarry: { x: 15, y: 62 },
+  refinery: { x: 21, y: 47 },
+  quarry: { x: 18, y: 62 },
 
   expeditionBay: { x: 85, y: 29 },
   logisticsCenter: { x: 86, y: 45 },
@@ -2357,11 +2357,11 @@ const BASE_HOME_SCENE_POSITIONS_DESKTOP = {
   refinery: { x: 24, y: 50 },
   quarry: { x: 17, y: 70 },
 
-  minerControl: { x: 34, y: 43 },
-  arcadeHub: { x: 34, y: 33 },
+  minerControl: { x: 47, y: 65 }, // MIN
+  arcadeHub: { x: 43, y: 20 },    // ARC
 
   powerCell: { x: 79, y: 14 },
-  researchLab: { x: 68, y: 32 },
+  researchLab: { x: 65, y: 10 },  // LAB
 
   expeditionBay: { x: 86, y: 31 },
   logisticsCenter: { x: 79, y: 46 },
