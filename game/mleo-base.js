@@ -6993,9 +6993,7 @@ export default function MleoBase() {
         <div className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200">
-                MLEO ecosystem command hub
-              </div>
+              {/* Title pill removed for a cleaner V3 look */}
               <div className="mt-3 flex items-center justify-between sm:block">
                 <h1 className="text-3xl font-black tracking-tight sm:text-4xl">{CONFIG.title}</h1>
                 <div className="flex items-center gap-2 sm:hidden">
@@ -8910,6 +8908,10 @@ export default function MleoBase() {
                   >
                     Close
                   </button>
+                </div>
+
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200">
+                  MLEO ecosystem command hub
                 </div>
 
                 <div className="mt-4 space-y-3">
