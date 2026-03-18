@@ -6192,24 +6192,6 @@ export default function MleoBase() {
                 >
                   {buttonText}
                 </button>
-
-                <div
-                  className={`mt-1.5 min-h-[18px] text-[11px] font-semibold ${
-                    !isUnlocked
-                      ? "text-amber-300"
-                      : ready
-                      ? "text-emerald-300"
-                      : "text-white/55"
-                  }`}
-                >
-                  {!isUnlocked && requirementsText
-                    ? `Requires: ${requirementsText}`
-                    : ready
-                    ? "Ready to upgrade"
-                    : isUnlocked
-                    ? "Need more resources"
-                    : ""}
-                </div>
               </div>
             </div>
           );
