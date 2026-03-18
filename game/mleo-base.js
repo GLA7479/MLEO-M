@@ -6968,7 +6968,7 @@ export default function MleoBase() {
             <div
               key={building.key}
               data-base-target={building.key}
-              className={`flex h-[252px] flex-col rounded-xl border p-3 ${availabilityCardClass(ready)} ${
+              className={`flex min-h-[328px] flex-col rounded-xl border p-3 ${availabilityCardClass(ready)} ${
                 highlightTarget === building.key
                   ? "border-cyan-300/70 ring-2 ring-cyan-300/35 shadow-[0_0_0_1px_rgba(103,232,249,0.25)]"
                   : ""
@@ -7041,7 +7041,7 @@ export default function MleoBase() {
 
               <ResourceCostRow cost={cost} resources={state.resources} />
 
-              <div className="mt-auto flex flex-col justify-end pt-0 pb-2">
+              <div className="mt-auto flex flex-col justify-end pt-0 pb-3">
                 <div className="text-[10px] font-semibold text-white/50">
                   {getBuildingEnergyLine(building, level, powerMode)}
                 </div>
