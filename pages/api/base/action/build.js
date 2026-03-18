@@ -62,7 +62,8 @@ export default async function handler(req, res) {
     }
 
     const { building_key } = req.body || {};
-    if (!building_key || typeof building_key !== "string") {
+    const buildingKey = String(building_key || "").trim();
+    if (!buildingKey) {
       return res.status(400).json({
         success: false,
         code: "BASE_INVALID_BUILDING_KEY",
@@ -76,7 +77,7 @@ export default async function handler(req, res) {
       "base_build_upgrade",
       {
         p_device_id: deviceId,
-        p_building_key: building_key,
+        p_building_key: buildingKey,
       }
     );
 
@@ -126,7 +127,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       state: result.state,
-      building_key,
+      building_key: buildingKey,
       new_level: Number(result.new_level || 0),
       cost: result.cost || null,
     });

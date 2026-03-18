@@ -62,7 +62,8 @@ export default async function handler(req, res) {
     }
 
     const { mission_key } = req.body || {};
-    if (!mission_key || typeof mission_key !== "string") {
+    const missionKey = String(mission_key || "").trim();
+    if (!missionKey) {
       return res.status(400).json({
         success: false,
         code: "BASE_INVALID_MISSION_KEY",
@@ -74,7 +75,7 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabase.rpc("base_claim_mission_reward", {
       p_device_id: deviceId,
-      p_mission_key: mission_key,
+      p_mission_key: missionKey,
     });
 
     if (error) {
@@ -99,7 +100,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       state,
-      mission_key,
+      mission_key: missionKey,
     });
   } catch (error) {
     console.error("base/action/mission-claim failed", error);

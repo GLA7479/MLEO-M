@@ -62,7 +62,8 @@ export default async function handler(req, res) {
     }
 
     const { module_key } = req.body || {};
-    if (!module_key || typeof module_key !== "string") {
+    const moduleKey = String(module_key || "").trim();
+    if (!moduleKey) {
       return res.status(400).json({
         success: false,
         code: "BASE_INVALID_MODULE_KEY",
@@ -76,7 +77,7 @@ export default async function handler(req, res) {
       "base_install_module",
       {
         p_device_id: deviceId,
-        p_module_key: module_key,
+        p_module_key: moduleKey,
       }
     );
 
@@ -126,7 +127,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       state: result.state,
-      module_key: result.module_key,
+      module_key: result.module_key || moduleKey,
       cost: result.cost || null,
     });
   } catch (error) {

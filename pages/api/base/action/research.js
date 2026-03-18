@@ -62,7 +62,8 @@ export default async function handler(req, res) {
     }
 
     const { research_key } = req.body || {};
-    if (!research_key || typeof research_key !== "string") {
+    const researchKey = String(research_key || "").trim();
+    if (!researchKey) {
       return res.status(400).json({
         success: false,
         code: "BASE_INVALID_RESEARCH_KEY",
@@ -76,7 +77,7 @@ export default async function handler(req, res) {
       "base_unlock_research",
       {
         p_device_id: deviceId,
-        p_research_key: research_key,
+        p_research_key: researchKey,
       }
     );
 
@@ -134,7 +135,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       state: result.state,
-      research_key: result.research_key,
+      research_key: result.research_key || researchKey,
       cost: result.cost || null,
     });
   } catch (error) {

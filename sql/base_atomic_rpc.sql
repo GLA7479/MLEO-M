@@ -146,6 +146,19 @@ BEGIN
   WHERE device_id = p_device_id
   RETURNING * INTO v_state;
 
+  INSERT INTO public.base_action_audit (device_id, action_type, action_detail)
+  VALUES (
+    p_device_id,
+    'ship',
+    jsonb_build_object(
+      'shipped', v_shipped,
+      'consumed', v_consumed,
+      'factor', v_factor,
+      'ship_cap', v_ship_cap,
+      'sent_today', v_sent_today + v_shipped
+    )
+  );
+
   RETURN QUERY
   SELECT
     v_shipped,
@@ -313,6 +326,18 @@ BEGIN
     updated_at = now()
   WHERE device_id = p_device_id
   RETURNING * INTO v_state;
+
+  INSERT INTO public.base_action_audit (device_id, action_type, action_detail)
+  VALUES (
+    p_device_id,
+    'spend',
+    jsonb_build_object(
+      'spend_type', p_spend_type,
+      'cost', v_cost,
+      'data_cost', coalesce(v_data_cost, 0),
+      'vault_balance', v_vault_balance
+    )
+  );
 
   RETURN QUERY
   SELECT
@@ -998,6 +1023,18 @@ END;
 $$;
 
 -- ============================================================================
+-- Audit table for base actions (ship, spend)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.base_action_audit (
+  id bigserial PRIMARY KEY,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  device_id text NOT NULL,
+  action_type text NOT NULL,
+  action_detail jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+
+-- ============================================================================
 -- Security: Revoke from PUBLIC and anon/authenticated, grant to service_role
 -- ============================================================================
 
@@ -1018,5 +1055,9 @@ GRANT EXECUTE ON FUNCTION public.base_hire_crew(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_perform_maintenance(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_install_module(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_unlock_research(text, text) TO service_role;
+
+REVOKE ALL ON public.base_action_audit FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT ON public.base_action_audit TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.base_action_audit_id_seq TO service_role;
 
 COMMIT;

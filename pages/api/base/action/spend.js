@@ -39,7 +39,8 @@ export default async function handler(req, res) {
     }
 
     const { spend_type } = req.body || {};
-    if (!spend_type || !ALLOWED_SPEND_TYPES.has(spend_type)) {
+    const spendType = String(spend_type || "").trim();
+    if (!spendType || !ALLOWED_SPEND_TYPES.has(spendType)) {
       return res.status(400).json({ success: false, code: "BASE_INVALID_SPEND_TYPE", message: "Invalid or missing spend_type" });
     }
 
@@ -48,7 +49,7 @@ export default async function handler(req, res) {
     // Use atomic RPC function
     const { data: rpcData, error: rpcError } = await supabase.rpc("base_spend_shared_vault", {
       p_device_id: deviceId,
-      p_spend_type: spend_type,
+      p_spend_type: spendType,
     });
 
     if (rpcError) {
@@ -82,7 +83,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       state: result.state,
-      spend_type,
+      spend_type: spendType,
       cost: Number(result.cost || 0),
       vault_balance: Number(result.vault_balance || 0),
     });

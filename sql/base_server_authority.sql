@@ -614,7 +614,7 @@ BEGIN
       'ORE', floor(v_ore_now),
       'GOLD', floor(v_gold_now),
       'SCRAP', floor(v_scrap_now),
-      'ENERGY', floor(v_energy_now),
+      'ENERGY', floor(greatest(0, least(v_energy_cap, v_energy_now))),
       'DATA', floor(v_data_now)
     );
 

@@ -927,9 +927,14 @@ function offlineFactorFor(ms) {
 }
 
 async function readVaultSafe() {
-  const res = await getBaseVaultBalance();
-  if (!res?.ok) return null;
-  return Number(res.balance ?? 0);
+  try {
+    const res = await getBaseVaultBalance();
+    if (!res?.ok) return 0;
+    const value = Number(res.balance || 0);
+    return Number.isFinite(value) ? Math.max(0, value) : 0;
+  } catch {
+    return 0;
+  }
 }
 
 /** Blueprint is paid from shared vault MLEO + DATA; not state.resources ORE/GOLD/SCRAP. */
@@ -1039,6 +1044,109 @@ function freshState() {
   };
 }
 
+function safeNumber(value, fallback = 0, min = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, n);
+}
+
+function safeInteger(value, fallback = 0, min = 0) {
+  const n = Math.floor(Number(value));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, n);
+}
+
+function sanitizeBaseState(raw, fallback = null) {
+  const seed = fallback || freshState();
+  const src = raw && typeof raw === "object" ? raw : {};
+
+  return {
+    ...seed,
+    ...src,
+
+    version: safeInteger(src.version, seed.version, 1),
+    lastDay: typeof src.lastDay === "string" ? src.lastDay : seed.lastDay,
+    lastTickAt: safeInteger(src.lastTickAt, seed.lastTickAt, 0),
+    lastHiddenAt: safeInteger(src.lastHiddenAt, 0, 0),
+
+    resources: {
+      ...seed.resources,
+      ...(src.resources || {}),
+      ORE: safeNumber(src?.resources?.ORE, seed.resources.ORE, 0),
+      GOLD: safeNumber(src?.resources?.GOLD, seed.resources.GOLD, 0),
+      SCRAP: safeNumber(src?.resources?.SCRAP, seed.resources.SCRAP, 0),
+      ENERGY: safeNumber(src?.resources?.ENERGY, seed.resources.ENERGY, 0),
+      DATA: safeNumber(src?.resources?.DATA, seed.resources.DATA, 0),
+    },
+
+    buildings: {
+      ...seed.buildings,
+      ...(src.buildings || {}),
+      hq: safeInteger(src?.buildings?.hq, seed.buildings.hq, 1),
+      quarry: safeInteger(src?.buildings?.quarry, seed.buildings.quarry, 0),
+      tradeHub: safeInteger(src?.buildings?.tradeHub, seed.buildings.tradeHub, 0),
+      salvage: safeInteger(src?.buildings?.salvage, seed.buildings.salvage, 0),
+      refinery: safeInteger(src?.buildings?.refinery, seed.buildings.refinery, 0),
+      powerCell: safeInteger(src?.buildings?.powerCell, seed.buildings.powerCell, 0),
+      minerControl: safeInteger(src?.buildings?.minerControl, seed.buildings.minerControl, 0),
+      arcadeHub: safeInteger(src?.buildings?.arcadeHub, seed.buildings.arcadeHub, 0),
+      expeditionBay: safeInteger(src?.buildings?.expeditionBay, seed.buildings.expeditionBay, 0),
+      logisticsCenter: safeInteger(src?.buildings?.logisticsCenter, seed.buildings.logisticsCenter, 0),
+      researchLab: safeInteger(src?.buildings?.researchLab, seed.buildings.researchLab, 0),
+      repairBay: safeInteger(src?.buildings?.repairBay, seed.buildings.repairBay, 0),
+    },
+
+    crew: safeInteger(src.crew, seed.crew, 0),
+    crewRole: typeof src.crewRole === "string" ? src.crewRole : seed.crewRole,
+    commanderPath: typeof src.commanderPath === "string" ? src.commanderPath : seed.commanderPath,
+
+    modules: src.modules && typeof src.modules === "object" ? src.modules : {},
+    research: src.research && typeof src.research === "object" ? src.research : {},
+
+    bankedMleo: safeNumber(src.bankedMleo, seed.bankedMleo, 0),
+    sentToday: safeNumber(src.sentToday, seed.sentToday, 0),
+    totalBanked: safeNumber(src.totalBanked, seed.totalBanked, 0),
+    blueprintLevel: safeInteger(src.blueprintLevel, seed.blueprintLevel, 0),
+    totalSharedSpent: safeNumber(src.totalSharedSpent, seed.totalSharedSpent, 0),
+    overclockUntil: safeInteger(src.overclockUntil, seed.overclockUntil, 0),
+    expeditionReadyAt: safeInteger(src.expeditionReadyAt, seed.expeditionReadyAt, 0),
+    maintenanceDue: safeNumber(src.maintenanceDue, seed.maintenanceDue, 0),
+    stability: safeNumber(src.stability, seed.stability, 0),
+    commanderXp: safeNumber(src.commanderXp, seed.commanderXp, 0),
+    commanderLevel: safeInteger(src.commanderLevel, seed.commanderLevel, 1),
+    totalExpeditions: safeInteger(src.totalExpeditions, seed.totalExpeditions, 0),
+    totalMissionsDone: safeInteger(src.totalMissionsDone, seed.totalMissionsDone, 0),
+
+    stats: {
+      ...seed.stats,
+      ...(src.stats || {}),
+      upgradesToday: safeInteger(src?.stats?.upgradesToday, seed.stats.upgradesToday, 0),
+      shippedToday: safeNumber(src?.stats?.shippedToday, seed.stats.shippedToday, 0),
+      expeditionsToday: safeInteger(src?.stats?.expeditionsToday, seed.stats.expeditionsToday, 0),
+      vaultSpentToday: safeNumber(src?.stats?.vaultSpentToday, seed.stats.vaultSpentToday, 0),
+      dataToday: safeNumber(src?.stats?.dataToday, seed.stats.dataToday, 0),
+      maintenanceToday: safeInteger(src?.stats?.maintenanceToday, seed.stats.maintenanceToday, 0),
+    },
+
+    missionState: {
+      dailySeed:
+        typeof src?.missionState?.dailySeed === "string"
+          ? src.missionState.dailySeed
+          : seed.missionState.dailySeed,
+      completed:
+        src?.missionState?.completed && typeof src.missionState.completed === "object"
+          ? src.missionState.completed
+          : {},
+      claimed:
+        src?.missionState?.claimed && typeof src.missionState.claimed === "object"
+          ? src.missionState.claimed
+          : {},
+    },
+
+    log: Array.isArray(src.log) ? src.log.slice(0, MAX_LOG_ITEMS) : seed.log,
+  };
+}
+
 function isNewPlayer(state) {
   const b = state?.buildings || {};
   const upgrades = state?.stats?.upgradesToday ?? 0;
@@ -1074,10 +1182,10 @@ function applyStarterPackIfNeeded(state) {
 
 function normalizeServerState(raw, prevState = null) {
   const seed = freshState();
-  const prev = prevState || null;
+  const prev = prevState ? sanitizeBaseState(prevState, seed) : null;
 
   if (!raw) {
-    return prev ? { ...seed, ...prev } : seed;
+    return prev ? sanitizeBaseState({ ...seed, ...prev }, seed) : seed;
   }
 
   const lastTick =
@@ -1094,7 +1202,7 @@ function normalizeServerState(raw, prevState = null) {
     raw.overclockUntil ??
     (raw.overclock_until ? new Date(raw.overclock_until).getTime() : prev?.overclockUntil ?? 0);
 
-  return {
+  return sanitizeBaseState({
     ...seed,
     ...(prev || {}),
     ...raw,
@@ -1125,17 +1233,21 @@ function normalizeServerState(raw, prevState = null) {
     bankedMleo: Number(raw.bankedMleo ?? raw.banked_mleo ?? prev?.bankedMleo ?? 0),
     sentToday: Number(raw.sentToday ?? raw.sent_today ?? prev?.sentToday ?? 0),
     totalBanked: Number(raw.totalBanked ?? raw.total_banked ?? prev?.totalBanked ?? 0),
-    totalSharedSpent: Number(
-      raw.totalSharedSpent ?? raw.total_shared_spent ?? prev?.totalSharedSpent ?? 0
-    ),
-
-    stability: Number(raw.stability ?? prev?.stability ?? 100),
-    expeditionReadyAt: expeditionReady,
+    blueprintLevel: Number(raw.blueprintLevel ?? raw.blueprint_level ?? prev?.blueprintLevel ?? 0),
+    totalSharedSpent: Number(raw.totalSharedSpent ?? raw.total_shared_spent ?? prev?.totalSharedSpent ?? 0),
     overclockUntil,
+    expeditionReadyAt: expeditionReady,
+    maintenanceDue: Number(raw.maintenanceDue ?? raw.maintenance_due ?? prev?.maintenanceDue ?? 0),
+    stability: Number(raw.stability ?? prev?.stability ?? 100),
+    commanderXp: Number(raw.commanderXp ?? raw.commander_xp ?? prev?.commanderXp ?? 0),
+    commanderLevel: Number(raw.commanderLevel ?? raw.commander_level ?? prev?.commanderLevel ?? 1),
+    totalExpeditions: Number(raw.totalExpeditions ?? raw.total_expeditions ?? prev?.totalExpeditions ?? 0),
+    totalMissionsDone: Number(raw.totalMissionsDone ?? raw.total_missions_done ?? prev?.totalMissionsDone ?? 0),
 
+    stats: raw.stats || prev?.stats || seed.stats,
     missionState: raw.missionState || raw.mission_state || prev?.missionState || seed.missionState,
-    log: raw.log || prev?.log || seed.log,
-  };
+    log: prev?.log || seed.log,
+  }, seed);
 }
 
 function derive(state, now = Date.now()) {
@@ -2073,6 +2185,22 @@ export default function MleoBase() {
   const [claimedContracts, setClaimedContracts] = useState(() => loadJson("mleo_base_claimed_contracts_v1", {}));
   const [devTab, setDevTab] = useState("crew");
 
+  const actionLocksRef = useRef({});
+
+  function isActionLocked(name) {
+    return !!actionLocksRef.current[name];
+  }
+
+  async function runLockedAction(name, fn) {
+    if (actionLocksRef.current[name]) return null;
+    actionLocksRef.current[name] = true;
+    try {
+      return await fn();
+    } finally {
+      actionLocksRef.current[name] = false;
+    }
+  }
+
   const mobilePanelScrollRef = useRef(null);
 
   const activeInfo = openInfoKey ? INFO_COPY[openInfoKey] : null;
@@ -2345,7 +2473,9 @@ export default function MleoBase() {
         const shouldReset = savedVersion < 6 || resetFlag;
 
         const initial =
-          saved && !shouldReset ? normalizeServerState(saved, seed) : seed;
+          saved && !shouldReset
+            ? sanitizeBaseState(normalizeServerState(saved, seed), seed)
+            : sanitizeBaseState(seed, seed);
 
         const localProfile = loadJson("mleo_base_profile_v1", null);
         let initialMerged = localProfile
@@ -2374,7 +2504,7 @@ export default function MleoBase() {
         console.error("BASE boot failed", error);
         if (!alive) return;
         setMounted(true);
-        setState(freshState());
+        setState(sanitizeBaseState(freshState(), freshState()));
       }
     }
 
@@ -2462,7 +2592,8 @@ export default function MleoBase() {
 
     const pollId = window.setInterval(async () => {
       const bal = await readVaultSafe();
-      if (bal != null) setSharedVault((prev) => (Math.abs(prev - bal) > 1e-6 ? bal : prev));
+      if (!Number.isFinite(bal) || bal < 0) return;
+      setSharedVault((prev) => (Math.abs(prev - bal) > 1e-6 ? bal : prev));
     }, 4000);
 
     window.addEventListener("focus", onFocus);
@@ -2870,6 +3001,7 @@ export default function MleoBase() {
   };
 
   const buyBuilding = async (key) => {
+    return runLockedAction(`build:${key}`, async () => {
     const def = BUILDINGS.find((item) => item.key === key);
     if (!def) return;
 
@@ -2928,9 +3060,11 @@ export default function MleoBase() {
       console.error("Build failed", error);
       showToast(error?.message || "Build action failed.");
     }
+  });
   };
 
   const hireCrew = async () => {
+    return runLockedAction("hireCrew", async () => {
     const cost = crewCost(state.crew);
 
     if (!canAfford(state.resources, cost)) {
@@ -2981,9 +3115,11 @@ export default function MleoBase() {
       console.error("Crew action failed", error);
       showToast(error?.message || "Crew action failed.");
     }
+  });
   };
 
   const buyModule = async (key) => {
+    return runLockedAction(`module:${key}`, async () => {
     const moduleDef = MODULES.find((item) => item.key === key);
     if (!moduleDef) return;
 
@@ -3037,9 +3173,11 @@ export default function MleoBase() {
       console.error("Module install failed", error);
       showToast(error?.message || "Module install failed.");
     }
+  });
   };
 
   const buyResearch = async (key) => {
+    return runLockedAction(`research:${key}`, async () => {
     const def = RESEARCH.find((item) => item.key === key);
     if (!def) return;
 
@@ -3098,9 +3236,11 @@ export default function MleoBase() {
       console.error("Research failed", error);
       showToast(error?.message || "Research action failed.");
     }
+  });
   };
 
   const handleLaunchExpedition = async () => {
+    return runLockedAction("expedition", async () => {
     const now = Date.now();
     if ((state.expeditionReadyAt || 0) > now) {
       showToast("Expedition team is still out in the field.");
@@ -3166,9 +3306,11 @@ export default function MleoBase() {
       console.error("Expedition failed", error);
       showToast("Expedition action failed. Try again.");
     }
+  });
   };
 
   const bankToSharedVault = async () => {
+    return runLockedAction("ship", async () => {
     try {
       const res = await shipToVault();
       
@@ -3238,9 +3380,11 @@ export default function MleoBase() {
       const errorMessage = error?.message || "Nothing ready to ship yet.";
       showToast(errorMessage);
     }
+  });
   };
 
   const buyBlueprint = async () => {
+    return runLockedAction("blueprint", async () => {
     const dataCost = 20 + state.blueprintLevel * 6;
     if ((state.resources.DATA || 0) < dataCost) {
       showToast(`Need ${fmt(dataCost)} DATA.`);
@@ -3273,9 +3417,11 @@ export default function MleoBase() {
       console.error("Blueprint purchase failed", error);
       showToast("Blueprint purchase failed. Try again.");
     }
+  });
   };
 
   const activateOverclock = async () => {
+    return runLockedAction("overclock", async () => {
     if ((state.resources.DATA || 0) < 12) {
       showToast("Need 12 DATA.");
       return;
@@ -3307,9 +3453,11 @@ export default function MleoBase() {
       console.error("Overclock failed", error);
       showToast("Overclock action failed. Try again.");
     }
+  });
   };
 
   const refillEnergy = async () => {
+    return runLockedAction("refill", async () => {
     const cap = derived.energyCap;
     if ((state.resources.ENERGY || 0) >= cap - 1) {
       showToast("Energy is already near full.");
@@ -3345,9 +3493,11 @@ export default function MleoBase() {
       console.error("Refill failed", error);
       showToast("Refill action failed. Try again.");
     }
+  });
   };
 
   const performMaintenance = async () => {
+    return runLockedAction("maintenance", async () => {
     const cost = { GOLD: 50, SCRAP: 28, DATA: 6 };
 
     if (!hasResources(state.resources, cost)) {
@@ -3379,6 +3529,7 @@ export default function MleoBase() {
       console.error("Maintenance failed", error);
       showToast("Maintenance action failed. Try again.");
     }
+  });
   };
 
   const claimMission = async (missionKey) => {

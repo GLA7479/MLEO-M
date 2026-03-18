@@ -5,6 +5,9 @@ import { checkIpRateLimit } from "../../../lib/server/ipRateLimit";
 import { logIpRateLimitExceeded } from "../../../lib/server/securityLogger";
 
 export default async function handler(req, res) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
   try {
     const ipRate = await checkIpRateLimit(req, 100, 60_000);
     if (!ipRate.allowed) {
