@@ -2156,6 +2156,265 @@ function InfoButton({ infoKey, setOpenInfoKey, className = "" }) {
   );
 }
 
+const BASE_HOME_SCENE_ORDER = [
+  "hq",
+  "quarry",
+  "tradeHub",
+  "salvage",
+  "refinery",
+  "powerCell",
+  "minerControl",
+  "arcadeHub",
+  "expeditionBay",
+  "logisticsCenter",
+  "researchLab",
+  "repairBay",
+];
+
+const BASE_HOME_SCENE_POSITIONS = {
+  hq: { x: 50, y: 56 },
+
+  powerCell: { x: 78, y: 24 },
+  researchLab: { x: 69, y: 33 },
+
+  tradeHub: { x: 22, y: 21 },
+
+  salvage: { x: 17, y: 47 },
+  arcadeHub: { x: 27, y: 41 },
+  minerControl: { x: 31, y: 33 },
+
+  refinery: { x: 23, y: 66 },
+  quarry: { x: 16, y: 78 },
+
+  expeditionBay: { x: 83, y: 45 },
+  logisticsCenter: { x: 84, y: 61 },
+  repairBay: { x: 76, y: 76 },
+};
+
+const BASE_HOME_SCENE_IDENTITY = {
+  hq: { short: "HQ", glow: "emerald", icon: "◆" },
+  quarry: { short: "MINE", glow: "amber", icon: "◇" },
+  tradeHub: { short: "TRD", glow: "yellow", icon: "◎" },
+  salvage: { short: "SAL", glow: "lime", icon: "▣" },
+  refinery: { short: "REF", glow: "orange", icon: "⬡" },
+  powerCell: { short: "PWR", glow: "cyan", icon: "⚡" },
+  minerControl: { short: "MIN", glow: "slate", icon: "▤" },
+  arcadeHub: { short: "ARC", glow: "violet", icon: "◉" },
+  expeditionBay: { short: "EXP", glow: "violet", icon: "◈" },
+  logisticsCenter: { short: "LOG", glow: "sky", icon: "▢" },
+  researchLab: { short: "LAB", glow: "indigo", icon: "◉" },
+  repairBay: { short: "REP", glow: "teal", icon: "⚙" },
+};
+
+function getBaseSceneIdentity(key) {
+  return (
+    BASE_HOME_SCENE_IDENTITY[key] || {
+      short: key?.slice(0, 3)?.toUpperCase?.() || "BASE",
+      glow: "slate",
+      icon: "•",
+    }
+  );
+}
+
+function getBaseSceneGlow(glow, state = "normal") {
+  const palette = {
+    emerald:
+      "border-emerald-400/70 bg-emerald-950/45 text-emerald-100 shadow-[0_0_16px_rgba(16,185,129,0.35)]",
+    amber:
+      "border-amber-400/60 bg-amber-950/35 text-amber-100 shadow-[0_0_12px_rgba(245,158,11,0.28)]",
+    yellow:
+      "border-yellow-400/60 bg-yellow-950/35 text-yellow-100 shadow-[0_0_12px_rgba(250,204,21,0.28)]",
+    lime:
+      "border-lime-400/60 bg-lime-950/35 text-lime-100 shadow-[0_0_12px_rgba(132,204,22,0.28)]",
+    cyan:
+      "border-cyan-400/70 bg-cyan-950/35 text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,0.35)]",
+    violet:
+      "border-violet-400/60 bg-violet-950/35 text-violet-100 shadow-[0_0_12px_rgba(167,139,250,0.28)]",
+    indigo:
+      "border-indigo-400/60 bg-indigo-950/35 text-indigo-100 shadow-[0_0_12px_rgba(99,102,241,0.28)]",
+    teal:
+      "border-teal-400/60 bg-teal-950/35 text-teal-100 shadow-[0_0_12px_rgba(45,212,191,0.28)]",
+    orange:
+      "border-orange-400/60 bg-orange-950/35 text-orange-100 shadow-[0_0_12px_rgba(251,146,60,0.28)]",
+    sky: "border-sky-400/60 bg-sky-950/35 text-sky-100 shadow-[0_0_12px_rgba(56,189,248,0.28)]",
+    slate:
+      "border-slate-500/60 bg-slate-900/75 text-slate-200 shadow-[0_0_10px_rgba(148,163,184,0.15)]",
+  };
+
+  if (state === "warning") {
+    return "border-amber-300/70 bg-amber-950/40 text-amber-100 shadow-[0_0_18px_rgba(251,191,36,0.35)]";
+  }
+
+  if (state === "critical") {
+    return "border-rose-400/75 bg-rose-950/40 text-rose-100 shadow-[0_0_20px_rgba(244,63,94,0.35)]";
+  }
+
+  return palette[glow] || palette.slate;
+}
+
+function getBaseSceneNodeState(key, base, derived) {
+  const energy = Number(base?.resources?.ENERGY || 0);
+  const energyCap = Number(derived?.energyCap || 0);
+  const stability = Number(base?.stability || 100);
+
+  if (key === "powerCell") {
+    if (energyCap > 0 && energy <= energyCap * 0.12) return "critical";
+    if (energyCap > 0 && energy <= energyCap * 0.25) return "warning";
+  }
+
+  if (key === "repairBay") {
+    if (stability < 50) return "critical";
+    if (stability < 70) return "warning";
+  }
+
+  if (key === "refinery") {
+    if (stability < 70) return "warning";
+  }
+
+  return "normal";
+}
+
+function BaseHomeFlowScene({ base, derived, selected, onSelect }) {
+  const nodes = useMemo(() => {
+    const buildings = base?.buildings || {};
+
+    return BASE_HOME_SCENE_ORDER.filter((key) => {
+      if (key === "hq") return true;
+      return Number(buildings[key] || 0) > 0;
+    }).map((key) => {
+      const def = BUILDINGS.find((b) => b.key === key);
+      const level =
+        key === "hq" ? Math.max(1, Number(buildings[key] || 1)) : Number(buildings[key] || 0);
+
+      return {
+        key,
+        level,
+        name: def?.name || key,
+        pos: BASE_HOME_SCENE_POSITIONS[key],
+        identity: getBaseSceneIdentity(key),
+        state: getBaseSceneNodeState(key, base, derived),
+      };
+    });
+  }, [base, derived]);
+
+  const hq = nodes.find((n) => n.key === "hq") || {
+    key: "hq",
+    level: 1,
+    name: "HQ",
+    pos: BASE_HOME_SCENE_POSITIONS.hq,
+    identity: getBaseSceneIdentity("hq"),
+    state: "normal",
+  };
+
+  const links = nodes.filter((n) => n.key !== "hq" && n.pos);
+
+  return (
+    <div className="relative mx-auto w-full max-w-md aspect-[3/4] overflow-hidden rounded-[30px] border border-cyan-400/18 bg-slate-950/90 shadow-[0_16px_40px_rgba(0,0,0,0.34)]">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: `
+            radial-gradient(circle at 50% 56%, rgba(16,185,129,0.18) 0%, rgba(16,185,129,0.08) 14%, transparent 24%),
+            radial-gradient(circle at 50% 56%, rgba(34,211,238,0.10) 0%, transparent 42%),
+            linear-gradient(180deg, rgba(2,6,23,0.95) 0%, rgba(8,15,30,0.96) 42%, rgba(2,6,23,0.98) 100%)
+          `,
+        }}
+      />
+
+      <div
+        className="pointer-events-none absolute inset-0 opacity-25"
+        style={{
+          background: `
+            repeating-linear-gradient(90deg, rgba(148,163,184,0.06) 0, rgba(148,163,184,0.06) 1px, transparent 1px, transparent 22px),
+            repeating-linear-gradient(0deg, rgba(148,163,184,0.05) 0, rgba(148,163,184,0.05) 1px, transparent 1px, transparent 22px)
+          `,
+        }}
+      />
+
+      <div className="pointer-events-none absolute inset-3 rounded-[26px] border border-white/6" />
+
+      <div className="pointer-events-none absolute left-[50%] top-[56%] h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-400/20 bg-emerald-400/5 blur-[2px]" />
+      <div className="pointer-events-none absolute left-[50%] top-[56%] h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-400/25" />
+
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+      >
+        {links.map((node) => (
+          <line
+            key={`line-${node.key}`}
+            x1={hq.pos.x}
+            y1={hq.pos.y}
+            x2={node.pos.x}
+            y2={node.pos.y}
+            stroke="rgba(34,211,238,0.18)"
+            strokeWidth="0.45"
+            strokeDasharray="1.2 1.8"
+          />
+        ))}
+
+        {links.map((node) => (
+          <circle
+            key={`dot-${node.key}`}
+            cx={(hq.pos.x + node.pos.x) / 2}
+            cy={(hq.pos.y + node.pos.y) / 2}
+            r="0.7"
+            fill={selected === node.key ? "rgba(255,255,255,0.95)" : "rgba(34,211,238,0.55)"}
+          />
+        ))}
+      </svg>
+
+      {nodes.map((node) => {
+        const isHq = node.key === "hq";
+        const isSelected = selected === node.key;
+        const classes = getBaseSceneGlow(node.identity.glow, node.state);
+
+        return (
+          <button
+            key={node.key}
+            type="button"
+            onClick={() => onSelect(node.key)}
+            title={node.name}
+            className={`absolute -translate-x-1/2 -translate-y-1/2 border-2 font-bold transition duration-150 active:scale-95 ${
+              isHq
+                ? "min-w-[86px] rounded-2xl px-4 py-3 text-sm"
+                : "min-w-[64px] rounded-xl px-2.5 py-2 text-[11px]"
+            } ${classes} ${
+              isSelected
+                ? "ring-2 ring-white/80 ring-offset-2 ring-offset-slate-950 scale-[1.04]"
+                : "hover:scale-[1.03]"
+            }`}
+            style={{
+              left: `${node.pos.x}%`,
+              top: `${node.pos.y}%`,
+            }}
+          >
+            <div className="flex items-center justify-center gap-1.5">
+              <span className={isHq ? "text-emerald-300" : ""}>{node.identity.icon}</span>
+              <span className="uppercase tracking-[0.08em]">{node.identity.short}</span>
+            </div>
+
+            <div className={`mt-1 ${isHq ? "text-[11px]" : "text-[10px]"} opacity-85`}>
+              Lv {node.level}
+            </div>
+          </button>
+        );
+      })}
+
+      <div className="pointer-events-none absolute left-3 right-3 top-3 flex items-center justify-between">
+        <div className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200/80">
+          BASE V3 MAP
+        </div>
+
+        <div className="rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/55">
+          {nodes.length - 1} buildings online
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MleoBase() {
   const { isConnected, address } = useAccount();
   const { openConnectModal } = useConnectModal();
@@ -6216,6 +6475,460 @@ export default function MleoBase() {
     },
   ];
 
+  const openHomeFlowTarget = (target) => {
+    const infoTargets = new Set([
+      "sharedVault",
+      "bankedMleo",
+      "commander",
+      "data",
+      "energy",
+      "stability",
+      "ore",
+      "gold",
+      "scrap",
+    ]);
+
+    if (infoTargets.has(target)) {
+      setOpenInfoKey(target);
+      return;
+    }
+
+    if (target === "shipping") {
+      openMobilePanel("ops");
+      setOpenInnerPanel("ops-console");
+      setBuildInfo(getOperationsInfo("shipping"));
+      return;
+    }
+
+    if (target === "maintenance") {
+      openMobilePanel("ops");
+      setOpenInnerPanel("ops-console");
+      setBuildInfo(getOperationsInfo("maintenance"));
+      return;
+    }
+
+    if (target === "research-center") {
+      openMobilePanel("build");
+      setOpenInnerPanel("build-development");
+      setBuildInfo(getSystemInfo("blueprint"));
+      return;
+    }
+
+    const building = BUILDINGS.find((item) => item.key === target);
+
+    if (building) {
+      const tab = getStructuresTabForTarget(target);
+      if (tab) setStructuresTab(tab);
+
+      openMobilePanel("build");
+      setOpenInnerPanel("build-structures");
+      setBuildInfo(getBuildingInfo(building));
+      return;
+    }
+  };
+
+  const homeFlowSections = useMemo(() => {
+    const b = state.buildings || {};
+    const research = state.research || {};
+    const researchCount = Object.values(research).filter(Boolean).length;
+    const lowEnergy =
+      Number(state.resources?.ENERGY || 0) <= Number(derived.energyCap || 0) * 0.25;
+    const criticalEnergy =
+      Number(state.resources?.ENERGY || 0) <= Number(derived.energyCap || 0) * 0.12;
+    const stabilityValue = Number(state.stability || 100);
+
+    const supportState = stabilityValue < 50 ? "critical" : stabilityValue < 70 ? "warning" : "active";
+
+    const energyState = criticalEnergy ? "critical" : lowEnergy ? "warning" : "active";
+
+    const ghostNode = (key, label, tone, unlockHint) => ({
+      key,
+      label,
+      note: unlockHint,
+      tone,
+      state: "ghost",
+      ghost: true,
+      visible: true,
+    });
+
+    return {
+      core: {
+        key: "hq",
+        label: "HQ",
+        note: `Lv ${Math.max(1, Number(b.hq || 1))}`,
+        tone: "core",
+        state: "active",
+        visible: true,
+        badge: "Core",
+      },
+
+      primary: [
+        (b.quarry || 0) > 0
+          ? {
+              key: "quarry",
+              label: "Quarry",
+              note: `Lv ${b.quarry || 0}`,
+              tone: "industry",
+              state: "active",
+              visible: true,
+              badge: "Ore",
+            }
+          : null,
+        (b.tradeHub || 0) > 0
+          ? {
+              key: "tradeHub",
+              label: "Trade Hub",
+              note: `Lv ${b.tradeHub || 0}`,
+              tone: "economy",
+              state: "active",
+              visible: true,
+              badge: "Gold",
+            }
+          : ghostNode("tradeHub-ghost", "Trade Hub", "economy", "Unlock later"),
+        (b.salvage || 0) > 0
+          ? {
+              key: "salvage",
+              label: "Salvage",
+              note: `Lv ${b.salvage || 0}`,
+              tone: "industry",
+              state: "active",
+              visible: true,
+              badge: "Scrap",
+            }
+          : ghostNode("salvage-ghost", "Salvage", "industry", "Unlock later"),
+        (b.powerCell || 0) > 0
+          ? {
+              key: "powerCell",
+              label: "Power Cell",
+              note: `Lv ${b.powerCell || 0}`,
+              tone: "support",
+              state: energyState,
+              visible: true,
+              badge: lowEnergy ? "Low energy" : "Power",
+            }
+          : ghostNode("powerCell-ghost", "Power Cell", "support", "Power route"),
+      ].filter(Boolean),
+
+      systems: [
+        (b.refinery || 0) > 0
+          ? {
+              key: "refinery",
+              label: "Refinery",
+              note: `Lv ${b.refinery || 0}`,
+              tone: "economy",
+              state: stabilityValue < 70 ? "warning" : "active",
+              visible: true,
+              badge: "MLEO",
+            }
+          : ghostNode("refinery-ghost", "Refinery", "economy", "Convert output"),
+        (b.researchLab || 0) > 0
+          ? {
+              key: "researchLab",
+              label: "Research Lab",
+              note: `Lv ${b.researchLab || 0}`,
+              tone: "intel",
+              state: researchCount > 0 ? "active" : "normal",
+              visible: true,
+              badge: researchCount > 0 ? `${researchCount} tech` : "Research",
+            }
+          : ghostNode("researchLab-ghost", "Research Lab", "intel", "Unlock tech"),
+        (b.repairBay || 0) > 0
+          ? {
+              key: "repairBay",
+              label: "Repair Bay",
+              note: `Lv ${b.repairBay || 0}`,
+              tone: "support",
+              state: supportState,
+              visible: true,
+              badge: stabilityValue < 70 ? "Repair" : "Stable",
+            }
+          : ghostNode("repairBay-ghost", "Repair Bay", "support", "Stability"),
+        (b.logisticsCenter || 0) > 0
+          ? {
+              key: "logisticsCenter",
+              label: "Logistics",
+              note: `Lv ${b.logisticsCenter || 0}`,
+              tone: "support",
+              state: "active",
+              visible: true,
+              badge: "Flow",
+            }
+          : ghostNode("logisticsCenter-ghost", "Logistics", "support", "Efficiency"),
+      ].filter(Boolean),
+
+      advanced: [
+        (b.minerControl || 0) > 0
+          ? {
+              key: "minerControl",
+              label: "Miner Control",
+              note: `Lv ${b.minerControl || 0}`,
+              tone: "intel",
+              state: "active",
+              visible: true,
+              badge: "Miners",
+            }
+          : null,
+        (b.arcadeHub || 0) > 0
+          ? {
+              key: "arcadeHub",
+              label: "Arcade Hub",
+              note: `Lv ${b.arcadeHub || 0}`,
+              tone: "intel",
+              state: "active",
+              visible: true,
+              badge: "Arcade",
+            }
+          : null,
+        (b.expeditionBay || 0) > 0
+          ? {
+              key: "expeditionBay",
+              label: "Expedition",
+              note: `Lv ${b.expeditionBay || 0}`,
+              tone: "economy",
+              state: "active",
+              visible: true,
+              badge: "Runs",
+            }
+          : null,
+      ].filter(Boolean),
+
+      actions: [
+        {
+          key: "shipping",
+          label: "Shipping",
+          note: `${fmt(state.bankedMleo || 0)} MLEO`,
+          tone: "economy",
+          state: (state.bankedMleo || 0) > 0 ? "active" : "normal",
+          visible: true,
+          badge: (state.bankedMleo || 0) > 0 ? "Ready" : "Idle",
+        },
+        {
+          key: "maintenance",
+          label: "Maintenance",
+          note: `${fmt(state.stability || 0)}%`,
+          tone: "support",
+          state: supportState,
+          visible: true,
+          badge: supportState === "active" ? "OK" : "Check",
+        },
+        {
+          key: "research-center",
+          label: "Research",
+          note: researchCount > 0 ? `${researchCount} unlocked` : "Open tree",
+          tone: "intel",
+          state: researchCount > 0 ? "active" : "normal",
+          visible: (b.researchLab || 0) > 0 || researchCount > 0,
+          badge: researchCount > 0 ? "Live" : "Tree",
+        },
+      ].filter((item) => item.visible),
+    };
+  }, [
+    state.buildings,
+    state.research,
+    state.bankedMleo,
+    state.stability,
+    state.resources,
+    derived.energyCap,
+  ]);
+
+  const flowToneClass = (tone, state = "normal") => {
+    let base = "border-sky-400/25 bg-sky-500/10 text-sky-100";
+
+    if (tone === "core") {
+      base = "border-cyan-400/35 bg-cyan-500/12 text-cyan-100";
+    } else if (tone === "industry") {
+      base = "border-emerald-400/25 bg-emerald-500/10 text-emerald-100";
+    } else if (tone === "economy") {
+      base = "border-violet-400/25 bg-violet-500/10 text-violet-100";
+    } else if (tone === "support") {
+      base = "border-amber-300/25 bg-amber-400/10 text-amber-100";
+    }
+
+    if (state === "ghost") {
+      return "border-white/8 bg-white/[0.03] text-white/38";
+    }
+
+    if (state === "warning") {
+      return `${base} ring-1 ring-amber-300/40 shadow-[0_0_18px_rgba(251,191,36,0.10)]`;
+    }
+
+    if (state === "critical") {
+      return `${base} ring-1 ring-rose-400/45 shadow-[0_0_20px_rgba(244,63,94,0.14)]`;
+    }
+
+    if (state === "active") {
+      return `${base} shadow-[0_0_18px_rgba(34,211,238,0.08)]`;
+    }
+
+    return base;
+  };
+
+  const renderFlowNode = (node, options = {}) => {
+    const { wide = false, center = false, compact = false } = options;
+    const isGhost = node.state === "ghost" || node.ghost;
+
+    return (
+      <button
+        key={node.key}
+        type="button"
+        onClick={() => {
+          if (!isGhost) openHomeFlowTarget(node.key);
+        }}
+        className={`group relative rounded-2xl border px-3 text-center shadow-[0_0_0_1px_rgba(255,255,255,0.02)] transition duration-150 ${
+          isGhost ? "cursor-default opacity-75" : "hover:scale-[1.02] active:scale-[0.99]"
+        } ${flowToneClass(node.tone, node.state)} ${
+          wide ? "w-full" : center ? "w-[48%] max-w-[220px]" : "flex-1 min-w-[96px]"
+        } ${compact ? "py-2.5" : "py-3.5"}`}
+      >
+        <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/10 opacity-50" />
+
+        {node.badge ? (
+          <div className="mb-2 flex justify-center">
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] ${
+                isGhost
+                  ? "border border-white/10 bg-white/[0.04] text-white/40"
+                  : "border border-white/10 bg-white/10 text-white/70"
+              }`}
+            >
+              {node.badge}
+            </span>
+          </div>
+        ) : null}
+
+        <div className="text-[11px] font-black uppercase tracking-[0.14em]">{node.label}</div>
+        <div className="mt-1 text-xs opacity-80">{node.note}</div>
+
+        {node.state === "warning" && !isGhost && (
+          <div className="mt-2 inline-flex items-center rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-100">
+            Alert
+          </div>
+        )}
+
+        {node.state === "critical" && !isGhost && (
+          <div className="mt-2 inline-flex items-center rounded-full border border-rose-300/30 bg-rose-300/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-rose-100">
+            Critical
+          </div>
+        )}
+      </button>
+    );
+  };
+
+  const getBaseFlowSummary = () => {
+    const energy = Number(state.resources?.ENERGY || 0);
+    const energyCap = Number(derived.energyCap || 0);
+    const stability = Number(state.stability || 100);
+    const researchCount = Object.values(state.research || {}).filter(Boolean).length;
+    const buildingCount = Object.values(state.buildings || {}).reduce(
+      (sum, value) => sum + (Number(value) > 0 ? 1 : 0),
+      0
+    );
+
+    if (energyCap > 0 && energy <= energyCap * 0.12) {
+      return {
+        title: "Base under pressure",
+        text: "Energy is critically low. Power and maintenance systems need attention.",
+        tone: "critical",
+      };
+    }
+
+    if (stability < 50) {
+      return {
+        title: "Base integrity unstable",
+        text: "Repair Bay and maintenance actions should be prioritized.",
+        tone: "critical",
+      };
+    }
+
+    if (energyCap > 0 && energy <= energyCap * 0.25) {
+      return {
+        title: "Energy running low",
+        text: "Power Cell upgrades can stabilize production flow.",
+        tone: "warning",
+      };
+    }
+
+    if (stability < 70) {
+      return {
+        title: "Maintenance recommended",
+        text: "The base is operating, but system stability is under pressure.",
+        tone: "warning",
+      };
+    }
+
+    if (researchCount > 0) {
+      return {
+        title: "Base network active",
+        text: `${buildingCount} systems online • ${researchCount} research unlocks active`,
+        tone: "active",
+      };
+    }
+
+    return {
+      title: "Base network stable",
+      text: `${buildingCount} systems online and ready for expansion`,
+      tone: "normal",
+    };
+  };
+
+  const getBaseFlowSummaryClass = (tone) => {
+    if (tone === "critical") {
+      return "border-rose-400/30 bg-rose-500/10 text-rose-100";
+    }
+    if (tone === "warning") {
+      return "border-amber-300/30 bg-amber-400/10 text-amber-100";
+    }
+    if (tone === "active") {
+      return "border-cyan-400/30 bg-cyan-500/10 text-cyan-100";
+    }
+    return "border-white/10 bg-white/[0.04] text-white/80";
+  };
+
+  const baseFlowSummary = getBaseFlowSummary();
+
+  const mobileTopStats = [
+    {
+      key: "sharedVault",
+      label: "Vault",
+      value: `${fmt(sharedVault)} MLEO`,
+    },
+    {
+      key: "bankedMleo",
+      label: "Banked",
+      value: `${fmt(state.bankedMleo)} MLEO`,
+    },
+    {
+      key: "energy",
+      label: "Energy",
+      value: `${fmt(state.resources.ENERGY)}/${fmt(derived.energyCap)}`,
+    },
+    {
+      key: "stability",
+      label: "Stability",
+      value: `${fmt(state.stability)}%`,
+    },
+    {
+      key: "data",
+      label: "Data",
+      value: fmt(state.resources.DATA),
+    },
+    {
+      key: "ore",
+      label: "Ore",
+      value: fmt(state.resources.ORE),
+    },
+    {
+      key: "gold",
+      label: "Gold",
+      value: fmt(state.resources.GOLD),
+    },
+    {
+      key: "scrap",
+      label: "Scrap",
+      value: fmt(state.resources.SCRAP),
+    },
+  ];
+
   const activityLogContent = (
     <>
       <div className="mb-4 flex flex-wrap gap-2">
@@ -7280,7 +7993,6 @@ export default function MleoBase() {
 
           {/* Mobile */}
           <div className="relative mt-4 space-y-3 sm:hidden overscroll-none pb-0">
-
             <div
               onClick={() => {
                 if (commandHubCount > 0) setShowReadyPanel(true);
@@ -7324,131 +8036,99 @@ export default function MleoBase() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3">
-              <div className="relative">
-                <InfoButton
-                  infoKey="sharedVault"
-                  setOpenInfoKey={setOpenInfoKey}
-                />
-                <MetricCard
-                  label="Shared Vault"
-                  value={`${fmt(sharedVault)} MLEO`}
-                  note="Shared across the MLEO ecosystem."
-                  accent="emerald"
-                />
-              </div>
-              <div className="relative">
-                <InfoButton
-                  infoKey="bankedMleo"
-                  setOpenInfoKey={setOpenInfoKey}
-                />
-                <MetricCard
-                  label="Base Banked"
-                  value={`${fmt(state.bankedMleo)} MLEO`}
-                  note="Refined here, then shipped."
-                  accent="violet"
-                />
+            <div className="overflow-x-auto no-scrollbar">
+              <div className="flex gap-2 pb-1">
+                {mobileTopStats.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => openHomeFlowTarget(item.key)}
+                    className="shrink-0 min-w-[104px] rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-left"
+                  >
+                    <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
+                      {item.label}
+                    </div>
+                    <div className="mt-1 text-sm font-bold text-white">{item.value}</div>
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="relative">
-                <InfoButton
-                  infoKey="commander"
-                  setOpenInfoKey={setOpenInfoKey}
-                />
-                <MetricCard
-                  label="Commander"
-                  value={`Lv ${state.commanderLevel}`}
-                  note={`${fmt(state.commanderXp)} / ${fmt(xpForLevel(state.commanderLevel))} XP`}
-                  accent="sky"
-                  compact
-                />
+            <div className="flex items-center gap-3 px-1">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-cyan-400/20 to-cyan-400/10" />
+              <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-300/55">
+                Command Network
               </div>
+              <div className="h-px flex-1 bg-gradient-to-l from-transparent via-cyan-400/20 to-cyan-400/10" />
+            </div>
 
-              <div className="relative">
-                <InfoButton
-                  infoKey="data"
-                  setOpenInfoKey={setOpenInfoKey}
-                />
-                <MetricCard
-                  label="Data"
-                  value={fmt(state.resources.DATA)}
-                  note={`x${derived.dataMult.toFixed(2)} progression`}
-                  accent="sky"
-                  compact
-                />
-              </div>
+            <div className="rounded-[28px] border border-cyan-400/18 bg-slate-950/78 p-3.5 shadow-[0_10px_35px_rgba(0,0,0,0.28)]">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-300/70">
+                      Base Flow Map
+                    </div>
+                    <div className="mt-1 text-sm text-white/65">
+                      Tap any building to jump into its existing window.
+                    </div>
+                  </div>
 
-              <div
-                className={`w-full ${highlightCard(
-                  (state.resources.ENERGY || 0) <= derived.energyCap * 0.25,
-                  "warning"
-                )}`}
-              >
-                <div className="relative">
-                  <InfoButton
-                    infoKey="energy"
-                    setOpenInfoKey={setOpenInfoKey}
-                  />
-
-                  <MetricCard
-                    label="Energy"
-                    value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
-                    note={`Regen ${derived.energyRegen.toFixed(2)}/s`}
-                    accent="slate"
-                    compact
-                  />
+                  <button
+                    type="button"
+                    onClick={() => openMobilePanel("build")}
+                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
+                  >
+                    Build
+                  </button>
                 </div>
-            </div>
 
-              <div
-                className={`w-full ${
-                  highlightCard(systemState === "critical", "critical") ||
-                  highlightCard(systemState === "warning", "warning")
-                }`}
-              >
-                <div className="relative">
-                  <InfoButton
-                    infoKey="stability"
-                    setOpenInfoKey={setOpenInfoKey}
-                  />
-
-                  <MetricCard
-                    label="Stability"
-                    value={`${fmt(state.stability)}%`}
-                    note={systemMeta.label}
-                    accent={systemMeta.accent}
-                    compact
-                  />
+                <div
+                  className={`rounded-2xl border px-3.5 py-3 ${getBaseFlowSummaryClass(
+                    baseFlowSummary.tone
+                  )}`}
+                >
+                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-75">
+                    Base Status
+                  </div>
+                  <div className="mt-1 text-sm font-semibold">{baseFlowSummary.title}</div>
+                  <div className="mt-1 text-xs opacity-80">{baseFlowSummary.text}</div>
                 </div>
-            </div>
-          </div>
 
-            <div className="mt-auto grid grid-cols-3 gap-2">
-              <div className="relative rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
-                <InfoButton
-                  infoKey="ore"
-                  setOpenInfoKey={setOpenInfoKey}
-                />
-                <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Ore</div>
-                <div className="mt-1 text-sm font-bold text-white">{fmt(state.resources.ORE)}</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openHomeFlowTarget("maintenance")}
+                    className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center text-[11px] font-semibold text-white/85 hover:bg-white/[0.08]"
+                  >
+                    Maintenance
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openHomeFlowTarget("research-center")}
+                    className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center text-[11px] font-semibold text-white/85 hover:bg-white/[0.08]"
+                  >
+                    Research
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openHomeFlowTarget("shipping")}
+                    className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center text-[11px] font-semibold text-white/85 hover:bg-white/[0.08]"
+                  >
+                    Shipping
+                  </button>
+                </div>
               </div>
-              <div className="relative rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
-                <InfoButton
-                  infoKey="gold"
-                  setOpenInfoKey={setOpenInfoKey}
+
+              <div className="mt-4">
+                <BaseHomeFlowScene
+                  base={state}
+                  derived={derived}
+                  selected={highlightTarget}
+                  onSelect={openHomeFlowTarget}
                 />
-                <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Gold</div>
-                <div className="mt-1 text-sm font-bold text-white">{fmt(state.resources.GOLD)}</div>
-              </div>
-              <div className="relative rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
-                <InfoButton
-                  infoKey="scrap"
-                  setOpenInfoKey={setOpenInfoKey}
-                />
-                <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Scrap</div>
-                <div className="mt-1 text-sm font-bold text-white">{fmt(state.resources.SCRAP)}</div>
               </div>
             </div>
           </div>
@@ -8580,53 +9260,87 @@ className="fixed inset-0 z-[117] bg-black/60 backdrop-blur-sm sm:hidden"
                 </div>
               </div>
 
-              {/* Desktop - Command Schematic */}
+              {/* Desktop - Flow Map */}
               <div className="hidden xl:block">
                 <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
-                  <div className="mb-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-white/55">Command Schematic</div>
-                    <div className="mt-1 text-lg font-bold text-white">Base Sectors</div>
-                    <div className="mt-1 text-sm text-white/65">
-                      A live overview of core sectors, support links and current operational state.
+                  <div className="mb-4 flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.18em] text-white/55">
+                        Command Flow Map
+                      </div>
+                      <div className="mt-1 text-lg font-bold text-white">
+                        Live Base Network
+                      </div>
+                      <div className="mt-1 text-sm text-white/65">
+                        Click any active building to jump straight into its existing build window.
+                      </div>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => openDesktopPanel("build")}
+                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
+                    >
+                      Build
+                    </button>
                   </div>
 
-                  <div className="grid gap-3 xl:grid-cols-4">
-                    {[
-                      { key: "hq", label: "HQ Core" },
-                      { key: "refinery", label: "Refinery Sector" },
-                      { key: "logisticsCenter", label: "Logistics Sector" },
-                      { key: "researchLab", label: "Research Sector" },
-                      { key: "repairBay", label: "Repair Sector" },
-                      { key: "expeditionBay", label: "Expedition Sector" },
-                      { key: "minerControl", label: "Miner Link Sector" },
-                      { key: "arcadeHub", label: "Arcade Link Sector" },
-                    ].map((sector) => {
-                      const status = sectorStatusForBuilding(sector.key, state);
-                      const level = Number(state.buildings?.[sector.key] || 0);
-
-                      return (
-                        <div
-                          key={sector.key}
-                          className={`rounded-2xl border px-4 py-3 ${sectorStatusClasses(status)}`}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="text-sm font-semibold">{sector.label}</div>
-                            <div className="rounded-full bg-black/20 px-2 py-1 text-[11px] font-bold">
-                              Lv {level}
-                            </div>
-                          </div>
-
-                          <div className="mt-2 text-xs uppercase tracking-[0.14em]">
-                            {status}
-                          </div>
-
-                          <div className="mt-2 text-xs text-white/70">
-                            {buildingSynergyTag(sector.key)}
-                          </div>
+                  <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+                    <div className="space-y-3">
+                      <div
+                        className={`rounded-2xl border px-3.5 py-3 ${getBaseFlowSummaryClass(
+                          baseFlowSummary.tone
+                        )}`}
+                      >
+                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-75">
+                          Base Status
                         </div>
-                      );
-                    })}
+                        <div className="mt-1 text-sm font-semibold">{baseFlowSummary.title}</div>
+                        <div className="mt-1 text-xs opacity-80">{baseFlowSummary.text}</div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openHomeFlowTarget("maintenance")}
+                          className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center text-[11px] font-semibold text-white/85 hover:bg-white/[0.08]"
+                        >
+                          Maintenance
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => openHomeFlowTarget("research-center")}
+                          className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center text-[11px] font-semibold text-white/85 hover:bg-white/[0.08]"
+                        >
+                          Research
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => openHomeFlowTarget("shipping")}
+                          className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center text-[11px] font-semibold text-white/85 hover:bg-white/[0.08]"
+                        >
+                          Shipping
+                        </button>
+                      </div>
+
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                        <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
+                          Visible rule
+                        </div>
+                        <div className="mt-2 text-xs text-white/70">
+                          Only buildings the player already built are shown on the map.
+                        </div>
+                      </div>
+                    </div>
+
+                    <BaseHomeFlowScene
+                      base={state}
+                      derived={derived}
+                      selected={highlightTarget}
+                      onSelect={openHomeFlowTarget}
+                    />
                   </div>
                 </div>
               </div>
