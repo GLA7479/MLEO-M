@@ -269,11 +269,11 @@ export default function MleoBaseV3() {
   return (
     <Layout>
       <div className="bg-slate-950 text-slate-50 min-h-[100dvh] md:h-[100dvh] md:overflow-hidden">
-        <div className="mx-auto flex h-[100dvh] max-w-[1600px] flex-col overflow-hidden px-2 py-2 md:grid md:grid-cols-[360px_minmax(0,1fr)] md:gap-3 md:px-3 md:py-3">
+        <div className="mx-auto flex h-[100dvh] max-w-[1600px] flex-col overflow-hidden px-2 py-2 md:grid md:grid-cols-[330px_minmax(0,1fr)] md:gap-3 md:px-3 md:py-3">
           <aside className="hidden md:flex md:min-h-0 md:flex-col md:gap-3">
             <BaseHudV3 base={baseState} />
             <BaseHintV3 base={baseState} />
-            <div className="min-h-0 flex-1 overflow-hidden rounded-[28px] border border-slate-800 bg-slate-900/50 backdrop-blur">
+            <div className="min-h-0 flex-1 overflow-hidden rounded-[28px] border border-slate-800 bg-slate-900/55 backdrop-blur">
               <div className="border-b border-slate-800 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Activity</div>
                 <div className="mt-1 text-sm font-semibold text-slate-200">Base events</div>
@@ -284,14 +284,18 @@ export default function MleoBaseV3() {
             </div>
           </aside>
 
-          <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-slate-800 bg-slate-900/40 backdrop-blur">
-            <div className="md:hidden shrink-0">
+          <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-slate-800 bg-slate-900/40 backdrop-blur md:pr-[7rem]">
+            <div className="md:hidden shrink-0 space-y-2">
               <BaseHudV3 base={baseState} />
               <BaseHintV3 base={baseState} />
             </div>
 
-            <div className="flex min-h-0 flex-1 items-center justify-center px-2 pb-2 pt-2 md:px-4 md:pb-4 md:pt-4">
-              <BaseSceneV3 base={baseState} selected={selectedBuilding} onSelect={setSelectedBuilding} />
+            <div className="flex min-h-0 flex-1 px-1 pb-2 pt-2 md:px-4 md:py-4">
+              <BaseSceneV3
+                base={baseState}
+                selected={selectedBuilding}
+                onSelect={setSelectedBuilding}
+              />
             </div>
 
             <div className="md:hidden shrink-0">

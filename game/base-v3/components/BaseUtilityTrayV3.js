@@ -8,12 +8,13 @@ function getStatus(base, claimableMissionKeys) {
   const data = Number(res.DATA ?? 0);
   const banked = Number(base?.bankedMleo ?? 0);
   const stability = Number(base?.stability ?? 100);
+  const maintenanceDue = Number(base?.maintenanceDue ?? 0);
   const missionReady = Array.isArray(claimableMissionKeys) && claimableMissionKeys.length > 0;
 
   return {
     expeditionReady: energy >= EXPEDITION_REQUIREMENTS.ENERGY && data >= EXPEDITION_REQUIREMENTS.DATA,
     shipReady: banked >= 120,
-    maintenanceWarn: stability < 75 || Number(base?.maintenanceDue ?? 0) >= 1,
+    maintenanceWarn: stability < 75 || maintenanceDue >= 1,
     missionReady,
   };
 }
@@ -38,7 +39,8 @@ export function BaseUtilityTrayV3({
 }) {
   const status = getStatus(base, claimableMissionKeys);
   const hasClaimable = Array.isArray(claimableMissionKeys) && claimableMissionKeys.length > 0;
-  const handleMissionClick = onClaimMission && hasClaimable ? () => onClaimMission(claimableMissionKeys[0]) : null;
+  const handleMissionClick =
+    onClaimMission && hasClaimable ? () => onClaimMission(claimableMissionKeys[0]) : null;
 
   const items = [
     {
@@ -85,11 +87,10 @@ export function BaseUtilityTrayV3({
         className={`
           md:hidden shrink-0 px-0 pb-[calc(0.35rem+env(safe-area-inset-bottom))]
           transition-all duration-200
-          ${sheetOpen ? "opacity-35" : "opacity-100"}
-          ${sheetOpen ? "pointer-events-none" : ""}
+          ${sheetOpen ? "translate-y-6 opacity-0 pointer-events-none" : "translate-y-0 opacity-100"}
         `}
       >
-        <div className="flex items-center justify-center gap-1.5 rounded-[22px] border border-slate-800 bg-slate-950/80 px-2 py-2 backdrop-blur">
+        <div className="flex items-center justify-center gap-1.5 rounded-[22px] border border-slate-800 bg-slate-950/88 px-2 py-2 backdrop-blur">
           {hubHref && (
             <Link
               href={hubHref}
@@ -116,12 +117,18 @@ export function BaseUtilityTrayV3({
         </div>
       </div>
 
-      {/* Desktop side rail */}
-      <div className="hidden md:flex md:absolute md:right-4 md:top-1/2 md:z-30 md:-translate-y-1/2 md:flex-col md:gap-2">
+      {/* Desktop rail */}
+      <div
+        className={`
+          hidden md:flex md:absolute md:right-4 md:top-4 md:z-30 md:w-[104px] md:flex-col md:gap-2
+          transition-all duration-200
+          ${sheetOpen ? "md:translate-x-5 md:opacity-0 md:pointer-events-none" : "md:translate-x-0 md:opacity-100"}
+        `}
+      >
         {hubHref && (
           <Link
             href={hubHref}
-            className="rounded-2xl border border-slate-700/70 bg-slate-950/80 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300 backdrop-blur"
+            className="rounded-2xl border border-slate-700/70 bg-slate-950/85 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300 backdrop-blur"
           >
             Hub
           </Link>
@@ -133,13 +140,13 @@ export function BaseUtilityTrayV3({
             type="button"
             onClick={item.onClick || undefined}
             disabled={busy || item.disabled}
-            className={`min-w-[108px] rounded-2xl border px-4 py-3 text-left transition disabled:opacity-45 disabled:pointer-events-none ${toneClass(
+            className={`rounded-2xl border px-3 py-3 text-left transition disabled:opacity-45 disabled:pointer-events-none ${toneClass(
               item.active,
               item.warn
             )}`}
           >
             <div className="text-[10px] uppercase tracking-[0.22em] opacity-70">{item.short}</div>
-            <div className="mt-1 text-sm font-semibold">{item.label}</div>
+            <div className="mt-1 text-sm font-semibold leading-tight">{item.label}</div>
           </button>
         ))}
       </div>

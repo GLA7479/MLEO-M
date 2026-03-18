@@ -32,7 +32,7 @@ export function ActivityFeedV3({ items, mode = "mobile" }) {
   const mobileList = list.slice(0, 4).reverse();
 
   return (
-    <div className="w-full px-0 pb-1">
+    <div className="w-full pb-1">
       <div className="flex gap-1.5 overflow-x-auto no-scrollbar text-[10px] text-slate-300">
         {mobileList.length === 0 ? (
           <span className="rounded-full border border-slate-800 bg-slate-950/70 px-2.5 py-1.5 text-slate-500">

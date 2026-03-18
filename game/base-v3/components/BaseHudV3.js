@@ -48,8 +48,7 @@ export function BaseHudV3({ base }) {
 
   return (
     <>
-      {/* Mobile */}
-      <div className="md:hidden w-full px-0 pt-0">
+      <div className="md:hidden w-full">
         <div className="rounded-[24px] border border-slate-800 bg-slate-900/70 px-3 py-3 backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div>
