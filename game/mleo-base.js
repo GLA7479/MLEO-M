@@ -2309,29 +2309,8 @@ function BaseHomeFlowScene({ base, derived, selected, onSelect }) {
   const links = nodes.filter((n) => n.key !== "hq" && n.pos);
 
   return (
-    <div className="relative mx-auto w-full max-w-md aspect-[3/4] overflow-hidden rounded-[30px] bg-slate-950/90 shadow-[0_16px_40px_rgba(0,0,0,0.34)]">
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background: `
-            radial-gradient(circle at 50% 56%, rgba(16,185,129,0.18) 0%, rgba(16,185,129,0.08) 14%, transparent 24%),
-            radial-gradient(circle at 50% 56%, rgba(34,211,238,0.10) 0%, transparent 42%),
-            linear-gradient(180deg, rgba(2,6,23,0.95) 0%, rgba(8,15,30,0.96) 42%, rgba(2,6,23,0.98) 100%)
-          `,
-        }}
-      />
-
-      <div
-        className="pointer-events-none absolute inset-0 opacity-25"
-        style={{
-          background: `
-            repeating-linear-gradient(90deg, rgba(148,163,184,0.06) 0, rgba(148,163,184,0.06) 1px, transparent 1px, transparent 22px),
-            repeating-linear-gradient(0deg, rgba(148,163,184,0.05) 0, rgba(148,163,184,0.05) 1px, transparent 1px, transparent 22px)
-          `,
-        }}
-      />
-
-      {/* Intentionally no inner frame so the map feels like it blends into the screen */}
+    <div className="relative mx-auto w-full max-w-md aspect-[3/4] overflow-hidden">
+      {/* Background is rendered by the parent so the whole screen feels uniform */}
 
       <svg
         className="pointer-events-none absolute inset-0 h-full w-full"
@@ -7989,7 +7968,18 @@ export default function MleoBase() {
           ) : null}
 
           {/* Mobile */}
-          <div className="relative mt-4 space-y-3 sm:hidden overscroll-none pb-28">
+          <div
+            className="relative mt-4 space-y-3 sm:hidden overscroll-none pb-28"
+            style={{
+              background: `
+                radial-gradient(circle at 50% 56%, rgba(16,185,129,0.18) 0%, rgba(16,185,129,0.08) 14%, transparent 24%),
+                radial-gradient(circle at 50% 56%, rgba(34,211,238,0.10) 0%, transparent 42%),
+                linear-gradient(180deg, rgba(2,6,23,0.95) 0%, rgba(8,15,30,0.96) 42%, rgba(2,6,23,0.98) 100%),
+                repeating-linear-gradient(90deg, rgba(148,163,184,0.06) 0, rgba(148,163,184,0.06) 1px, transparent 1px, transparent 22px),
+                repeating-linear-gradient(0deg, rgba(148,163,184,0.05) 0, rgba(148,163,184,0.05) 1px, transparent 1px, transparent 22px)
+              `,
+            }}
+          >
             <div
               onClick={() => {
                 if (commandHubCount > 0) setShowReadyPanel(true);
