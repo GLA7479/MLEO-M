@@ -2,30 +2,32 @@ export function EventStrip({ items, max }) {
   const list = (items || []).slice(0, max);
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
         <span className="text-xs font-semibold tracking-wide text-slate-300">
-          BASE FEED
+          Base activity
         </span>
         <span className="text-[10px] text-slate-500">
-          Showing last {max} events
+          Last {max} events
         </span>
       </div>
-      <div className="flex gap-2 overflow-x-auto text-[11px] text-slate-300">
-        {list.length === 0 && (
-          <span className="text-slate-500">
-            No recent events. Your base awaits your command.
-          </span>
-        )}
-        {list.map((item) => (
-          <span
-            key={item.id}
-            className="rounded-full border border-slate-800 bg-slate-900 px-2 py-0.5 whitespace-nowrap"
-          >
-            {item.message || "Event"}
-          </span>
-        ))}
-      </div>
+
+      {list.length === 0 ? (
+        <div className="rounded-md bg-slate-950/60 px-2 py-1.5 text-[11px] text-slate-500">
+          No recent events. Your base awaits your command.
+        </div>
+      ) : (
+        <ul className="space-y-1 text-[11px] text-slate-200 sm:flex sm:flex-wrap sm:gap-1.5 sm:space-y-0">
+          {list.map((item) => (
+            <li
+              key={item.id}
+              className="rounded-md bg-slate-900/80 px-2 py-1 sm:rounded-full"
+            >
+              {item.message || "Event"}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

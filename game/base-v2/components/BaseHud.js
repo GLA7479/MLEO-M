@@ -17,8 +17,8 @@ export function BaseHud({ state }) {
     commanderNext > 0 ? Math.min(1, Math.max(0, commanderXp / commanderNext)) : 0;
 
   return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="flex flex-wrap items-center gap-3 text-xs">
+    <div className="flex flex-col gap-2 text-xs sm:gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
         <HudPill label="ORE" value={format(r.ORE)} tone="slate" />
         <HudPill label="GOLD" value={format(r.GOLD)} tone="amber" />
         <HudPill label="SCRAP" value={format(r.SCRAP)} tone="lime" />
@@ -26,10 +26,10 @@ export function BaseHud({ state }) {
         <HudPill label="DATA" value={format(r.DATA)} tone="violet" />
       </div>
 
-      <div className="flex items-center gap-4 text-xs">
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4 lg:justify-end">
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-slate-400">Stability</span>
-          <div className="h-2 w-28 rounded-full bg-slate-900">
+          <div className="h-2 w-32 max-w-full rounded-full bg-slate-900">
             <div
               className="h-full rounded-full bg-emerald-500"
               style={{ width: `${Math.max(0, Math.min(1, stability)) * 100}%` }}
@@ -40,7 +40,7 @@ export function BaseHud({ state }) {
           <span className="text-[11px] text-slate-400">
             Cmdr L{commanderLevel}
           </span>
-          <div className="h-2 w-32 rounded-full bg-slate-900">
+          <div className="h-2 w-32 max-w-full rounded-full bg-slate-900">
             <div
               className="h-full rounded-full bg-indigo-500"
               style={{ width: `${xpRatio * 100}%` }}

@@ -51,11 +51,7 @@ export default function MleoBaseV2() {
     let cancelled = false;
     async function hydrate() {
       try {
-        if (!address) {
-          setLoading(false);
-          return;
-        }
-        const baseState = await getBaseState(address);
+        const baseState = await getBaseState();
         if (cancelled) return;
         setState(baseState);
         setLoading(false);
@@ -73,9 +69,8 @@ export default function MleoBaseV2() {
   }, [address]);
 
   const baseVaultBalance = useMemo(() => {
-    if (!address) return null;
-    return getBaseVaultBalance(address);
-  }, [address]);
+    return getBaseVaultBalance();
+  }, []);
 
   function pushLog(entry) {
     logRef.current = [
@@ -87,11 +82,17 @@ export default function MleoBaseV2() {
   // Placeholder action wrappers.
   // These should mirror the behavior from mleo-base.js without changing rules.
   async function handleBuild(key) {
-    if (!address || !state) return;
+    if (!state) return;
     try {
-      const result = await buildBuilding(address, key);
-      setState(result.state);
-      if (result.log) pushLog(result.log);
+      const result = await buildBuilding(key);
+      if (result?.state) {
+        setState(result.state);
+      }
+      if (result?.log) {
+        pushLog(result.log);
+      } else if (result?.message) {
+        pushLog({ type: "info", message: result.message });
+      }
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Build failed." });
@@ -99,11 +100,17 @@ export default function MleoBaseV2() {
   }
 
   async function handleInstallModule(key) {
-    if (!address || !state) return;
+    if (!state) return;
     try {
-      const result = await installModule(address, key);
-      setState(result.state);
-      if (result.log) pushLog(result.log);
+      const result = await installModule(key);
+      if (result?.state) {
+        setState(result.state);
+      }
+      if (result?.log) {
+        pushLog(result.log);
+      } else if (result?.message) {
+        pushLog({ type: "info", message: result.message });
+      }
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Module install failed." });
@@ -111,11 +118,17 @@ export default function MleoBaseV2() {
   }
 
   async function handleResearch(key) {
-    if (!address || !state) return;
+    if (!state) return;
     try {
-      const result = await researchTech(address, key);
-      setState(result.state);
-      if (result.log) pushLog(result.log);
+      const result = await researchTech(key);
+      if (result?.state) {
+        setState(result.state);
+      }
+      if (result?.log) {
+        pushLog(result.log);
+      } else if (result?.message) {
+        pushLog({ type: "info", message: result.message });
+      }
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Research failed." });
@@ -123,11 +136,17 @@ export default function MleoBaseV2() {
   }
 
   async function handleLaunchExpedition(config) {
-    if (!address || !state) return;
+    if (!state) return;
     try {
-      const result = await launchExpeditionAction(address, config);
-      setState(result.state);
-      if (result.log) pushLog(result.log);
+      const result = await launchExpeditionAction(config);
+      if (result?.state) {
+        setState(result.state);
+      }
+      if (result?.log) {
+        pushLog(result.log);
+      } else if (result?.message) {
+        pushLog({ type: "info", message: result.message });
+      }
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Expedition failed." });
@@ -135,11 +154,17 @@ export default function MleoBaseV2() {
   }
 
   async function handleShipToVault(payload) {
-    if (!address || !state) return;
+    if (!state) return;
     try {
-      const result = await shipToVault(address, payload);
-      setState(result.state);
-      if (result.log) pushLog(result.log);
+      const result = await shipToVault();
+      if (result?.state) {
+        setState(result.state);
+      }
+      if (result?.log) {
+        pushLog(result.log);
+      } else if (result?.message) {
+        pushLog({ type: "info", message: result.message });
+      }
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Shipment failed." });
@@ -147,11 +172,17 @@ export default function MleoBaseV2() {
   }
 
   async function handleSpendFromVault(payload) {
-    if (!address || !state) return;
+    if (!state) return;
     try {
-      const result = await spendFromVault(address, payload);
-      setState(result.state);
-      if (result.log) pushLog(result.log);
+      const result = await spendFromVault(payload);
+      if (result?.state) {
+        setState(result.state);
+      }
+      if (result?.log) {
+        pushLog(result.log);
+      } else if (result?.message) {
+        pushLog({ type: "info", message: result.message });
+      }
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Spend failed." });
@@ -159,11 +190,17 @@ export default function MleoBaseV2() {
   }
 
   async function handleHireCrew() {
-    if (!address || !state) return;
+    if (!state) return;
     try {
-      const result = await hireCrewAction(address);
-      setState(result.state);
-      if (result.log) pushLog(result.log);
+      const result = await hireCrewAction();
+      if (result?.state) {
+        setState(result.state);
+      }
+      if (result?.log) {
+        pushLog(result.log);
+      } else if (result?.message) {
+        pushLog({ type: "info", message: result.message });
+      }
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Hire failed." });
@@ -171,11 +208,17 @@ export default function MleoBaseV2() {
   }
 
   async function handleMaintenance() {
-    if (!address || !state) return;
+    if (!state) return;
     try {
-      const result = await performMaintenanceAction(address);
-      setState(result.state);
-      if (result.log) pushLog(result.log);
+      const result = await performMaintenanceAction();
+      if (result?.state) {
+        setState(result.state);
+      }
+      if (result?.log) {
+        pushLog(result.log);
+      } else if (result?.message) {
+        pushLog({ type: "info", message: result.message });
+      }
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Maintenance failed." });
@@ -183,36 +226,21 @@ export default function MleoBaseV2() {
   }
 
   async function handleClaimMission(id) {
-    if (!address || !state) return;
+    if (!state) return;
     try {
-      const result = await claimBaseMission(address, id);
-      setState(result.state);
-      if (result.log) pushLog(result.log);
+      const result = await claimBaseMission(id);
+      if (result?.state) {
+        setState(result.state);
+      }
+      if (result?.log) {
+        pushLog(result.log);
+      } else if (result?.message) {
+        pushLog({ type: "info", message: result.message });
+      }
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Claim failed." });
     }
-  }
-
-  if (!address) {
-    return (
-      <Layout>
-        <div className="mx-auto max-w-4xl py-16 px-4 text-center">
-          <h1 className="text-3xl font-bold mb-4">MLEO Base V2</h1>
-          <p className="mb-6 text-neutral-300">
-            Connect your wallet to access your base.
-          </p>
-          {openConnectModal && (
-            <button
-              className="rounded bg-indigo-600 px-4 py-2 font-medium hover:bg-indigo-500"
-              onClick={openConnectModal}
-            >
-              Connect Wallet
-            </button>
-          )}
-        </div>
-      </Layout>
-    );
   }
 
   if (loading) {
@@ -245,80 +273,99 @@ export default function MleoBaseV2() {
 
   return (
     <Layout>
-      <div className="flex h-[calc(100vh-4rem)] flex-col bg-slate-950/70 text-neutral-100">
-        {/* Top HUD */}
-        <div className="border-b border-slate-800 bg-slate-900/70 px-4 py-2 flex items-center justify-between">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-3">
-              <span className="text-sm uppercase tracking-wide text-slate-400">
-                MLEO BASE // V2
-              </span>
-              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">
-                Commander: {address.slice(0, 6)}...{address.slice(-4)}
-              </span>
+      <div className="min-h-screen bg-slate-950/80 text-neutral-100">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          {/* Header */}
+          <header className="flex flex-col gap-2 border-b border-slate-800 pb-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold uppercase tracking-wide text-slate-300">
+                  MLEO BASE // V2
+                </span>
+                {address && (
+                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">
+                    {address.slice(0, 6)}...{address.slice(-4)}
+                  </span>
+                )}
+              </div>
+              <BaseHud state={state} />
             </div>
-            <BaseHud state={state} />
-          </div>
-          <div className="flex items-center gap-2">
-            {openAccountModal && (
-              <button
-                className="rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs hover:border-slate-400"
-                onClick={openAccountModal}
+            <div className="flex flex-wrap items-center gap-2">
+              {openAccountModal && address && (
+                <button
+                  className="rounded border border-slate-600 bg-slate-900 px-3 py-1 text-xs hover:border-slate-400"
+                  onClick={openAccountModal}
+                >
+                  Account
+                </button>
+              )}
+              {openConnectModal && !address && (
+                <button
+                  className="rounded bg-indigo-600 px-3 py-1 text-xs font-medium hover:bg-indigo-500"
+                  onClick={openConnectModal}
+                >
+                  Connect Wallet
+                </button>
+              )}
+              <Link
+                href="/mleo-base"
+                className="rounded border border-slate-700 px-3 py-1 text-xs hover:border-slate-400"
               >
-                Account
-              </button>
-            )}
-            <Link
-              href="/game/mleo-base"
-              className="rounded border border-slate-700 px-2 py-1 text-xs hover:border-slate-400"
-            >
-              Legacy View
-            </Link>
-          </div>
-        </div>
-
-        {/* Main layout */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* World / Base map */}
-          <div className="flex-1 border-r border-slate-900 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-4 py-3">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold tracking-wide text-slate-300">
-                BASE OVERVIEW
-              </h2>
-              <span className="text-xs text-slate-500">
-                Prototype layout – logic mirrors V1
-              </span>
+                Legacy View
+              </Link>
             </div>
-            <BaseMap
-              state={state}
-              onSelectBuilding={(key) => {
-                setSelectedBuildingKey(key);
-              }}
-            />
-          </div>
+          </header>
 
-          {/* Right actions / panels */}
-          <div className="w-80 flex flex-col border-l border-slate-900 bg-slate-950/90">
-            <div className="border-b border-slate-900 px-3 py-2">
-              <h2 className="text-xs font-semibold tracking-wide text-slate-300">
-                ACTIONS & DETAIL
-              </h2>
-            </div>
-            <div className="flex-1 overflow-y-auto px-3 py-2 text-xs text-slate-300 space-y-3">
-              <BuildingPanel
-                state={state}
-                selectedKey={selectedBuildingKey}
-                onBuild={handleBuild}
-              />
-              <ExpeditionPanel state={state} onLaunch={handleLaunchExpedition} />
-              <CrewPanel state={state} />
-            </div>
-          </div>
-        </div>
+          {/* Main content */}
+          <main className="flex flex-col gap-4 xl:flex-row">
+            {/* Map section */}
+            <section className="flex-1 space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold tracking-wide text-slate-200">
+                  Base overview
+                </h2>
+                <span className="text-[11px] text-slate-500">
+                  Visual layer on top of existing logic
+                </span>
+              </div>
+              <div className="min-h-[260px] rounded-lg border border-slate-800 bg-slate-950/80 p-2 sm:p-3">
+                <BaseMap
+                  state={state}
+                  onSelectBuilding={(key) => {
+                    setSelectedBuildingKey(key);
+                  }}
+                />
+              </div>
+            </section>
 
-        {/* Bottom log strip */}
-        <div className="border-t border-slate-900 bg-slate-950/95 px-3 py-2">
-          <EventStrip items={logRef.current} max={MAX_LOG_ITEMS} />
+            {/* Detail / actions */}
+            <aside className="w-full space-y-3 xl:w-[340px]">
+              <div className="rounded-lg border border-slate-800 bg-slate-950/90 px-3 py-2 text-xs text-slate-300">
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="text-[11px] font-semibold tracking-wide text-slate-200">
+                    Actions & detail
+                  </h2>
+                </div>
+                <div className="space-y-3">
+                  <BuildingPanel
+                    state={state}
+                    selectedKey={selectedBuildingKey}
+                    onBuild={handleBuild}
+                  />
+                  <ExpeditionPanel
+                    state={state}
+                    onLaunch={handleLaunchExpedition}
+                  />
+                  <CrewPanel state={state} />
+                </div>
+              </div>
+            </aside>
+          </main>
+
+          {/* Activity / log */}
+          <section className="rounded-lg border border-slate-800 bg-slate-950/90 px-3 py-2">
+            <EventStrip items={logRef.current} max={MAX_LOG_ITEMS} />
+          </section>
         </div>
       </div>
     </Layout>
