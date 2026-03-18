@@ -1345,7 +1345,7 @@ function derive(state, now = Date.now()) {
 
   return {
     energyCap: CONFIG.baseEnergyCap + powerLevel * 30 + (state.research.coolant ? 15 : 0),
-    energyRegen: CONFIG.baseEnergyRegen + powerLevel * 1.2 + (state.research.coolant ? 0.8 : 0),
+    energyRegen: 4.6 + powerLevel * 1.35 + (state.research.coolant ? 1.0 : 0),
     oreMult,
     goldMult,
     scrapMult,
@@ -1412,63 +1412,63 @@ function simulate(state, elapsedMs, efficiency = 1) {
   };
 
   runBuilding("quarry", (level) => {
-    const energyNeed = 0.9 * level * dt;
+    const energyNeed = 0.72 * level * dt;
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.ORE += 2.0 * level * d.oreMult * effective;
   });
 
   runBuilding("tradeHub", (level) => {
-    const energyNeed = 1.2 * level * dt;
+    const energyNeed = 0.78 * level * dt;
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.GOLD += 1.0 * level * d.goldMult * effective;
   });
 
   runBuilding("salvage", (level) => {
-    const energyNeed = 1.15 * level * dt;
+    const energyNeed = 0.78 * level * dt;
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.SCRAP += 0.8 * level * d.scrapMult * effective;
   });
 
   runBuilding("minerControl", (level) => {
-    const energyNeed = 0.45 * level * dt;
+    const energyNeed = 0.26 * level * dt;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.18 * level * d.dataMult * effective;
   });
 
   runBuilding("arcadeHub", (level) => {
-    const energyNeed = 0.55 * level * dt;
+    const energyNeed = 0.30 * level * dt;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.15 * level * d.dataMult * effective;
   });
 
   runBuilding("researchLab", (level) => {
-    const energyNeed = 0.55 * level * dt;
+    const energyNeed = 0.30 * level * dt;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.28 * level * d.dataMult * effective;
   });
 
   runBuilding("logisticsCenter", (level) => {
-    const energyNeed = 0.45 * level * dt;
+    const energyNeed = 0.26 * level * dt;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.08 * level * d.dataMult * effective;
   });
 
   runBuilding("repairBay", (level) => {
-    const energyNeed = 0.45 * level * dt;
+    const energyNeed = 0.22 * level * dt;
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
-    next.stability = Math.min(100, (next.stability || 100) + 0.02 * level * effective);
+    next.stability = Math.min(100, (next.stability || 100) + 0.035 * level * effective);
   });
 
   runBuilding("refinery", (level) => {
-    const energyNeed = 2.2 * level * dt;
+    const energyNeed = 1.35 * level * dt;
     const oreNeed = 1.8 * level * effective;
     const scrapNeed = 0.7 * level * effective;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
@@ -1481,12 +1481,12 @@ function simulate(state, elapsedMs, efficiency = 1) {
 
   const elapsedMinutes = dt / 60;
   const decayMultiplier = 1 / (d.maintenanceRelief || 1);
-  next.maintenanceDue = (next.maintenanceDue || 0) + elapsedMinutes * 0.2 * decayMultiplier;
+  next.maintenanceDue = (next.maintenanceDue || 0) + elapsedMinutes * 0.14 * decayMultiplier;
 
   if ((next.maintenanceDue || 0) >= 1) {
     const decaySteps = Math.floor(next.maintenanceDue);
     next.maintenanceDue -= decaySteps;
-    next.stability = Math.max(55, (next.stability || 100) - decaySteps * 0.15);
+    next.stability = Math.max(60, (next.stability || 100) - decaySteps * 0.08);
   }
 
   const dataAfter = next.resources.DATA || 0;

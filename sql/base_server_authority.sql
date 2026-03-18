@@ -486,11 +486,11 @@ BEGIN
   v_data_mult := v_data_mult * v_hq_bonus * v_stability_factor;
 
   v_energy_cap := 140 + (v_power * 30);
-  v_energy_regen := 3.8 + (v_power * 1.2);
+  v_energy_regen := 4.6 + (v_power * 1.35);
 
   IF public.base_jsonb_bool(v_research, 'coolant', false) THEN
     v_energy_cap := v_energy_cap + 15;
-    v_energy_regen := v_energy_regen + 0.8;
+    v_energy_regen := v_energy_regen + 1.0;
   END IF;
 
   v_ship_cap := 12000 + (v_logistics * 1800) + (v_blueprint * 450);
@@ -516,15 +516,15 @@ BEGIN
       * v_data_mult;
 
   v_energy_use :=
-      (v_quarry * 0.75)
-    + (v_trade * 0.95)
-    + (v_salvage * 0.95)
-    + (v_refinery * 1.75)
-    + (v_miner * 0.35)
-    + (v_arcade * 0.42)
-    + (v_logistics * 0.35)
-    + (v_research_lab * 0.42)
-    + (v_repair * 0.32);
+      (v_quarry * 0.72)
+    + (v_trade * 0.78)
+    + (v_salvage * 0.78)
+    + (v_refinery * 1.35)
+    + (v_miner * 0.26)
+    + (v_arcade * 0.30)
+    + (v_logistics * 0.26)
+    + (v_research_lab * 0.30)
+    + (v_repair * 0.22);
 
   IF v_energy_now < (v_energy_use * v_elapsed_seconds) THEN
     IF v_energy_use > 0 THEN
@@ -570,18 +570,18 @@ BEGIN
 
     v_maintenance_due := v_maintenance_due + (
       (
-        (v_hq * 0.030)
-        + (v_quarry * 0.028)
-        + (v_trade * 0.030)
-        + (v_salvage * 0.032)
-        + (v_refinery * 0.060)
-        + (v_power * 0.018)
-        + (v_miner * 0.020)
-        + (v_arcade * 0.020)
-        + (v_expedition * 0.018)
-        + (v_logistics * 0.018)
-        + (v_research_lab * 0.024)
-        + (v_repair * 0.010)
+        (v_hq * 0.022)
+        + (v_quarry * 0.020)
+        + (v_trade * 0.022)
+        + (v_salvage * 0.024)
+        + (v_refinery * 0.045)
+        + (v_power * 0.014)
+        + (v_miner * 0.015)
+        + (v_arcade * 0.015)
+        + (v_expedition * 0.014)
+        + (v_logistics * 0.014)
+        + (v_research_lab * 0.018)
+        + (v_repair * 0.008)
       )
       / greatest(1.0, v_maintenance_relief)
     )
@@ -590,11 +590,11 @@ BEGIN
     v_stability := public.base_clamp_num(
       v_stability - (
         (
-          greatest(v_maintenance_due - 100, 0) * 0.003
+          greatest(v_maintenance_due - 100, 0) * 0.0018
         ) + (
           v_refinery * CASE
-            WHEN public.base_jsonb_bool(v_modules, 'minerLink', false) THEN 0.0008
-            ELSE 0.0010
+            WHEN public.base_jsonb_bool(v_modules, 'minerLink', false) THEN 0.00045
+            ELSE 0.00060
           END
         ) * v_elapsed_seconds
       ),
@@ -604,7 +604,7 @@ BEGIN
 
     IF v_repair > 0 THEN
       v_stability := public.base_clamp_num(
-        v_stability + ((v_repair * 0.0015) * v_elapsed_seconds),
+        v_stability + ((v_repair * 0.0024) * v_elapsed_seconds),
         50,
         100
       );

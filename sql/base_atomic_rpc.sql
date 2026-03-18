@@ -829,8 +829,8 @@ DECLARE
   v_state public.base_device_state%ROWTYPE;
   v_resources jsonb;
   v_stats jsonb;
-  v_cost jsonb := jsonb_build_object('GOLD', 50, 'SCRAP', 28, 'DATA', 6);
-  v_stability_gain integer := 22;
+  v_cost jsonb := jsonb_build_object('GOLD', 42, 'SCRAP', 22, 'DATA', 5);
+  v_stability_gain integer := 34;
   v_xp_gain bigint := 20;
   v_new_stability numeric;
   v_new_commander_xp bigint;
@@ -864,7 +864,7 @@ BEGIN
     );
   END LOOP;
 
-  v_new_stability := least(100, greatest(55, coalesce(v_state.stability, 100) + v_stability_gain));
+  v_new_stability := least(100, greatest(72, coalesce(v_state.stability, 100) + v_stability_gain));
   v_new_commander_xp := coalesce(v_state.commander_xp, 0) + v_xp_gain;
 
   v_stats := jsonb_set(
