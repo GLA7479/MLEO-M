@@ -20,6 +20,10 @@ function distance(ax, ay, bx, by) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
 function computeLayout({ width, height, basePositions }) {
   const keys = Object.keys(basePositions);
   const hq = basePositions.hq || { x: 50, y: 50 };
@@ -183,6 +187,7 @@ function BuildingNode({ buildingKey, def, level, locked, active, selected, onSel
 export function BaseSceneV3({ base, selected, onSelect }) {
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -199,12 +204,77 @@ export function BaseSceneV3({ base, selected, onSelect }) {
     return () => ro.disconnect();
   }, []);
 
+  useEffect(() => {
+    let raf = 0;
+    function loop() {
+      setTick((t) => (t + 1) % 1_000_000);
+      raf = requestAnimationFrame(loop);
+    }
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   const layout = useMemo(() => {
     if (!size.width || !size.height) return SCENE_POSITIONS;
     return computeLayout({ width: size.width, height: size.height, basePositions: SCENE_POSITIONS });
   }, [size.width, size.height]);
 
   const hqPos = layout.hq || SCENE_POSITIONS.hq || { x: 50, y: 50 };
+
+  const routeKeys = useMemo(() => {
+    const primary = ["powerCell", "researchLab", "logisticsCenter", "refinery", "tradeHub"];
+    const extra = ["salvage", "expeditionBay", "repairBay", "minerControl", "arcadeHub", "quarry"];
+    const keys = [...primary, ...extra].filter((k) => layout[k]);
+    if (selected && selected !== "hq" && layout[selected]) keys.unshift(selected, selected);
+    return keys;
+  }, [layout, selected]);
+
+  const drones = useMemo(() => {
+    if (!size.width || !size.height || routeKeys.length === 0) return [];
+    const now = tick / 60; // time-ish
+    const count = 5;
+    const items = [];
+    for (let i = 0; i < count; i++) {
+      const idx = (i + Math.floor(now * (0.55 + i * 0.08))) % routeKeys.length;
+      const k = routeKeys[idx];
+      const target = layout[k];
+      if (!target) continue;
+
+      const speed = 0.085 + i * 0.02 + (selected ? 0.02 : 0);
+      const t = (now * speed + i * 0.23) % 1;
+      const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      items.push({
+        id: `d${i}`,
+        x: lerp(hqPos.x, target.x, eased),
+        y: lerp(hqPos.y, target.y, eased),
+        hot: selected === k,
+      });
+    }
+    return items;
+  }, [hqPos.x, hqPos.y, layout, routeKeys, selected, size.width, size.height, tick]);
+
+  const packets = useMemo(() => {
+    if (!size.width || !size.height) return [];
+    const now = tick / 60;
+    const keys = (SCENE_LINK_KEYS || []).filter((k) => layout[k]);
+    const items = [];
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      const target = layout[k];
+      if (!target) continue;
+      for (let j = 0; j < 2; j++) {
+        const speed = 0.12 + i * 0.01;
+        const t = (now * speed + j * 0.47 + i * 0.13) % 1;
+        items.push({
+          id: `p-${k}-${j}`,
+          x: lerp(hqPos.x, target.x, t),
+          y: lerp(hqPos.y, target.y, t),
+          hot: selected === k,
+        });
+      }
+    }
+    return items;
+  }, [hqPos.x, hqPos.y, layout, selected, size.width, size.height, tick]);
 
   return (
     <div
@@ -222,14 +292,50 @@ export function BaseSceneV3({ base, selected, onSelect }) {
           `,
         }}
       />
+
+      {/* Closed system overlay: faint grid + dome */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-35"
+        style={{
+          background: `
+            radial-gradient(ellipse 75% 70% at 50% 58%, rgba(16,185,129,0.10) 0%, rgba(2,6,23,0) 55%),
+            radial-gradient(ellipse 110% 95% at 50% 50%, rgba(15,23,42,0) 45%, rgba(0,0,0,0.6) 100%),
+            repeating-linear-gradient(90deg, rgba(148,163,184,0.06) 0, rgba(148,163,184,0.06) 1px, transparent 1px, transparent 10px),
+            repeating-linear-gradient(0deg, rgba(148,163,184,0.05) 0, rgba(148,163,184,0.05) 1px, transparent 1px, transparent 12px)
+          `,
+        }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-0 animate-base-v3-scanline opacity-25"
+        style={{
+          background: "linear-gradient(180deg, transparent 0%, rgba(56,189,248,0.10) 45%, rgba(56,189,248,0.04) 60%, transparent 100%)",
+        }}
+        aria-hidden
+      />
+      <div className="pointer-events-none absolute inset-2 rounded-[1.6rem] border border-slate-600/25" aria-hidden />
+
       {/* Central platform / ring under HQ */}
       <div
-        className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-[42%] h-[32%] rounded-full border-2 border-emerald-500/25 bg-emerald-950/20"
+        className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-[44%] h-[34%] rounded-full border-2 bg-emerald-950/20 ${
+          selected ? "border-emerald-400/35" : "border-emerald-500/25"
+        }`}
         style={{ left: `${hqPos.x}%`, top: `${hqPos.y}%` }}
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-[38%] h-[28%] rounded-full bg-emerald-900/15"
+        className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-[40%] h-[30%] rounded-full bg-emerald-900/15"
+        style={{ left: `${hqPos.x}%`, top: `${hqPos.y}%` }}
+        aria-hidden
+      />
+      {/* Core routing rings (rotate) */}
+      <div
+        className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-[32%] h-[24%] rounded-full border border-emerald-400/20 animate-base-v3-core-rotate"
+        style={{ left: `${hqPos.x}%`, top: `${hqPos.y}%` }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-[28%] h-[21%] rounded-full border border-cyan-400/15 animate-base-v3-core-rotate-slow"
         style={{ left: `${hqPos.x}%`, top: `${hqPos.y}%` }}
         aria-hidden
       />
@@ -279,6 +385,44 @@ export function BaseSceneV3({ base, selected, onSelect }) {
         )}
       </svg>
 
+      {/* Data packets (DB routing) */}
+      {packets.map((p) => (
+        <div
+          key={p.id}
+          className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full animate-base-v3-packet ${
+            p.hot ? "bg-emerald-300/95" : "bg-cyan-300/80"
+          }`}
+          style={{
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            width: p.hot ? "6px" : "4px",
+            height: p.hot ? "6px" : "4px",
+            boxShadow: p.hot ? "0 0 12px rgba(16,185,129,0.55)" : "0 0 10px rgba(34,211,238,0.35)",
+          }}
+          aria-hidden
+        />
+      ))}
+
+      {/* Spider-miner drones (service routes) */}
+      {drones.map((d) => (
+        <div
+          key={d.id}
+          className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full ${
+            d.hot ? "bg-emerald-200" : "bg-slate-200/85"
+          }`}
+          style={{
+            left: `${d.x}%`,
+            top: `${d.y}%`,
+            width: d.hot ? "7px" : "6px",
+            height: d.hot ? "7px" : "6px",
+            boxShadow: d.hot
+              ? "0 0 14px rgba(16,185,129,0.55), 0 0 0 6px rgba(16,185,129,0.06)"
+              : "0 0 10px rgba(148,163,184,0.35), 0 0 0 5px rgba(148,163,184,0.05)",
+          }}
+          aria-hidden
+        />
+      ))}
+
       {SCENE_BUILDING_KEYS.map((key) => {
         const pos = layout[key];
         if (!pos) return null;
@@ -305,12 +449,13 @@ export function BaseSceneV3({ base, selected, onSelect }) {
           />
         );
       })}
-
-      {/* Drone / particle between HQ and one building */}
-      <div
-        className="pointer-events-none absolute left-[38%] top-[42%] h-1.5 w-1.5 rounded-full bg-cyan-300/90 shadow-[0_0_10px_rgba(34,211,238,0.8)] animate-base-v3-drone"
-        aria-hidden
-      />
+      {/* “Sealed system” corner glyphs */}
+      <div className="pointer-events-none absolute left-3 top-3 text-[9px] text-slate-500/80 uppercase tracking-widest" aria-hidden>
+        SYS LOCKED
+      </div>
+      <div className="pointer-events-none absolute right-3 top-3 text-[9px] text-slate-500/80 uppercase tracking-widest" aria-hidden>
+        DB ONLINE
+      </div>
     </div>
   );
 }

@@ -82,6 +82,30 @@ body {
 }
 .animate-base-v3-pulse-slow { animation: base-v3-pulse-slow 2.4s ease-in-out infinite; }
 
+/* HQ core rings (subtle rotation) */
+@keyframes base-v3-core-rotate {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+.animate-base-v3-core-rotate { animation: base-v3-core-rotate 18s linear infinite; }
+.animate-base-v3-core-rotate-slow { animation: base-v3-core-rotate 38s linear infinite; }
+
+/* Closed system scanline */
+@keyframes base-v3-scanline {
+  0% { transform: translateY(-30%); opacity: 0; }
+  15% { opacity: 0.35; }
+  50% { opacity: 0.2; }
+  100% { transform: translateY(130%); opacity: 0; }
+}
+.animate-base-v3-scanline { animation: base-v3-scanline 6.5s ease-in-out infinite; }
+
+/* Data packet shimmer */
+@keyframes base-v3-packet-shimmer {
+  0%, 100% { opacity: 0.55; filter: drop-shadow(0 0 6px rgba(34,211,238,0.25)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 10px rgba(34,211,238,0.55)); }
+}
+.animate-base-v3-packet { animation: base-v3-packet-shimmer 1.6s ease-in-out infinite; }
+
 @keyframes base-v3-drone {
   0% { transform: translate(0, 0); opacity: 0.6; }
   25% { transform: translate(8%, -5%); opacity: 1; }

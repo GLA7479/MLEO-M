@@ -36,9 +36,15 @@ export function BaseHudV3({ base }) {
             </div>
           ))}
         </div>
-        <div className="flex items-center gap-1.5 text-[9px] text-slate-500">
-          <span>STB {Math.round((stability ?? 0) * 100) / 100}</span>
-          <span>Lv.{commanderLevel}</span>
+        <div className="flex items-end gap-2">
+          <div className="hidden sm:flex flex-col leading-tight text-[8px] text-slate-500 text-right">
+            <span className="uppercase tracking-wide">SYNC: OK · LEDGER: SEALED</span>
+            <span className="uppercase tracking-wide">ROUTE TABLE: 12 · DB: ONLINE</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[9px] text-slate-500">
+            <span>STB {Math.round((stability ?? 0) * 100) / 100}</span>
+            <span>Lv.{commanderLevel}</span>
+          </div>
         </div>
       </div>
     </div>
