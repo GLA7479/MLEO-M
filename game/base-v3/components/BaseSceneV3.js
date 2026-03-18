@@ -295,7 +295,7 @@ export function BaseSceneV3({ base, selected, onSelect }) {
 
       {/* Closed system overlay: faint grid + dome */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-35"
+        className="pointer-events-none absolute inset-0 opacity-25"
         style={{
           background: `
             radial-gradient(ellipse 75% 70% at 50% 58%, rgba(16,185,129,0.10) 0%, rgba(2,6,23,0) 55%),
@@ -314,6 +314,29 @@ export function BaseSceneV3({ base, selected, onSelect }) {
         aria-hidden
       />
       <div className="pointer-events-none absolute inset-2 rounded-[1.6rem] border border-slate-600/25" aria-hidden />
+
+      {/* Sector pads (base world zones) */}
+      <div
+        className="pointer-events-none absolute left-[6%] top-[48%] w-[44%] h-[44%] rounded-[2.2rem] border border-amber-500/10 bg-gradient-to-br from-amber-950/25 via-slate-950/10 to-transparent"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute left-[52%] top-[10%] w-[42%] h-[34%] rounded-[2.2rem] border border-cyan-500/10 bg-gradient-to-br from-cyan-950/20 via-slate-950/10 to-transparent"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute left-[54%] top-[44%] w-[42%] h-[46%] rounded-[2.2rem] border border-emerald-500/10 bg-gradient-to-br from-emerald-950/18 via-slate-950/10 to-transparent"
+        aria-hidden
+      />
+      <div className="pointer-events-none absolute left-[10%] top-[50%] text-[9px] text-amber-200/60 uppercase tracking-widest" aria-hidden>
+        PRODUCTION
+      </div>
+      <div className="pointer-events-none absolute left-[56%] top-[12%] text-[9px] text-cyan-200/60 uppercase tracking-widest" aria-hidden>
+        RESEARCH
+      </div>
+      <div className="pointer-events-none absolute left-[58%] top-[46%] text-[9px] text-emerald-200/60 uppercase tracking-widest" aria-hidden>
+        EXPORT
+      </div>
 
       {/* Central platform / ring under HQ */}
       <div
@@ -364,8 +387,8 @@ export function BaseSceneV3({ base, selected, onSelect }) {
               y1={hqPos.y}
               x2={p.x}
               y2={p.y}
-              stroke="rgba(16, 185, 129, 0.14)"
-              strokeWidth="0.55"
+              stroke="rgba(16, 185, 129, 0.12)"
+              strokeWidth="0.8"
               strokeLinecap="round"
             />
           );

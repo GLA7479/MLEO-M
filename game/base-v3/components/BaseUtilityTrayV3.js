@@ -5,7 +5,7 @@ import Link from "next/link";
 export function BaseUtilityTrayV3({
   hubHref,
   busy,
-  collapsed,
+  sheetOpen,
   onExpedition,
   onMaintenance,
   onShipToVault,
@@ -27,17 +27,19 @@ export function BaseUtilityTrayV3({
   return (
     <div
       className={`
-        w-full px-2
+        w-full px-2 sticky bottom-0 z-30
         pb-[calc(0.5rem+env(safe-area-inset-bottom))]
         transition-all duration-200
-        ${collapsed ? "opacity-0 pointer-events-none translate-y-2" : "opacity-100"}
+        ${sheetOpen ? "opacity-40 scale-[0.98]" : "opacity-100"}
+        ${sheetOpen ? "md:opacity-100 md:scale-100" : ""}
+        ${sheetOpen ? "pointer-events-none md:pointer-events-auto" : ""}
       `}
     >
-      <div className="flex flex-wrap gap-1.5 justify-center items-center rounded-xl bg-slate-900/50 border border-slate-700/50 px-2 py-1.5">
+      <div className="mx-auto max-w-md flex flex-wrap gap-1.5 justify-center items-center rounded-full bg-slate-950/55 backdrop-blur border border-slate-700/50 px-2 py-2">
         {hubHref && (
           <Link
             href={hubHref}
-            className="rounded-lg border border-slate-600/60 bg-slate-800/80 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300 hover:bg-slate-700/80 hover:text-slate-100 transition touch-manipulation"
+            className="rounded-full border border-slate-600/60 bg-slate-800/70 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-300 hover:bg-slate-700/70 hover:text-slate-100 transition touch-manipulation"
           >
             ← Hub
           </Link>
@@ -50,11 +52,11 @@ export function BaseUtilityTrayV3({
             onClick={b.onClick || undefined}
             disabled={busy || (b.id === "mission" && !handleMissionClick)}
             className={`
-              rounded-lg px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide
+              rounded-full px-3 py-2 text-[10px] font-semibold uppercase tracking-wide
               transition touch-manipulation
               ${b.highlight
                 ? "bg-amber-500/20 border border-amber-500/50 text-amber-200"
-                : "bg-slate-800/80 border border-slate-600/60 text-slate-300 hover:bg-slate-700/80 hover:text-slate-100"}
+                : "bg-slate-800/70 border border-slate-600/60 text-slate-300 hover:bg-slate-700/70 hover:text-slate-100"}
               disabled:opacity-50 disabled:pointer-events-none
             `}
           >

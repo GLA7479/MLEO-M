@@ -17,6 +17,7 @@ import { BaseSceneV3 } from "./base-v3/components/BaseSceneV3";
 import { BuildingSheetV3 } from "./base-v3/components/BuildingSheetV3";
 import { ActivityFeedV3 } from "./base-v3/components/ActivityFeedV3";
 import { BaseUtilityTrayV3 } from "./base-v3/components/BaseUtilityTrayV3";
+import { BaseHintV3 } from "./base-v3/components/BaseHintV3";
 
 const MAX_LOG_ITEMS = 16;
 
@@ -292,10 +293,12 @@ export default function MleoBaseV3() {
           />
         </div>
 
+        <BaseHintV3 base={baseState} />
+
         <BaseUtilityTrayV3
           hubHref="/mining"
           busy={isBusy}
-          collapsed={Boolean(selectedBuilding)}
+          sheetOpen={Boolean(selectedBuilding)}
           onExpedition={handleExpedition}
           onMaintenance={handleMaintenance}
           onShipToVault={handleShipToVault}
