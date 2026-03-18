@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useAccount } from "wagmi";
-import { useAccountModal, useConnectModal } from "@rainbow-me/rainbowkit";
 import Layout from "../components/Layout";
 import { BaseMap } from "./base-v2/components/BaseMap";
 import { BaseHud } from "./base-v2/components/BaseHud";
@@ -11,7 +9,6 @@ import { ExpeditionPanel } from "./base-v2/components/ExpeditionPanel";
 import { CrewPanel } from "./base-v2/components/CrewPanel";
 import {
   applyBaseVaultDelta,
-  getBaseVaultBalance,
   getBaseState,
   buildBuilding,
   installModule,
@@ -36,10 +33,6 @@ import {
 const MAX_LOG_ITEMS = 16;
 
 export default function MleoBaseV2() {
-  const { address } = useAccount();
-  const { openConnectModal } = useConnectModal();
-  const { openAccountModal } = useAccountModal();
-
   const [state, setState] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -67,10 +60,6 @@ export default function MleoBaseV2() {
       cancelled = true;
     };
   }, [address]);
-
-  const baseVaultBalance = useMemo(() => {
-    return getBaseVaultBalance();
-  }, []);
 
   function pushLog(entry) {
     logRef.current = [
@@ -282,31 +271,13 @@ export default function MleoBaseV2() {
                 <span className="text-sm font-semibold uppercase tracking-wide text-slate-300">
                   MLEO BASE // V2
                 </span>
-                {address && (
-                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">
-                    {address.slice(0, 6)}...{address.slice(-4)}
-                  </span>
-                )}
+                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">
+                  Offline Commander
+                </span>
               </div>
               <BaseHud state={state} />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {openAccountModal && address && (
-                <button
-                  className="rounded border border-slate-600 bg-slate-900 px-3 py-1 text-xs hover:border-slate-400"
-                  onClick={openAccountModal}
-                >
-                  Account
-                </button>
-              )}
-              {openConnectModal && !address && (
-                <button
-                  className="rounded bg-indigo-600 px-3 py-1 text-xs font-medium hover:bg-indigo-500"
-                  onClick={openConnectModal}
-                >
-                  Connect Wallet
-                </button>
-              )}
               <Link
                 href="/mleo-base"
                 className="rounded border border-slate-700 px-3 py-1 text-xs hover:border-slate-400"
