@@ -2309,7 +2309,7 @@ function BaseHomeFlowScene({ base, derived, selected, onSelect }) {
   const links = nodes.filter((n) => n.key !== "hq" && n.pos);
 
   return (
-    <div className="relative mx-auto w-full max-w-md aspect-[3/4] overflow-hidden rounded-[30px] border border-cyan-400/18 bg-slate-950/90 shadow-[0_16px_40px_rgba(0,0,0,0.34)]">
+    <div className="relative mx-auto w-full max-w-md aspect-[3/4] overflow-hidden rounded-[30px] bg-slate-950/90 shadow-[0_16px_40px_rgba(0,0,0,0.34)]">
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -2331,10 +2331,7 @@ function BaseHomeFlowScene({ base, derived, selected, onSelect }) {
         }}
       />
 
-      <div className="pointer-events-none absolute inset-3 rounded-[26px] border border-white/6" />
-
-      <div className="pointer-events-none absolute left-[50%] top-[56%] h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-400/20 bg-emerald-400/5 blur-[2px]" />
-      <div className="pointer-events-none absolute left-[50%] top-[56%] h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-400/25" />
+      {/* Intentionally no inner frame so the map feels like it blends into the screen */}
 
       <svg
         className="pointer-events-none absolute inset-0 h-full w-full"
