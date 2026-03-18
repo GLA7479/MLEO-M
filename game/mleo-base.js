@@ -6997,12 +6997,15 @@ export default function MleoBase() {
               <div className="mt-3 flex items-center justify-between sm:block">
                 <h1 className="text-3xl font-black tracking-tight sm:text-4xl">{CONFIG.title}</h1>
                 <div className="flex items-center gap-2 sm:hidden">
-                  <Link href="/mining" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10">
+                  <Link
+                    href="/mining"
+                    className="rounded-2xl border border-white/15 bg-white/5 px-4 h-[35px] flex items-center text-sm font-semibold hover:bg-white/10"
+                  >
                     Hub
                   </Link>
                   <button
                     onClick={() => setMobileMenuOpen(true)}
-                    className="relative flex h-[46px] w-[46px] items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
+                    className="relative flex h-[35px] w-[35px] items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
                     aria-label="Open menu"
                   >
                     <span className="text-[22px] leading-none">☰</span>
@@ -8072,7 +8075,7 @@ export default function MleoBase() {
                     key={item.key}
                     type="button"
                     onClick={() => openHomeFlowTarget(item.key)}
-                    className="shrink-0 min-w-[104px] rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-left"
+                    className="shrink-0 min-w-[104px] rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-left"
                   >
                     <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
                       {item.label}
