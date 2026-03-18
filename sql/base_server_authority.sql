@@ -493,7 +493,7 @@ BEGIN
     v_energy_regen := v_energy_regen + 0.8;
   END IF;
 
-  v_ship_cap := 12000 + (v_blueprint * 5000);
+  v_ship_cap := 12000 + (v_logistics * 1800) + (v_blueprint * 450);
 
   v_expedition_cooldown_seconds := 120;
 

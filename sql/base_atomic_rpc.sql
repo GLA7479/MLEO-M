@@ -30,6 +30,7 @@ DECLARE
   v_banked_mleo bigint;
   v_sent_today bigint;
   v_blueprint_level integer;
+  v_logistics_level integer;
   v_ship_cap bigint;
   v_room bigint;
   v_factor numeric;
@@ -42,14 +43,6 @@ DECLARE
   v_commander_xp bigint;
   v_vault_balance bigint;
   v_stats jsonb;
-  v_softcut_steps jsonb := '[
-    {"upto": 0.60, "factor": 1.00},
-    {"upto": 0.85, "factor": 0.72},
-    {"upto": 1.00, "factor": 0.50},
-    {"upto": 1.15, "factor": 0.30},
-    {"upto": 9.99, "factor": 0.16}
-  ]'::jsonb;
-  v_step record;
   v_daily_ship_cap bigint := 12000;
   v_vault_delta_result record;
 BEGIN
@@ -65,6 +58,7 @@ BEGIN
   v_banked_mleo := coalesce(v_state.banked_mleo, 0);
   v_sent_today := coalesce(v_state.sent_today, 0);
   v_blueprint_level := coalesce(v_state.blueprint_level, 0);
+  v_logistics_level := coalesce((coalesce(v_state.buildings, '{}'::jsonb)->>'logisticsCenter')::integer, 0);
   v_stats := coalesce(v_state.stats, '{}'::jsonb);
 
   -- Validation: must have banked MLEO
@@ -73,27 +67,26 @@ BEGIN
   END IF;
 
   -- Calculate ship cap
-  v_ship_cap := v_daily_ship_cap + (v_blueprint_level * 5000);
+  v_ship_cap := v_daily_ship_cap + (v_logistics_level * 1800) + (v_blueprint_level * 450);
   v_room := greatest(0, v_ship_cap - v_sent_today);
-  
+
   IF v_room <= 0 THEN
     RAISE EXCEPTION 'Today''s shipping cap is already full';
   END IF;
 
-  -- Calculate softcut factor
-  v_factor := 0.16; -- default
+  -- Linear softcut, aligned with client
   IF v_ship_cap > 0 THEN
-    FOR v_step IN SELECT * FROM jsonb_array_elements(v_softcut_steps)
-    LOOP
-      IF (v_sent_today::numeric / v_ship_cap::numeric) <= (v_step.value->>'upto')::numeric THEN
-        v_factor := (v_step.value->>'factor')::numeric;
-        EXIT;
-      END IF;
-    END LOOP;
+    v_factor := greatest(0.5, 1 - ((v_sent_today::numeric / v_ship_cap::numeric) * 0.5));
+  ELSE
+    v_factor := 0.5;
   END IF;
 
   -- Calculate bank bonus
-  v_bank_bonus := 1 + (v_blueprint_level * 0.08);
+  v_bank_bonus := 1 + (v_blueprint_level * 0.02) + (v_logistics_level * 0.025);
+
+  IF coalesce(v_state.crew_role, '') = 'logistician' THEN
+    v_bank_bonus := v_bank_bonus * 1.03;
+  END IF;
 
   -- Calculate shipped amount
   v_shipped := least(
