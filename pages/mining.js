@@ -2902,9 +2902,9 @@ export default function GamesHub() {
                         BASE
                       </button>
                     </Link>
-                    <Link href="/mleo-base-v2">
-                      <button className="w-full bg-sky-600 hover:bg-sky-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors">
-                        BASE V2
+                    <Link href="/mleo-base-v3">
+                      <button className="w-full bg-sky-600/80 hover:bg-sky-600 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors border border-sky-500/40">
+                        Legacy
                       </button>
                     </Link>
                   </div>
