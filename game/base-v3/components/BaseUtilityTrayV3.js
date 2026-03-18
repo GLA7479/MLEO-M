@@ -5,6 +5,7 @@ import Link from "next/link";
 export function BaseUtilityTrayV3({
   hubHref,
   busy,
+  collapsed,
   onExpedition,
   onMaintenance,
   onShipToVault,
@@ -24,7 +25,14 @@ export function BaseUtilityTrayV3({
   ].filter(Boolean);
 
   return (
-    <div className="w-full px-2 pb-2">
+    <div
+      className={`
+        w-full px-2
+        pb-[calc(0.5rem+env(safe-area-inset-bottom))]
+        transition-all duration-200
+        ${collapsed ? "opacity-0 pointer-events-none translate-y-2" : "opacity-100"}
+      `}
+    >
       <div className="flex flex-wrap gap-1.5 justify-center items-center rounded-xl bg-slate-900/50 border border-slate-700/50 px-2 py-1.5">
         {hubHref && (
           <Link

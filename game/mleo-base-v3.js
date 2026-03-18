@@ -295,6 +295,7 @@ export default function MleoBaseV3() {
         <BaseUtilityTrayV3
           hubHref="/mining"
           busy={isBusy}
+          collapsed={Boolean(selectedBuilding)}
           onExpedition={handleExpedition}
           onMaintenance={handleMaintenance}
           onShipToVault={handleShipToVault}

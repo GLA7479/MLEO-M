@@ -21,18 +21,29 @@ export const SCENE_BUILDING_KEYS = [
 // Right / lower-right: expeditionBay, logisticsCenter, repairBay (command / export)
 // Support band: tradeHub, minerControl, arcadeHub
 export const SCENE_POSITIONS = {
-  hq: { x: 50, y: 50 },
-  quarry: { x: 20, y: 64 },
-  salvage: { x: 16, y: 46 },
-  refinery: { x: 24, y: 56 },
-  tradeHub: { x: 32, y: 26 },
-  minerControl: { x: 36, y: 36 },
-  arcadeHub: { x: 30, y: 40 },
-  powerCell: { x: 72, y: 22 },
-  researchLab: { x: 68, y: 30 },
-  expeditionBay: { x: 82, y: 44 },
-  logisticsCenter: { x: 78, y: 56 },
-  repairBay: { x: 76, y: 68 },
+  // Center (slightly below geometric center for better flow + bottom layers)
+  hq: { x: 50, y: 54 },
+
+  // Upper-right (core systems)
+  powerCell: { x: 78, y: 22 },
+  researchLab: { x: 70, y: 30 },
+
+  // Upper-left (ecosystem / trade)
+  tradeHub: { x: 22, y: 20 },
+
+  // Mid-left (support / activity / control)
+  salvage: { x: 18, y: 44 },
+  arcadeHub: { x: 27, y: 40 },
+  minerControl: { x: 30, y: 32 },
+
+  // Lower-left (production)
+  refinery: { x: 24, y: 62 },
+  quarry: { x: 16, y: 72 },
+
+  // Right / lower-right (command / export)
+  expeditionBay: { x: 84, y: 42 },
+  logisticsCenter: { x: 86, y: 58 },
+  repairBay: { x: 78, y: 72 },
 };
 
 // Links from HQ for energy/routes (visual only)

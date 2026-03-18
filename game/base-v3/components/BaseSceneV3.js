@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BUILDINGS } from "../../base-v2/data/buildings";
 import { SCENE_BUILDING_KEYS, SCENE_POSITIONS, SCENE_LINK_KEYS } from "../data/scenePositions";
 import { getBuildingIdentity } from "../data/buildingIdentity";
@@ -7,6 +8,101 @@ function getBuildingLevel(state, key) {
   if (typeof raw === "number") return raw;
   if (raw && typeof raw === "object" && typeof raw.level === "number") return raw.level;
   return 0;
+}
+
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function distance(ax, ay, bx, by) {
+  const dx = ax - bx;
+  const dy = ay - by;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function computeLayout({ width, height, basePositions }) {
+  const keys = Object.keys(basePositions);
+  const hq = basePositions.hq || { x: 50, y: 50 };
+
+  // Approx radii in px that match the current tap targets.
+  const HQ_RADIUS = 44;
+  const NODE_RADIUS = 30;
+  const HQ_PROTECTED = 92; // protected bubble around HQ (px)
+  const MIN_MARGIN = 18; // keep nodes inside scene bounds (px)
+
+  // Initialize in px
+  const nodes = keys.map((key) => {
+    const p = basePositions[key];
+    return {
+      key,
+      x: (p.x / 100) * width,
+      y: (p.y / 100) * height,
+      r: key === "hq" ? HQ_RADIUS : NODE_RADIUS,
+      locked: false,
+    };
+  });
+
+  const hqNode = nodes.find((n) => n.key === "hq") || {
+    key: "hq",
+    x: (hq.x / 100) * width,
+    y: (hq.y / 100) * height,
+    r: HQ_RADIUS,
+  };
+
+  // Simple relaxation solver to avoid overlaps + keep HQ zone clear.
+  const iters = 42;
+  for (let iter = 0; iter < iters; iter++) {
+    // Pairwise repulsion
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i];
+        const b = nodes[j];
+        if (a.key === "hq" && b.key === "hq") continue;
+
+        const minDist = a.r + b.r + 10;
+        const d = distance(a.x, a.y, b.x, b.y) || 0.0001;
+        if (d < minDist) {
+          const push = (minDist - d) * 0.5;
+          const ux = (b.x - a.x) / d;
+          const uy = (b.y - a.y) / d;
+          // Keep HQ more stable; push the other node a bit more.
+          const aWeight = a.key === "hq" ? 0.15 : 0.5;
+          const bWeight = b.key === "hq" ? 0.15 : 0.5;
+          a.x -= ux * push * aWeight;
+          a.y -= uy * push * aWeight;
+          b.x += ux * push * bWeight;
+          b.y += uy * push * bWeight;
+        }
+      }
+    }
+
+    // HQ protected zone (bigger than HQ itself)
+    for (const n of nodes) {
+      if (n.key === "hq") continue;
+      const d = distance(n.x, n.y, hqNode.x, hqNode.y) || 0.0001;
+      const min = HQ_PROTECTED + n.r;
+      if (d < min) {
+        const push = (min - d) * 0.9;
+        const ux = (n.x - hqNode.x) / d;
+        const uy = (n.y - hqNode.y) / d;
+        n.x += ux * push;
+        n.y += uy * push;
+      }
+    }
+
+    // Clamp to bounds
+    for (const n of nodes) {
+      n.x = clamp(n.x, MIN_MARGIN + n.r, width - MIN_MARGIN - n.r);
+      n.y = clamp(n.y, MIN_MARGIN + n.r, height - MIN_MARGIN - n.r);
+    }
+  }
+
+  // Convert back to %
+  const out = {};
+  for (const n of nodes) {
+    out[n.key] = { x: (n.x / width) * 100, y: (n.y / height) * 100 };
+  }
+  return out;
 }
 
 const GLOW_CLASSES = {
@@ -85,8 +181,36 @@ function BuildingNode({ buildingKey, def, level, locked, active, selected, onSel
 }
 
 export function BaseSceneV3({ base, selected, onSelect }) {
+  const containerRef = useRef(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    function update() {
+      const rect = el.getBoundingClientRect();
+      setSize({ width: rect.width || 0, height: rect.height || 0 });
+    }
+
+    update();
+    const ro = new ResizeObserver(() => update());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const layout = useMemo(() => {
+    if (!size.width || !size.height) return SCENE_POSITIONS;
+    return computeLayout({ width: size.width, height: size.height, basePositions: SCENE_POSITIONS });
+  }, [size.width, size.height]);
+
+  const hqPos = layout.hq || SCENE_POSITIONS.hq || { x: 50, y: 50 };
+
   return (
-    <div className="relative w-full max-w-md aspect-[3/4] mx-auto rounded-3xl overflow-hidden shadow-xl border border-slate-700/80 bg-gradient-to-b from-slate-950 via-slate-900/95 to-slate-950">
+    <div
+      ref={containerRef}
+      className="relative w-full max-w-md aspect-[3/4] mx-auto rounded-3xl overflow-hidden shadow-xl border border-slate-700/80 bg-gradient-to-b from-slate-950 via-slate-900/95 to-slate-950"
+    >
       {/* World layer: terrain / base feel */}
       <div
         className="pointer-events-none absolute inset-0"
@@ -100,18 +224,20 @@ export function BaseSceneV3({ base, selected, onSelect }) {
       />
       {/* Central platform / ring under HQ */}
       <div
-        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[42%] h-[32%] rounded-full border-2 border-emerald-500/25 bg-emerald-950/20"
+        className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-[42%] h-[32%] rounded-full border-2 border-emerald-500/25 bg-emerald-950/20"
+        style={{ left: `${hqPos.x}%`, top: `${hqPos.y}%` }}
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[38%] h-[28%] rounded-full bg-emerald-900/15"
+        className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-[38%] h-[28%] rounded-full bg-emerald-900/15"
+        style={{ left: `${hqPos.x}%`, top: `${hqPos.y}%` }}
         aria-hidden
       />
       {/* Ambient glow behind HQ */}
       <div
         className="pointer-events-none absolute inset-0 opacity-40"
         style={{
-          background: "radial-gradient(ellipse 55% 45% at 50% 50%, rgba(16, 185, 129, 0.2), transparent 65%)",
+          background: `radial-gradient(ellipse 55% 45% at ${hqPos.x}% ${hqPos.y}%, rgba(16, 185, 129, 0.2), transparent 65%)`,
         }}
       />
 
@@ -123,25 +249,38 @@ export function BaseSceneV3({ base, selected, onSelect }) {
         aria-hidden
       >
         {(SCENE_LINK_KEYS || ["quarry", "tradeHub", "powerCell", "salvage"]).map((key) => {
-          const p = SCENE_POSITIONS[key];
+          const p = layout[key];
           if (!p) return null;
           return (
             <line
               key={key}
-              x1={50}
-              y1={50}
+              x1={hqPos.x}
+              y1={hqPos.y}
               x2={p.x}
               y2={p.y}
-              stroke="rgba(16, 185, 129, 0.4)"
-              strokeWidth="0.8"
+              stroke="rgba(16, 185, 129, 0.14)"
+              strokeWidth="0.55"
               strokeLinecap="round"
             />
           );
         })}
+
+        {selected && selected !== "hq" && layout[selected] && (
+          <line
+            key={`sel-${selected}`}
+            x1={hqPos.x}
+            y1={hqPos.y}
+            x2={layout[selected].x}
+            y2={layout[selected].y}
+            stroke="rgba(16, 185, 129, 0.72)"
+            strokeWidth="1.35"
+            strokeLinecap="round"
+          />
+        )}
       </svg>
 
       {SCENE_BUILDING_KEYS.map((key) => {
-        const pos = SCENE_POSITIONS[key];
+        const pos = layout[key];
         if (!pos) return null;
         const def = BUILDINGS.find((b) => b.key === key);
         if (!def) return null;

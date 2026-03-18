@@ -88,7 +88,7 @@ export function BuildingSheetV3({
         aria-hidden
       />
       <div
-        className="relative pointer-events-auto w-full max-h-[75vh] overflow-y-auto rounded-t-3xl border-t border-slate-700 bg-slate-950/98 shadow-2xl animate-base-v3-sheet-enter"
+        className="relative pointer-events-auto w-full max-h-[78vh] overflow-y-auto rounded-t-3xl border-t border-slate-700 bg-slate-950/98 shadow-2xl animate-base-v3-sheet-enter pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
         role="dialog"
         aria-modal="true"
         aria-label={`${def.name} details`}
