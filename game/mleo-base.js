@@ -358,7 +358,7 @@ const DAILY_MISSIONS = [
     key: "spend_vault",
     name: "Spend 50 MLEO from vault",
     target: 50,
-    reward: { XP: 45, DATA: 10 },
+    reward: { XP: 55, DATA: 14 },
   },
 ];
 
@@ -2643,6 +2643,8 @@ export default function MleoBase() {
         ? "build"
         : step.tab === "development"
         ? "build"
+        : step.tab === "systems"
+        ? "intel"
         : step.tab === "intel"
         ? "intel"
         : "overview";
@@ -2711,6 +2713,11 @@ export default function MleoBase() {
     })();
 
     const targetStructuresTab = getStructuresTabForTarget(step.target);
+
+    if (step.tab === "systems") {
+      setOpenInfoKey(null);
+      setBuildInfo(getSystemInfo(step.target));
+    }
 
     try {
       const isMobile =
@@ -4511,15 +4518,16 @@ export default function MleoBase() {
         const next = level + 1;
         return `Refinery level ${next} increases conversion capacity and energy use. Improves long-term conversion toward banked MLEO.`;
       },
-      why: "Refinery is the main bridge from infrastructure into banked MLEO. It should feel valuable, but still controlled — exactly what this game loop needs.",
+      why: "Refinery is the main bridge from infrastructure into banked MLEO. It should feel valuable, but still controlled — exactly what this game loop needs. When Stability drops into warning/critical range, Refinery becomes a pressure point: prioritize maintenance and Repair Bay before scaling harder.",
       linked: "ORE + SCRAP conversion · banked MLEO · shipping strategy · vault support",
-      impact: "A stronger Refinery increases your ability to support the shared vault, but only if the rest of your economy can feed it.",
+      impact: "A stronger Refinery increases your ability to support the shared vault, but only if the rest of your economy can feed it. Low Stability makes Refinery scaling riskier and increases the need for proactive maintenance.",
       tips: {
         building: "Logistics Center",
         research: "Token Discipline",
         module: "Vault Compressor",
         actions: [
           "Only push Refinery hard if Ore, Scrap and energy support are already healthy.",
+          "If Stability is weak, delay extra Refinery levels until you stabilize the base first.",
           "Refinery is strongest inside a balanced economy, not by itself.",
           "Pair it with Logistics if shipping becomes an important part of your loop.",
         ],
@@ -4650,15 +4658,16 @@ export default function MleoBase() {
         const data = fmt((building.outputs?.DATA || 0) * next);
         return `Logistics Center level ${next} will improve shipment discipline further and raise DATA support to about ${data}.`;
       },
-      why: "If BASE is going to support the shared vault in a controlled way, Logistics Center is a key structure. It makes shipping feel smarter, not just bigger.",
+      why: "If BASE is going to support the shared vault in a controlled way, Logistics Center is a key structure. It makes shipping feel smarter, not just bigger. When Stability drops, logistics/export systems become more fragile and need proactive maintenance support.",
       linked: "Shipping quality · export handling · shared vault support · efficiency discipline",
-      impact: "This upgrade improves late-game control and makes the path from banked MLEO to shipped value more stable and strategic.",
+      impact: "This upgrade improves late-game control and makes the path from banked MLEO to shipped value more stable and strategic. Low Stability increases pressure during export lanes, so keep Repair Bay and maintenance in sync.",
       tips: {
         building: "Refinery",
         research: "Logistics",
         module: "Vault Compressor",
         actions: [
           "Upgrade Logistics Center when shipping becomes a meaningful part of your economy.",
+          "If Stability is low, focus on Maintenance/Repair Bay before pushing export lanes further.",
           "This is a control upgrade, not just a production upgrade.",
           "Best used alongside Refinery and Blueprint progression.",
         ],
@@ -4678,15 +4687,16 @@ export default function MleoBase() {
         const data = fmt((building.outputs?.DATA || 0) * next);
         return `Research Lab level ${next} will improve DATA generation to about ${data} and strengthen your long-term optimization path.`;
       },
-      why: "Research Lab is important because DATA gives depth to the economy. It helps the game scale through smarter progression instead of only more emissions.",
+      why: "Research Lab is important because DATA gives depth to the economy. It helps the game scale through smarter progression instead of only more emissions. If Stability is weak, the advanced DATA lane can still work, but your base feels more fragile—prioritize maintenance and keep Repair Bay supported.",
       linked: "DATA generation · advanced research · long-term optimization · strategy depth",
-      impact: "A stronger Research Lab improves your ability to unlock advanced systems and keeps progression feeling intelligent instead of flat.",
+      impact: "A stronger Research Lab improves your ability to unlock advanced systems and keeps progression feeling intelligent instead of flat. Low Stability makes advanced expansion feel riskier, so maintain rhythm instead of rushing levels.",
       tips: {
         building: "Miner Control",
         research: "Deep Scan",
         module: "Arcade Relay",
         actions: [
           "Upgrade Research Lab when you want stronger long-term progression tools.",
+          "If Stability is low, slow down Research Lab scaling and do maintenance first.",
           "Very useful if advanced research paths are becoming your next milestone.",
           "One of the best structures for strategic scaling.",
         ],
@@ -4722,378 +4732,430 @@ export default function MleoBase() {
   const DEVELOPMENT_INFO_COPY = {
     servoDrill: {
       title: "Servo Drill",
-      focus: "Ore production boost",
+      focus: "Direct Ore multiplier",
       text:
-        "Servo Drill is a production module focused on Quarry efficiency.\n\n" +
-        "What it does:\n" +
-        "• Increases Ore output.\n" +
-        "• Helps early and mid-game resource flow.\n" +
-        "• Makes Refinery support easier because Ore becomes more stable.\n\n" +
-        "Best use:\n" +
-        "Install it when Ore is your bottleneck or when you want to prepare for stronger Refinery cycles.",
+        "Servo Drill is a clean production module for your Ore lane.\n\n" +
+        "What it helps:\n" +
+        "• Makes Quarry output stronger.\n" +
+        "• Helps early and mid-game construction feel smoother.\n" +
+        "• Good when Ore is your first real bottleneck.\n\n" +
+        "Important:\n" +
+        "It boosts Ore output, but it does not solve Energy pressure by itself.",
       tips: {
         building: "Quarry",
+        supportBuildings: ["Power Cell", "Miner Control"],
         research: "Miner Sync",
+        supportResearch: ["Field Ops"],
         module: "Servo Drill",
+        operation: "",
+        watch: "If Quarry is starved by Energy, this module will not fix the root problem.",
         actions: [
-          "Upgrade Quarry first if Ore is still weak.",
-          "Install Servo Drill when you want smoother Ore flow.",
-          "Use it to support Refinery and future upgrades.",
+          "Take Servo Drill when Ore is slowing your upgrades.",
+          "Pair it with Miner Sync for a stronger Ore lane.",
+          "Keep Power Cell healthy so the Ore lane can actually run.",
         ],
       },
       nextStep: {
         label: "Open Quarry",
         tab: "build",
         target: "quarry",
-        why: "Servo Drill is strongest when Quarry production is already active.",
+        why: "Servo Drill is strongest when Quarry is already part of your main economy.",
       },
     },
 
     vaultCompressor: {
       title: "Vault Compressor",
-      focus: "Bank efficiency + shipping support",
+      focus: "Better bank and ship efficiency",
       text:
-        "Vault Compressor is an economy module focused on better MLEO flow.\n\n" +
-        "What it does:\n" +
-        "• Improves bank efficiency.\n" +
-        "• Adds support to shipment quality.\n" +
-        "• Helps turn BASE progress into stronger Shared Vault results.\n\n" +
-        "Best use:\n" +
-        "Very good once your Refinery is active and you are shipping regularly.",
+        "Vault Compressor improves the quality of your MLEO export loop.\n\n" +
+        "What it helps:\n" +
+        "• Better bank efficiency.\n" +
+        "• Better ship yield.\n" +
+        "• Stronger value from a mature Refinery + shipping setup.\n\n" +
+        "Important:\n" +
+        "It is most valuable after banked MLEO and shipping are already active.",
       tips: {
         building: "Refinery",
+        supportBuildings: ["Logistics Center"],
         research: "Logistics",
+        supportResearch: ["Routing AI"],
         module: "Vault Compressor",
+        operation: "Ship to Shared Vault",
+        watch: "This module is weak if your base is not producing enough banked MLEO yet.",
         actions: [
-          "Build Refinery first.",
-          "Ship regularly to feel the value of this module.",
-          "Pair it with Logistics research for stronger export flow.",
+          "Install it once shipping becomes part of your normal loop.",
+          "Pair it with Logistics Center for better export value.",
+          "Do not prioritize it over fixing Ore, Scrap or Energy problems.",
         ],
       },
       nextStep: {
         label: "Open Shipping",
         tab: "operations",
         target: "shipping",
-        why: "This module matters most when banked MLEO is already moving into the Shared Vault.",
+        why: "Vault Compressor becomes meaningful when you actively ship banked MLEO.",
       },
     },
 
     arcadeRelay: {
       title: "Arcade Relay",
-      focus: "XP + DATA support",
+      focus: "Mission XP and DATA support",
       text:
-        "Arcade Relay is a progression module that supports missions and strategic growth.\n\n" +
-        "What it does:\n" +
-        "• Improves mission XP.\n" +
-        "• Improves DATA gain.\n" +
-        "• Helps BASE feel more connected to wider progression systems.\n\n" +
-        "Best use:\n" +
-        "Install it when you want faster commander growth and smarter long-term scaling.",
+        "Arcade Relay supports the softer progression side of BASE.\n\n" +
+        "What it helps:\n" +
+        "• Better mission XP.\n" +
+        "• Better DATA gain.\n" +
+        "• Strong support for commander progression rhythm.\n\n" +
+        "Important:\n" +
+        "This is a progression helper, not a raw production engine.",
       tips: {
         building: "Arcade Hub",
+        supportBuildings: ["Research Lab", "Expedition Bay"],
         research: "Arcade Ops",
+        supportResearch: ["Deep Scan"],
         module: "Arcade Relay",
+        operation: "Daily Missions / Field Expedition",
+        watch: "It feels best in active play, not in a passive-only build.",
         actions: [
-          "Run missions consistently.",
-          "Use it when commander XP matters more.",
-          "Pair it with Arcade Hub and Research Lab progression.",
+          "Take Arcade Relay when you are leaning into missions and DATA.",
+          "Pair it with Arcade Hub for smoother commander growth.",
+          "Use it when you want a lighter, more active-feeling progression loop.",
         ],
       },
       nextStep: {
-        label: "Open Daily Missions",
-        tab: "operations",
-        target: "missions",
-        why: "Arcade Relay is most noticeable when you actively claim mission rewards.",
+        label: "Open Arcade Hub",
+        tab: "build",
+        target: "arcadeHub",
+        why: "Arcade Relay fits best when Arcade Hub is already part of your build.",
       },
     },
 
     minerLink: {
       title: "Miner Link",
-      focus: "Ore quality + refinery stability",
+      focus: "Ore support and refinery stress relief",
       text:
-        "Miner Link is a synergy module between raw resource growth and safer processing.\n\n" +
-        "What it does:\n" +
-        "• Improves Ore output.\n" +
-        "• Supports Refinery stability.\n" +
-        "• Helps the whole production loop feel smoother.\n\n" +
-        "Best use:\n" +
-        "Great when your economy starts depending on both Quarry and Refinery at the same time.",
-      tips: {
-        building: "Miner Control",
-        research: "Miner Sync",
-        module: "Miner Link",
-        actions: [
-          "Use it once your base becomes more production-heavy.",
-          "Excellent before bigger Refinery scaling.",
-          "Best when Ore and stability both matter.",
-        ],
-      },
-      nextStep: {
-        label: "Open Miner Control",
-        tab: "build",
-        target: "minerControl",
-        why: "Miner Link works best as part of your wider Miners synergy path.",
-      },
-    },
-
-    coolant: {
-      title: "Coolant Loops",
-      focus: "Energy cap + regeneration",
-      text:
-        "Coolant Loops is one of the most useful early research upgrades in BASE.\n\n" +
-        "What it does:\n" +
-        "• Increases Energy regeneration.\n" +
-        "• Increases Energy cap.\n" +
-        "• Makes the whole base feel less stalled.\n\n" +
-        "Best use:\n" +
-        "Research this early if you often feel that Energy is slowing everything down.",
-      tips: {
-        building: "Power Cell",
-        research: "Coolant Loops",
-        module: "",
-        actions: [
-          "Take this early if Energy feels frustrating.",
-          "Pair it with Power Cell upgrades.",
-          "Use it before scaling multiple active systems.",
-        ],
-      },
-      nextStep: {
-        label: "Open Power Cell",
-        tab: "build",
-        target: "powerCell",
-        why: "Power Cell and Coolant Loops are your main Energy foundation.",
-      },
-    },
-
-    routing: {
-      title: "Routing AI",
-      focus: "Bank efficiency",
-      text:
-        "Routing AI improves how efficiently your BASE economy converts progress into useful output.\n\n" +
-        "What it does:\n" +
-        "• Improves bank efficiency.\n" +
-        "• Helps economy flow feel smarter and cleaner.\n" +
-        "• Unlocks stronger follow-up research paths.\n\n" +
-        "Best use:\n" +
-        "Strong choice once you want a more optimized economy instead of only raw production.",
+        "Miner Link is a bridge module between raw industry and safer processing.\n\n" +
+        "What it helps:\n" +
+        "• More Ore output.\n" +
+        "• Better Refinery-related stability handling.\n" +
+        "• Stronger industrial flow in mid-game.\n\n" +
+        "Important:\n" +
+        "This is one of the best support modules if you want a production-heavy base without making Stability feel too fragile.",
       tips: {
         building: "Refinery",
-        research: "Routing AI",
-        module: "Vault Compressor",
+        supportBuildings: ["Quarry", "Repair Bay"],
+        research: "Predictive Maintenance",
+        supportResearch: ["Miner Sync"],
+        module: "Miner Link",
+        operation: "Maintenance Cycle",
+        watch: "It helps refinery stress, but it does not replace Repair Bay and good maintenance timing.",
         actions: [
-          "Use it after stabilizing your basic production.",
-          "Good before deep economy scaling.",
-          "Helps unlock several stronger research branches.",
+          "Take Miner Link before pushing Refinery too hard.",
+          "Pair it with Repair Bay for a safer industrial mid-game.",
+          "Great choice when Ore and banked MLEO are both important to your plan.",
         ],
       },
       nextStep: {
         label: "Open Refinery",
         tab: "build",
         target: "refinery",
-        why: "Bank efficiency becomes more meaningful once Refinery flow is active.",
+        why: "Miner Link becomes most valuable when Refinery is central to your build.",
       },
     },
 
-    fieldOps: {
-      title: "Field Ops",
-      focus: "Crew bonus scaling",
+    coolant: {
+      title: "Coolant Loops",
+      focus: "Early Energy support",
       text:
-        "Field Ops improves how effective your crew becomes over time.\n\n" +
-        "What it does:\n" +
-        "• Increases crew bonus value.\n" +
-        "• Strengthens progression through command identity.\n" +
-        "• Supports stronger mid-game scaling.\n\n" +
-        "Best use:\n" +
-        "Research it when crew investment is becoming part of your main plan.",
+        "Coolant Loops is one of the cleanest early-game research upgrades.\n\n" +
+        "What it helps:\n" +
+        "• Adds Energy regen.\n" +
+        "• Adds Energy cap.\n" +
+        "• Makes early expansion less punishing.\n\n" +
+        "Important:\n" +
+        "This is support research, not a replacement for Power Cell.",
       tips: {
-        building: "HQ",
-        research: "Field Ops",
+        building: "Power Cell",
+        supportBuildings: ["Repair Bay"],
+        research: "Coolant Loops",
+        supportResearch: [],
         module: "",
+        operation: "Emergency Refill",
+        watch: "If you keep choking on Energy, Power Cell still matters more.",
         actions: [
-          "Hire crew before expecting full value.",
-          "Useful once command growth matters more.",
-          "Helps multiple systems at once through crew scaling.",
+          "Research this early if Energy feels too tight.",
+          "Pair it with Power Cell for real stability.",
+          "Great support before scaling heavy passive buildings.",
         ],
       },
       nextStep: {
-        label: "Open HQ",
+        label: "Open Power Cell",
         tab: "build",
-        target: "hq",
-        why: "Field Ops fits best into a stronger command-centered base.",
+        target: "powerCell",
+        why: "Coolant Loops is best when paired with your main Energy structure.",
       },
     },
 
-    minerSync: {
-      title: "Miner Sync",
-      focus: "Ore output + mission support",
+    routing: {
+      title: "Routing AI",
+      focus: "Bank efficiency support",
       text:
-        "Miner Sync is a research path for better Ore momentum and stronger daily progression.\n\n" +
-        "What it does:\n" +
-        "• Improves Ore output.\n" +
-        "• Adds support to daily mission flow.\n" +
-        "• Makes the base feel more productive and active.\n\n" +
-        "Best use:\n" +
-        "Great when Ore demand is rising and you want better progression rhythm.",
-      tips: {
-        building: "Quarry",
-        research: "Miner Sync",
-        module: "Servo Drill",
-        actions: [
-          "Use it when Ore keeps running short.",
-          "Excellent together with Servo Drill.",
-          "Helpful before stronger Refinery expansion.",
-        ],
-      },
-      nextStep: {
-        label: "Open Quarry",
-        tab: "build",
-        target: "quarry",
-        why: "Miner Sync is strongest when Quarry is already part of your main economy.",
-      },
-    },
-
-    arcadeOps: {
-      title: "Arcade Ops",
-      focus: "Commander XP + expedition rewards",
-      text:
-        "Arcade Ops improves strategic progression and reward quality.\n\n" +
-        "What it does:\n" +
-        "• Increases commander XP gains.\n" +
-        "• Improves expedition rewards.\n" +
-        "• Supports wider ecosystem progression.\n\n" +
-        "Best use:\n" +
-        "Take it when you want BASE to feel more rewarding beyond raw resources.",
-      tips: {
-        building: "Arcade Hub",
-        research: "Arcade Ops",
-        module: "Arcade Relay",
-        actions: [
-          "Best for XP-focused progression.",
-          "Use it if expeditions are part of your main routine.",
-          "Strong long-term growth research.",
-        ],
-      },
-      nextStep: {
-        label: "Open Expedition",
-        tab: "operations",
-        target: "expedition",
-        why: "Arcade Ops becomes more visible when you actively run expeditions.",
-      },
-    },
-
-    logistics: {
-      title: "Logistics",
-      focus: "Ship efficiency",
-      text:
-        "Logistics is a direct shipment research upgrade.\n\n" +
-        "What it does:\n" +
-        "• Improves ship efficiency.\n" +
-        "• Makes export flow smoother.\n" +
-        "• Helps Shared Vault growth feel cleaner and more efficient.\n\n" +
-        "Best use:\n" +
-        "Very useful once you are shipping often and want better return from each export cycle.",
+        "Routing AI improves the quality of your bank flow.\n\n" +
+        "What it helps:\n" +
+        "• Better bank efficiency.\n" +
+        "• Smoother export foundation.\n" +
+        "• Better long-term value from shipping systems.\n\n" +
+        "Important:\n" +
+        "Routing AI is part of a shipping chain, not a standalone economy fix.",
       tips: {
         building: "Logistics Center",
-        research: "Logistics",
+        supportBuildings: ["Refinery"],
+        research: "Routing AI",
+        supportResearch: ["Logistics"],
         module: "Vault Compressor",
+        operation: "Ship to Shared Vault",
+        watch: "Weak Refinery output means this research has little to optimize.",
         actions: [
-          "Use it once you ship regularly.",
-          "Very strong with Logistics Center upgrades.",
-          "Supports long-term Shared Vault growth.",
+          "Take Routing AI when shipping starts to matter.",
+          "Use it as setup for stronger logistics-focused progression.",
+          "Good value once banked MLEO becomes steady.",
         ],
       },
       nextStep: {
         label: "Open Logistics Center",
         tab: "build",
         target: "logisticsCenter",
-        why: "This research is most valuable when your shipment system is already developed.",
+        why: "Routing AI supports the export systems around Logistics Center.",
+      },
+    },
+
+    fieldOps: {
+      title: "Field Ops",
+      focus: "Role support and command scaling",
+      text:
+        "Field Ops strengthens the effect of crew identity and command planning.\n\n" +
+        "What it helps:\n" +
+        "• Improves crew-related support.\n" +
+        "• Unlocks stronger advanced research lanes.\n" +
+        "• Helps transition into a more structured mid-game.\n\n" +
+        "Important:\n" +
+        "Field Ops is a bridge research. It is more about enabling the next layer than giving one huge raw stat.",
+      tips: {
+        building: "HQ",
+        supportBuildings: ["Expedition Bay", "Research Lab"],
+        research: "Field Ops",
+        supportResearch: ["Arcade Ops", "Predictive Maintenance"],
+        module: "",
+        operation: "",
+        watch: "It shines more once your base already has a few active systems.",
+        actions: [
+          "Take it before advanced support research.",
+          "Useful when your build is moving from early setup into real specialization.",
+          "Pairs well with active mission and expedition play.",
+        ],
+      },
+      nextStep: {
+        label: "Open Development",
+        tab: "development",
+        target: "crew",
+        why: "Field Ops supports the broader command identity layer.",
+      },
+    },
+
+    minerSync: {
+      title: "Miner Sync",
+      focus: "Ore scaling and mission utility",
+      text:
+        "Miner Sync is one of the strongest direct Ore researches.\n\n" +
+        "What it helps:\n" +
+        "• More Ore output.\n" +
+        "• Better industrial scaling.\n" +
+        "• Extra daily mission support.\n\n" +
+        "Important:\n" +
+        "Excellent when Ore is the real bottleneck and you want both economy and progression flow.",
+      tips: {
+        building: "Quarry",
+        supportBuildings: ["Power Cell", "Miner Control"],
+        research: "Miner Sync",
+        supportResearch: ["Field Ops"],
+        module: "Servo Drill",
+        operation: "",
+        watch: "It boosts Ore, but does not solve weak Scrap or Energy by itself.",
+        actions: [
+          "Take Miner Sync when Quarry is already central to your base.",
+          "Pair with Servo Drill for a much stronger Ore lane.",
+          "Very useful if upgrades keep feeling Ore-starved.",
+        ],
+      },
+      nextStep: {
+        label: "Open Quarry",
+        tab: "build",
+        target: "quarry",
+        why: "Miner Sync is built to strengthen your main Ore source.",
+      },
+    },
+
+    arcadeOps: {
+      title: "Arcade Ops",
+      focus: "XP and expedition reward support",
+      text:
+        "Arcade Ops boosts active progression and expedition value.\n\n" +
+        "What it helps:\n" +
+        "• More commander XP.\n" +
+        "• Better expedition rewards.\n" +
+        "• Stronger active-play progression rhythm.\n\n" +
+        "Important:\n" +
+        "This research feels best when missions and expeditions are already a real part of your loop.",
+      tips: {
+        building: "Expedition Bay",
+        supportBuildings: ["Arcade Hub"],
+        research: "Arcade Ops",
+        supportResearch: ["Deep Scan"],
+        module: "Arcade Relay",
+        operation: "Field Expedition",
+        watch: "Less valuable in a passive-only style.",
+        actions: [
+          "Take Arcade Ops when expeditions are part of your core play.",
+          "Pair it with Arcade Relay for a smoother active progression lane.",
+          "Good research for players who like a livelier command rhythm.",
+        ],
+      },
+      nextStep: {
+        label: "Open Expedition Bay",
+        tab: "build",
+        target: "expeditionBay",
+        why: "Arcade Ops works best when expeditions are already relevant.",
+      },
+    },
+
+    logistics: {
+      title: "Logistics",
+      focus: "Shipping efficiency and export flow",
+      text:
+        "Logistics is one of the main export researches.\n\n" +
+        "What it helps:\n" +
+        "• Better ship efficiency.\n" +
+        "• Smoother export rhythm.\n" +
+        "• Better value from mature banked MLEO flow.\n\n" +
+        "Important:\n" +
+        "It is strongest after Refinery and shipping are already alive.",
+      tips: {
+        building: "Logistics Center",
+        supportBuildings: ["Refinery"],
+        research: "Logistics",
+        supportResearch: ["Routing AI"],
+        module: "Vault Compressor",
+        operation: "Ship to Shared Vault",
+        watch: "Shipping research feels weak when there is little banked MLEO to move.",
+        actions: [
+          "Take it once shipping becomes daily behavior.",
+          "Pair it with Routing AI and Vault Compressor for a true export lane.",
+          "Best when you already have something meaningful to ship.",
+        ],
+      },
+      nextStep: {
+        label: "Open Shipping",
+        tab: "operations",
+        target: "shipping",
+        why: "This research directly supports the shipping loop.",
       },
     },
 
     predictiveMaintenance: {
       title: "Predictive Maintenance",
-      focus: "Slower decay + safer base",
+      focus: "Slower stability pressure growth",
       text:
-        "Predictive Maintenance is a defensive research that protects long-term performance.\n\n" +
-        "What it does:\n" +
-        "• Slows maintenance decay.\n" +
-        "• Improves Repair Bay value.\n" +
-        "• Makes large bases easier to manage.\n\n" +
-        "Best use:\n" +
-        "Excellent when the base starts feeling fragile or you are juggling many active systems.",
+        "Predictive Maintenance is a key defensive research for heavier bases.\n\n" +
+        "What it helps:\n" +
+        "• Slows maintenance pressure.\n" +
+        "• Makes Repair Bay work better.\n" +
+        "• Makes advanced production builds feel safer.\n\n" +
+        "Important:\n" +
+        "This is one of the best researches when you want Refinery and advanced systems without constant stability pain.",
       tips: {
         building: "Repair Bay",
+        supportBuildings: ["Power Cell", "Refinery"],
         research: "Predictive Maintenance",
+        supportResearch: ["Field Ops"],
         module: "Miner Link",
+        operation: "Maintenance Cycle",
+        watch: "It reduces pressure, but you still need to do maintenance when the base is stressed.",
         actions: [
-          "Take it when stability starts slipping more often.",
-          "Very useful for safer scaling.",
-          "Great with Repair Bay upgrades.",
+          "Take this before pushing a heavy mid-game setup too far.",
+          "Pair with Repair Bay for much better stability control.",
+          "Especially useful if Refinery is becoming important.",
         ],
       },
       nextStep: {
         label: "Open Repair Bay",
         tab: "build",
         target: "repairBay",
-        why: "This research has the best impact when Repair Bay is part of your setup.",
+        why: "Predictive Maintenance is strongest when Repair Bay is active in your build.",
       },
     },
 
     deepScan: {
       title: "Deep Scan",
-      focus: "More DATA + better rare findings",
+      focus: "Expedition DATA and rare-find support",
       text:
-        "Deep Scan is a research path for stronger strategic rewards.\n\n" +
-        "What it does:\n" +
-        "• Improves DATA from expeditions.\n" +
-        "• Improves rare discovery quality.\n" +
-        "• Strengthens advanced progression routes.\n\n" +
-        "Best use:\n" +
-        "Good for players who want more strategic value from expeditions instead of only basic rewards.",
+        "Deep Scan makes expeditions more rewarding on the strategic side.\n\n" +
+        "What it helps:\n" +
+        "• More DATA from expeditions.\n" +
+        "• Better rare findings.\n" +
+        "• More value from active field play.\n\n" +
+        "Important:\n" +
+        "This is best for players who use expeditions for more than just occasional utility.",
       tips: {
-        building: "Research Lab",
+        building: "Expedition Bay",
+        supportBuildings: ["Research Lab", "Arcade Hub"],
         research: "Deep Scan",
+        supportResearch: ["Arcade Ops"],
         module: "Arcade Relay",
+        operation: "Field Expedition",
+        watch: "If expeditions are rare in your playstyle, this research will feel niche.",
         actions: [
-          "Use it if expeditions are frequent.",
-          "Very good for DATA-focused progression.",
-          "Supports advanced research pacing.",
+          "Take Deep Scan when expeditions are a real part of progression.",
+          "Great for DATA-focused active play.",
+          "Pairs well with Arcade Ops for a stronger field loop.",
         ],
       },
       nextStep: {
-        label: "Open Expedition",
-        tab: "operations",
-        target: "expedition",
-        why: "Deep Scan is felt most clearly through active expedition loops.",
+        label: "Open Expedition Bay",
+        tab: "build",
+        target: "expeditionBay",
+        why: "Deep Scan is tied directly to expedition value.",
       },
     },
 
     tokenDiscipline: {
       title: "Token Discipline",
-      focus: "Lower raw MLEO + stronger DATA + better ship quality",
+      focus: "Trade raw bank speed for higher quality support",
       text:
         "Token Discipline is an advanced balancing research.\n\n" +
-        "What it does:\n" +
-        "• Reduces raw banked MLEO output.\n" +
-        "• Increases DATA output.\n" +
-        "• Improves shipment quality.\n\n" +
-        "Best use:\n" +
-        "This is for a smarter, more controlled economy. It is less about raw speed and more about healthier long-term scaling.",
+        "What it helps:\n" +
+        "• Higher DATA output.\n" +
+        "• Better ship quality.\n" +
+        "• A more controlled advanced economy style.\n\n" +
+        "Tradeoff:\n" +
+        "It reduces raw banked MLEO output while improving the quality of the broader strategic loop.",
       tips: {
         building: "Research Lab",
+        supportBuildings: ["Logistics Center", "Refinery"],
         research: "Token Discipline",
+        supportResearch: ["Logistics", "Deep Scan"],
         module: "Vault Compressor",
+        operation: "Ship to Shared Vault",
+        watch: "Do not take it blindly if you only care about raw banked MLEO speed.",
         actions: [
-          "Take it when you want strategic depth over raw output.",
-          "Good for controlled long-term economy balance.",
-          "Best for advanced BASE identity.",
+          "Choose this when you want a more advanced, balanced economy style.",
+          "Strong for DATA + shipping synergy builds.",
+          "Less attractive if your goal is only raw Refinery throughput.",
         ],
       },
       nextStep: {
         label: "Open Research Lab",
         tab: "build",
         target: "researchLab",
-        why: "Token Discipline belongs to a more advanced DATA-driven build path.",
+        why: "Token Discipline fits advanced builds that already value DATA and strategic flow.",
       },
     },
   };
@@ -5257,182 +5319,218 @@ export default function MleoBase() {
   const MISSION_INFO_COPY = {
     upgrade_building: {
       title: "Mission: Upgrade 1 building",
-      focus: "Progress the base by improving any structure",
+      focus: "Simple progression teaching mission",
       text:
-        "This mission completes when you upgrade any building by one level.\n\n" +
-        "Good ways to finish it:\n" +
-        "• Upgrade cheap early structures.\n" +
-        "• Use it together with your current bottleneck.\n" +
-        "• Do not force an expensive upgrade only for the mission if it slows your economy.",
+        "This mission rewards you for keeping the base moving.\n\n" +
+        "Why it matters:\n" +
+        "• Encourages active growth.\n" +
+        "• Helps new players avoid sitting idle too long.\n" +
+        "• Good early mission because it teaches the upgrade loop naturally.",
       tips: {
-        building: "HQ",
+        building: "Any useful current bottleneck building",
+        supportBuildings: ["HQ", "Power Cell", "Quarry"],
         research: "",
+        supportResearch: [],
         module: "",
+        operation: "",
+        watch: "Do not force a bad upgrade only to complete the mission.",
         actions: [
-          "Cheap structures are often the fastest mission completion.",
-          "Use this mission to push real progression, not random spending.",
-          "Good early options are Quarry, Trade Hub or Power Cell.",
+          "Use this mission to justify a useful upgrade you already need.",
+          "Power Cell and Quarry are often safe early picks.",
+          "Treat the mission as guidance, not as a trap.",
         ],
       },
       nextStep: {
         label: "Open Structures",
         tab: "build",
         target: "hq",
-        why: "Any structure upgrade can complete this mission.",
+        why: "This mission is completed through your normal building upgrades.",
       },
     },
 
     run_expedition: {
       title: "Mission: Complete 1 expedition",
-      focus: "Use Operations to gain mixed rewards",
+      focus: "Reward active field play",
       text:
-        "This mission completes after launching and resolving one expedition.\n\n" +
-        "Good for:\n" +
-        "• Scrap and DATA support.\n" +
-        "• Flexible progression.\n" +
-        "• Combining mission progress with resource gain.",
+        "This mission pushes the player into expeditions in a soft, understandable way.\n\n" +
+        "Why it matters:\n" +
+        "• Gives a reason to use the field system.\n" +
+        "• Supports mixed-resource progression.\n" +
+        "• Feels more active and fun than pure passive waiting.",
       tips: {
         building: "Expedition Bay",
+        supportBuildings: ["Power Cell"],
         research: "Arcade Ops",
+        supportResearch: ["Deep Scan"],
         module: "Arcade Relay",
+        operation: "Field Expedition",
+        watch: "Do not force expeditions when Energy is already choking the base.",
         actions: [
-          "Make sure Energy is high enough first.",
-          "This mission is usually efficient because it also gives useful loot.",
-          "Very good when you also need Scrap or DATA.",
+          "Use this mission when expedition costs are comfortable.",
+          "Good mission for Scrap and DATA support.",
+          "Better once Expedition Bay is online.",
         ],
       },
       nextStep: {
         label: "Open Expedition",
         tab: "operations",
         target: "expedition",
-        why: "This is the exact action that completes the mission.",
+        why: "This mission is completed directly through expedition play.",
       },
     },
 
     generate_data: {
       title: "Mission: Generate 12 DATA",
-      focus: "Grow your research and advanced progression",
+      focus: "Teach the strategic value of DATA",
       text:
-        "This mission tracks DATA generation over time.\n\n" +
-        "Best ways to do it:\n" +
-        "• Upgrade Research Lab.\n" +
-        "• Use Miner Control and Arcade Hub.\n" +
-        "• Run expeditions and DATA-support systems.",
+        "This mission highlights DATA as a real progression lane, not just a side stat.\n\n" +
+        "Why it matters:\n" +
+        "• Encourages Research Lab and support DATA systems.\n" +
+        "• Teaches that advanced progress depends on DATA pace.\n" +
+        "• Helps players notice weak DATA economy earlier.",
       tips: {
         building: "Research Lab",
+        supportBuildings: ["Miner Control", "Arcade Hub"],
         research: "Deep Scan",
+        supportResearch: ["Arcade Ops"],
         module: "Arcade Relay",
+        operation: "Field Expedition",
+        watch: "Weak DATA usually slows the whole advanced game quietly.",
         actions: [
-          "Research Lab is the clearest DATA structure.",
-          "Expeditions can help finish this mission faster.",
-          "DATA is more valuable later, so this mission is strong long-term.",
+          "Use Research Lab as the main answer.",
+          "Support with Miner Control and Arcade Hub.",
+          "Expeditions can help when you need a burst.",
         ],
       },
       nextStep: {
         label: "Open Research Lab",
         tab: "build",
         target: "researchLab",
-        why: "Research Lab is one of the best ways to improve DATA flow.",
+        why: "Research Lab is the main long-term DATA structure.",
       },
     },
 
     perform_maintenance: {
       title: "Mission: Perform 1 maintenance",
-      focus: "Protect stability and keep systems healthy",
+      focus: "Teach preventive stability play",
       text:
-        "This mission completes when you run one maintenance action.\n\n" +
+        "This mission teaches that maintenance is part of normal healthy play, not only emergency repair.\n\n" +
         "Why it matters:\n" +
-        "• Encourages safer base management.\n" +
-        "• Helps avoid losing momentum through instability.\n" +
-        "• Rewards good control, not only expansion.",
+        "• Encourages players to care about Stability earlier.\n" +
+        "• Makes the defensive side of the game feel rewarded.\n" +
+        "• Prevents players from learning the system only through failure.",
       tips: {
         building: "Repair Bay",
+        supportBuildings: ["Power Cell"],
         research: "Predictive Maintenance",
-        module: "",
+        supportResearch: ["Field Ops"],
+        module: "Miner Link",
+        operation: "Maintenance Cycle",
+        watch: "Waiting too long usually makes maintenance feel reactive instead of smart.",
         actions: [
-          "Best done before stability gets dangerous.",
-          "A healthy base grows better than a rushed unstable base.",
-          "Use this mission as a reminder to maintain regularly.",
+          "Do maintenance before the base feels damaged.",
+          "Great mission for teaching stability habits.",
+          "Especially useful when Refinery is becoming active.",
         ],
       },
       nextStep: {
         label: "Open Maintenance",
         tab: "operations",
         target: "maintenance",
-        why: "Maintenance action completes this mission directly.",
+        why: "This mission is completed directly through the maintenance action.",
       },
     },
 
     double_expedition: {
       title: "Mission: Launch 2 expeditions",
-      focus: "Spend Energy for repeated field progress",
+      focus: "Push deeper into the active field loop",
       text:
-        "This mission needs two expeditions, so it is more demanding than the basic expedition mission.\n\n" +
-        "Best use:\n" +
-        "Complete it when your Energy economy is stable and you want extra field rewards anyway.",
+        "This mission is a stronger version of the expedition rhythm.\n\n" +
+        "Why it matters:\n" +
+        "• Rewards more active command play.\n" +
+        "• Makes expedition investment feel more useful.\n" +
+        "• Supports Scrap and DATA recovery routes.",
       tips: {
         building: "Expedition Bay",
+        supportBuildings: ["Power Cell", "Arcade Hub"],
         research: "Arcade Ops",
+        supportResearch: ["Deep Scan"],
         module: "Arcade Relay",
+        operation: "Field Expedition",
+        watch: "Only worth forcing if your Energy and DATA can comfortably support it.",
         actions: [
-          "Avoid this when your Energy economy is weak.",
-          "Much better once Power Cell and regen are stronger.",
-          "Good mission when you need Scrap and DATA together.",
+          "Best when expeditions are already part of your play loop.",
+          "Avoid pushing this mission if Energy is unstable.",
+          "Good mission for active players, less important for passive styles.",
         ],
       },
       nextStep: {
         label: "Open Expedition",
         tab: "operations",
         target: "expedition",
-        why: "You need repeated expedition usage to finish this mission.",
+        why: "This mission is fully tied to expedition activity.",
       },
     },
 
     ship_mleo: {
       title: "Mission: Ship 60 MLEO",
-      focus: "Move base value into the shared vault",
+      focus: "Teach the export loop clearly",
       text:
-        "This mission tracks shipped MLEO from BASE into the Shared Vault.\n\n" +
-        "To complete it:\n" +
-        "• Produce banked MLEO with Refinery.\n" +
-        "• Keep enough output ready.\n" +
-        "• Use shipping when the amount is available.",
+        "This mission teaches that BASE progress becomes real vault progress only after shipping.\n\n" +
+        "Why it matters:\n" +
+        "• Connects Refinery to Shared Vault clearly.\n" +
+        "• Encourages real use of the export loop.\n" +
+        "• Helps players understand banked vs shipped value.",
       tips: {
         building: "Refinery",
+        supportBuildings: ["Logistics Center", "Quarry", "Salvage Yard"],
         research: "Logistics",
+        supportResearch: ["Routing AI"],
         module: "Vault Compressor",
+        operation: "Ship to Shared Vault",
+        watch: "Do not focus on shipping if banked MLEO generation is still weak.",
         actions: [
-          "This mission depends on your production loop, not only on clicking ship.",
-          "Refinery + shipping upgrades make it much easier.",
-          "Good mission because it also strengthens your main vault.",
+          "Build enough banked MLEO first.",
+          "Use Logistics support when shipping becomes regular.",
+          "Excellent mission for teaching the full MLEO loop.",
         ],
       },
       nextStep: {
         label: "Open Shipping",
         tab: "operations",
         target: "shipping",
-        why: "Shipping is the action that converts banked MLEO into mission progress.",
+        why: "This mission is completed through the shipping action.",
       },
     },
 
     spend_vault: {
       title: "Mission: Spend 50 MLEO from vault",
-      focus: "Use shared vault resources strategically",
+      focus: "Teach reinvestment instead of only hoarding",
       text:
-        "This mission completes when you spend MLEO from the Shared Vault.\n\n" +
-        "What it teaches:\n" +
-        "• Vault MLEO is not only for saving.\n" +
-        "• Some progression systems are worth reinvesting into.\n" +
-        "• Smart spending can be part of progress, not a loss.",
+        "This mission teaches that Shared Vault is also meant to be reinvested, not only stored.\n\n" +
+        "Why it matters:\n" +
+        "• Encourages Blueprint and other vault actions.\n" +
+        "• Makes the vault feel alive instead of static.\n" +
+        "• Helps players understand long-term reinvestment decisions.",
       tips: {
-        building: "",
-        research: "",
-        module: "",
+        building: "Logistics Center",
+        supportBuildings: ["Refinery"],
+        research: "Logistics",
+        supportResearch: ["Routing AI"],
+        module: "Vault Compressor",
+        operation: "Blueprint / Refill / Overclock",
+        watch: "Spending vault value blindly can hurt if the base is not ready to use the benefit well.",
         actions: [
-          "Do not spend vault blindly only for the mission.",
-          "Use it when the upgrade or action is actually useful.",
-          "Best when combined with systems that need vault investment.",
+          "Blueprint is the cleanest long-term spend.",
+          "Refill is emergency recovery, not ideal routine spending.",
+          "This mission is about smart reinvestment, not random spending.",
         ],
+      },
+      nextStep: {
+        label: "Open Blueprint",
+        tab: "systems",
+        target: "blueprint",
+        why: "Blueprint is the most natural long-term Shared Vault spend path.",
       },
     },
   };
