@@ -6911,34 +6911,9 @@ export default function MleoBase() {
 
   const mobileTopStats = [
     {
-      key: "sharedVault",
-      label: "Vault",
-      value: `${fmt(sharedVault)} MLEO`,
-    },
-    {
-      key: "bankedMleo",
-      label: "Banked",
-      value: `${fmt(state.bankedMleo)} MLEO`,
-    },
-    {
-      key: "energy",
-      label: "Energy",
-      value: `${fmt(state.resources.ENERGY)}/${fmt(derived.energyCap)}`,
-    },
-    {
-      key: "stability",
-      label: "Stability",
-      value: `${fmt(state.stability)}%`,
-    },
-    {
-      key: "data",
-      label: "Data",
-      value: fmt(state.resources.DATA),
-    },
-    {
-      key: "ore",
-      label: "Ore",
-      value: fmt(state.resources.ORE),
+      key: "scrap",
+      label: "Scrap",
+      value: fmt(state.resources.SCRAP),
     },
     {
       key: "gold",
@@ -6946,9 +6921,34 @@ export default function MleoBase() {
       value: fmt(state.resources.GOLD),
     },
     {
-      key: "scrap",
-      label: "Scrap",
-      value: fmt(state.resources.SCRAP),
+      key: "ore",
+      label: "Ore",
+      value: fmt(state.resources.ORE),
+    },
+    {
+      key: "data",
+      label: "Data",
+      value: fmt(state.resources.DATA),
+    },
+    {
+      key: "stability",
+      label: "Stability",
+      value: `${fmt(state.stability)}%`,
+    },
+    {
+      key: "energy",
+      label: "Energy",
+      value: `${fmt(state.resources.ENERGY)}/${fmt(derived.energyCap)}`,
+    },
+    {
+      key: "bankedMleo",
+      label: "Banked",
+      value: `${fmt(state.bankedMleo)}`,
+    },
+    {
+      key: "sharedVault",
+      label: "Vault",
+      value: `${fmt(sharedVault)}`,
     },
   ];
 
@@ -8075,7 +8075,7 @@ export default function MleoBase() {
                     key={item.key}
                     type="button"
                     onClick={() => openHomeFlowTarget(item.key)}
-                    className="shrink-0 min-w-[104px] rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-left"
+                    className="shrink-0 min-w-[78px] rounded-2xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-left"
                   >
                     <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
                       {item.label}
