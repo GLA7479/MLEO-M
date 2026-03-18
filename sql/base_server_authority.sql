@@ -485,12 +485,12 @@ BEGIN
   v_mleo_mult := v_mleo_mult * v_hq_bonus * v_stability_factor;
   v_data_mult := v_data_mult * v_hq_bonus * v_stability_factor;
 
-  v_energy_cap := 140 + (v_power * 36);
-  v_energy_regen := 4.6 + (v_power * 1.75);
+  v_energy_cap := 140 + (v_power * 42);
+  v_energy_regen := 4.6 + (v_power * 2.2);
 
   IF public.base_jsonb_bool(v_research, 'coolant', false) THEN
-    v_energy_cap := v_energy_cap + 18;
-    v_energy_regen := v_energy_regen + 1.15;
+    v_energy_cap := v_energy_cap + 22;
+    v_energy_regen := v_energy_regen + 1.35;
   END IF;
 
   v_ship_cap := 12000 + (v_logistics * 1800) + (v_blueprint * 450);
@@ -519,11 +519,11 @@ BEGIN
       (v_quarry * 0.72)
     + (v_trade * 0.78)
     + (v_salvage * 0.78)
-    + (v_refinery * 1.35)
-    + (v_miner * 0.22)
-    + (v_arcade * 0.24)
-    + (v_logistics * 0.22)
-    + (v_research_lab * 0.26)
+    + (v_refinery * 1.10)
+    + (v_miner * 0.20)
+    + (v_arcade * 0.22)
+    + (v_logistics * 0.20)
+    + (v_research_lab * 0.24)
     + (v_repair * 0.22);
 
   IF v_energy_now < (v_energy_use * v_elapsed_seconds) THEN

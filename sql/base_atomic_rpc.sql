@@ -241,10 +241,10 @@ BEGIN
   v_blueprint_level := coalesce(v_state.blueprint_level, 0);
   v_stats := coalesce(v_state.stats, '{}'::jsonb);
   v_energy_cap := 140
-  + (coalesce((coalesce(v_state.buildings, '{}'::jsonb)->>'powerCell')::integer, 0) * 36)
+  + (coalesce((coalesce(v_state.buildings, '{}'::jsonb)->>'powerCell')::integer, 0) * 42)
   + CASE
       WHEN coalesce((coalesce(v_state.research, '{}'::jsonb)->>'coolant')::boolean, false)
-      THEN 18
+      THEN 22
       ELSE 0
     END;
 

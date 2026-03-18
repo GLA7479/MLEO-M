@@ -93,7 +93,7 @@ const BUILDINGS = [
     baseCost: { GOLD: 240, SCRAP: 45 },
     growth: 1.24,
     energyUse: 0,
-    power: { cap: 36, regen: 1.75 },
+    power: { cap: 42, regen: 2.2 },
     requires: [{ key: "tradeHub", lvl: 1 }],
   },
   {
@@ -213,7 +213,7 @@ const RESEARCH = [
   {
     key: "coolant",
     name: "Coolant Loops",
-    desc: "+1.0 Energy regen and +15 Energy cap.",
+    desc: "+1.35 Energy regen and +22 Energy cap.",
     cost: { ORE: 240, SCRAP: 70 },
   },
   {
@@ -676,12 +676,19 @@ function getAlerts(state, derived, systemState, liveContracts = []) {
     });
   }
 
-  if (energyCap > 0 && energy <= energyCap * 0.12) {
+  if (energyCap > 0 && energy <= energyCap * 0.08) {
+    alerts.push({
+      key: "low-energy",
+      tone: "critical",
+      title: "Critical energy reserve",
+      text: "Energy reserve is critically low. Refill now or allow systems to recover.",
+    });
+  } else if (energyCap > 0 && energy <= energyCap * 0.18) {
     alerts.push({
       key: "low-energy",
       tone: "warning",
-      title: "Critical energy reserve",
-      text: "Energy reserve is critically low. Refill now or allow systems to recover.",
+      title: "Low energy reserve",
+      text: "Energy is getting low. Consider refill or Power Cell soon.",
     });
   }
 
@@ -1344,8 +1351,8 @@ function derive(state, now = Date.now()) {
   };
 
   return {
-    energyCap: CONFIG.baseEnergyCap + powerLevel * 36 + (state.research.coolant ? 18 : 0),
-    energyRegen: CONFIG.baseEnergyRegen + powerLevel * 1.75 + (state.research.coolant ? 1.15 : 0),
+    energyCap: CONFIG.baseEnergyCap + powerLevel * 42 + (state.research.coolant ? 22 : 0),
+    energyRegen: CONFIG.baseEnergyRegen + powerLevel * 2.2 + (state.research.coolant ? 1.35 : 0),
     oreMult,
     goldMult,
     scrapMult,
@@ -1400,7 +1407,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
   const dt = clamp(elapsedMs / 1000, 0, 60 * 60 * 12);
   const effective = dt * efficiency;
   const d = derive(next, now);
-  const reserveEnergy = Math.max(10, Math.floor(d.energyCap * 0.08));
+  const reserveEnergy = Math.max(8, Math.floor(d.energyCap * 0.06));
   const dataBefore = next.resources.DATA || 0;
 
   next.resources.ENERGY = clamp(next.resources.ENERGY + d.energyRegen * dt, 0, d.energyCap);
@@ -1433,28 +1440,28 @@ function simulate(state, elapsedMs, efficiency = 1) {
   });
 
   runBuilding("minerControl", (level) => {
-    const energyNeed = 0.22 * level * dt;
+    const energyNeed = 0.20 * level * dt;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.18 * level * d.dataMult * effective;
   });
 
   runBuilding("arcadeHub", (level) => {
-    const energyNeed = 0.24 * level * dt;
+    const energyNeed = 0.22 * level * dt;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.15 * level * d.dataMult * effective;
   });
 
   runBuilding("researchLab", (level) => {
-    const energyNeed = 0.26 * level * dt;
+    const energyNeed = 0.24 * level * dt;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.28 * level * d.dataMult * effective;
   });
 
   runBuilding("logisticsCenter", (level) => {
-    const energyNeed = 0.22 * level * dt;
+    const energyNeed = 0.20 * level * dt;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.08 * level * d.dataMult * effective;
@@ -1468,7 +1475,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
   });
 
   runBuilding("refinery", (level) => {
-    const energyNeed = 1.35 * level * dt;
+    const energyNeed = 1.10 * level * dt;
     const oreNeed = 1.8 * level * effective;
     const scrapNeed = 0.7 * level * effective;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
@@ -1794,7 +1801,7 @@ function getNextStep(state, derived, systemState, liveContracts = []) {
     };
   }
 
-  if (energyCap > 0 && energy <= energyCap * 0.12) {
+  if (energyCap > 0 && energy <= energyCap * 0.08) {
     return {
       title: "Recover energy reserves",
       text: "Energy reserve is critically low. Refill now or allow systems to recover.",
