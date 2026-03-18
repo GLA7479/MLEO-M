@@ -6520,7 +6520,32 @@ export default function MleoBase() {
       if (tab) setStructuresTab(tab);
 
       routePanel("build", "build-structures");
-      setBuildInfo(getBuildingInfo(building));
+      // Mobile: open the upgrade list directly (no info sheet overlay).
+      if (!isDesktopViewport) {
+        setOpenInfoKey(null);
+        setBuildInfo(null);
+
+        // Highlight + scroll the exact building card inside the build panel.
+        setHighlightTarget(target);
+        setTimeout(() => {
+          const el = document.querySelector(`[data-base-target="${target}"]`);
+          if (!el) return;
+
+          const centered = centerTargetInMobilePanel(el);
+          if (!centered) {
+            el.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+              inline: "nearest",
+            });
+          }
+        }, 320);
+
+        setTimeout(() => setHighlightTarget(null), 4200);
+      } else {
+        // Desktop: keep the existing behavior (info sheet available).
+        setBuildInfo(getBuildingInfo(building));
+      }
       return;
     }
   };
