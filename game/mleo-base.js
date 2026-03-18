@@ -2175,21 +2175,22 @@ const BASE_HOME_SCENE_POSITIONS = {
   // Shift the entire cluster slightly upward to reduce the empty top area.
   hq: { x: 50, y: 40 },
 
-  powerCell: { x: 78, y: 8 },
-  researchLab: { x: 69, y: 17 },
+  // Slightly spread left/right to avoid crowding while staying in bounds.
+  powerCell: { x: 80, y: 8 },
+  researchLab: { x: 67, y: 17 },
 
-  tradeHub: { x: 22, y: 5 },
+  tradeHub: { x: 20, y: 5 },
 
-  salvage: { x: 17, y: 31 },
-  arcadeHub: { x: 27, y: 25 },
-  minerControl: { x: 31, y: 17 },
+  salvage: { x: 15, y: 31 },
+  arcadeHub: { x: 26, y: 25 },
+  minerControl: { x: 33, y: 17 },
 
-  refinery: { x: 23, y: 50 },
-  quarry: { x: 16, y: 62 },
+  refinery: { x: 21, y: 50 },
+  quarry: { x: 15, y: 62 },
 
-  expeditionBay: { x: 83, y: 29 },
-  logisticsCenter: { x: 84, y: 45 },
-  repairBay: { x: 76, y: 60 },
+  expeditionBay: { x: 85, y: 29 },
+  logisticsCenter: { x: 86, y: 45 },
+  repairBay: { x: 78, y: 60 },
 };
 
 const BASE_HOME_SCENE_IDENTITY = {
@@ -2318,28 +2319,48 @@ function BaseHomeFlowScene({ base, derived, selected, onSelect }) {
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
       >
-        {links.map((node) => (
-          <line
-            key={`line-${node.key}`}
-            x1={hq.pos.x}
-            y1={hq.pos.y}
-            x2={node.pos.x}
-            y2={node.pos.y}
-            stroke="rgba(34,211,238,0.18)"
-            strokeWidth="0.45"
-            strokeDasharray="1.2 1.8"
-          />
-        ))}
+        {links.map((node) => {
+          const lineTone =
+            node.state === "critical"
+              ? { stroke: "rgba(244,63,94,0.22)", width: "0.58", dash: "2.2 1.3" }
+              : node.state === "warning"
+              ? { stroke: "rgba(251,191,36,0.18)", width: "0.5", dash: "1.6 1.4" }
+              : { stroke: "rgba(34,211,238,0.16)", width: "0.45", dash: "1.2 1.8" };
 
-        {links.map((node) => (
-          <circle
-            key={`dot-${node.key}`}
-            cx={(hq.pos.x + node.pos.x) / 2}
-            cy={(hq.pos.y + node.pos.y) / 2}
-            r="0.7"
-            fill={selected === node.key ? "rgba(255,255,255,0.95)" : "rgba(34,211,238,0.55)"}
-          />
-        ))}
+          return (
+            <line
+              key={`line-${node.key}`}
+              x1={hq.pos.x}
+              y1={hq.pos.y}
+              x2={node.pos.x}
+              y2={node.pos.y}
+              stroke={lineTone.stroke}
+              strokeWidth={lineTone.width}
+              strokeDasharray={lineTone.dash}
+            />
+          );
+        })}
+
+        {links.map((node) => {
+          const dotFill =
+            node.state === "critical"
+              ? "rgba(244,63,94,0.65)"
+              : node.state === "warning"
+              ? "rgba(251,191,36,0.55)"
+              : "rgba(34,211,238,0.55)";
+
+          const r = node.state === "critical" ? "1.0" : node.state === "warning" ? "0.85" : "0.7";
+
+          return (
+            <circle
+              key={`dot-${node.key}`}
+              cx={(hq.pos.x + node.pos.x) / 2}
+              cy={(hq.pos.y + node.pos.y) / 2}
+              r={r}
+              fill={selected === node.key ? "rgba(255,255,255,0.95)" : dotFill}
+            />
+          );
+        })}
       </svg>
 
       {nodes.map((node) => {
@@ -7985,7 +8006,7 @@ export default function MleoBase() {
               onClick={() => {
                 if (commandHubCount > 0) setShowReadyPanel(true);
               }}
-              className={`rounded-2xl border px-4 py-3 transition ${
+              className={`rounded-2xl border px-4 py-2 transition ${
                 commandHubCount > 0
                   ? `cursor-pointer shadow-[0_0_24px_rgba(34,211,238,0.18)] hover:border-cyan-400/80 ${
                       primaryCommandItem?.type === "alert"
@@ -8006,9 +8027,6 @@ export default function MleoBase() {
                         {commandHubCount}
                       </span>
                     )}
-                  </div>
-                  <div className="mt-0.5 text-xs text-white/75">
-                    {primaryCommandItem?.text || "Nothing needs attention right now."}
                   </div>
                 </div>
 
