@@ -2896,11 +2896,18 @@ export default function GamesHub() {
         </button>
       </div>
 
-                  <Link href="/mleo-base">
-                    <button className="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors">
-                      {questCard.play}
-          </button>
-                  </Link>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Link href="/mleo-base">
+                      <button className="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors">
+                        BASE
+                      </button>
+                    </Link>
+                    <Link href="/mleo-base-v2">
+                      <button className="w-full bg-sky-600 hover:bg-sky-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors">
+                        BASE V2
+                      </button>
+                    </Link>
+                  </div>
     </div>
   </article>
 
