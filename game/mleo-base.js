@@ -2653,6 +2653,21 @@ export default function MleoBase() {
   const activeInfo = openInfoKey ? INFO_COPY[openInfoKey] : null;
   const shownInfo = activeInfo || buildInfo;
 
+  // When user opens a resource info panel (e.g. Energy), show an "UPGRADE" button
+  // that jumps to the corresponding structure in the Build panel.
+  const infoUpgradeBuildingKey = (() => {
+    const info = activeInfo;
+    const buildingName = info?.tips?.building;
+    if (!buildingName) return null;
+
+    const normalized = String(buildingName).trim().toLowerCase();
+    const match = BUILDINGS.find((b) =>
+      String(b?.name || "").trim().toLowerCase() === normalized
+    );
+
+    return match?.key || null;
+  })();
+
   function toggleInnerPanel(panelKey) {
     setOpenInnerPanel((current) => (current === panelKey ? null : panelKey));
   }
@@ -7320,18 +7335,6 @@ export default function MleoBase() {
                 </div>
 
                 <div className="mt-2 flex w-full flex-col gap-2">
-                <button
-                  onClick={() => buyBuilding(building.key)}
-                  disabled={!ready}
-                  className={`w-full rounded-xl px-3 py-2 text-xs font-semibold leading-none transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
-                    canCoverCost(state.resources, cost)
-                      ? "bg-white/10"
-                      : "bg-white/10 opacity-70"
-                  }`}
-                >
-                  {buttonText}
-                </button>
-
                   {canThrottle && level > 0 ? (
                     <div className="grid grid-cols-5 gap-1.5">
                       {BUILDING_POWER_STEPS.map((mode) => {
@@ -7352,7 +7355,33 @@ export default function MleoBase() {
                         );
                       })}
                     </div>
-                  ) : null}
+                  ) : (
+                    // Keep exact visual spacing for buildings without power % controls.
+                    <div className="grid grid-cols-5 gap-1.5 opacity-0 pointer-events-none">
+                      {BUILDING_POWER_STEPS.map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          disabled
+                          className="rounded-lg border border-white/10 bg-white/5 px-1.5 py-1.5 text-[10px] font-bold text-white/70"
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => buyBuilding(building.key)}
+                    disabled={!ready}
+                    className={`w-full rounded-xl px-3 py-2 text-xs font-semibold leading-none transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
+                      canCoverCost(state.resources, cost)
+                        ? "bg-white/10"
+                        : "bg-white/10 opacity-70"
+                    }`}
+                  >
+                    {buttonText}
+                  </button>
                 </div>
               </div>
             </div>
@@ -9079,8 +9108,22 @@ export default function MleoBase() {
                     MLEO BASE INFO
                   </div>
 
-                  <div className="mt-2 pr-16 text-4xl font-black leading-none text-white">
-                    {shownInfo.title}
+                  <div className="mt-2 pr-16">
+                    <div className="flex items-end gap-3">
+                      <div className="text-4xl font-black leading-none text-white">
+                        {shownInfo.title}
+                      </div>
+
+                      {infoUpgradeBuildingKey ? (
+                        <button
+                          type="button"
+                          onClick={() => openHomeFlowTarget(infoUpgradeBuildingKey)}
+                          className="mb-1 rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[12px] font-bold text-white/85 hover:bg-white/10"
+                        >
+                          UPGRADE
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
 
                   {shownInfo?.focus ? (
