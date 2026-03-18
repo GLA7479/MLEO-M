@@ -2588,6 +2588,7 @@ export default function MleoBase() {
 
   const [desktopPanel, setDesktopPanel] = useState("ops");
   const [desktopCompact, setDesktopCompact] = useState(true);
+  const [desktopPanelOpen, setDesktopPanelOpen] = useState(false);
 
   const [activeEvent, setActiveEvent] = useState(null);
   const [eventCooldownUntil, setEventCooldownUntil] = useState(0);
@@ -2802,13 +2803,10 @@ export default function MleoBase() {
           setOpenInnerPanel("build-structures");
         }
       } else {
-        setDesktopPanel(targetTab);
-
-        if (targetInnerPanel) {
-          setOpenInnerPanel(targetInnerPanel);
-        } else if (targetTab === "build") {
-          setOpenInnerPanel("build-structures");
-        }
+        openDesktopPanel(
+          targetTab,
+          targetInnerPanel || (targetTab === "build" ? "build-structures" : null)
+        );
       }
     } catch {
       // no-op
@@ -7281,9 +7279,15 @@ export default function MleoBase() {
     setMobilePanel(null);
   };
 
+  const closeDesktopPanel = () => {
+    setOpenInnerPanel(null);
+    setDesktopPanelOpen(false);
+  };
+
   const openDesktopPanel = (panel, inner = null) => {
     setDesktopPanel(panel);
     setOpenInnerPanel(inner || null);
+    setDesktopPanelOpen(true);
   };
 
   const desktopPanelTitle =
@@ -7864,7 +7868,7 @@ export default function MleoBase() {
   return (
     <Layout title="MLEO BASE">
       <main className="h-[100dvh] overflow-hidden overflow-x-hidden bg-[#07111f] text-white sm:min-h-screen sm:h-auto sm:overflow-visible">
-        <div className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:pb-36">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               {/* Title pill removed for a cleaner V3 look */}
@@ -8037,8 +8041,685 @@ export default function MleoBase() {
 
           {/* Removed: desktop duplicate ORE/GOLD/SCRAP metric cards */}
 
+          {/* Desktop Home Scene */}
+          <div className="mt-4 hidden lg:block">
+            <div className="rounded-[30px] border border-white/10 bg-slate-950/72 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+              <div className="grid gap-4 xl:grid-cols-[1.12fr_0.88fr]">
+                <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-300/70">
+                        Desktop Flow
+                      </div>
+                      <div className="mt-1 text-2xl font-black text-white">Command Center</div>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/75">
+                      4 fixed windows
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (commandHubCount > 0) {
+                        openDesktopPanel("ops", "ops-console");
+                      }
+                    }}
+                    className={`mt-4 w-full rounded-3xl border px-4 py-3 text-left transition ${
+                      commandHubCount > 0
+                        ? `shadow-[0_0_24px_rgba(34,211,238,0.18)] hover:border-cyan-400/80 ${
+                            primaryCommandItem?.type === "alert"
+                              ? alertToneClasses(primaryCommandItem.tone)
+                              : "border-cyan-400/60 bg-cyan-500/10 hover:bg-cyan-500/15"
+                          }`
+                        : "border-white/10 bg-white/5"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <div className="text-base font-bold text-white">
+                            {primaryCommandItem?.title || "Base is stable"}
+                          </div>
+                          {commandHubCount > 0 ? (
+                            <span className="inline-flex min-w-[24px] items-center justify-center rounded-full bg-cyan-400 px-1.5 py-0.5 text-[10px] font-black text-slate-950">
+                              {commandHubCount}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mt-1 text-sm text-white/65">
+                          {primaryCommandItem?.text ||
+                            "Everything important should stay visible without scrolling the page."}
+                        </div>
+                      </div>
+
+                      <div
+                        className={`shrink-0 rounded-2xl px-3 py-2 text-xs font-semibold transition ${
+                          commandHubCount > 0
+                            ? "bg-cyan-500 text-white hover:bg-cyan-400"
+                            : "bg-white/10 text-white/80"
+                        }`}
+                      >
+                        {commandHubCount > 0 ? "OPEN" : "OK"}
+                      </div>
+                    </div>
+                  </button>
+
+                  <div className="mt-4 grid grid-cols-3 gap-3 xl:grid-cols-6">
+                    {mobileTopStats.map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => openHomeFlowTarget(item.key)}
+                        className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-left transition hover:bg-white/[0.08]"
+                      >
+                        <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
+                          {item.label}
+                        </div>
+                        <div className="mt-1 text-sm font-bold text-white">{item.value}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="mt-4">
+                    <BaseHomeFlowScene
+                      base={state}
+                      derived={derived}
+                      selected={highlightTarget}
+                      onSelect={openHomeFlowTarget}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 auto-rows-fr">
+                  <div className="relative">
+                    <InfoButton infoKey="sharedVault" setOpenInfoKey={setOpenInfoKey} />
+                    <MetricCard
+                      label="Shared Vault"
+                      value={`${fmt(sharedVault)} MLEO`}
+                      note="Shared across Miners, Arcade and Online."
+                      accent="emerald"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <InfoButton infoKey="bankedMleo" setOpenInfoKey={setOpenInfoKey} />
+                    <MetricCard
+                      label="Base Banked"
+                      value={`${fmt(state.bankedMleo)} MLEO`}
+                      note="Refined here, then shipped."
+                      accent="violet"
+                    />
+                  </div>
+
+                  <div
+                    className={`h-full w-full ${highlightCard(
+                      (state.resources.ENERGY || 0) <= derived.energyCap * 0.25,
+                      "warning"
+                    )}`}
+                  >
+                    <div className="relative">
+                      <InfoButton infoKey="energy" setOpenInfoKey={setOpenInfoKey} />
+                      <MetricCard
+                        label="Energy"
+                        value={`${fmt(state.resources.ENERGY)} / ${fmt(derived.energyCap)}`}
+                        note={`Regen ${derived.energyRegen.toFixed(2)}/s`}
+                        accent="slate"
+                      />
+                    </div>
+                  </div>
+
+                  <div
+                    className={`h-full w-full ${
+                      highlightCard(systemState === "critical", "critical") ||
+                      highlightCard(systemState === "warning", "warning")
+                    }`}
+                  >
+                    <div className="relative">
+                      <InfoButton infoKey="stability" setOpenInfoKey={setOpenInfoKey} />
+                      <MetricCard
+                        label="Stability"
+                        value={`${fmt(state.stability)}%`}
+                        note={systemMeta.label}
+                        accent={systemMeta.accent}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => openDesktopPanel("overview", "overview-recommendation")}
+                    className="rounded-2xl border border-cyan-400/20 bg-cyan-500/8 p-4 text-left transition hover:bg-cyan-500/12"
+                  >
+                    <div className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-200/70">
+                      Next step
+                    </div>
+                    <div className="mt-1 text-sm font-bold text-white">{nextStep.title}</div>
+                    <div className="mt-1 text-xs text-white/60">{nextStep.text}</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openDesktopPanel("overview", "overview-contracts")}
+                    className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-left transition hover:bg-white/[0.08]"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/45">
+                        Live contracts
+                      </div>
+                      {liveContractsAvailableCount > 0 ? (
+                        <span className="inline-flex min-w-[22px] items-center justify-center rounded-full bg-cyan-400 px-1.5 py-0.5 text-[10px] font-black text-slate-950">
+                          {liveContractsAvailableCount}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-1 text-sm font-bold text-white">
+                      {liveContractsAvailableCount > 0
+                        ? `${liveContractsAvailableCount} reward${
+                            liveContractsAvailableCount > 1 ? "s" : ""
+                          } ready`
+                        : "No rewards ready"}
+                    </div>
+                    <div className="mt-1 text-xs text-white/60">Open the window to claim or review.</div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop Fixed Nav */}
+          <div className="fixed inset-x-0 bottom-0 z-[118] hidden lg:block px-6 pb-6 pt-3">
+            <div className="mx-auto max-w-4xl rounded-3xl border border-white/10 bg-slate-950/88 p-2 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { key: "overview", label: "Overview", badge: readyCounts.contracts + readyCounts.missions },
+                  { key: "ops", label: "Operations", badge: readyCounts.expedition + readyCounts.shipment },
+                  { key: "build", label: "Build", badge: buildOpportunitiesCount },
+                  { key: "intel", label: "Intel", badge: 0 },
+                ].map((tab) => {
+                  const active = desktopPanelOpen && desktopPanel === tab.key;
+                  const hasBadge = Number(tab.badge || 0) > 0;
+
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => openDesktopPanel(tab.key)}
+                      className={`relative rounded-2xl px-4 py-3 text-sm font-bold transition ${
+                        active
+                          ? "bg-cyan-500 text-white"
+                          : hasBadge
+                          ? "border border-cyan-400/40 bg-cyan-500/10 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.12)]"
+                          : "border border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                      }`}
+                    >
+                      {tab.label}
+                      {hasBadge ? (
+                        <span className="absolute -right-1 -top-1 inline-flex min-w-5 h-5 items-center justify-center rounded-full bg-cyan-400 px-1 text-[10px] font-black text-slate-950">
+                          {tab.badge}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop Panel Overlay */}
+          {desktopPanelOpen ? (
+            <div className="fixed inset-0 z-[117] hidden lg:block bg-black/55 backdrop-blur-sm">
+              <div className="absolute inset-x-6 top-[88px] bottom-[106px]">
+                <div className="mx-auto h-full max-w-6xl rounded-[30px] border border-white/10 bg-[#0b1526] shadow-2xl">
+                  <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-300/70">
+                        Desktop Window
+                      </div>
+                      <div className="mt-1 text-2xl font-black text-white">{desktopPanelTitle}</div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <WindowBankedBadge value={state.bankedMleo || 0} />
+                      <button
+                        onClick={closeDesktopPanel}
+                        className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-white/90 hover:bg-white/10"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="h-[calc(100%-81px)] overflow-y-auto px-5 py-4">
+                    {desktopPanel === "overview" ? (
+                      <div className="space-y-3">
+                        <BaseResourceBar
+                          resources={state.resources}
+                          energy={state.resources?.ENERGY || 0}
+                          energyCap={derived.energyCap || 140}
+                          bankedMleo={state.bankedMleo || 0}
+                          compact
+                          showBanked={false}
+                        />
+                        <div
+                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                            overviewRecommendationCount > 0
+                          )}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-lg font-bold text-white">Next Recommended Step</div>
+                              {openInnerPanel !== "overview-recommendation" ? (
+                                <div className="mt-1 text-sm text-white/60">
+                                  Suggested next action for your base
+                                </div>
+                              ) : null}
+                            </div>
+                            <button
+                              onClick={() => toggleInnerPanel("overview-recommendation")}
+                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            >
+                              {openInnerPanel === "overview-recommendation" ? "CLOSE" : "OPEN"}
+                            </button>
+                          </div>
+                          {openInnerPanel === "overview-recommendation" && (
+                            <div className="mt-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+                              <div className="text-base font-bold text-white">{nextStep.title}</div>
+                              <div className="mt-1 text-sm text-white/70">{nextStep.text}</div>
+                            </div>
+                          )}
+                        </div>
+
+                        {buildOpportunitiesCount > 0 ? (
+                          <button
+                            onClick={() => openDesktopPanel("build")}
+                            className="w-full rounded-3xl border border-cyan-400/20 bg-cyan-500/6 p-4 text-left shadow-[0_0_18px_rgba(34,211,238,0.06)]"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <div className="text-lg font-extrabold text-white">Build opportunities</div>
+                                <div className="mt-1 text-sm text-cyan-100/75">
+                                  {availableStructuresCount > 0 ? `${availableStructuresCount} structures` : null}
+                                  {availableStructuresCount > 0 && availableModulesCount > 0 ? " · " : null}
+                                  {availableModulesCount > 0 ? `${availableModulesCount} modules` : null}
+                                  {(availableStructuresCount > 0 || availableModulesCount > 0) &&
+                                  availableResearchCount > 0
+                                    ? " · "
+                                    : null}
+                                  {availableResearchCount > 0 ? `${availableResearchCount} research` : null}
+                                  {(availableStructuresCount > 0 ||
+                                    availableModulesCount > 0 ||
+                                    availableResearchCount > 0) &&
+                                  availableBlueprintCount > 0
+                                    ? " · "
+                                    : null}
+                                  {availableBlueprintCount > 0 ? "blueprint ready" : null}
+                                </div>
+                              </div>
+                              <span className="inline-flex min-w-7 h-7 items-center justify-center rounded-full bg-cyan-400 px-2 text-xs font-black text-slate-950">
+                                {buildOpportunitiesCount}
+                              </span>
+                            </div>
+                          </button>
+                        ) : null}
+
+                        {showCrew ? (
+                          <div
+                            className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                              overviewIdentityCount > 0
+                            )}`}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="text-lg font-bold text-white">Command Identity</div>
+                                {openInnerPanel !== "overview-identity" ? (
+                                  <div className="mt-1 text-sm text-white/60">
+                                    Current crew role and commander path
+                                  </div>
+                                ) : null}
+                              </div>
+                              <button
+                                onClick={() => toggleInnerPanel("overview-identity")}
+                                className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                              >
+                                {openInnerPanel === "overview-identity" ? "CLOSE" : "OPEN"}
+                              </button>
+                            </div>
+                            {openInnerPanel === "overview-identity" && (
+                              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                                  <div className="text-sm font-semibold text-white">{crewRoleInfo.name}</div>
+                                  <div className="mt-1 text-xs text-white/60">{roleBonusText}</div>
+                                </div>
+                                <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                                  <div className="text-sm font-semibold text-white">{commanderPathInfo.name}</div>
+                                  <div className="mt-1 text-xs text-white/60">{commanderPathText}</div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+
+                        <div
+                          data-base-target="contracts"
+                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                            liveContractsAvailableCount > 0
+                          )} ${
+                            isHighlightedTarget("contracts", highlightTarget)
+                              ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                              : ""
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <div className="text-lg font-bold text-white">Live Contracts</div>
+                                <SectionAvailabilityBadge count={liveContractsAvailableCount} />
+                              </div>
+                              {openInnerPanel !== "overview-contracts" ? (
+                                <div className="mt-1 text-sm text-white/60">
+                                  {liveContractsAvailableCount > 0
+                                    ? `${liveContractsAvailableCount} contract reward${
+                                        liveContractsAvailableCount > 1 ? "s" : ""
+                                      } ready`
+                                    : "No contract rewards ready right now"}
+                                </div>
+                              ) : null}
+                            </div>
+                            <button
+                              onClick={() => toggleInnerPanel("overview-contracts")}
+                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            >
+                              {openInnerPanel === "overview-contracts" ? "CLOSE" : "OPEN"}
+                            </button>
+                          </div>
+                          {openInnerPanel === "overview-contracts" && (
+                            <div className="mt-3 grid gap-2 md:grid-cols-2">
+                              {[...liveContracts].sort((a, b) => {
+                                const aReady = a.done && !a.claimed ? 1 : 0;
+                                const bReady = b.done && !b.claimed ? 1 : 0;
+                                return bReady - aReady;
+                              }).map((contract) => (
+                                <div
+                                  key={contract.key}
+                                  className={`rounded-2xl border border-white/10 bg-black/20 p-3 ${
+                                    contract.done && !contract.claimed ? highlightCard(true, "success") : ""
+                                  }`}
+                                >
+                                  <div className="text-sm font-semibold text-white">{contract.title}</div>
+                                  <div className="mt-1 text-xs text-white/60">{contract.rewardText}</div>
+                                  <button
+                                    onClick={() => claimContract(contract.key)}
+                                    disabled={!contract.done || contract.claimed}
+                                    className="mt-3 w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:opacity-40"
+                                  >
+                                    {contract.claimed ? "Claimed" : contract.done ? "Claim" : "In Progress"}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {desktopPanel === "ops" ? (
+                      <div className="space-y-3">
+                        <BaseResourceBar
+                          resources={state.resources}
+                          energy={state.resources?.ENERGY || 0}
+                          energyCap={derived.energyCap || 140}
+                          bankedMleo={state.bankedMleo || 0}
+                          compact
+                          showBanked={false}
+                        />
+
+                        <div
+                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                            operationsConsoleAvailableCount > 0
+                          )}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <div className="text-lg font-bold text-white">Operations Console</div>
+                                <SectionAvailabilityBadge count={operationsConsoleAvailableCount} />
+                              </div>
+                              {openInnerPanel !== "ops-console" ? (
+                                <div className="mt-1 text-sm text-white/60">
+                                  {sectionStatusHint("operations-console", {
+                                    expedition: readyCounts.expedition > 0,
+                                    ship: readyCounts.shipment > 0,
+                                    refill: readyCounts.refill > 0,
+                                    maintain: readyCounts.maintenance > 0,
+                                  })}
+                                </div>
+                              ) : null}
+                            </div>
+                            <button
+                              onClick={() => toggleInnerPanel("ops-console")}
+                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            >
+                              {openInnerPanel === "ops-console" ? "CLOSE" : "OPEN"}
+                            </button>
+                          </div>
+                          {openInnerPanel === "ops-console" && (
+                            <div className="mt-3">{operationsConsoleContent}</div>
+                          )}
+                        </div>
+
+                        <div
+                          data-base-target="missions"
+                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                            dailyMissionsAvailableCount > 0
+                          )} ${
+                            isHighlightedTarget("missions", highlightTarget)
+                              ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                              : ""
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <div className="text-lg font-bold text-white">Daily Missions</div>
+                                <SectionAvailabilityBadge count={dailyMissionsAvailableCount} />
+                              </div>
+                              {openInnerPanel !== "ops-missions" ? (
+                                <div className="mt-1 text-sm text-white/60">
+                                  {sectionStatusHint("daily-missions", { count: dailyMissionsAvailableCount })}
+                                </div>
+                              ) : null}
+                            </div>
+                            <button
+                              onClick={() => toggleInnerPanel("ops-missions")}
+                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            >
+                              {openInnerPanel === "ops-missions" ? "CLOSE" : "OPEN"}
+                            </button>
+                          </div>
+                          {openInnerPanel === "ops-missions" && (
+                            <div className="mt-3">{dailyMissionsContent}</div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {desktopPanel === "build" ? (
+                      <div className="space-y-3">
+                        <BaseResourceBar
+                          resources={state.resources}
+                          energy={state.resources?.ENERGY || 0}
+                          energyCap={derived.energyCap || 140}
+                          bankedMleo={state.bankedMleo || 0}
+                          compact
+                          showBanked={false}
+                        />
+
+                        <div
+                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                            developmentAvailableCount > 0
+                          )}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <div className="text-lg font-bold text-white">Development</div>
+                                <SectionAvailabilityBadge count={developmentAvailableCount} />
+                              </div>
+                              {openInnerPanel !== "build-development" ? (
+                                <div className="mt-1 text-sm text-white/60">
+                                  {buildSectionHint("development", {
+                                    modules: availableModulesCount,
+                                    research: availableResearchCount,
+                                  })}
+                                </div>
+                              ) : null}
+                            </div>
+                            <button
+                              onClick={() => toggleInnerPanel("build-development")}
+                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            >
+                              {openInnerPanel === "build-development" ? "CLOSE" : "OPEN"}
+                            </button>
+                          </div>
+                          {openInnerPanel === "build-development" && (
+                            <div className="mt-3">{crewModulesResearchContent}</div>
+                          )}
+                        </div>
+
+                        <div
+                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                            structuresAvailableCount > 0
+                          )}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <div className="text-lg font-bold text-white">Base Structures</div>
+                                <SectionAvailabilityBadge count={structuresAvailableCount} />
+                              </div>
+                              {openInnerPanel !== "build-structures" ? (
+                                <div className="mt-1 text-sm text-white/60">
+                                  {buildSectionHint("structures", {
+                                    structures: availableStructuresCount,
+                                  })}
+                                </div>
+                              ) : null}
+                            </div>
+                            <button
+                              onClick={() => toggleInnerPanel("build-structures")}
+                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            >
+                              {openInnerPanel === "build-structures" ? "CLOSE" : "OPEN"}
+                            </button>
+                          </div>
+                          {openInnerPanel === "build-structures" && (
+                            <div className="mt-3">{baseStructuresContent}</div>
+                          )}
+                        </div>
+
+                        <div
+                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                            supportAvailableCount > 0
+                          )}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <div className="text-lg font-bold text-white">Support Systems</div>
+                                <SectionAvailabilityBadge count={supportAvailableCount} />
+                              </div>
+                              {openInnerPanel !== "build-support" ? (
+                                <div className="mt-1 text-sm text-white/60">
+                                  {buildSectionHint("support", {
+                                    support: availableBlueprintCount,
+                                  })}
+                                </div>
+                              ) : null}
+                            </div>
+                            <button
+                              onClick={() => toggleInnerPanel("build-support")}
+                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            >
+                              {openInnerPanel === "build-support" ? "CLOSE" : "OPEN"}
+                            </button>
+                          </div>
+                          {openInnerPanel === "build-support" ? (
+                            <div className="mt-3">{buildSupportSystemsContent}</div>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {desktopPanel === "intel" ? (
+                      <div className="space-y-3">
+                        <BaseResourceBar
+                          resources={state.resources}
+                          energy={state.resources?.ENERGY || 0}
+                          energyCap={derived.energyCap || 140}
+                          bankedMleo={state.bankedMleo || 0}
+                          compact
+                          showBanked={false}
+                        />
+                        <div
+                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                            intelSummaryAvailableCount > 0
+                          )}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-lg font-bold text-white">Progress Summary</div>
+                              {openInnerPanel !== "intel-summary" ? (
+                                <div className="mt-1 text-sm text-white/60">
+                                  Key progress and identity data
+                                </div>
+                              ) : null}
+                            </div>
+                            <button
+                              onClick={() => toggleInnerPanel("intel-summary")}
+                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            >
+                              {openInnerPanel === "intel-summary" ? "CLOSE" : "OPEN"}
+                            </button>
+                          </div>
+                          {openInnerPanel === "intel-summary" && (
+                            <div className="mt-3">{progressSummaryContent}</div>
+                          )}
+                        </div>
+
+                        <div
+                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
+                            intelLogAvailableCount > 0
+                          )}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-lg font-bold text-white">Activity Log</div>
+                              {openInnerPanel !== "intel-log" ? (
+                                <div className="mt-1 text-sm text-white/60">
+                                  Recent events and milestones
+                                </div>
+                              ) : null}
+                            </div>
+                            <button
+                              onClick={() => toggleInnerPanel("intel-log")}
+                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                            >
+                              {openInnerPanel === "intel-log" ? "CLOSE" : "OPEN"}
+                            </button>
+                          </div>
+                          {openInnerPanel === "intel-log" && (
+                            <div className="mt-3">{activityLogContent}</div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {/* Desktop Command Center */}
-          <div className="mt-4 hidden lg:flex lg:min-h-[640px] lg:max-h-[calc(100vh-104px)] lg:gap-3">
+          <div className="hidden">
             {/* LEFT SIDEBAR */}
             <aside className="w-[184px] shrink-0 lg:flex lg:h-full lg:flex-col lg:gap-2">
               <div className="space-y-2.5">
