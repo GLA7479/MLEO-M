@@ -49,7 +49,7 @@ export function BaseHudV3({ base }) {
   return (
     <>
       <div className="md:hidden w-full">
-        <div className="rounded-[24px] border border-slate-800 bg-slate-900/70 px-3 py-3 backdrop-blur">
+        <div className="rounded-[24px] border border-slate-800 bg-slate-900/72 px-3 py-3 backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Base V3</div>
@@ -85,7 +85,7 @@ export function BaseHudV3({ base }) {
 
       {/* Desktop */}
       <div className="hidden md:block">
-        <div className="rounded-[28px] border border-slate-800 bg-slate-900/70 p-4 backdrop-blur">
+        <div className="rounded-[28px] border border-slate-800 bg-slate-900/72 p-4 backdrop-blur">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Base V3</div>

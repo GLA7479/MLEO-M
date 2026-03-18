@@ -269,7 +269,7 @@ export default function MleoBaseV3() {
   return (
     <Layout>
       <div className="bg-slate-950 text-slate-50 min-h-[100dvh] md:h-[100dvh] md:overflow-hidden">
-        <div className="mx-auto flex h-[100dvh] max-w-[1600px] flex-col overflow-hidden px-2 py-2 md:grid md:grid-cols-[330px_minmax(0,1fr)] md:gap-3 md:px-3 md:py-3">
+        <div className="mx-auto flex h-[100dvh] max-w-[1600px] flex-col overflow-hidden px-2 py-2 md:grid md:grid-cols-[332px_minmax(0,1fr)] md:gap-3 md:px-3 md:py-3">
           <aside className="hidden md:flex md:min-h-0 md:flex-col md:gap-3">
             <BaseHudV3 base={baseState} />
             <BaseHintV3 base={baseState} />

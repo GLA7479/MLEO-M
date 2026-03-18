@@ -1,5 +1,5 @@
 export function ActivityFeedV3({ items, mode = "mobile" }) {
-  const list = Array.isArray(items) ? items.slice(0, mode === "desktop" ? 8 : 4) : [];
+  const list = Array.isArray(items) ? items.slice(0, mode === "desktop" ? 8 : 1) : [];
 
   if (mode === "desktop") {
     return (
@@ -29,29 +29,20 @@ export function ActivityFeedV3({ items, mode = "mobile" }) {
     );
   }
 
-  const mobileList = list.slice(0, 4).reverse();
+  if (list.length === 0) return null;
+
+  const item = list[0];
 
   return (
     <div className="w-full pb-1">
-      <div className="flex gap-1.5 overflow-x-auto no-scrollbar text-[10px] text-slate-300">
-        {mobileList.length === 0 ? (
-          <span className="rounded-full border border-slate-800 bg-slate-950/70 px-2.5 py-1.5 text-slate-500">
-            Your base is idle. Make a move.
-          </span>
-        ) : (
-          mobileList.map((it, idx) => (
-            <div
-              key={it?.id ?? idx}
-              className={`shrink-0 rounded-full border px-2.5 py-1.5 ${
-                it?.type === "error"
-                  ? "border-red-500/30 bg-red-950/25 text-red-100"
-                  : "border-slate-800 bg-slate-950/70 text-slate-300"
-              }`}
-            >
-              {it?.message ?? "Event"}
-            </div>
-          ))
-        )}
+      <div
+        className={`rounded-2xl border px-3 py-2 text-[11px] ${
+          item?.type === "error"
+            ? "border-red-500/30 bg-red-950/20 text-red-100"
+            : "border-slate-800 bg-slate-950/70 text-slate-300"
+        }`}
+      >
+        {item?.message ?? "Event"}
       </div>
     </div>
   );
