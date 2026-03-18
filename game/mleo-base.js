@@ -2399,11 +2399,7 @@ function BaseHomeFlowScene({ base, derived, selected, onSelect }) {
         );
       })}
 
-      <div className="pointer-events-none absolute left-3 right-3 top-3 flex items-center justify-center">
-        <div className="rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/55">
-          {nodes.length - 1} buildings online
-        </div>
-      </div>
+      {/* Buildings online badge removed */}
     </div>
   );
 }
