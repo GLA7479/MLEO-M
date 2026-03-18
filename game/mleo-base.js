@@ -2173,23 +2173,23 @@ const BASE_HOME_SCENE_ORDER = [
 
 const BASE_HOME_SCENE_POSITIONS = {
   // Shift the entire cluster slightly upward to reduce the empty top area.
-  hq: { x: 50, y: 38 },
+  hq: { x: 50, y: 40 },
 
-  powerCell: { x: 78, y: 6 },
-  researchLab: { x: 69, y: 15 },
+  powerCell: { x: 78, y: 8 },
+  researchLab: { x: 69, y: 17 },
 
-  tradeHub: { x: 22, y: 3 },
+  tradeHub: { x: 22, y: 5 },
 
-  salvage: { x: 17, y: 29 },
-  arcadeHub: { x: 27, y: 23 },
-  minerControl: { x: 31, y: 15 },
+  salvage: { x: 17, y: 31 },
+  arcadeHub: { x: 27, y: 25 },
+  minerControl: { x: 31, y: 17 },
 
-  refinery: { x: 23, y: 48 },
-  quarry: { x: 16, y: 60 },
+  refinery: { x: 23, y: 50 },
+  quarry: { x: 16, y: 62 },
 
-  expeditionBay: { x: 83, y: 27 },
-  logisticsCenter: { x: 84, y: 43 },
-  repairBay: { x: 76, y: 58 },
+  expeditionBay: { x: 83, y: 29 },
+  logisticsCenter: { x: 84, y: 45 },
+  repairBay: { x: 76, y: 60 },
 };
 
 const BASE_HOME_SCENE_IDENTITY = {
