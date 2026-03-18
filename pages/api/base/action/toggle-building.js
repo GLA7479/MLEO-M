@@ -61,9 +61,18 @@ export default async function handler(req, res) {
       });
     }
 
-    const { building_key, paused } = req.body || {};
+    const { building_key, paused, power_mode } = req.body || {};
     const buildingKey = String(building_key || "").trim();
-    const pausedBool = !!paused;
+
+    // Support both:
+    // - legacy: { paused: boolean }  -> power_mode 0/100
+    // - new:    { power_mode: 0|25|50|75|100 }
+    let powerMode;
+    if (typeof power_mode !== "undefined") {
+      powerMode = Number(power_mode);
+    } else if (typeof paused === "boolean") {
+      powerMode = paused ? 0 : 100;
+    }
 
     if (!buildingKey) {
       return res.status(400).json({
@@ -73,22 +82,30 @@ export default async function handler(req, res) {
       });
     }
 
-    if (typeof paused !== "boolean") {
+    if (typeof powerMode !== "number" || !Number.isFinite(powerMode)) {
       return res.status(400).json({
         success: false,
-        code: "BASE_INVALID_PAUSE_VALUE",
-        message: "paused must be boolean",
+        code: "BASE_INVALID_POWER_MODE",
+        message: "power_mode must be one of 0, 25, 50, 75, 100 (or paused boolean for legacy)",
+      });
+    }
+
+    if (![0, 25, 50, 75, 100].includes(powerMode)) {
+      return res.status(400).json({
+        success: false,
+        code: "BASE_INVALID_POWER_MODE",
+        message: "power_mode must be one of 0, 25, 50, 75, 100",
       });
     }
 
     const supabase = getSupabaseAdmin();
 
     const { data: rpcData, error: rpcError } = await supabase.rpc(
-      "base_set_building_paused",
+      "base_set_building_power_mode",
       {
         p_device_id: deviceId,
         p_building_key: buildingKey,
-        p_paused: pausedBool,
+        p_power_mode: powerMode,
       }
     );
 
@@ -106,15 +123,15 @@ export default async function handler(req, res) {
     if (!result) {
       return res.status(400).json({
         success: false,
-        code: "BASE_TOGGLE_FAILED",
+        code: "BASE_POWER_MODE_FAILED",
         message: "RPC returned no data",
       });
     }
 
     return res.status(200).json({
       success: true,
-      paused: !!result.paused,
-      paused_buildings: result.paused_buildings || {},
+      power_mode: Number(result.power_mode ?? powerMode ?? 100),
+      building_power_modes: result.building_power_modes || {},
       state: result.state,
     });
   } catch (error) {

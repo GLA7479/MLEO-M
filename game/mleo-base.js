@@ -16,7 +16,7 @@ import {
   hireCrewAction,
   performMaintenanceAction,
   claimBaseMission,
-  toggleBuildingPause,
+  setBuildingPowerMode,
 } from "../lib/baseVaultClient";
 
 const MAX_LOG_ITEMS = 16;
@@ -165,8 +165,10 @@ const BUILDINGS = [
   },
 ];
 
-// Buildings whose passive output/drain can be paused (runtime only, upgrade level remains).
-const PAUSABLE_BUILDINGS = new Set([
+const BUILDING_POWER_STEPS = [0, 25, 50, 75, 100];
+const DEFAULT_BUILDING_POWER_MODE = 100;
+
+const RUNTIME_CONTROLLED_BUILDINGS = new Set([
   "quarry",
   "tradeHub",
   "salvage",
@@ -185,26 +187,60 @@ function fmtRate(value, digits = 2) {
   return n.toFixed(digits).replace(/\.?0+$/, "").replace(/\.$/, "");
 }
 
-function canPauseBuilding(buildingKey) {
-  return PAUSABLE_BUILDINGS.has(buildingKey);
+function canThrottleBuilding(buildingKey) {
+  return RUNTIME_CONTROLLED_BUILDINGS.has(buildingKey);
 }
 
-function isBuildingPaused(state, buildingKey) {
-  return !!state?.pausedBuildings?.[buildingKey];
+function normalizePowerMode(value) {
+  const n = Number(value);
+  return BUILDING_POWER_STEPS.includes(n) ? n : DEFAULT_BUILDING_POWER_MODE;
 }
 
-function getBuildingEnergyLine(building, level, paused) {
-  if (building.key === "powerCell") return "Passive: no ENERGY drain";
-  const effectiveDrain = paused ? 0 : (building.energyUse || 0) * level;
-  if (effectiveDrain > 0) {
-    return `Passive drain: ${fmtRate(effectiveDrain)} ENERGY/s per level`;
+function getBuildingPowerMode(state, buildingKey) {
+  if (!canThrottleBuilding(buildingKey)) return DEFAULT_BUILDING_POWER_MODE;
+  return normalizePowerMode(state?.buildingPowerModes?.[buildingKey]);
+}
+
+function getBuildingPowerFactor(state, buildingKey) {
+  return getBuildingPowerMode(state, buildingKey) / 100;
+}
+
+function getEffectiveBuildingLevel(state, buildingKey) {
+  const baseLevel = Number(state?.buildings?.[buildingKey] || 0);
+  return baseLevel * getBuildingPowerFactor(state, buildingKey);
+}
+
+function getBuildingEnergyLine(building, level, powerMode) {
+  if (building.key === "powerCell") {
+    return "Passive: no ENERGY drain · adds cap + regen";
   }
+
+  if (!canThrottleBuilding(building.key)) {
+    return "Always active / utility structure";
+  }
+
+  const factor = normalizePowerMode(powerMode) / 100;
+  const effectiveDrain = (building.energyUse || 0) * level * factor;
+
+  if (normalizePowerMode(powerMode) === 0) {
+    return "Drain: 0 ENERGY/s · output stopped";
+  }
+
+  if (effectiveDrain > 0) {
+    return `Drain at ${powerMode}%: ${fmtRate(effectiveDrain)} ENERGY/s`;
+  }
+
   return "Passive: no ENERGY drain";
 }
 
-function getBuildingPauseLine(buildingKey, paused) {
-  if (!canPauseBuilding(buildingKey)) return "Always active / utility structure";
-  return paused ? "Paused: passive output and passive drain are stopped" : "Running: passive output and passive drain are active";
+function getBuildingPowerLine(buildingKey, powerMode) {
+  if (!canThrottleBuilding(buildingKey)) return "Always active / utility structure";
+
+  const normalized = normalizePowerMode(powerMode);
+  if (normalized === 0) {
+    return "Mode 0% · passive output and drain stopped";
+  }
+  return `Mode ${normalized}% · passive output and drain scaled`;
 }
 
 const STRUCTURES_TAB_A = [
@@ -1059,7 +1095,7 @@ function freshState() {
       researchLab: 0,
       repairBay: 0,
     },
-    pausedBuildings: {},
+    buildingPowerModes: {},
     crew: 0,
     crewRole: "engineer",
     modules: {},
@@ -1107,6 +1143,23 @@ function safeInteger(value, fallback = 0, min = 0) {
   return Math.max(min, n);
 }
 
+function normalizeBuildingPowerModes(rawModes, rawPaused = null) {
+  const out = {};
+  for (const key of RUNTIME_CONTROLLED_BUILDINGS) {
+    const raw = rawModes?.[key];
+    if (BUILDING_POWER_STEPS.includes(Number(raw))) {
+      out[key] = Number(raw);
+      continue;
+    }
+
+    // Backward compat: rawPaused can be the old pausedBuildings/paused_buildings boolean map.
+    if (rawPaused && typeof rawPaused[key] === "boolean") {
+      out[key] = rawPaused[key] ? 0 : 100;
+    }
+  }
+  return out;
+}
+
 function sanitizeBaseState(raw, fallback = null) {
   const seed = fallback || freshState();
   const src = raw && typeof raw === "object" ? raw : {};
@@ -1147,17 +1200,10 @@ function sanitizeBaseState(raw, fallback = null) {
       repairBay: safeInteger(src?.buildings?.repairBay, seed.buildings.repairBay, 0),
     },
 
-    pausedBuildings: {
-      quarry: !!(src?.pausedBuildings?.quarry ?? src?.paused_buildings?.quarry),
-      tradeHub: !!(src?.pausedBuildings?.tradeHub ?? src?.paused_buildings?.tradeHub),
-      salvage: !!(src?.pausedBuildings?.salvage ?? src?.paused_buildings?.salvage),
-      refinery: !!(src?.pausedBuildings?.refinery ?? src?.paused_buildings?.refinery),
-      minerControl: !!(src?.pausedBuildings?.minerControl ?? src?.paused_buildings?.minerControl),
-      arcadeHub: !!(src?.pausedBuildings?.arcadeHub ?? src?.paused_buildings?.arcadeHub),
-      logisticsCenter: !!(src?.pausedBuildings?.logisticsCenter ?? src?.paused_buildings?.logisticsCenter),
-      researchLab: !!(src?.pausedBuildings?.researchLab ?? src?.paused_buildings?.researchLab),
-      repairBay: !!(src?.pausedBuildings?.repairBay ?? src?.paused_buildings?.repairBay),
-    },
+    buildingPowerModes: normalizeBuildingPowerModes(
+      src?.buildingPowerModes || src?.building_power_modes || {},
+      src?.pausedBuildings || src?.paused_buildings || {}
+    ),
 
     crew: safeInteger(src.crew, seed.crew, 0),
     crewRole: typeof src.crewRole === "string" ? src.crewRole : seed.crewRole,
@@ -1278,7 +1324,13 @@ function normalizeServerState(raw, prevState = null) {
 
     resources: raw.resources || prev?.resources || seed.resources,
     buildings: raw.buildings || prev?.buildings || seed.buildings,
-    pausedBuildings: raw.pausedBuildings || raw.paused_buildings || prev?.pausedBuildings || seed.pausedBuildings,
+    buildingPowerModes: normalizeBuildingPowerModes(
+      raw.buildingPowerModes ||
+        raw.building_power_modes ||
+        prev?.buildingPowerModes ||
+        seed.buildingPowerModes,
+      raw.pausedBuildings || raw.paused_buildings || null
+    ),
     modules: raw.modules || prev?.modules || {},
     research: raw.research || prev?.research || {},
 
@@ -1317,11 +1369,10 @@ function normalizeServerState(raw, prevState = null) {
 function derive(state, now = Date.now()) {
   const powerLevel = state.buildings.powerCell || 0;
   const hqLevel = state.buildings.hq || 1;
-  const pausedBuildings = state.pausedBuildings || {};
-  const minerLink = pausedBuildings?.minerControl ? 0 : state.buildings.minerControl || 0;
-  const arcadeLink = pausedBuildings?.arcadeHub ? 0 : state.buildings.arcadeHub || 0;
-  const researchLabLevel = pausedBuildings?.researchLab ? 0 : state.buildings.researchLab || 0;
-  const repairBayLevel = pausedBuildings?.repairBay ? 0 : state.buildings.repairBay || 0;
+  const minerLink = getEffectiveBuildingLevel(state, "minerControl");
+  const arcadeLink = getEffectiveBuildingLevel(state, "arcadeHub");
+  const researchLabLevel = getEffectiveBuildingLevel(state, "researchLab");
+  const repairBayLevel = getEffectiveBuildingLevel(state, "repairBay");
   const hasFieldOps = !!state.research.fieldOps;
 
   const crewRole = state.crewRole || "engineer";
@@ -1339,7 +1390,7 @@ function derive(state, now = Date.now()) {
   let scrapMult = workerBonus * overclock;
   let mleoMult = workerBonus * overclock;
   let dataMult = (1 + researchLabLevel * 0.06) * arcadeBonus;
-  const logisticsLevel = pausedBuildings?.logisticsCenter ? 0 : state.buildings.logisticsCenter || 0;
+  const logisticsLevel = getEffectiveBuildingLevel(state, "logisticsCenter");
   let bankBonus = 1 + state.blueprintLevel * 0.02 + logisticsLevel * 0.025;
   let maintenanceRelief = 1 + repairBayLevel * 0.08;
 
@@ -1433,7 +1484,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
     ...state,
     resources: { ...state.resources },
     buildings: { ...state.buildings },
-    pausedBuildings: { ...(state.pausedBuildings || {}) },
+    buildingPowerModes: { ...(state.buildingPowerModes || {}) },
     modules: { ...state.modules },
     research: { ...state.research },
     missionState: {
@@ -1474,10 +1525,14 @@ function simulate(state, elapsedMs, efficiency = 1) {
   next.resources.ENERGY = clamp(next.resources.ENERGY + d.energyRegen * dt, 0, d.energyCap);
 
   const runBuilding = (key, producer) => {
-    if (next.pausedBuildings?.[key]) return;
-    const level = next.buildings[key] || 0;
-    if (!level) return;
-    producer(level);
+    const baseLevel = Number(next.buildings[key] || 0);
+    if (!baseLevel) return;
+
+    const powerFactor = getBuildingPowerFactor(next, key);
+    const effectiveLevel = baseLevel * powerFactor;
+    if (effectiveLevel <= 0) return;
+
+    producer(effectiveLevel);
   };
 
   runBuilding("quarry", (level) => {
@@ -3460,26 +3515,28 @@ export default function MleoBase() {
   });
   };
 
-  const toggleBuildingRuntime = async (key) => {
-    return runLockedAction(`toggle:${key}`, async () => {
+  const changeBuildingPowerMode = async (key, powerMode) => {
+    return runLockedAction(`power:${key}:${powerMode}`, async () => {
       const def = BUILDINGS.find((item) => item.key === key);
       if (!def) return;
 
-      if (!canPauseBuilding(key)) {
-        showToast("This structure cannot be paused.");
+      if (!canThrottleBuilding(key)) {
+        showToast("This structure does not support runtime power mode.");
         return;
       }
 
-      const level = state.buildings?.[key] || 0;
+      const level = Number(state.buildings?.[key] || 0);
       if (level <= 0) {
         showToast("Build it first.");
         return;
       }
 
-      const nextPaused = !isBuildingPaused(state, key);
+      const nextMode = normalizePowerMode(powerMode);
+      const currentMode = getBuildingPowerMode(state, key);
+      if (currentMode === nextMode) return;
 
       try {
-        const res = await toggleBuildingPause(key, nextPaused);
+        const res = await setBuildingPowerMode(key, nextMode);
 
         if (res?.success && res?.state) {
           setState((prev) => {
@@ -3489,7 +3546,8 @@ export default function MleoBase() {
               ...prev,
               ...base,
               crewRole: base?.crewRole ?? prev?.crewRole ?? "engineer",
-              commanderPath: base?.commanderPath ?? prev?.commanderPath ?? "industry",
+              commanderPath:
+                base?.commanderPath ?? prev?.commanderPath ?? "industry",
               missionState: {
                 dailySeed:
                   base?.missionState?.dailySeed ||
@@ -3506,21 +3564,17 @@ export default function MleoBase() {
               },
             });
 
-            next.log = pushLog(
-              next.log,
-              `${def.name} ${nextPaused ? "paused" : "resumed"}.`
-            );
-
+            next.log = pushLog(next.log, `${def.name} power set to ${nextMode}%.`);
             return next;
           });
 
-          showToast(`${def.name} ${nextPaused ? "paused" : "resumed"}.`);
+          showToast(`${def.name} power set to ${nextMode}%.`);
         } else {
-          showToast(res?.message || "Pause toggle failed.");
+          showToast(res?.message || "Power mode update failed.");
         }
       } catch (error) {
-        console.error("Pause toggle failed", error);
-        showToast(error?.message || "Pause toggle failed.");
+        console.error("Power mode update failed", error);
+        showToast(error?.message || "Power mode update failed.");
       }
     });
   };
@@ -6807,23 +6861,34 @@ export default function MleoBase() {
             <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
               Energy / runtime
             </div>
-            <div className="text-white/85">{getBuildingEnergyLine(building, level, isBuildingPaused(state, building.key))}</div>
-            <div className="mt-2 text-sm text-white/70">
-              {getBuildingPauseLine(building.key, isBuildingPaused(state, building.key))}
+            <div className="text-white/85">
+              {getBuildingEnergyLine(building, level, getBuildingPowerMode(state, building.key))}
             </div>
 
-            {canPauseBuilding(building.key) && level > 0 ? (
-              <button
-                type="button"
-                onClick={() => toggleBuildingRuntime(building.key)}
-                className={`mt-3 w-full rounded-2xl border px-4 py-3 text-sm font-bold transition ${
-                  isBuildingPaused(state, building.key)
-                    ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15"
-                    : "border-amber-400/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15"
-                }`}
-              >
-                {isBuildingPaused(state, building.key) ? "Resume" : "Pause"}
-              </button>
+            <div className="mt-2 text-sm text-white/70">
+              {getBuildingPowerLine(building.key, getBuildingPowerMode(state, building.key))}
+            </div>
+
+            {canThrottleBuilding(building.key) && level > 0 ? (
+              <div className="mt-3 grid grid-cols-5 gap-2">
+                {BUILDING_POWER_STEPS.map((mode) => {
+                  const active = getBuildingPowerMode(state, building.key) === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => changeBuildingPowerMode(building.key, mode)}
+                      className={`rounded-xl border px-2 py-2 text-xs font-bold transition ${
+                        active
+                          ? "border-cyan-300/50 bg-cyan-500/15 text-cyan-200"
+                          : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                      }`}
+                    >
+                      {mode}%
+                    </button>
+                  );
+                })}
+              </div>
             ) : null}
           </div>
         </div>
@@ -6869,8 +6934,8 @@ export default function MleoBase() {
           const cost = buildingCost(building, level);
           const isUnlocked = unlocked(building, state);
           const ready = isUnlocked && canAfford(state.resources, cost);
-          const paused = isBuildingPaused(state, building.key);
-          const canPause = canPauseBuilding(building.key);
+          const powerMode = getBuildingPowerMode(state, building.key);
+          const canThrottle = canThrottleBuilding(building.key);
 
           const reqNameMap = {
             hq: "HQ",
@@ -6978,10 +7043,10 @@ export default function MleoBase() {
 
               <div className="mt-auto flex flex-col justify-end pt-0 pb-2">
                 <div className="text-[10px] font-semibold text-white/50">
-                  {getBuildingEnergyLine(building, level, paused)}
+                  {getBuildingEnergyLine(building, level, powerMode)}
                 </div>
                 <div className="mt-1 text-[10px] font-semibold text-cyan-200/70">
-                  {getBuildingPauseLine(building.key, paused)}
+                  {getBuildingPowerLine(building.key, powerMode)}
                 </div>
 
                 <div className="mt-2 flex w-full flex-col gap-2">
@@ -6997,18 +7062,26 @@ export default function MleoBase() {
                     {buttonText}
                   </button>
 
-                  {canPause && level > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => toggleBuildingRuntime(building.key)}
-                      className={`w-full rounded-xl px-3 py-2 text-xs font-semibold leading-none transition ${
-                        paused
-                          ? "border border-emerald-400/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15"
-                          : "border border-amber-400/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15"
-                      }`}
-                    >
-                      {paused ? "Resume" : "Pause"}
-                    </button>
+                  {canThrottle && level > 0 ? (
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {BUILDING_POWER_STEPS.map((mode) => {
+                        const active = powerMode === mode;
+                        return (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => changeBuildingPowerMode(building.key, mode)}
+                            className={`rounded-lg border px-1.5 py-1.5 text-[10px] font-bold transition ${
+                              active
+                                ? "border-cyan-300/50 bg-cyan-500/15 text-cyan-200"
+                                : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                            }`}
+                          >
+                            {mode}
+                          </button>
+                        );
+                      })}
+                    </div>
                   ) : null}
                 </div>
               </div>

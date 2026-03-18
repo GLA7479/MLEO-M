@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.base_device_state (
   resources jsonb NOT NULL DEFAULT '{}'::jsonb,
   buildings jsonb NOT NULL DEFAULT '{}'::jsonb,
   paused_buildings jsonb NOT NULL DEFAULT '{}'::jsonb,
+  building_power_modes jsonb NOT NULL DEFAULT '{}'::jsonb,
   modules jsonb NOT NULL DEFAULT '{}'::jsonb,
   research jsonb NOT NULL DEFAULT '{}'::jsonb,
   stats jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -35,6 +36,9 @@ CREATE TABLE IF NOT EXISTS public.base_device_state (
 
 ALTER TABLE public.base_device_state
   ADD COLUMN IF NOT EXISTS paused_buildings jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+ALTER TABLE public.base_device_state
+  ADD COLUMN IF NOT EXISTS building_power_modes jsonb NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE INDEX IF NOT EXISTS idx_base_device_state_updated_at
   ON public.base_device_state(updated_at DESC);
@@ -152,6 +156,21 @@ AS $$
   SELECT greatest(vmin, least(vmax, v));
 $$;
 
+CREATE OR REPLACE FUNCTION public.base_runtime_mode(j jsonb, k text)
+RETURNS numeric
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT CASE coalesce((j->>k)::integer, 100)
+    WHEN 0 THEN 0.00
+    WHEN 25 THEN 0.25
+    WHEN 50 THEN 0.50
+    WHEN 75 THEN 0.75
+    WHEN 100 THEN 1.00
+    ELSE 1.00
+  END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.base_get_or_create_state(
   p_device_id text
 )
@@ -243,7 +262,7 @@ DECLARE
   v_research jsonb;
   v_stats jsonb;
   v_mission_state jsonb;
-  v_paused_buildings jsonb;
+  v_building_power_modes jsonb;
 
   v_hq integer := 1;
   v_quarry integer := 1;
@@ -257,6 +276,17 @@ DECLARE
   v_logistics integer := 0;
   v_research_lab integer := 0;
   v_repair integer := 0;
+
+  -- Power-mode multipliers for runtime-controlled buildings (0..1).
+  v_quarry_mode numeric := 1.0;
+  v_trade_mode numeric := 1.0;
+  v_salvage_mode numeric := 1.0;
+  v_refinery_mode numeric := 1.0;
+  v_miner_mode numeric := 1.0;
+  v_arcade_mode numeric := 1.0;
+  v_logistics_mode numeric := 1.0;
+  v_research_lab_mode numeric := 1.0;
+  v_repair_mode numeric := 1.0;
 
   v_crew integer := 0;
   v_crew_role text := 'engineer';
@@ -363,7 +393,7 @@ BEGIN
   v_research := coalesce(v_state.research, '{}'::jsonb);
   v_stats := coalesce(v_state.stats, public.base_default_stats());
   v_mission_state := coalesce(v_state.mission_state, public.base_default_mission_state(current_date::text));
-  v_paused_buildings := coalesce(v_state.paused_buildings, '{}'::jsonb);
+  v_building_power_modes := coalesce(v_state.building_power_modes, '{}'::jsonb);
 
   IF coalesce(v_mission_state->>'dailySeed', '') <> current_date::text THEN
     v_mission_state := public.base_default_mission_state(current_date::text);
@@ -382,17 +412,52 @@ BEGIN
   v_research_lab := greatest(0, public.base_jsonb_int(v_buildings, 'researchLab', 0));
   v_repair := greatest(0, public.base_jsonb_int(v_buildings, 'repairBay', 0));
 
-  -- Pause support: if a building is marked as paused, treat its effective level as 0
-  -- so it stops passive output AND passive drain/pressure contributions.
-  v_quarry := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'quarry', false) THEN 0 ELSE v_quarry END;
-  v_trade := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'tradeHub', false) THEN 0 ELSE v_trade END;
-  v_salvage := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'salvage', false) THEN 0 ELSE v_salvage END;
-  v_refinery := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'refinery', false) THEN 0 ELSE v_refinery END;
-  v_miner := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'minerControl', false) THEN 0 ELSE v_miner END;
-  v_arcade := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'arcadeHub', false) THEN 0 ELSE v_arcade END;
-  v_logistics := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'logisticsCenter', false) THEN 0 ELSE v_logistics END;
-  v_research_lab := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'researchLab', false) THEN 0 ELSE v_research_lab END;
-  v_repair := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'repairBay', false) THEN 0 ELSE v_repair END;
+  -- Power-mode scaling: runtime-controlled passive buildings contribute proportionally.
+  v_quarry_mode := CASE
+    WHEN v_building_power_modes ? 'quarry' THEN public.base_runtime_mode(v_building_power_modes, 'quarry')
+    WHEN public.base_jsonb_bool(v_state.paused_buildings, 'quarry', false) THEN 0.00
+    ELSE 1.00
+  END;
+  v_trade_mode := CASE
+    WHEN v_building_power_modes ? 'tradeHub' THEN public.base_runtime_mode(v_building_power_modes, 'tradeHub')
+    WHEN public.base_jsonb_bool(v_state.paused_buildings, 'tradeHub', false) THEN 0.00
+    ELSE 1.00
+  END;
+  v_salvage_mode := CASE
+    WHEN v_building_power_modes ? 'salvage' THEN public.base_runtime_mode(v_building_power_modes, 'salvage')
+    WHEN public.base_jsonb_bool(v_state.paused_buildings, 'salvage', false) THEN 0.00
+    ELSE 1.00
+  END;
+  v_refinery_mode := CASE
+    WHEN v_building_power_modes ? 'refinery' THEN public.base_runtime_mode(v_building_power_modes, 'refinery')
+    WHEN public.base_jsonb_bool(v_state.paused_buildings, 'refinery', false) THEN 0.00
+    ELSE 1.00
+  END;
+  v_miner_mode := CASE
+    WHEN v_building_power_modes ? 'minerControl' THEN public.base_runtime_mode(v_building_power_modes, 'minerControl')
+    WHEN public.base_jsonb_bool(v_state.paused_buildings, 'minerControl', false) THEN 0.00
+    ELSE 1.00
+  END;
+  v_arcade_mode := CASE
+    WHEN v_building_power_modes ? 'arcadeHub' THEN public.base_runtime_mode(v_building_power_modes, 'arcadeHub')
+    WHEN public.base_jsonb_bool(v_state.paused_buildings, 'arcadeHub', false) THEN 0.00
+    ELSE 1.00
+  END;
+  v_logistics_mode := CASE
+    WHEN v_building_power_modes ? 'logisticsCenter' THEN public.base_runtime_mode(v_building_power_modes, 'logisticsCenter')
+    WHEN public.base_jsonb_bool(v_state.paused_buildings, 'logisticsCenter', false) THEN 0.00
+    ELSE 1.00
+  END;
+  v_research_lab_mode := CASE
+    WHEN v_building_power_modes ? 'researchLab' THEN public.base_runtime_mode(v_building_power_modes, 'researchLab')
+    WHEN public.base_jsonb_bool(v_state.paused_buildings, 'researchLab', false) THEN 0.00
+    ELSE 1.00
+  END;
+  v_repair_mode := CASE
+    WHEN v_building_power_modes ? 'repairBay' THEN public.base_runtime_mode(v_building_power_modes, 'repairBay')
+    WHEN public.base_jsonb_bool(v_state.paused_buildings, 'repairBay', false) THEN 0.00
+    ELSE 1.00
+  END;
 
   v_crew := greatest(0, coalesce(v_state.crew, 0));
   v_crew_role := coalesce(v_state.crew_role, 'engineer');
@@ -408,8 +473,8 @@ BEGIN
   END;
 
   v_hq_bonus := 1 + v_hq * 0.03;
-  v_miner_bonus := 1 + v_miner * 0.04;
-  v_arcade_bonus := 1 + v_arcade * 0.03;
+  v_miner_bonus := 1 + (v_miner * v_miner_mode) * 0.04;
+  v_arcade_bonus := 1 + (v_arcade * v_arcade_mode) * 0.03;
 
   IF v_state.overclock_until IS NOT NULL AND v_state.overclock_until > v_now THEN
     v_overclock := 1.35;
@@ -421,9 +486,9 @@ BEGIN
   v_gold_mult := v_worker_bonus * v_overclock;
   v_scrap_mult := v_worker_bonus * v_overclock;
   v_mleo_mult := v_worker_bonus * v_overclock;
-  v_data_mult := (1 + v_research_lab * 0.06) * v_arcade_bonus;
-  v_bank_bonus := 1 + v_blueprint * 0.02 + v_logistics * 0.025;
-  v_maintenance_relief := 1 + v_repair * 0.08;
+  v_data_mult := (1 + (v_research_lab * v_research_lab_mode) * 0.06) * v_arcade_bonus;
+  v_bank_bonus := 1 + v_blueprint * 0.02 + (v_logistics * v_logistics_mode) * 0.025;
+  v_maintenance_relief := 1 + (v_repair * v_repair_mode) * 0.08;
 
   IF v_crew_role = 'engineer' THEN
     v_maintenance_relief := v_maintenance_relief * 1.06;
@@ -511,7 +576,7 @@ BEGIN
     v_energy_regen := v_energy_regen + 1.35;
   END IF;
 
-  v_ship_cap := 12000 + (v_logistics * 1800) + (v_blueprint * 450);
+  v_ship_cap := 12000 + ((v_logistics * v_logistics_mode) * 1800) + (v_blueprint * 450);
 
   v_expedition_cooldown_seconds := 120;
 
@@ -526,23 +591,26 @@ BEGIN
 
   v_energy_now := least(v_energy_cap, v_energy_now + (v_energy_regen * v_elapsed_seconds));
 
-  v_ore_gain := (v_quarry * 2.0) * v_ore_mult;
-  v_gold_gain := (v_trade * 1.0) * v_gold_mult;
-  v_scrap_gain := (v_salvage * 0.8) * v_scrap_mult;
+  v_ore_gain := ((v_quarry * v_quarry_mode) * 2.0) * v_ore_mult;
+  v_gold_gain := ((v_trade * v_trade_mode) * 1.0) * v_gold_mult;
+  v_scrap_gain := ((v_salvage * v_salvage_mode) * 0.8) * v_scrap_mult;
   v_data_gain :=
-      ((v_miner * 0.18) + (v_arcade * 0.15) + (v_logistics * 0.08) + (v_research_lab * 0.28))
+      (((v_miner * v_miner_mode) * 0.18)
+      + ((v_arcade * v_arcade_mode) * 0.15)
+      + ((v_logistics * v_logistics_mode) * 0.08)
+      + ((v_research_lab * v_research_lab_mode) * 0.28))
       * v_data_mult;
 
   v_energy_use :=
-      (v_quarry * 0.72)
-    + (v_trade * 0.78)
-    + (v_salvage * 0.78)
-    + (v_refinery * 1.10)
-    + (v_miner * 0.20)
-    + (v_arcade * 0.22)
-    + (v_logistics * 0.20)
-    + (v_research_lab * 0.24)
-    + (v_repair * 0.22);
+      ((v_quarry * v_quarry_mode) * 0.72)
+    + ((v_trade * v_trade_mode) * 0.78)
+    + ((v_salvage * v_salvage_mode) * 0.78)
+    + ((v_refinery * v_refinery_mode) * 1.10)
+    + ((v_miner * v_miner_mode) * 0.20)
+    + ((v_arcade * v_arcade_mode) * 0.22)
+    + ((v_logistics * v_logistics_mode) * 0.20)
+    + ((v_research_lab * v_research_lab_mode) * 0.24)
+    + ((v_repair * v_repair_mode) * 0.22);
 
   IF v_energy_now < (v_energy_use * v_elapsed_seconds) THEN
     IF v_energy_use > 0 THEN
@@ -560,10 +628,10 @@ BEGIN
     v_scrap_now := v_scrap_now + (v_scrap_gain * v_elapsed_seconds);
     v_data_now := v_data_now + (v_data_gain * v_elapsed_seconds);
 
-    v_ore_use := (v_refinery * 1.8) * v_elapsed_seconds;
-    v_scrap_use := (v_refinery * 0.7) * v_elapsed_seconds;
+    v_ore_use := ((v_refinery * v_refinery_mode) * 1.8) * v_elapsed_seconds;
+    v_scrap_use := ((v_refinery * v_refinery_mode) * 0.7) * v_elapsed_seconds;
 
-    IF v_ore_now > 0 AND v_scrap_now > 0 AND v_refinery > 0 THEN
+    IF v_ore_now > 0 AND v_scrap_now > 0 AND (v_refinery * v_refinery_mode) > 0 THEN
       IF v_ore_now < v_ore_use THEN
         v_ore_use := v_ore_now;
       END IF;
@@ -572,7 +640,7 @@ BEGIN
         v_scrap_use := v_scrap_now;
       END IF;
 
-      IF (v_refinery * 1.8) > 0 AND (v_refinery * 0.7) > 0 THEN
+      IF (v_refinery * v_refinery_mode * 1.8) > 0 AND (v_refinery * v_refinery_mode * 0.7) > 0 THEN
         v_raw_banked_gain := least(
           v_ore_use / 1.8,
           v_scrap_use / 0.7
@@ -589,17 +657,17 @@ BEGIN
     v_maintenance_due := v_maintenance_due + (
       (
         (v_hq * 0.022)
-        + (v_quarry * 0.020)
-        + (v_trade * 0.022)
-        + (v_salvage * 0.024)
-        + (v_refinery * 0.045)
+        + ((v_quarry * v_quarry_mode) * 0.020)
+        + ((v_trade * v_trade_mode) * 0.022)
+        + ((v_salvage * v_salvage_mode) * 0.024)
+        + ((v_refinery * v_refinery_mode) * 0.045)
         + (v_power * 0.014)
-        + (v_miner * 0.015)
-        + (v_arcade * 0.015)
+        + ((v_miner * v_miner_mode) * 0.015)
+        + ((v_arcade * v_arcade_mode) * 0.015)
         + (v_expedition * 0.014)
-        + (v_logistics * 0.014)
-        + (v_research_lab * 0.018)
-        + (v_repair * 0.008)
+        + ((v_logistics * v_logistics_mode) * 0.014)
+        + ((v_research_lab * v_research_lab_mode) * 0.018)
+        + ((v_repair * v_repair_mode) * 0.008)
       )
       / greatest(1.0, v_maintenance_relief)
     )
@@ -610,7 +678,7 @@ BEGIN
         (
           greatest(v_maintenance_due - 100, 0) * 0.0018
         ) + (
-          v_refinery * CASE
+          (v_refinery * v_refinery_mode) * CASE
             WHEN public.base_jsonb_bool(v_modules, 'minerLink', false) THEN 0.00045
             ELSE 0.00060
           END
@@ -620,9 +688,9 @@ BEGIN
       100
     );
 
-    IF v_repair > 0 THEN
+    IF (v_repair * v_repair_mode) > 0 THEN
       v_stability := public.base_clamp_num(
-        v_stability + ((v_repair * 0.0024) * v_elapsed_seconds),
+        v_stability + (((v_repair * v_repair_mode) * 0.0024) * v_elapsed_seconds),
         50,
         100
       );
@@ -720,6 +788,91 @@ $$;
 -- ============================================================================
 -- Toggle passive building runtime (Pause/Resume)
 -- ============================================================================
+-- Runtime power mode (0/25/50/75/100) - scales passive output/drain contributions.
+CREATE OR REPLACE FUNCTION public.base_set_building_power_mode(
+  p_device_id text,
+  p_building_key text,
+  p_power_mode integer
+)
+RETURNS TABLE(
+  power_mode integer,
+  building_power_modes jsonb,
+  state jsonb
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_state public.base_device_state%ROWTYPE;
+  v_building_power_modes jsonb;
+  v_current_level integer;
+BEGIN
+  IF coalesce(trim(p_device_id), '') = '' THEN
+    RAISE EXCEPTION 'device_id is required';
+  END IF;
+
+  IF coalesce(trim(p_building_key), '') = '' THEN
+    RAISE EXCEPTION 'building_key is required';
+  END IF;
+
+  IF p_power_mode NOT IN (0, 25, 50, 75, 100) THEN
+    RAISE EXCEPTION 'Invalid power mode';
+  END IF;
+
+  IF p_building_key NOT IN (
+    'quarry',
+    'tradeHub',
+    'salvage',
+    'refinery',
+    'minerControl',
+    'arcadeHub',
+    'logisticsCenter',
+    'researchLab',
+    'repairBay'
+  ) THEN
+    RAISE EXCEPTION 'Invalid runtime-controlled building key';
+  END IF;
+
+  -- Reconcile first so we toggle against the latest computed state.
+  PERFORM public.base_reconcile_state(p_device_id);
+
+  SELECT *
+  INTO v_state
+  FROM public.base_device_state
+  WHERE device_id = p_device_id
+  FOR UPDATE;
+
+  v_building_power_modes := coalesce(v_state.building_power_modes, '{}'::jsonb);
+  v_current_level := coalesce((v_state.buildings->>p_building_key)::integer, 0);
+
+  IF v_current_level <= 0 THEN
+    RAISE EXCEPTION 'Building is not built yet';
+  END IF;
+
+  v_building_power_modes := jsonb_set(
+    v_building_power_modes,
+    ARRAY[p_building_key],
+    to_jsonb(p_power_mode),
+    true
+  );
+
+  UPDATE public.base_device_state
+  SET
+    building_power_modes = v_building_power_modes,
+    updated_at = now()
+  WHERE device_id = p_device_id
+  RETURNING *
+  INTO v_state;
+
+  RETURN QUERY
+  SELECT
+    coalesce((v_state.building_power_modes->>p_building_key)::integer, 100),
+    coalesce(v_state.building_power_modes, '{}'::jsonb),
+    to_jsonb(v_state);
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.base_set_building_paused(
   p_device_id text,
   p_building_key text,
@@ -938,10 +1091,12 @@ REVOKE EXECUTE ON FUNCTION public.base_get_or_create_state(text) FROM PUBLIC, an
 REVOKE EXECUTE ON FUNCTION public.base_reconcile_state(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_claim_mission_reward(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_set_building_paused(text, text, boolean) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_set_building_power_mode(text, text, integer) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.base_get_or_create_state(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_reconcile_state(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_claim_mission_reward(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_set_building_paused(text, text, boolean) TO service_role;
+GRANT EXECUTE ON FUNCTION public.base_set_building_power_mode(text, text, integer) TO service_role;
 
 COMMIT;
