@@ -16,6 +16,7 @@ import {
   hireCrewAction,
   performMaintenanceAction,
   claimBaseMission,
+  toggleBuildingPause,
 } from "../lib/baseVaultClient";
 
 const MAX_LOG_ITEMS = 16;
@@ -79,7 +80,7 @@ const BUILDINGS = [
     desc: "Converts Ore + Scrap into bankable MLEO.",
     baseCost: { GOLD: 280, ORE: 180, SCRAP: 35 },
     growth: 1.25,
-    energyUse: 1.35,
+    energyUse: 1.10,
     convert: { ORE: 1.8, SCRAP: 0.7, MLEO: 0.10 },
     requires: [
       { key: "salvage", lvl: 1 },
@@ -102,7 +103,7 @@ const BUILDINGS = [
     desc: "Improves synergy with Miners and increases ore conversion quality.",
     baseCost: { GOLD: 320, ORE: 120, SCRAP: 40 },
     growth: 1.22,
-    energyUse: 0.22,
+    energyUse: 0.20,
     outputs: { DATA: 0.18 },
     requires: [{ key: "hq", lvl: 2 }],
   },
@@ -112,7 +113,7 @@ const BUILDINGS = [
     desc: "Turns activity into base progression and improves mission rewards.",
     baseCost: { GOLD: 360, ORE: 90, SCRAP: 50 },
     growth: 1.24,
-    energyUse: 0.24,
+    energyUse: 0.22,
     outputs: { DATA: 0.15 },
     requires: [{ key: "hq", lvl: 2 }],
   },
@@ -136,7 +137,7 @@ const BUILDINGS = [
     baseCost: { ORE: 220, GOLD: 180, SCRAP: 90 },
     growth: 1.7,
     maxLevel: 15,
-    energyUse: 0.22,
+    energyUse: 0.20,
     outputs: { DATA: 0.08 },
     requires: [{ key: "hq", lvl: 2 }, { key: "tradeHub", lvl: 2 }],
   },
@@ -147,7 +148,7 @@ const BUILDINGS = [
     baseCost: { ORE: 180, GOLD: 240, SCRAP: 110 },
     growth: 1.75,
     maxLevel: 15,
-    energyUse: 0.26,
+    energyUse: 0.24,
     outputs: { DATA: 0.28 },
     requires: [{ key: "hq", lvl: 2 }, { key: "minerControl", lvl: 1 }],
   },
@@ -163,6 +164,48 @@ const BUILDINGS = [
     requires: [{ key: "hq", lvl: 2 }, { key: "powerCell", lvl: 1 }],
   },
 ];
+
+// Buildings whose passive output/drain can be paused (runtime only, upgrade level remains).
+const PAUSABLE_BUILDINGS = new Set([
+  "quarry",
+  "tradeHub",
+  "salvage",
+  "refinery",
+  "minerControl",
+  "arcadeHub",
+  "logisticsCenter",
+  "researchLab",
+  "repairBay",
+]);
+
+function fmtRate(value, digits = 2) {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n)) return "0";
+  if (Math.abs(n) >= 1000) return fmt(n);
+  return n.toFixed(digits).replace(/\.?0+$/, "").replace(/\.$/, "");
+}
+
+function canPauseBuilding(buildingKey) {
+  return PAUSABLE_BUILDINGS.has(buildingKey);
+}
+
+function isBuildingPaused(state, buildingKey) {
+  return !!state?.pausedBuildings?.[buildingKey];
+}
+
+function getBuildingEnergyLine(building, level, paused) {
+  if (building.key === "powerCell") return "Passive: no ENERGY drain";
+  const effectiveDrain = paused ? 0 : (building.energyUse || 0) * level;
+  if (effectiveDrain > 0) {
+    return `Passive drain: ${fmtRate(effectiveDrain)} ENERGY/s per level`;
+  }
+  return "Passive: no ENERGY drain";
+}
+
+function getBuildingPauseLine(buildingKey, paused) {
+  if (!canPauseBuilding(buildingKey)) return "Always active / utility structure";
+  return paused ? "Paused: passive output and passive drain are stopped" : "Running: passive output and passive drain are active";
+}
 
 const STRUCTURES_TAB_A = [
   "hq",
@@ -1016,6 +1059,7 @@ function freshState() {
       researchLab: 0,
       repairBay: 0,
     },
+    pausedBuildings: {},
     crew: 0,
     crewRole: "engineer",
     modules: {},
@@ -1101,6 +1145,18 @@ function sanitizeBaseState(raw, fallback = null) {
       logisticsCenter: safeInteger(src?.buildings?.logisticsCenter, seed.buildings.logisticsCenter, 0),
       researchLab: safeInteger(src?.buildings?.researchLab, seed.buildings.researchLab, 0),
       repairBay: safeInteger(src?.buildings?.repairBay, seed.buildings.repairBay, 0),
+    },
+
+    pausedBuildings: {
+      quarry: !!(src?.pausedBuildings?.quarry ?? src?.paused_buildings?.quarry),
+      tradeHub: !!(src?.pausedBuildings?.tradeHub ?? src?.paused_buildings?.tradeHub),
+      salvage: !!(src?.pausedBuildings?.salvage ?? src?.paused_buildings?.salvage),
+      refinery: !!(src?.pausedBuildings?.refinery ?? src?.paused_buildings?.refinery),
+      minerControl: !!(src?.pausedBuildings?.minerControl ?? src?.paused_buildings?.minerControl),
+      arcadeHub: !!(src?.pausedBuildings?.arcadeHub ?? src?.paused_buildings?.arcadeHub),
+      logisticsCenter: !!(src?.pausedBuildings?.logisticsCenter ?? src?.paused_buildings?.logisticsCenter),
+      researchLab: !!(src?.pausedBuildings?.researchLab ?? src?.paused_buildings?.researchLab),
+      repairBay: !!(src?.pausedBuildings?.repairBay ?? src?.paused_buildings?.repairBay),
     },
 
     crew: safeInteger(src.crew, seed.crew, 0),
@@ -1222,6 +1278,7 @@ function normalizeServerState(raw, prevState = null) {
 
     resources: raw.resources || prev?.resources || seed.resources,
     buildings: raw.buildings || prev?.buildings || seed.buildings,
+    pausedBuildings: raw.pausedBuildings || raw.paused_buildings || prev?.pausedBuildings || seed.pausedBuildings,
     modules: raw.modules || prev?.modules || {},
     research: raw.research || prev?.research || {},
 
@@ -1260,10 +1317,11 @@ function normalizeServerState(raw, prevState = null) {
 function derive(state, now = Date.now()) {
   const powerLevel = state.buildings.powerCell || 0;
   const hqLevel = state.buildings.hq || 1;
-  const minerLink = state.buildings.minerControl || 0;
-  const arcadeLink = state.buildings.arcadeHub || 0;
-  const researchLabLevel = state.buildings.researchLab || 0;
-  const repairBayLevel = state.buildings.repairBay || 0;
+  const pausedBuildings = state.pausedBuildings || {};
+  const minerLink = pausedBuildings?.minerControl ? 0 : state.buildings.minerControl || 0;
+  const arcadeLink = pausedBuildings?.arcadeHub ? 0 : state.buildings.arcadeHub || 0;
+  const researchLabLevel = pausedBuildings?.researchLab ? 0 : state.buildings.researchLab || 0;
+  const repairBayLevel = pausedBuildings?.repairBay ? 0 : state.buildings.repairBay || 0;
   const hasFieldOps = !!state.research.fieldOps;
 
   const crewRole = state.crewRole || "engineer";
@@ -1281,7 +1339,7 @@ function derive(state, now = Date.now()) {
   let scrapMult = workerBonus * overclock;
   let mleoMult = workerBonus * overclock;
   let dataMult = (1 + researchLabLevel * 0.06) * arcadeBonus;
-  const logisticsLevel = state.buildings.logisticsCenter || 0;
+  const logisticsLevel = pausedBuildings?.logisticsCenter ? 0 : state.buildings.logisticsCenter || 0;
   let bankBonus = 1 + state.blueprintLevel * 0.02 + logisticsLevel * 0.025;
   let maintenanceRelief = 1 + repairBayLevel * 0.08;
 
@@ -1373,6 +1431,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
     ...state,
     resources: { ...state.resources },
     buildings: { ...state.buildings },
+    pausedBuildings: { ...(state.pausedBuildings || {}) },
     modules: { ...state.modules },
     research: { ...state.research },
     missionState: {
@@ -1413,6 +1472,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
   next.resources.ENERGY = clamp(next.resources.ENERGY + d.energyRegen * dt, 0, d.energyCap);
 
   const runBuilding = (key, producer) => {
+    if (next.pausedBuildings?.[key]) return;
     const level = next.buildings[key] || 0;
     if (!level) return;
     producer(level);
@@ -1877,110 +1937,129 @@ function getNextStep(state, derived, systemState, liveContracts = []) {
 const INFO_COPY = {
   sharedVault: {
     title: "Shared Vault",
-    focus: "Refinery + shipping + logistics",
+    focus: "Refinery + shipping + logistics scaling",
     text:
-      "Shared Vault is your main MLEO balance across the ecosystem.\n\n" +
-      "How to grow it:\n" +
-      "• Produce banked MLEO in the Refinery.\n" +
-      "• Keep Ore and Scrap production strong.\n" +
-      "• Ship MLEO into the Shared Vault.\n" +
-      "• Improve logistics and shipment quality.",
+      "Shared Vault is the real MLEO balance you move out of BASE.\n\n" +
+      "How it grows:\n" +
+      "• Refinery creates banked MLEO inside BASE.\n" +
+      "• Shipping moves that banked MLEO into Shared Vault.\n" +
+      "• Logistics and Blueprint improve long-term shipment quality.\n\n" +
+      "Important:\n" +
+      "Banked MLEO is not the same as Shared Vault MLEO. Nothing reaches the vault until you ship it.",
     tips: {
-      building: "Refinery + Logistics Center",
+      building: "Refinery",
+      supportBuildings: ["Logistics Center", "Power Cell", "Quarry", "Salvage Yard"],
       research: "Logistics",
+      supportResearch: ["Routing AI"],
       module: "Vault Compressor",
+      operation: "Ship to Shared Vault",
+      watch: "Strong shipping means nothing if Refinery is underfed.",
       actions: [
-        "Upgrade Refinery",
-        "Upgrade Logistics Center",
-        "Ship regularly",
-        "Keep Ore + Scrap production high",
+        "Feed Refinery with stable Ore + Scrap first.",
+        "Upgrade Logistics when shipping starts to matter daily.",
+        "Do not sit too long on banked MLEO if you need real vault progress.",
       ],
     },
     nextStep: {
-      label: "Open Logistics / Shipping",
+      label: "Open Shipping",
       tab: "operations",
       target: "shipping",
-      why: "Shipping is how banked MLEO reaches Shared Vault.",
+      why: "Shipping is the final step that turns BASE progress into real Shared Vault MLEO.",
     },
   },
 
   bankedMleo: {
     title: "Base Banked",
-    focus: "Refinery + Ore + Scrap",
+    focus: "Refinery output before shipping",
     text:
-      "Banked MLEO is produced inside BASE by the Refinery and stays here until shipped.\n\n" +
-      "How to gain more banked MLEO:\n" +
-      "• Upgrade Refinery.\n" +
-      "• Increase Ore production.\n" +
-      "• Increase Scrap production.\n" +
-      "• Keep enough Energy available.",
+      "Banked MLEO is created inside BASE and waits there until you ship it.\n\n" +
+      "What controls it:\n" +
+      "• Refinery level.\n" +
+      "• Ore flow.\n" +
+      "• Scrap flow.\n" +
+      "• Enough Energy to keep Refinery running.\n\n" +
+      "Important:\n" +
+      "Refinery needs Ore, Scrap and Energy together. If one of them collapses, banked MLEO slows down.",
     tips: {
       building: "Refinery",
+      supportBuildings: ["Quarry", "Salvage Yard", "Power Cell", "Logistics Center"],
       research: "Routing AI",
+      supportResearch: ["Logistics"],
       module: "Vault Compressor",
+      operation: "Ship to Shared Vault",
+      watch: "Refinery is powerful, but it is also one of the heaviest systems in the base.",
       actions: [
-        "Upgrade Quarry",
-        "Upgrade Salvage Yard",
-        "Upgrade Refinery",
-        "Keep Energy from stalling production",
+        "Upgrade Refinery only when Ore and Scrap can feed it.",
+        "Fix Energy pressure before forcing more conversion.",
+        "Ship regularly once banked MLEO starts building up.",
       ],
     },
     nextStep: {
       label: "Upgrade Refinery",
       tab: "build",
       target: "refinery",
-      why: "Refinery converts Ore and Scrap into banked MLEO.",
+      why: "Refinery is the structure that directly creates banked MLEO.",
     },
   },
 
   commander: {
     title: "Commander Level",
-    focus: "Upgrades + missions + expeditions",
+    focus: "Upgrades + missions + expeditions + stable management",
     text:
-      "Commander Level reflects your long-term progression in BASE.\n\n" +
-      "How to level up faster:\n" +
-      "• Upgrade buildings.\n" +
-      "• Complete daily missions.\n" +
-      "• Launch expeditions.\n" +
-      "• Keep the base active and maintained.",
+      "Commander Level is your long-term BASE progression.\n\n" +
+      "Main XP sources:\n" +
+      "• Building upgrades.\n" +
+      "• Daily missions.\n" +
+      "• Expeditions.\n" +
+      "• Good base control over time.\n\n" +
+      "Important:\n" +
+      "A messy base still grows, but a stable and active base levels faster and feels better.",
     tips: {
       building: "Arcade Hub",
+      supportBuildings: ["HQ", "Expedition Bay"],
       research: "Arcade Ops",
+      supportResearch: ["Field Ops"],
       module: "Arcade Relay",
+      operation: "Daily Missions / Expeditions",
+      watch: "Ignoring maintenance and energy slows overall progression rhythm.",
       actions: [
-        "Claim daily missions",
-        "Launch expeditions often",
-        "Keep upgrading structures",
-        "Do maintenance instead of ignoring stability",
+        "Claim mission rewards often.",
+        "Use expeditions as XP + utility, not only for loot.",
+        "Keep upgrading instead of sitting idle for too long.",
       ],
     },
     nextStep: {
       label: "Open Daily Missions",
       tab: "operations",
       target: "missions",
-      why: "Missions are one of the fastest repeatable XP sources.",
+      why: "Missions are one of the most reliable repeatable XP sources.",
     },
   },
 
   data: {
     title: "DATA",
-    focus: "Research Lab + expeditions + daily missions",
+    focus: "Research Lab + support DATA structures + expeditions",
     text:
       "DATA is your strategic progression resource.\n\n" +
-      "Main ways to gain DATA:\n" +
-      "• Research Lab is your strongest long-term DATA generator.\n" +
-      "• Miner Control and Arcade Hub add supporting DATA income.\n" +
-      "• Expeditions give burst DATA and rare findings.\n" +
-      "• Daily missions help smooth early progression.",
+      "Main sources:\n" +
+      "• Research Lab is the strongest long-term DATA engine.\n" +
+      "• Miner Control and Arcade Hub add support DATA.\n" +
+      "• Expeditions give burst DATA.\n" +
+      "• Missions smooth out early progression.\n\n" +
+      "Important:\n" +
+      "DATA controls research pace, so weak DATA slows the whole advanced game.",
     tips: {
       building: "Research Lab",
-      research: "Deep Scan / Token Discipline",
+      supportBuildings: ["Miner Control", "Arcade Hub", "Expedition Bay"],
+      research: "Deep Scan",
+      supportResearch: ["Token Discipline", "Arcade Ops"],
       module: "Arcade Relay",
+      operation: "Field Expedition",
+      watch: "Research Lab is strong, but it also adds Energy pressure.",
       actions: [
-        "Upgrade Research Lab first",
-        "Then scale Miner Control + Arcade Hub",
-        "Run expeditions for extra DATA",
-        "Complete DATA missions every day",
+        "Build Research Lab as your main DATA lane.",
+        "Use Miner Control and Arcade Hub as support, not as full replacements.",
+        "Run expeditions when you need extra DATA bursts.",
       ],
     },
     nextStep: {
@@ -1993,81 +2072,95 @@ const INFO_COPY = {
 
   energy: {
     title: "Energy",
-    focus: "Power Cell + Coolant Loops",
+    focus: "Power Cell + Coolant Loops + runtime control",
     text:
-      "Energy powers the whole base.\n\n" +
-      "How to get more Energy:\n" +
-      "• Wait for passive regeneration.\n" +
-      "• Upgrade Power Cell.\n" +
-      "• Unlock energy research.\n" +
-      "• Avoid draining energy on weak timing.",
+      "Energy powers passive production and many active systems.\n\n" +
+      "Main rule:\n" +
+      "• If total drain is higher than regen, the base starts choking.\n" +
+      "• Power Cell is the long-term Energy fix.\n" +
+      "• Coolant Loops adds extra cap and regen.\n" +
+      "• Refill restores Energy now, but does not improve regen.\n\n" +
+      "Important:\n" +
+      "Heavy buildings should be paused or delayed if Energy cannot support them yet.",
     tips: {
       building: "Power Cell",
+      supportBuildings: ["Repair Bay"],
       research: "Coolant Loops",
+      supportResearch: ["Predictive Maintenance"],
       module: "",
+      operation: "Emergency Refill / Pause heavy buildings",
+      watch: ["Refinery", "Research Lab", "Quarry", "Trade Hub", "Salvage Yard"],
       actions: [
-        "Upgrade Power Cell early",
-        "Unlock Coolant Loops quickly",
-        "Do not overrun energy-heavy systems",
-        "Recover before big pushes",
+        "Upgrade Power Cell before scaling many heavy buildings together.",
+        "Use Refill as recovery, not as your core Energy economy.",
+        "Pause the heavy building causing pressure when Energy collapses.",
       ],
     },
     nextStep: {
       label: "Upgrade Power Cell",
       tab: "build",
       target: "powerCell",
-      why: "Power Cell increases Energy cap and regeneration.",
+      why: "Power Cell improves both Energy cap and Energy regeneration.",
     },
   },
 
   stability: {
     title: "Stability",
-    focus: "Maintenance + Repair Bay + safe choices",
+    focus: "Maintenance + Repair Bay + pressure control",
     text:
-      "Stability shows how healthy and efficient your base is.\n\n" +
-      "How to keep Stability high:\n" +
-      "• Perform maintenance regularly.\n" +
-      "• Upgrade Repair Bay.\n" +
-      "• Choose safer event outcomes.\n" +
-      "• Avoid risky pushes when the base is stressed.",
+      "Stability is the health of your base.\n\n" +
+      "How to protect it:\n" +
+      "• Maintenance restores Stability directly.\n" +
+      "• Repair Bay improves long-term stability recovery.\n" +
+      "• Predictive Maintenance slows pressure growth.\n" +
+      "• Miner Link helps reduce refinery-related stress.\n\n" +
+      "Important:\n" +
+      "Low Stability weakens the feel of the whole base and makes expansion riskier.",
     tips: {
       building: "Repair Bay",
+      supportBuildings: ["Power Cell"],
       research: "Predictive Maintenance",
+      supportResearch: ["Field Ops"],
       module: "Miner Link",
+      operation: "Maintenance Cycle",
+      watch: "Refinery pressure and ignoring maintenance are the fastest ways to destabilize the base.",
       actions: [
-        "Use maintenance before Stability gets low",
-        "Upgrade Repair Bay",
-        "Choose safe event outcomes",
-        "Avoid overpushing during weak Stability",
+        "Use maintenance before Stability gets ugly.",
+        "Build Repair Bay early if you plan a heavier mid-game base.",
+        "Do not force Refinery scaling while Stability is already weak.",
       ],
     },
     nextStep: {
       label: "Perform maintenance",
       tab: "operations",
       target: "maintenance",
-      why: "Maintenance is the fastest direct way to recover Stability.",
+      why: "Maintenance is the fastest direct Stability recovery action.",
     },
   },
 
   ore: {
     title: "ORE",
-    focus: "Quarry + Energy + Miner Sync",
+    focus: "Quarry + Energy + Ore multipliers",
     text:
-      "ORE is one of the main raw resources in BASE.\n\n" +
-      "How to gain more ORE:\n" +
-      "• Build and upgrade Quarry.\n" +
-      "• Keep enough Energy available.\n" +
-      "• Install ORE-focused modules.\n" +
-      "• Unlock ORE-focused research.",
+      "ORE is the main raw industrial resource in BASE.\n\n" +
+      "How to grow it:\n" +
+      "• Quarry is the main direct source.\n" +
+      "• Energy must stay healthy so Quarry can keep running.\n" +
+      "• Ore-focused research and modules multiply the lane.\n\n" +
+      "Important:\n" +
+      "Weak Ore slows building upgrades and also starves the Refinery.",
     tips: {
       building: "Quarry",
+      supportBuildings: ["Power Cell", "Miner Control"],
       research: "Miner Sync",
+      supportResearch: ["Field Ops"],
       module: "Servo Drill",
+      operation: "",
+      watch: "Quarry is one of the first places where Energy pressure becomes visible.",
       actions: [
-        "Upgrade Quarry steadily",
-        "Keep Energy available",
-        "Install Servo Drill",
-        "Unlock Miner Sync early",
+        "Upgrade Quarry steadily instead of leaving Ore behind.",
+        "Fix Energy before blaming Ore production alone.",
+        "Take Servo Drill and Miner Sync when Ore becomes your main bottleneck.",
       ],
     },
     nextStep: {
@@ -2082,50 +2175,58 @@ const INFO_COPY = {
     title: "GOLD",
     focus: "Trade Hub + missions + expeditions",
     text:
-      "GOLD is the main economy resource in BASE.\n\n" +
-      "How to gain more GOLD:\n" +
-      "• Upgrade Trade Hub.\n" +
-      "• Complete GOLD-reward daily missions.\n" +
-      "• Launch expeditions.\n" +
-      "• Use economy-related events.",
+      "GOLD is the main spendable economy resource in BASE.\n\n" +
+      "How to grow it:\n" +
+      "• Trade Hub gives steady direct GOLD.\n" +
+      "• Missions and expeditions give flexible support.\n" +
+      "• A healthy Gold loop keeps upgrades feeling smooth.\n\n" +
+      "Important:\n" +
+      "When GOLD is weak, the whole base starts feeling slow even if other resources look fine.",
     tips: {
       building: "Trade Hub",
+      supportBuildings: ["Expedition Bay"],
       research: "Field Ops",
+      supportResearch: ["Arcade Ops"],
       module: "",
+      operation: "Field Expedition / Daily Missions",
+      watch: "Do not overspend GOLD on recovery actions if your economy is already thin.",
       actions: [
-        "Upgrade Trade Hub often",
-        "Claim GOLD-reward missions",
-        "Run expeditions consistently",
-        "Keep GOLD balanced with other resources",
+        "Use Trade Hub as your stable main Gold lane.",
+        "Use expeditions to smooth rough Gold moments.",
+        "Keep GOLD balanced with Ore and Scrap instead of tunneling only one lane.",
       ],
     },
     nextStep: {
       label: "Upgrade Trade Hub",
       tab: "build",
       target: "tradeHub",
-      why: "Trade Hub is your strongest direct GOLD source.",
+      why: "Trade Hub is the strongest direct GOLD source.",
     },
   },
 
   scrap: {
     title: "SCRAP",
-    focus: "Salvage Yard + expeditions",
+    focus: "Salvage Yard + expeditions + refinery support",
     text:
-      "SCRAP is an advanced support resource.\n\n" +
-      "How to gain more SCRAP:\n" +
-      "• Build and upgrade Salvage Yard.\n" +
-      "• Run expeditions.\n" +
-      "• Complete SCRAP-reward missions.\n" +
-      "• Take salvage-related event rewards.",
+      "SCRAP is a support resource that becomes more important as the base matures.\n\n" +
+      "How to grow it:\n" +
+      "• Salvage Yard is the main stable source.\n" +
+      "• Expeditions help with burst Scrap.\n" +
+      "• Strong Scrap is important for advanced systems and Refinery feeding.\n\n" +
+      "Important:\n" +
+      "Many players feel blocked in mid-game because Scrap falls behind without noticing.",
     tips: {
       building: "Salvage Yard",
+      supportBuildings: ["Expedition Bay", "Refinery"],
       research: "Deep Scan",
+      supportResearch: ["Field Ops"],
       module: "Miner Link",
+      operation: "Field Expedition",
+      watch: "Refinery scaling feels bad fast when Scrap cannot keep up.",
       actions: [
-        "Upgrade Salvage Yard",
-        "Run expeditions often",
-        "Take salvage rewards when available",
-        "Keep SCRAP strong for refinery systems",
+        "Do not leave Salvage too low while pushing advanced systems.",
+        "Use expeditions when you need Scrap bursts.",
+        "Keep Scrap healthy before pushing harder into Refinery.",
       ],
     },
     nextStep: {
@@ -2681,6 +2782,37 @@ export default function MleoBase() {
     setTimeout(() => {
       setHighlightTarget(null);
     }, 4200);
+  }
+
+  function normalizeInfoTipItems(value) {
+    if (Array.isArray(value)) return value.filter(Boolean);
+    return value ? [value] : [];
+  }
+
+  function hasInfoTipContent(tips) {
+    if (!tips) return false;
+    return [
+      tips.building,
+      tips.supportBuildings,
+      tips.research,
+      tips.supportResearch,
+      tips.module,
+      tips.operation,
+      tips.watch,
+      tips.actions,
+    ].some((item) => normalizeInfoTipItems(item).length > 0);
+  }
+
+  function renderInfoTipRow(label, value) {
+    const items = normalizeInfoTipItems(value);
+    if (!items.length) return null;
+
+    return (
+      <div>
+        <span className="font-semibold text-white">{label}:</span>{" "}
+        {items.join(" · ")}
+      </div>
+    );
   }
 
   function handleInfoNextStep() {
@@ -3317,6 +3449,71 @@ export default function MleoBase() {
       showToast(error?.message || "Build action failed.");
     }
   });
+  };
+
+  const toggleBuildingRuntime = async (key) => {
+    return runLockedAction(`toggle:${key}`, async () => {
+      const def = BUILDINGS.find((item) => item.key === key);
+      if (!def) return;
+
+      if (!canPauseBuilding(key)) {
+        showToast("This structure cannot be paused.");
+        return;
+      }
+
+      const level = state.buildings?.[key] || 0;
+      if (level <= 0) {
+        showToast("Build it first.");
+        return;
+      }
+
+      const nextPaused = !isBuildingPaused(state, key);
+
+      try {
+        const res = await toggleBuildingPause(key, nextPaused);
+
+        if (res?.success && res?.state) {
+          setState((prev) => {
+            const base = normalizeServerState(res.state, prev);
+
+            const next = applyLevelUps({
+              ...prev,
+              ...base,
+              crewRole: base?.crewRole ?? prev?.crewRole ?? "engineer",
+              commanderPath: base?.commanderPath ?? prev?.commanderPath ?? "industry",
+              missionState: {
+                dailySeed:
+                  base?.missionState?.dailySeed ||
+                  prev?.missionState?.dailySeed ||
+                  todayKey(),
+                completed: {
+                  ...(prev?.missionState?.completed || {}),
+                  ...(base?.missionState?.completed || {}),
+                },
+                claimed: {
+                  ...(prev?.missionState?.claimed || {}),
+                  ...(base?.missionState?.claimed || {}),
+                },
+              },
+            });
+
+            next.log = pushLog(
+              next.log,
+              `${def.name} ${nextPaused ? "paused" : "resumed"}.`
+            );
+
+            return next;
+          });
+
+          showToast(`${def.name} ${nextPaused ? "paused" : "resumed"}.`);
+        } else {
+          showToast(res?.message || "Pause toggle failed.");
+        }
+      } catch (error) {
+        console.error("Pause toggle failed", error);
+        showToast(error?.message || "Pause toggle failed.");
+      }
+    });
   };
 
   const hireCrew = async () => {
@@ -4924,117 +5121,135 @@ export default function MleoBase() {
   const OPERATIONS_INFO_COPY = {
     shipping: {
       title: "Ship to Shared Vault",
-      focus: "Move BASE profit into your main MLEO vault",
+      focus: "Move banked MLEO out of BASE",
       text:
         "Shipping transfers banked MLEO from BASE into the Shared Vault.\n\n" +
-        "What it does:\n" +
-        "• Converts BASE progress into real usable vault balance.\n" +
-        "• Lets BASE support the wider MLEO ecosystem.\n" +
-        "• Uses a daily softcut so the system stays balanced.\n\n" +
-        "Best use:\n" +
-        "Ship when your banked MLEO is healthy and you want to move progress out of BASE without sitting on it too long.",
+        "What improves it:\n" +
+        "• More banked MLEO from Refinery.\n" +
+        "• Better ship quality from Logistics Center.\n" +
+        "• Better long-term export scaling from Blueprint and Logistics research.\n\n" +
+        "Important:\n" +
+        "Shipping is the final conversion step. No shipping means no real Shared Vault growth.",
       tips: {
         building: "Logistics Center",
+        supportBuildings: ["Refinery"],
         research: "Logistics",
+        supportResearch: ["Routing AI"],
         module: "Vault Compressor",
+        operation: "Ship to Shared Vault",
+        watch: "Banked MLEO sitting inside BASE is not yet real Shared Vault value.",
         actions: [
-          "Refinery must produce banked MLEO first.",
-          "Shipping is stronger when Logistics Center is upgraded.",
-          "Do not confuse banked MLEO with Shared Vault MLEO.",
+          "Make sure Refinery is feeding the lane first.",
+          "Improve Logistics when shipping becomes part of your daily loop.",
+          "Avoid wasting good shipping timing near cap pressure.",
         ],
       },
       nextStep: {
         label: "Open Refinery",
         tab: "build",
         target: "refinery",
-        why: "Shipping becomes useful only after Refinery is feeding banked MLEO.",
+        why: "Shipping matters only when Refinery is already producing banked MLEO.",
       },
     },
 
     expedition: {
       title: "Field Expedition",
-      focus: "Spend Energy to gain mixed rewards",
+      focus: "Spend Energy and DATA for mixed rewards",
       text:
         "Field Expedition is a controlled action that trades Energy for resource rewards.\n\n" +
-        "What it does:\n" +
-        "• Consumes Energy.\n" +
-        "• Can return Ore, Gold, Scrap and DATA.\n" +
-        "• Only has a small chance to add banked MLEO directly.\n\n" +
-        "Best use:\n" +
-        "Run expeditions when Energy is healthy and you want flexible resource growth, especially Scrap and DATA support.",
+        "What it gives:\n" +
+        "• Ore, Gold, Scrap and DATA.\n" +
+        "• A small chance for banked MLEO.\n" +
+        "• Good mission and progression support.\n\n" +
+        "Important:\n" +
+        "Expeditions are best when your base can spare the Energy and you need mixed utility, not just one pure resource.",
       tips: {
         building: "Expedition Bay",
+        supportBuildings: ["Power Cell"],
         research: "Arcade Ops",
+        supportResearch: ["Deep Scan"],
         module: "Arcade Relay",
+        operation: "Field Expedition",
+        watch: "Do not burn Energy on expeditions when your production loop is already starving.",
         actions: [
-          "Do not waste expeditions when Energy is low.",
-          "Expeditions are better for mixed utility than direct MLEO farming.",
-          "Use them to support missions, DATA flow and resource recovery.",
+          "Run expeditions for Scrap and DATA support.",
+          "Use Expedition Bay when this lane becomes central to your strategy.",
+          "Treat expeditions as flexible utility, not pure MLEO farming.",
         ],
       },
       nextStep: {
         label: "Open Expedition Bay",
         tab: "build",
         target: "expeditionBay",
-        why: "Expedition Bay improves this action and makes expedition play more valuable.",
+        why: "Expedition Bay improves this action and makes it more rewarding.",
       },
     },
 
     refill: {
       title: "Emergency Refill",
-      focus: "Buy back Energy when your base is stalled",
+      focus: "Restore Energy now, not permanently",
       text:
-        "Emergency Refill restores Energy by spending Gold.\n\n" +
+        "Emergency Refill restores Energy to your current cap.\n\n" +
         "What it does:\n" +
-        "• Gives immediate Energy back.\n" +
-        "• Helps restart production or action loops.\n" +
-        "• Costs Gold, so it is a recovery tool and not something to spam.\n\n" +
-        "Best use:\n" +
-        "Use it when Energy is your bottleneck and the refill helps you unlock better actions than the Gold you spend.",
+        "• Instantly fills ENERGY back to your current cap.\n" +
+        "• Costs Shared Vault MLEO.\n" +
+        "• Also consumes 5 DATA.\n" +
+        "• Does not improve Energy regeneration.\n\n" +
+        "Important:\n" +
+        "Refill is a recovery button. It is not your long-term Energy engine.",
       tips: {
         building: "Power Cell",
+        supportBuildings: ["Repair Bay"],
         research: "Coolant Loops",
+        supportResearch: ["Predictive Maintenance"],
         module: "",
+        operation: "Emergency Refill",
+        watch: "If you need refill all the time, the real problem is usually Power Cell timing or heavy building pressure.",
         actions: [
-          "Prefer better Energy scaling before relying on refill too often.",
-          "Use refill to recover tempo, not as your default Energy economy.",
-          "Power Cell + Coolant Loops reduce how often you need it.",
+          "Use Refill to recover tempo, not as your default Energy plan.",
+          "Upgrade Power Cell to reduce refill dependence.",
+          "Pause heavy buildings first when Energy keeps crashing.",
         ],
       },
       nextStep: {
         label: "Open Power Cell",
         tab: "build",
         target: "powerCell",
-        why: "Power Cell is the long-term solution when refill is needed too often.",
+        why: "Power Cell is the real long-term fix when refill becomes too common.",
       },
     },
 
     maintenance: {
       title: "Maintenance Cycle",
-      focus: "Protect base stability and avoid system pressure",
+      focus: "Direct Stability recovery and pressure control",
       text:
         "Maintenance keeps your BASE stable and prevents performance problems.\n\n" +
         "What it does:\n" +
-        "• Restores or protects stability.\n" +
-        "• Helps prevent warning or critical states.\n" +
-        "• Makes larger bases safer to run.\n\n" +
-        "Best use:\n" +
-        "Use maintenance before stability drops too far. It is much better as prevention than as a late emergency fix.",
+        "• Maintenance restores stability directly.\n" +
+        "• Repair Bay improves long-term stability support.\n" +
+        "• Predictive Maintenance slows pressure growth.\n" +
+        "• Miner Link helps when refinery load is part of the problem.\n\n" +
+        "Important:\n" +
+        "Maintenance works best before the base becomes unstable, not after everything is already under pressure.",
       tips: {
         building: "Repair Bay",
+        supportBuildings: ["Power Cell"],
         research: "Predictive Maintenance",
+        supportResearch: ["Field Ops"],
         module: "Miner Link",
+        operation: "Maintenance Cycle",
+        watch: "Heavy Refinery scaling with weak stability support is a common trap.",
         actions: [
-          "Do not wait for critical state before maintaining.",
-          "Refinery and active systems make stability more important.",
-          "Repair Bay and maintenance research make this much stronger.",
+          "Do maintenance before Stability drops too low.",
+          "Use Repair Bay if you plan a heavier advanced base.",
+          "Treat maintenance as prevention, not only emergency repair.",
         ],
       },
       nextStep: {
         label: "Open Repair Bay",
         tab: "build",
         target: "repairBay",
-        why: "Repair Bay is the structure that best supports stable long-term base growth.",
+        why: "Repair Bay is the structure that best supports long-term Stability control.",
       },
     },
   };
@@ -5750,50 +5965,62 @@ export default function MleoBase() {
   const SYSTEM_INFO_COPY = {
     blueprint: {
       title: "Blueprint Cache",
-      focus: "Permanent support upgrade for shipping and banking",
+      focus: "Permanent shipping support upgrade",
       text:
-        "Blueprint Cache is a long-term investment system.\n\n" +
-        "What it does:\n" +
-        "• Costs Shared Vault MLEO and DATA.\n" +
-        "• Permanently improves banking efficiency.\n" +
-        "• Permanently raises your daily ship cap.\n\n" +
-        "Best use:\n" +
-        "Buy Blueprint when you already have a stable BASE loop and want stronger long-term export performance instead of only short-term gains.",
+        "Blueprint is a long-term reinvestment system.\n\n" +
+        "What it improves:\n" +
+        "• Better bank / ship efficiency.\n" +
+        "• Higher daily ship cap.\n" +
+        "• Better value from a strong shipping loop.\n\n" +
+        "Important:\n" +
+        "Blueprint is strongest after your Refinery and shipping lane already work well.",
       tips: {
-        building: "Refinery",
+        building: "Logistics Center",
+        supportBuildings: ["Refinery"],
         research: "Logistics",
+        supportResearch: ["Routing AI"],
         module: "Vault Compressor",
+        operation: "Ship to Shared Vault",
+        watch: "Blueprint is reinvestment, not emergency recovery.",
         actions: [
-          "Blueprint is a reinvestment tool, not a panic button.",
-          "Best when shipping already matters to your economy.",
-          "Good for players who want stronger long-term BASE value.",
+          "Take Blueprint when shipping is already part of your main economy.",
+          "Do not prioritize it over broken Energy or Stability.",
+          "Blueprint becomes stronger as export flow becomes consistent.",
         ],
       },
       nextStep: {
         label: "Open Shipping",
         tab: "operations",
         target: "shipping",
-        why: "Blueprint matters most when you actively use your shipping pipeline.",
+        why: "Blueprint matters most when you actively use the shipping pipeline.",
       },
     },
 
     crewSummary: {
       title: "Crew Role Summary",
-      focus: "Your active command specialization",
+      focus: "Your current support style",
       text:
-        "This card shows the crew role currently shaping your base style.\n\n" +
-        "What it means:\n" +
-        "• Your role reflects how your command team approaches the base.\n" +
-        "• It helps define whether your build feels safer, smarter, more export-focused or more field-focused.\n" +
-        "• It is part of your identity layer, not just flavor text.",
+        "Crew Role changes what kind of help your base gets most naturally.\n\n" +
+        "Examples:\n" +
+        "• Engineer helps stability handling.\n" +
+        "• Logistician supports export flow.\n" +
+        "• Researcher supports DATA.\n" +
+        "• Scout supports field identity.\n" +
+        "• Operations helps economy balance.\n\n" +
+        "Important:\n" +
+        "Role should match your current bottleneck, not just your favorite theme.",
       tips: {
-        building: "HQ",
+        building: "Match role to bottleneck",
+        supportBuildings: ["Repair Bay for Engineer", "Logistics Center for Logistician", "Research Lab for Researcher"],
         research: "Field Ops",
+        supportResearch: [],
         module: "",
+        operation: "Review role when progression slows",
+        watch: "A good role still needs the right buildings behind it.",
         actions: [
-          "Use this card to remember what style your base is currently leaning into.",
-          "Change role when your bottlenecks change.",
-          "This summary works together with Commander Path.",
+          "Use Engineer when stability is becoming a problem.",
+          "Use Logistician when shipping becomes central.",
+          "Use Researcher when DATA and research pacing are your focus.",
         ],
       },
       nextStep: {
@@ -5806,21 +6033,33 @@ export default function MleoBase() {
 
     commanderSummary: {
       title: "Commander Path Summary",
-      focus: "Your strategic base identity",
+      focus: "Your high-level strategic direction",
       text:
-        "This card shows the strategic direction of your command path.\n\n" +
-        "What it means:\n" +
-        "• It reflects whether your base is leaning toward Industry, Logistics, Research or Ecosystem.\n" +
-        "• It helps define how the base should feel overall.\n" +
-        "• It is a strategy identity marker for the player.",
+        "Commander Path shows what style your base is leaning toward.\n\n" +
+        "Main paths:\n" +
+        "• Industry for safer production growth.\n" +
+        "• Logistics for export and vault flow.\n" +
+        "• Research for DATA and analysis.\n" +
+        "• Ecosystem for broader MLEO synergy.\n\n" +
+        "Important:\n" +
+        "Path works best when your upgrades actually match it.",
       tips: {
-        building: "HQ",
+        building: "Match path to core lane",
+        supportBuildings: [
+          "Quarry / Refinery for Industry",
+          "Logistics Center for Logistics",
+          "Research Lab for Research",
+          "Miner Control / Arcade Hub for Ecosystem",
+        ],
         research: "Field Ops",
+        supportResearch: ["Logistics", "Deep Scan", "Miner Sync"],
         module: "",
+        operation: "Review path when strategy changes",
+        watch: "Path is not a free bonus lane if your build goes the opposite way.",
         actions: [
-          "Use this as your high-level strategic reminder.",
-          "Path should match what systems you are investing in most.",
-          "Role and Path together explain your base identity.",
+          "Industry is safer for production-heavy play.",
+          "Logistics is stronger when Shared Vault shipping matters.",
+          "Research is better when DATA scaling is central.",
         ],
       },
       nextStep: {
@@ -5833,46 +6072,54 @@ export default function MleoBase() {
 
     baseProfile: {
       title: "Base Profile",
-      focus: "A simple label for your current stage of growth",
+      focus: "A readable summary of your current maturity",
       text:
-        "Base Profile is a readable summary of how developed your outpost currently is.\n\n" +
-        "What it means:\n" +
-        "• Early Outpost means the base is still in its first growth stage.\n" +
-        "• Growing Outpost means the command structure is maturing.\n" +
-        "• Developed Command means your base has enough depth to feel like a real command center.\n\n" +
-        "Best use:\n" +
-        "This is not a direct stat bonus card. It helps the player understand the current maturity of the base.",
+        "Base Profile is a simple stage label for your outpost.\n\n" +
+        "What it tells you:\n" +
+        "• Whether you are still early.\n" +
+        "• Whether your command center is maturing.\n" +
+        "• Whether the base already has enough systems to feel structured.\n\n" +
+        "Important:\n" +
+        "This is not a stat bonus. It is a readability tool for the player.",
       tips: {
         building: "HQ",
+        supportBuildings: ["Power Cell", "Refinery", "Research Lab"],
         research: "",
+        supportResearch: [],
         module: "",
+        operation: "",
+        watch: "Use this as a stage marker, not as a performance stat.",
         actions: [
-          "Think of this as a stage label, not a currency.",
-          "It helps players feel progression in a readable way.",
-          "Useful for understanding whether you are still early or already structured.",
+          "Read it as overall progression, not as raw power.",
+          "A higher profile usually means more systems are now worth connecting together.",
+          "Good for helping players feel long-term growth.",
         ],
       },
     },
 
     shipDiscipline: {
       title: "Ship Discipline",
-      focus: "Tracks daily shipment pressure and efficiency",
+      focus: "How much shipping pressure you already used today",
       text:
-        "Ship Discipline shows how much you have already shipped today compared to your cap.\n\n" +
-        "What it means:\n" +
-        "• The left value is how much you already sent today.\n" +
-        "• The right value is your current daily ship cap.\n" +
-        "• Softcut still applies, so shipping too aggressively can become less efficient.\n\n" +
-        "Best use:\n" +
-        "Use this card to decide whether it is worth shipping now or waiting for a better moment.",
+        "Ship Discipline compares today's shipped amount to your current cap.\n\n" +
+        "What it helps with:\n" +
+        "• Reading export pressure.\n" +
+        "• Timing shipments more smartly.\n" +
+        "• Understanding when softcut starts to matter more.\n\n" +
+        "Important:\n" +
+        "The cap is not the only thing that matters. Timing and efficiency still matter too.",
       tips: {
         building: "Logistics Center",
+        supportBuildings: ["Refinery"],
         research: "Logistics",
+        supportResearch: ["Routing AI"],
         module: "Vault Compressor",
+        operation: "Ship to Shared Vault",
+        watch: "Shipping too aggressively near cap can feel less efficient.",
         actions: [
-          "Do not treat cap as the only rule; timing still matters.",
-          "Blueprint upgrades make this card more forgiving over time.",
-          "Very useful for teaching better shipping discipline.",
+          "Use this card to pace exports.",
+          "Blueprint and Logistics make shipping more forgiving over time.",
+          "Good timing can matter almost as much as raw quantity.",
         ],
       },
       nextStep: {
@@ -5885,45 +6132,66 @@ export default function MleoBase() {
 
     commandAlerts: {
       title: "Command Alerts",
-      focus: "Why the game is warning or guiding you right now",
+      focus: "What needs attention right now",
       text:
-        "Command Alerts summarize what currently needs your attention.\n\n" +
-        "What they usually mean:\n" +
+        "Command Alerts explain the most important pressure or opportunity in your base.\n\n" +
+        "Typical alerts:\n" +
         "• Energy pressure.\n" +
-        "• Stability risk.\n" +
-        "• Shipping opportunity.\n" +
-        "• Contract or mission progress.\n\n" +
-        "Best use:\n" +
-        "Treat alerts as guidance, not as strict orders. They are there to help players understand what matters right now.",
+        "• Stability pressure.\n" +
+        "• Expedition readiness.\n" +
+        "• Shipping pressure.\n" +
+        "• Claimable rewards.\n\n" +
+        "Important:\n" +
+        "Alerts are guidance, not orders. They help the player focus without taking control away.",
       tips: {
-        building: "HQ",
+        building: "Power Cell / Repair Bay",
+        supportBuildings: ["Expedition Bay", "Logistics Center"],
         research: "",
+        supportResearch: [],
         module: "",
+        operation: "Open the system causing the alert",
+        watch: "Do not follow alerts blindly if your long-term plan says something else.",
         actions: [
-          "Good for new players who are not sure where to focus next.",
+          "Treat critical alerts first.",
+          "Use alerts to reduce confusion, especially in early and mid game.",
           "Alerts should support decisions, not replace strategy.",
-          "Useful when the game starts feeling overloaded.",
         ],
       },
     },
 
     nextStepCard: {
       title: "Recommended Next Step",
-      focus: "The game's current guidance for your best move",
+      focus: "The best immediate move for the current state",
       text:
-        "This card gives the player a suggested next move based on the current base state.\n\n" +
-        "What it means:\n" +
-        "• It points to the most helpful immediate action.\n" +
-        "• It reduces confusion during complex progression.\n" +
-        "• It should explain why that step matters now.",
+        "This card suggests the strongest immediate action based on your current base state.\n\n" +
+        "What it helps with:\n" +
+        "• Reducing confusion.\n" +
+        "• Teaching progression naturally.\n" +
+        "• Helping players move forward without reading everything.\n\n" +
+        "Important:\n" +
+        "It points to the next good move, not the only valid move.",
       tips: {
-        building: "HQ",
-        research: "",
-        module: "",
+        building: "Depends on bottleneck",
+        supportBuildings: [
+          "Power Cell for Energy",
+          "Repair Bay for Stability",
+          "Refinery for banked MLEO",
+          "Research Lab for DATA",
+        ],
+        research: "Depends on lane",
+        supportResearch: [
+          "Coolant Loops",
+          "Predictive Maintenance",
+          "Logistics",
+          "Miner Sync",
+        ],
+        module: "Depends on lane",
+        operation: "Use the suggested button jump",
+        watch: "This is immediate guidance, not full long-term planning.",
         actions: [
-          "This is especially helpful in early and mid-game.",
-          "Players should feel guided without losing freedom.",
-          "Good candidate for a permanent info button because the game is complex.",
+          "Great for new players.",
+          "Good for mid-game when the base starts feeling complex.",
+          "Use it as guidance while still keeping freedom to choose your own route.",
         ],
       },
     },
@@ -6032,6 +6300,30 @@ export default function MleoBase() {
             </div>
             <div>{info.impact}</div>
           </div>
+
+          <div>
+            <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-cyan-300/80">
+              Energy / runtime
+            </div>
+            <div className="text-white/85">{getBuildingEnergyLine(building, level, isBuildingPaused(state, building.key))}</div>
+            <div className="mt-2 text-sm text-white/70">
+              {getBuildingPauseLine(building.key, isBuildingPaused(state, building.key))}
+            </div>
+
+            {canPauseBuilding(building.key) && level > 0 ? (
+              <button
+                type="button"
+                onClick={() => toggleBuildingRuntime(building.key)}
+                className={`mt-3 w-full rounded-2xl border px-4 py-3 text-sm font-bold transition ${
+                  isBuildingPaused(state, building.key)
+                    ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15"
+                    : "border-amber-400/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15"
+                }`}
+              >
+                {isBuildingPaused(state, building.key) ? "Resume" : "Pause"}
+              </button>
+            ) : null}
+          </div>
         </div>
       ),
       tips: info.tips,
@@ -6075,6 +6367,8 @@ export default function MleoBase() {
           const cost = buildingCost(building, level);
           const isUnlocked = unlocked(building, state);
           const ready = isUnlocked && canAfford(state.resources, cost);
+          const paused = isBuildingPaused(state, building.key);
+          const canPause = canPauseBuilding(building.key);
 
           const reqNameMap = {
             hq: "HQ",
@@ -6181,17 +6475,40 @@ export default function MleoBase() {
               <ResourceCostRow cost={cost} resources={state.resources} />
 
               <div className="mt-auto flex flex-col justify-end pt-0 pb-2">
-                <button
-                  onClick={() => buyBuilding(building.key)}
-                  disabled={!ready}
-                  className={`w-full rounded-xl px-3 py-2 text-xs font-semibold leading-none transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
-                    canCoverCost(state.resources, cost)
-                      ? "bg-white/10"
-                      : "bg-white/10 opacity-70"
-                  }`}
-                >
-                  {buttonText}
-                </button>
+                <div className="text-[10px] font-semibold text-white/50">
+                  {getBuildingEnergyLine(building, level, paused)}
+                </div>
+                <div className="mt-1 text-[10px] font-semibold text-cyan-200/70">
+                  {getBuildingPauseLine(building.key, paused)}
+                </div>
+
+                <div className="mt-2 flex w-full flex-col gap-2">
+                  <button
+                    onClick={() => buyBuilding(building.key)}
+                    disabled={!ready}
+                    className={`w-full rounded-xl px-3 py-2 text-xs font-semibold leading-none transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
+                      canCoverCost(state.resources, cost)
+                        ? "bg-white/10"
+                        : "bg-white/10 opacity-70"
+                    }`}
+                  >
+                    {buttonText}
+                  </button>
+
+                  {canPause && level > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => toggleBuildingRuntime(building.key)}
+                      className={`w-full rounded-xl px-3 py-2 text-xs font-semibold leading-none transition ${
+                        paused
+                          ? "border border-emerald-400/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15"
+                          : "border border-amber-400/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15"
+                      }`}
+                    >
+                      {paused ? "Resume" : "Pause"}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
           );
@@ -7914,45 +8231,34 @@ export default function MleoBase() {
                     {shownInfo.text}
                   </div>
 
-                  {shownInfo?.tips ? (
+                  {hasInfoTipContent(shownInfo?.tips) ? (
                     <div className="mt-4 border-t border-white/10 pt-4">
                       <div className="grid gap-2 text-sm text-white/78">
-                        {shownInfo?.tips?.building ? (
-                          <div>
-                            <span className="font-semibold text-white">Best building:</span>{" "}
-                            {shownInfo.tips.building}
-                          </div>
-                        ) : null}
-
-                        {shownInfo?.tips?.research ? (
-                          <div>
-                            <span className="font-semibold text-white">Best research:</span>{" "}
-                            {shownInfo.tips.research}
-                          </div>
-                        ) : null}
-
-                        {shownInfo?.tips?.module ? (
-                          <div>
-                            <span className="font-semibold text-white">Best module:</span>{" "}
-                            {shownInfo.tips.module}
-                          </div>
-                        ) : null}
+                        {renderInfoTipRow("Main building", shownInfo?.tips?.building)}
+                        {renderInfoTipRow("Support buildings", shownInfo?.tips?.supportBuildings)}
+                        {renderInfoTipRow("Main research", shownInfo?.tips?.research)}
+                        {renderInfoTipRow("Support research", shownInfo?.tips?.supportResearch)}
+                        {renderInfoTipRow("Best module", shownInfo?.tips?.module)}
+                        {renderInfoTipRow("Best operation", shownInfo?.tips?.operation)}
+                        {renderInfoTipRow("Watch out", shownInfo?.tips?.watch)}
                       </div>
 
-                      <div className="mt-4">
-                        <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-200/70">
-                          Quick actions
+                      {normalizeInfoTipItems(shownInfo?.tips?.actions).length ? (
+                        <div className="mt-4">
+                          <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-200/70">
+                            Quick actions
+                          </div>
+
+                          <ul className="mt-2 space-y-1.5 text-sm leading-6 text-white/78">
+                            {normalizeInfoTipItems(shownInfo?.tips?.actions).map((item) => (
+                              <li key={item} className="flex gap-2">
+                                <span className="mt-[8px] h-1.5 w-1.5 rounded-full bg-cyan-300/90" />
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-
-                        <ul className="mt-2 space-y-1.5 text-sm leading-6 text-white/78">
-                          {shownInfo.tips.actions.map((item) => (
-                            <li key={item} className="flex gap-2">
-                              <span className="mt-[8px] h-1.5 w-1.5 rounded-full bg-cyan-300/90" />
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                      ) : null}
                     </div>
                   ) : null}
 

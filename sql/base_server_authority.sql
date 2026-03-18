@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.base_device_state (
   stability numeric(10,4) NOT NULL DEFAULT 100,
   resources jsonb NOT NULL DEFAULT '{}'::jsonb,
   buildings jsonb NOT NULL DEFAULT '{}'::jsonb,
+  paused_buildings jsonb NOT NULL DEFAULT '{}'::jsonb,
   modules jsonb NOT NULL DEFAULT '{}'::jsonb,
   research jsonb NOT NULL DEFAULT '{}'::jsonb,
   stats jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -31,6 +32,9 @@ CREATE TABLE IF NOT EXISTS public.base_device_state (
   updated_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.base_device_state
+  ADD COLUMN IF NOT EXISTS paused_buildings jsonb NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE INDEX IF NOT EXISTS idx_base_device_state_updated_at
   ON public.base_device_state(updated_at DESC);
@@ -239,6 +243,7 @@ DECLARE
   v_research jsonb;
   v_stats jsonb;
   v_mission_state jsonb;
+  v_paused_buildings jsonb;
 
   v_hq integer := 1;
   v_quarry integer := 1;
@@ -358,6 +363,7 @@ BEGIN
   v_research := coalesce(v_state.research, '{}'::jsonb);
   v_stats := coalesce(v_state.stats, public.base_default_stats());
   v_mission_state := coalesce(v_state.mission_state, public.base_default_mission_state(current_date::text));
+  v_paused_buildings := coalesce(v_state.paused_buildings, '{}'::jsonb);
 
   IF coalesce(v_mission_state->>'dailySeed', '') <> current_date::text THEN
     v_mission_state := public.base_default_mission_state(current_date::text);
@@ -375,6 +381,18 @@ BEGIN
   v_logistics := greatest(0, public.base_jsonb_int(v_buildings, 'logisticsCenter', 0));
   v_research_lab := greatest(0, public.base_jsonb_int(v_buildings, 'researchLab', 0));
   v_repair := greatest(0, public.base_jsonb_int(v_buildings, 'repairBay', 0));
+
+  -- Pause support: if a building is marked as paused, treat its effective level as 0
+  -- so it stops passive output AND passive drain/pressure contributions.
+  v_quarry := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'quarry', false) THEN 0 ELSE v_quarry END;
+  v_trade := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'tradeHub', false) THEN 0 ELSE v_trade END;
+  v_salvage := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'salvage', false) THEN 0 ELSE v_salvage END;
+  v_refinery := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'refinery', false) THEN 0 ELSE v_refinery END;
+  v_miner := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'minerControl', false) THEN 0 ELSE v_miner END;
+  v_arcade := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'arcadeHub', false) THEN 0 ELSE v_arcade END;
+  v_logistics := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'logisticsCenter', false) THEN 0 ELSE v_logistics END;
+  v_research_lab := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'researchLab', false) THEN 0 ELSE v_research_lab END;
+  v_repair := CASE WHEN public.base_jsonb_bool(v_paused_buildings, 'repairBay', false) THEN 0 ELSE v_repair END;
 
   v_crew := greatest(0, coalesce(v_state.crew, 0));
   v_crew_role := coalesce(v_state.crew_role, 'engineer');
@@ -699,6 +717,89 @@ BEGIN
 END;
 $$;
 
+-- ============================================================================
+-- Toggle passive building runtime (Pause/Resume)
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.base_set_building_paused(
+  p_device_id text,
+  p_building_key text,
+  p_paused boolean
+)
+RETURNS TABLE(
+  paused boolean,
+  paused_buildings jsonb,
+  state jsonb
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_state public.base_device_state%ROWTYPE;
+  v_paused_buildings jsonb;
+  v_current_level integer;
+BEGIN
+  IF coalesce(trim(p_device_id), '') = '' THEN
+    RAISE EXCEPTION 'device_id is required';
+  END IF;
+
+  IF coalesce(trim(p_building_key), '') = '' THEN
+    RAISE EXCEPTION 'building_key is required';
+  END IF;
+
+  IF p_building_key NOT IN (
+    'quarry',
+    'tradeHub',
+    'salvage',
+    'refinery',
+    'minerControl',
+    'arcadeHub',
+    'logisticsCenter',
+    'researchLab',
+    'repairBay'
+  ) THEN
+    RAISE EXCEPTION 'Invalid pausable building key';
+  END IF;
+
+  -- Reconcile first so we toggle against the latest computed state.
+  PERFORM public.base_reconcile_state(p_device_id);
+
+  SELECT *
+  INTO v_state
+  FROM public.base_device_state
+  WHERE device_id = p_device_id
+  FOR UPDATE;
+
+  v_paused_buildings := coalesce(v_state.paused_buildings, '{}'::jsonb);
+  v_current_level := coalesce((v_state.buildings->>p_building_key)::integer, 0);
+
+  IF v_current_level <= 0 THEN
+    RAISE EXCEPTION 'Building is not built yet';
+  END IF;
+
+  v_paused_buildings := jsonb_set(
+    v_paused_buildings,
+    ARRAY[p_building_key],
+    to_jsonb(coalesce(p_paused, false)),
+    true
+  );
+
+  UPDATE public.base_device_state
+  SET
+    paused_buildings = v_paused_buildings,
+    updated_at = now()
+  WHERE device_id = p_device_id
+  RETURNING *
+  INTO v_state;
+
+  RETURN QUERY
+  SELECT
+    coalesce((v_state.paused_buildings->>p_building_key)::boolean, false),
+    coalesce(v_state.paused_buildings, '{}'::jsonb),
+    to_jsonb(v_state);
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.base_claim_mission_reward(
   p_device_id text,
   p_mission_key text
@@ -836,9 +937,11 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.base_get_or_create_state(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_reconcile_state(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_claim_mission_reward(text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_set_building_paused(text, text, boolean) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.base_get_or_create_state(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_reconcile_state(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_claim_mission_reward(text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.base_set_building_paused(text, text, boolean) TO service_role;
 
 COMMIT;
