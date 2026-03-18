@@ -1,5 +1,5 @@
 import { BUILDINGS } from "../../base-v2/data/buildings";
-import { SCENE_BUILDING_KEYS, SCENE_POSITIONS } from "../data/scenePositions";
+import { SCENE_BUILDING_KEYS, SCENE_POSITIONS, SCENE_LINK_KEYS } from "../data/scenePositions";
 import { getBuildingIdentity } from "../data/buildingIdentity";
 
 function getBuildingLevel(state, key) {
@@ -19,6 +19,8 @@ const GLOW_CLASSES = {
   indigo: "border-indigo-400/50 bg-indigo-950/30 shadow-[0_0_10px_rgba(99,102,241,0.3)]",
   teal: "border-teal-400/50 bg-teal-950/30 shadow-[0_0_10px_rgba(45,212,191,0.3)]",
   slate: "border-slate-500/50 bg-slate-900/60",
+  orange: "border-orange-400/50 bg-orange-950/30 shadow-[0_0_10px_rgba(251,146,60,0.3)]",
+  sky: "border-sky-400/50 bg-sky-950/30 shadow-[0_0_10px_rgba(56,189,248,0.3)]",
 };
 
 const GLOW_ACTIVE = {
@@ -31,6 +33,8 @@ const GLOW_ACTIVE = {
   indigo: "border-indigo-400/70 shadow-[0_0_14px_rgba(99,102,241,0.4)]",
   teal: "border-teal-400/70 shadow-[0_0_14px_rgba(45,212,191,0.4)]",
   slate: "border-slate-500/60",
+  orange: "border-orange-400/70 shadow-[0_0_14px_rgba(251,146,60,0.4)]",
+  sky: "border-sky-400/70 shadow-[0_0_14px_rgba(56,189,248,0.4)]",
 };
 
 function BuildingNode({ buildingKey, def, level, locked, active, selected, onSelect, style, identity }) {
@@ -118,7 +122,7 @@ export function BaseSceneV3({ base, selected, onSelect }) {
         preserveAspectRatio="none"
         aria-hidden
       >
-        {["quarry", "tradeHub", "powerCell", "salvage"].map((key) => {
+        {(SCENE_LINK_KEYS || ["quarry", "tradeHub", "powerCell", "salvage"]).map((key) => {
           const p = SCENE_POSITIONS[key];
           if (!p) return null;
           return (

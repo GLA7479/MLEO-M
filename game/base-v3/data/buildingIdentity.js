@@ -1,73 +1,111 @@
-// V3: unique visual identity per building for mobile game scene (not generic nodes).
-// Short labels shown in scene: HQ, PWR, LAB, MINE, EXP, REP, TRD, SAL
+// V3: unique visual identity for all 12 buildings. 1:1 with original base.
 
 export const BUILDING_IDENTITY = {
   hq: {
     label: "HQ",
-    size: "lg", // largest node
-    shape: "hex", // central anchor
+    size: "lg",
     glow: "emerald",
     pulse: "breathe",
     icon: "◆",
+    tag: "COMMAND",
   },
   quarry: {
     label: "MINE",
     size: "md",
-    shape: "round",
     glow: "amber",
     pulse: "slow",
     icon: "◇",
+    tag: "PRODUCTION",
   },
   tradeHub: {
     label: "TRD",
     size: "md",
-    shape: "round",
     glow: "yellow",
     pulse: "slow",
     icon: "◎",
+    tag: "SUPPORT",
   },
   salvage: {
     label: "SAL",
     size: "md",
-    shape: "round",
     glow: "lime",
     pulse: "slow",
     icon: "▣",
+    tag: "PRODUCTION",
+  },
+  refinery: {
+    label: "REF",
+    size: "md",
+    glow: "orange",
+    pulse: "slow",
+    icon: "⬡",
+    tag: "PRODUCTION",
   },
   powerCell: {
     label: "PWR",
     size: "md",
-    shape: "round",
     glow: "cyan",
     pulse: "flicker",
     icon: "⚡",
+    tag: "SYSTEMS",
+  },
+  minerControl: {
+    label: "MIN",
+    size: "md",
+    glow: "slate",
+    pulse: "slow",
+    icon: "▤",
+    tag: "ECOSYSTEM",
+  },
+  arcadeHub: {
+    label: "ARC",
+    size: "md",
+    glow: "violet",
+    pulse: "slow",
+    icon: "◉",
+    tag: "ECOSYSTEM",
   },
   expeditionBay: {
     label: "EXP",
     size: "md",
-    shape: "round",
     glow: "violet",
     pulse: "slow",
     icon: "◈",
+    tag: "COMMAND",
+  },
+  logisticsCenter: {
+    label: "LOG",
+    size: "md",
+    glow: "sky",
+    pulse: "slow",
+    icon: "▢",
+    tag: "EXPORT",
   },
   researchLab: {
     label: "LAB",
     size: "md",
-    shape: "round",
     glow: "indigo",
     pulse: "slow",
     icon: "◉",
+    tag: "RESEARCH",
   },
   repairBay: {
     label: "REP",
     size: "md",
-    shape: "round",
     glow: "teal",
     pulse: "slow",
     icon: "⚙",
+    tag: "SUPPORT",
   },
 };
 
 export function getBuildingIdentity(key) {
-  return BUILDING_IDENTITY[key] || { label: key.slice(0, 3).toUpperCase(), size: "md", shape: "round", glow: "slate", pulse: "none", icon: "•" };
+  return BUILDING_IDENTITY[key] || {
+    label: key.slice(0, 3).toUpperCase(),
+    size: "md",
+    glow: "slate",
+    pulse: "none",
+    icon: "•",
+    tag: "BASE",
+  };
 }

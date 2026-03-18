@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import Layout from "../components/Layout";
 import {
   getBaseState,
@@ -17,6 +16,7 @@ import { BaseHudV3 } from "./base-v3/components/BaseHudV3";
 import { BaseSceneV3 } from "./base-v3/components/BaseSceneV3";
 import { BuildingSheetV3 } from "./base-v3/components/BuildingSheetV3";
 import { ActivityFeedV3 } from "./base-v3/components/ActivityFeedV3";
+import { BaseUtilityTrayV3 } from "./base-v3/components/BaseUtilityTrayV3";
 
 const MAX_LOG_ITEMS = 16;
 
@@ -282,14 +282,6 @@ export default function MleoBaseV3() {
   return (
     <Layout>
       <div className="flex min-h-screen flex-col bg-slate-950 text-slate-50">
-        <div className="flex items-center gap-2 px-3 pt-2">
-          <Link
-            href="/mining"
-            className="rounded-lg border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700 hover:text-white transition"
-          >
-            ← Hub
-          </Link>
-        </div>
         <BaseHudV3 base={baseState} />
 
         <div className="flex-1 flex items-stretch justify-center px-3 pb-2">
@@ -300,6 +292,16 @@ export default function MleoBaseV3() {
           />
         </div>
 
+        <BaseUtilityTrayV3
+          hubHref="/mining"
+          busy={isBusy}
+          onExpedition={handleExpedition}
+          onMaintenance={handleMaintenance}
+          onShipToVault={handleShipToVault}
+          onHireCrew={handleHireCrew}
+          onClaimMission={handleClaimMission}
+          claimableMissionKeys={baseState?.claimableMissions ?? []}
+        />
         <ActivityFeedV3 items={logItems} />
       </div>
 

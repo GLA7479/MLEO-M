@@ -9,17 +9,46 @@ function getBuildingLevel(state, key) {
   return 0;
 }
 
-// One short role line per building (game-like, not admin)
 function getRoleLine(key, def) {
-  if (key === "hq") return "Command center. Unlocks systems.";
-  if (key === "quarry") return "Produces Ore from energy.";
-  if (key === "tradeHub") return "Steady Gold income.";
-  if (key === "salvage") return "Recovers Scrap.";
-  if (key === "powerCell") return "Energy cap & regen.";
-  if (key === "expeditionBay") return "Launch expeditions.";
-  if (key === "researchLab") return "DATA & research.";
-  if (key === "repairBay") return "Stability & maintenance.";
-  return def?.desc?.slice(0, 50) || "Base building.";
+  const roles = {
+    hq: "Command center. Unlocks systems.",
+    quarry: "Produces Ore from energy.",
+    tradeHub: "Steady Gold income.",
+    salvage: "Recovers Scrap.",
+    refinery: "Converts Ore + Scrap → bankable MLEO.",
+    powerCell: "Energy cap & regen.",
+    minerControl: "Synergy with Miners. Ore quality.",
+    arcadeHub: "Activity → progression. Mission rewards.",
+    expeditionBay: "Stronger expeditions. Better loot.",
+    logisticsCenter: "Ship quality. Export efficiency.",
+    researchLab: "DATA & research paths.",
+    repairBay: "Stability. Less maintenance pressure.",
+  };
+  return roles[key] || def?.desc?.slice(0, 50) || "Base building.";
+}
+
+// Current effect summary by type: outputs, convert, power, or support
+function getEffectSummary(def, level) {
+  if (!def) return "—";
+  const lvl = Math.max(1, level || 0);
+  if (def.outputs && Object.keys(def.outputs).length > 0) {
+    const parts = Object.entries(def.outputs).map(([k, v]) => `${k} +${Number(v) * lvl}`);
+    return parts.join(", ");
+  }
+  if (def.convert) {
+    const c = def.convert;
+    return `ORE+SCRAP→MLEO (${c.ORE ?? 0}/${c.SCRAP ?? 0}→${c.MLEO ?? 0})`;
+  }
+  if (def.power) {
+    return `+${(def.power.cap ?? 0) * lvl} cap, +${(def.power.regen ?? 0) * lvl} regen`;
+  }
+  return "Support";
+}
+
+// Next level effect (simplified: same formula at level+1)
+function getNextEffectSummary(def, level) {
+  if (!def) return "—";
+  return getEffectSummary(def, level + 1);
 }
 
 export function BuildingSheetV3({
@@ -42,6 +71,8 @@ export function BuildingSheetV3({
   const affordable = canAfford(resources, nextCost);
   const locked = level <= 0 && (def.requires?.length ?? 0) > 0;
   const identity = getBuildingIdentity(buildingKey);
+  const currentEffect = getEffectSummary(def, level);
+  const nextEffect = level > 0 ? getNextEffectSummary(def, level) : currentEffect;
 
   const primaryAction = (() => {
     if (buildingKey === "expeditionBay") return { label: "Launch expedition", onClick: onExpedition };
@@ -51,34 +82,36 @@ export function BuildingSheetV3({
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center pointer-events-none">
-      {/* Backdrop – tap to close */}
       <div
         className="absolute inset-0 bg-black/55 pointer-events-auto animate-base-v3-sheet-backdrop"
         onClick={onClose}
         aria-hidden
       />
-      {/* Bottom sheet – portrait mobile first, thumb-friendly */}
       <div
         className="relative pointer-events-auto w-full max-h-[75vh] overflow-y-auto rounded-t-3xl border-t border-slate-700 bg-slate-950/98 shadow-2xl animate-base-v3-sheet-enter"
         role="dialog"
         aria-modal="true"
         aria-label={`${def.name} details`}
       >
-        {/* Drag handle */}
         <div className="sticky top-0 z-10 flex justify-center pt-2.5 pb-1 bg-slate-950/98">
           <div className="h-1 w-12 rounded-full bg-slate-600" aria-hidden />
         </div>
 
-        <div className="px-4 pb-6 pt-1 space-y-4">
-          {/* Header: icon + name + level + close */}
+        <div className="px-4 pb-6 pt-1 space-y-3">
+          {/* Header: icon + name + level + tag + close */}
           <div className="flex items-start gap-3">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 text-xl">
               {identity?.icon ?? "◆"}
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-base font-semibold text-slate-100">{def.name}</div>
-              <div className="text-xs text-slate-500 mt-0.5">
-                Lv.{level} · {locked ? "Locked" : "Online"}
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <span className="text-xs text-slate-500">Lv.{level} · {locked ? "Locked" : "Online"}</span>
+                {identity?.tag && (
+                  <span className="rounded bg-slate-700/80 px-1.5 py-0.5 text-[10px] text-slate-300 uppercase tracking-wide">
+                    {identity.tag}
+                  </span>
+                )}
               </div>
             </div>
             <button
@@ -91,10 +124,8 @@ export function BuildingSheetV3({
             </button>
           </div>
 
-          {/* One short role line */}
           <p className="text-xs text-slate-400 leading-snug">{getRoleLine(buildingKey, def)}</p>
 
-          {/* Requirements if locked */}
           {locked && (def.requires?.length ?? 0) > 0 && (
             <div className="rounded-xl bg-amber-950/40 border border-amber-500/40 px-3 py-2 text-xs text-amber-200/90 space-y-1">
               <div className="font-medium">Requirements</div>
@@ -112,35 +143,34 @@ export function BuildingSheetV3({
             </div>
           )}
 
-          {/* Next cost + effect in one row */}
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-xl bg-slate-900/80 px-3 py-2">
-              <div className="font-medium text-slate-400 mb-1">Next cost</div>
-              <div className="flex flex-wrap gap-1">
-                {Object.entries(nextCost).length === 0 ? (
-                  <span className="text-slate-500">—</span>
-                ) : (
-                  Object.entries(nextCost).map(([k, v]) => (
-                    <span key={k} className="rounded bg-slate-800 px-1.5 py-0.5 text-slate-200">
-                      {k} {Math.round(Number(v))}
-                    </span>
-                  ))
-                )}
-              </div>
-            </div>
-            <div className="rounded-xl bg-slate-900/80 px-3 py-2">
-              <div className="font-medium text-slate-400 mb-1">Effect</div>
-              <div className="text-slate-300 text-[11px]">
-                {def.outputs && Object.keys(def.outputs).length > 0
-                  ? Object.entries(def.outputs).map(([k, v]) => `${k}+${v}`).join(" ")
-                  : def.power
-                  ? `+${def.power.cap ?? 0} cap`
-                  : "—"}
-              </div>
+          {/* Next cost */}
+          <div className="rounded-xl bg-slate-900/80 px-3 py-2 text-xs">
+            <div className="font-medium text-slate-400 mb-1">Next level cost</div>
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(nextCost).length === 0 ? (
+                <span className="text-slate-500">—</span>
+              ) : (
+                Object.entries(nextCost).map(([k, v]) => (
+                  <span key={k} className="rounded bg-slate-800 px-1.5 py-0.5 text-slate-200">
+                    {k} {Math.round(Number(v))}
+                  </span>
+                ))
+              )}
             </div>
           </div>
 
-          {/* Main action – large thumb target */}
+          {/* Current effect + Next effect */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-xl bg-slate-900/80 px-3 py-2">
+              <div className="font-medium text-slate-400 mb-1">Current</div>
+              <div className="text-slate-300 text-[11px]">{currentEffect}</div>
+            </div>
+            <div className="rounded-xl bg-slate-900/80 px-3 py-2">
+              <div className="font-medium text-slate-400 mb-1">Next level</div>
+              <div className="text-slate-300 text-[11px]">{nextEffect}</div>
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={primaryAction.onClick}
