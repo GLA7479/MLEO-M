@@ -919,12 +919,9 @@ function offlineFactorFor(ms) {
 }
 
 async function readVaultSafe() {
-  try {
-    const value = await getBaseVaultBalance();
-    return Number.isFinite(value) ? Math.max(0, value) : 0;
-  } catch {
-    return 0;
-  }
+  const res = await getBaseVaultBalance();
+  if (!res?.ok) return null;
+  return Number(res.balance ?? 0);
 }
 
 /** Blueprint is paid from shared vault MLEO + DATA; not state.resources ORE/GOLD/SCRAP. */
@@ -1123,11 +1120,14 @@ function derive(state, now = Date.now()) {
   let scrapMult = workerBonus * overclock;
   let mleoMult = workerBonus * overclock;
   let dataMult = (1 + researchLabLevel * 0.06) * arcadeBonus;
-  let bankBonus = 1 + state.blueprintLevel * 0.08;
+  const logisticsLevel = state.buildings.logisticsCenter || 0;
+  let bankBonus = 1 + state.blueprintLevel * 0.02 + logisticsLevel * 0.025;
   let maintenanceRelief = 1 + repairBayLevel * 0.08;
 
   if (crewRole === "engineer") {
     maintenanceRelief *= 1.06;
+  } else if (crewRole === "logistician") {
+    bankBonus *= 1.03;
   } else if (crewRole === "researcher") {
     dataMult *= 1.05;
   } else if (crewRole === "scout") {
@@ -1176,7 +1176,8 @@ function derive(state, now = Date.now()) {
 
   const shipCap =
     CONFIG.dailyShipCap +
-    state.blueprintLevel * 5000;
+    logisticsLevel * 1800 +
+    state.blueprintLevel * 450;
 
   const minersBonus = {
     offlineRetention: minerLink * 0.015,
@@ -1189,7 +1190,7 @@ function derive(state, now = Date.now()) {
   };
 
   return {
-    energyCap: CONFIG.baseEnergyCap + powerLevel * 24 + (state.research.coolant ? 15 : 0),
+    energyCap: CONFIG.baseEnergyCap + powerLevel * 30 + (state.research.coolant ? 15 : 0),
     energyRegen: CONFIG.baseEnergyRegen + powerLevel * 1.2 + (state.research.coolant ? 0.8 : 0),
     oreMult,
     goldMult,
@@ -2324,7 +2325,7 @@ export default function MleoBase() {
         setState(initialMerged);
 
         const bal = await readVaultSafe();
-        if (alive) setSharedVault(bal);
+        if (alive && bal != null) setSharedVault(bal);
       } catch (error) {
         console.error("BASE boot failed", error);
         if (!alive) return;
@@ -2410,13 +2411,13 @@ export default function MleoBase() {
     const onStorage = async (event) => {
       if (event.key === "mleo_rush_core_v4" || event.key === "mleoMiningEconomy_v2.1") {
         const bal = await readVaultSafe();
-        setSharedVault(bal);
+        if (bal != null) setSharedVault(bal);
       }
     };
 
     const pollId = window.setInterval(async () => {
       const bal = await readVaultSafe();
-      setSharedVault((prev) => (Math.abs(prev - bal) > 1e-6 ? bal : prev));
+      if (bal != null) setSharedVault((prev) => (Math.abs(prev - bal) > 1e-6 ? bal : prev));
     }, 4000);
 
     window.addEventListener("focus", onFocus);
@@ -3130,7 +3131,7 @@ export default function MleoBase() {
       if (res?.state) {
         const serverState = res.state;
         const latestVault = await readVaultSafe();
-        setSharedVault(latestVault);
+        if (latestVault != null) setSharedVault(latestVault);
 
         const shippedBase = Number(res.shipped || 0);
         const bonusAmount =
@@ -3139,7 +3140,7 @@ export default function MleoBase() {
         if (bonusAmount > 0) {
           await addToVault(bonusAmount, "mleo-base-logistics-bonus");
           const afterBonusVault = await readVaultSafe();
-          setSharedVault(afterBonusVault);
+          if (afterBonusVault != null) setSharedVault(afterBonusVault);
         }
 
         setState((prev) => {
@@ -3201,7 +3202,7 @@ export default function MleoBase() {
       if (res?.success && res?.state) {
         const serverState = res.state;
         const latestVault = await readVaultSafe();
-        setSharedVault(latestVault);
+        if (latestVault != null) setSharedVault(latestVault);
         setState((prev) => {
           const next = {
             ...prev,
@@ -3235,7 +3236,7 @@ export default function MleoBase() {
       if (res?.success && res?.state) {
         const serverState = res.state;
         const latestVault = await readVaultSafe();
-        setSharedVault(latestVault);
+        if (latestVault != null) setSharedVault(latestVault);
         setState((prev) => {
           const next = {
             ...prev,
@@ -3270,11 +3271,11 @@ export default function MleoBase() {
       return;
     }
     try {
-      const res = await spendFromVault("refill", cap);
+      const res = await spendFromVault("refill");
       if (res?.success && res?.state) {
         const serverState = res.state;
         const latestVault = await readVaultSafe();
-        setSharedVault(latestVault);
+        if (latestVault != null) setSharedVault(latestVault);
         setState((prev) => {
           const next = {
             ...prev,

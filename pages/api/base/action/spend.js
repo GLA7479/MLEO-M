@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       return res.status(429).json({ success: false, code: "RATE_LIMIT_DEVICE", message: "Too many spend requests" });
     }
 
-    const { spend_type, energy_cap } = req.body || {};
+    const { spend_type } = req.body || {};
     if (!spend_type || !ALLOWED_SPEND_TYPES.has(spend_type)) {
       return res.status(400).json({ success: false, code: "BASE_INVALID_SPEND_TYPE", message: "Invalid or missing spend_type" });
     }
@@ -49,7 +49,6 @@ export default async function handler(req, res) {
     const { data: rpcData, error: rpcError } = await supabase.rpc("base_spend_shared_vault", {
       p_device_id: deviceId,
       p_spend_type: spend_type,
-      p_energy_cap: energy_cap || null,
     });
 
     if (rpcError) {

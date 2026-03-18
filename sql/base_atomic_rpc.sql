@@ -165,8 +165,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION public.base_spend_shared_vault(
   p_device_id text,
-  p_spend_type text,
-  p_energy_cap integer DEFAULT NULL
+  p_spend_type text
 )
 RETURNS TABLE(
   cost bigint,
@@ -220,7 +219,13 @@ BEGIN
   v_resources := coalesce(v_state.resources, '{}'::jsonb);
   v_blueprint_level := coalesce(v_state.blueprint_level, 0);
   v_stats := coalesce(v_state.stats, '{}'::jsonb);
-  v_energy_cap := coalesce(p_energy_cap, 140);
+  v_energy_cap := 140
+  + (coalesce((coalesce(v_state.buildings, '{}'::jsonb)->>'powerCell')::integer, 0) * 30)
+  + CASE
+      WHEN coalesce((coalesce(v_state.research, '{}'::jsonb)->>'coolant')::boolean, false)
+      THEN 15
+      ELSE 0
+    END;
 
   -- Calculate cost and validate resources based on spend_type
   IF p_spend_type = 'blueprint' THEN
@@ -997,7 +1002,7 @@ $$;
 -- ============================================================================
 
 REVOKE EXECUTE ON FUNCTION public.base_ship_to_vault(text) FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text, integer) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_launch_expedition(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_build_upgrade(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_hire_crew(text) FROM PUBLIC, anon, authenticated;
@@ -1006,7 +1011,7 @@ REVOKE EXECUTE ON FUNCTION public.base_install_module(text, text) FROM PUBLIC, a
 REVOKE EXECUTE ON FUNCTION public.base_unlock_research(text, text) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.base_ship_to_vault(text) TO service_role;
-GRANT EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text, integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_launch_expedition(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_build_upgrade(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_hire_crew(text) TO service_role;
