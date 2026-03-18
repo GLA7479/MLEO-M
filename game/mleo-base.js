@@ -8058,33 +8058,13 @@ export default function MleoBase() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 px-1">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-cyan-400/20 to-cyan-400/10" />
-              <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-300/55">
-                Command Network
-              </div>
-              <div className="h-px flex-1 bg-gradient-to-l from-transparent via-cyan-400/20 to-cyan-400/10" />
-            </div>
-
-            <div className="rounded-[28px] border border-cyan-400/18 bg-slate-950/78 p-3.5 shadow-[0_10px_35px_rgba(0,0,0,0.28)]">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-300/70">
-                      Base Flow Map
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <BaseHomeFlowScene
-                  base={state}
-                  derived={derived}
-                  selected={highlightTarget}
-                  onSelect={openHomeFlowTarget}
-                />
-              </div>
+            <div className="mt-4">
+              <BaseHomeFlowScene
+                base={state}
+                derived={derived}
+                selected={highlightTarget}
+                onSelect={openHomeFlowTarget}
+              />
             </div>
           </div>
 
