@@ -2172,23 +2172,24 @@ const BASE_HOME_SCENE_ORDER = [
 ];
 
 const BASE_HOME_SCENE_POSITIONS = {
-  hq: { x: 50, y: 56 },
+  // Shift the entire cluster slightly upward to reduce the empty top area.
+  hq: { x: 50, y: 38 },
 
-  powerCell: { x: 78, y: 24 },
-  researchLab: { x: 69, y: 33 },
+  powerCell: { x: 78, y: 6 },
+  researchLab: { x: 69, y: 15 },
 
-  tradeHub: { x: 22, y: 21 },
+  tradeHub: { x: 22, y: 3 },
 
-  salvage: { x: 17, y: 47 },
-  arcadeHub: { x: 27, y: 41 },
-  minerControl: { x: 31, y: 33 },
+  salvage: { x: 17, y: 29 },
+  arcadeHub: { x: 27, y: 23 },
+  minerControl: { x: 31, y: 15 },
 
-  refinery: { x: 23, y: 66 },
-  quarry: { x: 16, y: 78 },
+  refinery: { x: 23, y: 48 },
+  quarry: { x: 16, y: 60 },
 
-  expeditionBay: { x: 83, y: 45 },
-  logisticsCenter: { x: 84, y: 61 },
-  repairBay: { x: 76, y: 76 },
+  expeditionBay: { x: 83, y: 27 },
+  logisticsCenter: { x: 84, y: 43 },
+  repairBay: { x: 76, y: 58 },
 };
 
 const BASE_HOME_SCENE_IDENTITY = {
@@ -2309,7 +2310,7 @@ function BaseHomeFlowScene({ base, derived, selected, onSelect }) {
   const links = nodes.filter((n) => n.key !== "hq" && n.pos);
 
   return (
-    <div className="relative mx-auto w-full max-w-md aspect-[3/4] overflow-hidden">
+    <div className="relative mx-auto w-full max-w-md aspect-[3/5] overflow-hidden">
       {/* Background is rendered by the parent so the whole screen feels uniform */}
 
       <svg
@@ -8041,7 +8042,7 @@ export default function MleoBase() {
               </div>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-2">
               <BaseHomeFlowScene
                 base={state}
                 derived={derived}
