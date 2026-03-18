@@ -1359,6 +1359,8 @@ function derive(state, now = Date.now()) {
   if (commanderPath === "industry") {
     oreMult *= 1.03;
     maintenanceRelief *= 1.03;
+  } else if (commanderPath === "logistics") {
+    bankBonus *= 1.04;
   } else if (commanderPath === "research") {
     dataMult *= 1.06;
   } else if (commanderPath === "ecosystem") {
@@ -3958,7 +3960,7 @@ export default function MleoBase() {
 
   const performMaintenance = async () => {
     return runLockedAction("maintenance", async () => {
-    const cost = { GOLD: 50, SCRAP: 28, DATA: 6 };
+    const cost = { GOLD: 42, SCRAP: 22, DATA: 5 };
 
     if (!hasResources(state.resources, cost)) {
       showToast("Need GOLD, SCRAP and DATA for maintenance.");
@@ -4043,6 +4045,296 @@ export default function MleoBase() {
     }
   };
 
+  function quickTagToneClass(tone = "neutral") {
+    switch (tone) {
+      case "good":
+        return "bg-emerald-500/10 text-emerald-200 border border-emerald-400/20";
+      case "warn":
+        return "bg-amber-500/10 text-amber-200 border border-amber-400/20";
+      case "risk":
+        return "bg-rose-500/10 text-rose-200 border border-rose-400/20";
+      case "info":
+        return "bg-cyan-500/10 text-cyan-200 border border-cyan-400/20";
+      default:
+        return "bg-white/10 text-white/75 border border-white/10";
+    }
+  }
+
+  function renderQuickTags(tags = []) {
+    if (!tags?.length) return null;
+
+    return (
+      <div className="mt-3 flex flex-wrap gap-2">
+        {tags.map((tag) => (
+          <span
+            key={`${tag.label}-${tag.tone || "neutral"}`}
+            className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${quickTagToneClass(tag.tone)}`}
+          >
+            {tag.label}
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  function getModuleQuickTags(key) {
+    switch (key) {
+      case "servoDrill":
+        return [
+          { label: "best: ore", tone: "good" },
+          { label: "pair: quarry", tone: "info" },
+          { label: "watch: energy", tone: "warn" },
+        ];
+      case "vaultCompressor":
+        return [
+          { label: "best: shipping", tone: "good" },
+          { label: "pair: logistics", tone: "info" },
+          { label: "needs: banked", tone: "warn" },
+        ];
+      case "arcadeRelay":
+        return [
+          { label: "best: xp/data", tone: "good" },
+          { label: "pair: arcade", tone: "info" },
+          { label: "active play", tone: "neutral" },
+        ];
+      case "minerLink":
+        return [
+          { label: "best: refinery", tone: "good" },
+          { label: "stability help", tone: "info" },
+          { label: "pair: repair", tone: "warn" },
+        ];
+      default:
+        return [];
+    }
+  }
+
+  function getResearchQuickTags(key) {
+    switch (key) {
+      case "coolant":
+        return [
+          { label: "best: energy", tone: "good" },
+          { label: "pair: power cell", tone: "info" },
+        ];
+      case "routing":
+        return [
+          { label: "best: bank flow", tone: "good" },
+          { label: "pair: logistics", tone: "info" },
+        ];
+      case "fieldOps":
+        return [
+          { label: "crew boost", tone: "good" },
+          { label: "mid-game", tone: "neutral" },
+        ];
+      case "minerSync":
+        return [
+          { label: "best: ore", tone: "good" },
+          { label: "pair: quarry", tone: "info" },
+        ];
+      case "arcadeOps":
+        return [
+          { label: "best: expeditions", tone: "good" },
+          { label: "active xp", tone: "info" },
+        ];
+      case "logistics":
+        return [
+          { label: "best: shipping", tone: "good" },
+          { label: "needs: refinery", tone: "warn" },
+        ];
+      case "predictiveMaintenance":
+        return [
+          { label: "best: stability", tone: "good" },
+          { label: "pair: repair bay", tone: "info" },
+        ];
+      case "deepScan":
+        return [
+          { label: "data bursts", tone: "good" },
+          { label: "expeditions", tone: "info" },
+        ];
+      case "tokenDiscipline":
+        return [
+          { label: "advanced build", tone: "warn" },
+          { label: "data + ship", tone: "good" },
+          { label: "less raw bank", tone: "risk" },
+        ];
+      default:
+        return [];
+    }
+  }
+
+  function getMissionQuickTags(key) {
+    switch (key) {
+      case "upgrade_building":
+        return [
+          { label: "safe: power cell", tone: "good" },
+          { label: "or hq", tone: "info" },
+        ];
+      case "run_expedition":
+        return [
+          { label: "cost: 36 energy", tone: "warn" },
+          { label: "cost: 4 data", tone: "warn" },
+        ];
+      case "generate_data":
+        return [
+          { label: "main: research lab", tone: "good" },
+          { label: "support: miner/arcade", tone: "info" },
+        ];
+      case "perform_maintenance":
+        return [
+          { label: "main: repair bay", tone: "good" },
+          { label: "stability", tone: "info" },
+        ];
+      case "double_expedition":
+        return [
+          { label: "2 field runs", tone: "warn" },
+          { label: "energy heavy", tone: "risk" },
+        ];
+      case "ship_mleo":
+        return [
+          { label: "needs: banked mleo", tone: "warn" },
+          { label: "pair: logistics", tone: "info" },
+        ];
+      case "spend_vault":
+        return [
+          { label: "best: blueprint", tone: "good" },
+          { label: "smart reinvest", tone: "info" },
+        ];
+      default:
+        return [];
+    }
+  }
+
+  function getCrewRoleQuickTags(roleKey) {
+    switch (roleKey) {
+      case "engineer":
+        return [
+          { label: "best: stability", tone: "good" },
+          { label: "maintenance", tone: "info" },
+          { label: "safe build", tone: "neutral" },
+        ];
+      case "logistician":
+        return [
+          { label: "best: shipping", tone: "good" },
+          { label: "vault flow", tone: "info" },
+          { label: "late-game", tone: "warn" },
+        ];
+      case "researcher":
+        return [
+          { label: "best: data", tone: "good" },
+          { label: "analysis", tone: "info" },
+          { label: "pair: lab", tone: "warn" },
+        ];
+      case "scout":
+        return [
+          { label: "best: expeditions", tone: "good" },
+          { label: "field play", tone: "info" },
+          { label: "light bonus", tone: "neutral" },
+        ];
+      case "operations":
+        return [
+          { label: "gold + scrap", tone: "good" },
+          { label: "balanced", tone: "info" },
+          { label: "safe mid-game", tone: "neutral" },
+        ];
+      default:
+        return [];
+    }
+  }
+
+  function getCommanderPathQuickTags(pathKey) {
+    switch (pathKey) {
+      case "industry":
+        return [
+          { label: "best: ore", tone: "good" },
+          { label: "safer growth", tone: "info" },
+          { label: "stable mid-game", tone: "neutral" },
+        ];
+      case "logistics":
+        return [
+          { label: "best: shipping", tone: "good" },
+          { label: "vault flow", tone: "info" },
+          { label: "needs banked", tone: "warn" },
+        ];
+      case "research":
+        return [
+          { label: "best: data", tone: "good" },
+          { label: "systems", tone: "info" },
+          { label: "advanced", tone: "warn" },
+        ];
+      case "ecosystem":
+        return [
+          { label: "gold + data", tone: "good" },
+          { label: "broad synergy", tone: "info" },
+          { label: "hybrid", tone: "neutral" },
+        ];
+      default:
+        return [];
+    }
+  }
+
+  function getCrewRoleStatLine(roleKey) {
+    switch (roleKey) {
+      case "engineer":
+        return "+6% maintenance relief";
+      case "logistician":
+        return "+3% bank / ship bonus";
+      case "researcher":
+        return "+5% DATA multiplier";
+      case "scout":
+        return "+2% DATA multiplier";
+      case "operations":
+        return "+2% GOLD and +2% SCRAP";
+      default:
+        return "";
+    }
+  }
+
+  function getCommanderPathStatLine(pathKey) {
+    switch (pathKey) {
+      case "industry":
+        return "+3% ORE and +3% maintenance relief";
+      case "logistics":
+        return "+4% bank / ship bonus";
+      case "research":
+        return "+6% DATA multiplier";
+      case "ecosystem":
+        return "+1% GOLD and +2% DATA";
+      default:
+        return "";
+    }
+  }
+
+  function getCrewRoleHint(roleKey) {
+    switch (roleKey) {
+      case "engineer":
+        return "Best when Stability and maintenance are becoming annoying.";
+      case "logistician":
+        return "Best once shipping is part of your normal loop.";
+      case "researcher":
+        return "Best when DATA is your real bottleneck.";
+      case "scout":
+        return "Best for active expedition-oriented play.";
+      case "operations":
+        return "Best when you want a balanced economy boost.";
+      default:
+        return "";
+    }
+  }
+
+  function getCommanderPathHint(pathKey) {
+    switch (pathKey) {
+      case "industry":
+        return "Strong early/mid-game default for safer production growth.";
+      case "logistics":
+        return "Strong when Refinery + shipping are already online.";
+      case "research":
+        return "Strong for DATA-focused advanced progression.";
+      case "ecosystem":
+        return "Strong for hybrid play across economy and support systems.";
+      default:
+        return "";
+    }
+  }
+
   const dailyMissionsContent = (
     <div className="space-y-3">
       {[...DAILY_MISSIONS].sort((a, b) => {
@@ -4090,6 +4382,18 @@ export default function MleoBase() {
                   Progress: {fmt(progress)} / {fmt(mission.target)}
                 </div>
                 <div className="mt-1 text-[11px] text-white/55">Potential reward: {rewardText(mission.reward)}</div>
+
+                {renderQuickTags(getMissionQuickTags(mission.key))}
+
+                <div className="mt-2 text-[11px] text-white/45">
+                  {mission.key === "upgrade_building" && "Good moment to upgrade a real bottleneck, not a random building."}
+                  {mission.key === "run_expedition" && "Only worth forcing when Energy and DATA are comfortable."}
+                  {mission.key === "generate_data" && "Research Lab is the cleanest answer."}
+                  {mission.key === "perform_maintenance" && "Best done before Stability starts feeling ugly."}
+                  {mission.key === "double_expedition" && "Can drain tempo if Energy is already weak."}
+                  {mission.key === "ship_mleo" && "First create banked MLEO, then ship."}
+                  {mission.key === "spend_vault" && "Blueprint is the cleanest long-term spend path."}
+                </div>
               </div>
               <button
                 onClick={() => claimMission(mission.key)}
@@ -4160,6 +4464,9 @@ export default function MleoBase() {
 
               <div>
                 <div className="mb-2 text-xs uppercase tracking-[0.18em] text-white/45">Crew Specialization</div>
+                <div className="mb-3 text-[11px] text-white/35">
+                  Profile preference: saved locally on this device for now.
+                </div>
                 <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                   {CREW_ROLES.map((role) => {
                     const active = crewRole === role.key;
@@ -4179,14 +4486,14 @@ export default function MleoBase() {
                             tabIndex={0}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setBuildInfo(getCrewInfo(role));
+                            setBuildInfo(getCrewInfo(role.key));
                               setOpenInfoKey(null);
                             }}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                setBuildInfo(getCrewInfo(role));
+                              setBuildInfo(getCrewInfo(role.key));
                                 setOpenInfoKey(null);
                               }
                             }}
@@ -4200,6 +4507,19 @@ export default function MleoBase() {
                         <div className="pr-8">
                           <div className="text-sm font-semibold text-white">{role.name}</div>
                           <div className="mt-1 text-xs text-white/60">{role.desc}</div>
+
+                          {renderQuickTags(getCrewRoleQuickTags(role.key))}
+
+                          <div className="mt-2 text-[11px] font-semibold text-cyan-200/85">
+                            {getCrewRoleStatLine(role.key)}
+                          </div>
+                          <div className="mt-1 text-[11px] text-white/45">{getCrewRoleHint(role.key)}</div>
+
+                          {active ? (
+                            <div className="mt-2">
+                              <AvailabilityBadge />
+                            </div>
+                          ) : null}
                         </div>
                       </button>
                     );
@@ -4214,6 +4534,9 @@ export default function MleoBase() {
             <div className="mt-1 text-xs text-white/60">
               Choose a command identity for your base. This changes specialization, not the core economy.
             </div>
+          <div className="mt-2 text-[11px] text-white/35">
+            Profile preference: saved locally on this device for now.
+          </div>
 
             <div className="mt-3 grid gap-2 lg:grid-cols-2">
               {COMMANDER_PATHS.map((path) => {
@@ -4234,14 +4557,14 @@ export default function MleoBase() {
                         tabIndex={0}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setBuildInfo(getCommanderPathInfo(path));
+                          setBuildInfo(getCommanderPathInfo(path.key));
                           setOpenInfoKey(null);
                         }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
                             e.stopPropagation();
-                            setBuildInfo(getCommanderPathInfo(path));
+                            setBuildInfo(getCommanderPathInfo(path.key));
                             setOpenInfoKey(null);
                           }
                         }}
@@ -4255,6 +4578,19 @@ export default function MleoBase() {
                     <div className="pr-8">
                       <div className="text-sm font-semibold text-white">{path.name}</div>
                       <div className="mt-1 text-xs text-white/60">{path.desc}</div>
+
+                      {renderQuickTags(getCommanderPathQuickTags(path.key))}
+
+                      <div className="mt-2 text-[11px] font-semibold text-cyan-200/85">
+                        {getCommanderPathStatLine(path.key)}
+                      </div>
+                      <div className="mt-1 text-[11px] text-white/45">{getCommanderPathHint(path.key)}</div>
+
+                      {active ? (
+                        <div className="mt-2">
+                          <AvailabilityBadge />
+                        </div>
+                      ) : null}
                     </div>
                   </button>
                 );
@@ -4302,6 +4638,15 @@ export default function MleoBase() {
                   {moduleAvailable ? <AvailabilityBadge /> : null}
                 </div>
                 <div className="mt-1 text-xs text-white/60">{module.desc}</div>
+
+                {renderQuickTags(getModuleQuickTags(module.key))}
+
+                <div className="mt-2 text-[11px] text-white/45">
+                  {module.key === "servoDrill" && "Use when Ore is slowing upgrades."}
+                  {module.key === "vaultCompressor" && "Best once shipping is already active."}
+                  {module.key === "arcadeRelay" && "Best for mission / expedition focused play."}
+                  {module.key === "minerLink" && "Great before pushing Refinery too hard."}
+                </div>
               </div>
 
               <div className="mt-auto shrink-0 border-t border-white/10 pt-3">
@@ -4370,6 +4715,20 @@ export default function MleoBase() {
                   </div>
 
                   <div className="mt-1 text-xs text-white/60">{item.desc}</div>
+
+                {renderQuickTags(getResearchQuickTags(item.key))}
+
+                <div className="mt-2 text-[11px] text-white/45">
+                  {item.key === "coolant" && "Early support research for Energy pressure."}
+                  {item.key === "routing" && "Good once bank / shipping starts to matter."}
+                  {item.key === "fieldOps" && "Bridge research into stronger mid-game support."}
+                  {item.key === "minerSync" && "One of the cleanest Ore researches."}
+                  {item.key === "arcadeOps" && "Best for active expedition players."}
+                  {item.key === "logistics" && "Shipping research, not a raw economy fix."}
+                  {item.key === "predictiveMaintenance" && "Top defensive research for heavy builds."}
+                  {item.key === "deepScan" && "Best when expeditions are frequent."}
+                  {item.key === "tokenDiscipline" && "Advanced tradeoff research, not for every build."}
+                </div>
 
                   <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
                     Cost
@@ -5558,254 +5917,280 @@ export default function MleoBase() {
       title: "Engineer",
       focus: "Stability + maintenance support",
       text:
-        "Engineer is the safest crew specialization for keeping the base healthy.\n\n" +
-        "What it does:\n" +
-        "• Helps with stability-focused play.\n" +
-        "• Makes maintenance-oriented progression feel stronger.\n" +
-        "• Good when the base starts becoming larger and more fragile.\n\n" +
-        "Best use:\n" +
-        "Choose Engineer when your base often drops into warning state or when safe scaling matters more than aggression.",
+        "Engineer is the safest crew role for a base that is starting to feel heavy.\n\n" +
+        "What it helps:\n" +
+        "• Stronger maintenance relief.\n" +
+        "• Better support for Repair Bay style play.\n" +
+        "• Safer scaling when Refinery or advanced buildings add pressure.",
       tips: {
         building: "Repair Bay",
+        supportBuildings: ["Power Cell"],
         research: "Predictive Maintenance",
+        supportResearch: ["Field Ops"],
         module: "Miner Link",
+        operation: "Maintenance Cycle",
+        watch: "Best defensive role, but it does not solve weak Energy by itself.",
         actions: [
-          "Best for players who want fewer risky moments.",
-          "Very useful when Refinery and active systems are growing.",
-          "Good default role for safer long-term expansion.",
+          "Use Engineer when Stability is your main pain point.",
+          "Great with Repair Bay and Predictive Maintenance.",
+          "Safer choice than greedier roles for fragile builds.",
         ],
       },
       nextStep: {
         label: "Open Repair Bay",
         tab: "build",
         target: "repairBay",
-        why: "Engineer fits best into a maintenance-first base style.",
+        why: "Engineer works best in stability-focused builds.",
       },
     },
 
     logistician: {
       title: "Logistician",
-      focus: "Shipping + export discipline",
+      focus: "Shipping + vault flow",
       text:
-        "Logistician is the best crew role for vault movement and export rhythm.\n\n" +
-        "What it does:\n" +
-        "• Supports shipment preparation.\n" +
-        "• Helps you think around ship timing and export flow.\n" +
-        "• Good when BASE is already producing enough to ship consistently.\n\n" +
-        "Best use:\n" +
-        "Choose it when shipping is central to your strategy and you want smoother Shared Vault support.",
+        "Logistician is the export-focused crew role.\n\n" +
+        "What it helps:\n" +
+        "• Better bank / ship value.\n" +
+        "• Stronger Shared Vault conversion.\n" +
+        "• Better fit for mature Refinery loops.",
       tips: {
         building: "Logistics Center",
+        supportBuildings: ["Refinery"],
         research: "Logistics",
+        supportResearch: ["Routing AI"],
         module: "Vault Compressor",
+        operation: "Ship to Shared Vault",
+        watch: "Feels weak if you are not producing and shipping enough yet.",
         actions: [
-          "Best when Refinery is already feeding banked MLEO.",
-          "Strong for players focused on shared vault growth.",
-          "Less useful early if shipping is still weak.",
-        ],
-      },
-      nextStep: {
-        label: "Open Logistics Center",
-        tab: "build",
-        target: "logisticsCenter",
-        why: "This role shines once your shipping pipeline is developed.",
-      },
-    },
-
-    researcher: {
-      title: "Researcher",
-      focus: "DATA + system analysis",
-      text:
-        "Researcher is the smartest specialization for long-term scaling and DATA-focused progression.\n\n" +
-        "What it does:\n" +
-        "• Improves the value of DATA-centered play.\n" +
-        "• Supports advanced research identity.\n" +
-        "• Helps long-term optimization more than raw early speed.\n\n" +
-        "Best use:\n" +
-        "Choose it when you want better strategic growth instead of only direct production.",
-      tips: {
-        building: "Research Lab",
-        research: "Deep Scan",
-        module: "Arcade Relay",
-        actions: [
-          "Strongest in mid-game and later.",
-          "Good when expeditions and DATA both matter.",
-          "Ideal for advanced and smarter base pacing.",
-        ],
-      },
-      nextStep: {
-        label: "Open Research Lab",
-        tab: "build",
-        target: "researchLab",
-        why: "Researcher works best with a true DATA engine behind it.",
-      },
-    },
-
-    scout: {
-      title: "Scout",
-      focus: "Expedition identity + field awareness",
-      text:
-        "Scout is the field-operations role of the base.\n\n" +
-        "What it does:\n" +
-        "• Supports expedition identity.\n" +
-        "• Fits flexible play with more field activity.\n" +
-        "• Good for players who like mixed rewards instead of only static production.\n\n" +
-        "Best use:\n" +
-        "Choose Scout when expeditions are a regular part of your loop and you want the base to feel more active.",
-      tips: {
-        building: "Expedition Bay",
-        research: "Arcade Ops",
-        module: "Arcade Relay",
-        actions: [
-          "Strong for mixed utility progression.",
-          "Great when Scrap and DATA are often needed.",
-          "Not ideal if you mostly play passively.",
-        ],
-      },
-      nextStep: {
-        label: "Open Expedition",
-        tab: "operations",
-        target: "expedition",
-        why: "Scout is felt best through repeated expedition use.",
-      },
-    },
-
-    operations: {
-      title: "Operations Chief",
-      focus: "Balanced control room rhythm",
-      text:
-        "Operations Chief is the most balanced crew role.\n\n" +
-        "What it does:\n" +
-        "• Supports overall command rhythm.\n" +
-        "• Helps when you want a flexible identity instead of one narrow specialization.\n" +
-        "• Fits broad play across production, maintenance and field actions.\n\n" +
-        "Best use:\n" +
-        "Choose it when you want an all-round command style and are still learning what your strongest path is.",
-      tips: {
-        building: "HQ",
-        research: "Field Ops",
-        module: "",
-        actions: [
-          "Good default pick when unsure.",
-          "Useful for mixed and evolving builds.",
-          "A strong role while learning the game flow.",
-        ],
-      },
-      nextStep: {
-        label: "Open HQ",
-        tab: "build",
-        target: "hq",
-        why: "Operations Chief matches a broad command-centered identity.",
-      },
-    },
-  };
-
-  const COMMANDER_PATH_INFO_COPY = {
-    industry: {
-      title: "Commander Path: Industry",
-      focus: "Production-first base identity",
-      text:
-        "Industry is a production-focused command path.\n\n" +
-        "What it means:\n" +
-        "• Stronger emphasis on infrastructure and output.\n" +
-        "• Better fit for stable production growth.\n" +
-        "• Good when you want the base to feel like a resource engine first.",
-      tips: {
-        building: "Quarry",
-        research: "Miner Sync",
-        module: "Servo Drill",
-        actions: [
-          "Best for resource-heavy players.",
-          "Good when Ore and processing are your main bottlenecks.",
-          "Strong early and mid-game path.",
-        ],
-      },
-      nextStep: {
-        label: "Open Quarry",
-        tab: "build",
-        target: "quarry",
-        why: "Industry starts with stronger raw production foundations.",
-      },
-    },
-
-    logistics: {
-      title: "Commander Path: Logistics",
-      focus: "Shipment timing + vault movement",
-      text:
-        "Logistics is a commander path centered on exports and timing.\n\n" +
-        "What it means:\n" +
-        "• Stronger identity around shipping and vault support.\n" +
-        "• Better fit for disciplined export cycles.\n" +
-        "• Good when BASE exists mainly to support the wider MLEO ecosystem.",
-      tips: {
-        building: "Logistics Center",
-        research: "Logistics",
-        module: "Vault Compressor",
-        actions: [
-          "Best once banked MLEO is already consistent.",
-          "Very useful for shared vault-focused players.",
-          "Less important if exports are still weak.",
+          "Choose this when shipping matters daily.",
+          "Great once banked MLEO production is stable.",
+          "Not ideal if your base is still struggling with basics.",
         ],
       },
       nextStep: {
         label: "Open Shipping",
         tab: "operations",
         target: "shipping",
-        why: "This path matters most when shipment decisions are already central.",
+        why: "Logistician is strongest in a real export loop.",
       },
     },
 
-    research: {
-      title: "Commander Path: Research",
-      focus: "DATA + smart long-term optimization",
+    researcher: {
+      title: "Researcher",
+      focus: "DATA + advanced progression",
       text:
-        "Research is a slower but smarter command identity.\n\n" +
-        "What it means:\n" +
-        "• Focuses on DATA, system analysis and advanced scaling.\n" +
-        "• Better for players who like planning and optimization.\n" +
-        "• Less about raw speed and more about quality of progression.",
+        "Researcher is the cleanest role for strategic DATA-focused growth.\n\n" +
+        "What it helps:\n" +
+        "• Higher DATA multiplier.\n" +
+        "• Better fit for research-heavy builds.\n" +
+        "• Good when advanced progression is slowing down.",
       tips: {
         building: "Research Lab",
+        supportBuildings: ["Miner Control", "Arcade Hub"],
         research: "Deep Scan",
+        supportResearch: ["Arcade Ops", "Token Discipline"],
         module: "Arcade Relay",
+        operation: "Field Expedition",
+        watch: "Great for DATA, but not a direct fix for weak Ore / Scrap / Energy.",
         actions: [
-          "Best for strategic players.",
-          "Works well with expeditions and DATA loops.",
-          "A strong late-oriented identity.",
+          "Choose this when DATA is holding back your build.",
+          "Best with Research Lab already online.",
+          "Strong in more advanced strategic play.",
         ],
       },
       nextStep: {
         label: "Open Research Lab",
         tab: "build",
         target: "researchLab",
-        why: "Research path is built around DATA-driven progression.",
+        why: "Researcher is best when your DATA engine matters.",
+      },
+    },
+
+    scout: {
+      title: "Scout",
+      focus: "Field identity + expedition support",
+      text:
+        "Scout is a lighter, more active-play role.\n\n" +
+        "What it helps:\n" +
+        "• Small DATA support.\n" +
+        "• Better thematic fit for expeditions.\n" +
+        "• Good for players who like a more active command rhythm.",
+      tips: {
+        building: "Expedition Bay",
+        supportBuildings: ["Arcade Hub"],
+        research: "Arcade Ops",
+        supportResearch: ["Deep Scan"],
+        module: "Arcade Relay",
+        operation: "Field Expedition",
+        watch: "This is a flavor-forward role with a lighter raw bonus than the others.",
+        actions: [
+          "Best for expedition-oriented playstyles.",
+          "Use it when you want the game to feel more active and field-focused.",
+          "Less efficient than Researcher if you only care about raw DATA scaling.",
+        ],
+      },
+      nextStep: {
+        label: "Open Expedition",
+        tab: "operations",
+        target: "expedition",
+        why: "Scout fits players who lean into the field loop.",
+      },
+    },
+
+    operations: {
+      title: "Operations Chief",
+      focus: "Balanced Gold + Scrap support",
+      text:
+        "Operations Chief is the most balanced economy role.\n\n" +
+        "What it helps:\n" +
+        "• Better Gold flow.\n" +
+        "• Better Scrap flow.\n" +
+        "• Smooth overall base rhythm without leaning too hard into one lane.",
+      tips: {
+        building: "Trade Hub",
+        supportBuildings: ["Salvage Yard"],
+        research: "Field Ops",
+        supportResearch: [],
+        module: "",
+        operation: "",
+        watch: "Balanced and safe, but less specialized than Engineer / Logistician / Researcher.",
+        actions: [
+          "Good default if you want a smoother mid-game economy.",
+          "Useful when both Gold and Scrap feel tight together.",
+          "Great role for players who do not want to over-specialize too early.",
+        ],
+      },
+      nextStep: {
+        label: "Open Trade Hub",
+        tab: "build",
+        target: "tradeHub",
+        why: "Operations Chief supports the broader economy instead of one niche lane.",
+      },
+    },
+  };
+
+  const COMMANDER_PATH_INFO_COPY = {
+    industry: {
+      title: "Industry Path",
+      focus: "Safer ORE growth + steadier infrastructure",
+      text:
+        "Industry is the safest all-around commander path for production-first play.\n\n" +
+        "What it helps:\n" +
+        "• Higher ORE output.\n" +
+        "• Slightly better maintenance relief.\n" +
+        "• Smoother infrastructure pacing for early and mid-game.",
+      tips: {
+        building: "Quarry",
+        supportBuildings: ["Power Cell", "Repair Bay"],
+        research: "Miner Sync",
+        supportResearch: ["Predictive Maintenance"],
+        module: "Servo Drill",
+        operation: "",
+        watch: "Safe and strong, but not the best path for shipping or pure DATA play.",
+        actions: [
+          "Great default path for most players.",
+          "Very good when Ore is blocking upgrades.",
+          "Pairs well with stable industrial expansion.",
+        ],
+      },
+      nextStep: {
+        label: "Open Quarry",
+        tab: "build",
+        target: "quarry",
+        why: "Industry Path supports the Ore lane directly.",
+      },
+    },
+
+    logistics: {
+      title: "Logistics Path",
+      focus: "Bank bonus + export identity",
+      text:
+        "Logistics is the commander path for shipping-focused progression.\n\n" +
+        "What it helps:\n" +
+        "• Better bank / ship bonus.\n" +
+        "• Better fit for mature Refinery loops.\n" +
+        "• Strong Shared Vault identity.",
+      tips: {
+        building: "Logistics Center",
+        supportBuildings: ["Refinery"],
+        research: "Logistics",
+        supportResearch: ["Routing AI"],
+        module: "Vault Compressor",
+        operation: "Ship to Shared Vault",
+        watch: "Feels weak if your base is not actually exporting much yet.",
+        actions: [
+          "Best once banked MLEO and shipping are already meaningful.",
+          "Excellent for players centered on Shared Vault growth.",
+          "Not the best early-game path.",
+        ],
+      },
+      nextStep: {
+        label: "Open Shipping",
+        tab: "operations",
+        target: "shipping",
+        why: "Logistics Path is directly tied to export flow.",
+      },
+    },
+
+    research: {
+      title: "Research Path",
+      focus: "Higher DATA and systems optimization",
+      text:
+        "Research is the strongest commander path for DATA-focused advanced play.\n\n" +
+        "What it helps:\n" +
+        "• Higher DATA multiplier.\n" +
+        "• Better fit for Research Lab builds.\n" +
+        "• Strong late-game strategic identity.",
+      tips: {
+        building: "Research Lab",
+        supportBuildings: ["Miner Control", "Arcade Hub"],
+        research: "Deep Scan",
+        supportResearch: ["Token Discipline", "Arcade Ops"],
+        module: "Arcade Relay",
+        operation: "Field Expedition",
+        watch: "Best when DATA matters; weaker if your real bottleneck is still Energy or raw materials.",
+        actions: [
+          "Choose this when DATA is central to your strategy.",
+          "Excellent for advanced progression and research-heavy builds.",
+          "Pairs very well with Research Lab and expedition support.",
+        ],
+      },
+      nextStep: {
+        label: "Open Research Lab",
+        tab: "build",
+        target: "researchLab",
+        why: "Research Path is strongest with a real DATA engine.",
       },
     },
 
     ecosystem: {
-      title: "Commander Path: Ecosystem",
-      focus: "Synergy with Miners, Arcade and wider MLEO structure",
+      title: "Ecosystem Path",
+      focus: "Hybrid support across economy and DATA",
       text:
-        "Ecosystem is the most connected commander path.\n\n" +
-        "What it means:\n" +
-        "• Supports broader MLEO identity.\n" +
-        "• Fits players who want BASE to feel connected to the rest of the project.\n" +
-        "• Best for synergy-minded progression rather than narrow specialization.",
+        "Ecosystem is the broadest hybrid path.\n\n" +
+        "What it helps:\n" +
+        "• Slight Gold bonus.\n" +
+        "• Slight DATA bonus.\n" +
+        "• Better thematic fit for broader MLEO synergy play.",
       tips: {
         building: "Arcade Hub",
-        research: "Arcade Ops",
+        supportBuildings: ["Miner Control", "Trade Hub"],
+        research: "Field Ops",
+        supportResearch: ["Arcade Ops"],
         module: "Arcade Relay",
+        operation: "",
+        watch: "Flexible but less explosive than a specialized path.",
         actions: [
-          "Great for cross-system identity.",
-          "Best when you want BASE to feel like part of a larger ecosystem.",
-          "Strong thematic path for project cohesion.",
+          "Good hybrid choice for players who want broad support.",
+          "Useful when you do not want to lock into one main lane yet.",
+          "Pairs nicely with mixed Miners / Arcade / economy identity.",
         ],
       },
       nextStep: {
         label: "Open Arcade Hub",
         tab: "build",
         target: "arcadeHub",
-        why: "Ecosystem path is felt most clearly through connected systems.",
+        why: "Ecosystem Path fits the broader support identity of the base.",
       },
     },
   };
@@ -6024,20 +6409,39 @@ export default function MleoBase() {
     },
   };
 
-  function getCrewInfo(role) {
-    return CREW_INFO_COPY[role.key] || {
-      title: role.name,
+  function getCrewInfo(roleOrKey) {
+    const key = typeof roleOrKey === "string" ? roleOrKey : roleOrKey?.key;
+    const fallbackTitle =
+      typeof roleOrKey === "string"
+        ? String(roleOrKey)
+        : roleOrKey?.name || "Crew Role";
+
+    return CREW_INFO_COPY[key] || {
+      title: fallbackTitle,
       focus: "Crew Role",
-      text: role.desc,
+      text:
+        typeof roleOrKey === "string"
+          ? "This role shapes how your base feels to play."
+          : roleOrKey?.desc || "This role shapes how your base feels to play.",
       tips: { building: "", research: "", module: "", actions: [] },
     };
   }
 
-  function getCommanderPathInfo(path) {
-    return COMMANDER_PATH_INFO_COPY[path.key] || {
-      title: path.name,
+  function getCommanderPathInfo(pathOrKey) {
+    const key =
+      typeof pathOrKey === "string" ? pathOrKey : pathOrKey?.key;
+    const fallbackTitle =
+      typeof pathOrKey === "string"
+        ? String(pathOrKey)
+        : pathOrKey?.name || "Commander Path";
+
+    return COMMANDER_PATH_INFO_COPY[key] || {
+      title: fallbackTitle,
       focus: "Commander Path",
-      text: path.desc,
+      text:
+        typeof pathOrKey === "string"
+          ? "This path shapes your broader strategy."
+          : pathOrKey?.desc || "This path shapes your broader strategy.",
       tips: { building: "", research: "", module: "", actions: [] },
     };
   }
@@ -8902,14 +9306,14 @@ export default function MleoBase() {
                                 </p>
 
                                 <div className="mt-3 flex flex-wrap gap-2">
-                                  <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white/75">
-                                    BALANCED
+                                  <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-bold text-cyan-200">
+                                    COST: 36 ENERGY
                                   </span>
-                                  <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white/75">
-                                    SCAN
+                                  <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-[11px] font-bold text-amber-200">
+                                    COST: 4 DATA
                                   </span>
-                                  <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white/75">
-                                    SALVAGE
+                                  <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-white/75">
+                                    CD: 120s
                                   </span>
                                 </div>
                               </div>
@@ -9032,6 +9436,18 @@ export default function MleoBase() {
                                 <p className="mt-1 text-sm text-white/70">
                                   Spend shared MLEO on productivity instead of pure emissions.
                                 </p>
+
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-bold text-cyan-200">
+                                    OVERCLOCK: 900 + 12 DATA
+                                  </span>
+                                  <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-[11px] font-bold text-amber-200">
+                                    REFILL: 180 + 5 DATA
+                                  </span>
+                                  <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-white/75">
+                                    MAINTAIN: STABILITY
+                                  </span>
+                                </div>
                                 <p className="mt-2 text-xs text-white/55">
                                   Stability: {fmt(state.stability)}%
                                 </p>
@@ -9951,6 +10367,18 @@ className="fixed inset-0 z-[117] bg-black/60 backdrop-blur-sm sm:hidden"
                         <p className="mt-1 text-sm text-white/70">
                           Spend shared MLEO on productivity instead of pure emissions.
                         </p>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-bold text-cyan-200">
+                            OVERCLOCK: 900 + 12 DATA
+                          </span>
+                          <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-[11px] font-bold text-amber-200">
+                            REFILL: 180 + 5 DATA
+                          </span>
+                          <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-white/75">
+                            MAINTAIN: STABILITY
+                          </span>
+                        </div>
                         <p className="mt-2 text-xs text-white/55">
                           Stability: {fmt(state.stability)}%
                         </p>
