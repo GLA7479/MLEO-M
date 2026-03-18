@@ -50,7 +50,7 @@ const BUILDINGS = [
     desc: "Turns energy into raw Ore.",
     baseCost: { GOLD: 60 },
     growth: 1.18,
-    energyUse: 0.75,
+    energyUse: 0.72,
     outputs: { ORE: 2.0 },
   },
   {
@@ -59,7 +59,7 @@ const BUILDINGS = [
     desc: "Keeps the base liquid with steady Gold income.",
     baseCost: { GOLD: 100, ORE: 30 },
     growth: 1.2,
-    energyUse: 0.95,
+    energyUse: 0.78,
     outputs: { GOLD: 1.0 },
     requires: [{ key: "quarry", lvl: 1 }],
   },
@@ -69,7 +69,7 @@ const BUILDINGS = [
     desc: "Recovers Scrap for advanced systems.",
     baseCost: { GOLD: 150, ORE: 90 },
     growth: 1.22,
-    energyUse: 0.95,
+    energyUse: 0.78,
     outputs: { SCRAP: 0.8 },
     requires: [{ key: "quarry", lvl: 2 }],
   },
@@ -79,7 +79,7 @@ const BUILDINGS = [
     desc: "Converts Ore + Scrap into bankable MLEO.",
     baseCost: { GOLD: 280, ORE: 180, SCRAP: 35 },
     growth: 1.25,
-    energyUse: 1.75,
+    energyUse: 1.35,
     convert: { ORE: 1.8, SCRAP: 0.7, MLEO: 0.10 },
     requires: [
       { key: "salvage", lvl: 1 },
@@ -93,7 +93,7 @@ const BUILDINGS = [
     baseCost: { GOLD: 240, SCRAP: 45 },
     growth: 1.24,
     energyUse: 0,
-    power: { cap: 30, regen: 1.1 },
+    power: { cap: 36, regen: 1.75 },
     requires: [{ key: "tradeHub", lvl: 1 }],
   },
   {
@@ -102,7 +102,7 @@ const BUILDINGS = [
     desc: "Improves synergy with Miners and increases ore conversion quality.",
     baseCost: { GOLD: 320, ORE: 120, SCRAP: 40 },
     growth: 1.22,
-    energyUse: 0.35,
+    energyUse: 0.22,
     outputs: { DATA: 0.18 },
     requires: [{ key: "hq", lvl: 2 }],
   },
@@ -112,7 +112,7 @@ const BUILDINGS = [
     desc: "Turns activity into base progression and improves mission rewards.",
     baseCost: { GOLD: 360, ORE: 90, SCRAP: 50 },
     growth: 1.24,
-    energyUse: 0.42,
+    energyUse: 0.24,
     outputs: { DATA: 0.15 },
     requires: [{ key: "hq", lvl: 2 }],
   },
@@ -136,7 +136,7 @@ const BUILDINGS = [
     baseCost: { ORE: 220, GOLD: 180, SCRAP: 90 },
     growth: 1.7,
     maxLevel: 15,
-    energyUse: 0.35,
+    energyUse: 0.22,
     outputs: { DATA: 0.08 },
     requires: [{ key: "hq", lvl: 2 }, { key: "tradeHub", lvl: 2 }],
   },
@@ -147,7 +147,7 @@ const BUILDINGS = [
     baseCost: { ORE: 180, GOLD: 240, SCRAP: 110 },
     growth: 1.75,
     maxLevel: 15,
-    energyUse: 0.42,
+    energyUse: 0.26,
     outputs: { DATA: 0.28 },
     requires: [{ key: "hq", lvl: 2 }, { key: "minerControl", lvl: 1 }],
   },
@@ -158,7 +158,7 @@ const BUILDINGS = [
     baseCost: { ORE: 160, GOLD: 160, SCRAP: 140 },
     growth: 1.7,
     maxLevel: 15,
-    energyUse: 0.32,
+    energyUse: 0.22,
     outputs: {},
     requires: [{ key: "hq", lvl: 2 }, { key: "powerCell", lvl: 1 }],
   },
@@ -213,7 +213,7 @@ const RESEARCH = [
   {
     key: "coolant",
     name: "Coolant Loops",
-    desc: "+0.8 Energy regen and +15 Energy cap.",
+    desc: "+1.0 Energy regen and +15 Energy cap.",
     cost: { ORE: 240, SCRAP: 70 },
   },
   {
@@ -324,7 +324,7 @@ const CONFIG = {
   subtitle: "Command your MLEO base, connect Miners + Arcade, and grow your shared vault.",
   startingGold: 320,
   baseEnergyCap: 140,
-  baseEnergyRegen: 3.8,
+  baseEnergyRegen: 4.6,
   dailyShipCap: 12_000,
   expeditionCost: 36,
   expeditionCooldownMs: 120_000,
@@ -1344,8 +1344,8 @@ function derive(state, now = Date.now()) {
   };
 
   return {
-    energyCap: CONFIG.baseEnergyCap + powerLevel * 30 + (state.research.coolant ? 15 : 0),
-    energyRegen: 4.6 + powerLevel * 1.35 + (state.research.coolant ? 1.0 : 0),
+    energyCap: CONFIG.baseEnergyCap + powerLevel * 36 + (state.research.coolant ? 18 : 0),
+    energyRegen: CONFIG.baseEnergyRegen + powerLevel * 1.75 + (state.research.coolant ? 1.15 : 0),
     oreMult,
     goldMult,
     scrapMult,
@@ -1400,7 +1400,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
   const dt = clamp(elapsedMs / 1000, 0, 60 * 60 * 12);
   const effective = dt * efficiency;
   const d = derive(next, now);
-  const reserveEnergy = Math.max(24, Math.floor(d.energyCap * 0.18));
+  const reserveEnergy = Math.max(10, Math.floor(d.energyCap * 0.08));
   const dataBefore = next.resources.DATA || 0;
 
   next.resources.ENERGY = clamp(next.resources.ENERGY + d.energyRegen * dt, 0, d.energyCap);
@@ -1433,28 +1433,28 @@ function simulate(state, elapsedMs, efficiency = 1) {
   });
 
   runBuilding("minerControl", (level) => {
-    const energyNeed = 0.26 * level * dt;
+    const energyNeed = 0.22 * level * dt;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.18 * level * d.dataMult * effective;
   });
 
   runBuilding("arcadeHub", (level) => {
-    const energyNeed = 0.30 * level * dt;
+    const energyNeed = 0.24 * level * dt;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.15 * level * d.dataMult * effective;
   });
 
   runBuilding("researchLab", (level) => {
-    const energyNeed = 0.30 * level * dt;
+    const energyNeed = 0.26 * level * dt;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.28 * level * d.dataMult * effective;
   });
 
   runBuilding("logisticsCenter", (level) => {
-    const energyNeed = 0.26 * level * dt;
+    const energyNeed = 0.22 * level * dt;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.08 * level * d.dataMult * effective;
@@ -1476,7 +1476,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
     next.resources.ENERGY -= energyNeed;
     next.resources.ORE -= oreNeed;
     next.resources.SCRAP -= scrapNeed;
-    next.bankedMleo += 0.10 * level * d.mleoMult * effective;
+    next.bankedMleo += 0.10 * level * d.mleoMult * d.bankBonus * effective;
   });
 
   const elapsedMinutes = dt / 60;

@@ -241,10 +241,10 @@ BEGIN
   v_blueprint_level := coalesce(v_state.blueprint_level, 0);
   v_stats := coalesce(v_state.stats, '{}'::jsonb);
   v_energy_cap := 140
-  + (coalesce((coalesce(v_state.buildings, '{}'::jsonb)->>'powerCell')::integer, 0) * 30)
+  + (coalesce((coalesce(v_state.buildings, '{}'::jsonb)->>'powerCell')::integer, 0) * 36)
   + CASE
       WHEN coalesce((coalesce(v_state.research, '{}'::jsonb)->>'coolant')::boolean, false)
-      THEN 15
+      THEN 18
       ELSE 0
     END;
 
@@ -582,6 +582,7 @@ DECLARE
   v_building_config jsonb;
   v_requires jsonb;
   v_req jsonb;
+  v_early_discount numeric;
   kv record;
 BEGIN
   v_building_config := '{
@@ -624,6 +625,12 @@ BEGIN
   v_buildings := coalesce(v_state.buildings, '{}'::jsonb);
   v_stats := coalesce(v_state.stats, '{}'::jsonb);
   v_current_level := coalesce((v_buildings->>p_building_key)::integer, 0);
+  v_early_discount := CASE
+    WHEN v_current_level = 0 THEN 0.82
+    WHEN v_current_level = 1 THEN 0.88
+    WHEN v_current_level = 2 THEN 0.92
+    ELSE 1
+  END;
 
   IF v_max_level IS NOT NULL AND v_current_level >= v_max_level THEN
     RAISE EXCEPTION 'Building is at max level';
@@ -644,7 +651,7 @@ BEGIN
     v_cost := jsonb_set(
       v_cost,
       ARRAY[kv.key],
-      to_jsonb(floor((kv.value::text::numeric) * power(v_growth, v_current_level))::bigint),
+      to_jsonb(ceil((kv.value::text::numeric) * power(v_growth, v_current_level) * v_early_discount)::bigint),
       true
     );
   END LOOP;
