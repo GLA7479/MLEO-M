@@ -2586,7 +2586,7 @@ export default function MleoBase() {
   const [openInnerPanel, setOpenInnerPanel] = useState(null);
   const [structuresTab, setStructuresTab] = useState("core");
 
-  const [desktopPanel, setDesktopPanel] = useState("ops");
+  const [desktopPanel, setDesktopPanel] = useState("overview");
   const [desktopCompact, setDesktopCompact] = useState(true);
   const [desktopPanelOpen, setDesktopPanelOpen] = useState(false);
 
@@ -7285,8 +7285,15 @@ export default function MleoBase() {
   };
 
   const openDesktopPanel = (panel, inner = null) => {
+    const defaults = {
+      overview: "overview-contracts",
+      ops: "ops-console",
+      build: "build-structures",
+      intel: "intel-summary",
+    };
+
     setDesktopPanel(panel);
-    setOpenInnerPanel(inner || null);
+    setOpenInnerPanel(inner ?? defaults[panel] ?? null);
     setDesktopPanelOpen(true);
   };
 
@@ -7867,8 +7874,8 @@ export default function MleoBase() {
 
   return (
     <Layout title="MLEO BASE">
-      <main className="h-[100dvh] overflow-hidden overflow-x-hidden bg-[#07111f] text-white sm:min-h-screen sm:h-auto sm:overflow-visible">
-        <div className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:pb-36">
+      <main className="h-[100dvh] overflow-hidden overflow-x-hidden bg-[#07111f] text-white sm:min-h-screen sm:h-auto sm:overflow-visible lg:h-[100dvh] lg:overflow-hidden">
+        <div className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:flex lg:h-full lg:flex-col lg:px-8 lg:pb-32">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               {/* Title pill removed for a cleaner V3 look */}
@@ -8042,7 +8049,7 @@ export default function MleoBase() {
           {/* Removed: desktop duplicate ORE/GOLD/SCRAP metric cards */}
 
           {/* Desktop Home Scene */}
-          <div className="mt-4 hidden lg:block">
+          <div className="hidden">
             <div className="rounded-[30px] border border-white/10 bg-slate-950/72 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl">
               <div className="grid gap-4 xl:grid-cols-[1.12fr_0.88fr]">
                 <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4">
@@ -8228,7 +8235,7 @@ export default function MleoBase() {
           </div>
 
           {/* Desktop Fixed Nav */}
-          <div className="fixed inset-x-0 bottom-0 z-[118] hidden lg:block px-6 pb-6 pt-3">
+          <div className="fixed inset-x-0 bottom-0 z-[118] hidden px-6 pb-6 pt-3">
             <div className="mx-auto max-w-4xl rounded-3xl border border-white/10 bg-slate-950/88 p-2 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
               <div className="grid grid-cols-4 gap-2">
                 {[
@@ -8267,7 +8274,7 @@ export default function MleoBase() {
 
           {/* Desktop Panel Overlay */}
           {desktopPanelOpen ? (
-            <div className="fixed inset-0 z-[117] hidden lg:block bg-black/55 backdrop-blur-sm">
+            <div className="fixed inset-0 z-[117] bg-black/55 backdrop-blur-sm">
               <div className="absolute inset-x-6 top-[88px] bottom-[106px]">
                 <div className="mx-auto h-full max-w-6xl rounded-[30px] border border-white/10 bg-[#0b1526] shadow-2xl">
                   <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
@@ -8719,846 +8726,74 @@ export default function MleoBase() {
           ) : null}
 
           {/* Desktop Command Center */}
-          <div className="hidden">
-            {/* LEFT SIDEBAR */}
-            <aside className="w-[184px] shrink-0 lg:flex lg:h-full lg:flex-col lg:gap-2">
-              <div className="space-y-2.5">
-                <div className="rounded-[28px] border border-white/10 bg-slate-950/75 p-3 backdrop-blur-xl">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-300/70">
-                    Command
-                  </div>
-                  <div className="mt-2 space-y-2">
-                    {[
-                      { key: "overview", label: "Overview" },
-                      { key: "ops", label: "Operations" },
-                      { key: "build", label: "Build" },
-                      { key: "intel", label: "Intel" },
-                    ].map((item) => {
-                      const active = desktopPanel === item.key;
-                      return (
-                        <button
-                          key={item.key}
-                          onClick={() => openDesktopPanel(item.key)}
-                          className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ${
-                            active
-                              ? "bg-cyan-400 text-slate-950"
-                              : "border border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
-                          }`}
-                        >
-                          <span>{item.label}</span>
-                          {item.key === "overview" && liveContractsAvailableCount > 0 ? (
-                            <span className="rounded-full bg-black/15 px-2 py-0.5 text-[11px] font-bold">
-                              {liveContractsAvailableCount}
-                            </span>
-                          ) : null}
-                          {item.key === "ops" && readyCounts.total > 0 ? (
-                            <span className="rounded-full bg-black/15 px-2 py-0.5 text-[11px] font-bold">
-                              {readyCounts.total}
-                            </span>
-                          ) : null}
-                          {item.key === "build" && buildOpportunitiesCount > 0 ? (
-                            <span className="rounded-full bg-black/15 px-2 py-0.5 text-[11px] font-bold">
-                              {buildOpportunitiesCount}
-                            </span>
-                          ) : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="rounded-[28px] border border-cyan-400/25 bg-cyan-500/10 p-3.5 backdrop-blur-xl">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200/70">
-                    Ready Now
-                  </div>
-                  <div className="mt-2 text-3xl font-black text-white">
-                    {readyCounts.total}
-                  </div>
-                  <div className="mt-1 text-xs text-white/65">
-                    Immediate actions and rewards available
-                  </div>
-
-                  <div className="mt-3 flex flex-col gap-2">
-                    <button
-                      onClick={() => {
-                        if (canExpeditionNow || canShipNow || needsRefillNow || needsMaintenanceNow) {
-                          openDesktopPanel("ops", "ops-console");
-                        } else if (dailyMissionsAvailableCount > 0) {
-                          openDesktopPanel("ops", "ops-missions");
-                        } else if (liveContractsAvailableCount > 0) {
-                          openDesktopPanel("overview", "overview-contracts");
-                        } else if (buildOpportunitiesCount > 0) {
-                          openDesktopPanel("build", "build-structures");
-                        } else {
-                          openDesktopPanel("overview");
-                        }
-                      }}
-                      className="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-bold text-slate-950 hover:bg-cyan-300"
-                    >
-                      Open Ready
-                    </button>
-
-                    <button
-                      onClick={() => setDesktopCompact((v) => !v)}
-                      className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"
-                    >
-                      {desktopCompact ? "Detailed View" : "Compact View"}
-                    </button>
+          <>
+            <div className="mt-4 hidden min-h-0 flex-1 lg:block">
+              <div
+                className="relative h-[calc(100dvh-190px)] overflow-hidden rounded-[30px] border border-white/10 bg-slate-950/78 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl"
+                style={{
+                  background: `
+                    radial-gradient(circle at 50% 50%, rgba(16,185,129,0.10) 0%, rgba(16,185,129,0.04) 12%, transparent 24%),
+                    radial-gradient(circle at 50% 50%, rgba(34,211,238,0.08) 0%, transparent 40%),
+                    linear-gradient(180deg, rgba(2,6,23,0.96) 0%, rgba(8,15,30,0.98) 42%, rgba(2,6,23,0.99) 100%),
+                    repeating-linear-gradient(90deg, rgba(148,163,184,0.045) 0, rgba(148,163,184,0.045) 1px, transparent 1px, transparent 26px),
+                    repeating-linear-gradient(0deg, rgba(148,163,184,0.04) 0, rgba(148,163,184,0.04) 1px, transparent 1px, transparent 26px)
+                  `,
+                }}
+              >
+                <div className="absolute inset-0 p-6">
+                  <div className="mx-auto flex h-full max-w-[1100px] items-center justify-center">
+                    <div className="w-full">
+                      <BaseHomeFlowScene
+                        base={state}
+                        derived={derived}
+                        selected={highlightTarget}
+                        onSelect={openHomeFlowTarget}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="mt-auto rounded-[28px] border border-white/10 bg-slate-950/75 p-3 backdrop-blur-xl">
-                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                  Commander
-                </div>
-                <div className="mt-1.5 text-[28px] font-black leading-none text-white">
-                  Lv {state.commanderLevel}
-                </div>
-                <div className="mt-2 text-sm text-white/75">{commanderPathInfo.name}</div>
-                <div className="mt-0.5 text-xs text-white/55">{crewRoleInfo.name}</div>
-
-                <div className="mt-3 grid grid-cols-1 gap-1.5">
-                  <Link
-                    href="/arcade"
-                    className="flex h-10 w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white hover:bg-white/10"
-                  >
-                    Open Arcade
-                  </Link>
-                  <Link
-                    href="/mleo-miners"
-                    className="flex h-10 w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white hover:bg-white/10"
-                  >
-                    Open Miners
-                  </Link>
-                  <button
-                    onClick={handleResetGame}
-                    className="flex h-10 w-full items-center justify-center rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 text-sm font-semibold text-rose-200 hover:bg-rose-500/20"
-                  >
-                    Reset Game
-                  </button>
-                </div>
-              </div>
-            </aside>
-
-            {/* MAIN AREA */}
-            <section className="min-w-0 flex-1 rounded-[28px] border border-white/10 bg-slate-950/75 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.28)] lg:flex lg:flex-col lg:min-h-0">
-              {/* TOP HUD */}
-              <div className="border-b border-white/10 px-3 py-2.5">
-                <div className="grid grid-cols-4 gap-2 xl:grid-cols-8">
-                  {desktopHudItems.map((item) => {
-                    const focus = item.tone === "focus";
+            {/* Desktop Fixed Nav */}
+            <div className="fixed inset-x-0 bottom-0 z-[118] hidden lg:block px-6 pb-6 pt-3">
+              <div className="mx-auto max-w-5xl rounded-3xl border border-white/10 bg-slate-950/88 p-2 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { key: "overview", label: "Overview", badge: readyCounts.contracts + readyCounts.missions },
+                    { key: "ops", label: "Operations", badge: readyCounts.expedition + readyCounts.shipment },
+                    { key: "build", label: "Build", badge: buildOpportunitiesCount },
+                    { key: "intel", label: "Intel", badge: 0 },
+                  ].map((tab) => {
+                    const active = desktopPanelOpen && desktopPanel === tab.key;
+                    const hasBadge = Number(tab.badge || 0) > 0;
 
                     return (
-                      <div
-                        key={item.label}
-                        className={`relative min-h-[64px] rounded-2xl border ${
-                          focus
-                            ? "border-cyan-400/20 bg-cyan-400/8"
-                            : "border-white/10 bg-white/5"
-                        } px-3 py-2`}
+                      <button
+                        key={tab.key}
+                        onClick={() => openDesktopPanel(tab.key)}
+                        className={`relative rounded-2xl px-4 py-3 text-sm font-bold transition ${
+                          active
+                            ? "bg-cyan-500 text-white"
+                            : hasBadge
+                            ? "border border-cyan-400/40 bg-cyan-500/10 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.12)]"
+                            : "border border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                        }`}
                       >
-                        {item.infoKey ? (
-                          <InfoButton
-                            infoKey={item.infoKey}
-                            setOpenInfoKey={setOpenInfoKey}
-                            className="right-2 top-2 h-6 w-6 text-[11px]"
-                          />
+                        {tab.label}
+                        {hasBadge ? (
+                          <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-cyan-400 px-1 text-[10px] font-black text-slate-950">
+                            {tab.badge}
+                          </span>
                         ) : null}
-
-                        <div className="pr-7 text-[10px] font-black uppercase tracking-[0.16em] text-white/40">
-                          {item.label}
-                        </div>
-
-                        <div className="mt-1 pr-6 text-sm font-extrabold text-white xl:text-[15px]">
-                          {item.value}
-                        </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
               </div>
-
-              {/* PANEL HEADER */}
-              <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-b border-white/10 px-3.5 py-2.5">
-                <div className="min-w-0">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-300/70">
-                    Desktop Command Center
-                  </div>
-                  <div className="mt-0.5 text-xl font-black text-white">
-                    {desktopPanelTitle}
-                  </div>
-                </div>
-
-                <div className="flex justify-center">
-                  <button
-                    onClick={() => setOpenInnerPanel(null)}
-                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
-                  >
-                    Reset Section
-                  </button>
-                </div>
-
-                <div className="flex justify-end">
-                  {desktopPriorityAlert ? (
-                    <div
-                      className={`hidden xl:flex min-w-0 max-w-[420px] items-center rounded-2xl border px-3 py-2 ${alertToneClasses(
-                        desktopPriorityAlert.tone
-                      )}`}
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate text-xs font-bold">
-                          {desktopPriorityAlert.title}
-                        </div>
-                        <div className="truncate text-[11px] text-white/75">
-                          {desktopPriorityAlert.text}
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-
-              {/* PANEL BODY */}
-              <div className="min-h-0 flex-1 overflow-y-auto p-3.5 pr-2.5 pb-4">
-                {desktopPanel === "overview" ? (
-                  <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                        Next Step
-                      </div>
-                      <div className="mt-2 text-xl font-black text-white">{nextStep.title}</div>
-                      <div className="mt-2 text-sm text-white/70">{nextStep.text}</div>
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <button
-                          onClick={() => openDesktopPanel("ops", "ops-console")}
-                          className="rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-bold text-white hover:bg-cyan-400"
-                        >
-                          Open Ops
-                        </button>
-                        <button
-                          onClick={() => openDesktopPanel("build", "build-structures")}
-                          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"
-                        >
-                          Open Build
-                        </button>
-                      </div>
-
-                      {(activeEvent || nextShipBonus > 0) && !desktopCompact ? (
-                        <div className="relative mt-4 rounded-2xl border border-fuchsia-400/20 bg-fuchsia-500/10 p-3">
-                          {activeEvent ? (
-                            <div className="absolute right-3 top-3 z-10">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setBuildInfo(getEventInfo(activeEvent));
-                                  setOpenInfoKey(null);
-                                }}
-                                className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-                                aria-label={`Open info for ${activeEvent.title}`}
-                                title={`Info about ${activeEvent.title}`}
-                              >
-                                i
-                              </button>
-                            </div>
-                          ) : null}
-                          <div className={activeEvent ? "pr-8" : ""}>
-                            <div className="text-sm font-bold text-white">
-                              {activeEvent ? activeEvent.title : "Logistics boost active"}
-                            </div>
-                            <div className="mt-1 text-xs text-white/70">
-                              {activeEvent ? activeEvent.text : "A previous command decision improved your next vault shipment."}
-                            </div>
-                          </div>
-
-                          {nextShipBonus > 0 ? (
-                            <div className="mt-2 text-xs font-bold text-fuchsia-200">
-                              Next ship bonus: +{Math.round(nextShipBonus * 100)}%
-                            </div>
-                          ) : null}
-
-                          {activeEvent ? (
-                            <div className="mt-3 grid gap-2">
-                              {activeEvent.choices.map((choice) => {
-                                const allowed = canApplyEventChoice(state, choice, derived);
-                                return (
-                                  <button
-                                    key={choice.key}
-                                    onClick={() => resolveLiveEventChoice(choice)}
-                                    disabled={!allowed}
-                                    className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-40"
-                                  >
-                                    {choice.label}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <div className="mb-3 flex items-center justify-between">
-                        <div>
-                          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                            Contracts
-                          </div>
-                          <div className="mt-1 text-lg font-black text-white">Live Objectives</div>
-                        </div>
-                        <button
-                          onClick={() =>
-                            setOpenInnerPanel(openInnerPanel === "overview-contracts" ? null : "overview-contracts")
-                          }
-                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
-                        >
-                          {openInnerPanel === "overview-contracts" ? "CLOSE" : "OPEN"}
-                        </button>
-                      </div>
-
-                      {openInnerPanel === "overview-contracts" || !desktopCompact ? (
-                        <div className="grid gap-3">
-                          {liveContracts.map((contract) => (
-                            <div
-                              key={contract.key}
-                              className="relative rounded-2xl border border-white/10 bg-black/20 p-3"
-                            >
-                              <div className="absolute right-3 top-3 z-10">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setBuildInfo(getContractInfo(contract));
-                                    setOpenInfoKey(null);
-                                  }}
-                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-                                  aria-label={`Open info for ${contract.title}`}
-                                  title={`Info about ${contract.title}`}
-                                >
-                                  i
-                                </button>
-                              </div>
-                              <div className="pr-8">
-                                <div className="text-sm font-bold text-white">{contract.title}</div>
-                                {!desktopCompact ? (
-                                  <div className="mt-1 text-xs text-white/65">{contract.desc}</div>
-                                ) : null}
-                                <div className="mt-1 text-xs text-cyan-200/80">{contract.rewardText}</div>
-                              </div>
-                              <button
-                                onClick={() => claimContract(contract.key)}
-                                disabled={!contract.done || contract.claimed}
-                                className="mt-3 w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:opacity-40"
-                              >
-                                {contract.claimed ? "Claimed" : contract.done ? "Claim Contract" : "In Progress"}
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-white/65">
-                          {liveContractsAvailableCount > 0
-                            ? `${liveContractsAvailableCount} contract reward${liveContractsAvailableCount > 1 ? "s" : ""} ready`
-                            : "No contract rewards ready right now"}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3 xl:col-span-2">
-                      <div className="grid gap-4 md:grid-cols-4">
-                        <div className="relative rounded-2xl border border-white/10 bg-black/20 p-3">
-                          <div className="absolute right-2 top-2 z-10">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setBuildInfo(getSystemInfo("crewSummary"));
-                                setOpenInfoKey(null);
-                              }}
-                              className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-                              aria-label="Open crew role summary info"
-                              title="Info about crew role"
-                            >
-                              i
-                            </button>
-                          </div>
-                          <div className="pr-7">
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Crew Role</div>
-                            <div className="mt-1 text-sm font-bold text-white">{crewRoleInfo.name}</div>
-                            <div className="mt-1 text-xs text-white/60">{roleBonusText}</div>
-                          </div>
-                        </div>
-                        <div className="relative rounded-2xl border border-white/10 bg-black/20 p-3">
-                          <div className="absolute right-2 top-2 z-10">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setBuildInfo(getSystemInfo("commanderSummary"));
-                                setOpenInfoKey(null);
-                              }}
-                              className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-                              aria-label="Open commander path summary info"
-                              title="Info about commander path"
-                            >
-                              i
-                            </button>
-                          </div>
-                          <div className="pr-7">
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Commander Path</div>
-                            <div className="mt-1 text-sm font-bold text-white">{commanderPathInfo.name}</div>
-                            <div className="mt-1 text-xs text-white/60">{commanderPathText}</div>
-                          </div>
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Base Profile</div>
-                          <div className="mt-1 text-sm font-bold text-white">
-                            {state.crew >= 5 ? "Developed Command" : state.crew >= 2 ? "Growing Outpost" : "Early Outpost"}
-                          </div>
-                          <div className="mt-1 text-xs text-white/60">Identity shaped by buildings, role and path.</div>
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Ship Discipline</div>
-                          <div className="mt-1 text-sm font-bold text-white">
-                            {fmt(state.sentToday)} / {fmt(derived.shipCap)}
-                          </div>
-                          <div className="mt-1 text-xs text-white/60">Softcut and cap remain active.</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {desktopPanel === "ops" ? (
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    <div className={`rounded-2xl border border-white/10 bg-white/5 p-3 ${highlightTarget === "shipping" ? "ring-2 ring-cyan-300/35" : ""}`}>
-                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                        Shipping
-                      </div>
-                      <div className="mt-1 text-lg font-black text-white">Ship to Shared Vault</div>
-                      <div className="mt-2 text-sm text-white/65">
-                        Move refined MLEO into the shared vault. Daily cap and softcut apply, so later shipments may convert less efficiently.
-                      </div>
-                      <button
-                        onClick={bankToSharedVault}
-                        disabled={!canShipNow}
-                        className="mt-4 w-full rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-bold text-white hover:bg-cyan-400 disabled:opacity-40"
-                      >
-                        Ship {fmt(state.bankedMleo)} MLEO
-                      </button>
-                    </div>
-
-                    {showExpeditions ? (
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                        Expedition
-                      </div>
-                      <div className="mt-1 text-lg font-black text-white">Field Expedition</div>
-                      <div className="mt-2 text-sm text-white/65">
-                        Potential rewards: resources, DATA, and rare findings. Typical outcome varies.
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {["balanced", "scan", "salvage"].map((mode) => (
-                          <button
-                            key={mode}
-                            onClick={() => setExpeditionMode(mode)}
-                            className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
-                              expeditionMode === mode
-                                ? "bg-cyan-500 text-white"
-                                : "bg-white/10 text-white/75 hover:bg-white/20"
-                            }`}
-                          >
-                            {mode.toUpperCase()}
-                          </button>
-                        ))}
-                      </div>
-
-                      <button
-                        onClick={handleLaunchExpedition}
-                        disabled={expeditionLeft > 0 || !canExpeditionNow}
-                        className="mt-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/20 disabled:opacity-40"
-                      >
-                        {expeditionLeft > 0 ? `Ready in ${Math.ceil(expeditionLeft / 1000)}s` : "Launch Expedition"}
-                      </button>
-                    </div>
-                    ) : null}
-
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                        Blueprint
-                      </div>
-                      <div className="mt-1 text-lg font-black text-white">Blueprint Cache</div>
-                      <div className="mt-2 text-sm text-white/65">
-                        Costs {fmt(blueprintCost)} shared MLEO + {fmt(blueprintDataCost)} DATA and improves long-term efficiency.
-                      </div>
-                      <button
-                        onClick={buyBlueprint}
-                        disabled={!canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)}
-                        className={`mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold transition ${
-                          canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)
-                            ? "bg-fuchsia-600 text-white hover:bg-fuchsia-500"
-                            : "bg-white/10 text-white/45"
-                        }`}
-                      >
-                        Buy Blueprint Lv {state.blueprintLevel + 1}
-                      </button>
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                        Utilities
-                      </div>
-                      <div className="mt-1 text-lg font-black text-white">Base Support</div>
-                      <div className="mt-2 text-sm text-white/65">
-                        Stability: {fmt(state.stability)}% · keep systems healthy and productive.
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-3 gap-2">
-                        <button
-                          onClick={activateOverclock}
-                          className="rounded-xl bg-white/10 px-3 py-3 text-xs font-bold text-white hover:bg-white/20"
-                        >
-                          {overclockLeft > 0 ? `Overclock ${Math.ceil(overclockLeft / 1000)}s` : `Overclock ${fmt(CONFIG.overclockCost)}`}
-                        </button>
-                        <button
-                          onClick={refillEnergy}
-                          className="rounded-xl bg-white/10 px-3 py-3 text-xs font-bold text-white hover:bg-white/20"
-                        >
-                          Refill {fmt(CONFIG.refillCost)}
-                        </button>
-                        <button
-                          onClick={performMaintenance}
-                          className="rounded-xl bg-white/10 px-3 py-3 text-xs font-bold text-white hover:bg-white/20"
-                        >
-                          Maintain
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3 xl:col-span-2">
-                      <div className="mb-3 flex items-center justify-between">
-                        <div>
-                          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                            Daily Missions
-                          </div>
-                          <div className="mt-1 text-lg font-black text-white">Mission Queue</div>
-                        </div>
-                        <button
-                          onClick={() =>
-                            setOpenInnerPanel(openInnerPanel === "ops-missions" ? null : "ops-missions")
-                          }
-                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
-                        >
-                          {openInnerPanel === "ops-missions" ? "CLOSE" : "OPEN"}
-                        </button>
-                      </div>
-
-                      {openInnerPanel === "ops-missions" || !desktopCompact ? (
-                        <div>{dailyMissionsContent}</div>
-                      ) : (
-                        <div className="text-sm text-white/65">
-                          {sectionStatusHint("daily-missions", { count: dailyMissionsAvailableCount })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-
-                {desktopPanel === "build" ? (
-                  <div className="grid gap-4">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <div className="mb-3 flex items-center justify-between">
-                        <div>
-                          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                            Structures
-                          </div>
-                          <div className="mt-1 text-lg font-black text-white">Base Upgrades</div>
-                        </div>
-                        <button
-                          onClick={() =>
-                            setOpenInnerPanel(openInnerPanel === "build-structures" ? null : "build-structures")
-                          }
-                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
-                        >
-                          {openInnerPanel === "build-structures" ? "CLOSE" : "OPEN"}
-                        </button>
-                      </div>
-
-                      {openInnerPanel === "build-structures" || !desktopCompact ? (
-                        <div>{baseStructuresContent}</div>
-                      ) : (
-                        <div className="text-sm text-white/65">
-                          {buildSectionHint("structures", { structures: availableStructuresCount })}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                        <div className="mb-3 flex items-center justify-between">
-                          <div>
-                            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                              Development
-                            </div>
-                            <div className="mt-1 text-lg font-black text-white">Modules & Research</div>
-                          </div>
-                          <button
-                            onClick={() =>
-                              setOpenInnerPanel(openInnerPanel === "build-development" ? null : "build-development")
-                            }
-                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            {openInnerPanel === "build-development" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-
-                        {openInnerPanel === "build-development" || !desktopCompact ? (
-                          <div>{crewModulesResearchContent}</div>
-                        ) : (
-                          <div className="text-sm text-white/65">
-                            {buildSectionHint("development", {
-                              modules: availableModulesCount,
-                              research: availableResearchCount,
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                        <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                          Support Systems
-                        </div>
-                        <div>{buildSupportSystemsContent}</div>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {desktopPanel === "intel" ? (
-                  <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                        Command Schematic
-                      </div>
-                      <div className="mt-1 text-lg font-black text-white">Base Sectors</div>
-                      <div className="mt-2 grid gap-3">
-                        {[
-                          { key: "hq", label: "HQ Core" },
-                          { key: "refinery", label: "Refinery Sector" },
-                          { key: "logisticsCenter", label: "Logistics Sector" },
-                          { key: "researchLab", label: "Research Sector" },
-                          { key: "repairBay", label: "Repair Sector" },
-                          { key: "expeditionBay", label: "Expedition Sector" },
-                          { key: "minerControl", label: "Miner Link Sector" },
-                          { key: "arcadeHub", label: "Arcade Link Sector" },
-                        ].map((sector) => {
-                          const status = sectorStatusForBuilding(sector.key, state);
-                          const level = Number(state.buildings?.[sector.key] || 0);
-                          return (
-                            <div
-                              key={sector.key}
-                              className="rounded-2xl border border-white/10 bg-black/20 p-3"
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <div>
-                                  <div className="text-sm font-bold text-white">{sector.label}</div>
-                                  <div className="mt-1 text-xs text-white/60">
-                                    {buildingSynergyTag(sector.key)}
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <div className="text-xs font-bold text-white/70">Lv {level}</div>
-                                  <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-cyan-200/70">
-                                    {status}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4">
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                        <div className="mb-3 flex items-center justify-between">
-                          <div>
-                            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                              Progress
-                            </div>
-                            <div className="mt-1 text-lg font-black text-white">Summary</div>
-                          </div>
-                          <button
-                            onClick={() =>
-                              setOpenInnerPanel(openInnerPanel === "intel-summary" ? null : "intel-summary")
-                            }
-                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            {openInnerPanel === "intel-summary" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-
-                        {openInnerPanel === "intel-summary" || !desktopCompact ? (
-                          <div>{progressSummaryContent}</div>
-                        ) : (
-                          <div className="text-sm text-white/65">Key progress and identity data.</div>
-                        )}
-                      </div>
-
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                        <div className="mb-3 flex items-center justify-between">
-                          <div>
-                            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-                              Activity Log
-                            </div>
-                            <div className="mt-1 text-lg font-black text-white">Recent Events</div>
-                          </div>
-                          <button
-                            onClick={() =>
-                              setOpenInnerPanel(openInnerPanel === "intel-log" ? null : "intel-log")
-                            }
-                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            {openInnerPanel === "intel-log" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-
-                        {openInnerPanel === "intel-log" || !desktopCompact ? (
-                          <div>{activityLogContent}</div>
-                        ) : (
-                          <div className="text-sm text-white/65">
-                            Recent events and milestones.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </section>
-          </div>
-
-          {shownInfo ? (
-            <div
-              className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/78 backdrop-blur-sm px-4 lg:items-stretch lg:justify-end lg:px-0"
-              onClick={() => {
-                setOpenInfoKey(null);
-                setBuildInfo(null);
-              }}
-            >
-              <div
-                className="relative w-full max-w-md max-h-[78vh] overflow-y-auto rounded-3xl border border-cyan-400/20 bg-slate-950/95 p-5 shadow-[0_20px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl lg:max-h-none lg:h-full lg:w-[430px] lg:max-w-none lg:rounded-none lg:rounded-l-[28px] lg:border-y-0 lg:border-r-0 lg:border-l lg:p-6"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpenInfoKey(null);
-                    setBuildInfo(null);
-                  }}
-                  className="absolute right-4 top-4 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-2xl font-bold text-white/85 backdrop-blur-md transition hover:bg-white/10"
-                  aria-label="Close info"
-                >
-                  ×
-                </button>
-
-                <div className="sticky top-0 z-20 -mx-5 -mt-5 mb-4 border-b border-white/10 bg-slate-950/92 px-5 pt-5 pb-3 backdrop-blur-xl lg:-mx-6 lg:-mt-6 lg:px-6 lg:pt-6">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-cyan-200/70">
-                    MLEO BASE INFO
-                  </div>
-
-                  <div className="mt-2 pr-16 text-4xl font-black leading-none text-white">
-                    {shownInfo.title}
-                  </div>
-
-                  {shownInfo?.focus ? (
-                    <div className="mt-2 pr-16 text-sm leading-6 text-cyan-200/80">
-                      <span className="font-semibold text-white">Focus:</span>{" "}
-                      {shownInfo.focus}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-                  <div className="whitespace-pre-line text-sm leading-7 text-white/80">
-                    {shownInfo.text}
-                  </div>
-
-                  {hasInfoTipContent(shownInfo?.tips) ? (
-                    <div className="mt-4 border-t border-white/10 pt-4">
-                      <div className="grid gap-2 text-sm text-white/78">
-                        {renderInfoTipRow("Main building", shownInfo?.tips?.building)}
-                        {renderInfoTipRow("Support buildings", shownInfo?.tips?.supportBuildings)}
-                        {renderInfoTipRow("Main research", shownInfo?.tips?.research)}
-                        {renderInfoTipRow("Support research", shownInfo?.tips?.supportResearch)}
-                        {renderInfoTipRow("Best module", shownInfo?.tips?.module)}
-                        {renderInfoTipRow("Best operation", shownInfo?.tips?.operation)}
-                        {renderInfoTipRow("Watch out", shownInfo?.tips?.watch)}
-                      </div>
-
-                      {normalizeInfoTipItems(shownInfo?.tips?.actions).length ? (
-                        <div className="mt-4">
-                          <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-200/70">
-                            Quick actions
-                          </div>
-
-                          <ul className="mt-2 space-y-1.5 text-sm leading-6 text-white/78">
-                            {normalizeInfoTipItems(shownInfo?.tips?.actions).map((item) => (
-                              <li key={item} className="flex gap-2">
-                                <span className="mt-[8px] h-1.5 w-1.5 rounded-full bg-cyan-300/90" />
-                                <span>{item}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  {shownInfo?.nextStep ? (
-                    <button
-                      type="button"
-                      onClick={handleInfoNextStep}
-                      className="mt-4 flex w-full items-start justify-between rounded-2xl border border-cyan-400/20 bg-cyan-500/8 px-4 py-3 text-left transition hover:bg-cyan-500/14"
-                    >
-                      <div>
-                        <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-200/70">
-                          Recommended next step
-                        </div>
-                        <div className="mt-1 text-base font-semibold text-white">
-                          {shownInfo.nextStep.label}
-                        </div>
-                        {shownInfo.nextStep.why ? (
-                          <div className="mt-1 text-sm text-white/68">
-                            Why: {shownInfo.nextStep.why}
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <div className="ml-4 pt-1 text-cyan-200/80">→</div>
-                    </button>
-                  ) : null}
-                </div>
-
-                <div className="sticky bottom-0 z-20 -mx-5 mt-5 flex justify-end bg-transparent px-5 pb-6 pt-3 pointer-events-none lg:-mx-6 lg:px-6">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOpenInfoKey(null);
-                      setBuildInfo(null);
-                    }}
-                    className="pointer-events-auto rounded-2xl border border-cyan-400/20 bg-slate-950/85 px-5 py-3 text-base font-semibold text-white shadow-[0_6px_18px_rgba(0,0,0,0.18)] backdrop-blur-md transition hover:bg-cyan-500/15"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
             </div>
-          ) : null}
-
+          </>
+          
           {/* Mobile */}
           <div
             className="relative mt-4 space-y-3 sm:hidden overscroll-none pb-28"
