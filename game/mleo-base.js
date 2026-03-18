@@ -2402,11 +2402,7 @@ function BaseHomeFlowScene({ base, derived, selected, onSelect }) {
         );
       })}
 
-      <div className="pointer-events-none absolute left-3 right-3 top-3 flex items-center justify-between">
-        <div className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200/80">
-          BASE V3 MAP
-        </div>
-
+      <div className="pointer-events-none absolute left-3 right-3 top-3 flex items-center justify-center">
         <div className="rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/55">
           {nodes.length - 1} buildings online
         </div>
@@ -6493,23 +6489,32 @@ export default function MleoBase() {
       return;
     }
 
+    const isDesktopViewport =
+      typeof window !== "undefined" && window.matchMedia("(min-width: 640px)").matches;
+
+    const routePanel = (panel, inner) => {
+      if (isDesktopViewport) {
+        openDesktopPanel(panel, inner);
+      } else {
+        openMobilePanel(panel);
+        setOpenInnerPanel(inner || null);
+      }
+    };
+
     if (target === "shipping") {
-      openMobilePanel("ops");
-      setOpenInnerPanel("ops-console");
+      routePanel("ops", "ops-console");
       setBuildInfo(getOperationsInfo("shipping"));
       return;
     }
 
     if (target === "maintenance") {
-      openMobilePanel("ops");
-      setOpenInnerPanel("ops-console");
+      routePanel("ops", "ops-console");
       setBuildInfo(getOperationsInfo("maintenance"));
       return;
     }
 
     if (target === "research-center") {
-      openMobilePanel("build");
-      setOpenInnerPanel("build-development");
+      routePanel("build", "build-development");
       setBuildInfo(getSystemInfo("blueprint"));
       return;
     }
@@ -6520,8 +6525,7 @@ export default function MleoBase() {
       const tab = getStructuresTabForTarget(target);
       if (tab) setStructuresTab(tab);
 
-      openMobilePanel("build");
-      setOpenInnerPanel("build-structures");
+      routePanel("build", "build-structures");
       setBuildInfo(getBuildingInfo(building));
       return;
     }
@@ -7992,7 +7996,7 @@ export default function MleoBase() {
           ) : null}
 
           {/* Mobile */}
-          <div className="relative mt-4 space-y-3 sm:hidden overscroll-none pb-0">
+          <div className="relative mt-4 space-y-3 sm:hidden overscroll-none pb-28">
             <div
               onClick={() => {
                 if (commandHubCount > 0) setShowReadyPanel(true);
@@ -8069,56 +8073,7 @@ export default function MleoBase() {
                     <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-300/70">
                       Base Flow Map
                     </div>
-                    <div className="mt-1 text-sm text-white/65">
-                      Tap any building to jump into its existing window.
-                    </div>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => openMobilePanel("build")}
-                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
-                  >
-                    Build
-                  </button>
-                </div>
-
-                <div
-                  className={`rounded-2xl border px-3.5 py-3 ${getBaseFlowSummaryClass(
-                    baseFlowSummary.tone
-                  )}`}
-                >
-                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-75">
-                    Base Status
-                  </div>
-                  <div className="mt-1 text-sm font-semibold">{baseFlowSummary.title}</div>
-                  <div className="mt-1 text-xs opacity-80">{baseFlowSummary.text}</div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openHomeFlowTarget("maintenance")}
-                    className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center text-[11px] font-semibold text-white/85 hover:bg-white/[0.08]"
-                  >
-                    Maintenance
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => openHomeFlowTarget("research-center")}
-                    className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center text-[11px] font-semibold text-white/85 hover:bg-white/[0.08]"
-                  >
-                    Research
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => openHomeFlowTarget("shipping")}
-                    className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center text-[11px] font-semibold text-white/85 hover:bg-white/[0.08]"
-                  >
-                    Shipping
-                  </button>
                 </div>
               </div>
 
