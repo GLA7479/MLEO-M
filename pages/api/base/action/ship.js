@@ -35,6 +35,8 @@ export default async function handler(req, res) {
     if (!rateLimit.allowed) {
       return res.status(429).json({ success: false, code: "RATE_LIMIT_DEVICE", message: "Too many ship requests" });
     }
+    const suspiciousRapidShip =
+      typeof rateLimit.remaining === "number" && rateLimit.remaining < 5;
 
     const supabase = getSupabaseAdmin();
 
@@ -74,6 +76,7 @@ export default async function handler(req, res) {
       shipped: Number(result.shipped || 0),
       consumed: Number(result.consumed || 0),
       vault_balance: Number(result.vault_balance || 0),
+      suspicious_rapid_ship: suspiciousRapidShip,
     });
   } catch (error) {
     console.error("base/action/ship failed", error);

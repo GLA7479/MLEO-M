@@ -807,6 +807,21 @@ BEGIN
     updated_at = now()
   WHERE device_id = p_device_id;
 
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'mission_claim',
+    jsonb_build_object(
+      'mission_key', p_mission_key,
+      'reward', jsonb_build_object('XP', v_xp_gain),
+      'resources_after', v_resources,
+      'banked_mleo_after', coalesce(v_state.banked_mleo, 0),
+      'commander_xp_after', coalesce(v_state.commander_xp, 0) + v_xp_gain,
+      'mission_state_after', v_mission_state
+    ),
+    0,
+    '[]'::jsonb
+  );
+
   RETURN QUERY
   SELECT *
   FROM public.base_device_state

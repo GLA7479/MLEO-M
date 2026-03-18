@@ -139,8 +139,7 @@ BEGIN
   WHERE device_id = p_device_id
   RETURNING * INTO v_state;
 
-  INSERT INTO public.base_action_audit (device_id, action_type, action_detail)
-  VALUES (
+  PERFORM public.base_write_audit(
     p_device_id,
     'ship',
     jsonb_build_object(
@@ -148,8 +147,24 @@ BEGIN
       'consumed', v_consumed,
       'factor', v_factor,
       'ship_cap', v_ship_cap,
-      'sent_today', v_sent_today + v_shipped
-    )
+      'sent_today_before', v_sent_today,
+      'sent_today_after', v_sent_today + v_shipped,
+      'banked_before', v_banked_mleo,
+      'banked_after', v_new_banked_mleo,
+      'blueprint_level', v_blueprint_level,
+      'logistics_level', coalesce((coalesce(v_state.buildings, '{}'::jsonb)->>'logisticsCenter')::integer, 0),
+      'commander_xp_after', v_commander_xp,
+      'vault_balance_after', v_vault_balance
+    ),
+    CASE
+      WHEN v_shipped >= greatest(1, floor(v_ship_cap * 0.9)) THEN 2
+      ELSE 0
+    END,
+    CASE
+      WHEN v_shipped >= greatest(1, floor(v_ship_cap * 0.9))
+        THEN jsonb_build_array('near_daily_cap_single_ship')
+      ELSE '[]'::jsonb
+    END
   );
 
   RETURN QUERY
@@ -320,16 +335,29 @@ BEGIN
   WHERE device_id = p_device_id
   RETURNING * INTO v_state;
 
-  INSERT INTO public.base_action_audit (device_id, action_type, action_detail)
-  VALUES (
+  PERFORM public.base_write_audit(
     p_device_id,
     'spend',
     jsonb_build_object(
       'spend_type', p_spend_type,
       'cost', v_cost,
       'data_cost', coalesce(v_data_cost, 0),
-      'vault_balance', v_vault_balance
-    )
+      'blueprint_level_before', v_blueprint_level,
+      'blueprint_level_after', coalesce(v_new_blueprint_level, v_blueprint_level),
+      'vault_balance_after', v_vault_balance,
+      'energy_after', coalesce((v_new_resources->>'ENERGY')::numeric, null),
+      'data_after', coalesce((v_new_resources->>'DATA')::numeric, null),
+      'total_shared_spent_after', v_new_total_shared_spent
+    ),
+    CASE
+      WHEN p_spend_type = 'overclock' THEN 1
+      ELSE 0
+    END,
+    CASE
+      WHEN p_spend_type = 'overclock'
+        THEN jsonb_build_array('overclock_used')
+      ELSE '[]'::jsonb
+    END
   );
 
   RETURN QUERY
@@ -490,6 +518,21 @@ BEGIN
   WHERE device_id = p_device_id
   RETURNING * INTO v_state;
 
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'expedition',
+    jsonb_build_object(
+      'loot', coalesce(v_loot, '{}'::jsonb),
+      'xp_gain', coalesce(v_xp_gain, 0),
+      'energy_after', coalesce((v_new_resources->>'ENERGY')::numeric, null),
+      'data_after', coalesce((v_new_resources->>'DATA')::numeric, null),
+      'cooldown_until', v_new_expedition_ready_at,
+      'total_expeditions_after', coalesce((v_stats->>'expeditionsToday')::bigint, 0)
+    ),
+    0,
+    '[]'::jsonb
+  );
+
   RETURN QUERY
   SELECT
     v_loot,
@@ -643,6 +686,27 @@ BEGIN
   WHERE device_id = p_device_id
   RETURNING * INTO v_state;
 
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'build',
+    jsonb_build_object(
+      'building_key', p_building_key,
+      'new_level', v_new_level,
+      'hq_level', coalesce((coalesce(v_state.buildings, '{}'::jsonb)->>'hq')::integer, 1),
+      'cost', coalesce(v_cost, '{}'::jsonb),
+      'resources_after', v_new_resources
+    ),
+    CASE
+      WHEN p_building_key = 'hq' THEN 1
+      ELSE 0
+    END,
+    CASE
+      WHEN p_building_key = 'hq'
+        THEN jsonb_build_array('hq_upgrade')
+      ELSE '[]'::jsonb
+    END
+  );
+
   RETURN QUERY
   SELECT
     v_new_level,
@@ -719,6 +783,19 @@ BEGIN
     updated_at = now()
   WHERE device_id = p_device_id
   RETURNING * INTO v_state;
+
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'hire_crew',
+    jsonb_build_object(
+      'crew_after', coalesce(v_state.crew, 0),
+      'crew_role_after', coalesce(v_state.crew_role, 'engineer'),
+      'resources_after', v_resources,
+      'commander_xp_after', coalesce(v_state.commander_xp, 0)
+    ),
+    0,
+    '[]'::jsonb
+  );
 
   RETURN QUERY
   SELECT
@@ -806,6 +883,20 @@ BEGIN
     updated_at = now()
   WHERE device_id = p_device_id
   RETURNING * INTO v_state;
+
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'maintenance',
+    jsonb_build_object(
+      'cost', v_cost,
+      'vault_balance_after', null,
+      'maintenance_due_after', null,
+      'stability_after', v_new_stability,
+      'total_shared_spent_after', null
+    ),
+    0,
+    '[]'::jsonb
+  );
 
   RETURN QUERY
   SELECT
@@ -898,6 +989,19 @@ BEGIN
     updated_at = now()
   WHERE device_id = p_device_id
   RETURNING * INTO v_state;
+
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'install_module',
+    jsonb_build_object(
+      'module_key', p_module_key,
+      'modules_after', v_modules,
+      'resources_after', v_resources,
+      'commander_xp_after', coalesce(v_state.commander_xp, 0)
+    ),
+    0,
+    '[]'::jsonb
+  );
 
   RETURN QUERY
   SELECT
@@ -1005,6 +1109,19 @@ BEGIN
   WHERE device_id = p_device_id
   RETURNING * INTO v_state;
 
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'unlock_research',
+    jsonb_build_object(
+      'research_key', p_research_key,
+      'research_after', v_research,
+      'resources_after', v_resources,
+      'commander_xp_after', coalesce(v_state.commander_xp, 0)
+    ),
+    0,
+    '[]'::jsonb
+  );
+
   RETURN QUERY
   SELECT
     p_research_key,
@@ -1026,6 +1143,46 @@ CREATE TABLE IF NOT EXISTS public.base_action_audit (
   action_type text NOT NULL,
   action_detail jsonb NOT NULL DEFAULT '{}'::jsonb
 );
+
+ALTER TABLE public.base_action_audit
+  ADD COLUMN IF NOT EXISTS suspicion_score integer NOT NULL DEFAULT 0;
+
+ALTER TABLE public.base_action_audit
+  ADD COLUMN IF NOT EXISTS suspicion_flags jsonb NOT NULL DEFAULT '[]'::jsonb;
+
+-- ============================================================================
+-- Audit helper: base_write_audit
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.base_write_audit(
+  p_device_id text,
+  p_action_type text,
+  p_action_detail jsonb DEFAULT '{}'::jsonb,
+  p_suspicion_score integer DEFAULT 0,
+  p_suspicion_flags jsonb DEFAULT '[]'::jsonb
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.base_action_audit (
+    device_id,
+    action_type,
+    action_detail,
+    suspicion_score,
+    suspicion_flags
+  )
+  VALUES (
+    p_device_id,
+    p_action_type,
+    coalesce(p_action_detail, '{}'::jsonb),
+    greatest(0, coalesce(p_suspicion_score, 0)),
+    coalesce(p_suspicion_flags, '[]'::jsonb)
+  );
+END;
+$$;
 
 -- ============================================================================
 -- Security: Revoke from PUBLIC and anon/authenticated, grant to service_role
@@ -1052,5 +1209,8 @@ GRANT EXECUTE ON FUNCTION public.base_unlock_research(text, text) TO service_rol
 REVOKE ALL ON public.base_action_audit FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT ON public.base_action_audit TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.base_action_audit_id_seq TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.base_write_audit(text, text, jsonb, integer, jsonb) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.base_write_audit(text, text, jsonb, integer, jsonb) TO service_role;
 
 COMMIT;

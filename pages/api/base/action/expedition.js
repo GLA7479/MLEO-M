@@ -35,6 +35,8 @@ export default async function handler(req, res) {
     if (!rateLimit.allowed) {
       return res.status(429).json({ success: false, code: "RATE_LIMIT_DEVICE", message: "Too many expedition requests" });
     }
+    const suspiciousRapidExpedition =
+      typeof rateLimit.remaining === "number" && rateLimit.remaining < 3;
 
     const supabase = getSupabaseAdmin();
 
@@ -76,6 +78,7 @@ export default async function handler(req, res) {
       state,
       loot: result?.loot || null,
       xp_gain: Number(result?.xp_gain || 0),
+      suspicious_rapid_expedition: suspiciousRapidExpedition,
     });
   } catch (error) {
     console.error("base/action/expedition failed", error);
