@@ -24,12 +24,19 @@ function getVisualState(def, state) {
   return { locked, active, lowEnergy, upgradeAvailable };
 }
 
+const BASE_BG_IMAGE = "/images/space/base.png";
+
 export function BaseMap({ state, onSelectBuilding }) {
   return (
-    <div className="relative h-[260px] w-full overflow-hidden rounded-md border border-slate-800 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 sm:h-[320px] md:h-[360px]">
-      {/* Background grid / terrain hint */}
-      <div className="pointer-events-none absolute inset-0 opacity-[0.18]">
-        <div className="h-full w-full bg-[radial-gradient(circle_at_top,_rgba(148,163,184,0.35),transparent_60%),repeating-linear-gradient(90deg,rgba(30,64,175,0.2)_0,rgba(30,64,175,0.2)_1px,transparent_1px,transparent_16px),repeating-linear-gradient(0deg,rgba(30,64,175,0.16)_0,rgba(30,64,175,0.16)_1px,transparent_1px,transparent_16px)]" />
+    <div
+      className="relative h-[260px] w-full overflow-hidden rounded-md border border-slate-800 bg-slate-950 bg-cover bg-center bg-no-repeat sm:h-[320px] md:h-[360px]"
+      style={{ backgroundImage: `url(${BASE_BG_IMAGE})` }}
+    >
+      {/* Overlay so building nodes stay readable */}
+      <div className="pointer-events-none absolute inset-0 bg-slate-950/40" />
+      {/* Optional subtle grid */}
+      <div className="pointer-events-none absolute inset-0 opacity-[0.12]">
+        <div className="h-full w-full bg-[repeating-linear-gradient(90deg,rgba(30,64,175,0.15)_0,rgba(30,64,175,0.15)_1px,transparent_1px,transparent_16px),repeating-linear-gradient(0deg,rgba(30,64,175,0.12)_0,rgba(30,64,175,0.12)_1px,transparent_1px,transparent_16px)]" />
       </div>
 
       {BUILDINGS.map((def) => {

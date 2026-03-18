@@ -59,7 +59,7 @@ export default function MleoBaseV2() {
     return () => {
       cancelled = true;
     };
-  }, [address]);
+  }, []);
 
   function pushLog(entry) {
     logRef.current = [
