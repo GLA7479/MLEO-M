@@ -21,9 +21,6 @@ import { BaseHintV3 } from "./base-v3/components/BaseHintV3";
 
 const MAX_LOG_ITEMS = 16;
 
-// V3: scene-first mobile-first game screen. Replaces dashboard feel with a game screen.
-// Gameplay rules, backend endpoints, server state shape and action semantics unchanged.
-
 export default function MleoBaseV3() {
   const [baseState, setBaseState] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -34,16 +31,19 @@ export default function MleoBaseV3() {
 
   useEffect(() => {
     let cancelled = false;
+
     async function hydrate() {
       try {
         const res = await getBaseState();
         if (cancelled) return;
+
         if (!res || !res.success || !res.state) {
           setError(res?.message || "Failed to load base state.");
           setBaseState(null);
           setLoading(false);
           return;
         }
+
         setBaseState(res.state);
         setError(null);
       } catch (err) {
@@ -53,24 +53,19 @@ export default function MleoBaseV3() {
           setBaseState(null);
         }
       }
+
       if (!cancelled) setLoading(false);
     }
+
     hydrate();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function pushLog(entry) {
-    const item = { id: Date.now(), ...entry };
+    const item = { id: Date.now() + Math.random(), ...entry };
     setLogItems((prev) => [item, ...prev].slice(0, MAX_LOG_ITEMS));
-  }
-
-  async function refreshBase() {
-    try {
-      const res = await getBaseState();
-      if (res?.success && res?.state) setBaseState(res.state);
-    } catch (e) {
-      console.warn("Refresh failed", e);
-    }
   }
 
   async function handleBuild(key) {
@@ -83,8 +78,7 @@ export default function MleoBaseV3() {
         return;
       }
       setBaseState(res.state);
-      if (res?.log) pushLog(res.log);
-      else pushLog({ type: "info", message: "Build completed." });
+      pushLog(res?.log || { type: "info", message: "Build completed." });
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Build failed." });
@@ -103,8 +97,7 @@ export default function MleoBaseV3() {
         return;
       }
       setBaseState(res.state);
-      if (res?.log) pushLog(res.log);
-      else pushLog({ type: "info", message: "Module installed." });
+      pushLog(res?.log || { type: "info", message: "Module installed." });
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Module install failed." });
@@ -123,8 +116,7 @@ export default function MleoBaseV3() {
         return;
       }
       setBaseState(res.state);
-      if (res?.log) pushLog(res.log);
-      else pushLog({ type: "info", message: "Research completed." });
+      pushLog(res?.log || { type: "info", message: "Research completed." });
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Research failed." });
@@ -143,8 +135,7 @@ export default function MleoBaseV3() {
         return;
       }
       setBaseState(res.state);
-      if (res?.log) pushLog(res.log);
-      else pushLog({ type: "info", message: "Expedition launched." });
+      pushLog(res?.log || { type: "info", message: "Expedition launched." });
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Expedition failed." });
@@ -163,8 +154,7 @@ export default function MleoBaseV3() {
         return;
       }
       setBaseState(res.state);
-      if (res?.log) pushLog(res.log);
-      else pushLog({ type: "info", message: "Shipped to vault." });
+      pushLog(res?.log || { type: "info", message: "Shipped to vault." });
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Shipment failed." });
@@ -183,8 +173,7 @@ export default function MleoBaseV3() {
         return;
       }
       setBaseState(res.state);
-      if (res?.log) pushLog(res.log);
-      else pushLog({ type: "info", message: "Spent from vault." });
+      pushLog(res?.log || { type: "info", message: "Spent from vault." });
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Spend failed." });
@@ -203,8 +192,7 @@ export default function MleoBaseV3() {
         return;
       }
       setBaseState(res.state);
-      if (res?.log) pushLog(res.log);
-      else pushLog({ type: "info", message: "Crew hired." });
+      pushLog(res?.log || { type: "info", message: "Crew hired." });
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Hire failed." });
@@ -223,8 +211,7 @@ export default function MleoBaseV3() {
         return;
       }
       setBaseState(res.state);
-      if (res?.log) pushLog(res.log);
-      else pushLog({ type: "info", message: "Maintenance done." });
+      pushLog(res?.log || { type: "info", message: "Maintenance done." });
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Maintenance failed." });
@@ -243,8 +230,7 @@ export default function MleoBaseV3() {
         return;
       }
       setBaseState(res.state);
-      if (res?.log) pushLog(res.log);
-      else pushLog({ type: "info", message: "Mission claimed." });
+      pushLog(res?.log || { type: "info", message: "Mission claimed." });
     } catch (err) {
       console.error(err);
       pushLog({ type: "error", message: "Claim failed." });
@@ -282,48 +268,67 @@ export default function MleoBaseV3() {
 
   return (
     <Layout>
-      <div className="flex min-h-screen flex-col bg-slate-950 text-slate-50">
-        <BaseHudV3 base={baseState} />
+      <div className="bg-slate-950 text-slate-50 min-h-[100dvh] md:h-[100dvh] md:overflow-hidden">
+        <div className="mx-auto flex h-[100dvh] max-w-[1600px] flex-col overflow-hidden px-2 py-2 md:grid md:grid-cols-[360px_minmax(0,1fr)] md:gap-3 md:px-3 md:py-3">
+          <aside className="hidden md:flex md:min-h-0 md:flex-col md:gap-3">
+            <BaseHudV3 base={baseState} />
+            <BaseHintV3 base={baseState} />
+            <div className="min-h-0 flex-1 overflow-hidden rounded-[28px] border border-slate-800 bg-slate-900/50 backdrop-blur">
+              <div className="border-b border-slate-800 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Activity</div>
+                <div className="mt-1 text-sm font-semibold text-slate-200">Base events</div>
+              </div>
+              <div className="h-[calc(100%-68px)] overflow-y-auto">
+                <ActivityFeedV3 items={logItems} mode="desktop" />
+              </div>
+            </div>
+          </aside>
 
-        <div className="flex-1 flex items-stretch justify-center px-3 pb-2">
-          <BaseSceneV3
-            base={baseState}
-            selected={selectedBuilding}
-            onSelect={setSelectedBuilding}
-          />
+          <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-slate-800 bg-slate-900/40 backdrop-blur">
+            <div className="md:hidden shrink-0">
+              <BaseHudV3 base={baseState} />
+              <BaseHintV3 base={baseState} />
+            </div>
+
+            <div className="flex min-h-0 flex-1 items-center justify-center px-2 pb-2 pt-2 md:px-4 md:pb-4 md:pt-4">
+              <BaseSceneV3 base={baseState} selected={selectedBuilding} onSelect={setSelectedBuilding} />
+            </div>
+
+            <div className="md:hidden shrink-0">
+              <ActivityFeedV3 items={logItems} mode="mobile" />
+            </div>
+
+            <BaseUtilityTrayV3
+              base={baseState}
+              hubHref="/mining"
+              busy={isBusy}
+              sheetOpen={Boolean(selectedBuilding)}
+              onExpedition={handleExpedition}
+              onMaintenance={handleMaintenance}
+              onShipToVault={handleShipToVault}
+              onHireCrew={handleHireCrew}
+              onClaimMission={handleClaimMission}
+              claimableMissionKeys={baseState?.claimableMissions ?? []}
+            />
+          </section>
         </div>
 
-        <BaseHintV3 base={baseState} />
-
-        <BaseUtilityTrayV3
-          hubHref="/mining"
+        <BuildingSheetV3
+          base={baseState}
+          buildingKey={selectedBuilding}
           busy={isBusy}
-          sheetOpen={Boolean(selectedBuilding)}
+          onClose={() => setSelectedBuilding(null)}
+          onBuild={handleBuild}
           onExpedition={handleExpedition}
           onMaintenance={handleMaintenance}
+          onInstallModule={handleInstallModule}
+          onResearch={handleResearch}
           onShipToVault={handleShipToVault}
+          onSpendFromVault={handleSpendFromVault}
           onHireCrew={handleHireCrew}
           onClaimMission={handleClaimMission}
-          claimableMissionKeys={baseState?.claimableMissions ?? []}
         />
-        <ActivityFeedV3 items={logItems} />
       </div>
-
-      <BuildingSheetV3
-        base={baseState}
-        buildingKey={selectedBuilding}
-        busy={isBusy}
-        onClose={() => setSelectedBuilding(null)}
-        onBuild={handleBuild}
-        onExpedition={handleExpedition}
-        onMaintenance={handleMaintenance}
-        onInstallModule={handleInstallModule}
-        onResearch={handleResearch}
-        onShipToVault={handleShipToVault}
-        onSpendFromVault={handleSpendFromVault}
-        onHireCrew={handleHireCrew}
-        onClaimMission={handleClaimMission}
-      />
     </Layout>
   );
 }

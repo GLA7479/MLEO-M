@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BUILDINGS } from "../../base-v2/data/buildings";
+import { buildingCost, canAfford } from "../../base-v2/utils/buildings";
 import { SCENE_BUILDING_KEYS, SCENE_POSITIONS, SCENE_LINK_KEYS } from "../data/scenePositions";
 import { getBuildingIdentity } from "../data/buildingIdentity";
 
@@ -137,13 +138,70 @@ const GLOW_ACTIVE = {
   sky: "border-sky-400/70 shadow-[0_0_14px_rgba(56,189,248,0.4)]",
 };
 
-function BuildingNode({ buildingKey, def, level, locked, active, selected, onSelect, style, identity }) {
+const STATUS_BADGE_CLASSES = {
+  emerald: "border-emerald-500/40 bg-emerald-950/80 text-emerald-100",
+  amber: "border-amber-500/40 bg-amber-950/80 text-amber-100",
+  cyan: "border-cyan-500/40 bg-cyan-950/80 text-cyan-100",
+  slate: "border-slate-700/80 bg-slate-950/85 text-slate-300",
+};
+
+function getNodeStatus({ base, buildingKey, level, locked, canUpgrade }) {
+  const res = base?.resources ?? {};
+  const energy = Number(res.ENERGY ?? 0);
+  const data = Number(res.DATA ?? 0);
+  const stability = Number(base?.stability ?? 100);
+  const banked = Number(base?.bankedMleo ?? 0);
+
+  if (buildingKey === "expeditionBay" && level > 0 && energy >= 36 && data >= 4) {
+    return { label: "READY", tone: "emerald" };
+  }
+
+  if (locked) {
+    return { label: "LOCK", tone: "slate" };
+  }
+
+  if (level === 0 && canUpgrade) {
+    return { label: "NEW", tone: "cyan" };
+  }
+
+  if (level > 0 && canUpgrade) {
+    return { label: "UP", tone: "emerald" };
+  }
+
+  if (buildingKey === "powerCell" && energy < 12) {
+    return { label: "LOW", tone: "amber" };
+  }
+
+  if (buildingKey === "repairBay" && stability < 75) {
+    return { label: "FIX", tone: "amber" };
+  }
+
+  if (buildingKey === "refinery" && banked >= 120) {
+    return { label: "SHIP", tone: "emerald" };
+  }
+
+  return null;
+}
+
+function BuildingNode({
+  buildingKey,
+  level,
+  locked,
+  active,
+  selected,
+  onSelect,
+  style,
+  identity,
+  status,
+}) {
   const id = identity || getBuildingIdentity(buildingKey);
   const glow = id.glow || "slate";
   const isHq = buildingKey === "hq";
+
   const sizeClasses = isHq
-    ? "min-w-[4rem] min-h-[4rem] text-base px-4 py-3 rounded-2xl"
-    : "min-w-[2.75rem] min-h-[2.5rem] text-[11px] px-2.5 py-2 rounded-xl";
+    ? "min-w-[4.1rem] min-h-[4.1rem] px-4 py-3 text-base rounded-2xl md:min-w-[5rem] md:min-h-[5rem] md:text-lg"
+    : "min-w-[3rem] min-h-[2.7rem] px-2.5 py-2 text-[11px] rounded-xl md:min-w-[3.7rem] md:min-h-[3.1rem] md:px-3 md:py-2.5 md:text-[12px]";
+
   const baseGlow = active ? GLOW_ACTIVE[glow] : GLOW_CLASSES[glow];
   const lockedClass = locked ? "opacity-55" : "";
   const pulseClass =
@@ -153,7 +211,9 @@ function BuildingNode({ buildingKey, def, level, locked, active, selected, onSel
       ? "animate-base-v3-pulse-slow"
       : "";
   const hqBreathe = isHq && active ? "animate-base-v3-hq-breathe" : "";
-  const selectedRing = selected ? "ring-2 ring-white/80 ring-offset-2 ring-offset-slate-950 scale-105 z-10 animate-base-v3-selected" : "";
+  const selectedRing = selected
+    ? "ring-2 ring-white/80 ring-offset-2 ring-offset-slate-950 scale-[1.03] z-10 animate-base-v3-selected"
+    : "";
 
   return (
     <button
@@ -164,13 +224,23 @@ function BuildingNode({ buildingKey, def, level, locked, active, selected, onSel
         absolute -translate-x-1/2 -translate-y-1/2 border-2 flex items-center justify-center gap-1
         transition-all duration-200 font-semibold
         ${sizeClasses}
-        ${active ? `text-slate-100 ${baseGlow}` : "border-slate-600/60 bg-slate-900/70 text-slate-500"}
+        ${active ? `text-slate-100 ${baseGlow}` : "border-slate-600/60 bg-slate-900/75 text-slate-500"}
         ${lockedClass}
         ${selectedRing}
         ${hqBreathe}
         active:scale-95
       `}
     >
+      {status && (
+        <span
+          className={`absolute -right-1.5 -top-1.5 rounded-full border px-1.5 py-0.5 text-[8px] font-bold tracking-wide ${
+            STATUS_BADGE_CLASSES[status.tone] || STATUS_BADGE_CLASSES.slate
+          }`}
+        >
+          {status.label}
+        </span>
+      )}
+
       <span className={`shrink-0 ${pulseClass}`}>
         {isHq ? (
           <span className="text-emerald-300 drop-shadow-[0_0_6px_rgba(16,185,129,0.6)]">{id.icon}</span>
@@ -178,8 +248,14 @@ function BuildingNode({ buildingKey, def, level, locked, active, selected, onSel
           <span className={active ? "text-slate-200" : "text-slate-500"}>{id.icon}</span>
         )}
       </span>
+
       <span className="uppercase tracking-wide">{id.label}</span>
-      {level > 0 && <span className="text-[10px] opacity-90 text-slate-300">Lv.{level}</span>}
+
+      {level > 0 && (
+        <span className="hidden md:inline text-[10px] opacity-90 text-slate-300">
+          Lv.{level}
+        </span>
+      )}
     </button>
   );
 }
@@ -279,7 +355,7 @@ export function BaseSceneV3({ base, selected, onSelect }) {
   return (
     <div
       ref={containerRef}
-      className="relative w-full max-w-md aspect-[3/4] mx-auto rounded-3xl overflow-hidden shadow-xl border border-slate-700/80 bg-gradient-to-b from-slate-950 via-slate-900/95 to-slate-950"
+      className="relative mx-auto w-full max-w-md aspect-[3/4] overflow-hidden rounded-3xl border border-slate-700/80 bg-gradient-to-b from-slate-950 via-slate-900/95 to-slate-950 shadow-xl md:h-full md:max-w-none md:aspect-auto md:rounded-[32px]"
     >
       {/* World layer: terrain / base feel */}
       <div
@@ -449,25 +525,39 @@ export function BaseSceneV3({ base, selected, onSelect }) {
       {SCENE_BUILDING_KEYS.map((key) => {
         const pos = layout[key];
         if (!pos) return null;
+
         const def = BUILDINGS.find((b) => b.key === key);
         if (!def) return null;
+
         const level = getBuildingLevel(base, key);
-        const hasReqs = !def.requires?.length || (def.requires ?? []).every((r) => getBuildingLevel(base, r.key) >= (r.lvl ?? 1));
+        const hasReqs =
+          !def.requires?.length ||
+          (def.requires ?? []).every((r) => getBuildingLevel(base, r.key) >= (r.lvl ?? 1));
+
         const locked = level <= 0 && !hasReqs;
         const active = level > 0;
         const identity = getBuildingIdentity(key);
+        const nextCost = buildingCost(def, level);
+        const canUpgradeNow = hasReqs && canAfford(base?.resources ?? {}, nextCost);
+        const status = getNodeStatus({
+          base,
+          buildingKey: key,
+          level,
+          locked,
+          canUpgrade: canUpgradeNow,
+        });
 
         return (
           <BuildingNode
             key={key}
             buildingKey={key}
-            def={def}
             level={level}
             locked={locked}
             active={active}
             selected={selected === key}
             onSelect={() => onSelect?.(key)}
             identity={identity}
+            status={status}
             style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
           />
         );

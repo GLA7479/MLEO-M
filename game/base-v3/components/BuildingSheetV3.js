@@ -191,12 +191,12 @@ export function BuildingSheetV3({
       />
       <div
         className="
-          relative pointer-events-auto w-full max-h-[78vh] overflow-y-auto
+          relative pointer-events-auto w-full max-h-[82vh] overflow-y-auto
           rounded-t-3xl border-t border-slate-700
-          md:w-[420px] md:max-w-[420px] md:max-h-[82vh]
-          md:rounded-2xl md:border md:border-slate-700 md:border-t md:shadow-2xl
+          md:w-[460px] md:max-w-[460px] md:max-h-[86vh]
+          md:rounded-[28px] md:border md:border-slate-700 md:border-t md:shadow-2xl
           bg-slate-950/98 shadow-2xl animate-base-v3-sheet-enter
-          pb-[calc(env(safe-area-inset-bottom)+0.5rem)] md:pb-4
+          pb-[calc(env(safe-area-inset-bottom)+0.5rem)] md:pb-5
         "
         role="dialog"
         aria-modal="true"
