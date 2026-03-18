@@ -846,9 +846,14 @@ function pushLog(log, text) {
 
 function buildingCost(def, level) {
   const factor = Math.pow(def.growth || 1, level);
+  const earlyDiscount =
+    level === 0 ? 0.82
+    : level === 1 ? 0.88
+    : level === 2 ? 0.92
+    : 1;
   const out = {};
   for (const [key, value] of Object.entries(def.baseCost || {})) {
-    out[key] = Math.ceil(value * factor);
+    out[key] = Math.ceil(value * factor * earlyDiscount);
   }
   return out;
 }
@@ -890,13 +895,16 @@ function unlocked(def, state) {
   return def.requires.every((req) => (state.buildings[req.key] || 0) >= (req.lvl || 1));
 }
 
+/** Server-aligned softcut: factor between 1.0 and 0.5 by sent_today/ship_cap ratio. */
+function getShipSoftcutFactor(sentToday, shipCap) {
+  const safeCap = Math.max(1, Number(shipCap || 0));
+  const safeSent = Math.max(0, Number(sentToday || 0));
+  const ratio = safeSent / safeCap;
+  return Math.max(0.5, 1 - ratio * 0.5);
+}
+
 function softcutFactor(used, cap) {
-  if (cap <= 0) return 1;
-  const ratio = used / cap;
-  for (const step of DAILY_SOFTCUT) {
-    if (ratio <= step.upto) return step.factor;
-  }
-  return 0.16;
+  return getShipSoftcutFactor(used, cap);
 }
 
 function offlineFactorFor(ms) {
@@ -972,8 +980,8 @@ function freshState() {
   return {
     version: 6,
     lastDay: todayKey(),
-    lastTickAt: Date.now(),
     lastHiddenAt: 0,
+    starterPackClaimed: false,
     resources: {
       ORE: 70,
       GOLD: CONFIG.startingGold,
@@ -981,6 +989,7 @@ function freshState() {
       ENERGY: CONFIG.baseEnergyCap,
       DATA: 10,
     },
+    lastTickAt: Date.now(),
     buildings: {
       hq: 1,
       quarry: 1,
@@ -1028,6 +1037,39 @@ function freshState() {
     },
     log: pushLog([], "MLEO BASE online. HQ is active."),
   };
+}
+
+function isNewPlayer(state) {
+  const b = state?.buildings || {};
+  const upgrades = state?.stats?.upgradesToday ?? 0;
+  return (b.hq || 0) <= 1 && upgrades === 0 && (b.refinery || 0) === 0;
+}
+
+function applyStarterPackIfNeeded(state) {
+  if (!state) return state;
+  if (typeof window === "undefined") return state;
+  try {
+    if (window.localStorage.getItem("mleo_starter_claimed") === "1") return state;
+    if (!isNewPlayer(state)) return state;
+  } catch {
+    return state;
+  }
+  const derived = derive(state);
+  const energyCap = Number(derived?.energyCap ?? CONFIG.baseEnergyCap);
+  const next = {
+    ...state,
+    resources: {
+      ...state.resources,
+      ORE: (state.resources?.ORE || 0) + 80,
+      GOLD: (state.resources?.GOLD || 0) + 12,
+      SCRAP: (state.resources?.SCRAP || 0) + 12,
+      ENERGY: Math.max(state.resources?.ENERGY || 0, energyCap),
+    },
+  };
+  try {
+    window.localStorage.setItem("mleo_starter_claimed", "1");
+  } catch {}
+  return next;
 }
 
 function normalizeServerState(raw, prevState = null) {
@@ -2012,6 +2054,7 @@ export default function MleoBase() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState(null);
   const [showReadyPanel, setShowReadyPanel] = useState(false);
+  const [showAllSuggestions, setShowAllSuggestions] = useState(false);
 
   // One open inner panel at a time (mobile)
   const [openInnerPanel, setOpenInnerPanel] = useState(null);
@@ -2305,13 +2348,14 @@ export default function MleoBase() {
           saved && !shouldReset ? normalizeServerState(saved, seed) : seed;
 
         const localProfile = loadJson("mleo_base_profile_v1", null);
-        const initialMerged = localProfile
+        let initialMerged = localProfile
           ? {
               ...initial,
               crewRole: localProfile.crewRole || initial.crewRole,
               commanderPath: localProfile.commanderPath || initial.commanderPath,
             }
           : initial;
+        initialMerged = applyStarterPackIfNeeded(initialMerged);
 
         if (!alive) return;
 
@@ -2361,34 +2405,35 @@ export default function MleoBase() {
 
         setState((prev) => {
           const normalized = normalizeServerState(serverState, prev);
+          const withStarter = applyStarterPackIfNeeded(normalized);
 
           return applyLevelUps({
             ...prev,
-            ...normalized,
+            ...withStarter,
             crewRole:
               serverState?.crewRole ??
               serverState?.crew_role ??
-              normalized?.crewRole ??
+              withStarter?.crewRole ??
               prev?.crewRole ??
               "engineer",
             commanderPath:
               serverState?.commanderPath ??
               serverState?.commander_path ??
-              normalized?.commanderPath ??
+              withStarter?.commanderPath ??
               prev?.commanderPath ??
               "industry",
             missionState: {
               dailySeed:
-                normalized?.missionState?.dailySeed ||
+                withStarter?.missionState?.dailySeed ||
                 prev?.missionState?.dailySeed ||
                 todayKey(),
               completed: {
                 ...(prev?.missionState?.completed || {}),
-                ...(normalized?.missionState?.completed || {}),
+                ...(withStarter?.missionState?.completed || {}),
               },
               claimed: {
                 ...(prev?.missionState?.claimed || {}),
-                ...(normalized?.missionState?.claimed || {}),
+                ...(withStarter?.missionState?.claimed || {}),
               },
             },
           });
@@ -2552,6 +2597,10 @@ export default function MleoBase() {
   );
   const desktopPriorityAlert = alerts[0] || null;
 
+  const showExpeditions = (state.buildings?.hq || 0) >= 2;
+  const showCrew = (state.buildings?.hq || 0) >= 3;
+  const showAdvancedResearch = (state.blueprintLevel || 0) >= 1 || (state.buildings?.hq || 0) >= 3;
+
   const commandHubItems = useMemo(() => {
     const items = [];
 
@@ -2589,7 +2638,7 @@ export default function MleoBase() {
       });
     }
 
-    if (readyCounts.expedition > 0) {
+    if (showExpeditions && readyCounts.expedition > 0) {
       items.push({
         key: "expedition",
         type: "ready",
@@ -2601,7 +2650,7 @@ export default function MleoBase() {
     }
 
     return items;
-  }, [alerts, readyCounts]);
+  }, [alerts, readyCounts, showExpeditions]);
 
   const primaryCommandItem = commandHubItems[0] || null;
   const commandHubCount = commandHubItems.length;
@@ -3429,7 +3478,7 @@ export default function MleoBase() {
                 <div className="mt-1 text-[11px] text-white/60">
                   Progress: {fmt(progress)} / {fmt(mission.target)}
                 </div>
-                <div className="mt-1 text-[11px] text-white/55">Reward: {rewardText(mission.reward)}</div>
+                <div className="mt-1 text-[11px] text-white/55">Potential reward: {rewardText(mission.reward)}</div>
               </div>
               <button
                 onClick={() => claimMission(mission.key)}
@@ -3856,10 +3905,7 @@ export default function MleoBase() {
       },
       next(level, building) {
         const next = level + 1;
-        const ore = fmt((building.convert?.ORE || 0) * next);
-        const scrap = fmt((building.convert?.SCRAP || 0) * next);
-        const mleo = fmt((building.convert?.MLEO || 0) * next);
-        return `Refinery level ${next} will increase conversion pressure to about ${ore} ORE and ${scrap} SCRAP, while raising banked MLEO potential to about ${mleo}.`;
+        return `Refinery level ${next} increases conversion capacity and energy use. Improves long-term conversion toward banked MLEO.`;
       },
       why: "Refinery is the main bridge from infrastructure into banked MLEO. It should feel valuable, but still controlled — exactly what this game loop needs.",
       linked: "ORE + SCRAP conversion · banked MLEO · shipping strategy · vault support",
@@ -6654,13 +6700,14 @@ export default function MleoBase() {
                       </button>
                     </div>
 
+                    {showExpeditions ? (
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                       <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
                         Expedition
                       </div>
                       <div className="mt-1 text-lg font-black text-white">Field Expedition</div>
                       <div className="mt-2 text-sm text-white/65">
-                        Spend {CONFIG.expeditionCost} energy for resources, DATA and rare findings.
+                        Potential rewards: resources, DATA, and rare findings. Typical outcome varies.
                       </div>
 
                       <div className="mt-4 flex flex-wrap gap-2">
@@ -6687,6 +6734,7 @@ export default function MleoBase() {
                         {expeditionLeft > 0 ? `Ready in ${Math.ceil(expeditionLeft / 1000)}s` : "Launch Expedition"}
                       </button>
                     </div>
+                    ) : null}
 
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                       <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
@@ -7355,7 +7403,7 @@ export default function MleoBase() {
                             </div>
                           </button>
                         )}
-                        {readyCounts.expedition > 0 && (
+                        {showExpeditions && readyCounts.expedition > 0 ? (
                           <button
                             onClick={() => {
                               openMobilePanel("ops");
@@ -7373,7 +7421,7 @@ export default function MleoBase() {
                               <span className="text-cyan-300 text-lg font-bold">›</span>
                             </div>
                           </button>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   )}
@@ -7442,6 +7490,7 @@ export default function MleoBase() {
                         </button>
                       ) : null}
 
+                      {showCrew ? (
                       <div
                         className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
                           overviewIdentityCount > 0
@@ -7476,6 +7525,7 @@ export default function MleoBase() {
                           </div>
                         )}
                       </div>
+                      ) : null}
 
                       <div
                         data-base-target="contracts"
@@ -7627,6 +7677,7 @@ export default function MleoBase() {
                               </button>
                             </div>
 
+                            {showExpeditions ? (
                             <div
                               data-base-target="expedition"
                               className={`relative rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 ${
@@ -7660,8 +7711,7 @@ export default function MleoBase() {
                                   Field Expedition
                                 </div>
                                 <p className="mt-1 text-sm text-white/70">
-                                  Spend {CONFIG.expeditionCost} energy for Ore, Gold, Scrap, DATA and
-                                  only a small chance of banked MLEO.
+                                  Potential rewards: Ore, Gold, Scrap, DATA, and sometimes banked MLEO. Typical outcome varies.
                                 </p>
 
                                 <div className="mt-3 flex flex-wrap gap-2">
@@ -7691,6 +7741,7 @@ export default function MleoBase() {
                                   : "Launch Expedition"}
                               </button>
                             </div>
+                            ) : null}
 
                             <div
                               data-base-target="blueprint"
@@ -8129,8 +8180,8 @@ export default function MleoBase() {
           {/* Mobile Ready Panel */}
           {showReadyPanel ? (
             <div
-              className="fixed inset-0 z-[117] bg-black/60 backdrop-blur-sm sm:hidden"
-              onClick={() => setShowReadyPanel(false)}
+className="fixed inset-0 z-[117] bg-black/60 backdrop-blur-sm sm:hidden"
+                onClick={() => { setShowReadyPanel(false); setShowAllSuggestions(false); }}
             >
               <div
                 className="absolute inset-x-4 top-[110px] rounded-3xl border border-white/10 bg-[#0b1526] p-4 shadow-2xl"
@@ -8138,14 +8189,14 @@ export default function MleoBase() {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-lg font-bold text-white">Command Hub</div>
+                    <div className="text-lg font-bold text-white">Best next step</div>
                     <div className="mt-1 text-xs text-white/60">
-                      Alerts, rewards and live actions currently available.
+                      {commandHubCount > 0 ? "Primary alert or action" : "Nothing needs attention right now."}
                     </div>
                   </div>
 
                   <button
-                    onClick={() => setShowReadyPanel(false)}
+                    onClick={() => { setShowReadyPanel(false); setShowAllSuggestions(false); }}
                     className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20"
                   >
                     Close
@@ -8161,41 +8212,54 @@ export default function MleoBase() {
                   }`}
                 >
                   {commandHubItems.length ? (
-                    commandHubItems.map((item) => (
-                      <button
-                        key={item.key}
-                        type="button"
-                        onClick={() => handleCommandHubItemClick(item)}
-                        className={`block w-full rounded-2xl border p-3 text-left transition hover:bg-white/10 ${
-                          item.type === "alert"
-                            ? alertToneClasses(item.tone)
-                            : "border-white/10 bg-black/20"
-                        } ${
-                          isHighlightedTarget(
-                            getAlertNavigationTarget(item)?.target,
-                            highlightTarget
-                          )
-                            ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
-                            : ""
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-sm font-semibold text-white">{item.title}</div>
-                            <div className="mt-1 text-xs text-white/65">{item.text}</div>
-                          </div>
+                    <>
+                      {[primaryCommandItem, ...(showAllSuggestions ? commandHubItems.slice(1) : [])]
+                        .filter(Boolean)
+                        .map((item) => (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => handleCommandHubItemClick(item)}
+                            className={`block w-full rounded-2xl border p-3 text-left transition hover:bg-white/10 ${
+                              item.type === "alert"
+                                ? alertToneClasses(item.tone)
+                                : "border-white/10 bg-black/20"
+                            } ${
+                              isHighlightedTarget(
+                                getAlertNavigationTarget(item)?.target,
+                                highlightTarget
+                              )
+                                ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                                : ""
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold text-white">{item.title}</div>
+                                <div className="mt-1 text-xs text-white/65">{item.text}</div>
+                              </div>
 
-                          <div className="shrink-0 flex items-center gap-2">
-                            {item.count > 0 ? (
-                              <span className="inline-flex min-w-[22px] items-center justify-center rounded-full bg-cyan-400 px-1.5 py-0.5 text-[10px] font-bold text-black">
-                                {item.count}
-                              </span>
-                            ) : null}
-                            <span className="text-cyan-300 text-lg font-bold">›</span>
-                          </div>
-                        </div>
-                      </button>
-                    ))
+                              <div className="shrink-0 flex items-center gap-2">
+                                {item.count > 0 ? (
+                                  <span className="inline-flex min-w-[22px] items-center justify-center rounded-full bg-cyan-400 px-1.5 py-0.5 text-[10px] font-bold text-black">
+                                    {item.count}
+                                  </span>
+                                ) : null}
+                                <span className="text-cyan-300 text-lg font-bold">›</span>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      {!showAllSuggestions && commandHubCount > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowAllSuggestions(true)}
+                          className="block w-full rounded-2xl border border-white/10 bg-white/5 py-2.5 text-center text-xs font-semibold text-cyan-200 hover:bg-white/10"
+                        >
+                          More suggestions ({commandHubCount - 1})
+                        </button>
+                      ) : null}
+                    </>
                   ) : (
                     <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
                       Nothing needs attention right now.
@@ -8517,6 +8581,7 @@ export default function MleoBase() {
                       </button>
                     </div>
 
+                    {showExpeditions ? (
                     <div
                       data-base-target="expedition"
                       className={`relative flex h-full flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 ${
@@ -8545,7 +8610,7 @@ export default function MleoBase() {
                       <div className="flex min-h-[88px] flex-col pr-8">
                         <div className="text-sm font-semibold text-cyan-200">Field Expedition</div>
                         <p className="mt-1 text-sm text-white/70">
-                          Spend {CONFIG.expeditionCost} energy for Ore, Gold, Scrap, DATA and only a small chance of banked MLEO.
+                          Potential rewards: Ore, Gold, Scrap, DATA, and sometimes banked MLEO. Typical outcome varies.
                         </p>
 
                         <div className="mt-3 grid grid-cols-3 gap-2">
@@ -8577,6 +8642,7 @@ export default function MleoBase() {
                         {expeditionLeft > 0 ? `Ready in ${Math.ceil(expeditionLeft / 1000)}s` : "Launch Expedition"}
                       </button>
                     </div>
+                    ) : null}
 
                     <div className="relative flex h-full flex-col gap-3 rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4">
                       <div className="absolute right-3 top-3 z-10">
