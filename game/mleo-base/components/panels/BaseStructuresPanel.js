@@ -173,14 +173,14 @@ export function BaseStructuresPanel({
 
                   <button
                     onClick={() => onBuyBuilding?.(card.key)}
-                    disabled={!card.ready}
+                    disabled={!card.ready || card.buildBusy}
                     className={`w-full rounded-xl px-3 py-2 text-xs font-semibold leading-none transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
                       card.canAffordCost
                         ? "bg-white/10"
                         : "bg-white/10 opacity-70"
                     }`}
                   >
-                    {card.buttonText}
+                    {card.buildBusy ? "Upgrading..." : card.buttonText}
                   </button>
                 </div>
               </div>

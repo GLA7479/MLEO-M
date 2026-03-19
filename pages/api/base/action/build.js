@@ -50,7 +50,7 @@ export default async function handler(req, res) {
     const rateLimit = await checkArcadeRateLimit(
       "base-action-build",
       deviceId,
-      30,
+      60,
       60_000
     );
     if (!rateLimit.allowed) {

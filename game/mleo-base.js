@@ -1647,6 +1647,7 @@ export default function MleoBase() {
   const [commanderPath, setCommanderPath] = useState(() => loadJson("mleo_base_profile_v1", {})?.commanderPath || "industry");
   const [claimedContracts, setClaimedContracts] = useState(() => loadJson("mleo_base_claimed_contracts_v1", {}));
   const [devTab, setDevTab] = useState("crew");
+  const [activeBuildKey, setActiveBuildKey] = useState(null);
 
   const actionLocksRef = useRef({});
 
@@ -2546,6 +2547,8 @@ export default function MleoBase() {
   };
 
   const buyBuilding = async (key) => {
+    if (activeBuildKey === key || isActionLocked(`build:${key}`)) return;
+    setActiveBuildKey(key);
     return runLockedAction(`build:${key}`, async () => {
     const def = BUILDINGS.find((item) => item.key === key);
     if (!def) return;
@@ -2589,6 +2592,8 @@ export default function MleoBase() {
     } catch (error) {
       console.error("Build failed", error);
       showToast(error?.message || "Build action failed.");
+    } finally {
+      setActiveBuildKey((prev) => (prev === key ? null : prev));
     }
   });
   };
@@ -6144,6 +6149,7 @@ export default function MleoBase() {
       sectorStatusText: sectorStatusForBuilding(building.key, state).toUpperCase(),
       requirementsText,
       ready,
+      buildBusy: activeBuildKey === building.key,
       canAffordCost: canCoverCostForBtn,
       buttonText,
       costRow: <ResourceCostRow cost={cost} resources={state.resources} />,

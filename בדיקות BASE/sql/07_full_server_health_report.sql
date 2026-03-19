@@ -113,7 +113,7 @@ fn_defs AS (
     AND p.proname IN (
       'base_reconcile_state',
       'base_ship_to_vault',
-      'base_spend_from_vault',
+      'base_spend_shared_vault',
       'base_offline_factor_for_seconds',
       'base_effective_offline_seconds'
     )
@@ -154,7 +154,7 @@ reconcile_checks AS (
 ship_spend_checks AS (
   SELECT jsonb_build_object(
     'ship_fn_exists', exists (SELECT 1 FROM fn_defs WHERE proname = 'base_ship_to_vault'),
-    'spend_fn_exists', exists (SELECT 1 FROM fn_defs WHERE proname = 'base_spend_from_vault'),
+    'spend_fn_exists', exists (SELECT 1 FROM fn_defs WHERE proname = 'base_spend_shared_vault'),
     'ship_uses_sync_vault_delta', exists (
       SELECT 1 FROM fn_defs
       WHERE proname = 'base_ship_to_vault'
@@ -162,7 +162,7 @@ ship_spend_checks AS (
     ),
     'spend_uses_sync_vault_delta', exists (
       SELECT 1 FROM fn_defs
-      WHERE proname = 'base_spend_from_vault'
+      WHERE proname = 'base_spend_shared_vault'
         AND def ILIKE '%sync_vault_delta%'
     ),
     'ship_logs_audit', exists (
@@ -172,7 +172,7 @@ ship_spend_checks AS (
     ),
     'spend_logs_audit', exists (
       SELECT 1 FROM fn_defs
-      WHERE proname = 'base_spend_from_vault'
+      WHERE proname = 'base_spend_shared_vault'
         AND def ILIKE '%base_write_audit%'
     )
   ) AS data

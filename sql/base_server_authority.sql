@@ -576,7 +576,7 @@ BEGIN
   v_data_mult := v_data_mult * v_hq_bonus * v_stability_factor;
 
   v_energy_cap := 140 + (v_power * 42);
-  v_energy_regen := 4.6 + (v_power * 2.2);
+  v_energy_regen := 6.0 + (v_power * 2.5);
 
   IF public.base_jsonb_bool(v_research, 'coolant', false) THEN
     v_energy_cap := v_energy_cap + 22;
