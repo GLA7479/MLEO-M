@@ -1235,30 +1235,31 @@ const INFO_COPY = {
       "DATA is your strategic progression resource.\n\n" +
       "Main sources:\n" +
       "• Research Lab is the strongest long-term DATA engine.\n" +
-      "• Miner Control and Arcade Hub add support DATA.\n" +
+      "• Miner Control, Arcade Hub and Logistics Center add support DATA.\n" +
       "• Expeditions give burst DATA.\n" +
-      "• Missions smooth out early progression.\n\n" +
+      "• Missions help smooth early progression.\n\n" +
       "Important:\n" +
-      "DATA controls research pace, so weak DATA slows the whole advanced game.",
+      "DATA controls research pace, blueprint rhythm and advanced actions. Weak DATA slows the whole advanced game even if your raw economy still looks decent.",
     tips: {
       building: "Research Lab",
-      supportBuildings: ["Miner Control", "Arcade Hub", "Expedition Bay"],
+      supportBuildings: ["Miner Control", "Arcade Hub", "Logistics Center", "Expedition Bay"],
       research: "Deep Scan",
       supportResearch: ["Token Discipline", "Arcade Ops"],
       module: "Arcade Relay",
       operation: "Field Expedition",
-      watch: "Research Lab is strong, but it also adds Energy pressure.",
+      watch:
+        "Research Lab is the main DATA lane, but it also adds Energy pressure, so scaling it without support can feel worse than expected.",
       actions: [
-        "Build Research Lab as your main DATA lane.",
-        "Use Miner Control and Arcade Hub as support, not as full replacements.",
-        "Run expeditions when you need extra DATA bursts.",
+        "Use Research Lab as your main long-term DATA lane.",
+        "Use Miner Control, Arcade Hub and Logistics Center as support layers, not full replacements.",
+        "Run expeditions when you need burst DATA for a specific milestone.",
       ],
     },
     nextStep: {
       label: "Upgrade Research Lab",
       tab: "build",
       target: "researchLab",
-      why: "Research Lab is your strongest direct DATA generator.",
+      why: "Research Lab is your strongest direct long-term DATA generator.",
     },
   },
 
@@ -1269,23 +1270,23 @@ const INFO_COPY = {
       "Energy powers passive production and many active systems.\n\n" +
       "Main rule:\n" +
       "• If total drain is higher than regen, the base starts choking.\n" +
-      "• Power Cell is the long-term Energy fix.\n" +
+      "• Power Cell is the main long-term Energy fix.\n" +
       "• Coolant Loops adds extra cap and regen.\n" +
       "• Refill restores Energy now, but does not improve regen.\n\n" +
       "Important:\n" +
-      "Heavy buildings should be paused or delayed if Energy cannot support them yet.",
+      "Do not solve every Energy problem with Refill. In many cases, the better fix is Power Cell, Coolant Loops, or reducing heavy buildings until the base is stable again.",
     tips: {
       building: "Power Cell",
       supportBuildings: ["Repair Bay"],
       research: "Coolant Loops",
       supportResearch: ["Predictive Maintenance"],
       module: "",
-      operation: "Emergency Refill / Pause heavy buildings",
+      operation: "Emergency Refill / Reduce building power mode",
       watch: ["Refinery", "Research Lab", "Quarry", "Trade Hub", "Salvage Yard"],
       actions: [
         "Upgrade Power Cell before scaling many heavy buildings together.",
         "Use Refill as recovery, not as your core Energy economy.",
-        "Pause the heavy building causing pressure when Energy collapses.",
+        "Reduce the heavy building power mode when Energy collapses, instead of relying only on Refill.",
       ],
     },
     nextStep: {
@@ -1303,21 +1304,22 @@ const INFO_COPY = {
       "Stability is the health of your base.\n\n" +
       "How to protect it:\n" +
       "• Maintenance restores Stability directly.\n" +
-      "• Repair Bay improves long-term stability recovery.\n" +
+      "• Repair Bay improves long-term stability support.\n" +
       "• Predictive Maintenance slows pressure growth.\n" +
       "• Miner Link helps reduce refinery-related stress.\n\n" +
       "Important:\n" +
-      "Low Stability weakens the feel of the whole base and makes expansion riskier.",
+      "Low Stability makes advanced expansion feel worse even when your resource numbers look fine. Heavy industrial growth should be supported before pressure turns into collapse.",
     tips: {
       building: "Repair Bay",
-      supportBuildings: ["Power Cell"],
+      supportBuildings: ["Power Cell", "Refinery"],
       research: "Predictive Maintenance",
       supportResearch: ["Field Ops"],
       module: "Miner Link",
       operation: "Maintenance Cycle",
-      watch: "Refinery pressure and ignoring maintenance are the fastest ways to destabilize the base.",
+      watch:
+        "Refinery pressure, weak Energy support, and delayed maintenance are the fastest ways to destabilize the base.",
       actions: [
-        "Use maintenance before Stability gets ugly.",
+        "Use maintenance before Stability becomes ugly.",
         "Build Repair Bay early if you plan a heavier mid-game base.",
         "Do not force Refinery scaling while Stability is already weak.",
       ],
@@ -1332,100 +1334,105 @@ const INFO_COPY = {
 
   ore: {
     title: "ORE",
-    focus: "Quarry + Energy + Ore multipliers",
+    focus: "Quarry + Energy support + Ore multipliers",
     text:
       "ORE is the main raw industrial resource in BASE.\n\n" +
       "How to grow it:\n" +
-      "• Quarry is the main direct source.\n" +
-      "• Energy must stay healthy so Quarry can keep running.\n" +
-      "• Ore-focused research and modules multiply the lane.\n\n" +
+      "• Quarry is the main direct ORE source.\n" +
+      "• Power Cell helps keep the Ore lane active when Energy pressure rises.\n" +
+      "• Miner Control supports industrial synergy.\n" +
+      "• Miner Sync and Servo Drill multiply the lane.\n\n" +
       "Important:\n" +
-      "Weak Ore slows building upgrades and also starves the Refinery.",
+      "Weak ORE does not only slow building upgrades. It also starves Refinery, which means weaker banked MLEO later.",
     tips: {
       building: "Quarry",
-      supportBuildings: ["Power Cell", "Miner Control"],
+      supportBuildings: ["Power Cell", "Miner Control", "Refinery"],
       research: "Miner Sync",
       supportResearch: ["Field Ops"],
       module: "Servo Drill",
       operation: "",
-      watch: "Quarry is one of the first places where Energy pressure becomes visible.",
+      watch:
+        "Quarry is one of the first places where Energy pressure becomes visible, so weak Energy can make ORE feel worse than it should.",
       actions: [
-        "Upgrade Quarry steadily instead of leaving Ore behind.",
-        "Fix Energy before blaming Ore production alone.",
-        "Take Servo Drill and Miner Sync when Ore becomes your main bottleneck.",
+        "Upgrade Quarry steadily instead of leaving ORE behind.",
+        "Fix Energy pressure before assuming the Ore lane itself is the only problem.",
+        "Take Servo Drill and Miner Sync when ORE becomes your real bottleneck.",
       ],
     },
     nextStep: {
       label: "Upgrade Quarry",
       tab: "build",
       target: "quarry",
-      why: "Quarry is the main direct source of ORE.",
+      why: "Quarry is the main direct source of ORE in BASE.",
     },
   },
 
   gold: {
     title: "GOLD",
-    focus: "Trade Hub + missions + expeditions",
+    focus: "Trade Hub + Quarry unlock path + Energy support",
     text:
       "GOLD is the main spendable economy resource in BASE.\n\n" +
       "How to grow it:\n" +
-      "• Trade Hub gives steady direct GOLD.\n" +
-      "• Missions and expeditions give flexible support.\n" +
-      "• A healthy Gold loop keeps upgrades feeling smooth.\n\n" +
+      "• Trade Hub is the main direct GOLD source.\n" +
+      "• Quarry is part of the unlock path because Trade Hub requires it.\n" +
+      "• Power Cell helps keep the Gold lane running when Energy pressure rises.\n" +
+      "• Missions and expeditions are support sources, not the main stable lane.\n\n" +
       "Important:\n" +
-      "When GOLD is weak, the whole base starts feeling slow even if other resources look fine.",
+      "If GOLD feels weak, do not look only at the Trade Hub level. Check whether Energy is starving the lane or whether the base is relying too much on temporary support rewards.",
     tips: {
       building: "Trade Hub",
-      supportBuildings: ["Expedition Bay"],
+      supportBuildings: ["Quarry", "Power Cell", "Expedition Bay"],
       research: "Field Ops",
-      supportResearch: ["Arcade Ops"],
+      supportResearch: ["Coolant Loops", "Arcade Ops"],
       module: "",
       operation: "Field Expedition / Daily Missions",
-      watch: "Do not overspend GOLD on recovery actions if your economy is already thin.",
+      watch:
+        "Trade Hub gives direct GOLD, but weak Energy can still make the whole Gold lane feel worse than expected.",
       actions: [
-        "Use Trade Hub as your stable main Gold lane.",
-        "Use expeditions to smooth rough Gold moments.",
-        "Keep GOLD balanced with Ore and Scrap instead of tunneling only one lane.",
+        "Use Trade Hub as your main long-term Gold lane.",
+        "If Gold feels weak, check Energy before assuming you only need more Trade Hub levels.",
+        "Use expeditions and missions to smooth temporary Gold shortages, not to replace Trade Hub.",
       ],
     },
     nextStep: {
       label: "Upgrade Trade Hub",
       tab: "build",
       target: "tradeHub",
-      why: "Trade Hub is the strongest direct GOLD source.",
+      why: "Trade Hub is the strongest direct GOLD source in the base.",
     },
   },
 
   scrap: {
     title: "SCRAP",
-    focus: "Salvage Yard + expeditions + refinery support",
+    focus: "Salvage Yard + expeditions + Refinery support",
     text:
       "SCRAP is a support resource that becomes more important as the base matures.\n\n" +
       "How to grow it:\n" +
-      "• Salvage Yard is the main stable source.\n" +
-      "• Expeditions help with burst Scrap.\n" +
-      "• Strong Scrap is important for advanced systems and Refinery feeding.\n\n" +
+      "• Salvage Yard is the main stable SCRAP source.\n" +
+      "• Expeditions help with burst Scrap when you need recovery.\n" +
+      "• Strong Scrap is important for advanced systems and for feeding Refinery.\n\n" +
       "Important:\n" +
-      "Many players feel blocked in mid-game because Scrap falls behind without noticing.",
+      "Many players feel blocked in mid-game because Scrap falls behind quietly. When that happens, advanced structures and Refinery progression both start feeling worse.",
     tips: {
       building: "Salvage Yard",
-      supportBuildings: ["Expedition Bay", "Refinery"],
+      supportBuildings: ["Expedition Bay", "Refinery", "Power Cell"],
       research: "Deep Scan",
       supportResearch: ["Field Ops"],
       module: "Miner Link",
       operation: "Field Expedition",
-      watch: "Refinery scaling feels bad fast when Scrap cannot keep up.",
+      watch:
+        "Refinery scaling feels bad very quickly when SCRAP cannot keep up, especially if Energy is also under pressure.",
       actions: [
-        "Do not leave Salvage too low while pushing advanced systems.",
-        "Use expeditions when you need Scrap bursts.",
-        "Keep Scrap healthy before pushing harder into Refinery.",
+        "Do not leave Salvage too low while pushing advanced structures.",
+        "Use expeditions for burst Scrap, but keep Salvage Yard as the real long-term lane.",
+        "Keep SCRAP healthy before pushing harder into Refinery.",
       ],
     },
     nextStep: {
       label: "Upgrade Salvage Yard",
       tab: "build",
       target: "salvage",
-      why: "Salvage Yard is your main long-term SCRAP source.",
+      why: "Salvage Yard is your main stable long-term source of SCRAP.",
     },
   },
 };
@@ -4094,6 +4101,12 @@ export default function MleoBase() {
           "Quarry pairs especially well with Refinery and Miner Control.",
         ],
       },
+      nextStep: {
+        label: "Open Trade Hub",
+        tab: "build",
+        target: "tradeHub",
+        why: "Trade Hub is one of the first major structures unlocked through strong Quarry progression.",
+      },
     },
 
     tradeHub: {
@@ -4107,18 +4120,34 @@ export default function MleoBase() {
         const gold = fmt((building.outputs?.GOLD || 0) * next);
         return `Trade Hub level ${next} will raise Gold flow to about ${gold}, helping your economy stay liquid.`;
       },
-      why: "Trade Hub reduces the feeling of being stuck. Gold is needed across the whole base, so stronger Gold flow makes the entire game feel smoother.",
-      linked: "GOLD economy · building costs · unlock chain · support for Power Cell and Refinery",
-      impact: "This upgrade improves economy stability. It makes future upgrades easier to sustain instead of forcing long waiting periods.",
+      why:
+        "Trade Hub is the main stable GOLD structure in BASE.\n" +
+        "It helps prevent the base from feeling stuck, but it still depends on healthy Energy support to run smoothly.",
+      linked:
+        "GOLD economy · Quarry unlock path · Energy support · Power Cell synergy · Refinery preparation",
+      impact:
+        "A stronger Trade Hub makes future upgrades easier to sustain instead of forcing long waiting periods.\n" +
+        "If Energy is weak, even a good Trade Hub can feel worse than expected.",
       tips: {
-        building: "Power Cell",
-        research: "Routing AI",
-        module: "Vault Compressor",
+        building: "Trade Hub",
+        supportBuildings: ["Quarry", "Power Cell", "Expedition Bay"],
+        research: "Field Ops",
+        supportResearch: ["Coolant Loops", "Arcade Ops"],
+        module: "",
+        operation: "Field Expedition / Daily Missions",
+        watch:
+          "Trade Hub is a stable Gold lane, but weak Energy can still slow its real usefulness.",
         actions: [
           "Trade Hub is one of the best upgrades when your base feels starved for spending power.",
-          "Use it to support expansion into Scrap, Power and Refinery paths.",
-          "A healthy Gold loop makes all other decisions easier.",
+          "Remember that Quarry is part of the unlock chain and Power Cell helps keep the lane healthy.",
+          "Use expeditions and missions as support, not as your main permanent Gold plan.",
         ],
+      },
+      nextStep: {
+        label: "Open Power Cell",
+        tab: "build",
+        target: "powerCell",
+        why: "Power Cell helps the Gold lane stay smoother under Energy pressure.",
       },
     },
 
@@ -4156,25 +4185,44 @@ export default function MleoBase() {
         const ore = fmt((building.convert?.ORE || 0) * level);
         const scrap = fmt((building.convert?.SCRAP || 0) * level);
         const mleo = fmt((building.convert?.MLEO || 0) * level);
-        return `Refinery is currently level ${level}. It is consuming about ${ore} ORE and ${scrap} SCRAP to support roughly ${mleo} banked MLEO potential.`;
+        return `Refinery is currently level ${level}.\nIt is consuming about ${ore} ORE and ${scrap} SCRAP to support roughly ${mleo} banked MLEO potential.`;
       },
       next(level, building) {
         const next = level + 1;
-        return `Refinery level ${next} increases conversion capacity and energy use. Improves long-term conversion toward banked MLEO.`;
+        const ore = fmt((building.convert?.ORE || 0) * next);
+        const scrap = fmt((building.convert?.SCRAP || 0) * next);
+        const mleo = fmt((building.convert?.MLEO || 0) * next);
+        return `Refinery level ${next} will raise conversion pressure to about ${ore} ORE + ${scrap} SCRAP for roughly ${mleo} banked MLEO potential.`;
       },
-      why: "Refinery is the main bridge from infrastructure into banked MLEO. It should feel valuable, but still controlled — exactly what this game loop needs. When Stability drops into warning/critical range, Refinery becomes a pressure point: prioritize maintenance and Repair Bay before scaling harder.",
-      linked: "ORE + SCRAP conversion · banked MLEO · shipping strategy · vault support",
-      impact: "A stronger Refinery increases your ability to support the shared vault, but only if the rest of your economy can feed it. Low Stability makes Refinery scaling riskier and increases the need for proactive maintenance.",
+      why:
+        "Refinery is the main bridge from infrastructure into banked MLEO.\n" +
+        "It is one of the most important structures in BASE, but it only feels good when the rest of the economy can actually feed it.",
+      linked:
+        "ORE + SCRAP conversion · banked MLEO · Energy pressure · shipping strategy · Shared Vault support",
+      impact:
+        "A stronger Refinery increases your banked MLEO potential, but it also increases pressure on Ore, Scrap, Energy and Stability.\n" +
+        "If one of those layers is weak, Refinery scaling starts feeling inefficient instead of exciting.",
       tips: {
         building: "Logistics Center",
+        supportBuildings: ["Quarry", "Salvage Yard", "Power Cell", "Repair Bay"],
         research: "Token Discipline",
+        supportResearch: ["Logistics", "Predictive Maintenance"],
         module: "Vault Compressor",
+        operation: "Ship to Shared Vault",
+        watch:
+          "Refinery becomes a pressure point when Stability is weak or when Ore/Scrap support is not ready yet.",
         actions: [
-          "Only push Refinery hard if Ore, Scrap and energy support are already healthy.",
-          "If Stability is weak, delay extra Refinery levels until you stabilize the base first.",
+          "Only push Refinery when ORE, SCRAP and Energy support are already healthy.",
+          "If Stability is weak, delay extra Refinery levels until the base is safer.",
           "Refinery is strongest inside a balanced economy, not by itself.",
-          "Pair it with Logistics if shipping becomes an important part of your loop.",
+          "Pair it with Logistics once shipping becomes part of your normal loop.",
         ],
+      },
+      nextStep: {
+        label: "Open Logistics Center",
+        tab: "build",
+        target: "logisticsCenter",
+        why: "Logistics is one of the best follow-up structures once Refinery starts mattering.",
       },
     },
 
@@ -4193,18 +4241,34 @@ export default function MleoBase() {
         const regen = fmt((building.power?.regen || 0) * next);
         return `Power Cell level ${next} will raise this support to about +${cap} Energy cap and +${regen} Energy regeneration.`;
       },
-      why: "Power Cell is one of the best comfort upgrades in the game. It reduces waiting, reduces pressure, and helps the whole base feel more alive.",
-      linked: "ENERGY cap · ENERGY regen · action uptime · support for Quarry, Refinery and expeditions",
-      impact: "Better energy support means less downtime and smoother progression. It is one of the cleanest upgrades for improving overall gameplay feel.",
+      why:
+        "Power Cell is one of the most important comfort and stability upgrades in BASE.\n" +
+        "It does not create resources directly, but it keeps your important lanes alive.",
+      linked:
+        "ENERGY cap · ENERGY regen · Trade Hub support · Quarry support · Refinery support · expedition uptime",
+      impact:
+        "Better Energy support means less downtime, fewer collapses, and smoother progression.\n" +
+        "It is one of the cleanest upgrades for making the whole base feel better.",
       tips: {
-        building: "Repair Bay",
+        building: "Power Cell",
+        supportBuildings: ["Trade Hub", "Repair Bay"],
         research: "Coolant Loops",
-        module: "Miner Link",
+        supportResearch: ["Predictive Maintenance"],
+        module: "",
+        operation: "Emergency Refill / Reduce building power mode",
+        watch:
+          "Power Cell fixes long-term Energy pressure. Refill only fixes the current moment.",
         actions: [
-          "Upgrade Power Cell when energy starts feeling like the main bottleneck.",
-          "This is especially valuable if you are expanding production and expeditions together.",
-          "Power Cell improves both efficiency and player comfort.",
+          "Upgrade Power Cell when Energy starts feeling like the main bottleneck.",
+          "Very important if you are running Quarry, Trade Hub, Salvage and Refinery together.",
+          "Use runtime power reduction if one heavy lane is choking the base.",
         ],
+      },
+      nextStep: {
+        label: "Open Maintenance",
+        tab: "operations",
+        target: "maintenance",
+        why: "If the base is already under pressure, recovery actions may be needed before more scaling.",
       },
     },
 
@@ -4302,19 +4366,35 @@ export default function MleoBase() {
         const data = fmt((building.outputs?.DATA || 0) * next);
         return `Logistics Center level ${next} will improve shipment discipline further and raise DATA support to about ${data}.`;
       },
-      why: "If BASE is going to support the shared vault in a controlled way, Logistics Center is a key structure. It makes shipping feel smarter, not just bigger. When Stability drops, logistics/export systems become more fragile and need proactive maintenance support.",
-      linked: "Shipping quality · export handling · shared vault support · efficiency discipline",
-      impact: "This upgrade improves late-game control and makes the path from banked MLEO to shipped value more stable and strategic. Low Stability increases pressure during export lanes, so keep Repair Bay and maintenance in sync.",
+      why:
+        "Logistics Center is a control structure for the export side of BASE.\n" +
+        "It does not replace Refinery, but it makes the path from banked MLEO to shipped value feel smarter and more stable.",
+      linked:
+        "Shipping quality · export handling · Shared Vault support · DATA support · Blueprint discipline",
+      impact:
+        "A stronger Logistics Center improves late-game control, helps the export lane feel cleaner, and supports DATA at the same time.\n" +
+        "It is most valuable once shipping becomes a real part of your loop.",
       tips: {
         building: "Refinery",
+        supportBuildings: ["Power Cell", "Repair Bay"],
         research: "Logistics",
+        supportResearch: ["Routing AI"],
         module: "Vault Compressor",
+        operation: "Ship to Shared Vault",
+        watch:
+          "If Refinery output is weak, Logistics has less to optimize. If Stability is weak, export lanes also become more fragile.",
         actions: [
-          "Upgrade Logistics Center when shipping becomes a meaningful part of your economy.",
-          "If Stability is low, focus on Maintenance/Repair Bay before pushing export lanes further.",
+          "Upgrade Logistics Center when shipping becomes a meaningful daily decision.",
           "This is a control upgrade, not just a production upgrade.",
-          "Best used alongside Refinery and Blueprint progression.",
+          "Best used together with Refinery, Blueprint progression and Vault Compressor.",
+          "If Stability is low, fix maintenance pressure before pushing export lanes harder.",
         ],
+      },
+      nextStep: {
+        label: "Research Logistics",
+        tab: "research",
+        target: "logistics",
+        why: "Logistics research is one of the best direct follow-ups to Logistics Center.",
       },
     },
 
@@ -4331,19 +4411,35 @@ export default function MleoBase() {
         const data = fmt((building.outputs?.DATA || 0) * next);
         return `Research Lab level ${next} will improve DATA generation to about ${data} and strengthen your long-term optimization path.`;
       },
-      why: "Research Lab is important because DATA gives depth to the economy. It helps the game scale through smarter progression instead of only more emissions. If Stability is weak, the advanced DATA lane can still work, but your base feels more fragile—prioritize maintenance and keep Repair Bay supported.",
-      linked: "DATA generation · advanced research · long-term optimization · strategy depth",
-      impact: "A stronger Research Lab improves your ability to unlock advanced systems and keeps progression feeling intelligent instead of flat. Low Stability makes advanced expansion feel riskier, so maintain rhythm instead of rushing levels.",
+      why:
+        "Research Lab is the main strategic DATA structure in BASE.\n" +
+        "It helps the game scale through smarter progression, not only through more raw emissions.",
+      linked:
+        "DATA generation · advanced research · blueprint rhythm · strategic depth · Energy pressure",
+      impact:
+        "A stronger Research Lab improves your access to advanced progression systems and makes DATA milestones arrive more naturally.\n" +
+        "At the same time, it adds pressure, so it feels best when Energy and Stability are already under control.",
       tips: {
         building: "Miner Control",
+        supportBuildings: ["Arcade Hub", "Expedition Bay", "Power Cell", "Repair Bay"],
         research: "Deep Scan",
+        supportResearch: ["Arcade Ops", "Token Discipline"],
         module: "Arcade Relay",
+        operation: "Field Expedition",
+        watch:
+          "Research Lab is powerful, but scaling it too early can make the base feel fragile if Energy and Stability are not ready.",
         actions: [
-          "Upgrade Research Lab when you want stronger long-term progression tools.",
-          "If Stability is low, slow down Research Lab scaling and do maintenance first.",
-          "Very useful if advanced research paths are becoming your next milestone.",
-          "One of the best structures for strategic scaling.",
+          "Upgrade Research Lab when you want stronger long-term strategic progression.",
+          "Slow down Research Lab scaling if Energy or Stability is already under pressure.",
+          "Use support DATA buildings and expeditions to smooth the lane instead of forcing only lab levels.",
+          "One of the best structures for advanced progression, but not a blind rush target.",
         ],
+      },
+      nextStep: {
+        label: "Open Deep Scan",
+        tab: "research",
+        target: "deepScan",
+        why: "Deep Scan is one of the best research follow-ups when DATA generation starts to matter.",
       },
     },
 
@@ -4357,18 +4453,32 @@ export default function MleoBase() {
         const next = level + 1;
         return `Repair Bay level ${next} will strengthen stability support even more, making recovery easier and pressure safer to manage.`;
       },
-      why: "Repair Bay is one of the best defensive upgrades in the game. It helps protect long-term efficiency instead of only chasing more output.",
-      linked: "Stability · maintenance pressure · system health · safe scaling",
+      why:
+        "Repair Bay is one of the best defensive upgrades in the game.\n" +
+        "It helps protect long-term efficiency instead of only chasing more output.",
+      linked:
+        "Stability · maintenance pressure · Predictive Maintenance synergy · Refinery safety · long-term scaling",
       impact: "A stronger Repair Bay keeps the base performing well over time and reduces the chance that instability becomes your real bottleneck.",
       tips: {
-        building: "Power Cell",
+        building: "Repair Bay",
+        supportBuildings: ["Power Cell", "Refinery"],
         research: "Predictive Maintenance",
+        supportResearch: ["Field Ops"],
         module: "Miner Link",
+        operation: "Maintenance Cycle",
+        watch:
+          "Repair Bay makes recovery easier, but it does not replace doing maintenance when the base is already stressed.",
         actions: [
           "Upgrade Repair Bay when your base starts feeling fragile under growth.",
-          "Great choice if you are pushing multiple systems at once.",
-          "Helps protect long-term efficiency and player comfort.",
+          "Very strong if Refinery and advanced systems are becoming central.",
+          "Pair it with Predictive Maintenance for much better stability control.",
         ],
+      },
+      nextStep: {
+        label: "Open Maintenance",
+        tab: "operations",
+        target: "maintenance",
+        why: "Maintenance is the direct action that works together with Repair Bay.",
       },
     },
   };
@@ -6125,6 +6235,7 @@ export default function MleoBase() {
         </div>
       ),
       tips: info.tips,
+      nextStep: info.nextStep,
     };
   };
 
