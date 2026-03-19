@@ -4502,7 +4502,7 @@ export default function MleoBase() {
                 : "border-white/10 bg-black/20"
             } ${
               highlightTarget === mission.key
-                ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
+                ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
                 : ""
             }`}
           >
@@ -4567,7 +4567,7 @@ export default function MleoBase() {
         data-base-target="shipping"
         className={`relative flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
           highlightCard((state.bankedMleo || 0) >= 120, "success") || ""
-        } ${isHighlightedTarget("shipping", highlightTarget) ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]" : ""}`}
+        } ${isHighlightedTarget("shipping", highlightTarget) ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]" : ""}`}
       >
         <div className="absolute right-3 top-3 z-10">
           <button
@@ -4611,7 +4611,7 @@ export default function MleoBase() {
             highlightCard(expeditionLeft <= 0 && (state.resources.DATA || 0) >= 4, "info") || ""
           } ${
             isHighlightedTarget("expedition", highlightTarget)
-              ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
+              ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
               : ""
           }`}
         >
@@ -4711,7 +4711,7 @@ export default function MleoBase() {
         data-base-target="maintenance"
         className={`relative rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 ${
           systemState === "critical" ? highlightCard(true, "critical") : systemState === "warning" ? highlightCard(true, "warning") : ""
-        } ${isHighlightedTarget("maintenance", highlightTarget) ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]" : ""}`}
+        } ${isHighlightedTarget("maintenance", highlightTarget) ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]" : ""}`}
       >
         <div className="absolute right-3 top-3 z-10 flex gap-1">
           <button
@@ -4998,7 +4998,7 @@ export default function MleoBase() {
               data-base-target={module.key}
               className={`relative flex h-full flex-col gap-2 rounded-2xl border p-3.5 ${availabilityCardClass(moduleAvailable)} ${
                 highlightTarget === module.key
-                  ? "border-amber-300/70 ring-2 ring-amber-300/35 shadow-[0_0_0_1px_rgba(252,211,77,0.25)]"
+                  ? "border-cyan-300/70 ring-2 ring-cyan-300/35 shadow-[0_0_0_1px_rgba(103,232,249,0.25)]"
                   : ""
               }`}
             >
@@ -5073,7 +5073,7 @@ export default function MleoBase() {
               data-base-target={item.key}
               className={`relative rounded-2xl border p-3.5 ${availabilityCardClass(researchAvailable)} ${
                 highlightTarget === item.key
-                  ? "border-amber-300/70 ring-2 ring-amber-300/35 shadow-[0_0_0_1px_rgba(252,211,77,0.25)]"
+                  ? "border-cyan-300/70 ring-2 ring-cyan-300/35 shadow-[0_0_0_1px_rgba(103,232,249,0.25)]"
                   : ""
               }`}
             >
@@ -7302,7 +7302,7 @@ export default function MleoBase() {
               data-base-target={building.key}
               className={`flex min-h-[328px] flex-col rounded-xl border p-3 ${availabilityCardClass(ready)} ${
                 highlightTarget === building.key
-                  ? "border-amber-300/70 ring-2 ring-amber-300/35 shadow-[0_0_0_1px_rgba(252,211,77,0.25)]"
+                  ? "border-cyan-300/70 ring-2 ring-cyan-300/35 shadow-[0_0_0_1px_rgba(103,232,249,0.25)]"
                   : ""
               }`}
             >
@@ -8859,7 +8859,7 @@ export default function MleoBase() {
                             dailyMissionsAvailableCount > 0
                           )} ${
                             isHighlightedTarget("missions", highlightTarget)
-                              ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
+                              ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
                               : ""
                           }`}
                         >
@@ -9618,7 +9618,7 @@ export default function MleoBase() {
                           liveContractsAvailableCount > 0
                         )} ${
                           isHighlightedTarget("contracts", highlightTarget)
-                            ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
+                            ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
                             : ""
                         }`}
                       >
@@ -9720,7 +9720,7 @@ export default function MleoBase() {
                                 highlightCard((state.bankedMleo || 0) >= 120, "success")
                               } ${
                                 isHighlightedTarget("shipping", highlightTarget)
-                                  ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
+                                  ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
                                   : ""
                               }`}
                             >
@@ -9772,7 +9772,7 @@ export default function MleoBase() {
                                 )
                               } ${
                                 isHighlightedTarget("expedition", highlightTarget)
-                                  ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
+                                  ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
                                   : ""
                               }`}
                             >
@@ -9837,7 +9837,7 @@ export default function MleoBase() {
                                 )
                               } ${
                                 isHighlightedTarget("blueprint", highlightTarget)
-                                  ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
+                                  ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
                                   : ""
                               }`}
                             >
@@ -9891,7 +9891,7 @@ export default function MleoBase() {
                                   : ""
                               } ${
                                 isHighlightedTarget("maintenance", highlightTarget)
-                                  ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
+                                  ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
                                   : ""
                               }`}
                             >
@@ -10308,7 +10308,7 @@ export default function MleoBase() {
                   data-base-target="alerts"
                   className={`mt-4 space-y-3 ${
                     isHighlightedTarget("alerts", highlightTarget)
-                      ? "rounded-3xl ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)] p-2"
+                      ? "rounded-3xl ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)] p-2"
                       : ""
                   }`}
                 >
@@ -10328,7 +10328,7 @@ export default function MleoBase() {
                               getAlertNavigationTarget(item)?.target,
                               highlightTarget
                             )
-                              ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
+                              ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
                               : ""
                           }`}
                         >
@@ -10603,7 +10603,7 @@ export default function MleoBase() {
                   data-base-target="contracts"
                   className={`mt-4 rounded-3xl border border-white/10 bg-white/5 p-4 ${
                     isHighlightedTarget("contracts", highlightTarget)
-                      ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
+                      ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
                       : ""
                   }`}
                 >
@@ -10672,7 +10672,7 @@ export default function MleoBase() {
                         highlightCard((state.bankedMleo || 0) >= 120, "success")
                       } ${
                         isHighlightedTarget("shipping", highlightTarget)
-                          ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
+                          ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
                           : ""
                       }`}
                     >
@@ -10712,7 +10712,7 @@ export default function MleoBase() {
                         highlightCard(expeditionLeft <= 0 && (state.resources.DATA || 0) >= 4, "info")
                       } ${
                         isHighlightedTarget("expedition", highlightTarget)
-                          ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
+                          ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
                           : ""
                       }`}
                     >
@@ -10813,7 +10813,7 @@ export default function MleoBase() {
                           : ""
                       } ${
                         isHighlightedTarget("maintenance", highlightTarget)
-                          ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
+                          ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
                           : ""
                       }`}
                     >
@@ -10895,7 +10895,7 @@ export default function MleoBase() {
                   data-base-target="missions"
                   className={`${
                     isHighlightedTarget("missions", highlightTarget)
-                      ? "rounded-3xl ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
+                      ? "rounded-3xl ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
                       : ""
                   }`}
                 >
