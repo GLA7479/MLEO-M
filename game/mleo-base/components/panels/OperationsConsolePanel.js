@@ -193,6 +193,18 @@ export function OperationsConsolePanel({
             <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-white/75">
               MAINTAIN: STABILITY
             </span>
+            <button
+              onClick={maintenance.onSafeMode}
+              className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-bold text-cyan-200 hover:bg-cyan-500/20"
+            >
+              {maintenance.safeModeButtonText || "Safe 50%"}
+            </button>
+            <button
+              onClick={maintenance.onNormalMode}
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold text-white/80 hover:bg-white/10"
+            >
+              {maintenance.normalModeButtonText || "Normal 100%"}
+            </button>
           </div>
 
           <p className="mt-2 text-xs text-white/55">

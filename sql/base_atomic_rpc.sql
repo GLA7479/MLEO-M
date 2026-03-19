@@ -220,6 +220,7 @@ DECLARE
   v_blueprint_growth numeric := 1.65;
   v_overclock_cost bigint := 900;
   v_overclock_duration_ms bigint := 480000; -- 8 minutes
+  v_overclock_energy_boost numeric := 0.18;
   v_refill_cost bigint := 180;
   v_energy_cap integer;
 BEGIN
@@ -264,19 +265,35 @@ BEGIN
     v_new_overclock_until := NULL;
     
   ELSIF p_spend_type = 'overclock' THEN
-    IF coalesce((v_resources->>'DATA')::integer, 0) < 12 THEN
+    v_data_cost := 12;
+
+    IF coalesce((v_resources->>'DATA')::integer, 0) < v_data_cost THEN
       RAISE EXCEPTION 'Need 12 DATA';
     END IF;
+
     v_cost := v_overclock_cost;
     v_new_blueprint_level := v_blueprint_level;
     v_new_overclock_until := now() + (v_overclock_duration_ms || ' milliseconds')::interval;
+
     v_new_resources := jsonb_set(
-      v_resources,
-      '{DATA}',
-      to_jsonb(greatest(0, coalesce((v_resources->>'DATA')::integer, 0) - 12))
+      jsonb_set(
+        v_resources,
+        '{DATA}',
+        to_jsonb(greatest(0, coalesce((v_resources->>'DATA')::integer, 0) - v_data_cost))
+      ),
+      '{ENERGY}',
+      to_jsonb(
+        least(
+          v_energy_cap,
+          coalesce((v_resources->>'ENERGY')::integer, 0)
+          + ceil(v_energy_cap * v_overclock_energy_boost)::integer
+        )
+      ),
+      true
     );
     
   ELSIF p_spend_type = 'refill' THEN
+    v_data_cost := 5;
     IF coalesce((v_resources->>'ENERGY')::integer, 0) >= (v_energy_cap - 1) THEN
       RAISE EXCEPTION 'Energy is already near full';
     END IF;
@@ -591,13 +608,13 @@ BEGIN
     "tradeHub": {"baseCost": {"GOLD": 100, "ORE": 30}, "growth": 1.2, "maxLevel": null, "requires": [{"key":"quarry","lvl":1}]},
     "salvage": {"baseCost": {"GOLD": 150, "ORE": 90}, "growth": 1.22, "maxLevel": null, "requires": [{"key":"quarry","lvl":2}]},
     "refinery": {"baseCost": {"GOLD": 280, "ORE": 180, "SCRAP": 35}, "growth": 1.25, "maxLevel": null, "requires": [{"key":"salvage","lvl":1},{"key":"tradeHub","lvl":1}]},
-    "powerCell": {"baseCost": {"GOLD": 240, "SCRAP": 45}, "growth": 1.24, "maxLevel": null, "requires": [{"key":"tradeHub","lvl":1}]},
+    "powerCell": {"baseCost": {"GOLD": 190, "ORE": 70, "SCRAP": 55}, "growth": 1.22, "maxLevel": null, "requires": [{"key":"tradeHub","lvl":1}]},
     "minerControl": {"baseCost": {"GOLD": 320, "ORE": 120, "SCRAP": 40}, "growth": 1.22, "maxLevel": null, "requires": [{"key":"hq","lvl":2}]},
     "arcadeHub": {"baseCost": {"GOLD": 360, "ORE": 90, "SCRAP": 50}, "growth": 1.24, "maxLevel": null, "requires": [{"key":"hq","lvl":2}]},
     "expeditionBay": {"baseCost": {"GOLD": 500, "ORE": 180, "SCRAP": 85}, "growth": 1.26, "maxLevel": null, "requires": [{"key":"hq","lvl":3},{"key":"salvage","lvl":2}]},
-    "logisticsCenter": {"baseCost": {"ORE": 220, "GOLD": 180, "SCRAP": 90}, "growth": 1.7, "maxLevel": 15, "requires": [{"key":"hq","lvl":2},{"key":"tradeHub","lvl":2}]},
-    "researchLab": {"baseCost": {"ORE": 180, "GOLD": 240, "SCRAP": 110}, "growth": 1.75, "maxLevel": 15, "requires": [{"key":"hq","lvl":2},{"key":"minerControl","lvl":1}]},
-    "repairBay": {"baseCost": {"ORE": 160, "GOLD": 160, "SCRAP": 140}, "growth": 1.7, "maxLevel": 15, "requires": [{"key":"hq","lvl":2},{"key":"powerCell","lvl":1}]}
+    "logisticsCenter": {"baseCost": {"ORE": 240, "GOLD": 140, "SCRAP": 95}, "growth": 1.36, "maxLevel": 15, "requires": [{"key":"hq","lvl":2},{"key":"tradeHub","lvl":2}]},
+    "researchLab": {"baseCost": {"ORE": 220, "GOLD": 170, "SCRAP": 105}, "growth": 1.38, "maxLevel": 15, "requires": [{"key":"hq","lvl":2},{"key":"minerControl","lvl":1}]},
+    "repairBay": {"baseCost": {"ORE": 190, "GOLD": 120, "SCRAP": 130}, "growth": 1.34, "maxLevel": 15, "requires": [{"key":"hq","lvl":2},{"key":"powerCell","lvl":1}]}
   }'::jsonb;
 
   IF NOT (v_building_config ? p_building_key) THEN

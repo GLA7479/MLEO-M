@@ -437,40 +437,6 @@ function canAffordBlueprint(state, sharedVault, cost, dataCost) {
   return vault >= Number(cost || 0) && data >= Number(dataCost || 0);
 }
 
-function isNewPlayer(state) {
-  const b = state?.buildings || {};
-  const upgrades = state?.stats?.upgradesToday ?? 0;
-  return (b.hq || 0) <= 1 && upgrades === 0 && (b.refinery || 0) === 0;
-}
-
-function applyStarterPackIfNeeded(state) {
-  if (!state) return state;
-  if (typeof window === "undefined") return state;
-  try {
-    if (window.localStorage.getItem("mleo_starter_claimed") === "1") return state;
-    if (!isNewPlayer(state)) return state;
-  } catch {
-    return state;
-  }
-  const derived = derive(state);
-  const energyCap = Number(derived?.energyCap ?? CONFIG.baseEnergyCap);
-  const next = {
-    ...state,
-    resources: {
-      ...state.resources,
-      ORE: (state.resources?.ORE || 0) + 80,
-      GOLD: (state.resources?.GOLD || 0) + 12,
-      SCRAP: (state.resources?.SCRAP || 0) + 12,
-      ENERGY: Math.max(state.resources?.ENERGY || 0, energyCap),
-    },
-  };
-  try {
-    window.localStorage.setItem("mleo_starter_claimed", "1");
-  } catch {}
-  return next;
-}
-
-
 function derive(state, now = Date.now()) {
   const powerLevel = state.buildings.powerCell || 0;
   const hqLevel = state.buildings.hq || 1;
@@ -483,7 +449,9 @@ function derive(state, now = Date.now()) {
   const crewRole = state.crewRole || "engineer";
   const commanderPath = state.commanderPath || "industry";
   const workerBonus = 1 + state.crew * (hasFieldOps ? 0.03 : 0.02);
-  const overclock = now < (state.overclockUntil || 0) ? 1.35 : 1;
+  const overclockActive = now < (state.overclockUntil || 0);
+  const overclock = overclockActive ? 1.45 : 1;
+  const energyUseMult = overclockActive ? 0.78 : 1;
   const hqBonus = 1 + hqLevel * 0.03;
   const minerBonus = 1 + minerLink * 0.04;
   const arcadeBonus = 1 + arcadeLink * 0.03;
@@ -577,6 +545,7 @@ function derive(state, now = Date.now()) {
     shipCap,
     bankBonus,
     maintenanceRelief,
+    energyUseMult,
     stability,
     minersBonus,
     arcadeSupport,
@@ -641,63 +610,63 @@ function simulate(state, elapsedMs, efficiency = 1) {
   };
 
   runBuilding("quarry", (level) => {
-    const energyNeed = 0.72 * level * dt;
+    const energyNeed = 0.72 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.ORE += 2.0 * level * d.oreMult * effective;
   });
 
   runBuilding("tradeHub", (level) => {
-    const energyNeed = 0.78 * level * dt;
+    const energyNeed = 0.78 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.GOLD += 1.0 * level * d.goldMult * effective;
   });
 
   runBuilding("salvage", (level) => {
-    const energyNeed = 0.78 * level * dt;
+    const energyNeed = 0.78 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.SCRAP += 0.8 * level * d.scrapMult * effective;
   });
 
   runBuilding("minerControl", (level) => {
-    const energyNeed = 0.20 * level * dt;
+    const energyNeed = 0.20 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.18 * level * d.dataMult * effective;
   });
 
   runBuilding("arcadeHub", (level) => {
-    const energyNeed = 0.22 * level * dt;
+    const energyNeed = 0.22 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.15 * level * d.dataMult * effective;
   });
 
   runBuilding("researchLab", (level) => {
-    const energyNeed = 0.24 * level * dt;
+    const energyNeed = 0.24 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.28 * level * d.dataMult * effective;
   });
 
   runBuilding("logisticsCenter", (level) => {
-    const energyNeed = 0.20 * level * dt;
+    const energyNeed = 0.20 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.DATA += 0.08 * level * d.dataMult * effective;
   });
 
   runBuilding("repairBay", (level) => {
-    const energyNeed = 0.22 * level * dt;
+    const energyNeed = 0.22 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.stability = Math.min(100, (next.stability || 100) + 0.035 * level * effective);
   });
 
   runBuilding("refinery", (level) => {
-    const energyNeed = 1.10 * level * dt;
+    const energyNeed = 1.10 * level * dt * (d.energyUseMult || 1);
     const oreNeed = 1.8 * level * effective;
     const scrapNeed = 0.7 * level * effective;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
@@ -2042,31 +2011,20 @@ export default function MleoBase() {
         const serverRes = await getBaseState();
         const saved = serverRes?.state || null;
 
-        // Reset state if version is less than 6 (new starter pack) or reset flag is set
+        // Only explicit reset flag should force a fresh client seed now.
+        // Starter resources are server-authoritative.
         const resetFlag =
           typeof window !== "undefined"
             ? window.localStorage.getItem("base_reset_flag") === "true"
             : false;
-        const resetVersion =
-          typeof window !== "undefined"
-            ? window.localStorage.getItem("base_reset_version")
-            : null;
-
-        // If reset flag is set, treat saved version as 0 to force reset
-        const savedVersion =
-          resetFlag && resetVersion
-            ? Number(resetVersion)
-            : saved
-            ? Number(saved.version || 0)
-            : 0;
-        const shouldReset = savedVersion < 6 || resetFlag;
+        const shouldReset = resetFlag;
 
         const initial =
           saved && !shouldReset
             ? sanitizeBaseState(normalizeServerState(saved, seed), seed)
             : sanitizeBaseState(seed, seed);
 
-        let initialMerged = applyStarterPackIfNeeded(initial);
+        const initialMerged = initial;
 
         if (!alive) return;
 
@@ -2100,6 +2058,7 @@ export default function MleoBase() {
     if (typeof window === "undefined") return;
     window.localStorage.removeItem("mleo_base_profile_v1");
     window.localStorage.removeItem("mleo_base_claimed_contracts_v1");
+    window.localStorage.removeItem("mleo_starter_claimed");
   }, []);
 
 
@@ -2120,14 +2079,7 @@ export default function MleoBase() {
         const serverState = res?.state;
         if (!alive || !serverState) return;
 
-        setState((prev) => {
-          const normalized = normalizeServerState(serverState, prev);
-          const withStarter = applyStarterPackIfNeeded(normalized);
-          return mergeAuthoritativeServerState(prev, {
-            ...serverState,
-            ...withStarter,
-          });
-        });
+        setState((prev) => mergeAuthoritativeServerState(prev, serverState));
       } catch (error) {
         console.error("BASE refresh failed", error);
       }
@@ -2656,6 +2608,90 @@ export default function MleoBase() {
     }
   });
   };
+
+  const SAFE_MODE_PRESET = {
+    quarry: 50,
+    tradeHub: 50,
+    salvage: 50,
+    refinery: 50,
+    minerControl: 50,
+    arcadeHub: 50,
+    logisticsCenter: 50,
+    researchLab: 50,
+    repairBay: 100,
+  };
+
+  const NORMAL_MODE_PRESET = {
+    quarry: 100,
+    tradeHub: 100,
+    salvage: 100,
+    refinery: 100,
+    minerControl: 100,
+    arcadeHub: 100,
+    logisticsCenter: 100,
+    researchLab: 100,
+    repairBay: 100,
+  };
+
+  const applyPowerPreset = async (presetKey, presetMap) => {
+    return runLockedAction(`powerPreset:${presetKey}`, async () => {
+      try {
+        let lastServerState = null;
+        let changed = 0;
+
+        for (const [buildingKey, targetMode] of Object.entries(presetMap)) {
+          if (!canThrottleBuilding(buildingKey)) continue;
+          if ((state.buildings?.[buildingKey] || 0) <= 0) continue;
+
+          const currentMode = getBuildingPowerMode(state, buildingKey);
+          if (currentMode === targetMode) continue;
+
+          const res = await setBuildingPowerMode(buildingKey, targetMode);
+          if (!res?.success || !res?.state) {
+            showToast(res?.message || `${buildingKey} power preset failed.`);
+            return;
+          }
+
+          lastServerState = res.state;
+          changed += 1;
+        }
+
+        if (!changed) {
+          showToast(
+            presetKey === "safe"
+              ? "Safe Mode is already active."
+              : "All runtime buildings are already at 100%."
+          );
+          return;
+        }
+
+        if (lastServerState) {
+          setState((prev) => {
+            const next = mergeAuthoritativeServerState(prev, lastServerState);
+            next.log = pushLog(
+              next.log,
+              presetKey === "safe"
+                ? "Safe Mode engaged. Runtime buildings throttled while manual controls remain available."
+                : "Runtime buildings restored to 100%."
+            );
+            return next;
+          });
+        }
+
+        showToast(
+          presetKey === "safe"
+            ? "Safe Mode engaged."
+            : "Runtime buildings restored to 100%."
+        );
+      } catch (error) {
+        console.error("Power preset failed", error);
+        showToast(error?.message || "Power preset failed.");
+      }
+    });
+  };
+
+  const applySafeModePreset = async () => applyPowerPreset("safe", SAFE_MODE_PRESET);
+  const applyNormalModePreset = async () => applyPowerPreset("normal", NORMAL_MODE_PRESET);
 
   const hireCrew = async () => {
     return runLockedAction("hireCrew", async () => {
@@ -3471,6 +3507,10 @@ export default function MleoBase() {
           setOpenInfoKey(null);
         },
         onOverclock: activateOverclock,
+        onSafeMode: applySafeModePreset,
+        onNormalMode: applyNormalModePreset,
+        safeModeButtonText: "Safe 50%",
+        normalModeButtonText: "Normal 100%",
         overclockButtonText:
           overclockLeft > 0
             ? `Overclock ${Math.ceil(overclockLeft / 1000)}s`
@@ -6343,7 +6383,7 @@ export default function MleoBase() {
   );
 
   const handleResetGame = async () => {
-    if (!confirm("Are you sure you want to reset the game? This will start fresh with the new starter pack.")) {
+    if (!confirm("Are you sure you want to reset the game? This will start fresh with the current server-backed BASE setup.")) {
       return;
     }
     
@@ -8780,6 +8820,18 @@ export default function MleoBase() {
                           <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-white/75">
                             MAINTAIN: STABILITY
                           </span>
+                          <button
+                            onClick={applySafeModePreset}
+                            className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-bold text-cyan-200 hover:bg-cyan-500/20"
+                          >
+                            Safe 50%
+                          </button>
+                          <button
+                            onClick={applyNormalModePreset}
+                            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold text-white/80 hover:bg-white/10"
+                          >
+                            Normal 100%
+                          </button>
                         </div>
                         <p className="mt-2 text-xs text-white/55">
                           Stability: {fmt(state.stability)}%

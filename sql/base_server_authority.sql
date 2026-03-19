@@ -76,9 +76,9 @@ LANGUAGE sql
 IMMUTABLE
 AS $$
   SELECT jsonb_build_object(
-    'ORE', 70,
-    'GOLD', 320,
-    'SCRAP', 22,
+    'ORE', 150,
+    'GOLD', 332,
+    'SCRAP', 34,
     'ENERGY', 140,
     'DATA', 10
   );
@@ -323,6 +323,7 @@ DECLARE
   v_miner_bonus numeric := 1.0;
   v_arcade_bonus numeric := 1.0;
   v_overclock numeric := 1.0;
+  v_overclock_drain_mult numeric := 1.0;
   v_bank_bonus numeric := 1.0;
   v_data_mult numeric := 1.0;
   v_ore_mult numeric := 1.0;
@@ -509,9 +510,11 @@ BEGIN
   v_arcade_bonus := 1 + (v_arcade * v_arcade_mode) * 0.03;
 
   IF v_state.overclock_until IS NOT NULL AND v_state.overclock_until > v_now THEN
-    v_overclock := 1.35;
+    v_overclock := 1.45;
+    v_overclock_drain_mult := 0.78;
   ELSE
     v_overclock := 1.0;
+    v_overclock_drain_mult := 1.0;
   END IF;
 
   v_ore_mult := v_worker_bonus * v_overclock;
@@ -634,15 +637,17 @@ BEGIN
       * v_data_mult;
 
   v_energy_use :=
-      ((v_quarry * v_quarry_mode) * 0.60)
-    + ((v_trade * v_trade_mode) * 0.62)
-    + ((v_salvage * v_salvage_mode) * 0.62)
-    + ((v_refinery * v_refinery_mode) * 0.90)
-    + ((v_miner * v_miner_mode) * 0.16)
-    + ((v_arcade * v_arcade_mode) * 0.18)
-    + ((v_logistics * v_logistics_mode) * 0.16)
-    + ((v_research_lab * v_research_lab_mode) * 0.20)
-    + ((v_repair * v_repair_mode) * 0.18);
+    (
+        ((v_quarry * v_quarry_mode) * 0.60)
+      + ((v_trade * v_trade_mode) * 0.62)
+      + ((v_salvage * v_salvage_mode) * 0.62)
+      + ((v_refinery * v_refinery_mode) * 0.90)
+      + ((v_miner * v_miner_mode) * 0.16)
+      + ((v_arcade * v_arcade_mode) * 0.18)
+      + ((v_logistics * v_logistics_mode) * 0.16)
+      + ((v_research_lab * v_research_lab_mode) * 0.20)
+      + ((v_repair * v_repair_mode) * 0.18)
+    ) * v_overclock_drain_mult;
 
   IF v_energy_now < (v_energy_use * v_effective_seconds) THEN
     IF v_energy_use > 0 THEN

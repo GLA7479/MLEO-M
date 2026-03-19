@@ -202,14 +202,13 @@ export function getMissionProgress(state) {
 
 export function freshState() {
   return {
-    version: 6,
+    version: 7,
     lastDay: todayKey(),
     lastHiddenAt: 0,
-    starterPackClaimed: false,
     resources: {
-      ORE: 70,
-      GOLD: CONFIG.startingGold,
-      SCRAP: 22,
+      ORE: 150,
+      GOLD: 332,
+      SCRAP: 34,
       ENERGY: CONFIG.baseEnergyCap,
       DATA: 10,
     },
