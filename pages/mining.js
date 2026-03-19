@@ -2896,15 +2896,10 @@ export default function GamesHub() {
         </button>
       </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2">
                     <Link href="/mleo-base">
                       <button className="w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
                         BASE
-                      </button>
-                    </Link>
-                    <Link href="/mleo-base-v3">
-                      <button className="w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
-                        Legacy
                       </button>
                     </Link>
                   </div>

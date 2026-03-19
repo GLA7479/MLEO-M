@@ -12,12 +12,12 @@ import {
   performMaintenanceAction,
   claimBaseMission,
 } from "../lib/baseVaultClient";
-import { BaseHudV3 } from "./base-v3/components/BaseHudV3";
-import { BaseSceneV3 } from "./base-v3/components/BaseSceneV3";
-import { BuildingSheetV3 } from "./base-v3/components/BuildingSheetV3";
-import { ActivityFeedV3 } from "./base-v3/components/ActivityFeedV3";
-import { BaseUtilityTrayV3 } from "./base-v3/components/BaseUtilityTrayV3";
-import { BaseHintV3 } from "./base-v3/components/BaseHintV3";
+import { BaseHudV3 } from "./components/BaseHudV3";
+import { BaseSceneV3 } from "./components/BaseSceneV3";
+import { BuildingSheetV3 } from "./components/BuildingSheetV3";
+import { ActivityFeedV3 } from "./components/ActivityFeedV3";
+import { BaseUtilityTrayV3 } from "./components/BaseUtilityTrayV3";
+import { BaseHintV3 } from "./components/BaseHintV3";
 
 const MAX_LOG_ITEMS = 16;
 

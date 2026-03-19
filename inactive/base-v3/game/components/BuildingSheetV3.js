@@ -1,5 +1,5 @@
-import { BUILDINGS } from "../../base-v2/data/buildings";
-import { buildingCost, canAfford } from "../../base-v2/utils/buildings";
+import { BUILDINGS } from "../../../../game/base-v2/data/buildings";
+import { buildingCost, canAfford } from "../../../../game/base-v2/utils/buildings";
 import { getBuildingIdentity } from "../data/buildingIdentity";
 
 const EXPEDITION_REQUIREMENTS = { ENERGY: 36, DATA: 4 };

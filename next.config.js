@@ -1,3 +1,5 @@
+const path = require("path");
+
 const isProduction = process.env.NODE_ENV === "production";
 
 const securityHeaders = [
@@ -50,9 +52,7 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: {
-    esmExternals: 'loose'
-  },
+  outputFileTracingRoot: path.resolve(__dirname),
   async headers() {
     return [
       {
