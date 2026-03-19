@@ -180,7 +180,7 @@ export function BaseStructuresPanel({
                         : "bg-white/10 opacity-70"
                     }`}
                   >
-                    {card.buildBusy ? "Upgrading..." : card.buttonText}
+                    {card.buildBusy ? "Building..." : card.buttonText}
                   </button>
                 </div>
               </div>

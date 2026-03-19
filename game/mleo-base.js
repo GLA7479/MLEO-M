@@ -2587,7 +2587,11 @@ export default function MleoBase() {
 
         showToast(`${def.name} upgraded to level ${res.new_level || level + 1}.`);
       } else {
-        showToast(res?.message || "Build failed.");
+        if (res?.code === "RATE_LIMIT_DEVICE") {
+          showToast("Too many taps detected. Please wait a moment and try again.");
+        } else {
+          showToast(res?.message || "Build failed.");
+        }
       }
     } catch (error) {
       console.error("Build failed", error);

@@ -47,13 +47,27 @@ export default async function handler(req, res) {
       });
     }
 
+    console.log("BASE_BUILD_REQUEST", {
+      deviceId,
+      buildingKey: req.body?.building_key || req.body?.buildingKey || null,
+      ua: req.headers["user-agent"] || "unknown",
+      ts: Date.now(),
+    });
+
     const rateLimit = await checkArcadeRateLimit(
       "base-action-build",
       deviceId,
-      60,
+      120,
       60_000
     );
     if (!rateLimit.allowed) {
+      console.log("BASE_BUILD_RATE_LIMITED", {
+        deviceId,
+        remaining: rateLimit.remaining,
+        retryAfterMs: rateLimit.retryAfterMs,
+        ua: req.headers["user-agent"] || "unknown",
+        ts: Date.now(),
+      });
       return res.status(429).json({
         success: false,
         code: "RATE_LIMIT_DEVICE",
