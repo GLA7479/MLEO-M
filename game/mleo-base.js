@@ -24,7 +24,6 @@ import {
   ReadyNowSummaryBlock,
 } from "./mleo-base/components/panels/PanelShells";
 import {
-  applyBaseVaultDelta,
   getBaseVaultBalance,
   getBaseState,
   buildBuilding,
@@ -476,13 +475,6 @@ function canAffordBlueprint(state, sharedVault, cost, dataCost) {
   const data = Number(state?.resources?.DATA || 0);
   return vault >= Number(cost || 0) && data >= Number(dataCost || 0);
 }
-
-async function addToVault(amount, gameId = "mleo-base") {
-  const delta = Math.max(0, Math.floor(Number(amount || 0)));
-  if (!delta) return { ok: true, skipped: true };
-  return applyBaseVaultDelta(delta, gameId);
-}
-
 
 function isNewPlayer(state) {
   const b = state?.buildings || {};
@@ -2878,14 +2870,7 @@ export default function MleoBase() {
         if (latestVault != null) setSharedVault(latestVault);
 
         const shippedBase = Number(res.shipped || 0);
-        const bonusAmount =
-          nextShipBonus > 0 ? Math.floor(shippedBase * nextShipBonus) : 0;
-
-        if (bonusAmount > 0) {
-          await addToVault(bonusAmount, "mleo-base-logistics-bonus");
-          const afterBonusVault = await readVaultSafe();
-          if (afterBonusVault != null) setSharedVault(afterBonusVault);
-        }
+        const bonusAmount = 0;
 
         setState((prev) => {
           const next = mergeProgressFromServer({
@@ -2897,20 +2882,14 @@ export default function MleoBase() {
           });
           next.log = pushLog(
             next.log,
-            `Shipped ${fmt(shippedBase)} MLEO to shared vault${
-              bonusAmount > 0 ? ` (+${fmt(bonusAmount)} logistics bonus)` : ""
-            }.`
+            `Shipped ${fmt(shippedBase)} MLEO to shared vault.`
           );
           return next;
         });
 
         setNextShipBonus(0);
 
-        showToast(
-          `+${fmt(shippedBase)} MLEO shipped${
-            bonusAmount > 0 ? ` (+${fmt(bonusAmount)} bonus)` : ""
-          }.`
-        );
+        showToast(`+${fmt(shippedBase)} MLEO shipped.`);
       } else {
         showToast(res?.message || "Ship failed.");
       }

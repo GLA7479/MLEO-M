@@ -255,6 +255,7 @@ DECLARE
   v_state public.base_device_state%ROWTYPE;
   v_now timestamptz := now();
   v_elapsed_seconds numeric := 0;
+  v_effective_seconds numeric := 0;
 
   v_resources jsonb;
   v_buildings jsonb;
@@ -383,9 +384,11 @@ BEGIN
   END IF;
 
   v_elapsed_seconds := extract(epoch FROM (v_now - v_state.last_tick_at));
+  v_elapsed_seconds := least(greatest(v_elapsed_seconds, 0), 43200);
   IF v_elapsed_seconds <= 0 THEN
     RETURN v_state;
   END IF;
+  v_effective_seconds := public.base_effective_offline_seconds(v_elapsed_seconds);
 
   v_resources := coalesce(v_state.resources, public.base_default_resources());
   v_buildings := coalesce(v_state.buildings, public.base_default_buildings());
@@ -589,7 +592,7 @@ BEGIN
   v_sent_today := greatest(0, coalesce(v_state.sent_today, 0));
   v_maintenance_due := greatest(0, coalesce(v_state.maintenance_due, 0));
 
-  v_energy_now := least(v_energy_cap, v_energy_now + (v_energy_regen * v_elapsed_seconds));
+  v_energy_now := least(v_energy_cap, v_energy_now + (v_energy_regen * v_effective_seconds));
 
   v_ore_gain := ((v_quarry * v_quarry_mode) * 2.0) * v_ore_mult;
   v_gold_gain := ((v_trade * v_trade_mode) * 1.0) * v_gold_mult;
@@ -612,24 +615,24 @@ BEGIN
     + ((v_research_lab * v_research_lab_mode) * 0.24)
     + ((v_repair * v_repair_mode) * 0.22);
 
-  IF v_energy_now < (v_energy_use * v_elapsed_seconds) THEN
+  IF v_energy_now < (v_energy_use * v_effective_seconds) THEN
     IF v_energy_use > 0 THEN
-      v_elapsed_seconds := greatest(0, floor(v_energy_now / v_energy_use));
+      v_effective_seconds := greatest(0, floor(v_energy_now / v_energy_use));
     ELSE
-      v_elapsed_seconds := 0;
+      v_effective_seconds := 0;
     END IF;
   END IF;
 
   IF v_elapsed_seconds > 0 THEN
-    v_energy_now := greatest(0, v_energy_now - (v_energy_use * v_elapsed_seconds));
+    v_energy_now := greatest(0, v_energy_now - (v_energy_use * v_effective_seconds));
 
-    v_ore_now := v_ore_now + (v_ore_gain * v_elapsed_seconds);
-    v_gold_now := v_gold_now + (v_gold_gain * v_elapsed_seconds);
-    v_scrap_now := v_scrap_now + (v_scrap_gain * v_elapsed_seconds);
-    v_data_now := v_data_now + (v_data_gain * v_elapsed_seconds);
+    v_ore_now := v_ore_now + (v_ore_gain * v_effective_seconds);
+    v_gold_now := v_gold_now + (v_gold_gain * v_effective_seconds);
+    v_scrap_now := v_scrap_now + (v_scrap_gain * v_effective_seconds);
+    v_data_now := v_data_now + (v_data_gain * v_effective_seconds);
 
-    v_ore_use := ((v_refinery * v_refinery_mode) * 1.8) * v_elapsed_seconds;
-    v_scrap_use := ((v_refinery * v_refinery_mode) * 0.7) * v_elapsed_seconds;
+    v_ore_use := ((v_refinery * v_refinery_mode) * 1.8) * v_effective_seconds;
+    v_scrap_use := ((v_refinery * v_refinery_mode) * 0.7) * v_effective_seconds;
 
     IF v_ore_now > 0 AND v_scrap_now > 0 AND (v_refinery * v_refinery_mode) > 0 THEN
       IF v_ore_now < v_ore_use THEN
@@ -690,7 +693,7 @@ BEGIN
 
     IF (v_repair * v_repair_mode) > 0 THEN
       v_stability := public.base_clamp_num(
-        v_stability + (((v_repair * v_repair_mode) * 0.0024) * v_elapsed_seconds),
+        v_stability + (((v_repair * v_repair_mode) * 0.0024) * v_effective_seconds),
         50,
         100
       );
@@ -707,7 +710,7 @@ BEGIN
     v_stats := jsonb_set(
       coalesce(v_stats, public.base_default_stats()),
       '{dataToday}',
-      to_jsonb(coalesce((v_stats->>'dataToday')::numeric, 0) + floor(v_data_gain * v_elapsed_seconds)),
+      to_jsonb(coalesce((v_stats->>'dataToday')::numeric, 0) + floor(v_data_gain * v_effective_seconds)),
       true
     );
 
