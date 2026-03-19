@@ -4055,25 +4055,41 @@ export default function MleoBase() {
     hq: {
       now(level) {
         return level <= 0
-          ? "HQ is still at base state. Right now it mainly represents your command core and overall progression gate."
-          : `HQ is currently level ${level}. It already improves your global base progression path and supports access to stronger systems.`;
+          ? "HQ is still at base state, so your command core is not yet pushing the rest of the base forward."
+          : `HQ is currently level ${level}. It is already improving overall progression pacing and helping stronger systems feel more reachable.`;
       },
       next(level) {
         const next = level + 1;
-        return `HQ level ${next} will push your command core forward, making advanced structures feel more natural to unlock and improving the overall quality of your progression route.`;
+        return `HQ level ${next} will strengthen your command core and make the whole base progression path feel smoother and less bottlenecked.`;
       },
-      why: "HQ is one of the most important upgrades in the whole game because it controls access to stronger systems. When HQ is weak, the entire base feels slower and more limited.",
-      linked: "Global progression · unlocking advanced structures · overall build pacing",
-      impact: "A stronger HQ makes the whole base develop more smoothly. It does not just help one resource — it improves how fast your whole command center matures.",
+      why:
+        "HQ is your global progression anchor.\n" +
+        "It does not specialize in one resource, but it helps the whole build mature in a cleaner order.",
+      linked:
+        "Global progression · unlock rhythm · stronger structure access · smoother mid-game transition",
+      impact:
+        "A stronger HQ improves the quality of your overall build path.\n" +
+        "It is especially useful when the base is starting to move from early setup into real specialization.",
       tips: {
-        building: "Trade Hub",
-        research: "Routing AI",
-        module: "Miner Link",
+        building: "Quarry",
+        supportBuildings: ["Trade Hub", "Power Cell", "Research Lab"],
+        research: "Field Ops",
+        supportResearch: ["Coolant Loops", "Arcade Ops"],
+        module: "",
+        operation: "Daily Missions / Field Expedition",
+        watch:
+          "HQ improves structure flow, but it does not fix a broken Energy, Ore or Stability bottleneck by itself.",
         actions: [
-          "Upgrade HQ when you feel your build path is starting to bottleneck.",
-          "Use HQ upgrades to prepare for stronger mid-game structures.",
-          "HQ is a progression anchor, not just a cosmetic level.",
+          "Upgrade HQ when your overall progression path starts feeling cramped.",
+          "Use HQ as a pacing upgrade, not as an emergency economy fix.",
+          "Strong when you are preparing to move from early economy into layered mid-game systems.",
         ],
+      },
+      nextStep: {
+        label: "Open Quarry",
+        tab: "build",
+        target: "quarry",
+        why: "Quarry is one of the first practical structures that benefits from a stronger overall progression path.",
       },
     },
 
@@ -4160,20 +4176,36 @@ export default function MleoBase() {
       next(level, building) {
         const next = level + 1;
         const scrap = fmt((building.outputs?.SCRAP || 0) * next);
-        return `Salvage Yard level ${next} will improve Scrap recovery to about ${scrap}, making support upgrades easier to afford.`;
+        return `Salvage Yard level ${next} will improve Scrap recovery to about ${scrap}, making support upgrades and Refinery feeding easier to sustain.`;
       },
-      why: "Scrap becomes increasingly important as the base matures. Without Salvage, advanced structures and support systems start feeling blocked.",
-      linked: "SCRAP recovery · advanced systems · Refinery input · expedition support",
-      impact: "More Scrap improves your mid-game stability because many important upgrades depend on it.",
+      why:
+        "Salvage Yard is the backbone of your long-term Scrap lane.\n" +
+        "Without healthy Scrap, advanced systems and Refinery progression both start feeling blocked.",
+      linked:
+        "SCRAP recovery · advanced systems · Refinery input · expedition support · mid-game stability",
+      impact:
+        "A stronger Salvage Yard makes the mid-game much smoother.\n" +
+        "It reduces the chance that Scrap quietly becomes the hidden bottleneck in your base.",
       tips: {
         building: "Refinery",
-        research: "Field Ops",
+        supportBuildings: ["Expedition Bay", "Power Cell", "Repair Bay"],
+        research: "Deep Scan",
+        supportResearch: ["Field Ops"],
         module: "Miner Link",
+        operation: "Field Expedition",
+        watch:
+          "Scrap often falls behind quietly. When that happens, Refinery and advanced support upgrades both start feeling worse.",
         actions: [
-          "Upgrade Salvage when advanced structures start asking for more Scrap than you can comfortably supply.",
-          "This is a strong bridge between early economy and mid-game systems.",
-          "Salvage has especially good synergy with Refinery and Expedition Bay.",
+          "Upgrade Salvage before pushing advanced systems too hard.",
+          "Use expeditions for burst Scrap, but keep Salvage Yard as the permanent lane.",
+          "Especially important once Refinery becomes part of your real economy.",
         ],
+      },
+      nextStep: {
+        label: "Open Refinery",
+        tab: "build",
+        target: "refinery",
+        why: "Refinery is one of the main reasons Scrap becomes strategically important.",
       },
     },
 
@@ -4275,28 +4307,44 @@ export default function MleoBase() {
     minerControl: {
       now(level, building) {
         if (level <= 0) {
-          return "Miner Control is not built yet, so synergy with Miners is still limited.";
+          return "Miner Control is not built yet, so synergy between BASE and Miners is still limited.";
         }
         const data = fmt((building.outputs?.DATA || 0) * level);
-        return `Miner Control is currently level ${level}. It is already improving Miners synergy and adding about ${data} DATA support.`;
+        return `Miner Control is currently level ${level}. It is already strengthening Miners synergy and adds about ${data} DATA support.`;
       },
       next(level, building) {
         const next = level + 1;
         const data = fmt((building.outputs?.DATA || 0) * next);
-        return `Miner Control level ${next} will push Miners synergy further and improve DATA support to about ${data}.`;
+        return `Miner Control level ${next} will improve Miners integration further and raise DATA support to about ${data}.`;
       },
-      why: "This building is important because BASE should feel connected to Miners, not isolated from it. Miner Control makes that ecosystem link stronger.",
-      linked: "Miners synergy · DATA support · ore conversion quality · ecosystem cohesion",
-      impact: "The upgrade strengthens cross-system progression and makes BASE feel more integrated into the wider MLEO loop.",
+      why:
+        "Miner Control helps BASE feel connected to the wider MLEO ecosystem instead of isolated.\n" +
+        "It is more strategic than raw, but that strategic link matters a lot over time.",
+      linked:
+        "Miners synergy · DATA support · industrial cohesion · Ore strategy · ecosystem identity",
+      impact:
+        "A stronger Miner Control makes your progression feel more integrated across systems.\n" +
+        "It is especially useful when you want BASE to support the wider MLEO loop instead of standing alone.",
       tips: {
         building: "Research Lab",
+        supportBuildings: ["Quarry", "Refinery", "Power Cell"],
         research: "Miner Sync",
+        supportResearch: ["Field Ops"],
         module: "Servo Drill",
+        operation: "",
+        watch:
+          "Miner Control adds strategic value, but it does not replace fixing weak Ore, Energy or Scrap lanes.",
         actions: [
-          "Upgrade Miner Control if you want BASE and Miners to feel more connected.",
-          "This is a strategic upgrade, not just a raw output upgrade.",
-          "Very strong when combined with Quarry and Research Lab.",
+          "Upgrade Miner Control when ecosystem cohesion starts mattering to your plan.",
+          "Best when Quarry and Research Lab are already relevant.",
+          "Treat it as a strategic connector, not only as a raw stat card.",
         ],
+      },
+      nextStep: {
+        label: "Open Research Lab",
+        tab: "build",
+        target: "researchLab",
+        why: "Research Lab is one of the best structures to pair with Miner Control's strategic DATA support.",
       },
     },
 
@@ -4311,20 +4359,36 @@ export default function MleoBase() {
       next(level, building) {
         const next = level + 1;
         const data = fmt((building.outputs?.DATA || 0) * next);
-        return `Arcade Hub level ${next} will improve that activity link and raise DATA support to about ${data}.`;
+        return `Arcade Hub level ${next} will strengthen the activity-to-progression link and raise DATA support to about ${data}.`;
       },
-      why: "Arcade Hub is valuable because it helps the whole MLEO ecosystem feel unified. It gives BASE a meaningful relationship with gameplay activity.",
-      linked: "Arcade synergy · mission rewards · DATA flow · ecosystem progression",
-      impact: "This makes BASE progression feel more connected to the rest of the project instead of being a separate screen with isolated upgrades.",
+      why:
+        "Arcade Hub gives BASE a meaningful relationship with the rest of the MLEO experience.\n" +
+        "It helps activity, missions and progression feel connected rather than separate systems.",
+      linked:
+        "Arcade synergy · mission rhythm · DATA support · commander progression · ecosystem identity",
+      impact:
+        "A stronger Arcade Hub makes the game feel livelier and more unified.\n" +
+        "It is especially good for active players who want BASE to reward engagement, not only passive waiting.",
       tips: {
         building: "Expedition Bay",
+        supportBuildings: ["Research Lab", "Power Cell"],
         research: "Arcade Ops",
+        supportResearch: ["Deep Scan"],
         module: "Arcade Relay",
+        operation: "Daily Missions / Field Expedition",
+        watch:
+          "Arcade Hub feels best in active play. In passive-only styles it becomes more of a support layer than a core engine.",
         actions: [
-          "Upgrade Arcade Hub when you want stronger ecosystem identity.",
-          "Useful if missions and activity-based progression are becoming part of your main loop.",
-          "Arcade Hub works especially well with DATA-focused growth.",
+          "Upgrade Arcade Hub when missions and active progression are becoming part of your normal loop.",
+          "Pair it with Arcade Relay and Arcade Ops for a much smoother active-play identity.",
+          "Good support when DATA and commander XP both matter.",
         ],
+      },
+      nextStep: {
+        label: "Research Arcade Ops",
+        tab: "research",
+        target: "arcadeOps",
+        why: "Arcade Ops is one of the best direct follow-ups to Arcade Hub.",
       },
     },
 
@@ -4332,24 +4396,40 @@ export default function MleoBase() {
       now(level) {
         return level <= 0
           ? "Expedition Bay is not built yet, so expedition progression is still limited."
-          : `Expedition Bay is currently level ${level}. It is already supporting stronger expeditions and better loot potential.`;
+          : `Expedition Bay is currently level ${level}. It is already supporting stronger expeditions and better reward quality.`;
       },
       next(level) {
         const next = level + 1;
-        return `Expedition Bay level ${next} will further improve expedition strength and reward quality, helping side progression feel more meaningful.`;
+        return `Expedition Bay level ${next} will improve expedition strength and reward quality further, making mixed utility progression more reliable.`;
       },
-      why: "Expedition Bay matters because expeditions are one of the best ways to keep the game loop interesting beyond passive production alone.",
-      linked: "Expeditions · loot quality · side progression · resource recovery",
-      impact: "This upgrade improves your side economy and keeps progression moving between larger infrastructure milestones.",
+      why:
+        "Expedition Bay keeps the game from becoming only passive production.\n" +
+        "It supports active field play, mixed rewards, and a more flexible progression rhythm.",
+      linked:
+        "Expeditions · mixed rewards · Scrap support · DATA support · active progression",
+      impact:
+        "A stronger Expedition Bay improves one of the best utility systems in BASE.\n" +
+        "It helps fill temporary gaps when you need more flexible rewards instead of one narrow economy lane.",
       tips: {
-        building: "Repair Bay",
+        building: "Research Lab",
+        supportBuildings: ["Arcade Hub", "Power Cell", "Repair Bay"],
         research: "Deep Scan",
+        supportResearch: ["Arcade Ops"],
         module: "Arcade Relay",
+        operation: "Field Expedition",
+        watch:
+          "Expeditions are useful utility, but they should not replace fixing a broken core economy lane.",
         actions: [
-          "Upgrade Expedition Bay when expeditions are part of your active routine.",
-          "Strong choice if you want more varied progression instead of only passive growth.",
-          "Pairs very well with DATA and Scrap-focused play.",
+          "Upgrade Expedition Bay when field expeditions are becoming part of your regular play.",
+          "Very good when you want mixed DATA + Scrap support.",
+          "Pair with Deep Scan and Arcade Ops for a much stronger active progression loop.",
         ],
+      },
+      nextStep: {
+        label: "Open Deep Scan",
+        tab: "research",
+        target: "deepScan",
+        why: "Deep Scan is one of the best research follow-ups once Expedition Bay matters.",
       },
     },
 
@@ -4633,7 +4713,7 @@ export default function MleoBase() {
         research: "Coolant Loops",
         supportResearch: [],
         module: "",
-        operation: "Emergency Refill",
+        operation: "Emergency Refill / Reduce building power mode",
         watch: "If you keep choking on Energy, Power Cell still matters more.",
         actions: [
           "Research this early if Energy feels too tight.",
@@ -5024,7 +5104,7 @@ export default function MleoBase() {
         actions: [
           "Use Refill to recover tempo, not as your default Energy plan.",
           "Upgrade Power Cell to reduce refill dependence.",
-          "Pause heavy buildings first when Energy keeps crashing.",
+          "Reduce heavy building power mode first when Energy keeps crashing.",
         ],
       },
       nextStep: {
