@@ -3,6 +3,26 @@ import Link from "next/link";
 import { useAccount } from "wagmi";
 import { useAccountModal, useConnectModal } from "@rainbow-me/rainbowkit";
 import Layout from "../components/Layout";
+import { DailyMissionsPanel } from "./mleo-base/components/panels/DailyMissionsPanel";
+import { OperationsConsolePanel } from "./mleo-base/components/panels/OperationsConsolePanel";
+import { CrewModulesResearchPanel } from "./mleo-base/components/panels/CrewModulesResearchPanel";
+import { BuildSupportSystemsPanel } from "./mleo-base/components/panels/BuildSupportSystemsPanel";
+import { BaseStructuresPanel } from "./mleo-base/components/panels/BaseStructuresPanel";
+import { BaseHomeFlowScenePanel } from "./mleo-base/components/panels/BaseHomeFlowScenePanel";
+import {
+  ActivityLogPanel,
+  IntelPanelCards,
+  ProgressSummaryPanel,
+} from "./mleo-base/components/panels/IntelPanels";
+import { BuildPanelCards } from "./mleo-base/components/panels/BuildPanelCards";
+import { OpsPanelCards } from "./mleo-base/components/panels/OpsPanelCards";
+import { OverviewPanelCards } from "./mleo-base/components/panels/OverviewPanelCards";
+import {
+  DesktopPanelSection,
+  MobilePanelOverlayShell,
+  MobilePanelSection,
+  ReadyNowSummaryBlock,
+} from "./mleo-base/components/panels/PanelShells";
 import {
   applyBaseVaultDelta,
   getBaseVaultBalance,
@@ -18,167 +38,54 @@ import {
   claimBaseMission,
   setBuildingPowerMode,
 } from "../lib/baseVaultClient";
+import {
+  BASE_HOME_SCENE_IDENTITY,
+  BASE_HOME_SCENE_ORDER,
+  BASE_HOME_SCENE_POSITIONS_DESKTOP,
+  BASE_HOME_SCENE_POSITIONS_MOBILE,
+  BUILDINGS,
+  BUILDING_POWER_STEPS,
+  COMMANDER_PATHS,
+  CONFIG,
+  CREW_ROLES,
+  DAILY_MISSIONS,
+  DAILY_SOFTCUT,
+  DEFAULT_BUILDING_POWER_MODE,
+  EVENT_COOLDOWN_MS,
+  LIVE_CONTRACTS,
+  LIVE_EVENTS,
+  MODULES,
+  OFFLINE_TIERS,
+  RESEARCH,
+  RUNTIME_CONTROLLED_BUILDINGS,
+  STRUCTURES_TAB_A,
+  STRUCTURES_TAB_B,
+} from "./mleo-base/data";
+import {
+  applyLevelUps,
+  buildingRiskTag,
+  buildingRoleTag,
+  buildingSynergyTag,
+  commanderPathMeta,
+  crewRoleMeta,
+  freshState,
+  getBaseSceneGlow,
+  getBaseSceneIdentity,
+  getBaseSceneNodeState,
+  getMissionProgress,
+  getShipSoftcutFactor,
+  normalizeServerState,
+  offlineFactorFor,
+  sanitizeBaseState,
+  sectorStatusClasses,
+  sectorStatusForBuilding,
+  todayKey,
+  xpForLevel,
+} from "./mleo-base/engine";
+import { mergeProgressFromServer } from "./mleo-base/actions";
 
 const MAX_LOG_ITEMS = 16;
 
-const DAILY_SOFTCUT = [
-  { upto: 0.60, factor: 1.00 },
-  { upto: 0.85, factor: 0.72 },
-  { upto: 1.00, factor: 0.50 },
-  { upto: 1.15, factor: 0.30 },
-  { upto: 9.99, factor: 0.16 },
-];
-
-const OFFLINE_TIERS = [
-  { hours: 2, factor: 0.55 },
-  { hours: 6, factor: 0.35 },
-  { hours: 12, factor: 0.18 },
-];
-
-const BUILDINGS = [
-  {
-    key: "hq",
-    name: "HQ",
-    desc: "Core base level. Improves global efficiency and unlocks advanced systems.",
-    baseCost: { GOLD: 80, ORE: 40 },
-    growth: 1.18,
-    energyUse: 0,
-    outputs: {},
-  },
-  {
-    key: "quarry",
-    name: "Quarry",
-    desc: "Turns energy into raw Ore.",
-    baseCost: { GOLD: 60 },
-    growth: 1.18,
-    energyUse: 0.72,
-    outputs: { ORE: 2.0 },
-  },
-  {
-    key: "tradeHub",
-    name: "Trade Hub",
-    desc: "Keeps the base liquid with steady Gold income.",
-    baseCost: { GOLD: 100, ORE: 30 },
-    growth: 1.2,
-    energyUse: 0.78,
-    outputs: { GOLD: 1.0 },
-    requires: [{ key: "quarry", lvl: 1 }],
-  },
-  {
-    key: "salvage",
-    name: "Salvage Yard",
-    desc: "Recovers Scrap for advanced systems.",
-    baseCost: { GOLD: 150, ORE: 90 },
-    growth: 1.22,
-    energyUse: 0.78,
-    outputs: { SCRAP: 0.8 },
-    requires: [{ key: "quarry", lvl: 2 }],
-  },
-  {
-    key: "refinery",
-    name: "Refinery",
-    desc: "Converts Ore + Scrap into bankable MLEO.",
-    baseCost: { GOLD: 280, ORE: 180, SCRAP: 35 },
-    growth: 1.25,
-    energyUse: 1.10,
-    convert: { ORE: 1.8, SCRAP: 0.7, MLEO: 0.10 },
-    requires: [
-      { key: "salvage", lvl: 1 },
-      { key: "tradeHub", lvl: 1 },
-    ],
-  },
-  {
-    key: "powerCell",
-    name: "Power Cell",
-    desc: "Boosts Energy cap and regeneration.",
-    baseCost: { GOLD: 240, SCRAP: 45 },
-    growth: 1.24,
-    energyUse: 0,
-    power: { cap: 42, regen: 2.2 },
-    requires: [{ key: "tradeHub", lvl: 1 }],
-  },
-  {
-    key: "minerControl",
-    name: "Miner Control",
-    desc: "Improves synergy with Miners and increases ore conversion quality.",
-    baseCost: { GOLD: 320, ORE: 120, SCRAP: 40 },
-    growth: 1.22,
-    energyUse: 0.20,
-    outputs: { DATA: 0.18 },
-    requires: [{ key: "hq", lvl: 2 }],
-  },
-  {
-    key: "arcadeHub",
-    name: "Arcade Hub",
-    desc: "Turns activity into base progression and improves mission rewards.",
-    baseCost: { GOLD: 360, ORE: 90, SCRAP: 50 },
-    growth: 1.24,
-    energyUse: 0.22,
-    outputs: { DATA: 0.15 },
-    requires: [{ key: "hq", lvl: 2 }],
-  },
-  {
-    key: "expeditionBay",
-    name: "Expedition Bay",
-    desc: "Unlocks stronger expeditions and better loot tables.",
-    baseCost: { GOLD: 500, ORE: 180, SCRAP: 85 },
-    growth: 1.26,
-    energyUse: 0,
-    outputs: {},
-    requires: [
-      { key: "hq", lvl: 3 },
-      { key: "salvage", lvl: 2 },
-    ],
-  },
-  {
-    key: "logisticsCenter",
-    name: "Logistics Center",
-    desc: "Improves shipment quality, export handling and daily ship efficiency.",
-    baseCost: { ORE: 220, GOLD: 180, SCRAP: 90 },
-    growth: 1.7,
-    maxLevel: 15,
-    energyUse: 0.20,
-    outputs: { DATA: 0.08 },
-    requires: [{ key: "hq", lvl: 2 }, { key: "tradeHub", lvl: 2 }],
-  },
-  {
-    key: "researchLab",
-    name: "Research Lab",
-    desc: "Boosts DATA generation and supports advanced research paths.",
-    baseCost: { ORE: 180, GOLD: 240, SCRAP: 110 },
-    growth: 1.75,
-    maxLevel: 15,
-    energyUse: 0.24,
-    outputs: { DATA: 0.28 },
-    requires: [{ key: "hq", lvl: 2 }, { key: "minerControl", lvl: 1 }],
-  },
-  {
-    key: "repairBay",
-    name: "Repair Bay",
-    desc: "Improves stability and lowers maintenance pressure.",
-    baseCost: { ORE: 160, GOLD: 160, SCRAP: 140 },
-    growth: 1.7,
-    maxLevel: 15,
-    energyUse: 0.22,
-    outputs: {},
-    requires: [{ key: "hq", lvl: 2 }, { key: "powerCell", lvl: 1 }],
-  },
-];
-
-const BUILDING_POWER_STEPS = [0, 25, 50, 75, 100];
-const DEFAULT_BUILDING_POWER_MODE = 100;
-
-const RUNTIME_CONTROLLED_BUILDINGS = new Set([
-  "quarry",
-  "tradeHub",
-  "salvage",
-  "refinery",
-  "minerControl",
-  "arcadeHub",
-  "logisticsCenter",
-  "researchLab",
-  "repairBay",
-]);
 
 function fmtRate(value, digits = 2) {
   const n = Number(value || 0);
@@ -243,286 +150,6 @@ function getBuildingPowerLine(buildingKey, powerMode) {
   return `Mode ${normalized}% · passive output and drain scaled`;
 }
 
-const STRUCTURES_TAB_A = [
-  "hq",
-  "quarry",
-  "tradeHub",
-  "salvage",
-  "refinery",
-  "powerCell",
-];
-
-const STRUCTURES_TAB_B = [
-  "minerControl",
-  "arcadeHub",
-  "expeditionBay",
-  "logisticsCenter",
-  "researchLab",
-  "repairBay",
-];
-
-const MODULES = [
-  {
-    key: "servoDrill",
-    name: "Servo Drill",
-    desc: "+15% Ore output.",
-    cost: { GOLD: 320, SCRAP: 50 },
-  },
-  {
-    key: "vaultCompressor",
-    name: "Vault Compressor",
-    desc: "+8% bank efficiency and +5% ship yield.",
-    cost: { GOLD: 420, ORE: 120, SCRAP: 70 },
-  },
-  {
-    key: "arcadeRelay",
-    name: "Arcade Relay",
-    desc: "+15% mission XP and +10% DATA gain.",
-    cost: { GOLD: 520, ORE: 160, SCRAP: 90 },
-  },
-  {
-    key: "minerLink",
-    name: "Miner Link",
-    desc: "+12% Ore and +8% refinery stability.",
-    cost: { GOLD: 700, ORE: 260, SCRAP: 110 },
-  },
-];
-
-const RESEARCH = [
-  {
-    key: "coolant",
-    name: "Coolant Loops",
-    desc: "+1.35 Energy regen and +22 Energy cap.",
-    cost: { ORE: 240, SCRAP: 70 },
-  },
-  {
-    key: "routing",
-    name: "Routing AI",
-    desc: "+8% bank efficiency.",
-    cost: { ORE: 400, GOLD: 260, SCRAP: 120 },
-    requires: ["coolant"],
-  },
-  {
-    key: "fieldOps",
-    name: "Field Ops",
-    desc: "Crew bonus increases.",
-    cost: { ORE: 650, GOLD: 420, SCRAP: 180 },
-    requires: ["routing"],
-  },
-  {
-    key: "minerSync",
-    name: "Miner Sync",
-    desc: "+12% Ore output and +1 daily mission slot.",
-    cost: { ORE: 520, GOLD: 300, SCRAP: 130, DATA: 20 },
-    requires: ["routing"],
-  },
-  {
-    key: "arcadeOps",
-    name: "Arcade Ops",
-    desc: "+15% commander XP and +10% expedition rewards.",
-    cost: { ORE: 600, GOLD: 420, SCRAP: 180, DATA: 30 },
-    requires: ["fieldOps"],
-  },
-  {
-    key: "logistics",
-    name: "Logistics",
-    desc: "+10% ship efficiency and smoother export flow.",
-    cost: { ORE: 700, GOLD: 460, SCRAP: 220, DATA: 40 },
-    requires: ["routing"],
-  },
-  {
-    key: "predictiveMaintenance",
-    name: "Predictive Maintenance",
-    desc: "Maintenance decay is 25% slower and Repair Bay works better.",
-    cost: { ORE: 620, GOLD: 420, SCRAP: 260, DATA: 36 },
-    requires: ["fieldOps"],
-  },
-  {
-    key: "deepScan",
-    name: "Deep Scan",
-    desc: "+18% DATA from expeditions and better rare findings.",
-    cost: { ORE: 760, GOLD: 520, SCRAP: 240, DATA: 48 },
-    requires: ["arcadeOps"],
-  },
-  {
-    key: "tokenDiscipline",
-    name: "Token Discipline",
-    desc: "-12% raw banked MLEO output, +22% DATA output, +10% ship quality.",
-    cost: { ORE: 820, GOLD: 560, SCRAP: 280, DATA: 60 },
-    requires: ["logistics", "deepScan"],
-  },
-];
-
-const DAILY_MISSIONS = [
-  {
-    key: "upgrade_building",
-    name: "Upgrade 1 building",
-    target: 1,
-    reward: { XP: 30, DATA: 10 },
-  },
-  {
-    key: "run_expedition",
-    name: "Complete 1 expedition",
-    target: 1,
-    reward: { XP: 35, SCRAP: 24 },
-  },
-  {
-    key: "generate_data",
-    name: "Generate 12 DATA",
-    target: 12,
-    reward: { XP: 30, GOLD: 90 },
-  },
-  {
-    key: "perform_maintenance",
-    name: "Perform 1 maintenance",
-    target: 1,
-    reward: { XP: 35, DATA: 8 },
-  },
-  {
-    key: "double_expedition",
-    name: "Launch 2 expeditions",
-    target: 2,
-    reward: { XP: 40, SCRAP: 28 },
-  },
-  {
-    key: "ship_mleo",
-    name: "Ship 60 MLEO",
-    target: 60,
-    reward: { XP: 45, GOLD: 140 },
-  },
-  {
-    key: "spend_vault",
-    name: "Spend 50 MLEO from vault",
-    target: 50,
-    reward: { XP: 55, DATA: 14 },
-  },
-];
-
-const CONFIG = {
-  title: "MLEO BASE",
-  subtitle: "Command your MLEO base, connect Miners + Arcade, and grow your shared vault.",
-  startingGold: 320,
-  baseEnergyCap: 140,
-  baseEnergyRegen: 4.6,
-  dailyShipCap: 12_000,
-  expeditionCost: 36,
-  expeditionCooldownMs: 120_000,
-  overclockCost: 900,
-  overclockDurationMs: 8 * 60 * 1000,
-  refillCost: 180,
-  blueprintBaseCost: 1800,
-  blueprintGrowth: 1.65,
-};
-
-const EVENT_COOLDOWN_MS = 2 * 60 * 1000;
-
-const LIVE_EVENTS = [
-  {
-    key: "reactor_surge",
-    title: "Reactor Surge",
-    text: "A sudden power spike is stressing core systems. Choose between stability or short-term output.",
-    when: (state) => (state.buildings.powerCell || 0) >= 1 || (state.buildings.refinery || 0) >= 1,
-    choices: [
-      {
-        key: "stabilize",
-        label: "Stabilize Core",
-        effect: {
-          resources: { GOLD: -30, SCRAP: -12 },
-          stability: +8,
-        },
-        log: "Core stabilized. Stability improved.",
-      },
-      {
-        key: "overload",
-        label: "Push Output",
-        effect: {
-          stability: -6,
-          tempBuff: { key: "surge_boost", untilMs: 60 * 1000 },
-        },
-        log: "Reactor overloaded. Production boost active, but stability dropped.",
-      },
-    ],
-  },
-  {
-    key: "salvage_signal",
-    title: "Salvage Signal",
-    text: "Your scanners picked up a drifting salvage cluster. Spend energy for a controlled recovery.",
-    when: (state) => (state.buildings.salvage || 0) >= 1 || (state.buildings.expeditionBay || 0) >= 1,
-    choices: [
-      {
-        key: "ignore",
-        label: "Ignore",
-        effect: {},
-        log: "Signal ignored. No recovery team dispatched.",
-      },
-      {
-        key: "send_scout",
-        label: "Send Scout",
-        effect: {
-          resources: { ENERGY: -18, SCRAP: +22, DATA: +5 },
-        },
-        log: "Scout returned with salvage materials and tactical data.",
-      },
-      {
-        key: "full_recovery",
-        label: "Full Recovery",
-        effect: {
-          resources: { ENERGY: -28, GOLD: -20, SCRAP: +36, DATA: +8 },
-          stability: -2,
-        },
-        log: "Full recovery team deployed. Larger haul secured.",
-      },
-    ],
-  },
-  {
-    key: "crew_dispute",
-    title: "Crew Dispute",
-    text: "Tension is rising among workers. Resolve it cleanly or accept a temporary efficiency dip.",
-    when: (state) => (state.crew || 0) >= 2,
-    choices: [
-      {
-        key: "bonus",
-        label: "Pay Bonus",
-        effect: {
-          resources: { GOLD: -40 },
-          stability: +4,
-        },
-        log: "Crew bonus paid. Morale stabilized.",
-      },
-      {
-        key: "delay",
-        label: "Delay Response",
-        effect: {
-          stability: -5,
-        },
-        log: "Issue delayed. Crew morale weakened.",
-      },
-    ],
-  },
-  {
-    key: "logistics_window",
-    title: "Logistics Window",
-    text: "A narrow export route is open. Improve your next shipment quality or wait.",
-    when: (state) => (state.buildings.logisticsCenter || 0) >= 1,
-    choices: [
-      {
-        key: "prepare",
-        label: "Prepare Route",
-        effect: {
-          resources: { DATA: -6 },
-          nextShipBonus: 0.08,
-        },
-        log: "Logistics route prepared. Next shipment will be slightly stronger.",
-      },
-      {
-        key: "skip",
-        label: "Skip Window",
-        effect: {},
-        log: "Window skipped. Standard export flow maintained.",
-      },
-    ],
-  },
-];
 
 function getSystemState(stability) {
   const value = Number(stability || 100);
@@ -581,152 +208,6 @@ function pickLiveEvent(state) {
   return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
-const CREW_ROLES = [
-  {
-    key: "engineer",
-    name: "Engineer",
-    desc: "Improves stability handling and maintenance flow.",
-  },
-  {
-    key: "logistician",
-    name: "Logistician",
-    desc: "Improves shipment preparation and export discipline.",
-  },
-  {
-    key: "researcher",
-    name: "Researcher",
-    desc: "Focuses on DATA efficiency and system analysis.",
-  },
-  {
-    key: "scout",
-    name: "Scout",
-    desc: "Improves expedition awareness and field scouting identity.",
-  },
-  {
-    key: "operations",
-    name: "Operations Chief",
-    desc: "Balances overall command pressure and base rhythm.",
-  },
-];
-
-const COMMANDER_PATHS = [
-  {
-    key: "industry",
-    name: "Industry",
-    desc: "Production-focused command style with safer infrastructure pacing.",
-  },
-  {
-    key: "logistics",
-    name: "Logistics",
-    desc: "Shipment discipline, export timing and vault flow identity.",
-  },
-  {
-    key: "research",
-    name: "Research",
-    desc: "DATA, analysis and long-term systems optimization.",
-  },
-  {
-    key: "ecosystem",
-    name: "Ecosystem",
-    desc: "Supports synergy with Miners, Arcade and broader MLEO structure.",
-  },
-];
-
-function crewRoleMeta(roleKey) {
-  return CREW_ROLES.find((item) => item.key === roleKey) || CREW_ROLES[0];
-}
-
-function commanderPathMeta(pathKey) {
-  return COMMANDER_PATHS.find((item) => item.key === pathKey) || COMMANDER_PATHS[0];
-}
-
-const LIVE_CONTRACTS = [
-  {
-    key: "stability_watch",
-    title: "Stability Watch",
-    desc: "Keep base stability at 85%+.",
-    rewardText: "Reward: DATA 10 · XP 20",
-    check: (state) => Number(state.stability || 0) >= 85,
-    reward: { DATA: 10, XP: 20 },
-  },
-  {
-    key: "energy_ready",
-    title: "Energy Reserve",
-    desc: "Keep energy above 45% of cap.",
-    rewardText: "Reward: GOLD 80 · XP 15",
-    check: (state, derived) =>
-      Number(state.resources?.ENERGY || 0) >= Math.floor((derived.energyCap || 0) * 0.45),
-    reward: { GOLD: 80, XP: 15 },
-  },
-  {
-    key: "banking_cycle",
-    title: "Banking Cycle",
-    desc: "Accumulate at least 120 banked MLEO before next shipment.",
-    rewardText: "Reward: DATA 8 · SCRAP 16 · XP 18",
-    check: (state) => Number(state.bankedMleo || 0) >= 120,
-    reward: { DATA: 8, SCRAP: 16, XP: 18 },
-  },
-  {
-    key: "field_readiness",
-    title: "Field Readiness",
-    desc: "Maintain expedition readiness and 4+ DATA.",
-    rewardText: "Reward: GOLD 60 · XP 18",
-    check: (state) =>
-      Number(state.resources?.DATA || 0) >= 4 &&
-      Number(state.expeditionReadyAt || 0) <= Date.now(),
-    reward: { GOLD: 60, XP: 18 },
-  },
-];
-
-function buildingRoleTag(key) {
-  if (["quarry", "tradeHub", "salvage", "refinery"].includes(key)) return "Production";
-  if (["powerCell", "repairBay"].includes(key)) return "Systems";
-  if (["minerControl", "arcadeHub"].includes(key)) return "Ecosystem";
-  if (["expeditionBay", "researchLab", "logisticsCenter"].includes(key)) return "Command";
-  return "Core";
-}
-
-function buildingSynergyTag(key) {
-  if (key === "minerControl") return "Synergy: Miners";
-  if (key === "arcadeHub") return "Synergy: Arcade";
-  if (key === "refinery") return "Synergy: Vault loop";
-  if (key === "logisticsCenter") return "Synergy: Shipments";
-  if (key === "researchLab") return "Synergy: DATA";
-  if (key === "repairBay") return "Synergy: Stability";
-  if (key === "expeditionBay") return "Synergy: Expeditions";
-  if (key === "powerCell") return "Synergy: Energy";
-  return "Synergy: Base";
-}
-
-function buildingRiskTag(key) {
-  if (key === "refinery") return "Risk: Stability load";
-  if (key === "quarry") return "Risk: Energy demand";
-  if (key === "tradeHub") return "Risk: Low impact";
-  if (key === "salvage") return "Risk: Medium load";
-  if (key === "powerCell") return "Risk: Low";
-  if (key === "repairBay") return "Risk: Low";
-  if (key === "researchLab") return "Risk: Energy pressure";
-  if (key === "logisticsCenter") return "Risk: Low";
-  if (key === "expeditionBay") return "Risk: Resource timing";
-  return "Risk: Low";
-}
-
-function sectorStatusForBuilding(key, state) {
-  const level = Number(state.buildings?.[key] || 0);
-  const stability = Number(state.stability || 100);
-
-  if (level <= 0) return "offline";
-  if (stability < 50 && ["refinery", "researchLab", "logisticsCenter"].includes(key)) return "critical";
-  if (stability < 70 && ["repairBay", "powerCell", "refinery"].includes(key)) return "warning";
-  return "active";
-}
-
-function sectorStatusClasses(status) {
-  if (status === "critical") return "border-rose-500/35 bg-rose-500/10 text-rose-200";
-  if (status === "warning") return "border-amber-500/35 bg-amber-500/10 text-amber-200";
-  if (status === "active") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-200";
-  return "border-white/10 bg-white/5 text-white/45";
-}
 
 function getAlerts(state, derived, systemState, liveContracts = []) {
   const alerts = [];
@@ -890,10 +371,6 @@ function ResourceCostRow({ cost, resources }) {
   );
 }
 
-function todayKey() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function safeParse(raw, fallback) {
   if (!raw) return fallback;
   try {
@@ -923,11 +400,6 @@ function saveBaseProfilePatch(patch) {
       ...patch,
     })
   );
-}
-
-function pushLog(log, text) {
-  const next = [{ id: `${Date.now()}-${Math.random()}`, ts: Date.now(), text }, ...(log || [])];
-  return next.slice(0, MAX_LOG_ITEMS);
 }
 
 function buildingCost(def, level) {
@@ -981,35 +453,8 @@ function unlocked(def, state) {
   return def.requires.every((req) => (state.buildings[req.key] || 0) >= (req.lvl || 1));
 }
 
-/** Server-aligned softcut: factor between 1.0 and 0.5 by sent_today/ship_cap ratio. */
-function getShipSoftcutFactor(sentToday, shipCap) {
-  const safeCap = Math.max(1, Number(shipCap || 0));
-  const safeSent = Math.max(0, Number(sentToday || 0));
-  const ratio = safeSent / safeCap;
-  return Math.max(0.5, 1 - ratio * 0.5);
-}
-
 function softcutFactor(used, cap) {
   return getShipSoftcutFactor(used, cap);
-}
-
-function offlineFactorFor(ms) {
-  let remaining = Math.max(0, ms);
-  let consumed = 0;
-  let weighted = 0;
-  let startMs = 0;
-  for (const tier of OFFLINE_TIERS) {
-    const tierEnd = tier.hours * 3600 * 1000;
-    const room = Math.max(0, tierEnd - startMs);
-    const take = Math.min(remaining, room);
-    if (take <= 0) break;
-    weighted += take * tier.factor;
-    consumed += take;
-    remaining -= take;
-    startMs = tierEnd;
-  }
-  if (consumed <= 0) return 0;
-  return weighted / consumed;
 }
 
 async function readVaultSafe() {
@@ -1038,223 +483,6 @@ async function addToVault(amount, gameId = "mleo-base") {
   return applyBaseVaultDelta(delta, gameId);
 }
 
-function xpForLevel(level) {
-  return 120 + (level - 1) * 80;
-}
-
-function applyLevelUps(next) {
-  const state = {
-    ...next,
-    log: [...(next.log || [])],
-  };
-  while (state.commanderXp >= xpForLevel(state.commanderLevel)) {
-    state.commanderXp -= xpForLevel(state.commanderLevel);
-    state.commanderLevel += 1;
-    state.log = pushLog(state.log, `Commander Level ${state.commanderLevel} reached.`);
-  }
-  return state;
-}
-
-function getMissionProgress(state) {
-  return {
-    upgrade_building: Number(state?.stats?.upgradesToday || 0),
-    ship_mleo: Number(state?.stats?.shippedToday || 0),
-    run_expedition: Number(state?.stats?.expeditionsToday || 0),
-    spend_vault: Number(state?.stats?.vaultSpentToday || 0),
-    generate_data: Number(state?.stats?.dataToday || 0),
-    perform_maintenance: Number(state?.stats?.maintenanceToday || 0),
-    double_expedition: Number(state?.stats?.expeditionsToday || 0),
-  };
-}
-
-function freshState() {
-  return {
-    version: 6,
-    lastDay: todayKey(),
-    lastHiddenAt: 0,
-    starterPackClaimed: false,
-    resources: {
-      ORE: 70,
-      GOLD: CONFIG.startingGold,
-      SCRAP: 22,
-      ENERGY: CONFIG.baseEnergyCap,
-      DATA: 10,
-    },
-    lastTickAt: Date.now(),
-    buildings: {
-      hq: 1,
-      quarry: 1,
-      tradeHub: 0,
-      salvage: 0,
-      refinery: 0,
-      powerCell: 0,
-      minerControl: 0,
-      arcadeHub: 0,
-      expeditionBay: 0,
-      logisticsCenter: 0,
-      researchLab: 0,
-      repairBay: 0,
-    },
-    buildingPowerModes: {},
-    crew: 0,
-    crewRole: "engineer",
-    modules: {},
-    research: {},
-    bankedMleo: 0,
-    sentToday: 0,
-    totalBanked: 0,
-    blueprintLevel: 0,
-    totalSharedSpent: 0,
-    overclockUntil: 0,
-    expeditionReadyAt: Date.now(),
-    maintenanceDue: 0,
-    stability: 100,
-    commanderXp: 0,
-    commanderLevel: 1,
-    commanderPath: "industry",
-    totalExpeditions: 0,
-    totalMissionsDone: 0,
-    stats: {
-      upgradesToday: 0,
-      shippedToday: 0,
-      expeditionsToday: 0,
-      vaultSpentToday: 0,
-      dataToday: 0,
-      maintenanceToday: 0,
-    },
-    missionState: {
-      dailySeed: todayKey(),
-      completed: {},
-      claimed: {},
-    },
-    log: pushLog([], "MLEO BASE online. HQ is active."),
-  };
-}
-
-function safeNumber(value, fallback = 0, min = 0) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(min, n);
-}
-
-function safeInteger(value, fallback = 0, min = 0) {
-  const n = Math.floor(Number(value));
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(min, n);
-}
-
-function normalizeBuildingPowerModes(rawModes, rawPaused = null) {
-  const out = {};
-  for (const key of RUNTIME_CONTROLLED_BUILDINGS) {
-    const raw = rawModes?.[key];
-    if (BUILDING_POWER_STEPS.includes(Number(raw))) {
-      out[key] = Number(raw);
-      continue;
-    }
-
-    // Backward compat: rawPaused can be the old pausedBuildings/paused_buildings boolean map.
-    if (rawPaused && typeof rawPaused[key] === "boolean") {
-      out[key] = rawPaused[key] ? 0 : 100;
-    }
-  }
-  return out;
-}
-
-function sanitizeBaseState(raw, fallback = null) {
-  const seed = fallback || freshState();
-  const src = raw && typeof raw === "object" ? raw : {};
-
-  return {
-    ...seed,
-    ...src,
-
-    version: safeInteger(src.version, seed.version, 1),
-    lastDay: typeof src.lastDay === "string" ? src.lastDay : seed.lastDay,
-    lastTickAt: safeInteger(src.lastTickAt, seed.lastTickAt, 0),
-    lastHiddenAt: safeInteger(src.lastHiddenAt, 0, 0),
-
-    resources: {
-      ...seed.resources,
-      ...(src.resources || {}),
-      ORE: safeNumber(src?.resources?.ORE, seed.resources.ORE, 0),
-      GOLD: safeNumber(src?.resources?.GOLD, seed.resources.GOLD, 0),
-      SCRAP: safeNumber(src?.resources?.SCRAP, seed.resources.SCRAP, 0),
-      ENERGY: safeNumber(src?.resources?.ENERGY, seed.resources.ENERGY, 0),
-      DATA: safeNumber(src?.resources?.DATA, seed.resources.DATA, 0),
-    },
-
-    buildings: {
-      ...seed.buildings,
-      ...(src.buildings || {}),
-      hq: safeInteger(src?.buildings?.hq, seed.buildings.hq, 1),
-      quarry: safeInteger(src?.buildings?.quarry, seed.buildings.quarry, 0),
-      tradeHub: safeInteger(src?.buildings?.tradeHub, seed.buildings.tradeHub, 0),
-      salvage: safeInteger(src?.buildings?.salvage, seed.buildings.salvage, 0),
-      refinery: safeInteger(src?.buildings?.refinery, seed.buildings.refinery, 0),
-      powerCell: safeInteger(src?.buildings?.powerCell, seed.buildings.powerCell, 0),
-      minerControl: safeInteger(src?.buildings?.minerControl, seed.buildings.minerControl, 0),
-      arcadeHub: safeInteger(src?.buildings?.arcadeHub, seed.buildings.arcadeHub, 0),
-      expeditionBay: safeInteger(src?.buildings?.expeditionBay, seed.buildings.expeditionBay, 0),
-      logisticsCenter: safeInteger(src?.buildings?.logisticsCenter, seed.buildings.logisticsCenter, 0),
-      researchLab: safeInteger(src?.buildings?.researchLab, seed.buildings.researchLab, 0),
-      repairBay: safeInteger(src?.buildings?.repairBay, seed.buildings.repairBay, 0),
-    },
-
-    buildingPowerModes: normalizeBuildingPowerModes(
-      src?.buildingPowerModes || src?.building_power_modes || {},
-      src?.pausedBuildings || src?.paused_buildings || {}
-    ),
-
-    crew: safeInteger(src.crew, seed.crew, 0),
-    crewRole: typeof src.crewRole === "string" ? src.crewRole : seed.crewRole,
-    commanderPath: typeof src.commanderPath === "string" ? src.commanderPath : seed.commanderPath,
-
-    modules: src.modules && typeof src.modules === "object" ? src.modules : {},
-    research: src.research && typeof src.research === "object" ? src.research : {},
-
-    bankedMleo: safeNumber(src.bankedMleo, seed.bankedMleo, 0),
-    sentToday: safeNumber(src.sentToday, seed.sentToday, 0),
-    totalBanked: safeNumber(src.totalBanked, seed.totalBanked, 0),
-    blueprintLevel: safeInteger(src.blueprintLevel, seed.blueprintLevel, 0),
-    totalSharedSpent: safeNumber(src.totalSharedSpent, seed.totalSharedSpent, 0),
-    overclockUntil: safeInteger(src.overclockUntil, seed.overclockUntil, 0),
-    expeditionReadyAt: safeInteger(src.expeditionReadyAt, seed.expeditionReadyAt, 0),
-    maintenanceDue: safeNumber(src.maintenanceDue, seed.maintenanceDue, 0),
-    stability: safeNumber(src.stability, seed.stability, 0),
-    commanderXp: safeNumber(src.commanderXp, seed.commanderXp, 0),
-    commanderLevel: safeInteger(src.commanderLevel, seed.commanderLevel, 1),
-    totalExpeditions: safeInteger(src.totalExpeditions, seed.totalExpeditions, 0),
-    totalMissionsDone: safeInteger(src.totalMissionsDone, seed.totalMissionsDone, 0),
-
-    stats: {
-      ...seed.stats,
-      ...(src.stats || {}),
-      upgradesToday: safeInteger(src?.stats?.upgradesToday, seed.stats.upgradesToday, 0),
-      shippedToday: safeNumber(src?.stats?.shippedToday, seed.stats.shippedToday, 0),
-      expeditionsToday: safeInteger(src?.stats?.expeditionsToday, seed.stats.expeditionsToday, 0),
-      vaultSpentToday: safeNumber(src?.stats?.vaultSpentToday, seed.stats.vaultSpentToday, 0),
-      dataToday: safeNumber(src?.stats?.dataToday, seed.stats.dataToday, 0),
-      maintenanceToday: safeInteger(src?.stats?.maintenanceToday, seed.stats.maintenanceToday, 0),
-    },
-
-    missionState: {
-      dailySeed:
-        typeof src?.missionState?.dailySeed === "string"
-          ? src.missionState.dailySeed
-          : seed.missionState.dailySeed,
-      completed:
-        src?.missionState?.completed && typeof src.missionState.completed === "object"
-          ? src.missionState.completed
-          : {},
-      claimed:
-        src?.missionState?.claimed && typeof src.missionState.claimed === "object"
-          ? src.missionState.claimed
-          : {},
-    },
-
-    log: Array.isArray(src.log) ? src.log.slice(0, MAX_LOG_ITEMS) : seed.log,
-  };
-}
 
 function isNewPlayer(state) {
   const b = state?.buildings || {};
@@ -1289,82 +517,6 @@ function applyStarterPackIfNeeded(state) {
   return next;
 }
 
-function normalizeServerState(raw, prevState = null) {
-  const seed = freshState();
-  const prev = prevState ? sanitizeBaseState(prevState, seed) : null;
-
-  if (!raw) {
-    return prev ? sanitizeBaseState({ ...seed, ...prev }, seed) : seed;
-  }
-
-  const lastTick =
-    raw.lastTickAt ??
-    (raw.last_tick_at ? new Date(raw.last_tick_at).getTime() : prev?.lastTickAt ?? Date.now());
-
-  const expeditionReady =
-    raw.expeditionReadyAt ??
-    (raw.expedition_ready_at
-      ? new Date(raw.expedition_ready_at).getTime()
-      : prev?.expeditionReadyAt ?? Date.now());
-
-  const overclockUntil =
-    raw.overclockUntil ??
-    (raw.overclock_until ? new Date(raw.overclock_until).getTime() : prev?.overclockUntil ?? 0);
-
-  return sanitizeBaseState({
-    ...seed,
-    ...(prev || {}),
-    ...raw,
-
-    version: Number(raw.version ?? prev?.version ?? seed.version),
-    lastDay: raw.lastDay || raw.last_day || prev?.lastDay || seed.lastDay,
-
-    lastTickAt: lastTick,
-    lastHiddenAt: 0,
-
-    resources: raw.resources || prev?.resources || seed.resources,
-    buildings: raw.buildings || prev?.buildings || seed.buildings,
-    buildingPowerModes: normalizeBuildingPowerModes(
-      raw.buildingPowerModes ||
-        raw.building_power_modes ||
-        prev?.buildingPowerModes ||
-        seed.buildingPowerModes,
-      raw.pausedBuildings || raw.paused_buildings || null
-    ),
-    modules: raw.modules || prev?.modules || {},
-    research: raw.research || prev?.research || {},
-
-    crew: Number(raw.crew ?? prev?.crew ?? 0),
-    crewRole:
-      raw.crewRole ??
-      raw.crew_role ??
-      prev?.crewRole ??
-      "engineer",
-    commanderPath:
-      raw.commanderPath ??
-      raw.commander_path ??
-      prev?.commanderPath ??
-      "industry",
-
-    bankedMleo: Number(raw.bankedMleo ?? raw.banked_mleo ?? prev?.bankedMleo ?? 0),
-    sentToday: Number(raw.sentToday ?? raw.sent_today ?? prev?.sentToday ?? 0),
-    totalBanked: Number(raw.totalBanked ?? raw.total_banked ?? prev?.totalBanked ?? 0),
-    blueprintLevel: Number(raw.blueprintLevel ?? raw.blueprint_level ?? prev?.blueprintLevel ?? 0),
-    totalSharedSpent: Number(raw.totalSharedSpent ?? raw.total_shared_spent ?? prev?.totalSharedSpent ?? 0),
-    overclockUntil,
-    expeditionReadyAt: expeditionReady,
-    maintenanceDue: Number(raw.maintenanceDue ?? raw.maintenance_due ?? prev?.maintenanceDue ?? 0),
-    stability: Number(raw.stability ?? prev?.stability ?? 100),
-    commanderXp: Number(raw.commanderXp ?? raw.commander_xp ?? prev?.commanderXp ?? 0),
-    commanderLevel: Number(raw.commanderLevel ?? raw.commander_level ?? prev?.commanderLevel ?? 1),
-    totalExpeditions: Number(raw.totalExpeditions ?? raw.total_expeditions ?? prev?.totalExpeditions ?? 0),
-    totalMissionsDone: Number(raw.totalMissionsDone ?? raw.total_missions_done ?? prev?.totalMissionsDone ?? 0),
-
-    stats: raw.stats || prev?.stats || seed.stats,
-    missionState: raw.missionState || raw.mission_state || prev?.missionState || seed.missionState,
-    log: prev?.log || seed.log,
-  }, seed);
-}
 
 function derive(state, now = Date.now()) {
   const powerLevel = state.buildings.powerCell || 0;
@@ -2314,143 +1466,6 @@ function InfoButton({ infoKey, setOpenInfoKey, className = "" }) {
   );
 }
 
-const BASE_HOME_SCENE_ORDER = [
-  "hq",
-  "quarry",
-  "tradeHub",
-  "salvage",
-  "refinery",
-  "powerCell",
-  "minerControl",
-  "arcadeHub",
-  "expeditionBay",
-  "logisticsCenter",
-  "researchLab",
-  "repairBay",
-];
-
-const BASE_HOME_SCENE_POSITIONS_MOBILE = {
-  hq: { x: 50, y: 40 },
-
-  powerCell: { x: 80, y: 8 },
-  researchLab: { x: 51, y: 10 }, // LAB
-
-  tradeHub: { x: 20, y: 5 },
-
-  salvage: { x: 15, y: 31 },
-  arcadeHub: { x: 50, y: 61 },   // ARC
-  minerControl: { x: 16, y: 18 }, // MIN
-
-  refinery: { x: 21, y: 47 },
-  quarry: { x: 18, y: 62 },
-
-  expeditionBay: { x: 85, y: 29 },
-  logisticsCenter: { x: 86, y: 45 },
-  repairBay: { x: 78, y: 60 },
-};
-
-const BASE_HOME_SCENE_POSITIONS_DESKTOP = {
-  hq: { x: 50, y: 42 },
-
-  tradeHub: { x: 25, y: 14 },
-  salvage: { x: 17, y: 31 },
-  refinery: { x: 24, y: 50 },
-  quarry: { x: 17, y: 70 },
-
-  minerControl: { x: 47, y: 65 }, // MIN
-  arcadeHub: { x: 43, y: 20 },    // ARC
-
-  powerCell: { x: 79, y: 14 },
-  researchLab: { x: 65, y: 10 },  // LAB
-
-  expeditionBay: { x: 86, y: 31 },
-  logisticsCenter: { x: 79, y: 46 },
-  repairBay: { x: 86, y: 70 },
-};
-
-const BASE_HOME_SCENE_IDENTITY = {
-  hq: { short: "HQ", glow: "emerald", icon: "◆" },
-  quarry: { short: "MINE", glow: "amber", icon: "◇" },
-  tradeHub: { short: "TRD", glow: "yellow", icon: "◎" },
-  salvage: { short: "SAL", glow: "lime", icon: "▣" },
-  refinery: { short: "REF", glow: "orange", icon: "⬡" },
-  powerCell: { short: "PWR", glow: "cyan", icon: "⚡" },
-  minerControl: { short: "MIN", glow: "slate", icon: "▤" },
-  arcadeHub: { short: "ARC", glow: "violet", icon: "◉" },
-  expeditionBay: { short: "EXP", glow: "violet", icon: "◈" },
-  logisticsCenter: { short: "LOG", glow: "sky", icon: "▢" },
-  researchLab: { short: "LAB", glow: "indigo", icon: "◉" },
-  repairBay: { short: "REP", glow: "teal", icon: "⚙" },
-};
-
-function getBaseSceneIdentity(key) {
-  return (
-    BASE_HOME_SCENE_IDENTITY[key] || {
-      short: key?.slice(0, 3)?.toUpperCase?.() || "BASE",
-      glow: "slate",
-      icon: "•",
-    }
-  );
-}
-
-function getBaseSceneGlow(glow, state = "normal") {
-  const palette = {
-    emerald:
-      "border-emerald-400/70 bg-emerald-950/45 text-emerald-100 shadow-[0_0_16px_rgba(16,185,129,0.35)]",
-    amber:
-      "border-amber-400/60 bg-amber-950/35 text-amber-100 shadow-[0_0_12px_rgba(245,158,11,0.28)]",
-    yellow:
-      "border-yellow-400/60 bg-yellow-950/35 text-yellow-100 shadow-[0_0_12px_rgba(250,204,21,0.28)]",
-    lime:
-      "border-lime-400/60 bg-lime-950/35 text-lime-100 shadow-[0_0_12px_rgba(132,204,22,0.28)]",
-    cyan:
-      "border-cyan-400/70 bg-cyan-950/35 text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,0.35)]",
-    violet:
-      "border-violet-400/60 bg-violet-950/35 text-violet-100 shadow-[0_0_12px_rgba(167,139,250,0.28)]",
-    indigo:
-      "border-indigo-400/60 bg-indigo-950/35 text-indigo-100 shadow-[0_0_12px_rgba(99,102,241,0.28)]",
-    teal:
-      "border-teal-400/60 bg-teal-950/35 text-teal-100 shadow-[0_0_12px_rgba(45,212,191,0.28)]",
-    orange:
-      "border-orange-400/60 bg-orange-950/35 text-orange-100 shadow-[0_0_12px_rgba(251,146,60,0.28)]",
-    sky: "border-sky-400/60 bg-sky-950/35 text-sky-100 shadow-[0_0_12px_rgba(56,189,248,0.28)]",
-    slate:
-      "border-slate-500/60 bg-slate-900/75 text-slate-200 shadow-[0_0_10px_rgba(148,163,184,0.15)]",
-  };
-
-  if (state === "warning") {
-    return "border-amber-300/70 bg-amber-950/40 text-amber-100 shadow-[0_0_18px_rgba(251,191,36,0.35)]";
-  }
-
-  if (state === "critical") {
-    return "border-rose-400/75 bg-rose-950/40 text-rose-100 shadow-[0_0_20px_rgba(244,63,94,0.35)]";
-  }
-
-  return palette[glow] || palette.slate;
-}
-
-function getBaseSceneNodeState(key, base, derived) {
-  const energy = Number(base?.resources?.ENERGY || 0);
-  const energyCap = Number(derived?.energyCap || 0);
-  const stability = Number(base?.stability || 100);
-
-  if (key === "powerCell") {
-    if (energyCap > 0 && energy <= energyCap * 0.12) return "critical";
-    if (energyCap > 0 && energy <= energyCap * 0.25) return "warning";
-  }
-
-  if (key === "repairBay") {
-    if (stability < 50) return "critical";
-    if (stability < 70) return "warning";
-  }
-
-  if (key === "refinery") {
-    if (stability < 70) return "warning";
-  }
-
-  return "normal";
-}
-
 function BaseHomeFlowScene({ base, derived, selected, onSelect, layout = "mobile" }) {
   const scenePositions =
     layout === "desktop" ? BASE_HOME_SCENE_POSITIONS_DESKTOP : BASE_HOME_SCENE_POSITIONS_MOBILE;
@@ -2468,13 +1483,17 @@ function BaseHomeFlowScene({ base, derived, selected, onSelect, layout = "mobile
       const level =
         key === "hq" ? Math.max(1, Number(buildings[key] || 1)) : Number(buildings[key] || 0);
 
+      const identity = getBaseSceneIdentity(key);
+      const nodeState = getBaseSceneNodeState(key, base, derived);
+
       return {
         key,
         level,
         name: def?.name || key,
         pos: scenePositions[key],
-        identity: getBaseSceneIdentity(key),
-        state: getBaseSceneNodeState(key, base, derived),
+        identity,
+        state: nodeState,
+        glowClass: getBaseSceneGlow(identity.glow, nodeState),
       };
     });
   }, [base, derived, layout]);
@@ -2486,11 +1505,24 @@ function BaseHomeFlowScene({ base, derived, selected, onSelect, layout = "mobile
     pos: scenePositions.hq,
     identity: getBaseSceneIdentity("hq"),
     state: "normal",
+    glowClass: getBaseSceneGlow(getBaseSceneIdentity("hq").glow, "normal"),
   };
 
   const links = nodes.filter((n) => n.key !== "hq" && n.pos);
 
   return (
+    <BaseHomeFlowScenePanel
+      layout={layout}
+      hq={hq}
+      links={links}
+      nodes={nodes}
+      selected={selected}
+      onSelect={onSelect}
+    />
+  );
+
+  if (false) {
+    return (
     <div
       className={
         isDesktop
@@ -2592,7 +1624,8 @@ function BaseHomeFlowScene({ base, derived, selected, onSelect, layout = "mobile
 
       {/* Buildings online badge removed */}
     </div>
-  );
+    );
+  }
 }
 
 export default function MleoBase() {
@@ -3551,27 +2584,12 @@ export default function MleoBase() {
 
       if (res?.success && res?.state) {
         setState((prev) => {
-          const base = normalizeServerState(res.state, prev);
-
-          const next = applyLevelUps({
-            ...prev,
-            ...base,
-            crewRole: base?.crewRole ?? prev?.crewRole ?? "engineer",
-            commanderPath: base?.commanderPath ?? prev?.commanderPath ?? "industry",
-            missionState: {
-              dailySeed:
-                base?.missionState?.dailySeed ||
-                prev?.missionState?.dailySeed ||
-                todayKey(),
-              completed: {
-                ...(prev?.missionState?.completed || {}),
-                ...(base?.missionState?.completed || {}),
-              },
-              claimed: {
-                ...(prev?.missionState?.claimed || {}),
-                ...(base?.missionState?.claimed || {}),
-              },
-            },
+          const next = mergeProgressFromServer({
+            prev,
+            serverState: res.state,
+            normalizeServerState,
+            applyLevelUps,
+            todayKey,
           });
 
           next.log = pushLog(
@@ -3670,27 +2688,12 @@ export default function MleoBase() {
 
       if (res?.success && res?.state) {
         setState((prev) => {
-          const base = normalizeServerState(res.state, prev);
-
-          const next = applyLevelUps({
-            ...prev,
-            ...base,
-            crewRole: base?.crewRole ?? prev?.crewRole ?? "engineer",
-            commanderPath: base?.commanderPath ?? prev?.commanderPath ?? "industry",
-            missionState: {
-              dailySeed:
-                base?.missionState?.dailySeed ||
-                prev?.missionState?.dailySeed ||
-                todayKey(),
-              completed: {
-                ...(prev?.missionState?.completed || {}),
-                ...(base?.missionState?.completed || {}),
-              },
-              claimed: {
-                ...(prev?.missionState?.claimed || {}),
-                ...(base?.missionState?.claimed || {}),
-              },
-            },
+          const next = mergeProgressFromServer({
+            prev,
+            serverState: res.state,
+            normalizeServerState,
+            applyLevelUps,
+            todayKey,
           });
 
           next.log = pushLog(
@@ -3731,27 +2734,12 @@ export default function MleoBase() {
 
       if (res?.success && res?.state) {
         setState((prev) => {
-          const base = normalizeServerState(res.state, prev);
-
-          const next = applyLevelUps({
-            ...prev,
-            ...base,
-            crewRole: base?.crewRole ?? prev?.crewRole ?? "engineer",
-            commanderPath: base?.commanderPath ?? prev?.commanderPath ?? "industry",
-            missionState: {
-              dailySeed:
-                base?.missionState?.dailySeed ||
-                prev?.missionState?.dailySeed ||
-                todayKey(),
-              completed: {
-                ...(prev?.missionState?.completed || {}),
-                ...(base?.missionState?.completed || {}),
-              },
-              claimed: {
-                ...(prev?.missionState?.claimed || {}),
-                ...(base?.missionState?.claimed || {}),
-              },
-            },
+          const next = mergeProgressFromServer({
+            prev,
+            serverState: res.state,
+            normalizeServerState,
+            applyLevelUps,
+            todayKey,
           });
 
           next.log = pushLog(next.log, `${moduleDef.name} installed.`);
@@ -3794,27 +2782,12 @@ export default function MleoBase() {
 
       if (res?.success && res?.state) {
         setState((prev) => {
-          const base = normalizeServerState(res.state, prev);
-
-          const next = applyLevelUps({
-            ...prev,
-            ...base,
-            crewRole: base?.crewRole ?? prev?.crewRole ?? "engineer",
-            commanderPath: base?.commanderPath ?? prev?.commanderPath ?? "industry",
-            missionState: {
-              dailySeed:
-                base?.missionState?.dailySeed ||
-                prev?.missionState?.dailySeed ||
-                todayKey(),
-              completed: {
-                ...(prev?.missionState?.completed || {}),
-                ...(base?.missionState?.completed || {}),
-              },
-              claimed: {
-                ...(prev?.missionState?.claimed || {}),
-                ...(base?.missionState?.claimed || {}),
-              },
-            },
+          const next = mergeProgressFromServer({
+            prev,
+            serverState: res.state,
+            normalizeServerState,
+            applyLevelUps,
+            todayKey,
           });
 
           next.log = pushLog(next.log, `${def.name} research completed.`);
@@ -3855,27 +2828,14 @@ export default function MleoBase() {
         const loot = res.loot || {};
 
         setState((prev) => {
-          const base = normalizeServerState(serverState, prev);
-          const next = applyLevelUps({
-            ...prev,
-            ...base,
-            crewRole: base?.crewRole ?? prev?.crewRole ?? "engineer",
-            commanderPath: base?.commanderPath ?? prev?.commanderPath ?? "industry",
-            expeditionReadyAt: base.expeditionReadyAt || prev.expeditionReadyAt,
-            totalExpeditions: (prev.totalExpeditions || 0) + 1,
-            missionState: {
-              dailySeed:
-                base?.missionState?.dailySeed ||
-                prev?.missionState?.dailySeed ||
-                todayKey(),
-              completed: {
-                ...(prev?.missionState?.completed || {}),
-                ...(base?.missionState?.completed || {}),
-              },
-              claimed: {
-                ...(prev?.missionState?.claimed || {}),
-                ...(base?.missionState?.claimed || {}),
-              },
+          const next = mergeProgressFromServer({
+            prev,
+            serverState,
+            normalizeServerState,
+            applyLevelUps,
+            todayKey,
+            overrides: {
+              totalExpeditions: (prev.totalExpeditions || 0) + 1,
             },
           });
           next.log = pushLog(
@@ -3928,26 +2888,12 @@ export default function MleoBase() {
         }
 
         setState((prev) => {
-          const base = normalizeServerState(serverState, prev);
-          const next = applyLevelUps({
-            ...prev,
-            ...base,
-            crewRole: base?.crewRole ?? prev?.crewRole ?? "engineer",
-            commanderPath: base?.commanderPath ?? prev?.commanderPath ?? "industry",
-            missionState: {
-              dailySeed:
-                base?.missionState?.dailySeed ||
-                prev?.missionState?.dailySeed ||
-                todayKey(),
-              completed: {
-                ...(prev?.missionState?.completed || {}),
-                ...(base?.missionState?.completed || {}),
-              },
-              claimed: {
-                ...(prev?.missionState?.claimed || {}),
-                ...(base?.missionState?.claimed || {}),
-              },
-            },
+          const next = mergeProgressFromServer({
+            prev,
+            serverState,
+            normalizeServerState,
+            applyLevelUps,
+            todayKey,
           });
           next.log = pushLog(
             next.log,
@@ -4143,35 +3089,26 @@ export default function MleoBase() {
 
       setState((prev) => {
         const normalized = normalizeServerState(serverState, prev);
-
-        return applyLevelUps({
-          ...prev,
-          ...normalized,
-          crewRole:
-            serverState?.crewRole ??
-            serverState?.crew_role ??
-            normalized?.crewRole ??
-            prev?.crewRole ??
-            "engineer",
-          commanderPath:
-            serverState?.commanderPath ??
-            serverState?.commander_path ??
-            normalized?.commanderPath ??
-            prev?.commanderPath ??
-            "industry",
-          missionState: {
-            dailySeed:
-              normalized?.missionState?.dailySeed ||
-              prev?.missionState?.dailySeed ||
-              todayKey(),
-            completed: {
-              ...(prev?.missionState?.completed || {}),
-              ...(normalized?.missionState?.completed || {}),
-            },
-            claimed: {
-              ...(prev?.missionState?.claimed || {}),
-              ...(normalized?.missionState?.claimed || {}),
-            },
+        return mergeProgressFromServer({
+          prev,
+          serverState,
+          normalizeServerState,
+          applyLevelUps,
+          todayKey,
+          overrides: {
+            ...normalized,
+            crewRole:
+              serverState?.crewRole ??
+              serverState?.crew_role ??
+              normalized?.crewRole ??
+              prev?.crewRole ??
+              "engineer",
+            commanderPath:
+              serverState?.commanderPath ??
+              serverState?.commander_path ??
+              normalized?.commanderPath ??
+              prev?.commanderPath ??
+              "industry",
           },
         });
       });
@@ -4473,333 +3410,285 @@ export default function MleoBase() {
     }
   }
 
+  const openMissionInfoByKey = (key) => {
+    const mission = DAILY_MISSIONS.find((m) => m.key === key);
+    if (!mission) return;
+    setBuildInfo(getMissionInfo(mission));
+    setOpenInfoKey(null);
+  };
+
+  const dailyMissionsVM = [...DAILY_MISSIONS].sort((a, b) => {
+    const aProgress = missionProgress[a.key] || 0;
+    const aDone = aProgress >= a.target;
+    const aClaimed = !!state.missionState?.claimed?.[a.key];
+    const aReady = aDone && !aClaimed ? 1 : 0;
+
+    const bProgress = missionProgress[b.key] || 0;
+    const bDone = bProgress >= b.target;
+    const bClaimed = !!state.missionState?.claimed?.[b.key];
+    const bReady = bDone && !bClaimed ? 1 : 0;
+
+    return bReady - aReady;
+  }).map((mission) => {
+    const progress = missionProgress[mission.key] || 0;
+    const done = progress >= mission.target;
+    const claimed = !!state.missionState?.claimed?.[mission.key];
+    const ready = done && !claimed;
+
+    const helpText =
+      mission.key === "upgrade_building"
+        ? "Good moment to upgrade a real bottleneck, not a random building."
+        : mission.key === "run_expedition"
+        ? "Only worth forcing when Energy and DATA are comfortable."
+        : mission.key === "generate_data"
+        ? "Research Lab is the cleanest answer."
+        : mission.key === "perform_maintenance"
+        ? "Best done before Stability starts feeling ugly."
+        : mission.key === "double_expedition"
+        ? "Can drain tempo if Energy is already weak."
+        : mission.key === "ship_mleo"
+        ? "First create banked MLEO, then ship."
+        : mission.key === "spend_vault"
+        ? "Blueprint is the cleanest long-term spend path."
+        : null;
+
+    return {
+      key: mission.key,
+      name: mission.name,
+      progress,
+      target: mission.target,
+      progressText: fmt(progress),
+      targetText: fmt(mission.target),
+      rewardText: rewardText(mission.reward),
+      quickTags: getMissionQuickTags(mission.key),
+      helpText,
+      done,
+      claimed,
+      ready,
+      highlighted: highlightTarget === mission.key,
+    };
+  });
+
   const dailyMissionsContent = (
-    <div className="space-y-3">
-      {[...DAILY_MISSIONS].sort((a, b) => {
-        const aProgress = missionProgress[a.key] || 0;
-        const aDone = aProgress >= a.target;
-        const aClaimed = !!state.missionState?.claimed?.[a.key];
-        const aReady = aDone && !aClaimed ? 1 : 0;
-        
-        const bProgress = missionProgress[b.key] || 0;
-        const bDone = bProgress >= b.target;
-        const bClaimed = !!state.missionState?.claimed?.[b.key];
-        const bReady = bDone && !bClaimed ? 1 : 0;
-        
-        return bReady - aReady;
-      }).map((mission) => {
-        const progress = missionProgress[mission.key] || 0;
-        const done = progress >= mission.target;
-        const claimed = !!state.missionState?.claimed?.[mission.key];
-        const ready = done && !claimed;
-        return (
-          <div
-            key={mission.key}
-            data-base-target={mission.key}
-            className={`relative rounded-xl border p-2.5 ${
-              ready
-                ? "border-amber-400/40 bg-amber-500/10"
-                : "border-white/10 bg-black/20"
-            } ${
-              highlightTarget === mission.key
-                ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
-                : ""
-            }`}
-          >
-            <div className="absolute right-2.5 top-2.5 z-10">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setBuildInfo(getMissionInfo(mission));
-                  setOpenInfoKey(null);
-                }}
-                className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-                aria-label={`Open info for ${mission.name}`}
-                title={`Info about ${mission.name}`}
-              >
-                i
-              </button>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="pr-8">
-                <div className="text-xs font-semibold">{mission.name}</div>
-                <div className="mt-1 text-[11px] text-white/60">
-                  Progress: {fmt(progress)} / {fmt(mission.target)}
-                </div>
-                <div className="mt-1 text-[11px] text-white/55">Potential reward: {rewardText(mission.reward)}</div>
+    <DailyMissionsPanel
+      missions={dailyMissionsVM}
+      onClaimMission={claimMission}
+      onOpenMissionInfo={openMissionInfoByKey}
+    />
+  );
 
-                {renderQuickTags(getMissionQuickTags(mission.key))}
-
-                <div className="mt-2 text-[11px] text-white/45">
-                  {mission.key === "upgrade_building" && "Good moment to upgrade a real bottleneck, not a random building."}
-                  {mission.key === "run_expedition" && "Only worth forcing when Energy and DATA are comfortable."}
-                  {mission.key === "generate_data" && "Research Lab is the cleanest answer."}
-                  {mission.key === "perform_maintenance" && "Best done before Stability starts feeling ugly."}
-                  {mission.key === "double_expedition" && "Can drain tempo if Energy is already weak."}
-                  {mission.key === "ship_mleo" && "First create banked MLEO, then ship."}
-                  {mission.key === "spend_vault" && "Blueprint is the cleanest long-term spend path."}
-                </div>
-              </div>
-              <button
-                onClick={() => claimMission(mission.key)}
-                disabled={!done || claimed}
-                className={`shrink-0 rounded-xl px-3 py-1.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
-                  ready
-                    ? "bg-cyan-500 text-white hover:bg-cyan-400"
-                    : "bg-white/10 hover:bg-white/20"
-                }`}
-              >
-                {claimed ? "Claimed" : done ? "Claim" : "In Progress"}
-              </button>
-            </div>
-          </div>
-        );
-      })}
-    </div>
+  const compactResourceBar = (
+    <BaseResourceBar
+      resources={state.resources}
+      energy={state.resources?.ENERGY || 0}
+      energyCap={derived.energyCap || 140}
+      bankedMleo={state.bankedMleo || 0}
+      compact
+      showBanked={false}
+    />
   );
 
   // Used by Desktop "ops-console" inner panel.
   // Keep it presentation-only: the action handlers already contain the real game/server logic.
   const operationsConsoleContent = (
-    <div className="grid gap-3 md:grid-cols-2">
-      <div
-        data-base-target="shipping"
-        className={`relative flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
-          highlightCard((state.bankedMleo || 0) >= 120, "success") || ""
-        } ${isHighlightedTarget("shipping", highlightTarget) ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]" : ""}`}
-      >
-        <div className="absolute right-3 top-3 z-10">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setBuildInfo(getOperationsInfo("shipping"));
-              setOpenInfoKey(null);
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-            aria-label="Open shipping info"
-            title="Info about shipping"
-          >
-            i
-          </button>
-        </div>
-
-        <div className="flex min-h-[88px] flex-col pr-8">
-          <div className="text-sm font-semibold text-emerald-200">Ship to Shared Vault</div>
-          <p className="mt-1 text-sm text-white/70">
-            Move refined MLEO into the main vault with a daily softcut, so BASE supports Miners instead
-            of replacing it.
-          </p>
-        </div>
-
-        <button
-          onClick={bankToSharedVault}
-          disabled={!canShipNow}
-          className={`mt-auto w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold transition ${
-            canShipNow ? "bg-emerald-600 text-white hover:bg-emerald-500" : "bg-white/10 text-white/45"
-          }`}
-        >
-          Ship {fmt(state.bankedMleo || 0)} MLEO
-        </button>
-      </div>
-
-      {showExpeditions ? (
-        <div
-          data-base-target="expedition"
-          className={`relative flex h-full flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 ${
-            highlightCard(expeditionLeft <= 0 && (state.resources.DATA || 0) >= 4, "info") || ""
-          } ${
-            isHighlightedTarget("expedition", highlightTarget)
-              ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
-              : ""
-          }`}
-        >
-          <div className="absolute right-3 top-3 z-10">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setBuildInfo(getOperationsInfo("expedition"));
-                setOpenInfoKey(null);
-              }}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-              aria-label="Open expedition info"
-              title="Info about expedition"
-            >
-              i
-            </button>
-          </div>
-
-          <div className="flex min-h-[88px] flex-col pr-8">
-            <div className="text-sm font-semibold text-cyan-200">Field Expedition</div>
-            <p className="mt-1 text-sm text-white/70">
-              Potential rewards: Ore, Gold, Scrap, DATA, and sometimes banked MLEO. Typical outcome varies.
-            </p>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-bold text-cyan-200">
-                COST: 36 ENERGY
-              </span>
-              <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-[11px] font-bold text-amber-200">
-                COST: 4 DATA
-              </span>
-              <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-white/75">
-                CD: 120s
-              </span>
-            </div>
-          </div>
-
-          <button
-            onClick={handleLaunchExpedition}
-            disabled={!canExpeditionNow}
-            className={`mt-auto w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold transition ${
-              canExpeditionNow ? "bg-cyan-600 text-slate-950 hover:bg-cyan-500" : "bg-white/10 text-white/45"
-            }`}
-          >
-            {expeditionLeft > 0
-              ? `Expedition ${Math.ceil(expeditionLeft / 1000)}s`
-              : "Launch Expedition"}
-          </button>
-        </div>
-      ) : null}
-
-      <div
-        data-base-target="blueprint"
-        className={`relative rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4 ${
-          highlightCard(canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost), "info") || ""
-        }`}
-      >
-        <div className="absolute right-3 top-3 z-10">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setBuildInfo(getSystemInfo("blueprint"));
-              setOpenInfoKey(null);
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-            aria-label="Open blueprint info"
-            title="Info about blueprint"
-          >
-            i
-          </button>
-        </div>
-
-        <div className="flex min-h-[88px] flex-col pr-8">
-          <div className="text-sm font-semibold text-fuchsia-200">Blueprint Cache</div>
-          <p className="mt-1 text-sm text-white/70">
-            Costs {fmt(blueprintCost)} shared MLEO + {fmt(blueprintDataCost)} DATA. Raises banking efficiency
-            and daily ship cap permanently.
-          </p>
-        </div>
-
-        <button
-          onClick={buyBlueprint}
-          disabled={!canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)}
-          className={`mt-4 w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold transition ${
-            canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)
-              ? "bg-fuchsia-600 text-white hover:bg-fuchsia-500"
-              : "bg-white/10 text-white/45"
-          }`}
-        >
-          Buy Blueprint Lv {state.blueprintLevel + 1}
-        </button>
-      </div>
-
-      <div
-        data-base-target="maintenance"
-        className={`relative rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 ${
-          systemState === "critical" ? highlightCard(true, "critical") : systemState === "warning" ? highlightCard(true, "warning") : ""
-        } ${isHighlightedTarget("maintenance", highlightTarget) ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]" : ""}`}
-      >
-        <div className="absolute right-3 top-3 z-10 flex gap-1">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setBuildInfo(getOperationsInfo("refill"));
-              setOpenInfoKey(null);
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-            aria-label="Open refill info"
-            title="Info about refill"
-          >
-            i
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setBuildInfo(getOperationsInfo("maintenance"));
-              setOpenInfoKey(null);
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-            aria-label="Open maintenance info"
-            title="Info about maintenance"
-          >
-            i
-          </button>
-        </div>
-
-        <div className="flex min-h-[88px] flex-col pr-8">
-          <div className="text-sm font-semibold text-amber-200">Shared Vault Utilities</div>
-          <p className="mt-1 text-sm text-white/70">
-            Spend shared MLEO on productivity instead of pure emissions.
-          </p>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-bold text-cyan-200">
-              OVERCLOCK: 900 + 12 DATA
-            </span>
-            <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-[11px] font-bold text-amber-200">
-              REFILL: 180 + 5 DATA
-            </span>
-            <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-white/75">
-              MAINTAIN: STABILITY
-            </span>
-          </div>
-
-          <p className="mt-2 text-xs text-white/55">
-            Stability: {fmt(state.stability)}%
-          </p>
-        </div>
-
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <button
-            onClick={activateOverclock}
-            className="rounded-xl bg-amber-600 px-3 py-3 text-sm font-bold text-white hover:bg-amber-500"
-          >
-            {overclockLeft > 0
-              ? `Overclock ${Math.ceil(overclockLeft / 1000)}s`
-              : `Overclock ${fmt(CONFIG.overclockCost)}`}
-          </button>
-
-          <button
-            onClick={refillEnergy}
-            className="rounded-xl bg-white/10 px-3 py-3 text-sm font-bold text-white hover:bg-white/20"
-          >
-            Refill {fmt(CONFIG.refillCost)}
-          </button>
-
-          <button
-            onClick={performMaintenance}
-            className={`rounded-xl px-3 py-3 text-sm font-bold text-white ${
-              systemState === "critical"
-                ? "bg-rose-600 hover:bg-rose-500"
-                : systemState === "warning"
-                ? "bg-amber-600 hover:bg-amber-500"
-                : "bg-white/10 hover:bg-white/20"
-            }`}
-          >
-            Maintain
-          </button>
-        </div>
-      </div>
-    </div>
+    <OperationsConsolePanel
+      showExpeditions={showExpeditions}
+      highlightRingClass="ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+      shipping={{
+        highlighted: isHighlightedTarget("shipping", highlightTarget),
+        highlightClass: highlightCard((state.bankedMleo || 0) >= 120, "success") || "",
+        canShipNow,
+        bankedMleoText: fmt(state.bankedMleo || 0),
+        onOpenInfo: () => {
+          setBuildInfo(getOperationsInfo("shipping"));
+          setOpenInfoKey(null);
+        },
+        onShip: bankToSharedVault,
+      }}
+      expedition={{
+        highlighted: isHighlightedTarget("expedition", highlightTarget),
+        highlightClass:
+          highlightCard(expeditionLeft <= 0 && (state.resources.DATA || 0) >= 4, "info") || "",
+        canExpeditionNow,
+        buttonText:
+          expeditionLeft > 0
+            ? `Expedition ${Math.ceil(expeditionLeft / 1000)}s`
+            : "Launch Expedition",
+        onOpenInfo: () => {
+          setBuildInfo(getOperationsInfo("expedition"));
+          setOpenInfoKey(null);
+        },
+        onLaunch: handleLaunchExpedition,
+      }}
+      blueprint={{
+        highlighted: false, // Blueprint card didn't have ring highlight in the original code.
+        highlightClass: highlightCard(canBuyBlueprintNow, "info") || "",
+        canBuy: canBuyBlueprintNow,
+        costText: fmt(blueprintCost),
+        dataCostText: fmt(blueprintDataCost),
+        buttonText: `Buy Blueprint Lv ${state.blueprintLevel + 1}`,
+        onOpenInfo: () => {
+          setBuildInfo(getSystemInfo("blueprint"));
+          setOpenInfoKey(null);
+        },
+        onBuy: buyBlueprint,
+      }}
+      maintenance={{
+        highlighted: isHighlightedTarget("maintenance", highlightTarget),
+        highlightClass:
+          systemState === "critical"
+            ? highlightCard(true, "critical")
+            : systemState === "warning"
+            ? highlightCard(true, "warning")
+            : "",
+        systemState,
+        stabilityText: fmt(state.stability),
+        onOpenRefillInfo: () => {
+          setBuildInfo(getOperationsInfo("refill"));
+          setOpenInfoKey(null);
+        },
+        onOpenMaintenanceInfo: () => {
+          setBuildInfo(getOperationsInfo("maintenance"));
+          setOpenInfoKey(null);
+        },
+        onOverclock: activateOverclock,
+        overclockButtonText:
+          overclockLeft > 0
+            ? `Overclock ${Math.ceil(overclockLeft / 1000)}s`
+            : `Overclock ${fmt(CONFIG.overclockCost)}`,
+        onRefill: refillEnergy,
+        refillButtonText: `Refill ${fmt(CONFIG.refillCost)}`,
+        onMaintain: performMaintenance,
+      }}
+    />
   );
 
   const crewModulesResearchContent = (
+    <CrewModulesResearchPanel
+      devTab={devTab}
+      onSetDevTab={setDevTab}
+      resources={state.resources}
+      highlightTarget={highlightTarget}
+      crewTab={{
+        workerCount: state.crew,
+        globalBonusText: (state.research.fieldOps ? 3 : 2) * state.crew,
+        hireDisabled: !canCoverCost(state.resources, workerNextCost),
+        workerNextCost,
+        roles: CREW_ROLES.map((role) => ({
+          key: role.key,
+          name: role.name,
+          desc: role.desc,
+          active: crewRole === role.key,
+          quickTags: getCrewRoleQuickTags(role.key),
+          statLine: getCrewRoleStatLine(role.key),
+          hint: getCrewRoleHint(role.key),
+        })),
+        paths: COMMANDER_PATHS.map((path) => ({
+          key: path.key,
+          name: path.name,
+          desc: path.desc,
+          active: commanderPath === path.key,
+          quickTags: getCommanderPathQuickTags(path.key),
+          statLine: getCommanderPathStatLine(path.key),
+          hint: getCommanderPathHint(path.key),
+        })),
+      }}
+      modules={MODULES.map((module) => {
+        const owned = !!state.modules[module.key];
+        const canAfford = canCoverCost(state.resources, module.cost);
+        const available = !owned && canAfford;
+
+        const helpText =
+          module.key === "servoDrill"
+            ? "Use when Ore is slowing upgrades."
+            : module.key === "vaultCompressor"
+            ? "Best once shipping is already active."
+            : module.key === "arcadeRelay"
+            ? "Best for mission / expedition focused play."
+            : module.key === "minerLink"
+            ? "Great before pushing Refinery too hard."
+            : "";
+
+        return {
+          key: module.key,
+          name: module.name,
+          desc: module.desc,
+          quickTags: getModuleQuickTags(module.key),
+          helpText,
+          cost: module.cost,
+          owned,
+          canAfford,
+          available,
+        };
+      })}
+      research={RESEARCH.map((item) => {
+        const done = !!state.research[item.key];
+        const locked = item.requires?.some((key) => !state.research[key]);
+        const canAfford = canCoverCost(state.resources, item.cost);
+        const available = !done && !locked && canAfford;
+
+        const helpText =
+          item.key === "coolant"
+            ? "Early support research for Energy pressure."
+            : item.key === "routing"
+            ? "Good once bank / shipping starts to matter."
+            : item.key === "fieldOps"
+            ? "Bridge research into stronger mid-game support."
+            : item.key === "minerSync"
+            ? "One of the cleanest Ore researches."
+            : item.key === "arcadeOps"
+            ? "Best for active expedition players."
+            : item.key === "logistics"
+            ? "Shipping research, not a raw economy fix."
+            : item.key === "predictiveMaintenance"
+            ? "Top defensive research for heavy builds."
+            : item.key === "deepScan"
+            ? "Best when expeditions are frequent."
+            : item.key === "tokenDiscipline"
+            ? "Advanced tradeoff research, not for every build."
+            : "";
+
+        return {
+          key: item.key,
+          name: item.name,
+          desc: item.desc,
+          quickTags: getResearchQuickTags(item.key),
+          helpText,
+          cost: item.cost,
+          done,
+          locked,
+          canAfford,
+          available,
+        };
+      })}
+      onHire={hireCrew}
+      onSelectCrewRole={handleCrewRoleChange}
+      onOpenCrewRoleInfo={(key) => {
+        setBuildInfo(getCrewInfo(key));
+        setOpenInfoKey(null);
+      }}
+      onSelectCommanderPath={handleCommanderPathChange}
+      onOpenCommanderPathInfo={(key) => {
+        setBuildInfo(getCommanderPathInfo(key));
+        setOpenInfoKey(null);
+      }}
+      onBuyModule={buyModule}
+      onOpenModuleInfo={(key) => {
+        const module = MODULES.find((m) => m.key === key);
+        if (!module) return;
+        setBuildInfo(getDevelopmentInfo(module));
+        setOpenInfoKey(null);
+      }}
+      onBuyResearch={buyResearch}
+      onOpenResearchInfo={(key) => {
+        const item = RESEARCH.find((m) => m.key === key);
+        if (!item) return;
+        setBuildInfo(getDevelopmentInfo(item));
+        setOpenInfoKey(null);
+      }}
+    />
+  );
+  /*
     <div className="space-y-3">
       <div className="flex gap-2 overflow-x-auto pb-1">
         {[
@@ -5144,6 +4033,8 @@ export default function MleoBase() {
       ) : null}
     </div>
   );
+
+  */
 
   const BUILDING_INFO_COPY = {
     hq: {
@@ -7234,312 +6125,117 @@ export default function MleoBase() {
       ? BUILDINGS.filter((item) => STRUCTURES_TAB_A.includes(item.key))
       : BUILDINGS.filter((item) => STRUCTURES_TAB_B.includes(item.key));
 
+  const reqNameMap = {
+    hq: "HQ",
+    quarry: "Quarry",
+    tradeHub: "Trade Hub",
+    salvage: "Salvage",
+    refinery: "Refinery",
+    powerCell: "Power Cell",
+    minerControl: "Miner Ctrl",
+    arcadeHub: "Arcade Hub",
+    expeditionBay: "Expedition Bay",
+    logisticsCenter: "Logistics",
+    researchLab: "Research Lab",
+    repairBay: "Repair Bay",
+  };
+
+  const visibleStructuresVM = (visibleStructures || []).map((building) => {
+    const level = state.buildings[building.key] || 0;
+    const nextLevel = level + 1;
+    const cost = buildingCost(building, level);
+    const isUnlocked = unlocked(building, state);
+    const canAffordCost = canAfford(state.resources, cost);
+    const canCoverCostForBtn = canCoverCost(state.resources, cost);
+    const ready = isUnlocked && canAffordCost;
+    const powerMode = getBuildingPowerMode(state, building.key);
+    const canThrottle = canThrottleBuilding(building.key);
+
+    const requirementsText = building.requires?.length
+      ? building.requires
+          .map((req) => `${reqNameMap[req.key] || req.key} Lv ${req.lvl}`)
+          .join(" · ")
+      : "";
+
+    const buttonText = ready
+      ? "Upgrade"
+      : isUnlocked
+      ? "Need resources"
+      : "Need requirements";
+
+    return {
+      key: building.key,
+      name: building.name,
+      desc: building.desc,
+      level,
+      nextLevel,
+      roleTagText: buildingRoleTag(building.key),
+      synergyTagText: buildingSynergyTag(building.key),
+      sectorStatusText: sectorStatusForBuilding(building.key, state).toUpperCase(),
+      requirementsText,
+      ready,
+      canAffordCost: canCoverCostForBtn,
+      buttonText,
+      costRow: <ResourceCostRow cost={cost} resources={state.resources} />,
+      energyLineText: getBuildingEnergyLine(building, level, powerMode),
+      powerLineText: getBuildingPowerLine(building.key, powerMode),
+      canThrottle,
+      powerMode,
+    };
+  });
+
+  const openBuildingInfoByKey = (key) => {
+    if (!key) return;
+    const building = BUILDINGS.find((b) => b.key === key);
+    if (!building) return;
+    setBuildInfo(getBuildingInfo(building));
+    setOpenInfoKey(null);
+  };
+
   const baseStructuresContent = (
-    <div>
-      <div className="mb-3 flex gap-2">
-        <button
-          onClick={() => setStructuresTab("core")}
-          className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
-            structuresTab === "core"
-              ? "bg-cyan-400 text-slate-950"
-              : "border border-white/10 bg-white/5 text-white/75"
-          }`}
-        >
-          Core
-        </button>
-        <button
-          onClick={() => setStructuresTab("expansion")}
-          className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
-            structuresTab === "expansion"
-              ? "bg-cyan-400 text-slate-950"
-              : "border border-white/10 bg-white/5 text-white/75"
-          }`}
-        >
-          Expansion
-        </button>
-      </div>
-
-      <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-        {visibleStructures.map((building) => {
-          const level = state.buildings[building.key] || 0;
-          const nextLevel = level + 1;
-          const cost = buildingCost(building, level);
-          const isUnlocked = unlocked(building, state);
-          const ready = isUnlocked && canAfford(state.resources, cost);
-          const powerMode = getBuildingPowerMode(state, building.key);
-          const canThrottle = canThrottleBuilding(building.key);
-
-          const reqNameMap = {
-            hq: "HQ",
-            quarry: "Quarry",
-            tradeHub: "Trade Hub",
-            salvage: "Salvage",
-            refinery: "Refinery",
-            powerCell: "Power Cell",
-            minerControl: "Miner Ctrl",
-            arcadeHub: "Arcade Hub",
-            expeditionBay: "Expedition Bay",
-            logisticsCenter: "Logistics",
-            researchLab: "Research Lab",
-            repairBay: "Repair Bay",
-          };
-
-          const requirementsText = building.requires?.length
-            ? building.requires
-                .map((req) => `${reqNameMap[req.key] || req.key} Lv ${req.lvl}`)
-                .join(" · ")
-            : "";
-
-          const buttonText = ready
-            ? "Upgrade"
-            : isUnlocked
-            ? "Need resources"
-            : "Need requirements";
-
-          return (
-            <div
-              key={building.key}
-              data-base-target={building.key}
-              className={`flex min-h-[328px] flex-col rounded-xl border p-3 ${availabilityCardClass(ready)} ${
-                highlightTarget === building.key
-                  ? "border-cyan-300/70 ring-2 ring-cyan-300/35 shadow-[0_0_0_1px_rgba(103,232,249,0.25)]"
-                  : ""
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1 pr-2">
-                  <div className="line-clamp-1 h-[20px] text-[15px] font-semibold leading-5 text-white">
-                    {building.name}
-                  </div>
-                </div>
-
-                <div className="shrink-0 flex flex-col items-end gap-1">
-                  <div className="h-[28px] flex items-center justify-end">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setBuildInfo(getBuildingInfo(building));
-                        setOpenInfoKey(null);
-                      }}
-                      className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-                      aria-label={`Open info for ${building.name}`}
-                      title={`Info about ${building.name}`}
-                    >
-                      i
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-1 flex items-center justify-between">
-                <div className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/65">
-                  Lv {level}
-                </div>
-
-                <div className="h-[24px] flex items-center">
-                  {ready ? <AvailabilityBadge /> : null}
-                </div>
-              </div>
-
-              <div className="mt-1 h-[38px] overflow-hidden text-[11px] leading-[1.2rem] text-white/60 line-clamp-2">
-                {building.desc}
-              </div>
-
-              <div className="mt-1.5 min-h-[24px] max-h-[24px] overflow-hidden">
-                <div className="flex flex-wrap gap-1.5">
-                  <div className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/70">
-                    {buildingRoleTag(building.key)}
-                  </div>
-                  <div className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-200">
-                    {buildingSynergyTag(building.key)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-2 h-[22px]">
-                <div className="inline-flex w-fit rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] text-white/65">
-                  {sectorStatusForBuilding(building.key, state).toUpperCase()}
-                </div>
-              </div>
-
-              <div className="mt-1.5 h-[18px] text-[11px] font-medium text-cyan-200/85">
-                Next Lv {nextLevel}
-              </div>
-
-              <div className="mt-1 h-[14px] text-[10px] font-black uppercase tracking-[0.18em] text-white/40">
-                Cost
-              </div>
-
-              <ResourceCostRow cost={cost} resources={state.resources} />
-
-              <div className="mt-auto flex flex-col justify-end pt-0 pb-3">
-                <div className="text-[10px] font-semibold text-white/50">
-                  {getBuildingEnergyLine(building, level, powerMode)}
-                </div>
-                <div className="mt-1 text-[10px] font-semibold text-cyan-200/70">
-                  {getBuildingPowerLine(building.key, powerMode)}
-                </div>
-
-                <div className="mt-2 flex w-full flex-col gap-2">
-                  {canThrottle && level > 0 ? (
-                    <div className="grid grid-cols-5 gap-1.5">
-                      {BUILDING_POWER_STEPS.map((mode) => {
-                        const active = powerMode === mode;
-                        return (
-                          <button
-                            key={mode}
-                            type="button"
-                            onClick={() => changeBuildingPowerMode(building.key, mode)}
-                            className={`rounded-lg border px-1.5 py-1.5 text-[10px] font-bold transition ${
-                              active
-                                ? "border-cyan-300/50 bg-cyan-500/15 text-cyan-200"
-                                : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
-                            }`}
-                          >
-                            {mode}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    // Keep exact visual spacing for buildings without power % controls.
-                    <div className="grid grid-cols-5 gap-1.5 opacity-0 pointer-events-none">
-                      {BUILDING_POWER_STEPS.map((mode) => (
-                        <button
-                          key={mode}
-                          type="button"
-                          disabled
-                          className="rounded-lg border border-white/10 bg-white/5 px-1.5 py-1.5 text-[10px] font-bold text-white/70"
-                        >
-                          {mode}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <button
-                    onClick={() => buyBuilding(building.key)}
-                    disabled={!ready}
-                    className={`w-full rounded-xl px-3 py-2 text-xs font-semibold leading-none transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
-                      canCoverCost(state.resources, cost)
-                        ? "bg-white/10"
-                        : "bg-white/10 opacity-70"
-                    }`}
-                  >
-                    {buttonText}
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <BaseStructuresPanel
+      structuresTab={structuresTab}
+      onSetStructuresTab={setStructuresTab}
+      cards={visibleStructuresVM}
+      highlightTarget={highlightTarget}
+      powerSteps={BUILDING_POWER_STEPS}
+      onOpenBuildingInfo={openBuildingInfoByKey}
+      onChangePowerMode={changeBuildingPowerMode}
+      onBuyBuilding={buyBuilding}
+    />
   );
 
   const buildSupportSystemsContent = (
-    <div className="space-y-3">
-      <div className={`relative rounded-2xl border p-3.5 ${availabilityCardClass(canBuyBlueprintNow)}`}>
-        <div className="absolute right-2 top-2 z-10">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setBuildInfo(getSystemInfo("blueprint"));
-              setOpenInfoKey(null);
-            }}
-            className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-            aria-label="Open blueprint info"
-            title="Info about blueprint"
-          >
-            i
-          </button>
-        </div>
-        <div className="flex min-h-[20px] flex-col pr-8">
-          <div className="flex items-start justify-between gap-2">
-            <div className="text-base font-bold text-white">Blueprint Cache</div>
-            {canBuyBlueprintNow ? <AvailabilityBadge /> : null}
-          </div>
-          <div className="mt-1 text-sm text-white/65">
-            Upgrade your shipment capacity and long-term bank efficiency.
-          </div>
-          <div className="mt-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
-            Cost
-          </div>
-          <div className="mt-1 text-xs font-semibold text-white/80">
-            {fmt(blueprintCost)} shared MLEO · DATA {fmt(blueprintDataCost)}
-          </div>
-        </div>
-        <button
-          onClick={buyBlueprint}
-          className="mt-3 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-white/15"
-        >
-          Buy Blueprint Lv {Number(state.blueprintLevel || 0) + 1}
-        </button>
-        <div className="mt-1 min-h-[20px] text-center text-[10px] leading-4 text-white/45">
-          {canBuyBlueprintNow ? "Ready to purchase" : "Need more shared MLEO or DATA"}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          onClick={activateOverclock}
-          className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3.5 text-sm font-extrabold text-white hover:bg-white/15"
-        >
-          Overclock
-        </button>
-        <button
-          onClick={refillEnergy}
-          className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3.5 text-sm font-extrabold text-white hover:bg-white/15"
-        >
-          Refill
-        </button>
-      </div>
-
-      <button
-        onClick={performMaintenance}
-        className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3.5 text-sm font-extrabold text-white hover:bg-white/15"
-      >
-        Maintain
-      </button>
-    </div>
+    <BuildSupportSystemsPanel
+      canBuyBlueprintNow={canBuyBlueprintNow}
+      blueprintCostText={fmt(blueprintCost)}
+      blueprintDataCostText={fmt(blueprintDataCost)}
+      blueprintButtonText={`Buy Blueprint Lv ${Number(state.blueprintLevel || 0) + 1}`}
+      blueprintStatusText={
+        canBuyBlueprintNow ? "Ready to purchase" : "Need more shared MLEO or DATA"
+      }
+      onOpenBlueprintInfo={() => {
+        setBuildInfo(getSystemInfo("blueprint"));
+        setOpenInfoKey(null);
+      }}
+      onBuyBlueprint={buyBlueprint}
+      onOverclock={activateOverclock}
+      onRefill={refillEnergy}
+      onMaintain={performMaintenance}
+    />
   );
 
   const progressSummaryContent = (
-    <div className="grid gap-2 md:grid-cols-2">
-      <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-        <div className="font-semibold text-white">Totals</div>
-        <div className="mt-3 grid grid-cols-2 gap-3 text-sm text-white/70">
-          <div>
-            <div className="text-white/45 text-xs uppercase tracking-[0.16em]">Shipped</div>
-            <div className="mt-1 font-semibold text-white">{fmt(state.totalBanked)} MLEO</div>
-          </div>
-          <div>
-            <div className="text-white/45 text-xs uppercase tracking-[0.16em]">Vault Spent</div>
-            <div className="mt-1 font-semibold text-white">{fmt(state.totalSharedSpent)} MLEO</div>
-          </div>
-          <div>
-            <div className="text-white/45 text-xs uppercase tracking-[0.16em]">Expeditions</div>
-            <div className="mt-1 font-semibold text-white">{fmt(state.totalExpeditions)}</div>
-          </div>
-          <div>
-            <div className="text-white/45 text-xs uppercase tracking-[0.16em]">Missions</div>
-            <div className="mt-1 font-semibold text-white">{fmt(state.totalMissionsDone)}</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-        <div className="font-semibold text-white">Identity Snapshot</div>
-        <div className="mt-3 space-y-2 text-sm text-white/70">
-          <div><span className="text-white/45">Crew role:</span> {crewRoleInfo.name}</div>
-          <div><span className="text-white/45">Commander path:</span> {commanderPathInfo.name}</div>
-          <div><span className="text-white/45">System state:</span> {systemMeta.label}</div>
-          <div><span className="text-white/45">Base profile:</span> {state.crew >= 5 ? "Developed Command" : state.crew >= 2 ? "Growing Outpost" : "Early Outpost"}</div>
-        </div>
-      </div>
-    </div>
+    <ProgressSummaryPanel
+      totalBanked={state.totalBanked}
+      totalSharedSpent={state.totalSharedSpent}
+      totalExpeditions={state.totalExpeditions}
+      totalMissionsDone={state.totalMissionsDone}
+      crewCount={state.crew}
+      crewRoleName={crewRoleInfo.name}
+      commanderPathName={commanderPathInfo.name}
+      systemStateLabel={systemMeta.label}
+    />
   );
 
   const handleResetGame = async () => {
@@ -8225,30 +6921,7 @@ export default function MleoBase() {
   ];
 
   const activityLogContent = (
-    <>
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Link href="/mleo-miners" className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20">
-          Open Miners
-        </Link>
-        <Link href="/arcade" className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-2 text-sm font-semibold text-sky-200 hover:bg-sky-500/20">
-          Open Arcade
-        </Link>
-        <button
-          onClick={handleResetGame}
-          className="rounded-xl border border-rose-500/25 bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-200 hover:bg-rose-500/20"
-        >
-          Reset Game
-        </button>
-      </div>
-      <div className="space-y-2">
-        {(state.log || []).slice(0, 4).map((entry) => (
-          <div key={entry.id} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/75">
-            <div>{entry.text}</div>
-            <div className="mt-1 text-xs text-white/40">{new Date(entry.ts).toLocaleTimeString()}</div>
-          </div>
-        ))}
-      </div>
-    </>
+    <ActivityLogPanel logEntries={state.log} onResetGame={handleResetGame} />
   );
 
   if (!mounted) {
@@ -8809,255 +7482,72 @@ export default function MleoBase() {
                   </div>
                 ) : null}
                 {desktopPanel === "ops" ? (
-                      <div className="space-y-3">
-                        <BaseResourceBar
-                          resources={state.resources}
-                          energy={state.resources?.ENERGY || 0}
-                          energyCap={derived.energyCap || 140}
-                          bankedMleo={state.bankedMleo || 0}
-                          compact
-                          showBanked={false}
-                        />
-
-                        <div
-                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                            operationsConsoleAvailableCount > 0
-                          )}`}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <div className="text-lg font-bold text-white">Operations Console</div>
-                                <SectionAvailabilityBadge count={operationsConsoleAvailableCount} />
-                      </div>
-                              {openInnerPanel !== "ops-console" ? (
-                                <div className="mt-1 text-sm text-white/60">
-                                  {sectionStatusHint("operations-console", {
-                                    expedition: readyCounts.expedition > 0,
-                                    ship: readyCounts.shipment > 0,
-                                    refill: readyCounts.refill > 0,
-                                    maintain: readyCounts.maintenance > 0,
-                                  })}
-                                </div>
-                              ) : null}
-                      </div>
-                      <button
-                              onClick={() => toggleInnerPanel("ops-console")}
-                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                      >
-                              {openInnerPanel === "ops-console" ? "CLOSE" : "OPEN"}
-                      </button>
-                    </div>
-                          {openInnerPanel === "ops-console" && (
-                            <div className="mt-3">{operationsConsoleContent}</div>
-                          )}
-                      </div>
-
-                        <div
-                          data-base-target="missions"
-                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                            dailyMissionsAvailableCount > 0
-                          )} ${
+                      <DesktopPanelSection resourceBar={compactResourceBar}>
+                        <OpsPanelCards
+                          opsCardClass={buildSectionCardClass(operationsConsoleAvailableCount > 0)}
+                          missionsCardClass={`${buildSectionCardClass(dailyMissionsAvailableCount > 0)} ${
                             isHighlightedTarget("missions", highlightTarget)
                               ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
                               : ""
                           }`}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <div className="text-lg font-bold text-white">Daily Missions</div>
-                                <SectionAvailabilityBadge count={dailyMissionsAvailableCount} />
-                      </div>
-                              {openInnerPanel !== "ops-missions" ? (
-                                <div className="mt-1 text-sm text-white/60">
-                                  {sectionStatusHint("daily-missions", { count: dailyMissionsAvailableCount })}
-                    </div>
-                    ) : null}
-                      </div>
-                      <button
-                              onClick={() => toggleInnerPanel("ops-missions")}
-                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                            >
-                              {openInnerPanel === "ops-missions" ? "CLOSE" : "OPEN"}
-                      </button>
-                    </div>
-                          {openInnerPanel === "ops-missions" && (
-                            <div className="mt-3">{dailyMissionsContent}</div>
-                          )}
-                      </div>
-                      </div>
+                          opsAvailableCount={operationsConsoleAvailableCount}
+                          missionsAvailableCount={dailyMissionsAvailableCount}
+                          opsHintText={sectionStatusHint("operations-console", {
+                            expedition: readyCounts.expedition > 0,
+                            ship: readyCounts.shipment > 0,
+                            refill: readyCounts.refill > 0,
+                            maintain: readyCounts.maintenance > 0,
+                          })}
+                          missionsHintText={sectionStatusHint("daily-missions", {
+                            count: dailyMissionsAvailableCount,
+                          })}
+                          openInnerPanel={openInnerPanel}
+                          toggleInnerPanel={toggleInnerPanel}
+                          operationsConsoleContent={operationsConsoleContent}
+                          dailyMissionsContent={dailyMissionsContent}
+                        />
+                      </DesktopPanelSection>
                     ) : null}
 
                     {desktopPanel === "build" ? (
-                      <div className="space-y-3">
-                        <BaseResourceBar
-                          resources={state.resources}
-                          energy={state.resources?.ENERGY || 0}
-                          energyCap={derived.energyCap || 140}
-                          bankedMleo={state.bankedMleo || 0}
-                          compact
-                          showBanked={false}
-                        />
-
-                        <div
-                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                            developmentAvailableCount > 0
-                          )}`}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <div className="text-lg font-bold text-white">Development</div>
-                                <SectionAvailabilityBadge count={developmentAvailableCount} />
-                      </div>
-                              {openInnerPanel !== "build-development" ? (
-                                <div className="mt-1 text-sm text-white/60">
-                                  {buildSectionHint("development", {
-                                    modules: availableModulesCount,
-                                    research: availableResearchCount,
-                                  })}
-                    </div>
-                              ) : null}
-                        </div>
-                        <button
-                              onClick={() => toggleInnerPanel("build-development")}
-                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                            >
-                              {openInnerPanel === "build-development" ? "CLOSE" : "OPEN"}
-                        </button>
-                      </div>
-                          {openInnerPanel === "build-development" && (
-                            <div className="mt-3">{crewModulesResearchContent}</div>
-                      )}
-                    </div>
-
-                        <div
-                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                            structuresAvailableCount > 0
-                          )}`}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <div className="text-lg font-bold text-white">Base Structures</div>
-                                <SectionAvailabilityBadge count={structuresAvailableCount} />
-                          </div>
-                              {openInnerPanel !== "build-structures" ? (
-                                <div className="mt-1 text-sm text-white/60">
-                                  {buildSectionHint("structures", {
-                                    structures: availableStructuresCount,
-                                  })}
-                                </div>
-                              ) : null}
-                        </div>
-                        <button
-                              onClick={() => toggleInnerPanel("build-structures")}
-                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                        >
-                          {openInnerPanel === "build-structures" ? "CLOSE" : "OPEN"}
-                        </button>
-                      </div>
-                          {openInnerPanel === "build-structures" && (
-                            <div className="mt-3">{baseStructuresContent}</div>
-                      )}
-                    </div>
-
-                        <div
-                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                            supportAvailableCount > 0
-                          )}`}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <div className="text-lg font-bold text-white">Support Systems</div>
-                                <SectionAvailabilityBadge count={supportAvailableCount} />
-                            </div>
-                              {openInnerPanel !== "build-support" ? (
-                                <div className="mt-1 text-sm text-white/60">
-                                  {buildSectionHint("support", {
-                                    support: availableBlueprintCount,
-                                  })}
-                                </div>
-                              ) : null}
-                          </div>
-                          <button
-                              onClick={() => toggleInnerPanel("build-support")}
-                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                            >
-                              {openInnerPanel === "build-support" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-                          {openInnerPanel === "build-support" ? (
-                            <div className="mt-3">{buildSupportSystemsContent}</div>
-                          ) : null}
-                    </div>
-                  </div>
+                      <DesktopPanelSection resourceBar={compactResourceBar}>
+                    <BuildPanelCards
+                      developmentCardClass={buildSectionCardClass(developmentAvailableCount > 0)}
+                      structuresCardClass={buildSectionCardClass(structuresAvailableCount > 0)}
+                      supportCardClass={buildSectionCardClass(supportAvailableCount > 0)}
+                      developmentCount={developmentAvailableCount}
+                      structuresCount={structuresAvailableCount}
+                      supportCount={supportAvailableCount}
+                      developmentHint={buildSectionHint("development", {
+                        modules: availableModulesCount,
+                        research: availableResearchCount,
+                      })}
+                      structuresHint={buildSectionHint("structures", {
+                        structures: availableStructuresCount,
+                      })}
+                      supportHint={buildSectionHint("support", {
+                        support: availableBlueprintCount,
+                      })}
+                      openInnerPanel={openInnerPanel}
+                      toggleInnerPanel={toggleInnerPanel}
+                      crewModulesResearchContent={crewModulesResearchContent}
+                      baseStructuresContent={baseStructuresContent}
+                      buildSupportSystemsContent={buildSupportSystemsContent}
+                    />
+                  </DesktopPanelSection>
                 ) : null}
 
                 {desktopPanel === "intel" ? (
-                      <div className="space-y-3">
-                        <BaseResourceBar
-                          resources={state.resources}
-                          energy={state.resources?.ENERGY || 0}
-                          energyCap={derived.energyCap || 140}
-                          bankedMleo={state.bankedMleo || 0}
-                          compact
-                          showBanked={false}
+                      <DesktopPanelSection resourceBar={compactResourceBar}>
+                        <IntelPanelCards
+                          progressCardClass={buildSectionCardClass(intelSummaryAvailableCount > 0)}
+                          logCardClass={buildSectionCardClass(intelLogAvailableCount > 0)}
+                          openInnerPanel={openInnerPanel}
+                          toggleInnerPanel={toggleInnerPanel}
+                          progressSummaryContent={progressSummaryContent}
+                          activityLogContent={activityLogContent}
                         />
-                        <div
-                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                            intelSummaryAvailableCount > 0
-                          )}`}
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="text-lg font-bold text-white">Progress Summary</div>
-                              {openInnerPanel !== "intel-summary" ? (
-                                <div className="mt-1 text-sm text-white/60">
-                                  Key progress and identity data
-                                  </div>
-                              ) : null}
-                          </div>
-                          <button
-                              onClick={() => toggleInnerPanel("intel-summary")}
-                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            {openInnerPanel === "intel-summary" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-                          {openInnerPanel === "intel-summary" && (
-                            <div className="mt-3">{progressSummaryContent}</div>
-                        )}
-                      </div>
-
-                        <div
-                          className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                            intelLogAvailableCount > 0
-                          )}`}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="text-lg font-bold text-white">Activity Log</div>
-                              {openInnerPanel !== "intel-log" ? (
-                                <div className="mt-1 text-sm text-white/60">
-                                  Recent events and milestones
-                            </div>
-                              ) : null}
-                          </div>
-                          <button
-                              onClick={() => toggleInnerPanel("intel-log")}
-                              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            {openInnerPanel === "intel-log" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-                          {openInnerPanel === "intel-log" && (
-                            <div className="mt-3">{activityLogContent}</div>
-                          )}
-                    </div>
-                  </div>
+                      </DesktopPanelSection>
                 ) : null}
               </div>
           </div>
@@ -9420,773 +7910,124 @@ export default function MleoBase() {
 
           {/* Mobile Panel Overlay */}
           {mobilePanel ? (
-            <div className="fixed inset-0 z-[115] bg-black/55 backdrop-blur-sm sm:hidden">
-              <div className="absolute inset-x-0 bottom-0 top-[84px] rounded-t-[28px] border border-white/10 bg-[#0b1526] shadow-2xl">
-                <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-                  <div className="min-w-0">
-                    <div className="text-lg font-bold text-white">{mobilePanelTitle}</div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <WindowBankedBadge value={state.bankedMleo || 0} />
-                    <button
-                      onClick={closeMobilePanel}
-                      className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-bold text-white/90 hover:bg-white/10"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  ref={mobilePanelScrollRef}
-                  className="h-[calc(100%-73px)] overflow-y-auto px-4 py-4 pb-28"
-                >
-                  {/* Ready Now Summary Block */}
-                  {readyCounts.total > 0 && (
-                    <div className="mb-4 rounded-2xl border border-cyan-400/40 bg-cyan-400/10 p-3">
-                      <div className="mb-2 text-sm font-semibold text-cyan-200">Ready now</div>
-                      <div className="space-y-2">
-                        {readyCounts.missions > 0 && (
-                          <button
-                            onClick={() => {
-                              openMobilePanel("ops");
-                              setOpenInnerPanel("ops-missions");
-                            }}
-                            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <div className="text-sm font-bold text-white">
-                                  {readyCounts.missions} Mission reward{readyCounts.missions > 1 ? "s" : ""} ready
-                                </div>
-                                <div className="mt-1 text-xs text-white/60">
-                                  Open Daily Missions to claim it.
-                                </div>
-                              </div>
-                              <span className="text-cyan-300 text-lg font-bold">›</span>
-                            </div>
-                          </button>
-                        )}
-                        {readyCounts.contracts > 0 && (
-                          <button
-                            onClick={() => {
-                              openMobilePanel("overview");
-                              setOpenInnerPanel("overview-contracts");
-                            }}
-                            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <div className="text-sm font-bold text-white">
-                                  {readyCounts.contracts} Contract{readyCounts.contracts > 1 ? "s" : ""} ready
-                                </div>
-                                <div className="mt-1 text-xs text-white/60">
-                                  Open Live Contracts to claim.
-                                </div>
-                              </div>
-                              <span className="text-cyan-300 text-lg font-bold">›</span>
-                            </div>
-                          </button>
-                        )}
-                        {showExpeditions && readyCounts.expedition > 0 ? (
-                          <button
-                            onClick={() => {
-                              openMobilePanel("ops");
-                              setOpenInnerPanel("ops-console");
-                            }}
-                            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <div className="text-sm font-bold text-white">Expedition ready</div>
-                                <div className="mt-1 text-xs text-white/60">
-                                  Open Operations Console to launch.
-                                </div>
-                              </div>
-                              <span className="text-cyan-300 text-lg font-bold">›</span>
-                            </div>
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  )}
+            <MobilePanelOverlayShell
+              title={mobilePanelTitle}
+              bankedBadge={<WindowBankedBadge value={state.bankedMleo || 0} />}
+              onClose={closeMobilePanel}
+              scrollRef={mobilePanelScrollRef}
+            >
+                  <ReadyNowSummaryBlock
+                    readyCounts={readyCounts}
+                    showExpeditions={showExpeditions}
+                    onOpenMissions={() => {
+                      openMobilePanel("ops");
+                      setOpenInnerPanel("ops-missions");
+                    }}
+                    onOpenContracts={() => {
+                      openMobilePanel("overview");
+                      setOpenInnerPanel("overview-contracts");
+                    }}
+                    onOpenOpsConsole={() => {
+                      openMobilePanel("ops");
+                      setOpenInnerPanel("ops-console");
+                    }}
+                  />
 
                   {mobilePanel === "overview" ? (
-                    <div className="space-y-3">
-                      <BaseResourceBar
-                        resources={state.resources}
-                        energy={state.resources?.ENERGY || 0}
-                        energyCap={derived.energyCap || 140}
-                        bankedMleo={state.bankedMleo || 0}
-                        compact
-                        showBanked={false}
+                    <MobilePanelSection resourceBar={compactResourceBar}>
+                      <OverviewPanelCards
+                        buildSectionCardClass={buildSectionCardClass}
+                        openInnerPanel={openInnerPanel}
+                        toggleInnerPanel={toggleInnerPanel}
+                        overviewRecommendationCount={overviewRecommendationCount}
+                        nextStep={nextStep}
+                        buildOpportunitiesCount={buildOpportunitiesCount}
+                        availableStructuresCount={availableStructuresCount}
+                        availableModulesCount={availableModulesCount}
+                        availableResearchCount={availableResearchCount}
+                        availableBlueprintCount={availableBlueprintCount}
+                        onOpenBuildPanel={() => openMobilePanel("build")}
+                        showCrew={showCrew}
+                        overviewIdentityCount={overviewIdentityCount}
+                        crewRoleInfo={crewRoleInfo}
+                        roleBonusText={roleBonusText}
+                        commanderPathInfo={commanderPathInfo}
+                        commanderPathText={commanderPathText}
+                        liveContractsAvailableCount={liveContractsAvailableCount}
+                        liveContracts={liveContracts}
+                        highlightTarget={highlightTarget}
+                        isHighlightedTarget={isHighlightedTarget}
+                        highlightCard={highlightCard}
+                        onClaimContract={claimContract}
                       />
-                      <div
-                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                          overviewRecommendationCount > 0
-                        )}`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-lg font-bold text-white">Next Recommended Step</div>
-                            {openInnerPanel !== "overview-recommendation" ? (
-                              <div className="mt-1 text-sm text-white/60">
-                                Suggested next action for your base
-                              </div>
-                            ) : null}
-                          </div>
-                          <button
-                            onClick={() => toggleInnerPanel("overview-recommendation")}
-                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            {openInnerPanel === "overview-recommendation" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-                        {openInnerPanel === "overview-recommendation" && (
-                          <div className="mt-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
-                            <div className="text-base font-bold text-white">{nextStep.title}</div>
-                            <div className="mt-1 text-sm text-white/70">{nextStep.text}</div>
-                          </div>
-                        )}
-                      </div>
-
-                      {buildOpportunitiesCount > 0 ? (
-                        <button
-                          onClick={() => openMobilePanel("build")}
-                          className="w-full rounded-3xl border border-cyan-400/20 bg-cyan-500/6 p-4 text-left shadow-[0_0_18px_rgba(34,211,238,0.06)]"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <div className="text-lg font-extrabold text-white">Build opportunities</div>
-                              <div className="mt-1 text-sm text-cyan-100/75">
-                                {availableStructuresCount > 0 ? `${availableStructuresCount} structures` : null}
-                                {availableStructuresCount > 0 && availableModulesCount > 0 ? " · " : null}
-                                {availableModulesCount > 0 ? `${availableModulesCount} modules` : null}
-                                {(availableStructuresCount > 0 || availableModulesCount > 0) && availableResearchCount > 0 ? " · " : null}
-                                {availableResearchCount > 0 ? `${availableResearchCount} research` : null}
-                                {(availableStructuresCount > 0 || availableModulesCount > 0 || availableResearchCount > 0) && availableBlueprintCount > 0 ? " · " : null}
-                                {availableBlueprintCount > 0 ? "blueprint ready" : null}
-                              </div>
-                            </div>
-                            <span className="inline-flex min-w-7 h-7 items-center justify-center rounded-full bg-cyan-400 px-2 text-xs font-black text-slate-950">
-                              {buildOpportunitiesCount}
-                            </span>
-                          </div>
-                        </button>
-                      ) : null}
-
-                      {showCrew ? (
-                      <div
-                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                          overviewIdentityCount > 0
-                        )}`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-lg font-bold text-white">Command Identity</div>
-                            {openInnerPanel !== "overview-identity" ? (
-                              <div className="mt-1 text-sm text-white/60">
-                                Current crew role and commander path
-                              </div>
-                            ) : null}
-                          </div>
-                          <button
-                            onClick={() => toggleInnerPanel("overview-identity")}
-                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            {openInnerPanel === "overview-identity" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-                        {openInnerPanel === "overview-identity" && (
-                          <div className="mt-3 grid gap-3">
-                            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                              <div className="text-sm font-semibold text-white">{crewRoleInfo.name}</div>
-                              <div className="mt-1 text-xs text-white/60">{roleBonusText}</div>
-                            </div>
-                            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                              <div className="text-sm font-semibold text-white">{commanderPathInfo.name}</div>
-                              <div className="mt-1 text-xs text-white/60">{commanderPathText}</div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      ) : null}
-
-                      <div
-                        data-base-target="contracts"
-                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                          liveContractsAvailableCount > 0
-                        )} ${
-                          isHighlightedTarget("contracts", highlightTarget)
-                            ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
-                            : ""
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <div className="text-lg font-bold text-white">Live Contracts</div>
-                              <SectionAvailabilityBadge count={liveContractsAvailableCount} />
-                            </div>
-                            {openInnerPanel !== "overview-contracts" ? (
-                              <div className="mt-1 text-sm text-white/60">
-                                {liveContractsAvailableCount > 0
-                                  ? `${liveContractsAvailableCount} contract reward${liveContractsAvailableCount > 1 ? "s" : ""} ready`
-                                  : "No contract rewards ready right now"}
-                              </div>
-                            ) : null}
-                          </div>
-                          <button
-                            onClick={() => toggleInnerPanel("overview-contracts")}
-                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            {openInnerPanel === "overview-contracts" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-                        {openInnerPanel === "overview-contracts" && (
-                          <div className="mt-3 grid gap-2">
-                            {[...liveContracts].sort((a, b) => {
-                              const aReady = a.done && !a.claimed ? 1 : 0;
-                              const bReady = b.done && !b.claimed ? 1 : 0;
-                              return bReady - aReady;
-                            }).map((contract) => (
-                              <div
-                                key={contract.key}
-                                className={`rounded-2xl border border-white/10 bg-black/20 p-3 ${
-                                  contract.done && !contract.claimed ? highlightCard(true, "success") : ""
-                                }`}
-                              >
-                                <div className="text-sm font-semibold text-white">{contract.title}</div>
-                                <div className="mt-1 text-xs text-white/60">{contract.rewardText}</div>
-                                <button
-                                  onClick={() => claimContract(contract.key)}
-                                  disabled={!contract.done || contract.claimed}
-                                  className="mt-3 w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:opacity-40"
-                                >
-                                  {contract.claimed ? "Claimed" : contract.done ? "Claim" : "In Progress"}
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    </MobilePanelSection>
                   ) : null}
 
                   {mobilePanel === "ops" ? (
-                    <div className="space-y-3">
-                      <BaseResourceBar
-                        resources={state.resources}
-                        energy={state.resources?.ENERGY || 0}
-                        energyCap={derived.energyCap || 140}
-                        bankedMleo={state.bankedMleo || 0}
-                        compact
-                        showBanked={false}
+                    <MobilePanelSection resourceBar={compactResourceBar}>
+                      <OpsPanelCards
+                        opsCardClass={buildSectionCardClass(operationsConsoleAvailableCount > 0)}
+                        missionsCardClass={buildSectionCardClass(dailyMissionsAvailableCount > 0)}
+                        opsAvailableCount={operationsConsoleAvailableCount}
+                        missionsAvailableCount={dailyMissionsAvailableCount}
+                        opsHintText={sectionStatusHint("operations-console", {
+                          expedition: canExpeditionNow,
+                          ship: canShipNow,
+                          refill: needsRefillNow,
+                          maintain: needsMaintenanceNow,
+                        })}
+                        missionsHintText={sectionStatusHint("daily-missions", {
+                          count: dailyMissionsAvailableCount,
+                        })}
+                        openInnerPanel={openInnerPanel}
+                        toggleInnerPanel={toggleInnerPanel}
+                        operationsConsoleContent={operationsConsoleContent}
+                        dailyMissionsContent={dailyMissionsContent}
                       />
-                      <div
-                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                          operationsConsoleAvailableCount > 0
-                        )}`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <div className="text-lg font-bold text-white">Operations Console</div>
-                              <SectionAvailabilityBadge count={operationsConsoleAvailableCount} />
-                            </div>
-                            {openInnerPanel !== "ops-console" ? (
-                              <div className="mt-1 text-sm text-white/60">
-                                {sectionStatusHint("operations-console", {
-                                  expedition: canExpeditionNow,
-                                  ship: canShipNow,
-                                  refill: needsRefillNow,
-                                  maintain: needsMaintenanceNow,
-                                })}
-                              </div>
-                            ) : null}
-                          </div>
-                          <button
-                            onClick={() => toggleInnerPanel("ops-console")}
-                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            {openInnerPanel === "ops-console" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-                        {openInnerPanel === "ops-console" && (
-                          <div className="mt-3 grid gap-3">
-                            <div
-                              data-base-target="shipping"
-                              className={`relative rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
-                                highlightCard((state.bankedMleo || 0) >= 120, "success")
-                              } ${
-                                isHighlightedTarget("shipping", highlightTarget)
-                                  ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
-                                  : ""
-                              }`}
-                            >
-                              <div className="absolute right-3 top-3 z-10">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setBuildInfo(getOperationsInfo("shipping"));
-                                    setOpenInfoKey(null);
-                                  }}
-                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-                                  aria-label="Open shipping info"
-                                  title="Info about shipping"
-                                >
-                                  i
-                                </button>
-                              </div>
-                              <div className="flex min-h-[84px] flex-col pr-8">
-                                <div className="text-sm font-semibold text-emerald-200">
-                                  Ship to Shared Vault
-                                </div>
-                                <p className="mt-1 text-sm text-white/70">
-                                  Move refined MLEO into the main vault with a daily softcut, so BASE
-                                  supports Miners instead of replacing it.
-                                </p>
-                              </div>
-
-                              <button
-                                onClick={bankToSharedVault}
-                                disabled={!canShipNow}
-                                className={`mt-4 w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold transition ${
-                                  canShipNow
-                                    ? "bg-emerald-600 text-white hover:bg-emerald-500"
-                                    : "bg-white/10 text-white/45"
-                                }`}
-                              >
-                                Ship {fmt(state.bankedMleo || 0)} MLEO
-                              </button>
-                            </div>
-
-                            {showExpeditions ? (
-                            <div
-                              data-base-target="expedition"
-                              className={`relative rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 ${
-                                highlightCard(
-                                  expeditionLeft <= 0 && (state.resources.DATA || 0) >= 4,
-                                  "info"
-                                )
-                              } ${
-                                isHighlightedTarget("expedition", highlightTarget)
-                                  ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
-                                  : ""
-                              }`}
-                            >
-                              <div className="absolute right-3 top-3 z-10">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setBuildInfo(getOperationsInfo("expedition"));
-                                    setOpenInfoKey(null);
-                                  }}
-                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-                                  aria-label="Open expedition info"
-                                  title="Info about expedition"
-                                >
-                                  i
-                                </button>
-                              </div>
-                              <div className="flex min-h-[84px] flex-col pr-8">
-                                <div className="text-sm font-semibold text-cyan-200">
-                                  Field Expedition
-                                </div>
-                                <p className="mt-1 text-sm text-white/70">
-                                  Potential rewards: Ore, Gold, Scrap, DATA, and sometimes banked MLEO. Typical outcome varies.
-                                </p>
-
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-bold text-cyan-200">
-                                    COST: 36 ENERGY
-                                  </span>
-                                  <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-[11px] font-bold text-amber-200">
-                                    COST: 4 DATA
-                                  </span>
-                                  <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-white/75">
-                                    CD: 120s
-                                  </span>
-                                </div>
-                              </div>
-
-                              <button
-                                onClick={handleLaunchExpedition}
-                                disabled={!canExpeditionNow}
-                                className={`mt-4 w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold transition ${
-                                  canExpeditionNow
-                                    ? "bg-cyan-500 text-slate-950 hover:bg-cyan-400"
-                                    : "bg-white/10 text-white/45"
-                                }`}
-                              >
-                                {expeditionLeft > 0
-                                  ? `Expedition ${Math.ceil(expeditionLeft / 1000)}s`
-                                  : "Launch Expedition"}
-                              </button>
-                            </div>
-                            ) : null}
-
-                            <div
-                              data-base-target="blueprint"
-                              className={`relative rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4 ${
-                                highlightCard(
-                                  canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost),
-                                  "info"
-                                )
-                              } ${
-                                isHighlightedTarget("blueprint", highlightTarget)
-                                  ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
-                                  : ""
-                              }`}
-                            >
-                              <div className="absolute right-3 top-3 z-10">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setBuildInfo(getSystemInfo("blueprint"));
-                                    setOpenInfoKey(null);
-                                  }}
-                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-                                  aria-label="Open blueprint info"
-                                  title="Info about blueprint"
-                                >
-                                  i
-                                </button>
-                              </div>
-                              <div className="flex min-h-[84px] flex-col pr-8">
-                                <div className="text-sm font-semibold text-fuchsia-200">
-                                  Blueprint Cache
-                                </div>
-                                <p className="mt-1 text-sm text-white/70">
-                                  Costs {fmt(blueprintCost)} shared MLEO + {fmt(blueprintDataCost)} DATA. Raises banking
-                                  efficiency and daily ship cap permanently.
-                                </p>
-                              </div>
-
-                              <button
-                                onClick={buyBlueprint}
-                                disabled={
-                                  !canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)
-                                }
-                                className={`mt-4 w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold transition ${
-                                  canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)
-                                    ? "bg-fuchsia-600 text-white hover:bg-fuchsia-500"
-                                    : "bg-white/10 text-white/45"
-                                }`}
-                              >
-                                Buy Blueprint Lv {state.blueprintLevel + 1}
-                              </button>
-                            </div>
-
-                            <div
-                              data-base-target="maintenance"
-                              className={`relative rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 ${
-                                systemState === "critical"
-                                  ? highlightCard(true, "critical")
-                                  : systemState === "warning"
-                                  ? highlightCard(true, "warning")
-                                  : ""
-                              } ${
-                                isHighlightedTarget("maintenance", highlightTarget)
-                                  ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
-                                  : ""
-                              }`}
-                            >
-                              <div className="absolute right-3 top-3 z-10 flex gap-1">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setBuildInfo(getOperationsInfo("refill"));
-                                    setOpenInfoKey(null);
-                                  }}
-                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-                                  aria-label="Open refill info"
-                                  title="Info about refill"
-                                >
-                                  i
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setBuildInfo(getOperationsInfo("maintenance"));
-                                    setOpenInfoKey(null);
-                                  }}
-                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-                                  aria-label="Open maintenance info"
-                                  title="Info about maintenance"
-                                >
-                                  i
-                                </button>
-                              </div>
-                              <div className="flex min-h-[84px] flex-col pr-8">
-                                <div className="text-sm font-semibold text-amber-200">
-                                  Shared Vault Utilities
-                                </div>
-                                <p className="mt-1 text-sm text-white/70">
-                                  Spend shared MLEO on productivity instead of pure emissions.
-                                </p>
-
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-bold text-cyan-200">
-                                    OVERCLOCK: 900 + 12 DATA
-                                  </span>
-                                  <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-[11px] font-bold text-amber-200">
-                                    REFILL: 180 + 5 DATA
-                                  </span>
-                                  <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-white/75">
-                                    MAINTAIN: STABILITY
-                                  </span>
-                                </div>
-                                <p className="mt-2 text-xs text-white/55">
-                                  Stability: {fmt(state.stability)}%
-                                </p>
-                              </div>
-
-                              <div className="mt-4 grid grid-cols-3 gap-2">
-                                <button
-                                  onClick={activateOverclock}
-                                  className="rounded-xl bg-amber-600 px-3 py-3 text-xs font-bold text-white hover:bg-amber-500"
-                                >
-                                  {overclockLeft > 0
-                                    ? `Overclock ${Math.ceil(overclockLeft / 1000)}s`
-                                    : `Overclock ${fmt(CONFIG.overclockCost)}`}
-                                </button>
-
-                                <button
-                                  onClick={refillEnergy}
-                                  className="rounded-xl bg-white/10 px-3 py-3 text-xs font-bold text-white hover:bg-white/20"
-                                >
-                                  Refill {fmt(CONFIG.refillCost)}
-                                </button>
-
-                                <button
-                                  onClick={performMaintenance}
-                                  className={`rounded-xl px-3 py-3 text-xs font-bold text-white ${
-                                    systemState === "critical"
-                                      ? "bg-rose-600 hover:bg-rose-500"
-                                      : systemState === "warning"
-                                      ? "bg-amber-600 hover:bg-amber-500"
-                                      : "bg-white/10 hover:bg-white/20"
-                                  }`}
-                                >
-                                  Maintain
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div
-                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                          dailyMissionsAvailableCount > 0
-                        )}`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <div className="text-lg font-bold text-white">Daily Missions</div>
-                              <SectionAvailabilityBadge count={dailyMissionsAvailableCount} />
-                            </div>
-                            {openInnerPanel !== "ops-missions" ? (
-                              <div className="mt-1 text-sm text-white/60">
-                                {sectionStatusHint("daily-missions", {
-                                  count: dailyMissionsAvailableCount,
-                                })}
-                              </div>
-                            ) : null}
-                          </div>
-                          <button
-                            onClick={() => toggleInnerPanel("ops-missions")}
-                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            {openInnerPanel === "ops-missions" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-                        {openInnerPanel === "ops-missions" && (
-                          <div className="mt-3">{dailyMissionsContent}</div>
-                        )}
-                      </div>
-                    </div>
+                    </MobilePanelSection>
                   ) : null}
 
                   {mobilePanel === "build" ? (
-                    <div className="space-y-3">
-                      <BaseResourceBar
-                        resources={state.resources}
-                        energy={state.resources?.ENERGY || 0}
-                        energyCap={derived.energyCap || 140}
-                        bankedMleo={state.bankedMleo || 0}
-                        compact
-                        showBanked={false}
+                    <MobilePanelSection resourceBar={compactResourceBar}>
+                      <BuildPanelCards
+                        developmentCardClass={buildSectionCardClass(developmentAvailableCount > 0)}
+                        structuresCardClass={buildSectionCardClass(structuresAvailableCount > 0)}
+                        supportCardClass={buildSectionCardClass(supportAvailableCount > 0)}
+                        developmentCount={developmentAvailableCount}
+                        structuresCount={structuresAvailableCount}
+                        supportCount={supportAvailableCount}
+                        developmentHint={buildSectionHint("development", {
+                          modules: availableModulesCount,
+                          research: availableResearchCount,
+                        })}
+                        structuresHint={buildSectionHint("structures", {
+                          structures: availableStructuresCount,
+                        })}
+                        supportHint={buildSectionHint("support", {
+                          support: availableBlueprintCount,
+                        })}
+                        openInnerPanel={openInnerPanel}
+                        toggleInnerPanel={toggleInnerPanel}
+                        crewModulesResearchContent={crewModulesResearchContent}
+                        baseStructuresContent={baseStructuresContent}
+                        buildSupportSystemsContent={buildSupportSystemsContent}
                       />
-                      <div
-                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                          developmentAvailableCount > 0
-                        )}`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <div className="text-lg font-bold text-white">Development</div>
-                              <SectionAvailabilityBadge count={developmentAvailableCount} />
-                            </div>
-                            {openInnerPanel !== "build-development" ? (
-                              <div className="mt-1 text-sm text-white/60">
-                                {buildSectionHint("development", {
-                                  modules: availableModulesCount,
-                                  research: availableResearchCount,
-                                })}
-                              </div>
-                            ) : null}
-                          </div>
-                          <button
-                            onClick={() => toggleInnerPanel("build-development")}
-                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            {openInnerPanel === "build-development" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-                        {openInnerPanel === "build-development" && (
-                          <div className="mt-3">{crewModulesResearchContent}</div>
-                        )}
-                      </div>
-
-                      <div
-                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                          structuresAvailableCount > 0
-                        )}`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <div className="text-lg font-bold text-white">Base Structures</div>
-                              <SectionAvailabilityBadge count={structuresAvailableCount} />
-                            </div>
-                            {openInnerPanel !== "build-structures" ? (
-                              <div className="mt-1 text-sm text-white/60">
-                                {buildSectionHint("structures", {
-                                  structures: availableStructuresCount,
-                                })}
-                              </div>
-                            ) : null}
-                          </div>
-                          <button
-                            onClick={() => toggleInnerPanel("build-structures")}
-                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            {openInnerPanel === "build-structures" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-                        {openInnerPanel === "build-structures" && (
-                          <div className="mt-3">{baseStructuresContent}</div>
-                        )}
-                      </div>
-
-                      <div
-                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                          supportAvailableCount > 0
-                        )}`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <div className="text-lg font-bold text-white">Support Systems</div>
-                              <SectionAvailabilityBadge count={supportAvailableCount} />
-                            </div>
-                            {openInnerPanel !== "build-support" ? (
-                              <div className="mt-1 text-sm text-white/60">
-                                {buildSectionHint("support", {
-                                  support: availableBlueprintCount,
-                                })}
-                              </div>
-                            ) : null}
-                          </div>
-                          <button
-                            onClick={() => toggleInnerPanel("build-support")}
-                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            {openInnerPanel === "build-support" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-                        {openInnerPanel === "build-support" ? (
-                          <div className="mt-3">{buildSupportSystemsContent}</div>
-                        ) : null}
-                      </div>
-                    </div>
+                    </MobilePanelSection>
                   ) : null}
 
                   {mobilePanel === "intel" ? (
-                    <div className="space-y-3">
-                      <BaseResourceBar
-                        resources={state.resources}
-                        energy={state.resources?.ENERGY || 0}
-                        energyCap={derived.energyCap || 140}
-                        bankedMleo={state.bankedMleo || 0}
-                        compact
-                        showBanked={false}
+                    <MobilePanelSection resourceBar={compactResourceBar}>
+                      <IntelPanelCards
+                        progressCardClass={buildSectionCardClass(intelSummaryAvailableCount > 0)}
+                        logCardClass={buildSectionCardClass(intelLogAvailableCount > 0)}
+                        openInnerPanel={openInnerPanel}
+                        toggleInnerPanel={toggleInnerPanel}
+                        progressSummaryContent={progressSummaryContent}
+                        activityLogContent={activityLogContent}
                       />
-                      <div
-                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                          intelSummaryAvailableCount > 0
-                        )}`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-lg font-bold text-white">Progress Summary</div>
-                            {openInnerPanel !== "intel-summary" ? (
-                              <div className="mt-1 text-sm text-white/60">
-                                Key progress and identity data
-                              </div>
-                            ) : null}
-                          </div>
-                          <button
-                            onClick={() => toggleInnerPanel("intel-summary")}
-                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            {openInnerPanel === "intel-summary" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-                        {openInnerPanel === "intel-summary" && (
-                          <div className="mt-3">{progressSummaryContent}</div>
-                        )}
-                      </div>
-
-                      <div
-                        className={`rounded-3xl border p-3.5 transition ${buildSectionCardClass(
-                          intelLogAvailableCount > 0
-                        )}`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-lg font-bold text-white">Activity Log</div>
-                            {openInnerPanel !== "intel-log" ? (
-                              <div className="mt-1 text-sm text-white/60">
-                                Recent events and milestones
-                              </div>
-                            ) : null}
-                          </div>
-                          <button
-                            onClick={() => toggleInnerPanel("intel-log")}
-                            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            {openInnerPanel === "intel-log" ? "CLOSE" : "OPEN"}
-                          </button>
-                        </div>
-                        {openInnerPanel === "intel-log" && (
-                          <div className="mt-3">{activityLogContent}</div>
-                        )}
-                      </div>
-                    </div>
+                    </MobilePanelSection>
                   ) : null}
-                </div>
-              </div>
-            </div>
+            </MobilePanelOverlayShell>
           ) : null}
 
           {/* Mobile Menu */}
