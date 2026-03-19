@@ -259,8 +259,8 @@ function getAlerts(state, derived, systemState, liveContracts = []) {
     alerts.push({
       key: "expedition-ready",
       tone: "info",
-      title: "Expedition ready",
-      text: "Field team is available for deployment.",
+      title: "Start expedition",
+      text: "You can launch an expedition now from Operations Console.",
     });
   }
 
@@ -1711,7 +1711,7 @@ export default function MleoBase() {
 
       case "expedition-ready":
       case "expedition":
-        return { tab: "operations", target: "expedition" };
+        return { tab: "operations", target: "expedition-action" };
 
       case "banked-ready":
         return { tab: "operations", target: "shipping" };
@@ -1755,6 +1755,28 @@ export default function MleoBase() {
     return true;
   }
 
+  function isElementVisible(el) {
+    if (!el) return false;
+    return el.getClientRects().length > 0;
+  }
+
+  function getBestTargetElement(targetForScroll, isMobile) {
+    const selector = `[data-base-target="${targetForScroll}"]`;
+
+    if (isMobile) {
+      const mobileContainer = mobilePanelScrollRef.current;
+      if (mobileContainer) {
+        const mobileMatches = Array.from(mobileContainer.querySelectorAll(selector));
+        const visibleMobileMatch = mobileMatches.find((el) => isElementVisible(el));
+        if (visibleMobileMatch) return visibleMobileMatch;
+      }
+    }
+
+    const allMatches = Array.from(document.querySelectorAll(selector));
+    const visibleMatch = allMatches.find((el) => isElementVisible(el));
+    return visibleMatch || allMatches[0] || null;
+  }
+
   function navigateToBaseTarget(step) {
     if (!step?.target) return;
 
@@ -1772,7 +1794,12 @@ export default function MleoBase() {
         : "overview";
 
     const targetInnerPanel = (() => {
-      if (step.target === "shipping" || step.target === "maintenance" || step.target === "expedition") {
+      if (
+        step.target === "shipping" ||
+        step.target === "maintenance" ||
+        step.target === "expedition" ||
+        step.target === "expedition-action"
+      ) {
         return "ops-console";
       }
 
@@ -1840,7 +1867,6 @@ export default function MleoBase() {
       setOpenInfoKey(null);
       setBuildInfo(getSystemInfo(step.target));
     }
-
     try {
       const isMobile =
         typeof window !== "undefined" &&
@@ -1909,14 +1935,12 @@ export default function MleoBase() {
       const targetForScroll = missionFocusKey || step.target;
       setHighlightTarget(targetForScroll);
 
-      const el = document.querySelector(
-        `[data-base-target="${targetForScroll}"]`
-      );
-      if (!el) return;
-
       const isMobile =
         typeof window !== "undefined" &&
         window.matchMedia("(max-width: 639px)").matches;
+
+      const el = getBestTargetElement(targetForScroll, isMobile);
+      if (!el) return;
 
       if (isMobile) {
         const centered = centerTargetInMobilePanel(el);
@@ -1937,9 +1961,11 @@ export default function MleoBase() {
       }
     }, 320);
 
+    const highlightDurationMs =
+      step.target === "expedition" || step.target === "expedition-action" ? 6200 : 4200;
     setTimeout(() => {
       setHighlightTarget(null);
-    }, 4200);
+    }, highlightDurationMs);
   }
 
   function normalizeInfoTipItems(value) {
@@ -2320,8 +2346,8 @@ export default function MleoBase() {
         key: "expedition",
         type: "ready",
         tone: "info",
-        title: "Expedition ready",
-        text: "Field team is available for deployment.",
+        title: "Start expedition",
+        text: "You can launch an expedition now from Operations Console.",
         count: readyCounts.expedition,
       });
     }
@@ -3485,14 +3511,17 @@ export default function MleoBase() {
         onShip: bankToSharedVault,
       }}
       expedition={{
-        highlighted: isHighlightedTarget("expedition", highlightTarget),
+        highlighted:
+          isHighlightedTarget("expedition", highlightTarget) ||
+          isHighlightedTarget("expedition-action", highlightTarget),
         highlightClass:
           highlightCard(expeditionLeft <= 0 && (state.resources.DATA || 0) >= 4, "info") || "",
+        buttonHighlighted: isHighlightedTarget("expedition-action", highlightTarget),
         canExpeditionNow,
         buttonText:
           expeditionLeft > 0
             ? `Expedition ${Math.ceil(expeditionLeft / 1000)}s`
-            : "Launch Expedition",
+            : "Start Expedition",
         onOpenInfo: () => {
           setBuildInfo(getOperationsInfo("expedition"));
           setOpenInfoKey(null);
@@ -4789,7 +4818,7 @@ export default function MleoBase() {
         actions: [
           "Use this upgrade when it fits your current bottleneck.",
           "Pair it with related structures for better value.",
-          "Use the recommended next step to jump to the right panel.",
+          "Use the available action to jump to the right panel.",
         ],
       },
     };
@@ -4989,7 +5018,7 @@ export default function MleoBase() {
       nextStep: {
         label: "Open Expedition",
         tab: "operations",
-        target: "expedition",
+        target: "expedition-action",
         why: "This mission is completed directly through expedition play.",
       },
     },
@@ -5082,7 +5111,7 @@ export default function MleoBase() {
       nextStep: {
         label: "Open Expedition",
         tab: "operations",
-        target: "expedition",
+        target: "expedition-action",
         why: "This mission is fully tied to expedition activity.",
       },
     },
@@ -5288,7 +5317,7 @@ export default function MleoBase() {
       nextStep: {
         label: "Open Expedition",
         tab: "operations",
-        target: "expedition",
+        target: "expedition-action",
         why: "Scout fits players who lean into the field loop.",
       },
     },
@@ -5555,7 +5584,7 @@ export default function MleoBase() {
       nextStep: {
         label: "Open Expedition",
         tab: "operations",
-        target: "expedition",
+        target: "expedition-action",
         why: "This contract depends directly on expedition readiness.",
       },
     },
@@ -7380,87 +7409,34 @@ export default function MleoBase() {
 
                   <div className="h-[calc(100%-81px)] overflow-y-auto px-5 py-4">
                     {desktopPanel === "overview" ? (
-  <div className="flex h-full flex-col gap-3">
-    <div
-      className={"rounded-2xl border px-3.5 py-3 " + getBaseFlowSummaryClass(baseFlowSummary.tone)}
-    >
-      <div className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-75">
-        Base Status
-      </div>
-      <div className="mt-1 text-sm font-semibold">{baseFlowSummary.title}</div>
-      <div className="mt-1 text-xs opacity-80">{baseFlowSummary.text}</div>
-    </div>
-
-    <div className="grid grid-cols-4 gap-2 xl:grid-cols-8">
-      {mobileTopStats.map((item) => (
-        <div
-          key={item.key}
-          className="relative min-h-[64px] rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
-        >
-          <InfoButton
-            infoKey={item.infoKey || item.key}
-            setOpenInfoKey={setOpenInfoKey}
-            className="right-2 top-2 h-6 w-6 text-[11px]"
-          />
-
-                                <button
-                                  type="button"
-            onClick={() => setOpenInfoKey(item.infoKey || item.key)}
-            className="block w-full text-left"
-          >
-            <div className="pr-7 text-[10px] font-black uppercase tracking-[0.16em] text-white/40">
-              {item.label}
-                              </div>
-
-            <div className="mt-1 pr-6 text-sm font-extrabold text-white xl:text-[15px]">
-              {item.value}
-                              </div>
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-
-    <div className="min-h-0 flex-1 rounded-[26px] border border-white/10 bg-[#07111f]/80 p-4">
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300/70">
-            Command Flow Map
-                        </div>
-          <div className="mt-1 text-lg font-black text-white">Live Base Network</div>
-          <div className="mt-1 text-sm text-white/65">
-            Clicking a structure opens the matching panel, while this main screen stays clean and wide.
-          </div>
-                    </div>
-
-        <div className="flex gap-2">
-                            <button
-                              type="button"
-            onClick={() => openDesktopPanel("ops", "ops-console")}
-            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
-          >
-            Operations
-                            </button>
-
-                            <button
-                              type="button"
-            onClick={() => openDesktopPanel("build", "build-structures")}
-            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
-          >
-            Build
-                            </button>
-                          </div>
-                          </div>
-
-      <BaseHomeFlowScene
-        base={state}
-        derived={derived}
-        selected={highlightTarget}
-        onSelect={openHomeFlowTarget}
-        layout="desktop"
-      />
-                    </div>
-                  </div>
-                ) : null}
+                      <DesktopPanelSection resourceBar={compactResourceBar}>
+                        <OverviewPanelCards
+                          buildSectionCardClass={buildSectionCardClass}
+                          openInnerPanel={openInnerPanel}
+                          toggleInnerPanel={toggleInnerPanel}
+                          overviewRecommendationCount={overviewRecommendationCount}
+                          nextStep={nextStep}
+                          buildOpportunitiesCount={buildOpportunitiesCount}
+                          availableStructuresCount={availableStructuresCount}
+                          availableModulesCount={availableModulesCount}
+                          availableResearchCount={availableResearchCount}
+                          availableBlueprintCount={availableBlueprintCount}
+                          onOpenBuildPanel={() => openDesktopPanel("build", "build-structures")}
+                          showCrew={showCrew}
+                          overviewIdentityCount={overviewIdentityCount}
+                          crewRoleInfo={crewRoleInfo}
+                          roleBonusText={roleBonusText}
+                          commanderPathInfo={commanderPathInfo}
+                          commanderPathText={commanderPathText}
+                          liveContractsAvailableCount={liveContractsAvailableCount}
+                          liveContracts={liveContracts}
+                          highlightTarget={highlightTarget}
+                          isHighlightedTarget={isHighlightedTarget}
+                          highlightCard={highlightCard}
+                          onClaimContract={claimContract}
+                        />
+                      </DesktopPanelSection>
+                    ) : null}
                 {desktopPanel === "ops" ? (
                       <DesktopPanelSection resourceBar={compactResourceBar}>
                         <OpsPanelCards
@@ -7736,7 +7712,7 @@ export default function MleoBase() {
                     >
                       <div>
                         <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-200/70">
-                          Recommended next step
+                          Available action
                         </div>
                         <div className="mt-1 text-base font-semibold text-white">
                           {shownInfo.nextStep.label}
@@ -7908,8 +7884,7 @@ export default function MleoBase() {
                       setOpenInnerPanel("overview-contracts");
                     }}
                     onOpenOpsConsole={() => {
-                      openMobilePanel("ops");
-                      setOpenInnerPanel("ops-console");
+                      navigateToBaseTarget({ tab: "operations", target: "expedition-action" });
                     }}
                   />
 
@@ -8111,7 +8086,7 @@ export default function MleoBase() {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-lg font-bold text-white">Best next step</div>
+                    <div className="text-lg font-bold text-white">Available action</div>
                     <div className="mt-1 text-xs text-white/60">
                       {commandHubCount > 0 ? "Primary alert or action" : "Nothing needs attention right now."}
                     </div>
@@ -8532,7 +8507,8 @@ export default function MleoBase() {
                       className={`relative flex h-full flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 ${
                         highlightCard(expeditionLeft <= 0 && (state.resources.DATA || 0) >= 4, "info")
                       } ${
-                        isHighlightedTarget("expedition", highlightTarget)
+                        isHighlightedTarget("expedition", highlightTarget) ||
+                        isHighlightedTarget("expedition-action", highlightTarget)
                           ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
                           : ""
                       }`}
@@ -8553,9 +8529,9 @@ export default function MleoBase() {
                         </button>
                       </div>
                       <div className="flex min-h-[88px] flex-col pr-8">
-                        <div className="text-sm font-semibold text-cyan-200">Field Expedition</div>
+                        <div className="text-sm font-semibold text-cyan-200">Expedition</div>
                         <p className="mt-1 text-sm text-white/70">
-                          Potential rewards: Ore, Gold, Scrap, DATA, and sometimes banked MLEO. Typical outcome varies.
+                          Send your field team to gather resources.
                         </p>
 
                         <div className="mt-3 grid grid-cols-3 gap-2">
@@ -8580,11 +8556,16 @@ export default function MleoBase() {
                       </div>
 
                       <button
+                        data-base-target="expedition-action"
                         onClick={handleLaunchExpedition}
                         disabled={!canExpeditionNow}
-                        className="mt-auto w-full rounded-2xl bg-cyan-600 px-4 py-3.5 text-sm font-extrabold shadow-lg shadow-cyan-900/30 transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
+                        className={`mt-auto w-full rounded-2xl bg-cyan-600 px-4 py-3.5 text-sm font-extrabold shadow-lg shadow-cyan-900/30 transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40 ${
+                          isHighlightedTarget("expedition-action", highlightTarget)
+                            ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                            : ""
+                        }`}
                       >
-                        {expeditionLeft > 0 ? `Ready in ${Math.ceil(expeditionLeft / 1000)}s` : "Launch Expedition"}
+                        {expeditionLeft > 0 ? `Ready in ${Math.ceil(expeditionLeft / 1000)}s` : "Start Expedition"}
                       </button>
                     </div>
                     ) : null}

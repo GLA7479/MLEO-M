@@ -73,9 +73,9 @@ export function OperationsConsolePanel({
           </div>
 
           <div className="flex min-h-[88px] flex-col pr-8">
-            <div className="text-sm font-semibold text-cyan-200">Field Expedition</div>
+            <div className="text-sm font-semibold text-cyan-200">Expedition</div>
             <p className="mt-1 text-sm text-white/70">
-              Potential rewards: Ore, Gold, Scrap, DATA, and sometimes banked MLEO. Typical outcome varies.
+              Send your field team to gather resources.
             </p>
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -92,15 +92,16 @@ export function OperationsConsolePanel({
           </div>
 
           <button
+            data-base-target="expedition-action"
             onClick={expedition.onLaunch}
             disabled={!expedition.canExpeditionNow}
             className={`mt-auto w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold transition ${
               expedition.canExpeditionNow
                 ? "bg-cyan-600 text-slate-950 hover:bg-cyan-500"
                 : "bg-white/10 text-white/45"
-            }`}
+            } ${expedition.buttonHighlighted ? highlightRingClass : ""}`}
           >
-            {expedition.buttonText}
+            {expedition.canExpeditionNow ? "Start Expedition" : expedition.buttonText}
           </button>
         </div>
       ) : null}

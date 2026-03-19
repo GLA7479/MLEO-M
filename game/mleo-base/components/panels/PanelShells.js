@@ -97,8 +97,10 @@ export function ReadyNowSummaryBlock({
           >
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-bold text-white">Expedition ready</div>
-                <div className="mt-1 text-xs text-white/60">Open Operations Console to launch.</div>
+                <div className="text-sm font-bold text-white">Start expedition</div>
+                <div className="mt-1 text-xs text-white/60">
+                  You can launch an expedition now from Operations Console.
+                </div>
               </div>
               <span className="text-cyan-300 text-lg font-bold">›</span>
             </div>
