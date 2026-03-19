@@ -2364,6 +2364,13 @@ export default function MleoBase() {
 
   const primaryCommandItem = commandHubItems[0] || null;
   const commandHubCount = commandHubItems.length;
+  const desktopPrimaryTitle = primaryCommandItem?.title || "Base is stable";
+  const desktopPrimaryTitleClass =
+    desktopPrimaryTitle.length > 26
+      ? "text-[12px]"
+      : desktopPrimaryTitle.length > 18
+      ? "text-[13px]"
+      : "text-sm";
 
   const nextStep = useMemo(
     () => getNextStep(state, derived, systemState, liveContracts),
@@ -7176,27 +7183,12 @@ export default function MleoBase() {
             </div>
 
             <div className="hidden sm:flex flex-wrap items-center gap-2 sm:justify-start">
-              <div className="rounded-xl border border-white/15 bg-white/5 px-3 h-[42px] flex flex-col items-center justify-center gap-1">
-                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white/40 leading-none">
-                  BANKED
-                </div>
-                <div className="text-xs font-extrabold text-white leading-none">
-                  {formatResourceValue(state.bankedMleo || 0)}
-                </div>
-              </div>
-              <Link
-                href="/mining"
-                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10"
-              >
-                Hub
-              </Link>
-
               <button
                 type="button"
                 onClick={() => {
                   if (commandHubCount > 0) setShowReadyPanel(true);
                 }}
-                className={`rounded-2xl border px-4 py-2.5 transition ${
+                className={`flex items-center rounded-2xl border px-4 py-2.5 transition h-[42px] min-h-[42px] max-h-[42px] overflow-hidden ${
                   commandHubCount > 0
                     ? `cursor-pointer shadow-[0_0_24px_rgba(34,211,238,0.18)] hover:border-cyan-400/80 ${
                         primaryCommandItem?.type === "alert"
@@ -7209,8 +7201,11 @@ export default function MleoBase() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <div className="text-sm font-bold text-white">
-                        {primaryCommandItem?.title || "Base is stable"}
+                      <div
+                        className={`min-w-0 whitespace-nowrap overflow-hidden text-ellipsis font-bold text-white leading-none ${desktopPrimaryTitleClass}`}
+                        title={desktopPrimaryTitle}
+                      >
+                        {desktopPrimaryTitle}
                       </div>
 
                       {commandHubCount > 0 ? (
@@ -7222,7 +7217,7 @@ export default function MleoBase() {
                   </div>
 
                   <div
-                    className={`shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                    className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-semibold leading-none transition ${
                       commandHubCount > 0
                         ? "bg-cyan-500 text-white hover:bg-cyan-400"
                         : "bg-white/10 text-white/80"
@@ -7232,6 +7227,22 @@ export default function MleoBase() {
                   </div>
                 </div>
               </button>
+
+              <Link
+                href="/mining"
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10"
+              >
+                Hub
+              </Link>
+
+              <div className="rounded-xl border border-white/15 bg-white/5 px-3 h-[42px] flex flex-col items-center justify-center gap-1">
+                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white/40 leading-none">
+                  BANKED
+                </div>
+                <div className="text-xs font-extrabold text-white leading-none">
+                  {formatResourceValue(state.bankedMleo || 0)}
+                </div>
+              </div>
 
               <button
                 onClick={() => setShowHowToPlay(true)}
