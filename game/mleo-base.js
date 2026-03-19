@@ -2368,7 +2368,7 @@ export default function MleoBase() {
   const desktopPrimaryTitleClass =
     desktopPrimaryTitle.length > 26
       ? "text-[12px]"
-      : desktopPrimaryTitle.length > 18
+      : desktopPrimaryTitle.length >= 18
       ? "text-[13px]"
       : "text-sm";
 
@@ -7188,7 +7188,7 @@ export default function MleoBase() {
                 onClick={() => {
                   if (commandHubCount > 0) setShowReadyPanel(true);
                 }}
-                className={`flex items-center rounded-2xl border px-4 py-2.5 transition h-[42px] min-h-[42px] max-h-[42px] overflow-hidden ${
+                className={`flex items-center rounded-2xl border px-4 py-0 transition h-[42px] min-h-[42px] max-h-[42px] overflow-hidden ${
                   commandHubCount > 0
                     ? `cursor-pointer shadow-[0_0_24px_rgba(34,211,238,0.18)] hover:border-cyan-400/80 ${
                         primaryCommandItem?.type === "alert"
