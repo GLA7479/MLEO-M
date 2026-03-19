@@ -7140,15 +7140,11 @@ export default function MleoBase() {
             <div>
               {/* Title pill removed for a cleaner V3 look */}
               <div className="mt-3 flex items-center justify-between sm:block">
-                <h1 className="text-3xl font-black tracking-tight sm:text-4xl">{CONFIG.title}</h1>
+                <h1 className="whitespace-nowrap text-2xl font-black tracking-tight sm:text-4xl">
+                  {CONFIG.title}
+                </h1>
                 <div className="flex items-center gap-2 sm:hidden">
-                  <Link
-                    href="/mining"
-                    className="rounded-2xl border border-white/15 bg-white/5 px-4 h-[35px] flex items-center text-sm font-semibold hover:bg-white/10"
-                  >
-                    Hub
-                  </Link>
-                  <div className="rounded-2xl border border-white/15 bg-white/5 px-4 h-[35px] flex flex-col items-center justify-center">
+                  <div className="rounded-2xl border border-white/15 bg-white/5 px-3 h-[35px] flex flex-col items-center justify-center gap-1">
                     <div className="text-[9px] font-black uppercase tracking-[0.12em] text-white/40 leading-none">
                       BANKED
                     </div>
@@ -7156,6 +7152,12 @@ export default function MleoBase() {
                       {formatResourceValue(state.bankedMleo || 0)}
                     </div>
                   </div>
+                  <Link
+                    href="/mining"
+                    className="rounded-2xl border border-white/15 bg-white/5 px-4 h-[35px] flex items-center text-sm font-semibold hover:bg-white/10"
+                  >
+                    Hub
+                  </Link>
                   <button
                     onClick={() => setMobileMenuOpen(true)}
                     className="relative flex h-[35px] w-[35px] items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
@@ -7174,13 +7176,7 @@ export default function MleoBase() {
             </div>
 
             <div className="hidden sm:flex flex-wrap items-center gap-2 sm:justify-start">
-              <Link
-                href="/mining"
-                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10"
-              >
-                Hub
-              </Link>
-              <div className="rounded-xl border border-white/15 bg-white/5 px-4 h-[42px] flex flex-col items-center justify-center">
+              <div className="rounded-xl border border-white/15 bg-white/5 px-3 h-[42px] flex flex-col items-center justify-center gap-1">
                 <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white/40 leading-none">
                   BANKED
                 </div>
@@ -7188,6 +7184,12 @@ export default function MleoBase() {
                   {formatResourceValue(state.bankedMleo || 0)}
                 </div>
               </div>
+              <Link
+                href="/mining"
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10"
+              >
+                Hub
+              </Link>
 
               <button
                 type="button"
