@@ -35,6 +35,8 @@ import {
   hireCrewAction,
   performMaintenanceAction,
   claimBaseMission,
+  claimBaseContract,
+  setBaseProfile,
   setBuildingPowerMode,
 } from "../lib/baseVaultClient";
 import {
@@ -82,7 +84,6 @@ import {
   todayKey,
   xpForLevel,
 } from "./mleo-base/engine";
-import { mergeProgressFromServer } from "./mleo-base/actions";
 
 const MAX_LOG_ITEMS = 16;
 
@@ -358,37 +359,6 @@ function ResourceCostRow({ cost, resources }) {
         <div className="h-[34px]" />
       )}
     </div>
-  );
-}
-
-function safeParse(raw, fallback) {
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return fallback;
-  }
-}
-
-function loadJson(key, fallback) {
-  if (typeof window === "undefined") return fallback;
-  return safeParse(window.localStorage.getItem(key), fallback);
-}
-
-function saveJson(key, value) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(key, JSON.stringify(value));
-}
-
-function saveBaseProfilePatch(patch) {
-  if (typeof window === "undefined") return;
-  const current = loadJson("mleo_base_profile_v1", {}) || {};
-  window.localStorage.setItem(
-    "mleo_base_profile_v1",
-    JSON.stringify({
-      ...current,
-      ...patch,
-    })
   );
 }
 
@@ -1650,9 +1620,8 @@ export default function MleoBase() {
   const [nextShipBonus, setNextShipBonus] = useState(0);
 
   const [expeditionMode, setExpeditionMode] = useState("balanced");
-  const [crewRole, setCrewRole] = useState(() => loadJson("mleo_base_profile_v1", {})?.crewRole || "engineer");
-  const [commanderPath, setCommanderPath] = useState(() => loadJson("mleo_base_profile_v1", {})?.commanderPath || "industry");
-  const [claimedContracts, setClaimedContracts] = useState(() => loadJson("mleo_base_claimed_contracts_v1", {}));
+  const [crewRole, setCrewRole] = useState("engineer");
+  const [commanderPath, setCommanderPath] = useState("industry");
   const [devTab, setDevTab] = useState("crew");
   const [activeBuildKey, setActiveBuildKey] = useState(null);
 
@@ -1670,6 +1639,47 @@ export default function MleoBase() {
     } finally {
       actionLocksRef.current[name] = false;
     }
+  }
+
+  function mergeAuthoritativeServerState(prev, serverState) {
+    const normalized = normalizeServerState(serverState, prev);
+
+    return applyLevelUps({
+      ...prev,
+      ...normalized,
+      crewRole:
+        serverState?.crewRole ??
+        serverState?.crew_role ??
+        normalized?.crewRole ??
+        prev?.crewRole ??
+        "engineer",
+      commanderPath:
+        serverState?.commanderPath ??
+        serverState?.commander_path ??
+        normalized?.commanderPath ??
+        prev?.commanderPath ??
+        "industry",
+      contractState:
+        serverState?.contractState ??
+        serverState?.contract_state ??
+        normalized?.contractState ??
+        prev?.contractState ??
+        { claimed: {} },
+      missionState: {
+        dailySeed:
+          normalized?.missionState?.dailySeed ||
+          prev?.missionState?.dailySeed ||
+          todayKey(),
+        completed: {
+          ...(prev?.missionState?.completed || {}),
+          ...(normalized?.missionState?.completed || {}),
+        },
+        claimed: {
+          ...(prev?.missionState?.claimed || {}),
+          ...(normalized?.missionState?.claimed || {}),
+        },
+      },
+    });
   }
 
   const mobilePanelScrollRef = useRef(null);
@@ -2056,15 +2066,7 @@ export default function MleoBase() {
             ? sanitizeBaseState(normalizeServerState(saved, seed), seed)
             : sanitizeBaseState(seed, seed);
 
-        const localProfile = loadJson("mleo_base_profile_v1", null);
-        let initialMerged = localProfile
-          ? {
-              ...initial,
-              crewRole: localProfile.crewRole || initial.crewRole,
-              commanderPath: localProfile.commanderPath || initial.commanderPath,
-            }
-          : initial;
-        initialMerged = applyStarterPackIfNeeded(initialMerged);
+        let initialMerged = applyStarterPackIfNeeded(initial);
 
         if (!alive) return;
 
@@ -2094,6 +2096,12 @@ export default function MleoBase() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem("mleo_base_profile_v1");
+    window.localStorage.removeItem("mleo_base_claimed_contracts_v1");
+  }, []);
+
 
   useEffect(() => {
     if (!toast) return;
@@ -2115,39 +2123,9 @@ export default function MleoBase() {
         setState((prev) => {
           const normalized = normalizeServerState(serverState, prev);
           const withStarter = applyStarterPackIfNeeded(normalized);
-          const localProfile = loadJson("mleo_base_profile_v1", {}) || {};
-          const serverCrewRole = serverState?.crewRole ?? serverState?.crew_role;
-          const serverCommanderPath = serverState?.commanderPath ?? serverState?.commander_path;
-
-          return applyLevelUps({
-            ...prev,
+          return mergeAuthoritativeServerState(prev, {
+            ...serverState,
             ...withStarter,
-            crewRole:
-              localProfile?.crewRole ??
-              serverCrewRole ??
-              prev?.crewRole ??
-              withStarter?.crewRole ??
-              "engineer",
-            commanderPath:
-              localProfile?.commanderPath ??
-              serverCommanderPath ??
-              prev?.commanderPath ??
-              withStarter?.commanderPath ??
-              "industry",
-            missionState: {
-              dailySeed:
-                withStarter?.missionState?.dailySeed ||
-                prev?.missionState?.dailySeed ||
-                todayKey(),
-              completed: {
-                ...(prev?.missionState?.completed || {}),
-                ...(withStarter?.missionState?.completed || {}),
-              },
-              claimed: {
-                ...(prev?.missionState?.claimed || {}),
-                ...(withStarter?.missionState?.claimed || {}),
-              },
-            },
           });
         });
       } catch (error) {
@@ -2192,19 +2170,6 @@ export default function MleoBase() {
     };
   }, [mounted]);
 
-  useEffect(() => {
-    if (!mounted) return;
-    saveJson("mleo_base_claimed_contracts_v1", claimedContracts);
-  }, [mounted, claimedContracts]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    saveJson("mleo_base_profile_v1", {
-      crewRole: state.crewRole,
-      commanderPath: state.commanderPath,
-    });
-  }, [mounted, state.crewRole, state.commanderPath]);
-
   const derived = useMemo(() => derive(state), [state]);
   const systemState = useMemo(() => getSystemState(state.stability), [state.stability]);
   const systemMeta = useMemo(() => systemStateMeta(systemState), [systemState]);
@@ -2228,13 +2193,18 @@ export default function MleoBase() {
     return "Command style: wider MLEO ecosystem support.";
   }, [commanderPath]);
 
+  const contractClaimedMap = useMemo(
+    () => state?.contractState?.claimed || state?.contract_state?.claimed || {},
+    [state?.contractState, state?.contract_state]
+  );
+
   const liveContracts = useMemo(() => {
     return LIVE_CONTRACTS.map((contract) => ({
       ...contract,
       done: contract.check(state, derived),
-      claimed: !!claimedContracts[contract.key],
+      claimed: !!contractClaimedMap[contract.key],
     }));
-  }, [state, derived, claimedContracts]);
+  }, [state, derived, contractClaimedMap]);
 
   const missionProgress = getMissionProgress(state);
 
@@ -2534,59 +2504,66 @@ export default function MleoBase() {
     setActiveEvent(null);
   };
 
-  const handleCrewRoleChange = (roleKey) => {
-    setCrewRole(roleKey);
-    setState((prev) => ({
-      ...prev,
-      crewRole: roleKey,
-      log: pushLog(prev.log, `Crew specialization changed to ${crewRoleMeta(roleKey).name}.`),
-    }));
-    saveBaseProfilePatch({ crewRole: roleKey });
-    showToast(`Crew role: ${crewRoleMeta(roleKey).name}`);
-  };
+  const handleCrewRoleChange = async (roleKey) => {
+    if (roleKey === crewRole) return;
 
-  const handleCommanderPathChange = (pathKey) => {
-    setCommanderPath(pathKey);
-    setState((prev) => ({
-      ...prev,
-      commanderPath: pathKey,
-      log: pushLog(prev.log, `Commander path set to ${commanderPathMeta(pathKey).name}.`),
-    }));
-    saveBaseProfilePatch({ commanderPath: pathKey });
-    showToast(`Commander path: ${commanderPathMeta(pathKey).name}`);
-  };
+    return runLockedAction(`profile:crew:${roleKey}`, async () => {
+      try {
+        const res = await setBaseProfile({ crew_role: roleKey });
 
-  const claimContract = (key) => {
-    const contract = LIVE_CONTRACTS.find((item) => item.key === key);
-    if (!contract) return;
+        if (!res?.success || !res?.state) {
+          showToast(res?.message || "Failed to save crew role");
+          return;
+        }
 
-    const done = contract.check(state, derived);
-    if (!done) {
-      showToast("Contract is not complete yet.");
-      return;
-    }
-    if (claimedContracts[key]) {
-      showToast("Contract already claimed.");
-      return;
-    }
-
-    setState((prev) => {
-      const nextResources = { ...prev.resources };
-      for (const [rk, rv] of Object.entries(contract.reward || {})) {
-        if (rk === "XP") continue;
-        nextResources[rk] = (nextResources[rk] || 0) + rv;
+        setState((prev) => mergeAuthoritativeServerState(prev, res.state));
+        showToast(`Crew role: ${crewRoleMeta(roleKey).name}`);
+      } catch (error) {
+        console.error("Crew role update failed", error);
+        showToast(error?.message || "Crew role update failed");
       }
-
-      return applyLevelUps({
-        ...prev,
-        resources: nextResources,
-        commanderXp: prev.commanderXp + Number(contract.reward?.XP || 0),
-        log: pushLog(prev.log, `Contract claimed: ${contract.title}.`),
-      });
     });
+  };
 
-    setClaimedContracts((prev) => ({ ...prev, [key]: true }));
-    showToast(`Contract claimed: ${contract.title}`);
+  const handleCommanderPathChange = async (pathKey) => {
+    if (pathKey === commanderPath) return;
+
+    return runLockedAction(`profile:path:${pathKey}`, async () => {
+      try {
+        const res = await setBaseProfile({ commander_path: pathKey });
+
+        if (!res?.success || !res?.state) {
+          showToast(res?.message || "Failed to save commander path");
+          return;
+        }
+
+        setState((prev) => mergeAuthoritativeServerState(prev, res.state));
+        showToast(`Commander path: ${commanderPathMeta(pathKey).name}`);
+      } catch (error) {
+        console.error("Commander path update failed", error);
+        showToast(error?.message || "Commander path update failed");
+      }
+    });
+  };
+
+  const claimContract = async (key) => {
+    return runLockedAction(`contract:${key}`, async () => {
+      try {
+        const res = await claimBaseContract(key);
+
+        if (!res?.success || !res?.state) {
+          showToast(res?.message || "Contract claim failed");
+          return;
+        }
+
+        setState((prev) => mergeAuthoritativeServerState(prev, res.state));
+        const contract = LIVE_CONTRACTS.find((item) => item.key === key);
+        showToast(`Contract claimed: ${contract?.title || key}`);
+      } catch (error) {
+        console.error("Contract claim failed", error);
+        showToast(error?.message || "Contract claim failed");
+      }
+    });
   };
 
   const buyBuilding = async (key) => {
@@ -2613,13 +2590,7 @@ export default function MleoBase() {
 
       if (res?.success && res?.state) {
         setState((prev) => {
-          const next = mergeProgressFromServer({
-            prev,
-            serverState: res.state,
-            normalizeServerState,
-            applyLevelUps,
-            todayKey,
-          });
+          const next = mergeAuthoritativeServerState(prev, res.state);
 
           next.log = pushLog(
             next.log,
@@ -2670,38 +2641,7 @@ export default function MleoBase() {
 
         if (res?.success && res?.state) {
           setState((prev) => {
-            const base = normalizeServerState(res.state, prev);
-            const localProfile = loadJson("mleo_base_profile_v1", {}) || {};
-
-            const next = applyLevelUps({
-              ...prev,
-              ...base,
-              crewRole:
-                localProfile?.crewRole ??
-                base?.crewRole ??
-                prev?.crewRole ??
-                "engineer",
-              commanderPath:
-                localProfile?.commanderPath ??
-                base?.commanderPath ??
-                prev?.commanderPath ??
-                "industry",
-              missionState: {
-                dailySeed:
-                  base?.missionState?.dailySeed ||
-                  prev?.missionState?.dailySeed ||
-                  todayKey(),
-                completed: {
-                  ...(prev?.missionState?.completed || {}),
-                  ...(base?.missionState?.completed || {}),
-                },
-                claimed: {
-                  ...(prev?.missionState?.claimed || {}),
-                  ...(base?.missionState?.claimed || {}),
-                },
-              },
-            });
-
+            const next = mergeAuthoritativeServerState(prev, res.state);
             next.log = pushLog(next.log, `${def.name} power set to ${nextMode}%.`);
             return next;
           });
@@ -2731,13 +2671,7 @@ export default function MleoBase() {
 
       if (res?.success && res?.state) {
         setState((prev) => {
-          const next = mergeProgressFromServer({
-            prev,
-            serverState: res.state,
-            normalizeServerState,
-            applyLevelUps,
-            todayKey,
-          });
+          const next = mergeAuthoritativeServerState(prev, res.state);
 
           next.log = pushLog(
             next.log,
@@ -2777,13 +2711,7 @@ export default function MleoBase() {
 
       if (res?.success && res?.state) {
         setState((prev) => {
-          const next = mergeProgressFromServer({
-            prev,
-            serverState: res.state,
-            normalizeServerState,
-            applyLevelUps,
-            todayKey,
-          });
+          const next = mergeAuthoritativeServerState(prev, res.state);
 
           next.log = pushLog(next.log, `${moduleDef.name} installed.`);
           return next;
@@ -2825,13 +2753,7 @@ export default function MleoBase() {
 
       if (res?.success && res?.state) {
         setState((prev) => {
-          const next = mergeProgressFromServer({
-            prev,
-            serverState: res.state,
-            normalizeServerState,
-            applyLevelUps,
-            todayKey,
-          });
+          const next = mergeAuthoritativeServerState(prev, res.state);
 
           next.log = pushLog(next.log, `${def.name} research completed.`);
           return next;
@@ -2871,16 +2793,8 @@ export default function MleoBase() {
         const loot = res.loot || {};
 
         setState((prev) => {
-          const next = mergeProgressFromServer({
-            prev,
-            serverState,
-            normalizeServerState,
-            applyLevelUps,
-            todayKey,
-            overrides: {
-              totalExpeditions: (prev.totalExpeditions || 0) + 1,
-            },
-          });
+          const next = mergeAuthoritativeServerState(prev, serverState);
+          next.totalExpeditions = (prev.totalExpeditions || 0) + 1;
           next.log = pushLog(
             next.log,
             `Expedition (${expeditionMode}) returned with ${loot.ore || 0} ORE, ${
@@ -2924,13 +2838,7 @@ export default function MleoBase() {
         const bonusAmount = 0;
 
         setState((prev) => {
-          const next = mergeProgressFromServer({
-            prev,
-            serverState,
-            normalizeServerState,
-            applyLevelUps,
-            todayKey,
-          });
+          const next = mergeAuthoritativeServerState(prev, serverState);
           next.log = pushLog(
             next.log,
             `Shipped ${fmt(shippedBase)} MLEO to shared vault.`
@@ -3118,32 +3026,7 @@ export default function MleoBase() {
       }
 
       setState((prev) => {
-        const normalized = normalizeServerState(serverState, prev);
-        const localProfile = loadJson("mleo_base_profile_v1", {}) || {};
-        return mergeProgressFromServer({
-          prev,
-          serverState,
-          normalizeServerState,
-          applyLevelUps,
-          todayKey,
-          overrides: {
-            ...normalized,
-            crewRole:
-              localProfile?.crewRole ??
-              serverState?.crewRole ??
-              serverState?.crew_role ??
-              normalized?.crewRole ??
-              prev?.crewRole ??
-              "engineer",
-            commanderPath:
-              localProfile?.commanderPath ??
-              serverState?.commanderPath ??
-              serverState?.commander_path ??
-              normalized?.commanderPath ??
-              prev?.commanderPath ??
-              "industry",
-          },
-        });
+        return mergeAuthoritativeServerState(prev, serverState);
       });
 
       showToast("Mission reward claimed.");

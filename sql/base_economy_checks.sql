@@ -51,6 +51,16 @@ SELECT
 FROM public.base_action_audit
 WHERE action_type = 'mission_claim';
 
+-- contract claims
+SELECT
+  date_trunc('day', created_at) AS day,
+  action_detail->>'contract_key' AS contract_key,
+  count(*) AS claims
+FROM public.base_action_audit
+WHERE action_type = 'contract_claim'
+GROUP BY 1, 2
+ORDER BY 1 DESC, 3 DESC;
+
 -- build distribution
 SELECT
   action_detail->>'building_key' AS building_key,

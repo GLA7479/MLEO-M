@@ -32,6 +32,25 @@ WHERE action_type = 'mission_claim'
 GROUP BY 1
 ORDER BY claims DESC;
 
+-- contract claims
+SELECT
+  action_detail->>'contract_key' AS contract_key,
+  count(*) AS claims
+FROM public.base_action_audit
+WHERE action_type = 'contract_claim'
+GROUP BY 1
+ORDER BY claims DESC;
+
+-- profile updates
+SELECT
+  action_detail->>'crew_role_after' AS crew_role_after,
+  action_detail->>'commander_path_after' AS commander_path_after,
+  count(*) AS updates
+FROM public.base_action_audit
+WHERE action_type = 'profile_update'
+GROUP BY 1, 2
+ORDER BY updates DESC;
+
 -- 4) expeditions summary
 SELECT
   count(*) AS expeditions,

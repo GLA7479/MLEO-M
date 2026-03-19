@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.base_device_state (
   device_id text PRIMARY KEY,
-  version integer NOT NULL DEFAULT 6,
+  version integer NOT NULL DEFAULT 7,
   last_day date NOT NULL DEFAULT current_date,
   banked_mleo bigint NOT NULL DEFAULT 0,
   sent_today bigint NOT NULL DEFAULT 0,
@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS public.base_device_state (
   research jsonb NOT NULL DEFAULT '{}'::jsonb,
   stats jsonb NOT NULL DEFAULT '{}'::jsonb,
   mission_state jsonb NOT NULL DEFAULT '{}'::jsonb,
+  contract_state jsonb NOT NULL DEFAULT '{"claimed":{}}'::jsonb,
   log jsonb NOT NULL DEFAULT '[]'::jsonb,
   last_tick_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
@@ -39,6 +40,13 @@ ALTER TABLE public.base_device_state
 
 ALTER TABLE public.base_device_state
   ADD COLUMN IF NOT EXISTS building_power_modes jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+ALTER TABLE public.base_device_state
+  ADD COLUMN IF NOT EXISTS contract_state jsonb NOT NULL DEFAULT '{"claimed":{}}'::jsonb;
+
+UPDATE public.base_device_state
+SET contract_state = '{"claimed":{}}'::jsonb
+WHERE contract_state IS NULL OR contract_state = '{}'::jsonb;
 
 CREATE INDEX IF NOT EXISTS idx_base_device_state_updated_at
   ON public.base_device_state(updated_at DESC);
@@ -124,6 +132,16 @@ AS $$
   );
 $$;
 
+CREATE OR REPLACE FUNCTION public.base_default_contract_state()
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT jsonb_build_object(
+    'claimed', '{}'::jsonb
+  );
+$$;
+
 CREATE OR REPLACE FUNCTION public.base_jsonb_int(j jsonb, k text, fallback integer DEFAULT 0)
 RETURNS integer
 LANGUAGE sql
@@ -195,6 +213,7 @@ BEGIN
     research,
     stats,
     mission_state,
+    contract_state,
     log,
     expedition_ready_at,
     crew_role,
@@ -202,13 +221,14 @@ BEGIN
   )
   VALUES (
     p_device_id,
-    6,
+    7,
     public.base_default_resources(),
     public.base_default_buildings(),
     '{}'::jsonb,
     '{}'::jsonb,
     public.base_default_stats(),
     public.base_default_mission_state(current_date::text),
+    public.base_default_contract_state(),
     '[]'::jsonb,
     now(),
     'engineer',
@@ -343,10 +363,10 @@ BEGIN
   WHERE device_id = p_device_id
   FOR UPDATE;
 
-  IF v_state.version < 6 THEN
+  IF v_state.version < 7 THEN
     UPDATE public.base_device_state
     SET
-      version = 6,
+      version = 7,
       resources = coalesce(nullif(resources, '{}'::jsonb), public.base_default_resources()),
       buildings = coalesce(nullif(buildings, '{}'::jsonb), public.base_default_buildings()),
       stats = CASE
@@ -356,6 +376,11 @@ BEGIN
       mission_state = CASE
         WHEN mission_state = '{}'::jsonb THEN public.base_default_mission_state(current_date::text)
         ELSE mission_state
+      END,
+      contract_state = CASE
+        WHEN contract_state IS NULL OR contract_state = '{}'::jsonb
+          THEN public.base_default_contract_state()
+        ELSE contract_state
       END,
       crew_role = coalesce(crew_role, 'engineer'),
       commander_path = coalesce(commander_path, 'industry'),
@@ -1090,6 +1115,219 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.base_set_profile(
+  p_device_id text,
+  p_crew_role text DEFAULT NULL,
+  p_commander_path text DEFAULT NULL
+)
+RETURNS TABLE(state public.base_device_state)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_state public.base_device_state%ROWTYPE;
+  v_new_crew_role text;
+  v_new_commander_path text;
+BEGIN
+  IF coalesce(trim(p_device_id), '') = '' THEN
+    RAISE EXCEPTION 'device_id is required';
+  END IF;
+
+  SELECT * INTO v_state
+  FROM public.base_reconcile_state(p_device_id);
+
+  SELECT * INTO v_state
+  FROM public.base_device_state
+  WHERE device_id = p_device_id
+  FOR UPDATE;
+
+  v_new_crew_role := coalesce(nullif(trim(p_crew_role), ''), v_state.crew_role, 'engineer');
+  v_new_commander_path := coalesce(nullif(trim(p_commander_path), ''), v_state.commander_path, 'industry');
+
+  IF v_new_crew_role NOT IN ('engineer', 'logistician', 'researcher', 'scout', 'operations') THEN
+    RAISE EXCEPTION 'Invalid crew role';
+  END IF;
+
+  IF v_new_commander_path NOT IN ('industry', 'logistics', 'research', 'ecosystem') THEN
+    RAISE EXCEPTION 'Invalid commander path';
+  END IF;
+
+  UPDATE public.base_device_state
+  SET
+    crew_role = v_new_crew_role,
+    commander_path = v_new_commander_path,
+    updated_at = now()
+  WHERE device_id = p_device_id
+  RETURNING * INTO v_state;
+
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'profile_update',
+    jsonb_build_object(
+      'crew_role_after', v_new_crew_role,
+      'commander_path_after', v_new_commander_path
+    ),
+    0,
+    '[]'::jsonb
+  );
+
+  RETURN QUERY
+  SELECT *
+  FROM public.base_device_state
+  WHERE device_id = p_device_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.base_claim_contract(
+  p_device_id text,
+  p_contract_key text
+)
+RETURNS TABLE(state public.base_device_state)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_state public.base_device_state%ROWTYPE;
+  v_resources jsonb;
+  v_contract_state jsonb;
+  v_claimed boolean := false;
+  v_done boolean := false;
+  v_xp_gain integer := 0;
+  v_reward jsonb := '{}'::jsonb;
+  v_energy_cap integer := 140;
+BEGIN
+  IF coalesce(trim(p_device_id), '') = '' THEN
+    RAISE EXCEPTION 'device_id is required';
+  END IF;
+
+  IF coalesce(trim(p_contract_key), '') = '' THEN
+    RAISE EXCEPTION 'contract_key is required';
+  END IF;
+
+  SELECT * INTO v_state
+  FROM public.base_reconcile_state(p_device_id);
+
+  SELECT * INTO v_state
+  FROM public.base_device_state
+  WHERE device_id = p_device_id
+  FOR UPDATE;
+
+  v_resources := coalesce(v_state.resources, '{}'::jsonb);
+  v_contract_state := coalesce(v_state.contract_state, public.base_default_contract_state());
+  v_claimed := coalesce((v_contract_state->'claimed'->>p_contract_key)::boolean, false);
+
+  IF v_claimed THEN
+    RAISE EXCEPTION 'Contract already claimed';
+  END IF;
+
+  v_energy_cap :=
+    140
+    + (coalesce((coalesce(v_state.buildings, '{}'::jsonb)->>'powerCell')::integer, 0) * 42)
+    + CASE
+        WHEN coalesce((coalesce(v_state.research, '{}'::jsonb)->>'coolant')::boolean, false)
+        THEN 22
+        ELSE 0
+      END;
+
+  IF p_contract_key = 'stability_watch' THEN
+    v_done := coalesce(v_state.stability, 100) >= 85;
+    v_resources := jsonb_set(
+      v_resources,
+      '{DATA}',
+      to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 10),
+      true
+    );
+    v_xp_gain := 20;
+    v_reward := jsonb_build_object('DATA', 10, 'XP', 20);
+
+  ELSIF p_contract_key = 'energy_ready' THEN
+    v_done := coalesce((v_resources->>'ENERGY')::numeric, 0) >= (v_energy_cap * 0.45);
+    v_resources := jsonb_set(
+      v_resources,
+      '{GOLD}',
+      to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 80),
+      true
+    );
+    v_xp_gain := 15;
+    v_reward := jsonb_build_object('GOLD', 80, 'XP', 15);
+
+  ELSIF p_contract_key = 'banking_cycle' THEN
+    v_done := coalesce(v_state.banked_mleo, 0) >= 120;
+    v_resources := jsonb_set(
+      jsonb_set(
+        v_resources,
+        '{DATA}',
+        to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 8),
+        true
+      ),
+      '{SCRAP}',
+      to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 16),
+      true
+    );
+    v_xp_gain := 18;
+    v_reward := jsonb_build_object('DATA', 8, 'SCRAP', 16, 'XP', 18);
+
+  ELSIF p_contract_key = 'field_readiness' THEN
+    v_done :=
+      coalesce(v_state.expedition_ready_at, now()) <= now()
+      AND coalesce((v_resources->>'DATA')::int, 0) >= 4;
+
+    v_resources := jsonb_set(
+      v_resources,
+      '{GOLD}',
+      to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 60),
+      true
+    );
+    v_xp_gain := 18;
+    v_reward := jsonb_build_object('GOLD', 60, 'XP', 18);
+
+  ELSE
+    RAISE EXCEPTION 'Invalid contract key';
+  END IF;
+
+  IF NOT v_done THEN
+    RAISE EXCEPTION 'Contract not completed yet';
+  END IF;
+
+  v_contract_state := jsonb_set(
+    v_contract_state,
+    ARRAY['claimed', p_contract_key],
+    'true'::jsonb,
+    true
+  );
+
+  UPDATE public.base_device_state
+  SET
+    resources = v_resources,
+    contract_state = v_contract_state,
+    commander_xp = coalesce(commander_xp, 0) + v_xp_gain,
+    updated_at = now()
+  WHERE device_id = p_device_id
+  RETURNING * INTO v_state;
+
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'contract_claim',
+    jsonb_build_object(
+      'contract_key', p_contract_key,
+      'reward', v_reward,
+      'resources_after', v_resources,
+      'contract_state_after', v_contract_state,
+      'commander_xp_after', coalesce(v_state.commander_xp, 0)
+    ),
+    0,
+    '[]'::jsonb
+  );
+
+  RETURN QUERY
+  SELECT *
+  FROM public.base_device_state
+  WHERE device_id = p_device_id;
+END;
+$$;
+
 -- ============================================================================
 -- Security: Revoke from PUBLIC and anon/authenticated, grant to service_role
 -- ============================================================================
@@ -1097,12 +1335,16 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.base_get_or_create_state(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_reconcile_state(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_claim_mission_reward(text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_set_profile(text, text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_claim_contract(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_set_building_paused(text, text, boolean) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_set_building_power_mode(text, text, integer) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.base_get_or_create_state(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_reconcile_state(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_claim_mission_reward(text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.base_set_profile(text, text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.base_claim_contract(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_set_building_paused(text, text, boolean) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_set_building_power_mode(text, text, integer) TO service_role;
 
