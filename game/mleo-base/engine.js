@@ -140,7 +140,7 @@ export function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function pushLog(log, text) {
+export function pushLog(log, text) {
   const next = [{ id: `${Date.now()}-${Math.random()}`, ts: Date.now(), text }, ...(log || [])];
   return next.slice(0, MAX_LOG_ITEMS);
 }
