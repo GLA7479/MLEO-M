@@ -215,7 +215,6 @@ function getAlerts(state, derived, systemState, liveContracts = []) {
   const energy = Number(state.resources?.ENERGY || 0);
   const energyCap = Number(derived.energyCap || 0);
   const banked = Number(state.bankedMleo || 0);
-  const sentToday = Number(state.sentToday || 0);
   const shipCap = Number(derived.shipCap || 0);
   const expeditionReady = Number(state.expeditionReadyAt || 0) <= Date.now();
   const claimableContracts = liveContracts.filter((c) => c.done && !c.claimed).length;
@@ -262,15 +261,6 @@ function getAlerts(state, derived, systemState, liveContracts = []) {
       tone: "info",
       title: "Expedition ready",
       text: "Field team is available for deployment.",
-    });
-  }
-
-  if (shipCap > 0 && sentToday / shipCap >= 0.8) {
-    alerts.push({
-      key: "ship-pressure",
-      tone: "warning",
-      title: "Ship cap nearing limit",
-      text: "Daily export capacity is getting tight. Pace shipments carefully.",
     });
   }
 

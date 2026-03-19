@@ -609,15 +609,15 @@ BEGIN
       * v_data_mult;
 
   v_energy_use :=
-      ((v_quarry * v_quarry_mode) * 0.72)
-    + ((v_trade * v_trade_mode) * 0.78)
-    + ((v_salvage * v_salvage_mode) * 0.78)
-    + ((v_refinery * v_refinery_mode) * 1.10)
-    + ((v_miner * v_miner_mode) * 0.20)
-    + ((v_arcade * v_arcade_mode) * 0.22)
-    + ((v_logistics * v_logistics_mode) * 0.20)
-    + ((v_research_lab * v_research_lab_mode) * 0.24)
-    + ((v_repair * v_repair_mode) * 0.22);
+      ((v_quarry * v_quarry_mode) * 0.60)
+    + ((v_trade * v_trade_mode) * 0.62)
+    + ((v_salvage * v_salvage_mode) * 0.62)
+    + ((v_refinery * v_refinery_mode) * 0.90)
+    + ((v_miner * v_miner_mode) * 0.16)
+    + ((v_arcade * v_arcade_mode) * 0.18)
+    + ((v_logistics * v_logistics_mode) * 0.16)
+    + ((v_research_lab * v_research_lab_mode) * 0.20)
+    + ((v_repair * v_repair_mode) * 0.18);
 
   IF v_energy_now < (v_energy_use * v_effective_seconds) THEN
     IF v_energy_use > 0 THEN
