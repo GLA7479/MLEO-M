@@ -388,7 +388,11 @@ BEGIN
   IF v_elapsed_seconds <= 0 THEN
     RETURN v_state;
   END IF;
-  v_effective_seconds := public.base_effective_offline_seconds(v_elapsed_seconds);
+  IF v_elapsed_seconds <= 60 THEN
+    v_effective_seconds := v_elapsed_seconds;
+  ELSE
+    v_effective_seconds := public.base_effective_offline_seconds(v_elapsed_seconds);
+  END IF;
 
   v_resources := coalesce(v_state.resources, public.base_default_resources());
   v_buildings := coalesce(v_state.buildings, public.base_default_buildings());
