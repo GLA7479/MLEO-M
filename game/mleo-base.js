@@ -7202,7 +7202,7 @@ export default function MleoBase() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <div
-                        className={`min-w-0 whitespace-nowrap overflow-hidden text-ellipsis font-bold text-white leading-none ${desktopPrimaryTitleClass}`}
+                        className={`min-w-0 whitespace-nowrap overflow-hidden text-ellipsis font-bold text-white leading-[1.1] ${desktopPrimaryTitleClass}`}
                         title={desktopPrimaryTitle}
                       >
                         {desktopPrimaryTitle}
