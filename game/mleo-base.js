@@ -7148,6 +7148,14 @@ export default function MleoBase() {
                   >
                     Hub
                   </Link>
+                  <div className="rounded-2xl border border-white/15 bg-white/5 px-4 h-[35px] flex flex-col items-center justify-center">
+                    <div className="text-[9px] font-black uppercase tracking-[0.12em] text-white/40 leading-none">
+                      BANKED
+                    </div>
+                    <div className="text-[11px] font-extrabold text-white leading-none">
+                      {formatResourceValue(state.bankedMleo || 0)}
+                    </div>
+                  </div>
                   <button
                     onClick={() => setMobileMenuOpen(true)}
                     className="relative flex h-[35px] w-[35px] items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
@@ -7172,6 +7180,14 @@ export default function MleoBase() {
               >
                 Hub
               </Link>
+              <div className="rounded-xl border border-white/15 bg-white/5 px-4 h-[42px] flex flex-col items-center justify-center">
+                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white/40 leading-none">
+                  BANKED
+                </div>
+                <div className="text-xs font-extrabold text-white leading-none">
+                  {formatResourceValue(state.bankedMleo || 0)}
+                </div>
+              </div>
 
               <button
                 type="button"
