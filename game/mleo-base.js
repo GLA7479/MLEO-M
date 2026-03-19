@@ -2115,21 +2115,24 @@ export default function MleoBase() {
         setState((prev) => {
           const normalized = normalizeServerState(serverState, prev);
           const withStarter = applyStarterPackIfNeeded(normalized);
+          const localProfile = loadJson("mleo_base_profile_v1", {}) || {};
+          const serverCrewRole = serverState?.crewRole ?? serverState?.crew_role;
+          const serverCommanderPath = serverState?.commanderPath ?? serverState?.commander_path;
 
           return applyLevelUps({
             ...prev,
             ...withStarter,
             crewRole:
-              serverState?.crewRole ??
-              serverState?.crew_role ??
-              withStarter?.crewRole ??
+              localProfile?.crewRole ??
+              serverCrewRole ??
               prev?.crewRole ??
+              withStarter?.crewRole ??
               "engineer",
             commanderPath:
-              serverState?.commanderPath ??
-              serverState?.commander_path ??
-              withStarter?.commanderPath ??
+              localProfile?.commanderPath ??
+              serverCommanderPath ??
               prev?.commanderPath ??
+              withStarter?.commanderPath ??
               "industry",
             missionState: {
               dailySeed:
@@ -2668,13 +2671,21 @@ export default function MleoBase() {
         if (res?.success && res?.state) {
           setState((prev) => {
             const base = normalizeServerState(res.state, prev);
+            const localProfile = loadJson("mleo_base_profile_v1", {}) || {};
 
             const next = applyLevelUps({
               ...prev,
               ...base,
-              crewRole: base?.crewRole ?? prev?.crewRole ?? "engineer",
+              crewRole:
+                localProfile?.crewRole ??
+                base?.crewRole ??
+                prev?.crewRole ??
+                "engineer",
               commanderPath:
-                base?.commanderPath ?? prev?.commanderPath ?? "industry",
+                localProfile?.commanderPath ??
+                base?.commanderPath ??
+                prev?.commanderPath ??
+                "industry",
               missionState: {
                 dailySeed:
                   base?.missionState?.dailySeed ||
@@ -3108,6 +3119,7 @@ export default function MleoBase() {
 
       setState((prev) => {
         const normalized = normalizeServerState(serverState, prev);
+        const localProfile = loadJson("mleo_base_profile_v1", {}) || {};
         return mergeProgressFromServer({
           prev,
           serverState,
@@ -3117,12 +3129,14 @@ export default function MleoBase() {
           overrides: {
             ...normalized,
             crewRole:
+              localProfile?.crewRole ??
               serverState?.crewRole ??
               serverState?.crew_role ??
               normalized?.crewRole ??
               prev?.crewRole ??
               "engineer",
             commanderPath:
+              localProfile?.commanderPath ??
               serverState?.commanderPath ??
               serverState?.commander_path ??
               normalized?.commanderPath ??
