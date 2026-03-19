@@ -2612,7 +2612,7 @@ export default function MleoBase() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState(null);
   const [showReadyPanel, setShowReadyPanel] = useState(false);
-  const [showAllSuggestions, setShowAllSuggestions] = useState(false);
+  // showAllSuggestions removed: suggestions are always shown in full inside Ready Panel.
 
   // One open inner panel at a time (mobile)
   const [openInnerPanel, setOpenInnerPanel] = useState(null);
@@ -4096,10 +4096,17 @@ export default function MleoBase() {
   const claimMission = async (missionKey) => {
     try {
       const payload = await claimBaseMission(missionKey);
-      const serverState = payload?.state;
+      if (!payload?.success) {
+        showToast(payload?.message || "Mission claim failed");
+        return;
+      }
 
+      const serverState = payload?.state;
       if (!serverState) {
-        throw new Error("Missing updated base state");
+        // API can fail to return updated state even when it responds successfully.
+        // Don't crash the UI; fall back to a safe retry path.
+        showToast(payload?.message || "Mission claim failed (missing updated state).");
+        return;
       }
 
       setState((prev) => {
@@ -8254,6 +8261,48 @@ export default function MleoBase() {
               </Link>
 
               <button
+                type="button"
+                onClick={() => {
+                  if (commandHubCount > 0) setShowReadyPanel(true);
+                }}
+                className={`rounded-2xl border px-4 py-2.5 transition ${
+                  commandHubCount > 0
+                    ? `cursor-pointer shadow-[0_0_24px_rgba(34,211,238,0.18)] hover:border-cyan-400/80 ${
+                        primaryCommandItem?.type === "alert"
+                          ? alertToneClasses(primaryCommandItem.tone)
+                          : "border-cyan-400/60 bg-cyan-500/10 hover:bg-cyan-500/15"
+                      }`
+                    : "border-white/10 bg-white/5"
+                } ${commandHubCount > 0 ? "animate-pulse" : ""}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm font-bold text-white">
+                        {primaryCommandItem?.title || "Base is stable"}
+                      </div>
+
+                      {commandHubCount > 0 ? (
+                        <span className="inline-flex min-w-[24px] items-center justify-center rounded-full bg-cyan-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-950">
+                          {commandHubCount}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div
+                    className={`shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                      commandHubCount > 0
+                        ? "bg-cyan-500 text-white hover:bg-cyan-400"
+                        : "bg-white/10 text-white/80"
+                    }`}
+                  >
+                    {commandHubCount > 0 ? "OPEN" : "OK"}
+                  </div>
+                </div>
+              </button>
+
+              <button
                 onClick={() => setShowHowToPlay(true)}
                 className="rounded-xl border border-blue-500/25 bg-blue-500/10 px-4 py-2.5 text-sm font-semibold text-blue-200 hover:bg-blue-500/20"
               >
@@ -10192,11 +10241,11 @@ export default function MleoBase() {
           {/* Mobile Ready Panel */}
           {showReadyPanel ? (
             <div
-className="fixed inset-0 z-[117] bg-black/60 backdrop-blur-sm sm:hidden"
-                onClick={() => { setShowReadyPanel(false); setShowAllSuggestions(false); }}
+              className="fixed inset-0 z-[117] bg-black/60 backdrop-blur-sm"
+                onClick={() => setShowReadyPanel(false)}
             >
               <div
-                className="absolute inset-x-4 top-[110px] rounded-3xl border border-white/10 bg-[#0b1526] p-4 shadow-2xl"
+                className="absolute inset-x-4 top-[110px] rounded-3xl border border-white/10 bg-[#0b1526] p-4 shadow-2xl lg:inset-x-auto lg:left-1/2 lg:-translate-x-1/2 lg:w-full lg:max-w-6xl lg:top-[88px] lg:bottom-[106px] lg:rounded-[30px] lg:p-5 lg:overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between">
@@ -10208,7 +10257,7 @@ className="fixed inset-0 z-[117] bg-black/60 backdrop-blur-sm sm:hidden"
                   </div>
 
                   <button
-                    onClick={() => { setShowReadyPanel(false); setShowAllSuggestions(false); }}
+                    onClick={() => setShowReadyPanel(false)}
                     className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20"
                   >
                     Close
@@ -10225,52 +10274,41 @@ className="fixed inset-0 z-[117] bg-black/60 backdrop-blur-sm sm:hidden"
                 >
                   {commandHubItems.length ? (
                     <>
-                      {[primaryCommandItem, ...(showAllSuggestions ? commandHubItems.slice(1) : [])]
-                        .filter(Boolean)
-                        .map((item) => (
-                          <button
-                            key={item.key}
-                            type="button"
-                            onClick={() => handleCommandHubItemClick(item)}
-                            className={`block w-full rounded-2xl border p-3 text-left transition hover:bg-white/10 ${
-                              item.type === "alert"
-                                ? alertToneClasses(item.tone)
-                                : "border-white/10 bg-black/20"
-                            } ${
-                              isHighlightedTarget(
-                                getAlertNavigationTarget(item)?.target,
-                                highlightTarget
-                              )
-                                ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
-                                : ""
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="text-sm font-semibold text-white">{item.title}</div>
-                                <div className="mt-1 text-xs text-white/65">{item.text}</div>
-                              </div>
-
-                              <div className="shrink-0 flex items-center gap-2">
-                                {item.count > 0 ? (
-                                  <span className="inline-flex min-w-[22px] items-center justify-center rounded-full bg-cyan-400 px-1.5 py-0.5 text-[10px] font-bold text-black">
-                                    {item.count}
-                                  </span>
-                                ) : null}
-                                <span className="text-cyan-300 text-lg font-bold">›</span>
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      {!showAllSuggestions && commandHubCount > 1 ? (
+                      {commandHubItems.map((item) => (
                         <button
+                          key={item.key}
                           type="button"
-                          onClick={() => setShowAllSuggestions(true)}
-                          className="block w-full rounded-2xl border border-white/10 bg-white/5 py-2.5 text-center text-xs font-semibold text-cyan-200 hover:bg-white/10"
+                          onClick={() => handleCommandHubItemClick(item)}
+                          className={`block w-full rounded-2xl border p-3 text-left transition hover:bg-white/10 ${
+                            item.type === "alert"
+                              ? alertToneClasses(item.tone)
+                              : "border-white/10 bg-black/20"
+                          } ${
+                            isHighlightedTarget(
+                              getAlertNavigationTarget(item)?.target,
+                              highlightTarget
+                            )
+                              ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                              : ""
+                          }`}
                         >
-                          More suggestions ({commandHubCount - 1})
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-white">{item.title}</div>
+                              <div className="mt-1 text-xs text-white/65">{item.text}</div>
+                            </div>
+
+                            <div className="shrink-0 flex items-center gap-2">
+                              {item.count > 0 ? (
+                                <span className="inline-flex min-w-[22px] items-center justify-center rounded-full bg-cyan-400 px-1.5 py-0.5 text-[10px] font-bold text-black">
+                                  {item.count}
+                                </span>
+                              ) : null}
+                              <span className="text-cyan-300 text-lg font-bold">›</span>
+                            </div>
+                          </div>
                         </button>
-                      ) : null}
+                      ))}
                     </>
                   ) : (
                     <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
