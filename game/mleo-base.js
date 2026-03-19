@@ -2860,9 +2860,41 @@ export default function MleoBase() {
     }
 
     setTimeout(() => {
-      setHighlightTarget(step.target);
+      const missionFocusKey =
+        step.target === "missions"
+          ? (() => {
+              // Pick the mission the player should collect now, otherwise the first mission.
+              const sorted = [...DAILY_MISSIONS].sort((a, b) => {
+                const aProgress = missionProgress[a.key] || 0;
+                const aDone = aProgress >= a.target;
+                const aClaimed = !!state.missionState?.claimed?.[a.key];
+                const aReady = aDone && !aClaimed ? 1 : 0;
 
-      const el = document.querySelector(`[data-base-target="${step.target}"]`);
+                const bProgress = missionProgress[b.key] || 0;
+                const bDone = bProgress >= b.target;
+                const bClaimed = !!state.missionState?.claimed?.[b.key];
+                const bReady = bDone && !bClaimed ? 1 : 0;
+
+                return bReady - aReady;
+              });
+
+              const firstReady = sorted.find((m) => {
+                const progress = missionProgress[m.key] || 0;
+                const done = progress >= m.target;
+                const claimed = !!state.missionState?.claimed?.[m.key];
+                return done && !claimed;
+              });
+
+              return firstReady?.key || sorted[0]?.key || null;
+            })()
+          : null;
+
+      const targetForScroll = missionFocusKey || step.target;
+      setHighlightTarget(targetForScroll);
+
+      const el = document.querySelector(
+        `[data-base-target="${targetForScroll}"]`
+      );
       if (!el) return;
 
       const isMobile =
@@ -4461,11 +4493,19 @@ export default function MleoBase() {
         const claimed = !!state.missionState?.claimed?.[mission.key];
         const ready = done && !claimed;
         return (
-          <div key={mission.key} className={`relative rounded-xl border p-2.5 ${
-            ready
-              ? "border-cyan-400/40 bg-cyan-500/10"
-              : "border-white/10 bg-black/20"
-          }`}>
+          <div
+            key={mission.key}
+            data-base-target={mission.key}
+            className={`relative rounded-xl border p-2.5 ${
+              ready
+                ? "border-amber-400/40 bg-amber-500/10"
+                : "border-white/10 bg-black/20"
+            } ${
+              highlightTarget === mission.key
+                ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
+                : ""
+            }`}
+          >
             <div className="absolute right-2.5 top-2.5 z-10">
               <button
                 type="button"
@@ -8819,7 +8859,7 @@ export default function MleoBase() {
                             dailyMissionsAvailableCount > 0
                           )} ${
                             isHighlightedTarget("missions", highlightTarget)
-                              ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                              ? "ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
                               : ""
                           }`}
                         >
@@ -10855,7 +10895,7 @@ export default function MleoBase() {
                   data-base-target="missions"
                   className={`${
                     isHighlightedTarget("missions", highlightTarget)
-                      ? "rounded-3xl ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                      ? "rounded-3xl ring-2 ring-amber-300/90 border-amber-300 bg-amber-400/10 shadow-[0_0_0_1px_rgba(252,211,77,0.45),0_0_28px_rgba(245,158,11,0.18)]"
                       : ""
                   }`}
                 >
