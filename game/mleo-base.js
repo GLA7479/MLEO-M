@@ -2642,6 +2642,7 @@ export default function MleoBase() {
 
   const lastInteractionRef = useRef(Date.now());
   const lastPresenceSendRef = useRef(0);
+  const lastUiInteractionSendRef = useRef(0);
   const presenceInFlightRef = useRef(false);
   const presenceHeartbeatRef = useRef(null);
 
@@ -2706,25 +2707,45 @@ export default function MleoBase() {
     });
   }
 
-  async function pushPresence(interacted = false, force = false, keepalive = false) {
+  async function pushPresence({
+    interacted = false,
+    gameAction = false,
+    force = false,
+    keepalive = false,
+    reason = "passive",
+  } = {}) {
     if (typeof document === "undefined") return false;
     if (presenceInFlightRef.current) return false;
 
     const now = Date.now();
-    const minGap = interacted ? 8000 : 25000;
-    if (!force && now - lastPresenceSendRef.current < minGap) return false;
+
+    // UI-precision: only "real UI input" (pointerdown/click/keydown/touchstart) should
+    // update `last_interaction_at` via `interacted=true`. Passive/heartbeat/focus stays false.
+    const isGameplay = !!gameAction;
+    const isUiInteraction = !!interacted && !isGameplay;
+
+    // Passive presence is allowed more frequently than gameplay, but should never update last_interaction_at.
+    const minGapPassiveMs = 25_000;
+    const minGapUiMs = 20_000; // within your 15-30s requirement
+    const minGapGameplayMs = 0;
+
+    const minGapMs = isGameplay ? minGapGameplayMs : isUiInteraction ? minGapUiMs : minGapPassiveMs;
+    const gateRef = isUiInteraction ? lastUiInteractionSendRef : lastPresenceSendRef;
+
+    if (!force && now - gateRef.current < minGapMs) return false;
 
     presenceInFlightRef.current = true;
     try {
       const payload = await sendBasePresence({
-        visibilityState: document.visibilityState || "hidden",
+        visibilityState: document.visibilityState || (isGameplay ? "visible" : "hidden"),
         pageName: "base",
-        interacted,
+        interacted: !!interacted,
+        gameAction: !!gameAction,
         keepalive: !!keepalive,
       });
 
       if (!payload?.success) {
-        console.error("BASE presence push rejected", payload);
+        console.error(`BASE presence push rejected (${reason})`, payload);
         return false;
       }
 
@@ -2748,9 +2769,13 @@ export default function MleoBase() {
       }
 
       lastPresenceSendRef.current = now;
+      if (isUiInteraction || isGameplay) {
+        lastUiInteractionSendRef.current = now;
+      }
+
       return true;
     } catch (error) {
-      console.error("BASE presence push failed", error);
+      console.error(`BASE presence push failed (${reason})`, error);
       return false;
     } finally {
       presenceInFlightRef.current = false;
@@ -2812,24 +2837,36 @@ export default function MleoBase() {
 
       presenceHeartbeatRef.current = window.setInterval(() => {
         if (document.visibilityState === "visible") {
-          pushPresence(false);
+          pushPresence({ interacted: false, gameAction: false, reason: "heartbeat" });
         }
       }, 45000);
     };
 
-    const markInteraction = () => {
+    const markInteraction = (event) => {
       lastInteractionRef.current = Date.now();
       if (document.visibilityState === "visible") {
-        pushPresence(true);
+        const type = event?.type;
+        const reason =
+          type === "pointerdown"
+            ? "ui_pointerdown"
+            : type === "click"
+              ? "ui_click"
+              : type === "keydown"
+                ? "ui_keydown"
+                : type === "touchstart"
+                  ? "ui_touchstart"
+                  : "ui_interaction";
+
+        pushPresence({ interacted: true, gameAction: false, reason });
       }
     };
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        pushPresence(false, true);
+        pushPresence({ interacted: false, gameAction: false, force: true, reason: "visible" });
         startHeartbeat();
       } else {
-        pushPresence(false, true);
+        pushPresence({ interacted: false, gameAction: false, force: true, reason: "hidden" });
         stopHeartbeat();
         setHubGameplayOnline(false);
       }
@@ -2837,7 +2874,7 @@ export default function MleoBase() {
 
     const onFocus = () => {
       if (document.visibilityState === "visible") {
-        pushPresence(false, true);
+        pushPresence({ interacted: false, gameAction: false, force: true, reason: "focus" });
         startHeartbeat();
       }
     };
@@ -2867,9 +2904,9 @@ export default function MleoBase() {
       }).catch(() => {});
     };
 
-    const interactionEvents = ["pointerdown", "keydown", "wheel"];
-
-    interactionEvents.forEach((eventName) => {
+    const uiInteractionEvents = ["pointerdown", "click", "keydown", "touchstart"];
+ 
+    uiInteractionEvents.forEach((eventName) => {
       window.addEventListener(eventName, markInteraction, { passive: true });
     });
 
@@ -2879,13 +2916,13 @@ export default function MleoBase() {
     window.addEventListener("beforeunload", onBeforeUnload);
 
     if (document.visibilityState === "visible") {
-      pushPresence(false, true);
+      pushPresence({ interacted: false, gameAction: false, force: true, reason: "init_visible" });
       startHeartbeat();
     }
 
     return () => {
       stopHeartbeat();
-      interactionEvents.forEach((eventName) => {
+      uiInteractionEvents.forEach((eventName) => {
         window.removeEventListener(eventName, markInteraction);
       });
       window.removeEventListener("focus", onFocus);
