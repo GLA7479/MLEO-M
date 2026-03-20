@@ -973,14 +973,14 @@ function DesktopFloatingPanelShell({
   return (
     <div
       className="
-        z-[70] rounded-[24px] border border-cyan-400/18 bg-slate-950/96
+        z-[70] flex flex-col rounded-[24px] border border-cyan-400/18 bg-slate-950/96
         shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl
         px-4 py-3.5 sm:px-4 sm:py-3.5
         max-h-[calc(100dvh-120px)] md:max-h-[min(74vh,620px)]
         overflow-hidden
       "
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="shrink-0 flex items-start justify-between gap-3">
         <div>
           {eyebrow ? (
             <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200/65">
@@ -1011,14 +1011,12 @@ function DesktopFloatingPanelShell({
 
       <div
         className="
-          mt-3
-          max-h-[calc(100dvh-220px)] md:max-h-[min(58vh,470px)]
-          overflow-y-auto overscroll-contain pr-1 banked-scroll
-          [webkit-overflow-scrolling:touch]
-          pb-8 md:pb-10 min-h-0
+          min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 pb-10 md:pb-12
+          banked-scroll [webkit-overflow-scrolling:touch]
         "
       >
         {children}
+        <div aria-hidden className="h-8 md:h-10 shrink-0" />
       </div>
     </div>
   );
