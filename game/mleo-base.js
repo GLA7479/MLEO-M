@@ -894,19 +894,39 @@ function BaseResourceBar({
   bankedMleo = 0,
   compact = false,
   showBanked = true,
+  /** Mobile layout: SCRAP before ORE (desktop keeps ORE, GOLD, SCRAP, …). */
+  swapOreScrap = false,
 }) {
-  const items = [
-    { key: "ORE", label: "ORE", value: formatResourceValue(resources?.ORE || 0) },
-    { key: "GOLD", label: "GOLD", value: formatResourceValue(resources?.GOLD || 0) },
-    { key: "SCRAP", label: "SCRAP", value: formatResourceValue(resources?.SCRAP || 0) },
-    { key: "DATA", label: "DATA", value: formatResourceValue(resources?.DATA || 0) },
-    {
-      key: "ENERGY",
-      label: "ENERGY",
-      value: `${formatResourceValue(energy || 0)}/${formatResourceValue(energyCap || 0)}`,
-      focus: true,
-    },
-  ];
+  const ore = {
+    key: "ORE",
+    label: "ORE",
+    value: formatResourceValue(resources?.ORE || 0),
+  };
+  const gold = {
+    key: "GOLD",
+    label: "GOLD",
+    value: formatResourceValue(resources?.GOLD || 0),
+  };
+  const scrap = {
+    key: "SCRAP",
+    label: "SCRAP",
+    value: formatResourceValue(resources?.SCRAP || 0),
+  };
+  const data = {
+    key: "DATA",
+    label: "DATA",
+    value: formatResourceValue(resources?.DATA || 0),
+  };
+  const energyItem = {
+    key: "ENERGY",
+    label: "ENERGY",
+    value: `${formatResourceValue(energy || 0)}/${formatResourceValue(energyCap || 0)}`,
+    focus: true,
+  };
+
+  const items = swapOreScrap
+    ? [scrap, gold, ore, data, energyItem]
+    : [ore, gold, scrap, data, energyItem];
 
   return (
     <div
@@ -3459,6 +3479,18 @@ export default function MleoBase() {
       bankedMleo={state.bankedMleo || 0}
       compact
       showBanked={false}
+    />
+  );
+
+  const mobileCompactResourceBar = (
+    <BaseResourceBar
+      resources={state.resources}
+      energy={state.resources?.ENERGY || 0}
+      energyCap={derived.energyCap || 140}
+      bankedMleo={state.bankedMleo || 0}
+      compact
+      showBanked={false}
+      swapOreScrap
     />
   );
 
@@ -8066,7 +8098,7 @@ export default function MleoBase() {
                   />
 
                   {mobilePanel === "overview" ? (
-                    <MobilePanelSection resourceBar={compactResourceBar}>
+                    <MobilePanelSection resourceBar={mobileCompactResourceBar}>
                       <OverviewPanelCards
                         buildSectionCardClass={buildSectionCardClass}
                         openInnerPanel={openInnerPanel}
@@ -8095,7 +8127,7 @@ export default function MleoBase() {
                   ) : null}
 
                   {mobilePanel === "ops" ? (
-                    <MobilePanelSection resourceBar={compactResourceBar}>
+                    <MobilePanelSection resourceBar={mobileCompactResourceBar}>
                       <OpsPanelCards
                         opsCardClass={buildSectionCardClass(operationsConsoleAvailableCount > 0)}
                         missionsCardClass={buildSectionCardClass(dailyMissionsAvailableCount > 0)}
@@ -8119,7 +8151,7 @@ export default function MleoBase() {
                   ) : null}
 
                   {mobilePanel === "build" ? (
-                    <MobilePanelSection resourceBar={compactResourceBar}>
+                    <MobilePanelSection resourceBar={mobileCompactResourceBar}>
                       <BuildPanelCards
                         developmentCardClass={buildSectionCardClass(developmentAvailableCount > 0)}
                         structuresCardClass={buildSectionCardClass(structuresAvailableCount > 0)}
@@ -8145,7 +8177,7 @@ export default function MleoBase() {
                   ) : null}
 
                   {mobilePanel === "intel" ? (
-                    <MobilePanelSection resourceBar={compactResourceBar}>
+                    <MobilePanelSection resourceBar={mobileCompactResourceBar}>
                       <IntelPanelCards
                         progressCardClass={buildSectionCardClass(intelSummaryAvailableCount > 0)}
                         logCardClass={buildSectionCardClass(intelLogAvailableCount > 0)}
