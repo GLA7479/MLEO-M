@@ -2271,6 +2271,14 @@ export default function MleoBase() {
     const items = [];
 
     alerts.forEach((alert) => {
+      // getAlerts also emits expedition-ready; command hub adds a counted "Start expedition" row — keep only that one.
+      if (
+        alert.key === "expedition-ready" &&
+        showExpeditions &&
+        readyCounts.expedition > 0
+      ) {
+        return;
+      }
       items.push({
         key: `alert-${alert.key}`,
         type: "alert",
