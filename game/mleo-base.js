@@ -2742,10 +2742,10 @@ export default function MleoBase() {
 
   function computeHubGameplayOnline(now = Date.now()) {
     if (typeof document === "undefined") return false;
-    const presenceAlive = lastPresenceSendRef.current > 0 && now - lastPresenceSendRef.current <= 75_000;
     const visible = document.visibilityState === "visible";
-    const gameRecent = lastGameActionAtRef.current > 0 && now - lastGameActionAtRef.current <= 5 * 60_000;
-    return presenceAlive && visible && gameRecent;
+    const hasGameAction = lastGameActionAtRef.current > 0;
+    const gameRecent = now - lastGameActionAtRef.current <= 5 * 60_000;
+    return visible && hasGameAction && gameRecent;
   }
 
   async function markRealGameAction() {
