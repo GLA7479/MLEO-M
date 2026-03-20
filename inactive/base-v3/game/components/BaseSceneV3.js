@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BUILDINGS } from "../../../../game/base-v2/data/buildings";
-import { buildingCost, canAfford } from "../../../../game/base-v2/utils/buildings";
+import { BUILDINGS } from "../../../base-v2/data/buildings";
+import { buildingCost, canAfford } from "../../../base-v2/utils/buildings";
 import { SCENE_BUILDING_KEYS, SCENE_POSITIONS, SCENE_LINK_KEYS } from "../data/scenePositions";
 import { getBuildingIdentity } from "../data/buildingIdentity";
 

@@ -109,6 +109,19 @@ function getBuildingPowerMode(state, buildingKey) {
   return normalizePowerMode(state?.buildingPowerModes?.[buildingKey]);
 }
 
+/** Matches Shared Vault power presets for built runtime buildings only. */
+function getActivePowerPreset(state, safeMap, normalMap) {
+  const keys = Object.keys(safeMap);
+  const built = keys.filter((k) => (state?.buildings?.[k] || 0) > 0);
+  if (built.length === 0) return "none";
+
+  const matches = (map) => built.every((k) => getBuildingPowerMode(state, k) === map[k]);
+
+  if (matches(safeMap)) return "safe";
+  if (matches(normalMap)) return "normal";
+  return "mixed";
+}
+
 function getBuildingPowerFactor(state, buildingKey) {
   return getBuildingPowerMode(state, buildingKey) / 100;
 }
@@ -2633,34 +2646,50 @@ export default function MleoBase() {
     repairBay: 100,
   };
 
+  const powerPresetActive = useMemo(
+    () => getActivePowerPreset(state, SAFE_MODE_PRESET, NORMAL_MODE_PRESET),
+    [state.buildings, state.buildingPowerModes]
+  );
+
   const applyPowerPreset = async (presetKey, presetMap) => {
     return runLockedAction(`powerPreset:${presetKey}`, async () => {
       try {
         let lastServerState = null;
         let changed = 0;
+        // Merge server state after each step so the next building uses fresh power modes.
+        let working = state;
 
         for (const [buildingKey, targetMode] of Object.entries(presetMap)) {
           if (!canThrottleBuilding(buildingKey)) continue;
-          if ((state.buildings?.[buildingKey] || 0) <= 0) continue;
+          if ((working.buildings?.[buildingKey] || 0) <= 0) continue;
 
-          const currentMode = getBuildingPowerMode(state, buildingKey);
+          const currentMode = getBuildingPowerMode(working, buildingKey);
           if (currentMode === targetMode) continue;
 
           const res = await setBuildingPowerMode(buildingKey, targetMode);
           if (!res?.success || !res?.state) {
+            if (changed > 0) {
+              setState((prev) => mergeAuthoritativeServerState(prev, working));
+            }
             showToast(res?.message || `${buildingKey} power preset failed.`);
             return;
           }
 
+          working = mergeAuthoritativeServerState(working, res.state);
           lastServerState = res.state;
           changed += 1;
         }
 
         if (!changed) {
+          const hasRuntime = Object.keys(presetMap).some(
+            (k) => canThrottleBuilding(k) && (state.buildings?.[k] || 0) > 0
+          );
           showToast(
-            presetKey === "safe"
-              ? "Safe Mode is already active."
-              : "All runtime buildings are already at 100%."
+            !hasRuntime
+              ? "Build at least one production building (Quarry, Trade Hub, etc.) to use power presets."
+              : presetKey === "safe"
+              ? "Safe preset already matches your current power modes."
+              : "Normal 100% already matches your current power modes."
           );
           return;
         }
@@ -3509,6 +3538,7 @@ export default function MleoBase() {
         onOverclock: activateOverclock,
         onSafeMode: applySafeModePreset,
         onNormalMode: applyNormalModePreset,
+        powerPresetActive,
         safeModeButtonText: "Safe 50%",
         normalModeButtonText: "Normal 100%",
         overclockButtonText:
@@ -8821,18 +8851,79 @@ export default function MleoBase() {
                             MAINTAIN: STABILITY
                           </span>
                           <button
+                            type="button"
                             onClick={applySafeModePreset}
-                            className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-bold text-cyan-200 hover:bg-cyan-500/20"
+                            aria-pressed={powerPresetActive === "safe"}
+                            title={
+                              powerPresetActive === "safe"
+                                ? "Safe 50% is ON (all runtime buildings match this preset)"
+                                : "Safe 50% is OFF — click to apply"
+                            }
+                            className={`relative z-10 inline-flex cursor-pointer touch-manipulation select-none items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all duration-200 active:scale-[0.98] ${
+                              powerPresetActive === "safe"
+                                ? "border-2 border-cyan-200/90 bg-gradient-to-b from-cyan-500/40 to-cyan-700/30 text-white shadow-[0_0_20px_rgba(34,211,238,0.55)] ring-1 ring-cyan-300/50"
+                                : "border border-cyan-400/35 bg-slate-950/90 text-cyan-100/85 shadow-sm hover:border-cyan-300/50 hover:bg-cyan-950/70 hover:text-cyan-50"
+                            }`}
                           >
+                            <span
+                              className={`h-2 w-2 shrink-0 rounded-full ${
+                                powerPresetActive === "safe"
+                                  ? "bg-cyan-300 shadow-[0_0_10px_#67e8f9]"
+                                  : "bg-cyan-950 ring-1 ring-cyan-700/60"
+                              }`}
+                              aria-hidden
+                            />
                             Safe 50%
+                            <span
+                              className={`text-[9px] font-black uppercase tracking-wider ${
+                                powerPresetActive === "safe" ? "text-cyan-50" : "text-cyan-300/50"
+                              }`}
+                            >
+                              {powerPresetActive === "safe" ? "ON" : "OFF"}
+                            </span>
                           </button>
                           <button
+                            type="button"
                             onClick={applyNormalModePreset}
-                            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold text-white/80 hover:bg-white/10"
+                            aria-pressed={powerPresetActive === "normal"}
+                            title={
+                              powerPresetActive === "normal"
+                                ? "Normal 100% is ON (all runtime buildings at 100%)"
+                                : "Normal 100% is OFF — click to apply"
+                            }
+                            className={`relative z-10 inline-flex cursor-pointer touch-manipulation select-none items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all duration-200 active:scale-[0.98] ${
+                              powerPresetActive === "normal"
+                                ? "border-2 border-white/80 bg-gradient-to-b from-white/25 to-white/10 text-white shadow-[0_0_18px_rgba(255,255,255,0.22)] ring-1 ring-white/40"
+                                : "border border-white/20 bg-slate-950/90 text-white/80 shadow-sm hover:border-white/40 hover:bg-white/10 hover:text-white"
+                            }`}
                           >
+                            <span
+                              className={`h-2 w-2 shrink-0 rounded-full ${
+                                powerPresetActive === "normal"
+                                  ? "bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)]"
+                                  : "bg-white/15 ring-1 ring-white/25"
+                              }`}
+                              aria-hidden
+                            />
                             Normal 100%
+                            <span
+                              className={`text-[9px] font-black uppercase tracking-wider ${
+                                powerPresetActive === "normal" ? "text-white" : "text-white/50"
+                              }`}
+                            >
+                              {powerPresetActive === "normal" ? "ON" : "OFF"}
+                            </span>
                           </button>
                         </div>
+                        {powerPresetActive === "mixed" ? (
+                          <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-200/85">
+                            Custom power mix — tap Safe 50% or Normal 100% to align all buildings
+                          </p>
+                        ) : powerPresetActive === "none" ? (
+                          <p className="mt-1.5 text-[10px] text-white/45">
+                            Presets apply when you have runtime production buildings.
+                          </p>
+                        ) : null}
                         <p className="mt-2 text-xs text-white/55">
                           Stability: {fmt(state.stability)}%
                         </p>

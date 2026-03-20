@@ -194,18 +194,80 @@ export function OperationsConsolePanel({
               MAINTAIN: STABILITY
             </span>
             <button
+              type="button"
               onClick={maintenance.onSafeMode}
-              className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-bold text-cyan-200 hover:bg-cyan-500/20"
+              aria-pressed={maintenance.powerPresetActive === "safe"}
+              title={
+                maintenance.powerPresetActive === "safe"
+                  ? "Safe 50% is ON (all runtime buildings match this preset)"
+                  : "Safe 50% is OFF — click to apply"
+              }
+              className={`relative z-10 inline-flex cursor-pointer touch-manipulation select-none items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all duration-200 active:scale-[0.98] ${
+                maintenance.powerPresetActive === "safe"
+                  ? "border-2 border-cyan-200/90 bg-gradient-to-b from-cyan-500/40 to-cyan-700/30 text-white shadow-[0_0_20px_rgba(34,211,238,0.55)] ring-1 ring-cyan-300/50"
+                  : "border border-cyan-400/35 bg-slate-950/90 text-cyan-100/85 shadow-sm hover:border-cyan-300/50 hover:bg-cyan-950/70 hover:text-cyan-50"
+              }`}
             >
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${
+                  maintenance.powerPresetActive === "safe"
+                    ? "bg-cyan-300 shadow-[0_0_10px_#67e8f9]"
+                    : "bg-cyan-950 ring-1 ring-cyan-700/60"
+                }`}
+                aria-hidden
+              />
               {maintenance.safeModeButtonText || "Safe 50%"}
+              <span
+                className={`text-[9px] font-black uppercase tracking-wider ${
+                  maintenance.powerPresetActive === "safe" ? "text-cyan-50" : "text-cyan-300/50"
+                }`}
+              >
+                {maintenance.powerPresetActive === "safe" ? "ON" : "OFF"}
+              </span>
             </button>
             <button
+              type="button"
               onClick={maintenance.onNormalMode}
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold text-white/80 hover:bg-white/10"
+              aria-pressed={maintenance.powerPresetActive === "normal"}
+              title={
+                maintenance.powerPresetActive === "normal"
+                  ? "Normal 100% is ON (all runtime buildings at 100%)"
+                  : "Normal 100% is OFF — click to apply"
+              }
+              className={`relative z-10 inline-flex cursor-pointer touch-manipulation select-none items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all duration-200 active:scale-[0.98] ${
+                maintenance.powerPresetActive === "normal"
+                  ? "border-2 border-white/80 bg-gradient-to-b from-white/25 to-white/10 text-white shadow-[0_0_18px_rgba(255,255,255,0.22)] ring-1 ring-white/40"
+                  : "border border-white/20 bg-slate-950/90 text-white/80 shadow-sm hover:border-white/40 hover:bg-white/10 hover:text-white"
+              }`}
             >
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${
+                  maintenance.powerPresetActive === "normal"
+                    ? "bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)]"
+                    : "bg-white/15 ring-1 ring-white/25"
+                }`}
+                aria-hidden
+              />
               {maintenance.normalModeButtonText || "Normal 100%"}
+              <span
+                className={`text-[9px] font-black uppercase tracking-wider ${
+                  maintenance.powerPresetActive === "normal" ? "text-white" : "text-white/50"
+                }`}
+              >
+                {maintenance.powerPresetActive === "normal" ? "ON" : "OFF"}
+              </span>
             </button>
           </div>
+
+          {maintenance.powerPresetActive === "mixed" ? (
+            <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-200/85">
+              Custom power mix — tap Safe 50% or Normal 100% to align all buildings
+            </p>
+          ) : maintenance.powerPresetActive === "none" ? (
+            <p className="mt-1.5 text-[10px] text-white/45">
+              Presets apply when you have runtime production buildings.
+            </p>
+          ) : null}
 
           <p className="mt-2 text-xs text-white/55">
             Stability: {maintenance.stabilityText}%
