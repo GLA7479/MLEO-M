@@ -3380,7 +3380,7 @@ export default function MleoBase() {
     }));
   }, [state, derived, contractClaimedMap]);
 
-  const missionProgress = getMissionProgress(state);
+  const missionProgress = useMemo(() => getMissionProgress(state), [state]);
 
   const readyCounts = useMemo(() => {
     const expeditionReadyNow =
@@ -3586,11 +3586,16 @@ export default function MleoBase() {
         const actionChanged = rawOverview.nextAction.key !== prev.actionKey;
         const canUpdateAction = now >= Number(prev.lockedUntil || 0);
         const didUpdateAction = actionChanged && canUpdateAction;
+
+        if (!didUpdateAction) {
+          return prev;
+        }
+
         return {
           ...prev,
-          actionKey: didUpdateAction ? rawOverview.nextAction.key : prev.actionKey,
-          lockedAction: didUpdateAction ? rawOverview.nextAction : prev.lockedAction,
-          lockedUntil: didUpdateAction ? now + OVERVIEW_LOCK_MS : prev.lockedUntil,
+          actionKey: rawOverview.nextAction.key,
+          lockedAction: rawOverview.nextAction,
+          lockedUntil: now + OVERVIEW_LOCK_MS,
           lastUpdatedAt: now,
         };
       }
