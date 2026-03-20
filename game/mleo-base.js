@@ -967,6 +967,9 @@ function DesktopFloatingPanelShell({
   onClose,
   children,
 }) {
+  const actionBtnBase =
+    "h-10 min-h-10 rounded-full border px-4 text-sm font-semibold leading-none inline-flex items-center justify-center";
+
   return (
     <div
       className="
@@ -999,7 +1002,7 @@ function DesktopFloatingPanelShell({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/[0.09]"
+            className={`${actionBtnBase} border-white/10 bg-white/[0.05] text-white/80 hover:bg-white/[0.09]`}
           >
             Close
           </button>
@@ -1012,6 +1015,7 @@ function DesktopFloatingPanelShell({
           max-h-[calc(100dvh-220px)] md:max-h-[min(58vh,470px)]
           overflow-y-auto overscroll-contain pr-1 banked-scroll
           [webkit-overflow-scrolling:touch]
+          pb-8 md:pb-10 min-h-0
         "
       >
         {children}
@@ -2295,7 +2299,7 @@ export default function MleoBase() {
     navigateToBaseTarget(info.nextStep);
   }
 
-  function DesktopInfoFloatingPanel() {
+  function renderDesktopInfoFloatingPanel() {
     if (!shownInfo) return null;
 
     const subtitle =
@@ -2309,7 +2313,7 @@ export default function MleoBase() {
       <button
         type="button"
         onClick={() => openHomeFlowTarget(infoUpgradeBuildingKey)}
-        className="mb-1 rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[12px] font-bold text-white/85 hover:bg-white/10"
+        className="h-10 min-h-10 rounded-full border border-cyan-400/45 bg-cyan-500/12 px-4 text-sm font-semibold leading-none inline-flex items-center justify-center text-cyan-100 hover:bg-cyan-500/15"
       >
         UPGRADE
       </button>
@@ -7668,7 +7672,7 @@ export default function MleoBase() {
 
                 {shownInfo ? (
                   <div className="absolute right-0 top-[calc(100%+10px)] z-[130] w-[360px]">
-                    <DesktopInfoFloatingPanel />
+                    {renderDesktopInfoFloatingPanel()}
                   </div>
                 ) : null}
               </div>
