@@ -621,7 +621,7 @@ BEGIN
     v_energy_regen := v_energy_regen + 1.35;
   END IF;
 
-  v_ship_cap := 12000 + ((v_logistics * v_logistics_mode) * 1800) + (v_blueprint * 450);
+  v_ship_cap := 1800 + ((v_logistics * v_logistics_mode) * 320) + (v_blueprint * 90);
 
   v_expedition_cooldown_seconds := 120;
 
@@ -634,14 +634,14 @@ BEGIN
   v_sent_today := greatest(0, coalesce(v_state.sent_today, 0));
   v_maintenance_due := greatest(0, coalesce(v_state.maintenance_due, 0));
 
-  v_ore_gain := ((v_quarry * v_quarry_mode) * 2.0) * v_ore_mult;
-  v_gold_gain := ((v_trade * v_trade_mode) * 1.0) * v_gold_mult;
-  v_scrap_gain := ((v_salvage * v_salvage_mode) * 0.8) * v_scrap_mult;
+  v_ore_gain := ((v_quarry * v_quarry_mode) * 1.35) * v_ore_mult;
+  v_gold_gain := ((v_trade * v_trade_mode) * 0.60) * v_gold_mult;
+  v_scrap_gain := ((v_salvage * v_salvage_mode) * 0.50) * v_scrap_mult;
   v_data_gain :=
-      (((v_miner * v_miner_mode) * 0.18)
-      + ((v_arcade * v_arcade_mode) * 0.15)
-      + ((v_logistics * v_logistics_mode) * 0.08)
-      + ((v_research_lab * v_research_lab_mode) * 0.28))
+      (((v_miner * v_miner_mode) * 0.14)
+      + ((v_arcade * v_arcade_mode) * 0.11)
+      + ((v_logistics * v_logistics_mode) * 0.06)
+      + ((v_research_lab * v_research_lab_mode) * 0.22))
       * v_data_mult;
 
   v_energy_use :=
@@ -694,7 +694,7 @@ BEGIN
         v_raw_banked_gain := least(
           v_ore_use / 1.8,
           v_scrap_use / 0.7
-        ) * 0.10 * v_mleo_mult * v_bank_bonus;
+        ) * 0.015 * v_mleo_mult * v_bank_bonus;
       ELSE
         v_raw_banked_gain := 0;
       END IF;

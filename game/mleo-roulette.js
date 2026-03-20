@@ -269,6 +269,9 @@ export default function ColorWheelPage() {
     if (!wrapRef.current) return;
 
     const calc = () => {
+      const wrapEl = wrapRef.current;
+      if (!wrapEl) return;
+
       const rootH = window.visualViewport?.height ?? window.innerHeight;
       const safeBottom =
         Number(
@@ -292,7 +295,7 @@ export default function ColorWheelPage() {
         24;
 
       const freeH = Math.max(120, rootH - used);
-      const wheelWrap = wrapRef.current.querySelector("#roulette-wheel-wrap");
+      const wheelWrap = wrapEl.querySelector("#roulette-wheel-wrap");
       const freeW = Math.max(
         160,
         (wheelWrap?.clientWidth || window.innerWidth) - 4
