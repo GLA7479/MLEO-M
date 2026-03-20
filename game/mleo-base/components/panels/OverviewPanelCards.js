@@ -24,12 +24,12 @@ function CardShell({ className = "", children, ...rest }) {
 
 function MiniStat({ label, value, note }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-3">
+    <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
         {label}
       </div>
-      <div className="mt-1 text-base font-black text-white">{value}</div>
-      {note ? <div className="mt-1 text-xs text-white/55">{note}</div> : null}
+      <div className="mt-0.5 text-base font-black text-white">{value}</div>
+      {note ? <div className="mt-0.5 text-xs text-white/55">{note}</div> : null}
     </div>
   );
 }
@@ -40,14 +40,14 @@ function SectionButton({ isOpen, onClick }) {
       onClick={onClick}
       className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
     >
-      {isOpen ? "CLOSE" : "OPEN"}
+      {isOpen ? "Close" : "Open"}
     </button>
   );
 }
 
 function SectionHeader({ title, hint, right }) {
   return (
-    <div className="mb-3 flex items-start justify-between gap-3">
+    <div className="mb-2.5 flex items-start justify-between gap-3">
       <div>
         <div className="text-sm font-black uppercase tracking-[0.16em] text-white">
           {title}
@@ -253,10 +253,8 @@ function BuildOpportunitiesCard({
   availableBlueprintCount,
   onOpenBuildPanel,
 }) {
-  if (!(buildOpportunitiesCount > 0)) return null;
-
   return (
-    <CardShell>
+    <CardShell className="h-full">
       <SectionHeader
         title="Build Opportunities"
         hint={[
@@ -266,15 +264,21 @@ function BuildOpportunitiesCard({
           availableBlueprintCount > 0 ? "blueprint ready" : null,
         ]
           .filter(Boolean)
-          .join(" · ")}
-        right={<AvailabilityBadge count={buildOpportunitiesCount} />}
+          .join(" · ") || "No build opportunities right now"}
+        right={<AvailabilityBadge count={buildOpportunitiesCount > 0 ? buildOpportunitiesCount : 0} />}
       />
-      <button
-        onClick={onOpenBuildPanel}
-        className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
-      >
-        Open Build
-      </button>
+      {buildOpportunitiesCount > 0 ? (
+        <button
+          onClick={onOpenBuildPanel}
+          className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
+        >
+          Open Build
+        </button>
+      ) : (
+        <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/60">
+          Keep gathering resources to unlock upgrades.
+        </div>
+      )}
     </CardShell>
   );
 }
@@ -293,7 +297,7 @@ function IdentityCard({
   const isOpen = openInnerPanel === openKey;
 
   return (
-    <CardShell>
+    <CardShell className="h-full">
       <SectionHeader
         title="Command Identity"
         hint={!isOpen ? "Current crew role and commander path" : null}
@@ -328,7 +332,7 @@ function ContractsCard({
   const isOpen = openInnerPanel === openKey;
 
   return (
-    <CardShell data-base-target="contracts">
+    <CardShell data-base-target="contracts" className="h-full">
       <SectionHeader
         title="Live Contracts"
         hint={

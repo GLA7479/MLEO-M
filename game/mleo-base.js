@@ -1392,6 +1392,10 @@ function estimateDataPerHour(state, derived) {
 }
 
 function getUpgradeImpactPreview(state, derived, buildingKey) {
+  if (!state || typeof state !== "object") return null;
+  if (!derived || typeof derived !== "object") return null;
+  if (typeof buildingKey !== "string" || !buildingKey) return null;
+
   const supported = new Set([
     "quarry",
     "salvage",
@@ -1402,6 +1406,7 @@ function getUpgradeImpactPreview(state, derived, buildingKey) {
   ]);
   if (!supported.has(buildingKey)) return null;
 
+  try {
   const fmt = (value, maxFraction = 2) =>
     new Intl.NumberFormat("en-US", { maximumFractionDigits: maxFraction }).format(
       Number(value || 0)
@@ -1472,6 +1477,9 @@ function getUpgradeImpactPreview(state, derived, buildingKey) {
   }
 
   return null;
+  } catch {
+    return null;
+  }
 }
 
 function getOverviewBaseStatus({ systemState, stability, energy, energyCap, bankedSnapshot, shipRatio }) {
@@ -2340,6 +2348,7 @@ export default function MleoBase() {
   const [devTab, setDevTab] = useState("crew");
   const [activeBuildKey, setActiveBuildKey] = useState(null);
   const [overviewGuidanceState, setOverviewGuidanceState] = useState(null);
+  const highlightTimeoutRef = useRef(null);
 
   const actionLocksRef = useRef({});
 
@@ -2540,107 +2549,112 @@ export default function MleoBase() {
   }
 
   function navigateToBaseTarget(step) {
-    if (!step?.target) return;
+    if (!step || typeof step !== "object") return;
+    const normalizedStep = {
+      tab: typeof step.tab === "string" ? step.tab : "overview",
+      target: typeof step.target === "string" ? step.target : null,
+    };
+    if (!normalizedStep.target) return;
 
     const targetTab =
-      step.tab === "ops"
+      normalizedStep.tab === "ops"
         ? "ops"
-        : step.tab === "operations"
+        : normalizedStep.tab === "operations"
         ? "ops"
-        : step.tab === "build"
+        : normalizedStep.tab === "build"
         ? "build"
-        : step.tab === "development"
+        : normalizedStep.tab === "development"
         ? "build"
-        : step.tab === "systems"
+        : normalizedStep.tab === "systems"
         ? "intel"
-        : step.tab === "intel"
+        : normalizedStep.tab === "intel"
         ? "intel"
         : "overview";
 
     const targetInnerPanel = (() => {
       if (
-        step.target === "shipping" ||
-        step.target === "maintenance" ||
-        step.target === "expedition" ||
-        step.target === "expedition-action"
+        normalizedStep.target === "shipping" ||
+        normalizedStep.target === "maintenance" ||
+        normalizedStep.target === "expedition" ||
+        normalizedStep.target === "expedition-action"
       ) {
         return "ops-console";
       }
 
-      if (step.target === "missions") {
+      if (normalizedStep.target === "missions") {
         return "ops-missions";
       }
 
-      if (step.target === "contracts") {
+      if (normalizedStep.target === "contracts") {
         return "overview-contracts";
       }
 
-      if (step.target === "alerts") {
+      if (normalizedStep.target === "alerts") {
         return "overview-alerts";
       }
 
-      if (step.target === "recommendation") {
+      if (normalizedStep.target === "recommendation") {
         return "overview-recommendation";
       }
 
       if (
-        step.target === "quarry" ||
-        step.target === "tradeHub" ||
-        step.target === "salvage" ||
-        step.target === "refinery" ||
-        step.target === "powerCell" ||
-        step.target === "hq" ||
-        step.target === "minerControl" ||
-        step.target === "arcadeHub" ||
-        step.target === "expeditionBay" ||
-        step.target === "logisticsCenter" ||
-        step.target === "researchLab" ||
-        step.target === "repairBay"
+        normalizedStep.target === "quarry" ||
+        normalizedStep.target === "tradeHub" ||
+        normalizedStep.target === "salvage" ||
+        normalizedStep.target === "refinery" ||
+        normalizedStep.target === "powerCell" ||
+        normalizedStep.target === "hq" ||
+        normalizedStep.target === "minerControl" ||
+        normalizedStep.target === "arcadeHub" ||
+        normalizedStep.target === "expeditionBay" ||
+        normalizedStep.target === "logisticsCenter" ||
+        normalizedStep.target === "researchLab" ||
+        normalizedStep.target === "repairBay"
       ) {
         return "build-structures";
       }
 
       if (
-        step.target === "servoDrill" ||
-        step.target === "vaultCompressor" ||
-        step.target === "arcadeRelay" ||
-        step.target === "minerLink" ||
-        step.target === "coolant" ||
-        step.target === "routing" ||
-        step.target === "fieldOps" ||
-        step.target === "minerSync" ||
-        step.target === "arcadeOps" ||
-        step.target === "logistics" ||
-        step.target === "predictiveMaintenance" ||
-        step.target === "deepScan" ||
-        step.target === "tokenDiscipline"
+        normalizedStep.target === "servoDrill" ||
+        normalizedStep.target === "vaultCompressor" ||
+        normalizedStep.target === "arcadeRelay" ||
+        normalizedStep.target === "minerLink" ||
+        normalizedStep.target === "coolant" ||
+        normalizedStep.target === "routing" ||
+        normalizedStep.target === "fieldOps" ||
+        normalizedStep.target === "minerSync" ||
+        normalizedStep.target === "arcadeOps" ||
+        normalizedStep.target === "logistics" ||
+        normalizedStep.target === "predictiveMaintenance" ||
+        normalizedStep.target === "deepScan" ||
+        normalizedStep.target === "tokenDiscipline"
       ) {
         return "build-development";
       }
 
-      if (step.target === "crew" || step.target === "paths") {
+      if (normalizedStep.target === "crew" || normalizedStep.target === "paths") {
         return "build-development";
       }
 
       return null;
     })();
 
-    const targetStructuresTab = getStructuresTabForTarget(step.target);
+    const targetStructuresTab = getStructuresTabForTarget(normalizedStep.target);
 
-    if (step.tab === "systems") {
+    if (normalizedStep.tab === "systems") {
       setOpenInfoKey(null);
-      setBuildInfo(getSystemInfo(step.target));
+      setBuildInfo(getSystemInfo(normalizedStep.target));
     }
     try {
       const isMobile =
         typeof window !== "undefined" &&
         window.matchMedia("(max-width: 639px)").matches;
 
-      if (step.target === "crew") {
+      if (normalizedStep.target === "crew") {
         setDevTab("crew");
       }
 
-      if (step.target === "paths") {
+      if (normalizedStep.target === "paths") {
         setDevTab("paths");
       }
 
@@ -2668,7 +2682,7 @@ export default function MleoBase() {
 
     const attemptFocus = (attempt = 0) => {
       const missionFocusKey =
-        step.target === "missions"
+        normalizedStep.target === "missions"
           ? (() => {
               // Pick the mission the player should collect now, otherwise the first mission.
               const sorted = [...DAILY_MISSIONS].sort((a, b) => {
@@ -2696,7 +2710,7 @@ export default function MleoBase() {
             })()
           : null;
 
-      const targetForScroll = missionFocusKey || step.target;
+      const targetForScroll = missionFocusKey || normalizedStep.target;
       setHighlightTarget(targetForScroll);
 
       const isMobile =
@@ -2728,9 +2742,14 @@ export default function MleoBase() {
 
     setTimeout(() => attemptFocus(0), 280);
 
+    if (highlightTimeoutRef.current) {
+      window.clearTimeout(highlightTimeoutRef.current);
+    }
     const highlightDurationMs =
-      step.target === "expedition" || step.target === "expedition-action" ? 6200 : 4200;
-    setTimeout(() => {
+      normalizedStep.target === "expedition" || normalizedStep.target === "expedition-action"
+        ? 6200
+        : 4200;
+    highlightTimeoutRef.current = window.setTimeout(() => {
       setHighlightTarget(null);
     }, highlightDurationMs);
   }
@@ -8535,8 +8554,14 @@ export default function MleoBase() {
                     <div className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-200/70">
                       Next step
                       </div>
-                    <div className="mt-1 text-sm font-bold text-white">{overview.nextAction.title}</div>
-                    <div className="mt-1 text-xs text-white/60">{overview.nextAction.text}</div>
+                    <div className="mt-1 text-sm font-bold text-white">
+                      {overview?.nextAction?.title || nextStep?.title || "Scale efficiently"}
+                    </div>
+                    <div className="mt-1 text-xs text-white/60">
+                      {overview?.nextAction?.text ||
+                        nextStep?.text ||
+                        "No urgent issue detected. Push your strongest economy upgrade."}
+                    </div>
                   </button>
 
                               <button
@@ -9307,8 +9332,14 @@ export default function MleoBase() {
                     <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">
                       Next Recommended Step
                     </div>
-                    <div className="mt-1 text-lg font-bold text-white">{overview.nextAction.title}</div>
-                    <div className="mt-1 text-sm text-white/70">{overview.nextAction.text}</div>
+                    <div className="mt-1 text-lg font-bold text-white">
+                      {overview?.nextAction?.title || nextStep?.title || "Scale efficiently"}
+                    </div>
+                    <div className="mt-1 text-sm text-white/70">
+                      {overview?.nextAction?.text ||
+                        nextStep?.text ||
+                        "No urgent issue detected. Push your strongest economy upgrade."}
+                    </div>
                   </div>
                   <div className="rounded-2xl bg-black/20 px-4 py-3 text-sm text-white/75">
                     <div>Commander Lv {state.commanderLevel}</div>
