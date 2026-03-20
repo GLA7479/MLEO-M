@@ -857,6 +857,9 @@ DECLARE
   v_stability_gain integer := 34;
   v_xp_gain bigint := 20;
   v_new_stability numeric;
+  v_repair_level integer := 0;
+  v_maintenance_due_reduction numeric := 0;
+  v_new_maintenance_due numeric := 0;
   v_new_commander_xp bigint;
   kv record;
 BEGIN
@@ -870,6 +873,9 @@ BEGIN
 
   v_resources := coalesce(v_state.resources, '{}'::jsonb);
   v_stats := coalesce(v_state.stats, '{}'::jsonb);
+  v_repair_level := greatest(0, public.base_jsonb_int(coalesce(v_state.buildings, '{}'::jsonb), 'repairBay', 0));
+  v_maintenance_due_reduction := 70 + (v_repair_level * 8);
+  v_new_maintenance_due := greatest(0, coalesce(v_state.maintenance_due, 0) - v_maintenance_due_reduction);
 
   FOR kv IN SELECT key, value FROM jsonb_each(v_cost)
   LOOP
@@ -902,6 +908,7 @@ BEGIN
   SET
     resources = v_resources,
     stability = v_new_stability,
+    maintenance_due = v_new_maintenance_due,
     stats = v_stats,
     commander_xp = v_new_commander_xp,
     updated_at = now()
@@ -914,7 +921,7 @@ BEGIN
     jsonb_build_object(
       'cost', v_cost,
       'vault_balance_after', null,
-      'maintenance_due_after', null,
+      'maintenance_due_after', v_new_maintenance_due,
       'stability_after', v_new_stability,
       'total_shared_spent_after', null
     ),

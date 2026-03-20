@@ -310,6 +310,7 @@ DECLARE
   v_logistics_mode numeric := 1.0;
   v_research_lab_mode numeric := 1.0;
   v_repair_mode numeric := 1.0;
+  v_repair_support_mode numeric := 1.0;
 
   v_crew integer := 0;
   v_crew_role text := 'engineer';
@@ -499,6 +500,7 @@ BEGIN
     WHEN public.base_jsonb_bool(v_state.paused_buildings, 'repairBay', false) THEN 0.00
     ELSE 1.00
   END;
+  v_repair_support_mode := greatest(v_repair_mode, 0.75);
 
   v_crew := greatest(0, coalesce(v_state.crew, 0));
   v_crew_role := coalesce(v_state.crew_role, 'engineer');
@@ -531,7 +533,7 @@ BEGIN
   v_mleo_mult := v_worker_bonus * v_overclock;
   v_data_mult := (1 + (v_research_lab * v_research_lab_mode) * 0.06) * v_arcade_bonus;
   v_bank_bonus := 1 + v_blueprint * 0.02 + (v_logistics * v_logistics_mode) * 0.025;
-  v_maintenance_relief := 1 + (v_repair * v_repair_mode) * 0.08;
+  v_maintenance_relief := 1 + (v_repair * v_repair_support_mode) * 0.08;
 
   IF v_crew_role = 'engineer' THEN
     v_maintenance_relief := v_maintenance_relief * 1.06;
@@ -705,16 +707,16 @@ BEGIN
     v_maintenance_due := v_maintenance_due + (
       (
         (v_hq * 0.022)
-        + ((v_quarry * v_quarry_mode) * 0.020)
-        + ((v_trade * v_trade_mode) * 0.022)
-        + ((v_salvage * v_salvage_mode) * 0.024)
-        + ((v_refinery * v_refinery_mode) * 0.045)
+        + ((v_quarry * (v_quarry_mode * v_quarry_mode)) * 0.020)
+        + ((v_trade * (v_trade_mode * v_trade_mode)) * 0.022)
+        + ((v_salvage * (v_salvage_mode * v_salvage_mode)) * 0.024)
+        + ((v_refinery * (v_refinery_mode * v_refinery_mode)) * 0.045)
         + (v_power * 0.014)
-        + ((v_miner * v_miner_mode) * 0.015)
-        + ((v_arcade * v_arcade_mode) * 0.015)
+        + ((v_miner * (v_miner_mode * v_miner_mode)) * 0.015)
+        + ((v_arcade * (v_arcade_mode * v_arcade_mode)) * 0.015)
         + (v_expedition * 0.014)
-        + ((v_logistics * v_logistics_mode) * 0.014)
-        + ((v_research_lab * v_research_lab_mode) * 0.018)
+        + ((v_logistics * (v_logistics_mode * v_logistics_mode)) * 0.014)
+        + ((v_research_lab * (v_research_lab_mode * v_research_lab_mode)) * 0.018)
         + ((v_repair * v_repair_mode) * 0.008)
       )
       / greatest(1.0, v_maintenance_relief)
@@ -726,7 +728,7 @@ BEGIN
         (
           greatest(v_maintenance_due - 100, 0) * 0.0018
         ) + (
-          (v_refinery * v_refinery_mode) * CASE
+          (v_refinery * (v_refinery_mode * v_refinery_mode)) * CASE
             WHEN public.base_jsonb_bool(v_modules, 'minerLink', false) THEN 0.00045
             ELSE 0.00060
           END
@@ -736,9 +738,9 @@ BEGIN
       100
     );
 
-    IF (v_repair * v_repair_mode) > 0 THEN
+    IF (v_repair * v_repair_support_mode) > 0 THEN
       v_stability := public.base_clamp_num(
-        v_stability + (((v_repair * v_repair_mode) * 0.0024) * v_pressure_seconds),
+        v_stability + (((v_repair * v_repair_support_mode) * 0.0024) * v_pressure_seconds),
         50,
         100
       );
