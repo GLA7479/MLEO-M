@@ -127,7 +127,7 @@ export function OperationsConsolePanel({
           </button>
         </div>
 
-        <div className="flex min-h-[88px] flex-col pr-8">
+        <div className="flex min-h-[160px] flex-col pr-8">
           <div className="text-sm font-semibold text-fuchsia-200">Blueprint Cache</div>
           <p className="mt-1 text-sm text-white/70">
             Costs {blueprint.costText} shared MLEO + {blueprint.dataCostText} DATA. Raises banking efficiency
@@ -135,15 +135,17 @@ export function OperationsConsolePanel({
           </p>
         </div>
 
-        <button
-          onClick={blueprint.onBuy}
-          disabled={!blueprint.canBuy}
-          className={`mt-4 w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold transition ${
-            blueprint.canBuy ? "bg-fuchsia-600 text-white hover:bg-fuchsia-500" : "bg-white/10 text-white/45"
-          }`}
-        >
-          {blueprint.buttonText}
-        </button>
+        <div className="mt-auto grid grid-cols-1 gap-2 pt-1">
+          <button
+            onClick={blueprint.onBuy}
+            disabled={!blueprint.canBuy}
+            className={`w-full rounded-xl px-3 py-3 text-sm font-bold transition ${
+              blueprint.canBuy ? "bg-fuchsia-600 text-white hover:bg-fuchsia-500" : "bg-white/10 text-white/45"
+            }`}
+          >
+            {blueprint.buttonText}
+          </button>
+        </div>
       </div>
 
       <div

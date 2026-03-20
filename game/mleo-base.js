@@ -8773,23 +8773,25 @@ export default function MleoBase() {
                           i
                         </button>
                       </div>
-                      <div className="flex min-h-[88px] flex-col pr-8">
+                      <div className="flex min-h-[156px] flex-col pr-8">
                         <div className="text-sm font-semibold text-fuchsia-200">Blueprint Cache</div>
                         <p className="mt-1 text-sm text-white/70">
                           Costs {fmt(blueprintCost)} shared MLEO + {fmt(blueprintDataCost)} DATA. Raises banking efficiency and daily ship cap permanently.
                         </p>
                       </div>
-                      <button
-                        onClick={buyBlueprint}
-                        disabled={!canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)}
-                        className={`mt-auto w-full rounded-xl px-4 py-3 text-sm font-bold transition ${
-                          canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)
-                            ? "bg-fuchsia-600 hover:bg-fuchsia-500"
-                            : "bg-white/10 text-white/45"
-                        }`}
-                      >
-                        Buy Blueprint Lv {state.blueprintLevel + 1}
-                      </button>
+                      <div className="mt-auto grid grid-cols-1 gap-2 pt-1">
+                        <button
+                          onClick={buyBlueprint}
+                          disabled={!canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)}
+                          className={`w-full rounded-xl px-3 py-3 text-sm font-bold transition ${
+                            canAffordBlueprint(state, sharedVault, blueprintCost, blueprintDataCost)
+                              ? "bg-fuchsia-600 hover:bg-fuchsia-500"
+                              : "bg-white/10 text-white/45"
+                          }`}
+                        >
+                          Buy Blueprint Lv {state.blueprintLevel + 1}
+                        </button>
+                      </div>
                     </div>
 
                     <div
