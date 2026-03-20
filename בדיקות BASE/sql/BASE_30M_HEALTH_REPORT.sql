@@ -122,6 +122,9 @@ presence_now as (
     last_interaction_at,
     last_game_action_at,
     visibility_state,
+    (visibility_state = 'visible' and last_game_action_at is not null and last_game_action_at > now() - interval '5 minutes') as gameplay_online,
+    (visibility_state = 'visible' and last_interaction_at is not null and last_interaction_at > now() - interval '5 minutes') as active_ui,
+    (last_presence_at > now() - interval '90 seconds') as tab_alive,
     case
       when last_presence_at < now() - interval '75 seconds' then 'offline'
       when visibility_state <> 'visible' then 'idle'
@@ -129,9 +132,10 @@ presence_now as (
       else 'active'
     end as presence_status,
     case
-      when last_presence_at < now() - interval '75 seconds' then 'not_online'
-      when visibility_state <> 'visible' then 'not_online'
-      when last_game_action_at >= now() - interval '5 minutes' then 'online_real'
+      when visibility_state = 'visible'
+        and last_game_action_at is not null
+        and last_game_action_at > now() - interval '5 minutes'
+        then 'online_real'
       else 'not_online'
     end as gameplay_online_status
   from public.base_device_presence

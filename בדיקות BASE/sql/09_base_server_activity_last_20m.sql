@@ -178,11 +178,13 @@ with presence_now as (
     last_interaction_at,
     last_game_action_at,
     visibility_state,
+    (visibility_state = 'visible' and last_game_action_at is not null and last_game_action_at > now() - interval '5 minutes') as gameplay_online,
+    (visibility_state = 'visible' and last_interaction_at is not null and last_interaction_at > now() - interval '5 minutes') as active_ui,
+    (last_presence_at > now() - interval '90 seconds') as tab_alive,
     case
-      when last_presence_at >= now() - interval '75 seconds'
-       and visibility_state = 'visible'
+      when visibility_state = 'visible'
        and last_game_action_at is not null
-       and last_game_action_at >= now() - interval '5 minutes'
+       and last_game_action_at > now() - interval '5 minutes'
       then 'online_real'
       else 'not_online'
     end as gameplay_online_status

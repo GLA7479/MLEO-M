@@ -43,7 +43,7 @@ DECLARE
   v_commander_xp bigint;
   v_vault_balance bigint;
   v_stats jsonb;
-  v_daily_ship_cap bigint := 12000;
+  v_daily_ship_cap bigint := 1800;
   v_vault_delta_result record;
 BEGIN
   -- Get and lock state
@@ -67,7 +67,7 @@ BEGIN
   END IF;
 
   -- Calculate ship cap
-  v_ship_cap := v_daily_ship_cap + (v_logistics_level * 1800) + (v_blueprint_level * 450);
+  v_ship_cap := v_daily_ship_cap + (v_logistics_level * 320) + (v_blueprint_level * 90);
   v_room := greatest(0, v_ship_cap - v_sent_today);
 
   IF v_room <= 0 THEN

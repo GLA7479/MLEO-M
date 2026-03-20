@@ -318,7 +318,7 @@ DECLARE
   v_blueprint integer := 0;
 
   v_energy_cap numeric := 140;
-  v_energy_regen numeric := 3.2;
+  v_energy_regen numeric := 6.0;
   v_stability numeric := 100;
   v_stability_factor numeric := 1.0;
   v_worker_bonus numeric := 1.0;
@@ -334,7 +334,7 @@ DECLARE
   v_scrap_mult numeric := 1.0;
   v_mleo_mult numeric := 1.0;
   v_maintenance_relief numeric := 1.0;
-  v_ship_cap numeric := 12000;
+  v_ship_cap numeric := 1800;
   v_expedition_cooldown_seconds numeric := 120;
 
   v_energy_now numeric := 0;

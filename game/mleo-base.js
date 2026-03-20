@@ -563,10 +563,7 @@ function derive(state, now = Date.now()) {
   mleoMult *= hqBonus * stabilityFactor;
   dataMult *= hqBonus * stabilityFactor;
 
-  const shipCap =
-    CONFIG.dailyShipCap +
-    logisticsLevel * 320 +
-    state.blueprintLevel * 90;
+  const shipCap = 1800 + logisticsLevel * 320 + state.blueprintLevel * 90;
 
   const minersBonus = {
     offlineRetention: minerLink * 0.015,
@@ -579,8 +576,8 @@ function derive(state, now = Date.now()) {
   };
 
   return {
-    energyCap: CONFIG.baseEnergyCap + powerLevel * 46 + (state.research.coolant ? 24 : 0),
-    energyRegen: CONFIG.baseEnergyRegen + powerLevel * 2.45 + (state.research.coolant ? 1.45 : 0),
+    energyCap: 140 + powerLevel * 42 + (state.research.coolant ? 22 : 0),
+    energyRegen: 6.0 + powerLevel * 2.5 + (state.research.coolant ? 1.35 : 0),
     oreMult,
     goldMult,
     scrapMult,
@@ -2709,13 +2706,13 @@ export default function MleoBase() {
     });
   }
 
-  async function pushPresence(interacted = false) {
+  async function pushPresence(interacted = false, force = false, keepalive = false) {
     if (typeof document === "undefined") return false;
     if (presenceInFlightRef.current) return false;
 
     const now = Date.now();
     const minGap = interacted ? 8000 : 25000;
-    if (now - lastPresenceSendRef.current < minGap) return false;
+    if (!force && now - lastPresenceSendRef.current < minGap) return false;
 
     presenceInFlightRef.current = true;
     try {
@@ -2723,6 +2720,7 @@ export default function MleoBase() {
         visibilityState: document.visibilityState || "hidden",
         pageName: "base",
         interacted,
+        keepalive: !!keepalive,
       });
 
       if (!payload?.success) {
@@ -2816,7 +2814,7 @@ export default function MleoBase() {
         if (document.visibilityState === "visible") {
           pushPresence(false);
         }
-      }, 30000);
+      }, 45000);
     };
 
     const markInteraction = () => {
@@ -2828,19 +2826,45 @@ export default function MleoBase() {
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        pushPresence(false);
+        pushPresence(false, true);
         startHeartbeat();
       } else {
-        pushPresence(false);
+        pushPresence(false, true);
         stopHeartbeat();
+        setHubGameplayOnline(false);
       }
     };
 
     const onFocus = () => {
       if (document.visibilityState === "visible") {
-        pushPresence(false);
+        pushPresence(false, true);
         startHeartbeat();
       }
+    };
+
+    const onPageHide = () => {
+      // Ensure we don't get counted as gameplay online after leaving.
+      setHubGameplayOnline(false);
+      stopHeartbeat();
+      void sendBasePresence({
+        visibilityState: "hidden",
+        pageName: "base",
+        interacted: false,
+        gameAction: false,
+        keepalive: true,
+      }).catch(() => {});
+    };
+
+    const onBeforeUnload = () => {
+      setHubGameplayOnline(false);
+      stopHeartbeat();
+      void sendBasePresence({
+        visibilityState: "hidden",
+        pageName: "base",
+        interacted: false,
+        gameAction: false,
+        keepalive: true,
+      }).catch(() => {});
     };
 
     const interactionEvents = ["pointerdown", "keydown", "wheel"];
@@ -2851,9 +2875,11 @@ export default function MleoBase() {
 
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("beforeunload", onBeforeUnload);
 
     if (document.visibilityState === "visible") {
-      pushPresence(false);
+      pushPresence(false, true);
       startHeartbeat();
     }
 
@@ -2864,6 +2890,8 @@ export default function MleoBase() {
       });
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("beforeunload", onBeforeUnload);
     };
   }, [mounted]);
 
@@ -3492,10 +3520,12 @@ export default function MleoBase() {
       if (document.visibilityState === "visible") {
         refreshFromServer();
       }
-    }, 3000);
+    }, 12000);
 
     const onFocus = () => {
-      refreshFromServer();
+      if (document.visibilityState === "visible") {
+        refreshFromServer();
+      }
     };
 
     const onStorage = async (event) => {
@@ -3506,10 +3536,11 @@ export default function MleoBase() {
     };
 
     const pollId = window.setInterval(async () => {
+      if (document.visibilityState !== "visible") return;
       const bal = await readVaultSafe();
       if (!Number.isFinite(bal) || bal < 0) return;
       setSharedVault((prev) => (Math.abs(prev - bal) > 1e-6 ? bal : prev));
-    }, 4000);
+    }, 12000);
 
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
@@ -3982,6 +4013,7 @@ export default function MleoBase() {
         }
 
         setState((prev) => mergeAuthoritativeServerState(prev, res.state));
+        markRealGameAction();
         showToast(`Crew role: ${crewRoleMeta(roleKey).name}`);
       } catch (error) {
         console.error("Crew role update failed", error);
@@ -4003,6 +4035,7 @@ export default function MleoBase() {
         }
 
         setState((prev) => mergeAuthoritativeServerState(prev, res.state));
+        markRealGameAction();
         showToast(`Commander path: ${commanderPathMeta(pathKey).name}`);
       } catch (error) {
         console.error("Commander path update failed", error);
@@ -4124,6 +4157,7 @@ export default function MleoBase() {
           });
 
           showToast(`${def.name} power set to ${nextMode}%.`);
+          markRealGameAction();
         } else {
           showToast(res?.message || "Power mode update failed.");
         }
@@ -4217,6 +4251,7 @@ export default function MleoBase() {
             );
             return next;
           });
+          markRealGameAction();
         }
 
         showToast(
@@ -4378,75 +4413,6 @@ export default function MleoBase() {
 
         setState((prev) => {
           const next = mergeAuthoritativeServerState(prev, serverState);
-
-          const beforeORE = Number(prev?.resources?.ORE || 0);
-          const beforeGOLD = Number(prev?.resources?.GOLD || 0);
-          const beforeSCRAP = Number(prev?.resources?.SCRAP || 0);
-          const beforeDATA = Number(prev?.resources?.DATA || 0);
-          const beforeENERGY = Number(prev?.resources?.ENERGY || 0);
-          const beforeBanked = Number(prev?.bankedMleo || 0);
-
-          const afterORE = Number(next?.resources?.ORE || 0);
-          const afterGOLD = Number(next?.resources?.GOLD || 0);
-          const afterSCRAP = Number(next?.resources?.SCRAP || 0);
-          const afterDATA = Number(next?.resources?.DATA || 0);
-          const afterENERGY = Number(next?.resources?.ENERGY || 0);
-          const afterBanked = Number(next?.bankedMleo || 0);
-
-          let didRewardApply =
-            afterORE > beforeORE ||
-            afterGOLD > beforeGOLD ||
-            afterSCRAP > beforeSCRAP ||
-            afterDATA > beforeDATA ||
-            afterBanked > beforeBanked;
-
-          // If server merge did not actually increase resource totals, apply the returned loot payload directly.
-          // This fixes "success toast but no visible resources" finalize-sync failures.
-          if (!didRewardApply && loot && typeof loot === "object") {
-            const oreGain = Number(loot.ore || 0);
-            const goldGain = Number(loot.gold || 0);
-            const scrapGain = Number(loot.scrap || 0);
-            const dataGain = Number(loot.data || 0);
-            const bankedGain = Number(loot.bankedMleo || 0);
-
-            if (oreGain > 0 || goldGain > 0 || scrapGain > 0 || dataGain > 0 || bankedGain > 0) {
-              // Expected values mirror the SQL atomic RPC behavior.
-              const expectedORE = beforeORE + oreGain;
-              const expectedGOLD = beforeGOLD + goldGain;
-              const expectedSCRAP = beforeSCRAP + scrapGain;
-              const expectedENERGY = Math.max(0, beforeENERGY - CONFIG.expeditionCost);
-              const expectedDATA = Math.max(0, beforeDATA - 4) + dataGain;
-              const expectedBanked = beforeBanked + bankedGain;
-
-              if (Number(next?.resources?.ORE || 0) !== expectedORE) next.resources.ORE = expectedORE;
-              if (Number(next?.resources?.GOLD || 0) !== expectedGOLD) next.resources.GOLD = expectedGOLD;
-              if (Number(next?.resources?.SCRAP || 0) !== expectedSCRAP) next.resources.SCRAP = expectedSCRAP;
-              if (Number(next?.resources?.ENERGY || 0) !== expectedENERGY) next.resources.ENERGY = expectedENERGY;
-              if (Number(next?.resources?.DATA || 0) !== expectedDATA) next.resources.DATA = expectedDATA;
-              if (Number(next?.bankedMleo || 0) !== expectedBanked) next.bankedMleo = expectedBanked;
-
-              // Update didRewardApply after fallback.
-              const nowAfterORE = Number(next?.resources?.ORE || 0);
-              const nowAfterGOLD = Number(next?.resources?.GOLD || 0);
-              const nowAfterSCRAP = Number(next?.resources?.SCRAP || 0);
-              const nowAfterDATA = Number(next?.resources?.DATA || 0);
-              const nowAfterBanked = Number(next?.bankedMleo || 0);
-              didRewardApply =
-                nowAfterORE > beforeORE ||
-                nowAfterGOLD > beforeGOLD ||
-                nowAfterSCRAP > beforeSCRAP ||
-                nowAfterDATA > beforeDATA ||
-                nowAfterBanked > beforeBanked;
-            }
-          }
-
-          // If server state didn't advance cooldown, ensure the expedition goes out again.
-          const readyAt = Number(next?.expeditionReadyAt || 0);
-          if (!Number.isFinite(readyAt) || readyAt <= now) {
-            next.expeditionReadyAt = now + CONFIG.expeditionCooldownMs;
-          }
-
-          next.totalExpeditions = (prev.totalExpeditions || 0) + 1;
           next.log = pushLog(
             next.log,
             `Expedition (${expeditionMode}) returned with ${loot.ore || 0} ORE, ${
@@ -4455,8 +4421,6 @@ export default function MleoBase() {
               loot.bankedMleo ? ` and ${loot.bankedMleo} MLEO` : ""
             }.`
           );
-
-          // Toast should only fire when rewards actually affected state.
           if (expeditionToastNonceRef.current !== now) {
             expeditionToastNonceRef.current = now;
 
@@ -4477,9 +4441,9 @@ export default function MleoBase() {
             const breakdown = rewardParts.length ? ` · ${rewardParts.join(" · ")}` : "";
 
             showToast(
-              didRewardApply
+              rewardParts.length
                 ? `Expedition complete · field gains secured${breakdown}`
-                : res?.message || "Expedition completed, but no rewards were applied."
+                : res?.message || "Expedition completed."
             );
           }
           return next;
@@ -4524,6 +4488,7 @@ export default function MleoBase() {
           return next;
         });
 
+        markRealGameAction();
         setNextShipBonus(0);
 
         showToast(
@@ -4556,18 +4521,11 @@ export default function MleoBase() {
         const latestVault = await readVaultSafe();
         if (latestVault != null) setSharedVault(latestVault);
         setState((prev) => {
-          const next = {
-            ...prev,
-            blueprintLevel: Number(serverState.blueprint_level || prev.blueprintLevel),
-            resources: serverState.resources || prev.resources,
-            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
-            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
-            totalSharedSpent: Number(serverState.total_shared_spent || prev.totalSharedSpent),
-            stats: { ...prev.stats, ...(serverState.stats || {}) },
-            log: pushLog(prev.log, "Blueprint cache purchased."),
-          };
-          return applyLevelUps(next);
+          const next = mergeAuthoritativeServerState(prev, serverState);
+          next.log = pushLog(next.log, "Blueprint cache purchased.");
+          return next;
         });
+        markRealGameAction();
         showToast("Blueprint upgraded. Daily shipping cap increased and banking efficiency improved.");
       } else {
         showToast(res?.message || "Blueprint purchase failed.");
@@ -4592,18 +4550,11 @@ export default function MleoBase() {
         const latestVault = await readVaultSafe();
         if (latestVault != null) setSharedVault(latestVault);
         setState((prev) => {
-          const next = {
-            ...prev,
-            overclockUntil: serverState.overclock_until ? new Date(serverState.overclock_until).getTime() : prev.overclockUntil,
-            resources: serverState.resources || prev.resources,
-            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
-            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
-            totalSharedSpent: Number(serverState.total_shared_spent || prev.totalSharedSpent),
-            stats: { ...prev.stats, ...(serverState.stats || {}) },
-            log: pushLog(prev.log, "Overclock activated."),
-          };
-          return applyLevelUps(next);
+          const next = mergeAuthoritativeServerState(prev, serverState);
+          next.log = pushLog(next.log, "Overclock activated.");
+          return next;
         });
+        markRealGameAction();
         showToast("Overclock engaged. Base output is temporarily boosted.");
       } else {
         showToast(res?.message || "Overclock failed.");
@@ -4633,17 +4584,11 @@ export default function MleoBase() {
         const latestVault = await readVaultSafe();
         if (latestVault != null) setSharedVault(latestVault);
         setState((prev) => {
-          const next = {
-            ...prev,
-            resources: serverState.resources || prev.resources,
-            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
-            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
-            totalSharedSpent: Number(serverState.total_shared_spent || prev.totalSharedSpent),
-            stats: { ...prev.stats, ...(serverState.stats || {}) },
-            log: pushLog(prev.log, "Energy refilled."),
-          };
-          return applyLevelUps(next);
+          const next = mergeAuthoritativeServerState(prev, serverState);
+          next.log = pushLog(next.log, "Energy refilled.");
+          return next;
         });
+        markRealGameAction();
         showToast(
           withBottleneckNote("Recovery complete · energy reserves restored", {
             "energy-collapse": "Energy pressure eased",
@@ -4673,16 +4618,9 @@ export default function MleoBase() {
       if (res?.success && res?.state) {
         const serverState = res.state;
         setState((prev) => {
-          const next = {
-            ...prev,
-            resources: serverState.resources || prev.resources,
-            stability: Number(serverState.stability || prev.stability),
-            commanderXp: Number(serverState.commander_xp || prev.commanderXp),
-            commanderLevel: Number(serverState.commander_level || prev.commanderLevel),
-            stats: { ...prev.stats, ...(serverState.stats || {}) },
-            log: pushLog(prev.log, "Maintenance completed. Base stability improved."),
-          };
-          return applyLevelUps(next);
+          const next = mergeAuthoritativeServerState(prev, serverState);
+          next.log = pushLog(next.log, "Maintenance completed. Base stability improved.");
+          return next;
         });
 
         markRealGameAction();
