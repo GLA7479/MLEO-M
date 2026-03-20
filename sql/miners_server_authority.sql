@@ -11,15 +11,16 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.miners_economy_config (
   id integer PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-  base_stage_v1 numeric(20,8) NOT NULL DEFAULT 0.5,
-  daily_cap bigint NOT NULL DEFAULT 1095890,
-  offline_factor numeric(10,6) NOT NULL DEFAULT 0.5,
+  base_stage_v1 numeric(20,8) NOT NULL DEFAULT 0.20,
+  daily_cap bigint NOT NULL DEFAULT 2500,
+  offline_factor numeric(10,6) NOT NULL DEFAULT 0.35,
   gift_cooldown_seconds integer NOT NULL DEFAULT 3600,
   softcut_json jsonb NOT NULL DEFAULT '[
-    {"upto":0.8, "factor":1.0},
-    {"upto":1.0, "factor":0.5},
-    {"upto":1.2, "factor":0.25},
-    {"upto":9.99, "factor":0.10}
+    {"upto":0.55, "factor":1.00},
+    {"upto":0.75, "factor":0.55},
+    {"upto":0.90, "factor":0.30},
+    {"upto":1.00, "factor":0.15},
+    {"upto":9.99, "factor":0.06}
   ]'::jsonb,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -27,6 +28,21 @@ CREATE TABLE IF NOT EXISTS public.miners_economy_config (
 INSERT INTO public.miners_economy_config (id)
 VALUES (1)
 ON CONFLICT (id) DO NOTHING;
+
+UPDATE public.miners_economy_config
+SET
+  base_stage_v1 = 0.20,
+  daily_cap = 2500,
+  offline_factor = 0.35,
+  softcut_json = '[
+    {"upto":0.55, "factor":1.00},
+    {"upto":0.75, "factor":0.55},
+    {"upto":0.90, "factor":0.30},
+    {"upto":1.00, "factor":0.15},
+    {"upto":9.99, "factor":0.06}
+  ]'::jsonb,
+  updated_at = now()
+WHERE id = 1;
 
 CREATE TABLE IF NOT EXISTS public.miners_stage_multipliers (
   id bigserial PRIMARY KEY,
@@ -41,14 +57,33 @@ INSERT INTO public.miners_stage_multipliers (start_stage, end_stage, r)
 SELECT *
 FROM (
   VALUES
-    (1, 10, 1.6::numeric),
-    (11, 20, 1.4::numeric),
-    (21, 30, 1.3::numeric),
-    (31, 40, 1.1::numeric),
-    (41, 50, 1.05::numeric),
-    (51, 1000, 1.001::numeric)
+    (1, 10, 1.32::numeric),
+    (11, 20, 1.18::numeric),
+    (21, 30, 1.11::numeric),
+    (31, 40, 1.06::numeric),
+    (41, 50, 1.025::numeric),
+    (51, 1000, 1.0004::numeric)
 ) AS defaults(start_stage, end_stage, r)
 ON CONFLICT (start_stage, end_stage) DO NOTHING;
+
+UPDATE public.miners_stage_multipliers
+SET r = CASE
+  WHEN start_stage = 1 AND end_stage = 10 THEN 1.32
+  WHEN start_stage = 11 AND end_stage = 20 THEN 1.18
+  WHEN start_stage = 21 AND end_stage = 30 THEN 1.11
+  WHEN start_stage = 31 AND end_stage = 40 THEN 1.06
+  WHEN start_stage = 41 AND end_stage = 50 THEN 1.025
+  WHEN start_stage = 51 AND end_stage = 1000 THEN 1.0004
+  ELSE r
+END
+WHERE (start_stage, end_stage) IN (
+  (1, 10),
+  (11, 20),
+  (21, 30),
+  (31, 40),
+  (41, 50),
+  (51, 1000)
+);
 
 CREATE TABLE IF NOT EXISTS public.miners_gift_rewards (
   reward_key text PRIMARY KEY,
@@ -191,7 +226,7 @@ BEGIN
   FROM public.miners_economy_config mec
   WHERE mec.id = 1;
 
-  v_base := coalesce(v_base, 0.5);
+  v_base := coalesce(v_base, 0.20);
   IF v_stage <= 1 THEN
     RETURN v_base;
   END IF;
@@ -362,7 +397,7 @@ BEGIN
   WHERE mec.id = 1;
 
   v_daily_cap := coalesce(v_daily_cap, 0);
-  v_offline_factor := coalesce(v_offline_factor, 0.5);
+  v_offline_factor := coalesce(v_offline_factor, 0.35);
 
   FOR kv IN SELECT key, value FROM jsonb_each(coalesce(p_stage_counts, '{}'::jsonb))
   LOOP

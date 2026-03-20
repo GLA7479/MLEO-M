@@ -440,19 +440,17 @@ const CLAIM_SCHEDULE = [
 
 
 const SOFTCUT = [
-  { upto: 0.80, factor: 1.00 },
-  { upto: 1.00, factor: 0.50 },
-  { upto: 1.20, factor: 0.25 },
-  { upto: 9.99, factor: 0.10 },
+  { upto: 0.55, factor: 1.00 },
+  { upto: 0.75, factor: 0.55 },
+  { upto: 0.90, factor: 0.30 },
+  { upto: 1.00, factor: 0.15 },
+  { upto: 9.99, factor: 0.06 },
 ];
 
-const OFFLINE_DPS_FACTOR = 0.5;
+const OFFLINE_DPS_FACTOR = 0.35;
 const IDLE_OFFLINE_MS = 5 * 60 * 1000; // 5 minutes without claiming gift => idle-offli
 
-const TOTAL_SUPPLY = 100_000_000_000; // 100B
-const DAYS = 1825;                     // 5y
-const DAILY_EMISSION = Math.floor(TOTAL_SUPPLY / DAYS);
-const DAILY_CAP = Math.floor(DAILY_EMISSION * 0.02);
+const DAILY_CAP = 2_500;
 
 
 // ——— State I/O ———
@@ -539,32 +537,32 @@ function softcutFactor(minedToday, dailyCap){
 // === MLEO Accrual Engine (inline) ===
 // נטען טבלת multipliers לפי הקובץ שהעברת (mleo-multipliers.json)
 const MLEO_TABLE = {
-  v1: 0.5,
+  v1: 0.20,
   blocks: [
-    { start: 1,   end: 10,   r: 1.6  },
-    { start: 11,  end: 20,   r: 1.4  },
-    { start: 21,  end: 30,   r: 1.3  },
-    { start: 31,  end: 40,   r: 1.1  },
-    { start: 41,  end: 50,   r: 1.05 },
-    { start: 51,  end: 100,  r: 1.001 },
-    { start: 101, end: 150,  r: 1.001 },
-    { start: 151, end: 200,  r: 1.001 },
-    { start: 201, end: 250,  r: 1.001 },
-    { start: 251, end: 300,  r: 1.001 },
-    { start: 301, end: 350,  r: 1.001 },
-    { start: 351, end: 400,  r: 1.001 },
-    { start: 401, end: 450,  r: 1.001 },
-    { start: 451, end: 500,  r: 1.001 },
-    { start: 501, end: 550,  r: 1.001 },
-    { start: 551, end: 600,  r: 1.001 },
-    { start: 601, end: 650,  r: 1.001 },
-    { start: 651, end: 700,  r: 1.001 },
-    { start: 701, end: 750,  r: 1.001 },
-    { start: 751, end: 800,  r: 1.001 },
-    { start: 801, end: 850,  r: 1.001 },
-    { start: 851, end: 900,  r: 1.001 },
-    { start: 901, end: 950,  r: 1.001 },
-    { start: 951, end: 1000, r: 1.001 },
+    { start: 1,   end: 10,   r: 1.32   },
+    { start: 11,  end: 20,   r: 1.18   },
+    { start: 21,  end: 30,   r: 1.11   },
+    { start: 31,  end: 40,   r: 1.06   },
+    { start: 41,  end: 50,   r: 1.025  },
+    { start: 51,  end: 100,  r: 1.0004 },
+    { start: 101, end: 150,  r: 1.0004 },
+    { start: 151, end: 200,  r: 1.0004 },
+    { start: 201, end: 250,  r: 1.0004 },
+    { start: 251, end: 300,  r: 1.0004 },
+    { start: 301, end: 350,  r: 1.0004 },
+    { start: 351, end: 400,  r: 1.0004 },
+    { start: 401, end: 450,  r: 1.0004 },
+    { start: 451, end: 500,  r: 1.0004 },
+    { start: 501, end: 550,  r: 1.0004 },
+    { start: 551, end: 600,  r: 1.0004 },
+    { start: 601, end: 650,  r: 1.0004 },
+    { start: 651, end: 700,  r: 1.0004 },
+    { start: 701, end: 750,  r: 1.0004 },
+    { start: 751, end: 800,  r: 1.0004 },
+    { start: 801, end: 850,  r: 1.0004 },
+    { start: 851, end: 900,  r: 1.0004 },
+    { start: 901, end: 950,  r: 1.0004 },
+    { start: 951, end: 1000, r: 1.0004 },
   ],
 };
 
@@ -572,12 +570,12 @@ const MLEO_TABLE = {
 // stage 1 → v1
 // stage 2 → v1 * r(1)
 // stage n → v1 * Π_{i=1}^{n-1} r(i)   (r(i) נקבע לפי הבלוק בטבלה)
-const MLEO_STAGE_CACHE = { 1: MLEO_TABLE.v1 || 0.5 };
+const MLEO_STAGE_CACHE = { 1: MLEO_TABLE.v1 || 0.20 };
 
 // מחליף את engineRForStage (המנוע הישן הוסר)
 function stageRFor(stage){
   const b = (MLEO_TABLE.blocks || []).find(b => stage >= b.start && stage <= b.end);
-  return b ? (b.r || 1) : 1.001;
+  return b ? (b.r || 1) : 1.0004;
 }
 
 function mleoBaseForStage(stage) {
@@ -745,7 +743,7 @@ const { disconnect } = useDisconnect();
   const [claimAmount, setClaimAmount] = useState("");
   const [syncStatus, setSyncStatus] = useState("synced"); // "synced" | "syncing" | "pending"
   const minersConfigRef = useRef({
-    offlineFactor: 0.5,
+    offlineFactor: 0.35,
     dailyCap: DAILY_CAP,
   });
   function applyMiningServerSnapshot(patch = {}, historyEntry = null) {
@@ -769,7 +767,7 @@ const { disconnect } = useDisconnect();
       const st = resp.state || {};
       const cfg = resp.config || {};
       minersConfigRef.current = {
-        offlineFactor: Number(cfg.offlineFactor || minersConfigRef.current.offlineFactor || 0.5),
+        offlineFactor: Number(cfg.offlineFactor || minersConfigRef.current.offlineFactor || 0.35),
         dailyCap: Number(cfg.dailyCap || minersConfigRef.current.dailyCap || DAILY_CAP),
       };
       const result = applyMiningServerSnapshot({
