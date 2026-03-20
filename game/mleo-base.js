@@ -566,6 +566,78 @@ function derive(state, now = Date.now()) {
   };
 }
 
+function getBankedRateSnapshot(state, derived) {
+  const refineryLevel = getEffectiveBuildingLevel(state, "refinery");
+  const ore = Number(state?.resources?.ORE || 0);
+  const scrap = Number(state?.resources?.SCRAP || 0);
+  const energy = Number(state?.resources?.ENERGY || 0);
+
+  const oreNeedPerSecond = refineryLevel * 1.8;
+  const scrapNeedPerSecond = refineryLevel * 0.7;
+  const energyNeedPerSecond = refineryLevel * 0.9;
+
+  const reserveEnergy = Math.max(
+    8,
+    Math.floor((derived?.energyCap || CONFIG.baseEnergyCap) * 0.06)
+  );
+
+  const hasRefinery = refineryLevel > 0;
+  const hasOre = oreNeedPerSecond > 0 && ore >= oreNeedPerSecond;
+  const hasScrap = scrapNeedPerSecond > 0 && scrap >= scrapNeedPerSecond;
+  const hasEnergy =
+    energyNeedPerSecond > 0 && energy > reserveEnergy + energyNeedPerSecond;
+
+  const active = hasRefinery && hasOre && hasScrap && hasEnergy;
+
+  const perSecond = active
+    ? 0.015 *
+      refineryLevel *
+      Number(derived?.mleoMult || 1) *
+      Number(derived?.bankBonus || 1)
+    : 0;
+
+  const perHour = perSecond * 3600;
+  const perDay = perHour * 24;
+
+  const shipCap = Number(derived?.shipCap || 0);
+  const bankedNow = Number(state?.bankedMleo || 0);
+  const remainingToCap = Math.max(0, shipCap - bankedNow);
+
+  const etaHours = perHour > 0 ? remainingToCap / perHour : null;
+  const oreFeedHours =
+    oreNeedPerSecond > 0 ? ore / (oreNeedPerSecond * 3600) : null;
+  const scrapFeedHours =
+    scrapNeedPerSecond > 0 ? scrap / (scrapNeedPerSecond * 3600) : null;
+
+  const limitingSystem = !hasRefinery
+    ? "Refinery offline"
+    : !hasOre
+      ? "Ore limited"
+      : !hasScrap
+        ? "Scrap limited"
+        : !hasEnergy
+          ? "Energy limited"
+          : "Running";
+
+  return {
+    hasRefinery,
+    active,
+    refineryLevel,
+    perSecond,
+    perHour,
+    perDay,
+    shipCap,
+    remainingToCap,
+    etaHours,
+    oreFeedHours,
+    scrapFeedHours,
+    limitingSystem,
+    hasOre,
+    hasScrap,
+    hasEnergy,
+  };
+}
+
 function simulate(state, elapsedMs, efficiency = 1) {
   const next = {
     ...state,
@@ -1684,7 +1756,145 @@ export default function MleoBase() {
 
   const mobilePanelScrollRef = useRef(null);
 
-  const activeInfo = openInfoKey ? INFO_COPY[openInfoKey] : null;
+  const bankedRateSnapshot = useMemo(
+    () => getBankedRateSnapshot(state, derive(state)),
+    [state]
+  );
+
+  const activeInfo = useMemo(() => {
+    if (!openInfoKey) return null;
+
+    if (openInfoKey === "bankedMleo") {
+      const s = bankedRateSnapshot;
+      return {
+        ...INFO_COPY.bankedMleo,
+        text: (
+          <>
+            <div className="space-y-4">
+              <div className="text-sm leading-6 text-white/80">
+                Banked MLEO is created inside BASE and waits there until you
+                ship it to the shared vault.
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.22em] text-cyan-200/70">
+                    Current / hour
+                  </div>
+                  <div className="mt-1 text-lg font-black text-white">
+                    {fmtRate(s.perHour)}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.22em] text-white/50">
+                    Projected / day
+                  </div>
+                  <div className="mt-1 text-lg font-black text-white">
+                    {fmtRate(s.perDay)}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.22em] text-white/50">
+                    Ship cap
+                  </div>
+                  <div className="mt-1 text-lg font-black text-white">
+                    {fmt(s.shipCap)}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.22em] text-white/50">
+                    ETA to cap
+                  </div>
+                  <div className="mt-1 text-lg font-black text-white">
+                    {s.etaHours == null ? "—" : `${fmtRate(s.etaHours, 1)}h`}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.22em] text-white/50">
+                  Current refinery status
+                </div>
+                <div className="mt-2 text-sm font-semibold text-white">
+                  {s.limitingSystem}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                      s.hasOre
+                        ? "bg-emerald-500/15 text-emerald-200"
+                        : "bg-rose-500/15 text-rose-200"
+                    }`}
+                  >
+                    {s.hasOre ? "Ore OK" : "Ore low"}
+                  </span>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                      s.hasScrap
+                        ? "bg-emerald-500/15 text-emerald-200"
+                        : "bg-rose-500/15 text-rose-200"
+                    }`}
+                  >
+                    {s.hasScrap ? "Scrap OK" : "Scrap low"}
+                  </span>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                      s.hasEnergy
+                        ? "bg-emerald-500/15 text-emerald-200"
+                        : "bg-rose-500/15 text-rose-200"
+                    }`}
+                  >
+                    {s.hasEnergy ? "Energy OK" : "Energy low"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.22em] text-white/50">
+                  Feed endurance
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-3 text-sm text-white/80">
+                  <div>
+                    <div className="text-white/50">Ore support</div>
+                    <div className="mt-1 font-semibold text-white">
+                      {s.oreFeedHours == null ? "—" : `${fmtRate(s.oreFeedHours, 1)}h`}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-white/50">Scrap support</div>
+                    <div className="mt-1 font-semibold text-white">
+                      {s.scrapFeedHours == null ? "—" : `${fmtRate(s.scrapFeedHours, 1)}h`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-sm leading-6 text-white/75">
+                <div>
+                  Base Banked grows only while Refinery is supplied with Ore,
+                  Scrap and enough Energy.
+                </div>
+                <div>
+                  Shipping does not increase the rate. Shipping only moves
+                  banked MLEO into the real shared vault.
+                </div>
+                <div>
+                  To improve this number, focus on Refinery uptime, steady Ore
+                  + Scrap flow, and stable Energy.
+                </div>
+              </div>
+            </div>
+          </>
+        ),
+      };
+    }
+
+    return INFO_COPY[openInfoKey] || null;
+  }, [openInfoKey, bankedRateSnapshot]);
+
   const shownInfo = activeInfo || buildInfo;
 
   // When user opens a resource info panel (e.g. Energy), show an "UPGRADE" button
