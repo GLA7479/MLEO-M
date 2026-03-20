@@ -270,41 +270,45 @@ export default function ColorWheelPage() {
 
     const calc = () => {
       const wrapEl = wrapRef.current;
-      if (!wrapEl) return;
+      if (!wrapEl || typeof wrapEl.querySelector !== "function") return;
 
-      const rootH = window.visualViewport?.height ?? window.innerHeight;
-      const safeBottom =
-        Number(
-          getComputedStyle(document.documentElement)
-            .getPropertyValue("--satb")
-            .replace("px", "")
-        ) || 0;
+      try {
+        const rootH = window.visualViewport?.height ?? window.innerHeight;
+        const safeBottom =
+          Number(
+            getComputedStyle(document.documentElement)
+              .getPropertyValue("--satb")
+              .replace("px", "")
+          ) || 0;
 
-      const headH = headerRef.current?.offsetHeight || 0;
-      document.documentElement.style.setProperty("--head-h", headH + "px");
-      const topPad = headH + 8;
+        const headH = headerRef.current?.offsetHeight || 0;
+        document.documentElement.style.setProperty("--head-h", headH + "px");
+        const topPad = headH + 8;
 
-      const used =
-        headH +
-        (metersRef.current?.offsetHeight || 0) +
-        (betRef.current?.offsetHeight || 0) +
-        (ctaRef.current?.offsetHeight || 0) +
-        topPad +
-        48 +
-        safeBottom +
-        24;
+        const used =
+          headH +
+          (metersRef.current?.offsetHeight || 0) +
+          (betRef.current?.offsetHeight || 0) +
+          (ctaRef.current?.offsetHeight || 0) +
+          topPad +
+          48 +
+          safeBottom +
+          24;
 
-      const freeH = Math.max(120, rootH - used);
-      const wheelWrap = wrapEl.querySelector("#roulette-wheel-wrap");
-      const freeW = Math.max(
-        160,
-        (wheelWrap?.clientWidth || window.innerWidth) - 4
-      );
+        const freeH = Math.max(120, rootH - used);
+        const wheelWrap = wrapEl.querySelector("#roulette-wheel-wrap");
+        const freeW = Math.max(
+          160,
+          (wheelWrap?.clientWidth || window.innerWidth) - 4
+        );
 
-      const wheelSize = Math.max(120, Math.min(freeH, freeW, 300));
+        const wheelSize = Math.max(120, Math.min(freeH, freeW, 300));
 
-      if (wheelWrap) {
-        wheelWrap.style.setProperty("--wheel-size", wheelSize + "px");
+        if (wheelWrap) {
+          wheelWrap.style.setProperty("--wheel-size", wheelSize + "px");
+        }
+      } catch {
+        // Guard against transient unmount/resize races.
       }
     };
 

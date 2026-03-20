@@ -534,8 +534,8 @@ function derive(state, now = Date.now()) {
 
   const shipCap =
     CONFIG.dailyShipCap +
-    logisticsLevel * 1800 +
-    state.blueprintLevel * 450;
+    logisticsLevel * 320 +
+    state.blueprintLevel * 90;
 
   const minersBonus = {
     offlineRetention: minerLink * 0.015,
@@ -626,49 +626,49 @@ function simulate(state, elapsedMs, efficiency = 1) {
     const energyNeed = 0.72 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
-    next.resources.ORE += 2.0 * level * d.oreMult * effective;
+    next.resources.ORE += 1.35 * level * d.oreMult * effective;
   });
 
   runBuilding("tradeHub", (level) => {
     const energyNeed = 0.78 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
-    next.resources.GOLD += 1.0 * level * d.goldMult * effective;
+    next.resources.GOLD += 0.60 * level * d.goldMult * effective;
   });
 
   runBuilding("salvage", (level) => {
     const energyNeed = 0.78 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
-    next.resources.SCRAP += 0.8 * level * d.scrapMult * effective;
+    next.resources.SCRAP += 0.50 * level * d.scrapMult * effective;
   });
 
   runBuilding("minerControl", (level) => {
     const energyNeed = 0.20 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
-    next.resources.DATA += 0.18 * level * d.dataMult * effective;
+    next.resources.DATA += 0.14 * level * d.dataMult * effective;
   });
 
   runBuilding("arcadeHub", (level) => {
     const energyNeed = 0.22 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
-    next.resources.DATA += 0.15 * level * d.dataMult * effective;
+    next.resources.DATA += 0.11 * level * d.dataMult * effective;
   });
 
   runBuilding("researchLab", (level) => {
     const energyNeed = 0.24 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
-    next.resources.DATA += 0.28 * level * d.dataMult * effective;
+    next.resources.DATA += 0.22 * level * d.dataMult * effective;
   });
 
   runBuilding("logisticsCenter", (level) => {
     const energyNeed = 0.20 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
-    next.resources.DATA += 0.08 * level * d.dataMult * effective;
+    next.resources.DATA += 0.06 * level * d.dataMult * effective;
   });
 
   runBuilding("repairBay", (level) => {
@@ -687,7 +687,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
     next.resources.ENERGY -= energyNeed;
     next.resources.ORE -= oreNeed;
     next.resources.SCRAP -= scrapNeed;
-    next.bankedMleo += 0.10 * level * d.mleoMult * d.bankBonus * effective;
+    next.bankedMleo += 0.015 * level * d.mleoMult * d.bankBonus * effective;
   });
 
   const elapsedMinutes = dt / 60;

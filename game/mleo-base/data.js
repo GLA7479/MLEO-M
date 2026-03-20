@@ -29,7 +29,7 @@ export const BUILDINGS = [
     baseCost: { GOLD: 60 },
     growth: 1.18,
     energyUse: 0.72,
-    outputs: { ORE: 2.0 },
+    outputs: { ORE: 1.35 },
   },
   {
     key: "tradeHub",
@@ -38,7 +38,7 @@ export const BUILDINGS = [
     baseCost: { GOLD: 100, ORE: 30 },
     growth: 1.2,
     energyUse: 0.78,
-    outputs: { GOLD: 1.0 },
+    outputs: { GOLD: 0.60 },
     requires: [{ key: "quarry", lvl: 1 }],
   },
   {
@@ -48,7 +48,7 @@ export const BUILDINGS = [
     baseCost: { GOLD: 150, ORE: 90 },
     growth: 1.22,
     energyUse: 0.78,
-    outputs: { SCRAP: 0.8 },
+    outputs: { SCRAP: 0.50 },
     requires: [{ key: "quarry", lvl: 2 }],
   },
   {
@@ -58,7 +58,7 @@ export const BUILDINGS = [
     baseCost: { GOLD: 280, ORE: 180, SCRAP: 35 },
     growth: 1.25,
     energyUse: 1.1,
-    convert: { ORE: 1.8, SCRAP: 0.7, MLEO: 0.1 },
+    convert: { ORE: 1.8, SCRAP: 0.7, MLEO: 0.015 },
     requires: [
       { key: "salvage", lvl: 1 },
       { key: "tradeHub", lvl: 1 },
@@ -81,7 +81,7 @@ export const BUILDINGS = [
     baseCost: { GOLD: 320, ORE: 120, SCRAP: 40 },
     growth: 1.22,
     energyUse: 0.2,
-    outputs: { DATA: 0.18 },
+    outputs: { DATA: 0.14 },
     requires: [{ key: "hq", lvl: 2 }],
   },
   {
@@ -91,7 +91,7 @@ export const BUILDINGS = [
     baseCost: { GOLD: 360, ORE: 90, SCRAP: 50 },
     growth: 1.24,
     energyUse: 0.22,
-    outputs: { DATA: 0.15 },
+    outputs: { DATA: 0.11 },
     requires: [{ key: "hq", lvl: 2 }],
   },
   {
@@ -115,7 +115,7 @@ export const BUILDINGS = [
     growth: 1.36,
     maxLevel: 15,
     energyUse: 0.2,
-    outputs: { DATA: 0.08 },
+    outputs: { DATA: 0.06 },
     requires: [{ key: "hq", lvl: 2 }, { key: "tradeHub", lvl: 2 }],
   },
   {
@@ -126,7 +126,7 @@ export const BUILDINGS = [
     growth: 1.38,
     maxLevel: 15,
     energyUse: 0.24,
-    outputs: { DATA: 0.28 },
+    outputs: { DATA: 0.22 },
     requires: [{ key: "hq", lvl: 2 }, { key: "minerControl", lvl: 1 }],
   },
   {
@@ -265,7 +265,7 @@ export const CONFIG = {
   startingGold: 332,
   baseEnergyCap: 140,
   baseEnergyRegen: 4.6,
-  dailyShipCap: 12_000,
+  dailyShipCap: 1_800,
   expeditionCost: 36,
   expeditionCooldownMs: 120_000,
   overclockCost: 900,
