@@ -8733,11 +8733,12 @@ export default function MleoBase() {
                   </button>
                   <Link
                     href="/mining"
-                    className="relative rounded-2xl border border-white/15 bg-white/5 px-4 h-[35px] flex items-center text-sm font-semibold hover:bg-white/10"
+                    className={`rounded-2xl border px-4 h-[35px] flex items-center text-sm font-semibold transition ${
+                      hubGameplayOnline
+                        ? "border-cyan-400/70 bg-cyan-500/15 text-cyan-200 shadow-[0_0_24px_rgba(34,211,238,0.22)] hover:bg-cyan-500/20"
+                        : "border-cyan-400/35 bg-cyan-500/8 text-cyan-200/85 hover:bg-cyan-500/12"
+                    }`}
                   >
-                    {hubGameplayOnline ? (
-                      <span className="absolute -right-1 -top-1 inline-flex h-[10px] w-[10px] rounded-full bg-cyan-400 shadow-[0_0_24px_rgba(34,211,238,0.18)]" />
-                    ) : null}
                     Hub
                   </Link>
                   <button
@@ -8805,11 +8806,12 @@ export default function MleoBase() {
 
               <Link
                 href="/mining"
-                className="relative rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10"
+                className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
+                  hubGameplayOnline
+                    ? "border-cyan-400/70 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/20 shadow-[0_0_24px_rgba(34,211,238,0.22)]"
+                    : "border-cyan-400/35 bg-cyan-500/8 text-cyan-200/85 hover:bg-cyan-500/12"
+                }`}
               >
-                {hubGameplayOnline ? (
-                  <span className="absolute -right-1 -top-1 inline-flex h-[10px] w-[10px] rounded-full bg-cyan-400 shadow-[0_0_24px_rgba(34,211,238,0.18)]" />
-                ) : null}
                 Hub
               </Link>
 
