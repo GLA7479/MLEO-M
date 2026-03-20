@@ -2640,6 +2640,7 @@ export default function MleoBase() {
   const [activeBuildKey, setActiveBuildKey] = useState(null);
   const [overviewGuidanceState, setOverviewGuidanceState] = useState(null);
   const highlightTimeoutRef = useRef(null);
+  const expeditionToastNonceRef = useRef(0);
 
   const actionLocksRef = useRef({});
 
@@ -4186,6 +4187,74 @@ export default function MleoBase() {
 
         setState((prev) => {
           const next = mergeAuthoritativeServerState(prev, serverState);
+
+          const beforeORE = Number(prev?.resources?.ORE || 0);
+          const beforeGOLD = Number(prev?.resources?.GOLD || 0);
+          const beforeSCRAP = Number(prev?.resources?.SCRAP || 0);
+          const beforeDATA = Number(prev?.resources?.DATA || 0);
+          const beforeENERGY = Number(prev?.resources?.ENERGY || 0);
+          const beforeBanked = Number(prev?.bankedMleo || 0);
+
+          const afterORE = Number(next?.resources?.ORE || 0);
+          const afterGOLD = Number(next?.resources?.GOLD || 0);
+          const afterSCRAP = Number(next?.resources?.SCRAP || 0);
+          const afterDATA = Number(next?.resources?.DATA || 0);
+          const afterENERGY = Number(next?.resources?.ENERGY || 0);
+          const afterBanked = Number(next?.bankedMleo || 0);
+
+          let didRewardApply =
+            afterORE > beforeORE ||
+            afterGOLD > beforeGOLD ||
+            afterSCRAP > beforeSCRAP ||
+            afterDATA > beforeDATA ||
+            afterBanked > beforeBanked;
+
+          // If server merge did not actually increase resource totals, apply the returned loot payload directly.
+          // This fixes "success toast but no visible resources" finalize-sync failures.
+          if (!didRewardApply && loot && typeof loot === "object") {
+            const oreGain = Number(loot.ore || 0);
+            const goldGain = Number(loot.gold || 0);
+            const scrapGain = Number(loot.scrap || 0);
+            const dataGain = Number(loot.data || 0);
+            const bankedGain = Number(loot.bankedMleo || 0);
+
+            if (oreGain > 0 || goldGain > 0 || scrapGain > 0 || dataGain > 0 || bankedGain > 0) {
+              // Expected values mirror the SQL atomic RPC behavior.
+              const expectedORE = beforeORE + oreGain;
+              const expectedGOLD = beforeGOLD + goldGain;
+              const expectedSCRAP = beforeSCRAP + scrapGain;
+              const expectedENERGY = Math.max(0, beforeENERGY - CONFIG.expeditionCost);
+              const expectedDATA = Math.max(0, beforeDATA - 4) + dataGain;
+              const expectedBanked = beforeBanked + bankedGain;
+
+              if (Number(next?.resources?.ORE || 0) !== expectedORE) next.resources.ORE = expectedORE;
+              if (Number(next?.resources?.GOLD || 0) !== expectedGOLD) next.resources.GOLD = expectedGOLD;
+              if (Number(next?.resources?.SCRAP || 0) !== expectedSCRAP) next.resources.SCRAP = expectedSCRAP;
+              if (Number(next?.resources?.ENERGY || 0) !== expectedENERGY) next.resources.ENERGY = expectedENERGY;
+              if (Number(next?.resources?.DATA || 0) !== expectedDATA) next.resources.DATA = expectedDATA;
+              if (Number(next?.bankedMleo || 0) !== expectedBanked) next.bankedMleo = expectedBanked;
+
+              // Update didRewardApply after fallback.
+              const nowAfterORE = Number(next?.resources?.ORE || 0);
+              const nowAfterGOLD = Number(next?.resources?.GOLD || 0);
+              const nowAfterSCRAP = Number(next?.resources?.SCRAP || 0);
+              const nowAfterDATA = Number(next?.resources?.DATA || 0);
+              const nowAfterBanked = Number(next?.bankedMleo || 0);
+              didRewardApply =
+                nowAfterORE > beforeORE ||
+                nowAfterGOLD > beforeGOLD ||
+                nowAfterSCRAP > beforeSCRAP ||
+                nowAfterDATA > beforeDATA ||
+                nowAfterBanked > beforeBanked;
+            }
+          }
+
+          // If server state didn't advance cooldown, ensure the expedition goes out again.
+          const readyAt = Number(next?.expeditionReadyAt || 0);
+          if (!Number.isFinite(readyAt) || readyAt <= now) {
+            next.expeditionReadyAt = now + CONFIG.expeditionCooldownMs;
+          }
+
           next.totalExpeditions = (prev.totalExpeditions || 0) + 1;
           next.log = pushLog(
             next.log,
@@ -4195,10 +4264,18 @@ export default function MleoBase() {
               loot.bankedMleo ? ` and ${loot.bankedMleo} MLEO` : ""
             }.`
           );
+
+          // Toast should only fire when rewards actually affected state.
+          if (expeditionToastNonceRef.current !== now) {
+            expeditionToastNonceRef.current = now;
+            showToast(
+              didRewardApply
+                ? "Expedition complete · field gains secured"
+                : res?.message || "Expedition completed, but no rewards were applied."
+            );
+          }
           return next;
         });
-
-        showToast("Expedition complete · field gains secured");
       } else {
         showToast(res?.message || "Expedition failed.");
       }
