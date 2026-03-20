@@ -89,46 +89,53 @@ export function BaseStructuresPanel({
                 {card.desc}
               </div>
 
-              {/* Meta badges row: Production/Utility/Core + Synergy */}
-              <div className="mt-1.5 min-h-[24px] max-h-[24px] overflow-hidden">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <div className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/70">
-                    {card.roleTagText}
-                  </div>
-                  <div className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-200">
-                    {card.synergyTagText}
-                  </div>
-                </div>
-              </div>
-
-              {/* Compact status row: Lv badge + ACTIVE */}
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/65">
-                  Lv {card.level}
-                </div>
-                <div className="inline-flex w-fit rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-white/65">
-                  {card.sectorStatusText}
-                </div>
-              </div>
-
-              <div className="mt-1 h-[34px]">
-                {card.upgradeImpactPreview ? (
-                  <div className="rounded-lg border border-cyan-400/20 bg-cyan-500/8 px-2.5 py-1">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/70">
-                      {card.upgradeImpactPreview.label}
-                    </div>
-                    <div className="text-[11px] font-semibold text-cyan-100">
-                      {card.upgradeImpactPreview.value}
-                    </div>
-                    {card.upgradeImpactPreview.note ? (
-                      <div className="line-clamp-1 text-[10px] text-cyan-100/70">
-                        {card.upgradeImpactPreview.note}
+              {/* Content row: left meta/status stack + right upgrade impact box */}
+              <div className="mt-1.5 grid grid-cols-1 items-center gap-y-2 md:grid-cols-[1fr_auto] md:gap-x-3">
+                {/* LEFT column */}
+                <div className="flex flex-col gap-1">
+                  {/* Meta badges row: Production/Utility/Core + Synergy */}
+                  <div className="min-h-[24px] max-h-[24px] overflow-hidden">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/70">
+                        {card.roleTagText}
                       </div>
-                    ) : null}
+                      <div className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-200">
+                        {card.synergyTagText}
+                      </div>
+                    </div>
                   </div>
-                ) : (
-                  <div className="h-[34px]" />
-                )}
+
+                  {/* Compact status row: Lv badge + ACTIVE/WARNING */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/65">
+                      Lv {card.level}
+                    </div>
+                    <div className="inline-flex w-fit rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-white/65">
+                      {card.sectorStatusText}
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT column */}
+                <div className="h-[34px] flex items-center">
+                  {card.upgradeImpactPreview ? (
+                    <div className="rounded-lg border border-cyan-400/20 bg-cyan-500/8 px-2.5 py-1">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/70">
+                        {card.upgradeImpactPreview.label}
+                      </div>
+                      <div className="text-[11px] font-semibold text-cyan-100">
+                        {card.upgradeImpactPreview.value}
+                      </div>
+                      {card.upgradeImpactPreview.note ? (
+                        <div className="line-clamp-1 text-[10px] text-cyan-100/70">
+                          {card.upgradeImpactPreview.note}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="h-[34px]" />
+                  )}
+                </div>
               </div>
 
               <div className="mt-2 h-[14px] text-[10px] font-black uppercase tracking-[0.18em] text-white/40">
