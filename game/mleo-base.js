@@ -2730,6 +2730,25 @@ export default function MleoBase() {
         return false;
       }
 
+      // Hydrate local HUB source-of-truth after refresh:
+      // server keeps `last_game_action_at` unless this was a real gameplay action.
+      const serverPresence = payload?.presence;
+      const rawGameActionAt =
+        serverPresence?.last_game_action_at ??
+        serverPresence?.lastGameActionAt ??
+        null;
+      const parsedMs =
+        typeof rawGameActionAt === "number"
+          ? rawGameActionAt
+          : rawGameActionAt
+            ? new Date(rawGameActionAt).getTime()
+            : null;
+
+      if (parsedMs && Number.isFinite(parsedMs) && parsedMs !== lastGameActionAtRef.current) {
+        lastGameActionAtRef.current = parsedMs;
+        setHubGameplayOnline(computeHubGameplayOnline());
+      }
+
       lastPresenceSendRef.current = now;
       return true;
     } catch (error) {
