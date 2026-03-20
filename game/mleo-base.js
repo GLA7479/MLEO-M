@@ -1376,19 +1376,101 @@ function estimateOrePerHour(state, derived) {
 }
 
 function estimateDataPerHour(state, derived) {
-  const dataMult = Number(derived?.dataMult || 1);
   const lab = getEffectiveBuildingLevel(state, "researchLab");
   const miner = getEffectiveBuildingLevel(state, "minerControl");
   const arcade = getEffectiveBuildingLevel(state, "arcadeHub");
   const logistics = getEffectiveBuildingLevel(state, "logisticsCenter");
 
   const perSecond =
-    0.22 * lab * dataMult +
-    0.14 * miner * dataMult +
-    0.11 * arcade * dataMult +
-    0.06 * logistics * dataMult;
+    0.22 * lab * Number(derived?.dataMult || 1) +
+    0.14 * miner * Number(derived?.dataMult || 1) +
+    0.11 * arcade * Number(derived?.dataMult || 1) +
+    0.06 * logistics * Number(derived?.dataMult || 1);
 
   return perSecond * 3600;
+}
+
+function getUpgradeImpactPreview(state, derived, buildingKey) {
+  const supported = new Set([
+    "quarry",
+    "salvage",
+    "refinery",
+    "powerCell",
+    "repairBay",
+    "researchLab",
+  ]);
+  if (!supported.has(buildingKey)) return null;
+
+  const fmt = (value, maxFraction = 2) =>
+    new Intl.NumberFormat("en-US", { maximumFractionDigits: maxFraction }).format(
+      Number(value || 0)
+    );
+
+  const nextState = {
+    ...state,
+    buildings: {
+      ...(state?.buildings || {}),
+      [buildingKey]: Number(state?.buildings?.[buildingKey] || 0) + 1,
+    },
+  };
+  const nextDerived = derive(nextState);
+
+  if (buildingKey === "quarry") {
+    const modeFactor = getBuildingPowerFactor(state, "quarry");
+    const deltaPerHour = 1.35 * modeFactor * Number(derived?.oreMult || 1) * 3600;
+    return { label: "Upgrade impact", value: `+${fmt(deltaPerHour, 1)} ORE/hr` };
+  }
+
+  if (buildingKey === "salvage") {
+    const modeFactor = getBuildingPowerFactor(state, "salvage");
+    const deltaPerHour = 0.5 * modeFactor * Number(derived?.scrapMult || 1) * 3600;
+    return { label: "Upgrade impact", value: `+${fmt(deltaPerHour, 1)} SCRAP/hr` };
+  }
+
+  if (buildingKey === "refinery") {
+    const modeFactor = getBuildingPowerFactor(state, "refinery");
+    const deltaPerHour =
+      0.015 *
+      modeFactor *
+      Number(derived?.mleoMult || 1) *
+      Number(derived?.bankBonus || 1) *
+      3600;
+    return {
+      label: "Upgrade impact",
+      value: `+${fmt(deltaPerHour, 2)} banked/hr`,
+      note: "Assuming Ore/Scrap/Energy flow holds",
+    };
+  }
+
+  if (buildingKey === "powerCell") {
+    const capDelta = Number(nextDerived?.energyCap || 0) - Number(derived?.energyCap || 0);
+    const regenDelta = Number(nextDerived?.energyRegen || 0) - Number(derived?.energyRegen || 0);
+    return {
+      label: "Upgrade impact",
+      value: `+${fmt(capDelta, 0)} cap / +${fmt(regenDelta, 2)}/s`,
+      note: "Energy reserve and recovery",
+    };
+  }
+
+  if (buildingKey === "repairBay") {
+    const modeFactor = getBuildingPowerFactor(state, "repairBay");
+    const perHourStability = 0.035 * modeFactor * 3600;
+    const reliefDelta =
+      Number(nextDerived?.maintenanceRelief || 1) - Number(derived?.maintenanceRelief || 1);
+    return {
+      label: "Upgrade impact",
+      value: `+${fmt(perHourStability, 1)} stability/hr`,
+      note: `Maintenance relief +${fmt(reliefDelta, 2)}x`,
+    };
+  }
+
+  if (buildingKey === "researchLab") {
+    const modeFactor = getBuildingPowerFactor(state, "researchLab");
+    const deltaPerHour = 0.22 * modeFactor * Number(derived?.dataMult || 1) * 3600;
+    return { label: "Upgrade impact", value: `+${fmt(deltaPerHour, 1)} DATA/hr` };
+  }
+
+  return null;
 }
 
 function getOverviewBaseStatus({ systemState, stability, energy, energyCap, bankedSnapshot, shipRatio }) {
@@ -1410,7 +1492,7 @@ function getOverviewBaseStatus({ systemState, stability, energy, energyCap, bank
 
   if (
     systemState === "warning" ||
-    !bankedSnapshot.active ||
+    !bankedSnapshot?.active ||
     stability < 82 ||
     (energyCap > 0 && energy <= energyCap * 0.22)
   ) {
@@ -1437,12 +1519,12 @@ function getOverviewBottleneck({
   shipRatio,
   canShipNow,
 }) {
-  if (shipRatio >= 0.92 || (canShipNow && Number(bankedSnapshot.remainingToCap || 0) <= 40)) {
+  if (shipRatio >= 0.92 || (canShipNow && Number(bankedSnapshot?.remainingToCap || 0) <= 40)) {
     return {
       key: "ship-cap",
       label: "Near ship cap",
       text: "Refined MLEO is piling up and shipping is becoming the main limiter.",
-      target: { tab: "operations", target: "shipping" },
+      target: { tab: "ops", target: "shipping" },
       tone: "warning",
     };
   }
@@ -1452,12 +1534,12 @@ function getOverviewBottleneck({
       key: "energy-collapse",
       label: "Energy pressure",
       text: "Your reserve is too low to support healthy production flow.",
-      target: { tab: "operations", target: "maintenance" },
+      target: { tab: "ops", target: "maintenance" },
       tone: "critical",
     };
   }
 
-  if (bankedSnapshot.hasRefinery && !bankedSnapshot.hasOre) {
+  if (bankedSnapshot?.hasRefinery && !bankedSnapshot?.hasOre) {
     return {
       key: "ore-limited",
       label: "ORE limited",
@@ -1467,7 +1549,7 @@ function getOverviewBottleneck({
     };
   }
 
-  if (bankedSnapshot.hasRefinery && !bankedSnapshot.hasScrap) {
+  if (bankedSnapshot?.hasRefinery && !bankedSnapshot?.hasScrap) {
     return {
       key: "scrap-limited",
       label: "Scrap limited",
@@ -1482,12 +1564,12 @@ function getOverviewBottleneck({
       key: "stability-drag",
       label: "Stability drag",
       text: "Instability is reducing comfort and making the base harder to scale safely.",
-      target: { tab: "operations", target: "maintenance" },
+      target: { tab: "ops", target: "maintenance" },
       tone: "warning",
     };
   }
 
-  if (!bankedSnapshot.active || bankedSnapshot.perHour <= 0.01) {
+  if (!bankedSnapshot?.active || Number(bankedSnapshot?.perHour || 0) <= 0.01) {
     return {
       key: "weak-output",
       label: "Weak passive output",
@@ -1508,14 +1590,10 @@ function getOverviewBottleneck({
 
 function getOverviewBestAction({
   bottleneck,
-  state,
-  derived,
-  canShipNow,
   canExpeditionNow,
   liveContracts,
-  systemState,
 }) {
-  const claimableContracts = liveContracts.filter((c) => c.done && !c.claimed).length;
+  const claimableContracts = (liveContracts || []).filter((c) => c.done && !c.claimed).length;
 
   if (claimableContracts > 0) {
     return {
@@ -1532,14 +1610,14 @@ function getOverviewBestAction({
         title: "Ship Banked MLEO",
         text: "Free room before your banked flow starts wasting momentum.",
         cta: "Open shipping",
-        target: { tab: "operations", target: "shipping" },
+        target: { tab: "ops", target: "shipping" },
       };
     case "energy-collapse":
       return {
         title: "Recover energy reserves",
         text: "Use refill / safe mode first, then strengthen power support.",
         cta: "Open operations",
-        target: { tab: "operations", target: "maintenance" },
+        target: { tab: "ops", target: "maintenance" },
       };
     case "ore-limited":
       return {
@@ -1560,7 +1638,7 @@ function getOverviewBestAction({
         title: "Do Maintenance",
         text: "Restore comfort and prevent efficiency drag before scaling.",
         cta: "Open maintenance",
-        target: { tab: "operations", target: "maintenance" },
+        target: { tab: "ops", target: "maintenance" },
       };
     case "weak-output":
       return {
@@ -1575,28 +1653,83 @@ function getOverviewBestAction({
           title: "Run Expedition",
           text: "The base is stable enough to push active progression.",
           cta: "Open expedition",
-          target: { tab: "operations", target: "expedition-action" },
+          target: { tab: "ops", target: "expedition-action" },
         };
       }
-
-      const fallback = getNextStep(state, derived, systemState, liveContracts);
       return {
-        title: fallback.title,
-        text: fallback.text,
-        cta: canShipNow ? "Open shipping" : "Open Build",
-        target: canShipNow
-          ? { tab: "operations", target: "shipping" }
-          : { tab: "build", target: "refinery" },
+        title: "Scale efficiently",
+        text: "No urgent issue detected. Push your strongest economy upgrade.",
+        cta: "Open Build",
+        target: { tab: "build", target: "refinery" },
       };
   }
 }
 
-function buildOverviewV1({
+function getOverviewStabilityBlock({ state, derived, systemState, bankedSnapshot }) {
+  const stability = Number(state?.stability || 100);
+  const repairLevel = getEffectiveBuildingLevel(state, "repairBay");
+  const maintenanceRelief = Number(derived?.maintenanceRelief || 1);
+
+  const impactLabel =
+    stability >= 92
+      ? "High efficiency"
+      : stability >= 82
+      ? "Good efficiency"
+      : stability >= 70
+      ? "Soft drag"
+      : "Heavy drag";
+
+  const impactText =
+    stability >= 92
+      ? "Stability is supporting strong overall efficiency."
+      : stability >= 82
+      ? "Minor pressure only."
+      : stability >= 70
+      ? "The base is still working, but scaling is getting less clean."
+      : "Efficiency pressure is now meaningful. Maintenance should move up.";
+
+  const pressureLabel =
+    systemState === "critical"
+      ? "Critical"
+      : bankedSnapshot?.hasRefinery && !bankedSnapshot?.active
+      ? "Refinery strain"
+      : systemState === "warning"
+      ? "Rising"
+      : "Controlled";
+
+  const pressureText =
+    systemState === "critical"
+      ? "Core systems are under active pressure."
+      : bankedSnapshot?.hasRefinery && !bankedSnapshot?.active
+      ? "Refinery demand is contributing to instability pressure."
+      : systemState === "warning"
+      ? "Maintenance timing matters now."
+      : "No major stability issue detected.";
+
+  const repairSupportLabel = repairLevel > 0 ? `Lv ${Number(repairLevel).toFixed(0)}` : "Offline";
+  const repairSupportText =
+    repairLevel > 0
+      ? `Repair support active · relief x${maintenanceRelief.toFixed(2)}`
+      : "No Repair Bay support yet.";
+
+  return {
+    value: stability,
+    impactLabel,
+    impactText,
+    pressureLabel,
+    pressureText,
+    repairSupportLabel,
+    repairSupportText,
+  };
+}
+
+function buildOverviewV2({
   state,
   derived,
   systemState,
   liveContracts,
   readyCounts,
+  missionProgress,
   canShipNow,
   canExpeditionNow,
   bankedSnapshot,
@@ -1607,15 +1740,6 @@ function buildOverviewV1({
   const banked = Number(state.bankedMleo || 0);
   const shipCap = Number(derived.shipCap || 0);
   const shipRatio = shipCap > 0 ? banked / shipCap : 0;
-
-  const baseStatus = getOverviewBaseStatus({
-    systemState,
-    stability,
-    energy,
-    energyCap,
-    bankedSnapshot,
-    shipRatio,
-  });
 
   const bottleneck = getOverviewBottleneck({
     systemState,
@@ -1629,37 +1753,47 @@ function buildOverviewV1({
 
   const nextAction = getOverviewBestAction({
     bottleneck,
-    state,
-    derived,
-    canShipNow,
     canExpeditionNow,
     liveContracts,
-    systemState,
   });
 
   return {
-    baseStatus,
+    baseStatus: getOverviewBaseStatus({
+      systemState,
+      stability,
+      energy,
+      energyCap,
+      bankedSnapshot,
+      shipRatio,
+    }),
     bottleneck,
     nextAction,
     rates: {
-      bankedPerHour: bankedSnapshot.perHour,
-      projectedPerDay: bankedSnapshot.perDay,
+      bankedPerHour: Number(bankedSnapshot?.perHour || 0),
+      projectedPerDay: Number(bankedSnapshot?.perDay || 0),
       orePerHour: estimateOrePerHour(state, derived),
       dataPerHour: estimateDataPerHour(state, derived),
-      refineryState: bankedSnapshot.limitingSystem,
-      etaToShipCapHours: bankedSnapshot.etaHours,
+      refineryState: bankedSnapshot?.limitingSystem || "Unknown",
+      etaToShipCapHours: bankedSnapshot?.etaHours ?? null,
     },
+    stability: getOverviewStabilityBlock({
+      state,
+      derived,
+      systemState,
+      bankedSnapshot,
+    }),
     dailyProgress: {
       shipProgress: {
-        current: state.stats?.shippedToday || 0,
-        max: derived.shipCap || 0,
+        current: Number(state?.stats?.shippedToday || 0),
+        max: Number(derived?.shipCap || 0),
       },
-      expeditionsDone: state.stats?.expeditionsToday || 0,
-      maintenanceDone: state.stats?.maintenanceToday || 0,
-      missionsReady: readyCounts.missions || 0,
-      missionsCompleted: Object.keys(state.missionState?.completed || {}).filter(
-        (k) => state.missionState?.completed?.[k]
+      expeditionsDone: Number(state?.stats?.expeditionsToday || 0),
+      maintenanceDone: Number(state?.stats?.maintenanceToday || 0),
+      missionsReady: Number(readyCounts?.missions || 0),
+      missionsCompleted: Object.keys(state?.missionState?.completed || {}).filter(
+        (key) => state?.missionState?.completed?.[key]
       ).length,
+      missionProgress,
     },
   };
 }
@@ -2253,11 +2387,6 @@ export default function MleoBase() {
 
   const mobilePanelScrollRef = useRef(null);
 
-  const bankedRateSnapshot = useMemo(
-    () => getBankedRateSnapshot(state, derive(state)),
-    [state]
-  );
-
   const activeInfo = openInfoKey ? INFO_COPY[openInfoKey] : null;
   const shownInfo = activeInfo || buildInfo;
 
@@ -2372,7 +2501,9 @@ export default function MleoBase() {
     if (!step?.target) return;
 
     const targetTab =
-      step.tab === "operations"
+      step.tab === "ops"
+        ? "ops"
+        : step.tab === "operations"
         ? "ops"
         : step.tab === "build"
         ? "build"
@@ -3035,17 +3166,28 @@ export default function MleoBase() {
       ? "text-[13px]"
       : "text-sm";
 
-  const overviewV1 = useMemo(
+  const nextStep = useMemo(
+    () => getNextStep(state, derived, systemState, liveContracts),
+    [state, derived, systemState, liveContracts]
+  );
+
+  const bankedSnapshot = useMemo(
+    () => getBankedRateSnapshot(state, derived),
+    [state, derived]
+  );
+
+  const overview = useMemo(
     () =>
-      buildOverviewV1({
+      buildOverviewV2({
         state,
         derived,
         systemState,
         liveContracts,
         readyCounts,
+        missionProgress,
         canShipNow,
         canExpeditionNow,
-        bankedSnapshot: bankedRateSnapshot,
+        bankedSnapshot,
       }),
     [
       state,
@@ -3053,9 +3195,10 @@ export default function MleoBase() {
       systemState,
       liveContracts,
       readyCounts,
+      missionProgress,
       canShipNow,
       canExpeditionNow,
-      bankedRateSnapshot,
+      bankedSnapshot,
     ]
   );
 
@@ -3110,6 +3253,7 @@ export default function MleoBase() {
 
   const overviewIdentityCount = 1;
   const liveContractsAvailableCount = readyCounts.contracts;
+  const availableBlueprintCount = Number(canBuyBlueprintNow);
 
   const showToast = (message) => setToast(message);
 
@@ -7101,6 +7245,7 @@ export default function MleoBase() {
       canAffordCost: canCoverCostForBtn,
       buttonText,
       costRow: <ResourceCostRow cost={cost} resources={state.resources} />,
+      upgradeImpactPreview: getUpgradeImpactPreview(state, derived, building.key),
       energyLineText: getBuildingEnergyLine(building, level, powerMode),
       powerLineText: getBuildingPowerLine(building.key, powerMode),
       canThrottle,
@@ -7983,7 +8128,7 @@ export default function MleoBase() {
                 {showBankedPanel && !shownInfo ? (
                   <div className="absolute right-0 top-[calc(100%+10px)] z-[130] w-[360px]">
                     <BankedQuickPanel
-                      snapshot={bankedRateSnapshot}
+                      snapshot={bankedSnapshot}
                       bankedValue={state.bankedMleo || 0}
                       onClose={() => setShowBankedPanel(false)}
                     />
@@ -8286,8 +8431,8 @@ export default function MleoBase() {
                     <div className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-200/70">
                       Next step
                       </div>
-                    <div className="mt-1 text-sm font-bold text-white">{overviewV1.nextAction.title}</div>
-                    <div className="mt-1 text-xs text-white/60">{overviewV1.nextAction.text}</div>
+                    <div className="mt-1 text-sm font-bold text-white">{overview.nextAction.title}</div>
+                    <div className="mt-1 text-xs text-white/60">{overview.nextAction.text}</div>
                   </button>
 
                               <button
@@ -8387,11 +8532,13 @@ export default function MleoBase() {
                           buildSectionCardClass={buildSectionCardClass}
                           openInnerPanel={openInnerPanel}
                           toggleInnerPanel={toggleInnerPanel}
-                          overview={overviewV1}
+                          overview={overview}
+                          nextStep={nextStep}
                           buildOpportunitiesCount={buildOpportunitiesCount}
                           availableStructuresCount={availableStructuresCount}
                           availableModulesCount={availableModulesCount}
                           availableResearchCount={availableResearchCount}
+                          availableBlueprintCount={availableBlueprintCount}
                           onOpenBuildPanel={() => openDesktopPanel("build", "build-structures")}
                           onNavigate={navigateToBaseTarget}
                           showCrew={showCrew}
@@ -8700,7 +8847,7 @@ export default function MleoBase() {
                 />
                 <div className="fixed inset-x-3 top-[88px] bottom-3 z-[126] sm:hidden">
                   <BankedQuickPanel
-                    snapshot={bankedRateSnapshot}
+                    snapshot={bankedSnapshot}
                     bankedValue={state.bankedMleo || 0}
                     onClose={() => setShowBankedPanel(false)}
                   />
@@ -8786,11 +8933,13 @@ export default function MleoBase() {
                         buildSectionCardClass={buildSectionCardClass}
                         openInnerPanel={openInnerPanel}
                         toggleInnerPanel={toggleInnerPanel}
-                        overview={overviewV1}
+                        overview={overview}
+                        nextStep={nextStep}
                         buildOpportunitiesCount={buildOpportunitiesCount}
                         availableStructuresCount={availableStructuresCount}
                         availableModulesCount={availableModulesCount}
                         availableResearchCount={availableResearchCount}
+                        availableBlueprintCount={availableBlueprintCount}
                         onOpenBuildPanel={() => openMobilePanel("build")}
                         onNavigate={navigateToBaseTarget}
                         showCrew={showCrew}
@@ -9062,8 +9211,8 @@ export default function MleoBase() {
                     <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">
                       Next Recommended Step
                     </div>
-                    <div className="mt-1 text-lg font-bold text-white">{overviewV1.nextAction.title}</div>
-                    <div className="mt-1 text-sm text-white/70">{overviewV1.nextAction.text}</div>
+                    <div className="mt-1 text-lg font-bold text-white">{overview.nextAction.title}</div>
+                    <div className="mt-1 text-sm text-white/70">{overview.nextAction.text}</div>
                   </div>
                   <div className="rounded-2xl bg-black/20 px-4 py-3 text-sm text-white/75">
                     <div>Commander Lv {state.commanderLevel}</div>

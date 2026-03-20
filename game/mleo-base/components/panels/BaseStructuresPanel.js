@@ -120,6 +120,21 @@ export function BaseStructuresPanel({
                 Next Lv {card.nextLevel}
               </div>
 
+              <div className="mt-1 h-[34px]">
+                {card.upgradeImpactPreview ? (
+                  <div className="rounded-lg border border-cyan-400/20 bg-cyan-500/8 px-2.5 py-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/70">
+                      {card.upgradeImpactPreview.label}
+                    </div>
+                    <div className="text-[11px] font-semibold text-cyan-100">
+                      {card.upgradeImpactPreview.value}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-[34px]" />
+                )}
+              </div>
+
               <div className="mt-1 h-[14px] text-[10px] font-black uppercase tracking-[0.18em] text-white/40">
                 Cost
               </div>
