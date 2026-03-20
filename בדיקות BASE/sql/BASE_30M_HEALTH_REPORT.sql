@@ -210,7 +210,7 @@ select
       order by a.last_seen desc, a.device_id
     )
     from active_devices a
-  ) as active_devices,
+  ) as window_active_devices,
 
   (
     select jsonb_agg(
@@ -258,6 +258,22 @@ select
     )
     from online_real_now onr
   ) as online_real_now,
+
+  (
+    select jsonb_agg(
+      jsonb_build_object(
+        'device_id', onr.device_id,
+        'last_presence_at', onr.last_presence_at,
+        'last_interaction_at', onr.last_interaction_at,
+        'last_game_action_at', onr.last_game_action_at,
+        'visibility_state', onr.visibility_state,
+        'presence_status', onr.presence_status,
+        'gameplay_online_status', onr.gameplay_online_status
+      )
+      order by onr.last_presence_at desc, onr.device_id
+    )
+    from online_real_now onr
+  ) as online_now,
 
   (
     select jsonb_agg(

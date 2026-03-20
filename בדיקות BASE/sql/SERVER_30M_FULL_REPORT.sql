@@ -373,7 +373,7 @@ select jsonb_pretty(
       from base_by_device d
     ),
 
-    'active_devices', (
+    'window_active_devices', (
       select coalesce(
         jsonb_agg(
           jsonb_build_object(
@@ -426,6 +426,25 @@ select jsonb_pretty(
     ),
 
     'online_real_now', (
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'device_id', onr.device_id,
+            'last_presence_at', onr.last_presence_at,
+            'last_interaction_at', onr.last_interaction_at,
+            'last_game_action_at', onr.last_game_action_at,
+            'visibility_state', onr.visibility_state,
+            'presence_status', onr.presence_status,
+            'gameplay_online_status', onr.gameplay_online_status
+          )
+          order by onr.last_presence_at desc, onr.device_id
+        ),
+        '[]'::jsonb
+      )
+      from online_real_now onr
+    ),
+
+    'online_now', (
       select coalesce(
         jsonb_agg(
           jsonb_build_object(

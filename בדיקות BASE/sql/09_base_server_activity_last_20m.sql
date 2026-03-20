@@ -170,40 +170,26 @@ where created_at >= now() - interval '20 minutes'
 group by device_id
 order by last_action desc;
 
--- 5) Devices active now across BASE/MINERS/VAULT
-with active_base as (
+-- 5) BASE gameplay online now (real)
+with presence_now as (
   select
     device_id,
-    updated_at as last_seen,
-    'BASE' as source
-  from public.base_device_state
-  where updated_at >= now() - interval '20 minutes'
-),
-active_miners as (
-  select
-    device_id,
-    updated_at as last_seen,
-    'MINERS' as source
-  from public.miners_device_state
-  where updated_at >= now() - interval '20 minutes'
-),
-active_vault as (
-  select
-    device_id,
-    coalesce(updated_at, last_sync_at, created_at) as last_seen,
-    'VAULT' as source
-  from public.vault_balances
-  where coalesce(updated_at, last_sync_at, created_at) >= now() - interval '20 minutes'
+    last_presence_at,
+    last_interaction_at,
+    last_game_action_at,
+    visibility_state,
+    case
+      when last_presence_at < now() - interval '75 seconds' then 'offline'
+      when visibility_state <> 'visible' then 'idle'
+      when last_game_action_at is not null and last_game_action_at >= now() - interval '5 minutes' then 'online_real'
+      else 'not_online'
+    end as gameplay_online_status
+  from public.base_device_presence
 )
 select *
-from (
-  select * from active_base
-  union all
-  select * from active_miners
-  union all
-  select * from active_vault
-) x
-order by last_seen desc, device_id;
+from presence_now
+where gameplay_online_status = 'online_real'
+order by last_presence_at desc, device_id;
 
 -- 6) Suspicious/abnormal BASE actions (if supported by your schema)
 select
