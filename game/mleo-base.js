@@ -7828,7 +7828,12 @@ export default function MleoBase() {
     };
 
     setDesktopPanel(panel);
-    setOpenInnerPanel(inner ?? defaults[panel] ?? null);
+    // Normal tab entry should start with ALL inner sections closed for ops/build/intel.
+    // Targeted navigation passes an explicit `inner`, so it should keep its current behavior.
+    const isOpsBuildIntel = panel === "ops" || panel === "build" || panel === "intel";
+    const autoInner =
+      isOpsBuildIntel && inner == null ? null : defaults[panel] ?? null;
+    setOpenInnerPanel(inner ?? autoInner);
     setDesktopPanelOpen(true);
   };
 

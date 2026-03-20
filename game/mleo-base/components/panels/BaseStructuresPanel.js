@@ -145,11 +145,14 @@ export function BaseStructuresPanel({
               {card.costRow}
 
               <div className="mt-auto flex flex-col justify-end pt-0 pb-3">
-                <div className="text-[10px] font-semibold text-white/50">
-                  {card.energyLineText}
-                </div>
-                <div className="mt-1 text-[10px] font-semibold text-cyan-200/70">
-                  {card.powerLineText}
+                {/* Fixed-height bottom info block (stabilizes Upgrade button Y across cards) */}
+                <div className="flex flex-col">
+                  <div className="h-[14px] leading-[14px] text-[10px] font-semibold text-white/50">
+                    {card.energyLineText}
+                  </div>
+                  <div className="h-[14px] leading-[14px] text-[10px] font-semibold text-cyan-200/70">
+                    {card.powerLineText}
+                  </div>
                 </div>
 
                 <div className="mt-2 flex w-full flex-col gap-2">
@@ -175,7 +178,7 @@ export function BaseStructuresPanel({
                     </div>
                   ) : (
                     // Keep exact visual spacing for buildings without power % controls.
-                    <div className="grid grid-cols-5 gap-1.5 opacity-0 pointer-events-none">
+                    <div className="mt-3 grid grid-cols-5 gap-1.5 opacity-0 pointer-events-none">
                       {(powerSteps || []).map((mode) => (
                         <button
                           key={mode}
