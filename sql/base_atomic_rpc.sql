@@ -221,7 +221,7 @@ DECLARE
   v_overclock_cost bigint := 900;
   v_overclock_duration_ms bigint := 480000; -- 8 minutes
   v_overclock_energy_boost numeric := 0.18;
-  v_refill_cost bigint := 180;
+  v_refill_cost bigint := 160;
   v_energy_cap integer;
 BEGIN
   -- Validate spend_type
@@ -241,7 +241,7 @@ BEGIN
   v_resources := coalesce(v_state.resources, '{}'::jsonb);
   v_blueprint_level := coalesce(v_state.blueprint_level, 0);
   v_stats := coalesce(v_state.stats, '{}'::jsonb);
-  v_energy_cap := 140
+  v_energy_cap := 148
   + (coalesce((coalesce(v_state.buildings, '{}'::jsonb)->>'powerCell')::integer, 0) * 42)
   + CASE
       WHEN coalesce((coalesce(v_state.research, '{}'::jsonb)->>'coolant')::boolean, false)
@@ -853,7 +853,7 @@ DECLARE
   v_state public.base_device_state%ROWTYPE;
   v_resources jsonb;
   v_stats jsonb;
-  v_cost jsonb := jsonb_build_object('GOLD', 42, 'SCRAP', 22, 'DATA', 5);
+  v_cost jsonb := jsonb_build_object('GOLD', 42, 'SCRAP', 22, 'DATA', 4);
   v_stability_gain integer := 34;
   v_xp_gain bigint := 20;
   v_new_stability numeric;

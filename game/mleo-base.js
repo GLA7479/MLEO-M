@@ -576,8 +576,8 @@ function derive(state, now = Date.now()) {
   };
 
   return {
-    energyCap: 140 + powerLevel * 42 + (state.research.coolant ? 22 : 0),
-    energyRegen: 6.0 + powerLevel * 2.5 + (state.research.coolant ? 1.35 : 0),
+    energyCap: 148 + powerLevel * 42 + (state.research.coolant ? 22 : 0),
+    energyRegen: 6.4 + powerLevel * 2.5 + (state.research.coolant ? 1.35 : 0),
     oreMult,
     goldMult,
     scrapMult,
@@ -4643,7 +4643,7 @@ export default function MleoBase() {
 
   const performMaintenance = async () => {
     return runLockedAction("maintenance", async () => {
-    const cost = { GOLD: 42, SCRAP: 22, DATA: 5 };
+    const cost = { GOLD: 42, SCRAP: 22, DATA: 4 };
 
     if (!hasResources(state.resources, cost)) {
       showToast("Need GOLD, SCRAP and DATA for maintenance.");

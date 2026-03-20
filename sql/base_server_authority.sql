@@ -79,7 +79,7 @@ AS $$
     'ORE', 150,
     'GOLD', 332,
     'SCRAP', 34,
-    'ENERGY', 140,
+    'ENERGY', 148,
     'DATA', 10
   );
 $$;
@@ -317,7 +317,7 @@ DECLARE
   v_commander_path text := 'industry';
   v_blueprint integer := 0;
 
-  v_energy_cap numeric := 140;
+  v_energy_cap numeric := 148;
   v_energy_regen numeric := 6.0;
   v_stability numeric := 100;
   v_stability_factor numeric := 1.0;
@@ -613,15 +613,15 @@ BEGIN
   v_mleo_mult := v_mleo_mult * v_hq_bonus * v_stability_factor;
   v_data_mult := v_data_mult * v_hq_bonus * v_stability_factor;
 
-  v_energy_cap := 140 + (v_power * 42);
-  v_energy_regen := 6.0 + (v_power * 2.5);
+  v_energy_cap := 148 + (v_power * 42);
+  v_energy_regen := 6.4 + (v_power * 2.5);
 
   IF public.base_jsonb_bool(v_research, 'coolant', false) THEN
     v_energy_cap := v_energy_cap + 22;
     v_energy_regen := v_energy_regen + 1.35;
   END IF;
 
-  v_ship_cap := 1800 + ((v_logistics * v_logistics_mode) * 320) + (v_blueprint * 90);
+  v_ship_cap := 1800 + (v_logistics * 320) + (v_blueprint * 90);
 
   v_expedition_cooldown_seconds := 120;
 
@@ -1214,7 +1214,7 @@ DECLARE
   v_done boolean := false;
   v_xp_gain integer := 0;
   v_reward jsonb := '{}'::jsonb;
-  v_energy_cap integer := 140;
+  v_energy_cap integer := 148;
 BEGIN
   IF coalesce(trim(p_device_id), '') = '' THEN
     RAISE EXCEPTION 'device_id is required';
@@ -1241,7 +1241,7 @@ BEGIN
   END IF;
 
   v_energy_cap :=
-    140
+    148
     + (coalesce((coalesce(v_state.buildings, '{}'::jsonb)->>'powerCell')::integer, 0) * 42)
     + CASE
         WHEN coalesce((coalesce(v_state.research, '{}'::jsonb)->>'coolant')::boolean, false)
