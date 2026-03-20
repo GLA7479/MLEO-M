@@ -115,6 +115,40 @@ latest_base_state as (
   order by device_id, updated_at desc
 ),
 
+presence_now as (
+  select
+    device_id,
+    last_presence_at,
+    last_interaction_at,
+    last_game_action_at,
+    visibility_state,
+    case
+      when last_presence_at < now() - interval '75 seconds' then 'offline'
+      when visibility_state <> 'visible' then 'idle'
+      when coalesce(last_interaction_at, to_timestamp(0)) < now() - interval '5 minutes' then 'idle'
+      else 'active'
+    end as presence_status,
+    case
+      when last_presence_at < now() - interval '75 seconds' then 'not_online'
+      when visibility_state <> 'visible' then 'not_online'
+      when last_game_action_at >= now() - interval '5 minutes' then 'online_real'
+      else 'not_online'
+    end as gameplay_online_status
+  from public.base_device_presence
+),
+
+online_real_now as (
+  select *
+  from presence_now
+  where gameplay_online_status = 'online_real'
+),
+
+not_online_now as (
+  select *
+  from presence_now
+  where gameplay_online_status <> 'online_real'
+),
+
 suspicious_events as (
   select
     created_at,
@@ -192,6 +226,54 @@ select
     )
     from latest_base_state l
   ) as latest_base_state,
+
+  (
+    select jsonb_agg(
+      jsonb_build_object(
+        'device_id', pn.device_id,
+        'last_presence_at', pn.last_presence_at,
+        'last_interaction_at', pn.last_interaction_at,
+        'last_game_action_at', pn.last_game_action_at,
+        'visibility_state', pn.visibility_state,
+        'presence_status', pn.presence_status,
+        'gameplay_online_status', pn.gameplay_online_status
+      )
+      order by pn.last_presence_at desc, pn.device_id
+    )
+    from presence_now pn
+  ) as presence_now,
+
+  (
+    select jsonb_agg(
+      jsonb_build_object(
+        'device_id', onr.device_id,
+        'last_presence_at', onr.last_presence_at,
+        'last_interaction_at', onr.last_interaction_at,
+        'last_game_action_at', onr.last_game_action_at,
+        'visibility_state', onr.visibility_state,
+        'presence_status', onr.presence_status,
+        'gameplay_online_status', onr.gameplay_online_status
+      )
+      order by onr.last_presence_at desc, onr.device_id
+    )
+    from online_real_now onr
+  ) as online_real_now,
+
+  (
+    select jsonb_agg(
+      jsonb_build_object(
+        'device_id', non.device_id,
+        'last_presence_at', non.last_presence_at,
+        'last_interaction_at', non.last_interaction_at,
+        'last_game_action_at', non.last_game_action_at,
+        'visibility_state', non.visibility_state,
+        'presence_status', non.presence_status,
+        'gameplay_online_status', non.gameplay_online_status
+      )
+      order by non.last_presence_at desc, non.device_id
+    )
+    from not_online_now non
+  ) as not_online_now,
 
   (
     select jsonb_agg(
