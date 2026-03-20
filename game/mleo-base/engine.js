@@ -12,13 +12,17 @@ const MAX_LOG_ITEMS = 16;
 
 export const MISSION_GUIDANCE = {
   upgrade_building: {
+    shortTitle: "Stabilize and upgrade",
+    priority: 1,
     learningFocus: "Scale safely",
     whyItMatters: "Smart upgrades remove bottlenecks without destabilizing the base.",
-    bestActionHint: "Use safe mode before pushing heavy upgrades.",
-    helperLine: "Keep energy stable before scaling.",
+    bestActionHint: "Use Safe 50% first, then upgrade your bottleneck.",
+    helperLine: "Use safe mode before heavy upgrades.",
     target: { tab: "build", target: "powerCell" },
   },
   ship_mleo: {
+    shortTitle: "Ship before cap",
+    priority: 2,
     learningFocus: "Export timing",
     whyItMatters: "Shipping before cap keeps your bank loop efficient.",
     bestActionHint: "Ship before overflow slows your loop.",
@@ -26,13 +30,17 @@ export const MISSION_GUIDANCE = {
     target: { tab: "ops", target: "shipping" },
   },
   run_expedition: {
+    shortTitle: "Run clean expedition",
+    priority: 3,
     learningFocus: "Active timing",
     whyItMatters: "Expeditions are strongest when energy/data are comfortable.",
-    bestActionHint: "Run expedition only when your economy is stable.",
-    helperLine: "Run expeditions when energy and DATA are comfortable.",
+    bestActionHint: "Launch only when energy buffer and DATA are ready.",
+    helperLine: "Run expeditions when energy and DATA are ready.",
     target: { tab: "ops", target: "expedition-action" },
   },
   spend_vault: {
+    shortTitle: "Spend vault smart",
+    priority: 6,
     learningFocus: "Reinvestment",
     whyItMatters: "Shared vault spending drives long-term command growth.",
     bestActionHint: "Use blueprint spend when the base is stable.",
@@ -40,20 +48,26 @@ export const MISSION_GUIDANCE = {
     target: { tab: "ops", target: "blueprint" },
   },
   generate_data: {
+    shortTitle: "Stabilize DATA flow",
+    priority: 5,
     learningFocus: "Data engine",
     whyItMatters: "DATA supports missions, expeditions and progression choices.",
     bestActionHint: "Upgrade lab flow to keep DATA generation steady.",
-    helperLine: "Keep a steady DATA loop through lab support.",
+    helperLine: "Keep lab-fed DATA flow stable.",
     target: { tab: "build", target: "researchLab" },
   },
   perform_maintenance: {
+    shortTitle: "Maintain at the right time",
+    priority: 4,
     learningFocus: "Stability control",
     whyItMatters: "Maintenance protects efficiency before pressure compounds.",
-    bestActionHint: "Do maintenance before stability drops too far.",
+    bestActionHint: "Maintain before stability drops below the safe band.",
     helperLine: "Maintenance protects efficiency.",
     target: { tab: "ops", target: "maintenance" },
   },
   double_expedition: {
+    shortTitle: "Chain expeditions safely",
+    priority: 7,
     learningFocus: "Tempo discipline",
     whyItMatters: "Double runs are powerful only with enough reserves.",
     bestActionHint: "Stabilize first, then chain expeditions.",
@@ -64,6 +78,10 @@ export const MISSION_GUIDANCE = {
 
 export function getMissionGuidance(missionKey) {
   return MISSION_GUIDANCE[missionKey] || null;
+}
+
+export function getMissionGuidancePriority(missionKey) {
+  return Number(MISSION_GUIDANCE?.[missionKey]?.priority || 999);
 }
 
 export function crewRoleMeta(roleKey) {

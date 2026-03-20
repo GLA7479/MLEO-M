@@ -75,6 +75,7 @@ import {
   getBaseSceneNodeState,
   getMissionProgress,
   getMissionGuidance,
+  getMissionGuidancePriority,
   getShipSoftcutFactor,
   normalizeServerState,
   offlineFactorFor,
@@ -87,6 +88,11 @@ import {
 } from "./mleo-base/engine";
 
 const MAX_LOG_ITEMS = 16;
+const REFINERY_ORE_NEED_PER_LEVEL = 1.65;
+const REFINERY_SCRAP_NEED_PER_LEVEL = 0.62;
+const REFINERY_ENERGY_NEED_PER_LEVEL = 0.82;
+const REFINERY_BANKED_PER_LEVEL = 0.0165;
+const SHIP_READY_BANKED_THRESHOLD = 100;
 
 
 function fmtRate(value, digits = 2) {
@@ -383,9 +389,32 @@ function buildingCost(def, level) {
     : level === 1 ? 0.88
     : level === 2 ? 0.92
     : 1;
+  const key = def?.key;
+  const earlyKeyDiscount =
+    level > 2
+      ? 1
+      : key === "quarry"
+      ? level === 0
+        ? 0.9
+        : level === 1
+        ? 0.95
+        : 1
+      : key === "salvage" || key === "powerCell"
+      ? level === 0
+        ? 0.92
+        : level === 1
+        ? 0.96
+        : 1
+      : key === "repairBay" || key === "refinery" || key === "researchLab"
+      ? level === 0
+        ? 0.94
+        : level === 1
+        ? 0.97
+        : 1
+      : 1;
   const out = {};
   for (const [key, value] of Object.entries(def.baseCost || {})) {
-    out[key] = Math.ceil(value * factor * earlyDiscount);
+    out[key] = Math.ceil(value * factor * earlyDiscount * earlyKeyDiscount);
   }
   return out;
 }
@@ -479,7 +508,7 @@ function derive(state, now = Date.now()) {
   let dataMult = (1 + researchLabLevel * 0.06) * arcadeBonus;
   const logisticsLevel = getEffectiveBuildingLevel(state, "logisticsCenter");
   let bankBonus = 1 + state.blueprintLevel * 0.02 + logisticsLevel * 0.025;
-  let maintenanceRelief = 1 + repairBayLevel * 0.08;
+  let maintenanceRelief = 1 + repairBayLevel * 0.09;
 
   if (crewRole === "engineer") {
     maintenanceRelief *= 1.06;
@@ -549,8 +578,8 @@ function derive(state, now = Date.now()) {
   };
 
   return {
-    energyCap: CONFIG.baseEnergyCap + powerLevel * 42 + (state.research.coolant ? 22 : 0),
-    energyRegen: CONFIG.baseEnergyRegen + powerLevel * 2.2 + (state.research.coolant ? 1.35 : 0),
+    energyCap: CONFIG.baseEnergyCap + powerLevel * 46 + (state.research.coolant ? 24 : 0),
+    energyRegen: CONFIG.baseEnergyRegen + powerLevel * 2.45 + (state.research.coolant ? 1.45 : 0),
     oreMult,
     goldMult,
     scrapMult,
@@ -573,28 +602,37 @@ function getBankedRateSnapshot(state, derived) {
   const scrap = Number(state?.resources?.SCRAP || 0);
   const energy = Number(state?.resources?.ENERGY || 0);
 
-  const oreNeedPerSecond = refineryLevel * 1.8;
-  const scrapNeedPerSecond = refineryLevel * 0.7;
-  const energyNeedPerSecond = refineryLevel * 0.9;
+  const oreNeedPerSecond = refineryLevel * REFINERY_ORE_NEED_PER_LEVEL;
+  const scrapNeedPerSecond = refineryLevel * REFINERY_SCRAP_NEED_PER_LEVEL;
+  // Keep early-game preview aligned with `simulate()`:
+  // - `simulate()` uses earlyEnergyReliefFor(refinery, level) and energyUseMult for the energy check.
+  // - snapshot should apply the same factors so "Energy limited" doesn't disagree with reality.
+  const energyUseMult = Number(derived?.energyUseMult || 1);
+  const earlyEnergyRelief = refineryLevel > 2 ? 1 : 0.9;
+  const energyNeedPerSecond =
+    refineryLevel * REFINERY_ENERGY_NEED_PER_LEVEL * energyUseMult * earlyEnergyRelief;
 
   const reserveEnergy = Math.max(
     8,
-    Math.floor((derived?.energyCap || CONFIG.baseEnergyCap) * 0.06)
+    Math.floor((derived?.energyCap || CONFIG.baseEnergyCap) * 0.05)
   );
 
   const hasRefinery = refineryLevel > 0;
   const hasOre = oreNeedPerSecond > 0 && ore >= oreNeedPerSecond;
   const hasScrap = scrapNeedPerSecond > 0 && scrap >= scrapNeedPerSecond;
+  // `simulate()` allows equality (it blocks only when energy would fall below reserve).
   const hasEnergy =
-    energyNeedPerSecond > 0 && energy > reserveEnergy + energyNeedPerSecond;
+    energyNeedPerSecond > 0 && energy >= reserveEnergy + energyNeedPerSecond;
 
   const active = hasRefinery && hasOre && hasScrap && hasEnergy;
 
   const perSecond = active
-    ? 0.015 *
+    ? REFINERY_BANKED_PER_LEVEL *
       refineryLevel *
       Number(derived?.mleoMult || 1) *
-      Number(derived?.bankBonus || 1)
+      Number(derived?.bankBonus || 1) *
+      // `simulate()` applies earlyOutputBoostFor(refinery, level) when level <= 2.
+      (refineryLevel > 2 ? 1 : 1.08)
     : 0;
 
   const perHour = perSecond * 3600;
@@ -679,7 +717,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
   const dt = clamp(elapsedMs / 1000, 0, 60 * 60 * 12);
   const effective = dt * efficiency;
   const d = derive(next, now);
-  const reserveEnergy = Math.max(8, Math.floor(d.energyCap * 0.06));
+  const reserveEnergy = Math.max(8, Math.floor(d.energyCap * 0.05));
   const dataBefore = next.resources.DATA || 0;
 
   next.resources.ENERGY = clamp(next.resources.ENERGY + d.energyRegen * dt, 0, d.energyCap);
@@ -694,12 +732,29 @@ function simulate(state, elapsedMs, efficiency = 1) {
 
     producer(effectiveLevel);
   };
+  const earlyOutputBoostFor = (key, level) => {
+    if (level > 2) return 1;
+    if (key === "quarry") return 1.12;
+    if (key === "salvage") return 1.10;
+    if (key === "researchLab") return 1.10;
+    if (key === "refinery") return 1.08;
+    return 1;
+  };
+  const earlyEnergyReliefFor = (key, level) => {
+    if (level > 2) return 1;
+    if (key === "quarry" || key === "salvage" || key === "researchLab" || key === "refinery") {
+      return 0.9;
+    }
+    return 1;
+  };
 
   runBuilding("quarry", (level) => {
-    const energyNeed = 0.72 * level * dt * (d.energyUseMult || 1);
+    const energyNeed =
+      0.72 * level * dt * (d.energyUseMult || 1) * earlyEnergyReliefFor("quarry", level);
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
-    next.resources.ORE += 1.35 * level * d.oreMult * effective;
+    next.resources.ORE +=
+      1.35 * level * d.oreMult * effective * earlyOutputBoostFor("quarry", level);
   });
 
   runBuilding("tradeHub", (level) => {
@@ -710,10 +765,12 @@ function simulate(state, elapsedMs, efficiency = 1) {
   });
 
   runBuilding("salvage", (level) => {
-    const energyNeed = 0.78 * level * dt * (d.energyUseMult || 1);
+    const energyNeed =
+      0.78 * level * dt * (d.energyUseMult || 1) * earlyEnergyReliefFor("salvage", level);
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
-    next.resources.SCRAP += 0.50 * level * d.scrapMult * effective;
+    next.resources.SCRAP +=
+      0.50 * level * d.scrapMult * effective * earlyOutputBoostFor("salvage", level);
   });
 
   runBuilding("minerControl", (level) => {
@@ -731,10 +788,12 @@ function simulate(state, elapsedMs, efficiency = 1) {
   });
 
   runBuilding("researchLab", (level) => {
-    const energyNeed = 0.24 * level * dt * (d.energyUseMult || 1);
+    const energyNeed =
+      0.24 * level * dt * (d.energyUseMult || 1) * earlyEnergyReliefFor("researchLab", level);
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     next.resources.ENERGY -= energyNeed;
-    next.resources.DATA += 0.22 * level * d.dataMult * effective;
+    next.resources.DATA +=
+      0.22 * level * d.dataMult * effective * earlyOutputBoostFor("researchLab", level);
   });
 
   runBuilding("logisticsCenter", (level) => {
@@ -748,24 +807,35 @@ function simulate(state, elapsedMs, efficiency = 1) {
     const energyNeed = 0.22 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
-    next.stability = Math.min(100, (next.stability || 100) + 0.035 * level * effective);
+    next.stability = Math.min(100, (next.stability || 100) + 0.042 * level * effective);
   });
 
   runBuilding("refinery", (level) => {
-    const energyNeed = 1.10 * level * dt * (d.energyUseMult || 1);
-    const oreNeed = 1.8 * level * effective;
-    const scrapNeed = 0.7 * level * effective;
+    const energyNeed =
+      REFINERY_ENERGY_NEED_PER_LEVEL *
+      level *
+      dt *
+      (d.energyUseMult || 1) *
+      earlyEnergyReliefFor("refinery", level);
+    const oreNeed = REFINERY_ORE_NEED_PER_LEVEL * level * effective;
+    const scrapNeed = REFINERY_SCRAP_NEED_PER_LEVEL * level * effective;
     if (next.resources.ENERGY - energyNeed < reserveEnergy) return;
     if (next.resources.ORE < oreNeed || next.resources.SCRAP < scrapNeed) return;
     next.resources.ENERGY -= energyNeed;
     next.resources.ORE -= oreNeed;
     next.resources.SCRAP -= scrapNeed;
-    next.bankedMleo += 0.015 * level * d.mleoMult * d.bankBonus * effective;
+    next.bankedMleo +=
+      REFINERY_BANKED_PER_LEVEL *
+      level *
+      d.mleoMult *
+      d.bankBonus *
+      effective *
+      earlyOutputBoostFor("refinery", level);
   });
 
   const elapsedMinutes = dt / 60;
   const decayMultiplier = 1 / (d.maintenanceRelief || 1);
-  next.maintenanceDue = (next.maintenanceDue || 0) + elapsedMinutes * 0.14 * decayMultiplier;
+  next.maintenanceDue = (next.maintenanceDue || 0) + elapsedMinutes * 0.12 * decayMultiplier;
 
   if ((next.maintenanceDue || 0) >= 1) {
     const decaySteps = Math.floor(next.maintenanceDue);
@@ -1412,6 +1482,18 @@ function getUpgradeImpactPreview(state, derived, buildingKey) {
       Number(value || 0)
     );
 
+    // Align early-game "feel" between preview and `simulate()`:
+    // `simulate()` multiplies certain early building output by `earlyOutputBoostFor(key, level)`
+    // when effective level <= 2. Here we approximate the same behavior.
+    const earlyOutputBoostFor = (key, effectiveLevel) => {
+      if (effectiveLevel > 2) return 1;
+      if (key === "quarry") return 1.12;
+      if (key === "salvage") return 1.10;
+      if (key === "refinery") return 1.08;
+      if (key === "researchLab") return 1.10;
+      return 1;
+    };
+
   const nextState = {
     ...state,
     buildings: {
@@ -1423,24 +1505,53 @@ function getUpgradeImpactPreview(state, derived, buildingKey) {
 
   if (buildingKey === "quarry") {
     const modeFactor = getBuildingPowerFactor(state, "quarry");
-    const deltaPerHour = 1.35 * modeFactor * Number(derived?.oreMult || 1) * 3600;
+      const curBaseLevel = Number(state?.buildings?.quarry || 0);
+      const nextBaseLevel = curBaseLevel + 1;
+      const curEffectiveLevel = curBaseLevel * modeFactor;
+      const nextEffectiveLevel = nextBaseLevel * modeFactor;
+      const boostCur = earlyOutputBoostFor("quarry", curEffectiveLevel);
+      const boostNext = earlyOutputBoostFor("quarry", nextEffectiveLevel);
+      const deltaPerHour =
+        1.35 *
+        modeFactor *
+        Number(derived?.oreMult || 1) *
+        3600 *
+        (nextBaseLevel * boostNext - curBaseLevel * boostCur);
     return { label: "Upgrade impact", value: `+${fmt(deltaPerHour, 1)} ORE/hr` };
   }
 
   if (buildingKey === "salvage") {
     const modeFactor = getBuildingPowerFactor(state, "salvage");
-    const deltaPerHour = 0.5 * modeFactor * Number(derived?.scrapMult || 1) * 3600;
+      const curBaseLevel = Number(state?.buildings?.salvage || 0);
+      const nextBaseLevel = curBaseLevel + 1;
+      const curEffectiveLevel = curBaseLevel * modeFactor;
+      const nextEffectiveLevel = nextBaseLevel * modeFactor;
+      const boostCur = earlyOutputBoostFor("salvage", curEffectiveLevel);
+      const boostNext = earlyOutputBoostFor("salvage", nextEffectiveLevel);
+      const deltaPerHour =
+        0.5 *
+        modeFactor *
+        Number(derived?.scrapMult || 1) *
+        3600 *
+        (nextBaseLevel * boostNext - curBaseLevel * boostCur);
     return { label: "Upgrade impact", value: `+${fmt(deltaPerHour, 1)} SCRAP/hr` };
   }
 
   if (buildingKey === "refinery") {
     const modeFactor = getBuildingPowerFactor(state, "refinery");
-    const deltaPerHour =
-      0.015 *
-      modeFactor *
-      Number(derived?.mleoMult || 1) *
-      Number(derived?.bankBonus || 1) *
-      3600;
+      const curBaseLevel = Number(state?.buildings?.refinery || 0);
+      const nextBaseLevel = curBaseLevel + 1;
+      const curEffectiveLevel = curBaseLevel * modeFactor;
+      const nextEffectiveLevel = nextBaseLevel * modeFactor;
+      const boostCur = earlyOutputBoostFor("refinery", curEffectiveLevel);
+      const boostNext = earlyOutputBoostFor("refinery", nextEffectiveLevel);
+      const deltaPerHour =
+        REFINERY_BANKED_PER_LEVEL *
+        modeFactor *
+        Number(derived?.mleoMult || 1) *
+        Number(derived?.bankBonus || 1) *
+        3600 *
+        (nextBaseLevel * boostNext - curBaseLevel * boostCur);
     return {
       label: "Upgrade impact",
       value: `+${fmt(deltaPerHour, 2)} banked/hr`,
@@ -1460,7 +1571,7 @@ function getUpgradeImpactPreview(state, derived, buildingKey) {
 
   if (buildingKey === "repairBay") {
     const modeFactor = getBuildingPowerFactor(state, "repairBay");
-    const perHourStability = 0.035 * modeFactor * 3600;
+      const perHourStability = 0.042 * modeFactor * 3600;
     const reliefDelta =
       Number(nextDerived?.maintenanceRelief || 1) - Number(derived?.maintenanceRelief || 1);
     return {
@@ -1472,7 +1583,18 @@ function getUpgradeImpactPreview(state, derived, buildingKey) {
 
   if (buildingKey === "researchLab") {
     const modeFactor = getBuildingPowerFactor(state, "researchLab");
-    const deltaPerHour = 0.22 * modeFactor * Number(derived?.dataMult || 1) * 3600;
+      const curBaseLevel = Number(state?.buildings?.researchLab || 0);
+      const nextBaseLevel = curBaseLevel + 1;
+      const curEffectiveLevel = curBaseLevel * modeFactor;
+      const nextEffectiveLevel = nextBaseLevel * modeFactor;
+      const boostCur = earlyOutputBoostFor("researchLab", curEffectiveLevel);
+      const boostNext = earlyOutputBoostFor("researchLab", nextEffectiveLevel);
+      const deltaPerHour =
+        0.22 *
+        modeFactor *
+        Number(derived?.dataMult || 1) *
+        3600 *
+        (nextBaseLevel * boostNext - curBaseLevel * boostCur);
     return { label: "Upgrade impact", value: `+${fmt(deltaPerHour, 1)} DATA/hr` };
   }
 
@@ -1774,6 +1896,169 @@ function buildOverviewV2({
     canExpeditionNow,
     liveContracts,
   });
+  const recoveryHint = (() => {
+    const energyRatio = energyCap > 0 ? energy / energyCap : 1;
+    const inRecovery = bottleneck?.key === "energy-collapse" || systemState === "critical";
+    if (!inRecovery && energyRatio > 0.18) return null;
+    return {
+      title: "Recovery hint",
+      text: "Use Safe 50% to cut drain, then refill or maintain if needed.",
+      target: { tab: "ops", target: "maintenance" },
+    };
+  })();
+
+  const todaysLoop = (() => {
+    const steps = [];
+    const push = (title, status = "Soon", target = null) => {
+      if (!title) return;
+      if (steps.some((s) => s.title === title)) return;
+      steps.push({ title, status, target });
+    };
+
+    const energyRatio = energyCap > 0 ? energy / energyCap : 1;
+    const shipCap = Number(derived?.shipCap || 0);
+    const shipRatio = shipCap > 0 ? Number(state?.bankedMleo || 0) / shipCap : 0;
+    const claimableContracts = (liveContracts || []).filter((c) => c.done && !c.claimed).length;
+    const claimableMissions = Number(readyCounts?.missions || 0);
+
+    if (energyCap > 0) {
+      if (energyRatio <= 0.2) {
+        push("Restore energy buffer", "Ready", { tab: "ops", target: "maintenance" });
+      } else {
+        push("Keep energy buffer healthy", "Done");
+      }
+    }
+
+    if (bankedSnapshot?.hasRefinery) {
+      if (!bankedSnapshot?.hasOre || !bankedSnapshot?.hasScrap) {
+        push(
+          !bankedSnapshot?.hasOre ? "Feed refinery with ORE" : "Feed refinery with Scrap",
+          "Ready",
+          !bankedSnapshot?.hasOre
+            ? { tab: "build", target: "quarry" }
+            : { tab: "build", target: "salvage" }
+        );
+      } else {
+        push("Keep refinery feed stable", "Done");
+      }
+    }
+
+    if (canExpeditionNow) {
+      push("Run expedition now", "Ready", { tab: "ops", target: "expedition-action" });
+    } else {
+      push("Run expedition when ready", "Soon", { tab: "ops", target: "expedition-action" });
+    }
+
+    if (stability < 82 || systemState !== "normal") {
+      push("Do maintenance before pressure rises", "Ready", { tab: "ops", target: "maintenance" });
+    } else {
+      push("Maintain stability rhythm", "Done");
+    }
+
+    if (shipRatio >= 0.85 || canShipNow) {
+      push("Ship before cap pressure", canShipNow ? "Ready" : "Soon", {
+        tab: "ops",
+        target: "shipping",
+      });
+    }
+
+    if (claimableContracts > 0 || claimableMissions > 0) {
+      push(
+        "Claim available rewards",
+        "Ready",
+        claimableContracts > 0
+          ? { tab: "overview", target: "contracts" }
+          : { tab: "ops", target: "missions" }
+      );
+    }
+
+    return steps.slice(0, 4);
+  })();
+
+  const bottleneckChips = (() => {
+    const chips = [];
+    const push = (key, label, tone = "info") => {
+      if (!key || !label) return;
+      if (chips.some((item) => item.key === key)) return;
+      chips.push({ key, label, tone });
+    };
+
+    // First chip: current main bottleneck.
+    switch (bottleneck?.key) {
+      case "ship-cap":
+        push("ship-cap", "Near ship cap", "warning");
+        break;
+      case "energy-collapse":
+        push("energy-pressure", "Energy pressure", "critical");
+        break;
+      case "ore-limited":
+        push("ore-limited", "ORE limited", "warning");
+        break;
+      case "scrap-limited":
+        push("scrap-low", "Scrap low", "warning");
+        break;
+      case "stability-drag":
+        push("stability-drag", "Stability drag", "warning");
+        break;
+      case "weak-output":
+        push("output-weak", "Output weak", "info");
+        break;
+      default:
+        break;
+    }
+
+    // Optional second chip: closely related secondary pressure.
+    const energy = Number(state?.resources?.ENERGY || 0);
+    const energyCap = Number(derived?.energyCap || 0);
+    const stability = Number(state?.stability || 100);
+    const shipCap = Number(derived?.shipCap || 0);
+    const banked = Number(state?.bankedMleo || 0);
+    const shipRatio = shipCap > 0 ? banked / shipCap : 0;
+
+    if (chips.length < 2) {
+      if (
+        bottleneck?.key !== "energy-collapse" &&
+        energyCap > 0 &&
+        energy <= energyCap * 0.16
+      ) {
+        push("energy-pressure", "Energy pressure", "critical");
+      } else if (
+        chips.length < 2 &&
+        bottleneck?.key !== "ship-cap" &&
+        shipRatio >= 0.88
+      ) {
+        push("ship-cap", "Near ship cap", "warning");
+      } else if (
+        chips.length < 2 &&
+        bottleneck?.key !== "stability-drag" &&
+        (stability < 84 || systemState !== "normal")
+      ) {
+        push("stability-drag", "Stability drag", "warning");
+      } else if (
+        chips.length < 2 &&
+        bottleneck?.key !== "ore-limited" &&
+        bankedSnapshot?.hasRefinery &&
+        !bankedSnapshot?.hasOre
+      ) {
+        push("ore-limited", "ORE limited", "warning");
+      } else if (
+        chips.length < 2 &&
+        bottleneck?.key !== "scrap-limited" &&
+        bankedSnapshot?.hasRefinery &&
+        !bankedSnapshot?.hasScrap
+      ) {
+        push("scrap-low", "Scrap low", "warning");
+      } else if (
+        chips.length < 2 &&
+        bottleneck?.key !== "weak-output" &&
+        (!bankedSnapshot?.active || Number(bankedSnapshot?.perHour || 0) <= 0.01)
+      ) {
+        push("output-weak", "Output weak", "info");
+      }
+    }
+
+    return chips.slice(0, 2);
+  })();
 
   return {
     baseStatus: getOverviewBaseStatus({
@@ -1786,6 +2071,9 @@ function buildOverviewV2({
     }),
     bottleneck,
     nextAction,
+    recoveryHint,
+    bottleneckChips,
+    todaysLoop,
     rates: {
       bankedPerHour: Number(bankedSnapshot?.perHour || 0),
       projectedPerDay: Number(bankedSnapshot?.perDay || 0),
@@ -1983,7 +2271,9 @@ const INFO_COPY = {
     focus: "Power Cell + Coolant Loops + runtime control",
     text:
       "Energy powers production uptime.\n" +
-      "If drain beats regen, progression stalls quickly.",
+      "If drain beats regen, progression stalls quickly.\n\n" +
+      "Safe Mode (50%) lowers runtime drain for recovery.\n" +
+      "Tradeoff: lower short-term output while pressure is eased.",
     tips: {
       building: "Power Cell",
       supportBuildings: ["Repair Bay", "Refinery"],
@@ -2006,7 +2296,8 @@ const INFO_COPY = {
     focus: "Maintenance + Repair Bay + pressure control",
     text:
       "Stability protects overall efficiency.\n" +
-      "Low stability makes growth feel worse even with good resources.",
+      "Low stability makes growth feel worse even with good resources.\n\n" +
+      "Safe Mode helps by reducing drain while maintenance restores control.",
     tips: {
       building: "Repair Bay",
       supportBuildings: ["Power Cell", "Refinery"],
@@ -3135,7 +3426,7 @@ export default function MleoBase() {
     return "rounded-2xl border border-white/10 bg-white/10 text-white/85";
   }
 
-  const canShipNow = Number(state.bankedMleo || 0) >= 120;
+  const canShipNow = Number(state.bankedMleo || 0) >= SHIP_READY_BANKED_THRESHOLD;
   const canExpeditionNow =
     Number(state.expeditionReadyAt || 0) <= Date.now() &&
     Number(state.resources?.DATA || 0) >= 4 &&
@@ -4451,7 +4742,8 @@ export default function MleoBase() {
     const bClaimed = !!state.missionState?.claimed?.[b.key];
     const bReady = bDone && !bClaimed ? 1 : 0;
 
-    return bReady - aReady;
+    if (bReady !== aReady) return bReady - aReady;
+    return getMissionGuidancePriority(a.key) - getMissionGuidancePriority(b.key);
   }).map((mission) => {
     const progress = missionProgress[mission.key] || 0;
     const done = progress >= mission.target;
@@ -4462,7 +4754,7 @@ export default function MleoBase() {
 
     return {
       key: mission.key,
-      name: mission.name,
+      name: guidance?.shortTitle || mission.name,
       progress,
       target: mission.target,
       progressText: fmt(progress),
@@ -6081,7 +6373,8 @@ export default function MleoBase() {
         "• Instantly fills ENERGY back to your current cap.\n" +
         "• Costs Shared Vault MLEO.\n" +
         "• Also consumes 5 DATA.\n" +
-        "• Does not improve Energy regeneration.\n\n" +
+        "• Does not improve Energy regeneration.\n" +
+        "• Pairs well with Safe 50% so recovery does not drain away.\n\n" +
         "Important:\n" +
         "Refill is a recovery button. It is not your long-term Energy engine.",
       tips: {
@@ -6115,7 +6408,8 @@ export default function MleoBase() {
         "• Maintenance restores stability directly.\n" +
         "• Repair Bay improves long-term stability support.\n" +
         "• Predictive Maintenance slows pressure growth.\n" +
-        "• Miner Link helps when refinery load is part of the problem.\n\n" +
+        "• Miner Link helps when refinery load is part of the problem.\n" +
+        "• Safe 50% can buy time by cutting runtime pressure first.\n\n" +
         "Important:\n" +
         "Maintenance works best before the base becomes unstable, not after everything is already under pressure.",
       tips: {

@@ -92,11 +92,33 @@ function ActionButton({ action, onNavigate }) {
 
 function BaseStatusBlock({ status }) {
   if (!status) return null;
+  const chips = Array.isArray(status?.chips) ? status.chips.slice(0, 2) : [];
+  const chipClass = (tone) =>
+    tone === "critical"
+      ? "border-rose-300/35 bg-rose-500/12 text-rose-100"
+      : tone === "warning"
+      ? "border-amber-300/35 bg-amber-400/12 text-amber-100"
+      : "border-cyan-300/30 bg-cyan-500/10 text-cyan-100";
+
   return (
     <CardShell className={toneClasses(status.tone)}>
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">
         Base Status
       </div>
+      {chips.length ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {chips.map((chip) => (
+            <span
+              key={chip.key}
+              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] ${chipClass(
+                chip.tone
+              )}`}
+            >
+              {chip.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-2 text-2xl font-black">{status.label}</div>
       <div className="mt-2 text-sm leading-6 text-white/85">{status.text}</div>
     </CardShell>
@@ -239,6 +261,69 @@ function MissionFocusBlock({ missionGuidance, onNavigate }) {
           className="mt-3 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
         >
           {missionGuidance.cta || "Open missions"}
+        </button>
+      ) : null}
+    </CardShell>
+  );
+}
+
+function RecoveryHintBlock({ hint, onNavigate }) {
+  if (!hint?.text) return null;
+  return (
+    <CardShell className="border-amber-300/25 bg-amber-500/[0.07]">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">
+        {hint.title || "Recovery hint"}
+      </div>
+      <div className="mt-1 text-sm text-white/80">{hint.text}</div>
+      {hint?.target ? (
+        <button
+          onClick={() => onNavigate?.(hint.target)}
+          className="mt-3 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
+        >
+          Open recovery actions
+        </button>
+      ) : null}
+    </CardShell>
+  );
+}
+
+function TodaysLoopBlock({ steps, onNavigate }) {
+  const list = Array.isArray(steps) ? steps.slice(0, 4) : [];
+  if (!list.length) return null;
+
+  const statusClass = (status) =>
+    status === "Ready"
+      ? "text-cyan-200"
+      : status === "Done"
+      ? "text-emerald-200/90"
+      : "text-white/55";
+
+  const firstActionable = list.find((s) => s?.target);
+
+  return (
+    <CardShell className="border-white/12 bg-white/[0.04]">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+        Today&apos;s Loop
+      </div>
+      <div className="mt-2 space-y-1.5">
+        {list.map((step, idx) => (
+          <div key={`${step.title}-${idx}`} className="flex items-center justify-between gap-3 text-sm">
+            <div className="min-w-0 text-white/82">
+              <span className="mr-2 text-white/45">{idx + 1}.</span>
+              <span>{step.title}</span>
+            </div>
+            <span className={`shrink-0 text-[11px] font-semibold ${statusClass(step.status)}`}>
+              {step.status || "Soon"}
+            </span>
+          </div>
+        ))}
+      </div>
+      {firstActionable ? (
+        <button
+          onClick={() => onNavigate?.(firstActionable.target)}
+          className="mt-3 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
+        >
+          Focus first step
         </button>
       ) : null}
     </CardShell>
@@ -401,22 +486,30 @@ export function OverviewPanelCards({
   liveContracts,
   onClaimContract,
 }) {
-  const actionFallback = nextStep
-    ? {
-        title: nextStep.title,
-        text: nextStep.text,
-        cta: "Open",
-      }
-    : null;
+  const actionFallback =
+    nextStep && (nextStep?.title || nextStep?.text)
+      ? {
+          title: nextStep?.title || "Best Next Action",
+          text: nextStep?.text || "",
+          cta: "Open",
+        }
+      : null;
 
   const safeOverview = overview || {};
 
   return (
     <div className="space-y-4">
-      <BaseStatusBlock status={safeOverview.baseStatus} />
+      <BaseStatusBlock
+        status={{
+          ...(safeOverview.baseStatus || {}),
+          chips: safeOverview.bottleneckChips || [],
+        }}
+      />
       <BottleneckBlock bottleneck={safeOverview.bottleneck} onNavigate={onNavigate} />
       <NextActionBlock action={safeOverview.nextAction || actionFallback} onNavigate={onNavigate} />
+      <RecoveryHintBlock hint={safeOverview.recoveryHint} onNavigate={onNavigate} />
       <MissionFocusBlock missionGuidance={missionGuidance} onNavigate={onNavigate} />
+      <TodaysLoopBlock steps={safeOverview.todaysLoop} onNavigate={onNavigate} />
       <RatesBlock rates={safeOverview.rates} />
       <StabilityBlock stability={safeOverview.stability} />
       <DailyProgressBlock progress={safeOverview.dailyProgress} />
