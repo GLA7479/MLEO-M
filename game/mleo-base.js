@@ -2648,6 +2648,10 @@ export default function MleoBase() {
   const presenceInFlightRef = useRef(false);
   const presenceHeartbeatRef = useRef(null);
 
+  const lastGameActionAtRef = useRef(0);
+  const gameActionInFlightRef = useRef(false);
+  const [hubGameplayOnline, setHubGameplayOnline] = useState(false);
+
   const actionLocksRef = useRef({});
 
   function isActionLocked(name) {
@@ -2736,6 +2740,45 @@ export default function MleoBase() {
     }
   }
 
+  function computeHubGameplayOnline(now = Date.now()) {
+    if (typeof document === "undefined") return false;
+    const presenceAlive = lastPresenceSendRef.current > 0 && now - lastPresenceSendRef.current <= 75_000;
+    const visible = document.visibilityState === "visible";
+    const gameRecent = lastGameActionAtRef.current > 0 && now - lastGameActionAtRef.current <= 5 * 60_000;
+    return presenceAlive && visible && gameRecent;
+  }
+
+  async function markRealGameAction() {
+    if (typeof document === "undefined") return false;
+    if (gameActionInFlightRef.current) return false;
+
+    const now = Date.now();
+    gameActionInFlightRef.current = true;
+    try {
+      const payload = await sendBasePresence({
+        visibilityState: document.visibilityState || "visible",
+        pageName: "base",
+        interacted: true,
+        gameAction: true,
+      });
+
+      if (!payload?.success) {
+        console.error("BASE real game action push rejected", payload);
+        return false;
+      }
+
+      lastPresenceSendRef.current = now;
+      lastGameActionAtRef.current = now;
+      setHubGameplayOnline(computeHubGameplayOnline(now));
+      return true;
+    } catch (error) {
+      console.error("BASE real game action push failed", error);
+      return false;
+    } finally {
+      gameActionInFlightRef.current = false;
+    }
+  }
+
   useEffect(() => {
     if (!mounted || typeof window === "undefined") return;
 
@@ -2804,6 +2847,18 @@ export default function MleoBase() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [mounted]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const tick = () => {
+      setHubGameplayOnline(computeHubGameplayOnline());
+    };
+
+    tick();
+    const id = window.setInterval(tick, 5000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const mobilePanelScrollRef = useRef(null);
   const desktopPanelScrollRef = useRef(null);
@@ -3949,6 +4004,7 @@ export default function MleoBase() {
 
         setState((prev) => mergeAuthoritativeServerState(prev, res.state));
         const contract = LIVE_CONTRACTS.find((item) => item.key === key);
+        markRealGameAction();
         showToast("Contract claimed · rewards added");
       } catch (error) {
         console.error("Contract claim failed", error);
@@ -3989,6 +4045,9 @@ export default function MleoBase() {
           );
           return next;
         });
+
+        // Mark gameplay online only after server accepted the real action.
+        markRealGameAction();
 
         showToast(
           withBottleneckNote(`${def.name} upgraded · output improved`, {
@@ -4179,6 +4238,8 @@ export default function MleoBase() {
           return next;
         });
 
+        markRealGameAction();
+
         showToast(`Crew hired. Team size is now ${res.new_crew || state.crew + 1}.`);
       } else {
         showToast(res?.message || "Crew action failed.");
@@ -4215,6 +4276,8 @@ export default function MleoBase() {
           next.log = pushLog(next.log, `${moduleDef.name} installed.`);
           return next;
         });
+
+        markRealGameAction();
 
         showToast(`${moduleDef.name} installed.`);
       } else {
@@ -4257,6 +4320,8 @@ export default function MleoBase() {
           next.log = pushLog(next.log, `${def.name} research completed.`);
           return next;
         });
+
+        markRealGameAction();
 
         showToast(`${def.name} research completed.`);
       } else {
@@ -4400,6 +4465,9 @@ export default function MleoBase() {
           }
           return next;
         });
+
+        // Mark gameplay online only after server accepted the real action.
+        markRealGameAction();
       } else {
         showToast(res?.message || "Expedition failed.");
       }
@@ -4597,6 +4665,9 @@ export default function MleoBase() {
           };
           return applyLevelUps(next);
         });
+
+        markRealGameAction();
+
         showToast(
           withBottleneckNote("Maintenance complete · stability pressure reduced", {
             "stability-drag": "Main pressure reduced",
@@ -4632,6 +4703,8 @@ export default function MleoBase() {
       setState((prev) => {
         return mergeAuthoritativeServerState(prev, serverState);
       });
+
+      markRealGameAction();
 
       showToast("Mission reward claimed.");
     } catch (error) {
@@ -8660,8 +8733,11 @@ export default function MleoBase() {
                   </button>
                   <Link
                     href="/mining"
-                    className="rounded-2xl border border-white/15 bg-white/5 px-4 h-[35px] flex items-center text-sm font-semibold hover:bg-white/10"
+                    className="relative rounded-2xl border border-white/15 bg-white/5 px-4 h-[35px] flex items-center text-sm font-semibold hover:bg-white/10"
                   >
+                    {hubGameplayOnline ? (
+                      <span className="absolute -right-1 -top-1 inline-flex h-[10px] w-[10px] rounded-full bg-cyan-400 shadow-[0_0_24px_rgba(34,211,238,0.18)]" />
+                    ) : null}
                     Hub
                   </Link>
                   <button
@@ -8729,8 +8805,11 @@ export default function MleoBase() {
 
               <Link
                 href="/mining"
-                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10"
+                className="relative rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10"
               >
+                {hubGameplayOnline ? (
+                  <span className="absolute -right-1 -top-1 inline-flex h-[10px] w-[10px] rounded-full bg-cyan-400 shadow-[0_0_24px_rgba(34,211,238,0.18)]" />
+                ) : null}
                 Hub
               </Link>
 

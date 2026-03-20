@@ -26,6 +26,7 @@ export default async function handler(req, res) {
     const {
       visibility_state = "hidden",
       page_name = "base",
+      game_action = false,
       interacted = false,
     } = req.body || {};
 
@@ -35,6 +36,7 @@ export default async function handler(req, res) {
       p_device_id: deviceId,
       p_visibility_state: visibility_state,
       p_page_name: page_name,
+      p_game_action: !!game_action,
       p_interacted: !!interacted,
     });
 
