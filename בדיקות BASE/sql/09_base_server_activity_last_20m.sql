@@ -179,9 +179,11 @@ with presence_now as (
     last_game_action_at,
     visibility_state,
     case
-      when last_presence_at < now() - interval '75 seconds' then 'offline'
-      when visibility_state <> 'visible' then 'idle'
-      when last_game_action_at is not null and last_game_action_at >= now() - interval '5 minutes' then 'online_real'
+      when last_presence_at >= now() - interval '75 seconds'
+       and visibility_state = 'visible'
+       and last_game_action_at is not null
+       and last_game_action_at >= now() - interval '5 minutes'
+      then 'online_real'
       else 'not_online'
     end as gameplay_online_status
   from public.base_device_presence
@@ -211,8 +213,8 @@ order by suspicion_score desc, created_at desc;
 select
   now() as checked_at,
   (select count(*) from public.base_action_audit where created_at >= now() - interval '20 minutes') as base_actions_20m,
-  (select count(*) from public.base_device_state where updated_at >= now() - interval '20 minutes') as base_active_devices_20m,
+  (select count(distinct device_id) from public.base_device_state where updated_at >= now() - interval '20 minutes') as base_active_devices_20m,
   (select count(*) from public.vault_balances where coalesce(updated_at, last_sync_at, created_at) >= now() - interval '20 minutes') as vault_updates_20m,
-  (select count(*) from public.miners_device_state where updated_at >= now() - interval '20 minutes') as miners_active_devices_20m,
+  (select count(distinct device_id) from public.miners_device_state where updated_at >= now() - interval '20 minutes') as miners_active_devices_20m,
   (select count(*) from public.arcade_device_sessions where coalesce(updated_at, finished_at, started_at, created_at) >= now() - interval '20 minutes') as arcade_events_20m;
 
