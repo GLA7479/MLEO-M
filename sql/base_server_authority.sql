@@ -276,6 +276,8 @@ DECLARE
   v_now timestamptz := now();
   v_elapsed_seconds numeric := 0;
   v_effective_seconds numeric := 0;
+  v_pressure_seconds numeric := 0;
+  v_energy_net_per_second numeric := 0;
 
   v_resources jsonb;
   v_buildings jsonb;
@@ -414,10 +416,16 @@ BEGIN
   IF v_elapsed_seconds <= 0 THEN
     RETURN v_state;
   END IF;
-  IF v_elapsed_seconds <= 60 THEN
+  IF v_elapsed_seconds <= 180 THEN
     v_effective_seconds := v_elapsed_seconds;
   ELSE
     v_effective_seconds := public.base_effective_offline_seconds(v_elapsed_seconds);
+  END IF;
+
+  IF v_elapsed_seconds <= 180 THEN
+    v_pressure_seconds := v_elapsed_seconds;
+  ELSE
+    v_pressure_seconds := v_effective_seconds + ((v_elapsed_seconds - v_effective_seconds) * 0.35);
   END IF;
 
   v_resources := coalesce(v_state.resources, public.base_default_resources());
@@ -624,8 +632,6 @@ BEGIN
   v_sent_today := greatest(0, coalesce(v_state.sent_today, 0));
   v_maintenance_due := greatest(0, coalesce(v_state.maintenance_due, 0));
 
-  v_energy_now := least(v_energy_cap, v_energy_now + (v_energy_regen * v_effective_seconds));
-
   v_ore_gain := ((v_quarry * v_quarry_mode) * 2.0) * v_ore_mult;
   v_gold_gain := ((v_trade * v_trade_mode) * 1.0) * v_gold_mult;
   v_scrap_gain := ((v_salvage * v_salvage_mode) * 0.8) * v_scrap_mult;
@@ -649,16 +655,21 @@ BEGIN
       + ((v_repair * v_repair_mode) * 0.18)
     ) * v_overclock_drain_mult;
 
-  IF v_energy_now < (v_energy_use * v_effective_seconds) THEN
-    IF v_energy_use > 0 THEN
-      v_effective_seconds := greatest(0, floor(v_energy_now / v_energy_use));
-    ELSE
-      v_effective_seconds := 0;
-    END IF;
+  v_energy_net_per_second := v_energy_regen - v_energy_use;
+
+  IF v_energy_net_per_second < 0 THEN
+    v_effective_seconds := least(
+      v_effective_seconds,
+      greatest(0, floor(v_energy_now / abs(v_energy_net_per_second)))
+    );
   END IF;
 
   IF v_elapsed_seconds > 0 THEN
-    v_energy_now := greatest(0, v_energy_now - (v_energy_use * v_effective_seconds));
+    v_energy_now := public.base_clamp_num(
+      v_energy_now + (v_energy_net_per_second * v_effective_seconds),
+      0,
+      v_energy_cap
+    );
 
     v_ore_now := v_ore_now + (v_ore_gain * v_effective_seconds);
     v_gold_now := v_gold_now + (v_gold_gain * v_effective_seconds);
@@ -708,7 +719,7 @@ BEGIN
       )
       / greatest(1.0, v_maintenance_relief)
     )
-    * (v_elapsed_seconds / 60.0);
+    * (v_pressure_seconds / 60.0);
 
     v_stability := public.base_clamp_num(
       v_stability - (
@@ -719,7 +730,7 @@ BEGIN
             WHEN public.base_jsonb_bool(v_modules, 'minerLink', false) THEN 0.00045
             ELSE 0.00060
           END
-        ) * v_elapsed_seconds
+        ) * v_pressure_seconds
       ),
       50,
       100
@@ -727,7 +738,7 @@ BEGIN
 
     IF (v_repair * v_repair_mode) > 0 THEN
       v_stability := public.base_clamp_num(
-        v_stability + (((v_repair * v_repair_mode) * 0.0024) * v_effective_seconds),
+        v_stability + (((v_repair * v_repair_mode) * 0.0024) * v_pressure_seconds),
         50,
         100
       );
