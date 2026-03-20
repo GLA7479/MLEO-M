@@ -2334,13 +2334,10 @@ export default function MleoBase() {
     }).length;
   }, [state.research, state.resources]);
 
-  const availableBlueprintCount = canBuyBlueprintNow ? 1 : 0;
-
   const buildOpportunitiesCount =
     availableStructuresCount +
     availableModulesCount +
-    availableResearchCount +
-    availableBlueprintCount;
+    availableResearchCount;
 
   const developmentAvailableCount =
     availableModulesCount + availableResearchCount;
@@ -7603,7 +7600,6 @@ export default function MleoBase() {
                           availableStructuresCount={availableStructuresCount}
                           availableModulesCount={availableModulesCount}
                           availableResearchCount={availableResearchCount}
-                          availableBlueprintCount={availableBlueprintCount}
                           onOpenBuildPanel={() => openDesktopPanel("build", "build-structures")}
                           showCrew={showCrew}
                           overviewIdentityCount={overviewIdentityCount}
@@ -8081,7 +8077,6 @@ export default function MleoBase() {
                         availableStructuresCount={availableStructuresCount}
                         availableModulesCount={availableModulesCount}
                         availableResearchCount={availableResearchCount}
-                        availableBlueprintCount={availableBlueprintCount}
                         onOpenBuildPanel={() => openMobilePanel("build")}
                         showCrew={showCrew}
                         overviewIdentityCount={overviewIdentityCount}

@@ -125,7 +125,6 @@ export function OverviewPanelCards({
   availableStructuresCount,
   availableModulesCount,
   availableResearchCount,
-  availableBlueprintCount,
   onOpenBuildPanel,
   showCrew,
   overviewIdentityCount,
@@ -172,13 +171,6 @@ export function OverviewPanelCards({
                   ? " · "
                   : null}
                 {availableResearchCount > 0 ? `${availableResearchCount} research` : null}
-                {(availableStructuresCount > 0 ||
-                  availableModulesCount > 0 ||
-                  availableResearchCount > 0) &&
-                availableBlueprintCount > 0
-                  ? " · "
-                  : null}
-                {availableBlueprintCount > 0 ? "blueprint ready" : null}
               </div>
             </div>
             <span className="inline-flex min-w-7 h-7 items-center justify-center rounded-full bg-cyan-400 px-2 text-xs font-black text-slate-950">
