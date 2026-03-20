@@ -959,6 +959,142 @@ function WindowBankedBadge({ value }) {
   );
 }
 
+function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
+  const s = snapshot;
+
+  return (
+    <div className="rounded-[24px] border border-cyan-400/18 bg-slate-950/96 p-4 shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-4.5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200/65">
+            Banked MLEO
+          </div>
+          <div className="mt-1 text-2xl font-black leading-none text-white">
+            {fmt(bankedValue)}
+          </div>
+          <div className="mt-1 text-xs text-white/55">
+            Live refinery output snapshot
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/[0.09]"
+        >
+          Close
+        </button>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="rounded-[18px] border border-cyan-400/15 bg-cyan-500/[0.07] px-3 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/65">
+            Rate / hr
+          </div>
+          <div className="mt-1 text-[1.15rem] font-extrabold leading-none text-white">
+            {fmtRate(s.perHour)}
+          </div>
+        </div>
+
+        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+            Per day
+          </div>
+          <div className="mt-1 text-[1.15rem] font-extrabold leading-none text-white">
+            {fmtRate(s.perDay)}
+          </div>
+        </div>
+
+        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+            Ship cap
+          </div>
+          <div className="mt-1 text-[1.15rem] font-extrabold leading-none text-white">
+            {fmt(s.shipCap)}
+          </div>
+        </div>
+
+        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+            Cap ETA
+          </div>
+          <div className="mt-1 text-[1.15rem] font-extrabold leading-none text-white">
+            {s.etaHours == null ? "—" : `${fmtRate(s.etaHours, 1)}h`}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-3">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+          Refinery status
+        </div>
+        <div className="mt-2 text-sm font-semibold text-white">
+          {s.limitingSystem}
+        </div>
+
+        <div className="mt-2 flex flex-wrap gap-2">
+          <span
+            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+              s.hasOre ? "bg-emerald-500/15 text-emerald-200" : "bg-rose-500/15 text-rose-200"
+            }`}
+          >
+            {s.hasOre ? "Ore OK" : "Ore low"}
+          </span>
+          <span
+            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+              s.hasScrap ? "bg-emerald-500/15 text-emerald-200" : "bg-rose-500/15 text-rose-200"
+            }`}
+          >
+            {s.hasScrap ? "Scrap OK" : "Scrap low"}
+          </span>
+          <span
+            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+              s.hasEnergy ? "bg-emerald-500/15 text-emerald-200" : "bg-rose-500/15 text-rose-200"
+            }`}
+          >
+            {s.hasEnergy ? "Energy OK" : "Energy low"}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-3">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+          Feed endurance
+        </div>
+
+        <div className="mt-2 grid grid-cols-2 gap-3 text-sm text-white/80">
+          <div>
+            <div className="text-white/50">Ore support</div>
+            <div className="mt-1 font-semibold text-white">
+              {s.oreFeedHours == null ? "—" : `${fmtRate(s.oreFeedHours, 1)}h`}
+            </div>
+          </div>
+          <div>
+            <div className="text-white/50">Scrap support</div>
+            <div className="mt-1 font-semibold text-white">
+              {s.scrapFeedHours == null ? "—" : `${fmtRate(s.scrapFeedHours, 1)}h`}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-2 text-sm leading-6 text-white/75">
+        <div>
+          Base Banked grows only while Refinery is supplied with Ore, Scrap and enough
+          Energy.
+        </div>
+        <div>
+          Shipping does not increase the rate. Shipping only moves banked MLEO into the
+          real shared vault.
+        </div>
+        <div>
+          To improve this number, focus on Refinery uptime, steady Ore + Scrap flow, and
+          stable Energy.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BaseResourceBar({
   resources,
   energy,
@@ -1677,6 +1813,7 @@ export default function MleoBase() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState(null);
   const [showReadyPanel, setShowReadyPanel] = useState(false);
+  const [showBankedPanel, setShowBankedPanel] = useState(false);
   // showAllSuggestions removed: suggestions are always shown in full inside Ready Panel.
 
   // One open inner panel at a time (mobile)
@@ -1761,140 +1898,7 @@ export default function MleoBase() {
     [state]
   );
 
-  const activeInfo = useMemo(() => {
-    if (!openInfoKey) return null;
-
-    if (openInfoKey === "bankedMleo") {
-      const s = bankedRateSnapshot;
-      return {
-        ...INFO_COPY.bankedMleo,
-        text: (
-          <>
-            <div className="space-y-4">
-              <div className="text-sm leading-6 text-white/80">
-                Banked MLEO is created inside BASE and waits there until you
-                ship it to the shared vault.
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.22em] text-cyan-200/70">
-                    Current / hour
-                  </div>
-                  <div className="mt-1 text-lg font-black text-white">
-                    {fmtRate(s.perHour)}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.22em] text-white/50">
-                    Projected / day
-                  </div>
-                  <div className="mt-1 text-lg font-black text-white">
-                    {fmtRate(s.perDay)}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.22em] text-white/50">
-                    Ship cap
-                  </div>
-                  <div className="mt-1 text-lg font-black text-white">
-                    {fmt(s.shipCap)}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.22em] text-white/50">
-                    ETA to cap
-                  </div>
-                  <div className="mt-1 text-lg font-black text-white">
-                    {s.etaHours == null ? "—" : `${fmtRate(s.etaHours, 1)}h`}
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.22em] text-white/50">
-                  Current refinery status
-                </div>
-                <div className="mt-2 text-sm font-semibold text-white">
-                  {s.limitingSystem}
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                      s.hasOre
-                        ? "bg-emerald-500/15 text-emerald-200"
-                        : "bg-rose-500/15 text-rose-200"
-                    }`}
-                  >
-                    {s.hasOre ? "Ore OK" : "Ore low"}
-                  </span>
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                      s.hasScrap
-                        ? "bg-emerald-500/15 text-emerald-200"
-                        : "bg-rose-500/15 text-rose-200"
-                    }`}
-                  >
-                    {s.hasScrap ? "Scrap OK" : "Scrap low"}
-                  </span>
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                      s.hasEnergy
-                        ? "bg-emerald-500/15 text-emerald-200"
-                        : "bg-rose-500/15 text-rose-200"
-                    }`}
-                  >
-                    {s.hasEnergy ? "Energy OK" : "Energy low"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.22em] text-white/50">
-                  Feed endurance
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-3 text-sm text-white/80">
-                  <div>
-                    <div className="text-white/50">Ore support</div>
-                    <div className="mt-1 font-semibold text-white">
-                      {s.oreFeedHours == null ? "—" : `${fmtRate(s.oreFeedHours, 1)}h`}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-white/50">Scrap support</div>
-                    <div className="mt-1 font-semibold text-white">
-                      {s.scrapFeedHours == null ? "—" : `${fmtRate(s.scrapFeedHours, 1)}h`}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2 text-sm leading-6 text-white/75">
-                <div>
-                  Base Banked grows only while Refinery is supplied with Ore,
-                  Scrap and enough Energy.
-                </div>
-                <div>
-                  Shipping does not increase the rate. Shipping only moves
-                  banked MLEO into the real shared vault.
-                </div>
-                <div>
-                  To improve this number, focus on Refinery uptime, steady Ore
-                  + Scrap flow, and stable Energy.
-                </div>
-              </div>
-            </div>
-          </>
-        ),
-      };
-    }
-
-    return INFO_COPY[openInfoKey] || null;
-  }, [openInfoKey, bankedRateSnapshot]);
-
+  const activeInfo = openInfoKey ? INFO_COPY[openInfoKey] : null;
   const shownInfo = activeInfo || buildInfo;
 
   // When user opens a resource info panel (e.g. Energy), show an "UPGRADE" button
@@ -2242,6 +2246,26 @@ export default function MleoBase() {
     setShowReadyPanel(false);
     navigateToBaseTarget(step);
   }
+
+  useEffect(() => {
+    if (
+      openInfoKey ||
+      showHowToPlay ||
+      mobileMenuOpen ||
+      showReadyPanel ||
+      desktopPanelOpen ||
+      mobilePanel
+    ) {
+      setShowBankedPanel(false);
+    }
+  }, [
+    openInfoKey,
+    showHowToPlay,
+    mobileMenuOpen,
+    showReadyPanel,
+    desktopPanelOpen,
+    mobilePanel,
+  ]);
 
   useEffect(() => {
     let alive = true;
@@ -7361,14 +7385,23 @@ export default function MleoBase() {
                   {CONFIG.title}
                 </h1>
                 <div className="flex items-center gap-2 sm:hidden">
-                  <div className="rounded-2xl border border-white/15 bg-white/5 px-3 h-[35px] flex flex-col items-center justify-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBankedPanel((v) => !v);
+                      setShowReadyPanel(false);
+                      setOpenInfoKey(null);
+                    }}
+                    className="rounded-2xl border border-white/15 bg-white/5 px-3 h-[35px] flex flex-col items-center justify-center gap-1"
+                    title="Banked MLEO quick view"
+                  >
                     <div className="text-[9px] font-black uppercase tracking-[0.12em] text-white/40 leading-none">
                       BANKED
                     </div>
                     <div className="text-[11px] font-extrabold text-white leading-none">
                       {formatResourceValue(state.bankedMleo || 0)}
                     </div>
-                  </div>
+                  </button>
                   <Link
                     href="/mining"
                     className="rounded-2xl border border-white/15 bg-white/5 px-4 h-[35px] flex items-center text-sm font-semibold hover:bg-white/10"
@@ -7445,13 +7478,34 @@ export default function MleoBase() {
                 Hub
               </Link>
 
-              <div className="rounded-xl border border-white/15 bg-white/5 px-3 h-[42px] flex flex-col items-center justify-center gap-1">
-                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white/40 leading-none">
-                  BANKED
-                </div>
-                <div className="text-xs font-extrabold text-white leading-none">
-                  {formatResourceValue(state.bankedMleo || 0)}
-                </div>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowBankedPanel((v) => !v)}
+                  className={`rounded-xl border px-3 h-[42px] flex flex-col items-center justify-center gap-1 transition ${
+                    showBankedPanel
+                      ? "border-cyan-400/45 bg-cyan-500/12 text-cyan-100"
+                      : "border-white/15 bg-white/5 text-white"
+                  }`}
+                  title="Banked MLEO quick view"
+                >
+                  <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white/40 leading-none">
+                    BANKED
+                  </div>
+                  <div className="text-xs font-extrabold leading-none">
+                    {formatResourceValue(state.bankedMleo || 0)}
+                  </div>
+                </button>
+
+                {showBankedPanel ? (
+                  <div className="absolute right-0 top-[calc(100%+10px)] z-[130] w-[360px]">
+                    <BankedQuickPanel
+                      snapshot={bankedRateSnapshot}
+                      bankedValue={state.bankedMleo || 0}
+                      onClose={() => setShowBankedPanel(false)}
+                    />
+                  </div>
+                ) : null}
               </div>
 
               <button
@@ -8227,21 +8281,58 @@ export default function MleoBase() {
 
             <div className="overflow-x-auto no-scrollbar">
               <div className="flex gap-2 pb-1">
-                {mobileTopStats.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => openHomeFlowTarget(item.infoKey || item.key)}
-                    className="shrink-0 min-w-[78px] rounded-2xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-left"
-                  >
-                    <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
-                      {item.label}
-                    </div>
-                    <div className="mt-1 text-sm font-bold text-white">{item.value}</div>
-                  </button>
-                ))}
+                {mobileTopStats.map((item) =>
+                  item.key === "bankedMleo" ? (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => {
+                        setShowBankedPanel((v) => !v);
+                        setShowReadyPanel(false);
+                      }}
+                      className={`shrink-0 min-w-[78px] rounded-2xl border px-2 py-1.5 text-left transition ${
+                        showBankedPanel
+                          ? "border-cyan-400/45 bg-cyan-500/12 text-cyan-100"
+                          : "border-white/10 bg-white/[0.04] text-white"
+                      }`}
+                    >
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
+                        {item.label}
+                      </div>
+                      <div className="mt-1 text-sm font-bold text-white">{item.value}</div>
+                    </button>
+                  ) : (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => openHomeFlowTarget(item.infoKey || item.key)}
+                      className="shrink-0 min-w-[78px] rounded-2xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-left"
+                    >
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
+                        {item.label}
+                      </div>
+                      <div className="mt-1 text-sm font-bold text-white">{item.value}</div>
+                    </button>
+                  )
+                )}
               </div>
             </div>
+
+            {showBankedPanel ? (
+              <>
+                <div
+                  className="fixed inset-0 z-[125] bg-black/45 sm:hidden"
+                  onClick={() => setShowBankedPanel(false)}
+                />
+                <div className="fixed inset-x-3 top-[88px] z-[126] sm:hidden">
+                  <BankedQuickPanel
+                    snapshot={bankedRateSnapshot}
+                    bankedValue={state.bankedMleo || 0}
+                    onClose={() => setShowBankedPanel(false)}
+                  />
+                </div>
+              </>
+            ) : null}
 
             <div className="mt-2">
               <BaseHomeFlowScene
