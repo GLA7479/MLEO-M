@@ -852,9 +852,7 @@ function buildSectionHint(type, counts) {
   }
 
   if (type === "support") {
-    return counts.support > 0
-      ? "Blueprint ready"
-      : "Nothing available right now";
+    return "Vault blueprint and runtime tools.";
   }
 
   return "";
@@ -2348,8 +2346,6 @@ export default function MleoBase() {
     availableModulesCount + availableResearchCount;
 
   const structuresAvailableCount = availableStructuresCount;
-
-  const supportAvailableCount = availableBlueprintCount;
 
   const operationsConsoleAvailableCount =
     Number(canExpeditionNow) +
@@ -7657,10 +7653,10 @@ export default function MleoBase() {
                     <BuildPanelCards
                       developmentCardClass={buildSectionCardClass(developmentAvailableCount > 0)}
                       structuresCardClass={buildSectionCardClass(structuresAvailableCount > 0)}
-                      supportCardClass={buildSectionCardClass(supportAvailableCount > 0)}
+                      supportCardClass={buildSectionCardClass(false)}
                       developmentCount={developmentAvailableCount}
                       structuresCount={structuresAvailableCount}
-                      supportCount={supportAvailableCount}
+                      supportCount={0}
                       developmentHint={buildSectionHint("development", {
                         modules: availableModulesCount,
                         research: availableResearchCount,
@@ -7668,9 +7664,7 @@ export default function MleoBase() {
                       structuresHint={buildSectionHint("structures", {
                         structures: availableStructuresCount,
                       })}
-                      supportHint={buildSectionHint("support", {
-                        support: availableBlueprintCount,
-                      })}
+                      supportHint={buildSectionHint("support", {})}
                       openInnerPanel={openInnerPanel}
                       toggleInnerPanel={toggleInnerPanel}
                       crewModulesResearchContent={crewModulesResearchContent}
@@ -8134,10 +8128,10 @@ export default function MleoBase() {
                       <BuildPanelCards
                         developmentCardClass={buildSectionCardClass(developmentAvailableCount > 0)}
                         structuresCardClass={buildSectionCardClass(structuresAvailableCount > 0)}
-                        supportCardClass={buildSectionCardClass(supportAvailableCount > 0)}
+                        supportCardClass={buildSectionCardClass(false)}
                         developmentCount={developmentAvailableCount}
                         structuresCount={structuresAvailableCount}
-                        supportCount={supportAvailableCount}
+                        supportCount={0}
                         developmentHint={buildSectionHint("development", {
                           modules: availableModulesCount,
                           research: availableResearchCount,
@@ -8145,9 +8139,7 @@ export default function MleoBase() {
                         structuresHint={buildSectionHint("structures", {
                           structures: availableStructuresCount,
                         })}
-                        supportHint={buildSectionHint("support", {
-                          support: availableBlueprintCount,
-                        })}
+                        supportHint={buildSectionHint("support", {})}
                         openInnerPanel={openInnerPanel}
                         toggleInnerPanel={toggleInnerPanel}
                         crewModulesResearchContent={crewModulesResearchContent}
