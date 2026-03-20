@@ -969,7 +969,7 @@ function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
         shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl
         px-4 py-3.5 sm:px-4 sm:py-3.5
         max-h-[calc(100dvh-120px)] md:max-h-[min(74vh,620px)]
-        overflow-y-auto overscroll-contain [webkit-overflow-scrolling:touch]
+        overflow-hidden
       "
     >
       <div className="flex items-start justify-between gap-3">
@@ -993,110 +993,125 @@ function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <div className="rounded-[18px] border border-cyan-400/15 bg-cyan-500/[0.07] px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/65">
-            Rate / hr
-          </div>
-          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
-            {fmtRate(s.perHour)}
-          </div>
-        </div>
-
-        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-            Per day
-          </div>
-          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
-            {fmtRate(s.perDay)}
-          </div>
-        </div>
-
-        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-            Ship cap
-          </div>
-          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
-            {fmt(s.shipCap)}
-          </div>
-        </div>
-
-        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-            Cap ETA
-          </div>
-          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
-            {s.etaHours == null ? "—" : `${fmtRate(s.etaHours, 1)}h`}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-2.5 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-          Refinery status
-        </div>
-        <div className="mt-2 text-sm font-semibold text-white">
-          {s.limitingSystem}
-        </div>
-
-        <div className="mt-2 flex flex-wrap gap-2">
-          <span
-            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-              s.hasOre ? "bg-emerald-500/15 text-emerald-200" : "bg-rose-500/15 text-rose-200"
-            }`}
-          >
-            {s.hasOre ? "Ore OK" : "Ore low"}
-          </span>
-          <span
-            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-              s.hasScrap ? "bg-emerald-500/15 text-emerald-200" : "bg-rose-500/15 text-rose-200"
-            }`}
-          >
-            {s.hasScrap ? "Scrap OK" : "Scrap low"}
-          </span>
-          <span
-            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-              s.hasEnergy ? "bg-emerald-500/15 text-emerald-200" : "bg-rose-500/15 text-rose-200"
-            }`}
-          >
-            {s.hasEnergy ? "Energy OK" : "Energy low"}
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-2.5 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-          Feed endurance
-        </div>
-
-        <div className="mt-2 grid grid-cols-2 gap-3 text-sm text-white/80">
-          <div>
-            <div className="text-white/50">Ore support</div>
-            <div className="mt-1 font-semibold text-white">
-              {s.oreFeedHours == null ? "—" : `${fmtRate(s.oreFeedHours, 1)}h`}
+      <div
+        className="
+          mt-3
+          max-h-[calc(100dvh-220px)] md:max-h-[min(58vh,470px)]
+          overflow-y-auto overscroll-contain pr-1 banked-scroll
+          [webkit-overflow-scrolling:touch]
+        "
+      >
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-[18px] border border-cyan-400/15 bg-cyan-500/[0.07] px-3 py-2">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/65">
+              Rate / hr
+            </div>
+            <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
+              {fmtRate(s.perHour)}
             </div>
           </div>
-          <div>
-            <div className="text-white/50">Scrap support</div>
-            <div className="mt-1 font-semibold text-white">
-              {s.scrapFeedHours == null ? "—" : `${fmtRate(s.scrapFeedHours, 1)}h`}
+
+          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+              Per day
+            </div>
+            <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
+              {fmtRate(s.perDay)}
+            </div>
+          </div>
+
+          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+              Ship cap
+            </div>
+            <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
+              {fmt(s.shipCap)}
+            </div>
+          </div>
+
+          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+              Cap ETA
+            </div>
+            <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
+              {s.etaHours == null ? "—" : `${fmtRate(s.etaHours, 1)}h`}
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="mt-3 space-y-2.5 text-[13px] leading-6 text-white/76">
-        <div>
-          Base Banked grows only while Refinery is supplied with Ore, Scrap and enough
-          Energy.
+        <div className="mt-2.5 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+            Refinery status
+          </div>
+          <div className="mt-2 text-sm font-semibold text-white">
+            {s.limitingSystem}
+          </div>
+
+          <div className="mt-2 flex flex-wrap gap-2">
+            <span
+              className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                s.hasOre
+                  ? "bg-emerald-500/15 text-emerald-200"
+                  : "bg-rose-500/15 text-rose-200"
+              }`}
+            >
+              {s.hasOre ? "Ore OK" : "Ore low"}
+            </span>
+            <span
+              className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                s.hasScrap
+                  ? "bg-emerald-500/15 text-emerald-200"
+                  : "bg-rose-500/15 text-rose-200"
+              }`}
+            >
+              {s.hasScrap ? "Scrap OK" : "Scrap low"}
+            </span>
+            <span
+              className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                s.hasEnergy
+                  ? "bg-emerald-500/15 text-emerald-200"
+                  : "bg-rose-500/15 text-rose-200"
+              }`}
+            >
+              {s.hasEnergy ? "Energy OK" : "Energy low"}
+            </span>
+          </div>
         </div>
-        <div>
-          Shipping does not increase the rate. Shipping only moves banked MLEO into the
-          real shared vault.
+
+        <div className="mt-2.5 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+            Feed endurance
+          </div>
+
+          <div className="mt-2 grid grid-cols-2 gap-3 text-sm text-white/80">
+            <div>
+              <div className="text-white/50">Ore support</div>
+              <div className="mt-1 font-semibold text-white">
+                {s.oreFeedHours == null ? "—" : `${fmtRate(s.oreFeedHours, 1)}h`}
+              </div>
+            </div>
+            <div>
+              <div className="text-white/50">Scrap support</div>
+              <div className="mt-1 font-semibold text-white">
+                {s.scrapFeedHours == null ? "—" : `${fmtRate(s.scrapFeedHours, 1)}h`}
+              </div>
+            </div>
+          </div>
         </div>
-        <div>
-          To improve this number, focus on Refinery uptime, steady Ore + Scrap flow, and
-          stable Energy.
+
+        <div className="mt-3 space-y-2.5 text-[13px] leading-6 text-white/76">
+          <div>
+            Base Banked grows only while Refinery is supplied with Ore, Scrap and enough
+            Energy.
+          </div>
+          <div>
+            Shipping does not increase the rate. Shipping only moves banked MLEO into
+            the real shared vault.
+          </div>
+          <div>
+            To improve this number, focus on Refinery uptime, steady Ore + Scrap flow,
+            and stable Energy.
+          </div>
         </div>
       </div>
     </div>
