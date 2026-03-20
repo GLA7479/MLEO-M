@@ -38,6 +38,7 @@ import {
   claimBaseContract,
   setBaseProfile,
   setBuildingPowerMode,
+  sendBasePresence,
 } from "../lib/baseVaultClient";
 import {
   BASE_HOME_SCENE_IDENTITY,
@@ -2642,6 +2643,10 @@ export default function MleoBase() {
   const highlightTimeoutRef = useRef(null);
   const expeditionToastNonceRef = useRef(0);
 
+  const lastInteractionRef = useRef(Date.now());
+  const lastPresenceSendRef = useRef(0);
+  const presenceInFlightRef = useRef(false);
+
   const actionLocksRef = useRef({});
 
   function isActionLocked(name) {
@@ -2698,6 +2703,70 @@ export default function MleoBase() {
       },
     });
   }
+
+  async function pushPresence(interacted = false) {
+    if (typeof document === "undefined") return;
+    if (presenceInFlightRef.current) return;
+
+    const now = Date.now();
+    const minGap = interacted ? 8000 : 25000;
+    if (now - lastPresenceSendRef.current < minGap) return;
+
+    presenceInFlightRef.current = true;
+    try {
+      await sendBasePresence({
+        visibilityState: document.visibilityState || "hidden",
+        pageName: "base",
+        interacted,
+      });
+      lastPresenceSendRef.current = now;
+    } catch (error) {
+      console.error("BASE presence push failed", error);
+    } finally {
+      presenceInFlightRef.current = false;
+    }
+  }
+
+  useEffect(() => {
+    if (!mounted || typeof window === "undefined") return;
+
+    const markInteraction = () => {
+      lastInteractionRef.current = Date.now();
+      pushPresence(true);
+    };
+
+    const onVisibilityChange = () => {
+      pushPresence(false);
+    };
+
+    const onFocus = () => {
+      pushPresence(false);
+    };
+
+    const interactionEvents = ["pointerdown", "touchstart", "keydown", "wheel"];
+
+    interactionEvents.forEach((eventName) => {
+      window.addEventListener(eventName, markInteraction, { passive: true });
+    });
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    pushPresence(false);
+
+    const heartbeatId = window.setInterval(() => {
+      pushPresence(false);
+    }, 30000);
+
+    return () => {
+      window.clearInterval(heartbeatId);
+      interactionEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, markInteraction);
+      });
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [mounted]);
 
   const mobilePanelScrollRef = useRef(null);
   const desktopPanelScrollRef = useRef(null);
