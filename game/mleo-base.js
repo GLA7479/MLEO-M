@@ -963,16 +963,24 @@ function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
   const s = snapshot;
 
   return (
-    <div className="rounded-[24px] border border-cyan-400/18 bg-slate-950/96 p-4 shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-4.5">
+    <div
+      className="
+        z-[70] rounded-[24px] border border-cyan-400/18 bg-slate-950/96
+        shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl
+        px-4 py-3.5 sm:px-4 sm:py-3.5
+        max-h-[calc(100dvh-120px)] md:max-h-[min(74vh,620px)]
+        overflow-y-auto overscroll-contain [webkit-overflow-scrolling:touch]
+      "
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200/65">
             Banked MLEO
           </div>
-          <div className="mt-1 text-2xl font-black leading-none text-white">
+          <div className="mt-1 text-[1.9rem] font-black leading-none text-white">
             {fmt(bankedValue)}
           </div>
-          <div className="mt-1 text-xs text-white/55">
+          <div className="mt-0.5 text-[11px] text-white/55">
             Live refinery output snapshot
           </div>
         </div>
@@ -985,45 +993,45 @@ function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
         </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <div className="rounded-[18px] border border-cyan-400/15 bg-cyan-500/[0.07] px-3 py-2.5">
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="rounded-[18px] border border-cyan-400/15 bg-cyan-500/[0.07] px-3 py-2">
           <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/65">
             Rate / hr
           </div>
-          <div className="mt-1 text-[1.15rem] font-extrabold leading-none text-white">
+          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
             {fmtRate(s.perHour)}
           </div>
         </div>
 
-        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
+        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
           <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
             Per day
           </div>
-          <div className="mt-1 text-[1.15rem] font-extrabold leading-none text-white">
+          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
             {fmtRate(s.perDay)}
           </div>
         </div>
 
-        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
+        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
           <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
             Ship cap
           </div>
-          <div className="mt-1 text-[1.15rem] font-extrabold leading-none text-white">
+          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
             {fmt(s.shipCap)}
           </div>
         </div>
 
-        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
+        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
           <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
             Cap ETA
           </div>
-          <div className="mt-1 text-[1.15rem] font-extrabold leading-none text-white">
+          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
             {s.etaHours == null ? "—" : `${fmtRate(s.etaHours, 1)}h`}
           </div>
         </div>
       </div>
 
-      <div className="mt-3 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-3">
+      <div className="mt-2.5 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
         <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
           Refinery status
         </div>
@@ -1056,7 +1064,7 @@ function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
         </div>
       </div>
 
-      <div className="mt-3 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-3">
+      <div className="mt-2.5 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
         <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
           Feed endurance
         </div>
@@ -1077,7 +1085,7 @@ function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
         </div>
       </div>
 
-      <div className="mt-3 space-y-2 text-sm leading-6 text-white/75">
+      <div className="mt-3 space-y-2.5 text-[13px] leading-6 text-white/76">
         <div>
           Base Banked grows only while Refinery is supplied with Ore, Scrap and enough
           Energy.
@@ -8324,7 +8332,7 @@ export default function MleoBase() {
                   className="fixed inset-0 z-[125] bg-black/45 sm:hidden"
                   onClick={() => setShowBankedPanel(false)}
                 />
-                <div className="fixed inset-x-3 top-[88px] z-[126] sm:hidden">
+                <div className="fixed inset-x-3 top-[88px] bottom-3 z-[126] sm:hidden">
                   <BankedQuickPanel
                     snapshot={bankedRateSnapshot}
                     bankedValue={state.bankedMleo || 0}
