@@ -1369,6 +1369,301 @@ function getNextStep(state, derived, systemState, liveContracts = []) {
   };
 }
 
+function estimateOrePerHour(state, derived) {
+  const level = getEffectiveBuildingLevel(state, "quarry");
+  if (!level) return 0;
+  return 1.35 * level * Number(derived?.oreMult || 1) * 3600;
+}
+
+function estimateDataPerHour(state, derived) {
+  const dataMult = Number(derived?.dataMult || 1);
+  const lab = getEffectiveBuildingLevel(state, "researchLab");
+  const miner = getEffectiveBuildingLevel(state, "minerControl");
+  const arcade = getEffectiveBuildingLevel(state, "arcadeHub");
+  const logistics = getEffectiveBuildingLevel(state, "logisticsCenter");
+
+  const perSecond =
+    0.22 * lab * dataMult +
+    0.14 * miner * dataMult +
+    0.11 * arcade * dataMult +
+    0.06 * logistics * dataMult;
+
+  return perSecond * 3600;
+}
+
+function getOverviewBaseStatus({ systemState, stability, energy, energyCap, bankedSnapshot, shipRatio }) {
+  if (shipRatio >= 0.92) {
+    return {
+      label: "Bottlenecked",
+      tone: "warning",
+      text: "Ship cap is almost full and export flow is now your main limiter.",
+    };
+  }
+
+  if (systemState === "critical" || (energyCap > 0 && energy <= energyCap * 0.08)) {
+    return {
+      label: "Recovery Mode",
+      tone: "critical",
+      text: "The base is under pressure. Recovery actions should come before scaling.",
+    };
+  }
+
+  if (
+    systemState === "warning" ||
+    !bankedSnapshot.active ||
+    stability < 82 ||
+    (energyCap > 0 && energy <= energyCap * 0.22)
+  ) {
+    return {
+      label: "Under Pressure",
+      tone: "warning",
+      text: "The base is working, but at least one support system is limiting clean progression.",
+    };
+  }
+
+  return {
+    label: "Stable",
+    tone: "success",
+    text: "Core systems are healthy and the base is ready for efficient growth.",
+  };
+}
+
+function getOverviewBottleneck({
+  systemState,
+  stability,
+  energy,
+  energyCap,
+  bankedSnapshot,
+  shipRatio,
+  canShipNow,
+}) {
+  if (shipRatio >= 0.92 || (canShipNow && Number(bankedSnapshot.remainingToCap || 0) <= 40)) {
+    return {
+      key: "ship-cap",
+      label: "Near ship cap",
+      text: "Refined MLEO is piling up and shipping is becoming the main limiter.",
+      target: { tab: "operations", target: "shipping" },
+      tone: "warning",
+    };
+  }
+
+  if (energyCap > 0 && energy <= energyCap * 0.08) {
+    return {
+      key: "energy-collapse",
+      label: "Energy pressure",
+      text: "Your reserve is too low to support healthy production flow.",
+      target: { tab: "operations", target: "maintenance" },
+      tone: "critical",
+    };
+  }
+
+  if (bankedSnapshot.hasRefinery && !bankedSnapshot.hasOre) {
+    return {
+      key: "ore-limited",
+      label: "ORE limited",
+      text: "Refinery cannot sustain output because ore feed is too weak.",
+      target: { tab: "build", target: "quarry" },
+      tone: "warning",
+    };
+  }
+
+  if (bankedSnapshot.hasRefinery && !bankedSnapshot.hasScrap) {
+    return {
+      key: "scrap-limited",
+      label: "Scrap limited",
+      text: "Refinery is starved by scrap input.",
+      target: { tab: "build", target: "salvage" },
+      tone: "warning",
+    };
+  }
+
+  if (stability < 82 || systemState !== "normal") {
+    return {
+      key: "stability-drag",
+      label: "Stability drag",
+      text: "Instability is reducing comfort and making the base harder to scale safely.",
+      target: { tab: "operations", target: "maintenance" },
+      tone: "warning",
+    };
+  }
+
+  if (!bankedSnapshot.active || bankedSnapshot.perHour <= 0.01) {
+    return {
+      key: "weak-output",
+      label: "Weak passive output",
+      text: "The base is stable, but your banking loop is still too soft.",
+      target: { tab: "build", target: "refinery" },
+      tone: "info",
+    };
+  }
+
+  return {
+    key: "none",
+    label: "No critical issue",
+    text: "No major bottleneck detected right now.",
+    target: { tab: "overview", target: "recommendation" },
+    tone: "success",
+  };
+}
+
+function getOverviewBestAction({
+  bottleneck,
+  state,
+  derived,
+  canShipNow,
+  canExpeditionNow,
+  liveContracts,
+  systemState,
+}) {
+  const claimableContracts = liveContracts.filter((c) => c.done && !c.claimed).length;
+
+  if (claimableContracts > 0) {
+    return {
+      title: "Claim contract rewards",
+      text: "You already have completed rewards waiting.",
+      cta: "Open contracts",
+      target: { tab: "overview", target: "contracts" },
+    };
+  }
+
+  switch (bottleneck.key) {
+    case "ship-cap":
+      return {
+        title: "Ship Banked MLEO",
+        text: "Free room before your banked flow starts wasting momentum.",
+        cta: "Open shipping",
+        target: { tab: "operations", target: "shipping" },
+      };
+    case "energy-collapse":
+      return {
+        title: "Recover energy reserves",
+        text: "Use refill / safe mode first, then strengthen power support.",
+        cta: "Open operations",
+        target: { tab: "operations", target: "maintenance" },
+      };
+    case "ore-limited":
+      return {
+        title: "Upgrade Quarry",
+        text: "Ore feed is your limiting input right now.",
+        cta: "Open Quarry",
+        target: { tab: "build", target: "quarry" },
+      };
+    case "scrap-limited":
+      return {
+        title: "Upgrade Salvage",
+        text: "Scrap supply is holding the refinery back.",
+        cta: "Open Salvage",
+        target: { tab: "build", target: "salvage" },
+      };
+    case "stability-drag":
+      return {
+        title: "Do Maintenance",
+        text: "Restore comfort and prevent efficiency drag before scaling.",
+        cta: "Open maintenance",
+        target: { tab: "operations", target: "maintenance" },
+      };
+    case "weak-output":
+      return {
+        title: "Strengthen Refinery loop",
+        text: "You need more sustained banked output now.",
+        cta: "Open Refinery",
+        target: { tab: "build", target: "refinery" },
+      };
+    default:
+      if (canExpeditionNow) {
+        return {
+          title: "Run Expedition",
+          text: "The base is stable enough to push active progression.",
+          cta: "Open expedition",
+          target: { tab: "operations", target: "expedition-action" },
+        };
+      }
+
+      const fallback = getNextStep(state, derived, systemState, liveContracts);
+      return {
+        title: fallback.title,
+        text: fallback.text,
+        cta: canShipNow ? "Open shipping" : "Open Build",
+        target: canShipNow
+          ? { tab: "operations", target: "shipping" }
+          : { tab: "build", target: "refinery" },
+      };
+  }
+}
+
+function buildOverviewV1({
+  state,
+  derived,
+  systemState,
+  liveContracts,
+  readyCounts,
+  canShipNow,
+  canExpeditionNow,
+  bankedSnapshot,
+}) {
+  const energy = Number(state.resources?.ENERGY || 0);
+  const energyCap = Number(derived.energyCap || 0);
+  const stability = Number(state.stability || 100);
+  const banked = Number(state.bankedMleo || 0);
+  const shipCap = Number(derived.shipCap || 0);
+  const shipRatio = shipCap > 0 ? banked / shipCap : 0;
+
+  const baseStatus = getOverviewBaseStatus({
+    systemState,
+    stability,
+    energy,
+    energyCap,
+    bankedSnapshot,
+    shipRatio,
+  });
+
+  const bottleneck = getOverviewBottleneck({
+    systemState,
+    stability,
+    energy,
+    energyCap,
+    bankedSnapshot,
+    shipRatio,
+    canShipNow,
+  });
+
+  const nextAction = getOverviewBestAction({
+    bottleneck,
+    state,
+    derived,
+    canShipNow,
+    canExpeditionNow,
+    liveContracts,
+    systemState,
+  });
+
+  return {
+    baseStatus,
+    bottleneck,
+    nextAction,
+    rates: {
+      bankedPerHour: bankedSnapshot.perHour,
+      projectedPerDay: bankedSnapshot.perDay,
+      orePerHour: estimateOrePerHour(state, derived),
+      dataPerHour: estimateDataPerHour(state, derived),
+      refineryState: bankedSnapshot.limitingSystem,
+      etaToShipCapHours: bankedSnapshot.etaHours,
+    },
+    dailyProgress: {
+      shipProgress: {
+        current: state.stats?.shippedToday || 0,
+        max: derived.shipCap || 0,
+      },
+      expeditionsDone: state.stats?.expeditionsToday || 0,
+      maintenanceDone: state.stats?.maintenanceToday || 0,
+      missionsReady: readyCounts.missions || 0,
+      missionsCompleted: Object.keys(state.missionState?.completed || {}).filter(
+        (k) => state.missionState?.completed?.[k]
+      ).length,
+    },
+  };
+}
+
 const INFO_COPY = {
   sharedVault: {
     title: "Shared Vault",
@@ -2740,9 +3035,28 @@ export default function MleoBase() {
       ? "text-[13px]"
       : "text-sm";
 
-  const nextStep = useMemo(
-    () => getNextStep(state, derived, systemState, liveContracts),
-    [state, derived, systemState, liveContracts]
+  const overviewV1 = useMemo(
+    () =>
+      buildOverviewV1({
+        state,
+        derived,
+        systemState,
+        liveContracts,
+        readyCounts,
+        canShipNow,
+        canExpeditionNow,
+        bankedSnapshot: bankedRateSnapshot,
+      }),
+    [
+      state,
+      derived,
+      systemState,
+      liveContracts,
+      readyCounts,
+      canShipNow,
+      canExpeditionNow,
+      bankedRateSnapshot,
+    ]
   );
 
   const availableStructuresCount = useMemo(() => {
@@ -2794,7 +3108,6 @@ export default function MleoBase() {
     99
   );
 
-  const overviewRecommendationCount = 1;
   const overviewIdentityCount = 1;
   const liveContractsAvailableCount = readyCounts.contracts;
 
@@ -7973,8 +8286,8 @@ export default function MleoBase() {
                     <div className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-200/70">
                       Next step
                       </div>
-                    <div className="mt-1 text-sm font-bold text-white">{nextStep.title}</div>
-                    <div className="mt-1 text-xs text-white/60">{nextStep.text}</div>
+                    <div className="mt-1 text-sm font-bold text-white">{overviewV1.nextAction.title}</div>
+                    <div className="mt-1 text-xs text-white/60">{overviewV1.nextAction.text}</div>
                   </button>
 
                               <button
@@ -8074,13 +8387,13 @@ export default function MleoBase() {
                           buildSectionCardClass={buildSectionCardClass}
                           openInnerPanel={openInnerPanel}
                           toggleInnerPanel={toggleInnerPanel}
-                          overviewRecommendationCount={overviewRecommendationCount}
-                          nextStep={nextStep}
+                          overview={overviewV1}
                           buildOpportunitiesCount={buildOpportunitiesCount}
                           availableStructuresCount={availableStructuresCount}
                           availableModulesCount={availableModulesCount}
                           availableResearchCount={availableResearchCount}
                           onOpenBuildPanel={() => openDesktopPanel("build", "build-structures")}
+                          onNavigate={navigateToBaseTarget}
                           showCrew={showCrew}
                           overviewIdentityCount={overviewIdentityCount}
                           crewRoleInfo={crewRoleInfo}
@@ -8473,13 +8786,13 @@ export default function MleoBase() {
                         buildSectionCardClass={buildSectionCardClass}
                         openInnerPanel={openInnerPanel}
                         toggleInnerPanel={toggleInnerPanel}
-                        overviewRecommendationCount={overviewRecommendationCount}
-                        nextStep={nextStep}
+                        overview={overviewV1}
                         buildOpportunitiesCount={buildOpportunitiesCount}
                         availableStructuresCount={availableStructuresCount}
                         availableModulesCount={availableModulesCount}
                         availableResearchCount={availableResearchCount}
                         onOpenBuildPanel={() => openMobilePanel("build")}
+                        onNavigate={navigateToBaseTarget}
                         showCrew={showCrew}
                         overviewIdentityCount={overviewIdentityCount}
                         crewRoleInfo={crewRoleInfo}
@@ -8749,8 +9062,8 @@ export default function MleoBase() {
                     <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">
                       Next Recommended Step
                     </div>
-                    <div className="mt-1 text-lg font-bold text-white">{nextStep.title}</div>
-                    <div className="mt-1 text-sm text-white/70">{nextStep.text}</div>
+                    <div className="mt-1 text-lg font-bold text-white">{overviewV1.nextAction.title}</div>
+                    <div className="mt-1 text-sm text-white/70">{overviewV1.nextAction.text}</div>
                   </div>
                   <div className="rounded-2xl bg-black/20 px-4 py-3 text-sm text-white/75">
                     <div>Commander Lv {state.commanderLevel}</div>
