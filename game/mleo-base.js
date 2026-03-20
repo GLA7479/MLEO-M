@@ -4184,6 +4184,7 @@ export default function MleoBase() {
       if (res?.success && res?.state) {
         const serverState = res.state;
         const loot = res.loot || {};
+        const xpGain = Number(res?.xp_gain || 0);
 
         setState((prev) => {
           const next = mergeAuthoritativeServerState(prev, serverState);
@@ -4268,9 +4269,26 @@ export default function MleoBase() {
           // Toast should only fire when rewards actually affected state.
           if (expeditionToastNonceRef.current !== now) {
             expeditionToastNonceRef.current = now;
+
+            const oreGain = Number(loot?.ore || 0);
+            const goldGain = Number(loot?.gold || 0);
+            const scrapGain = Number(loot?.scrap || 0);
+            const dataGain = Number(loot?.data || 0);
+            const bankedGain = Number(loot?.bankedMleo || 0);
+
+            const rewardParts = [];
+            if (oreGain > 0) rewardParts.push(`+${fmt(oreGain)} ORE`);
+            if (goldGain > 0) rewardParts.push(`+${fmt(goldGain)} GOLD`);
+            if (scrapGain > 0) rewardParts.push(`+${fmt(scrapGain)} SCRAP`);
+            if (dataGain > 0) rewardParts.push(`+${fmt(dataGain)} DATA`);
+            if (bankedGain > 0) rewardParts.push(`+${fmt(bankedGain)} MLEO (banked)`);
+            if (xpGain > 0) rewardParts.push(`+${fmt(xpGain)} XP`);
+
+            const breakdown = rewardParts.length ? ` · ${rewardParts.join(" · ")}` : "";
+
             showToast(
               didRewardApply
-                ? "Expedition complete · field gains secured"
+                ? `Expedition complete · field gains secured${breakdown}`
                 : res?.message || "Expedition completed, but no rewards were applied."
             );
           }
