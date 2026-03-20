@@ -11,9 +11,12 @@ function toneClasses(tone = "info") {
   return "border-cyan-400/30 bg-cyan-500/10 text-cyan-100";
 }
 
-function CardShell({ className = "", children }) {
+function CardShell({ className = "", children, ...rest }) {
   return (
-    <div className={`rounded-2xl border border-white/10 bg-white/[0.05] p-4 ${className}`}>
+    <div
+      {...rest}
+      className={`rounded-2xl border border-white/10 bg-white/[0.05] p-4 ${className}`}
+    >
       {children}
     </div>
   );
@@ -221,6 +224,27 @@ function DailyProgressBlock({ progress }) {
   );
 }
 
+function MissionFocusBlock({ missionGuidance, onNavigate }) {
+  if (!missionGuidance?.title) return null;
+  return (
+    <CardShell className="border-cyan-400/20 bg-cyan-500/[0.06]">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
+        Mission Focus
+      </div>
+      <div className="mt-2 text-sm font-bold text-white">{missionGuidance.title}</div>
+      <div className="mt-1 text-sm text-white/75">{missionGuidance.hint}</div>
+      {missionGuidance.target ? (
+        <button
+          onClick={() => onNavigate?.(missionGuidance.target)}
+          className="mt-3 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
+        >
+          {missionGuidance.cta || "Open missions"}
+        </button>
+      ) : null}
+    </CardShell>
+  );
+}
+
 function BuildOpportunitiesCard({
   buildOpportunitiesCount,
   availableStructuresCount,
@@ -304,7 +328,7 @@ function ContractsCard({
   const isOpen = openInnerPanel === openKey;
 
   return (
-    <CardShell>
+    <CardShell data-base-target="contracts">
       <SectionHeader
         title="Live Contracts"
         hint={
@@ -353,6 +377,7 @@ function ContractsCard({
 
 export function OverviewPanelCards({
   overview,
+  missionGuidance,
   nextStep,
   onNavigate,
   openInnerPanel,
@@ -387,6 +412,7 @@ export function OverviewPanelCards({
       <BaseStatusBlock status={safeOverview.baseStatus} />
       <BottleneckBlock bottleneck={safeOverview.bottleneck} onNavigate={onNavigate} />
       <NextActionBlock action={safeOverview.nextAction || actionFallback} onNavigate={onNavigate} />
+      <MissionFocusBlock missionGuidance={missionGuidance} onNavigate={onNavigate} />
       <RatesBlock rates={safeOverview.rates} />
       <StabilityBlock stability={safeOverview.stability} />
       <DailyProgressBlock progress={safeOverview.dailyProgress} />

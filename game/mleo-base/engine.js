@@ -10,6 +10,62 @@ import {
 
 const MAX_LOG_ITEMS = 16;
 
+export const MISSION_GUIDANCE = {
+  upgrade_building: {
+    learningFocus: "Scale safely",
+    whyItMatters: "Smart upgrades remove bottlenecks without destabilizing the base.",
+    bestActionHint: "Use safe mode before pushing heavy upgrades.",
+    helperLine: "Keep energy stable before scaling.",
+    target: { tab: "build", target: "powerCell" },
+  },
+  ship_mleo: {
+    learningFocus: "Export timing",
+    whyItMatters: "Shipping before cap keeps your bank loop efficient.",
+    bestActionHint: "Ship before overflow slows your loop.",
+    helperLine: "Ship before overflow slows your loop.",
+    target: { tab: "ops", target: "shipping" },
+  },
+  run_expedition: {
+    learningFocus: "Active timing",
+    whyItMatters: "Expeditions are strongest when energy/data are comfortable.",
+    bestActionHint: "Run expedition only when your economy is stable.",
+    helperLine: "Run expeditions when energy and DATA are comfortable.",
+    target: { tab: "ops", target: "expedition-action" },
+  },
+  spend_vault: {
+    learningFocus: "Reinvestment",
+    whyItMatters: "Shared vault spending drives long-term command growth.",
+    bestActionHint: "Use blueprint spend when the base is stable.",
+    helperLine: "Spend vault on long-term upgrades, not panic buys.",
+    target: { tab: "ops", target: "blueprint" },
+  },
+  generate_data: {
+    learningFocus: "Data engine",
+    whyItMatters: "DATA supports missions, expeditions and progression choices.",
+    bestActionHint: "Upgrade lab flow to keep DATA generation steady.",
+    helperLine: "Keep a steady DATA loop through lab support.",
+    target: { tab: "build", target: "researchLab" },
+  },
+  perform_maintenance: {
+    learningFocus: "Stability control",
+    whyItMatters: "Maintenance protects efficiency before pressure compounds.",
+    bestActionHint: "Do maintenance before stability drops too far.",
+    helperLine: "Maintenance protects efficiency.",
+    target: { tab: "ops", target: "maintenance" },
+  },
+  double_expedition: {
+    learningFocus: "Tempo discipline",
+    whyItMatters: "Double runs are powerful only with enough reserves.",
+    bestActionHint: "Stabilize first, then chain expeditions.",
+    helperLine: "Stabilize first, then chain expeditions.",
+    target: { tab: "ops", target: "expedition-action" },
+  },
+};
+
+export function getMissionGuidance(missionKey) {
+  return MISSION_GUIDANCE[missionKey] || null;
+}
+
 export function crewRoleMeta(roleKey) {
   return CREW_ROLES.find((item) => item.key === roleKey) || CREW_ROLES[0];
 }

@@ -74,6 +74,7 @@ import {
   getBaseSceneIdentity,
   getBaseSceneNodeState,
   getMissionProgress,
+  getMissionGuidance,
   getShipSoftcutFactor,
   normalizeServerState,
   offlineFactorFor,
@@ -1597,6 +1598,7 @@ function getOverviewBestAction({
 
   if (claimableContracts > 0) {
     return {
+      key: "claim-contracts",
       title: "Claim contract rewards",
       text: "You already have completed rewards waiting.",
       cta: "Open contracts",
@@ -1607,6 +1609,7 @@ function getOverviewBestAction({
   switch (bottleneck.key) {
     case "ship-cap":
       return {
+        key: "ship-banked",
         title: "Ship Banked MLEO",
         text: "Free room before your banked flow starts wasting momentum.",
         cta: "Open shipping",
@@ -1614,6 +1617,7 @@ function getOverviewBestAction({
       };
     case "energy-collapse":
       return {
+        key: "recover-energy",
         title: "Recover energy reserves",
         text: "Use refill / safe mode first, then strengthen power support.",
         cta: "Open operations",
@@ -1621,6 +1625,7 @@ function getOverviewBestAction({
       };
     case "ore-limited":
       return {
+        key: "upgrade-quarry",
         title: "Upgrade Quarry",
         text: "Ore feed is your limiting input right now.",
         cta: "Open Quarry",
@@ -1628,6 +1633,7 @@ function getOverviewBestAction({
       };
     case "scrap-limited":
       return {
+        key: "upgrade-salvage",
         title: "Upgrade Salvage",
         text: "Scrap supply is holding the refinery back.",
         cta: "Open Salvage",
@@ -1635,6 +1641,7 @@ function getOverviewBestAction({
       };
     case "stability-drag":
       return {
+        key: "do-maintenance",
         title: "Do Maintenance",
         text: "Restore comfort and prevent efficiency drag before scaling.",
         cta: "Open maintenance",
@@ -1642,6 +1649,7 @@ function getOverviewBestAction({
       };
     case "weak-output":
       return {
+        key: "strengthen-refinery",
         title: "Strengthen Refinery loop",
         text: "You need more sustained banked output now.",
         cta: "Open Refinery",
@@ -1650,6 +1658,7 @@ function getOverviewBestAction({
     default:
       if (canExpeditionNow) {
         return {
+          key: "run-expedition",
           title: "Run Expedition",
           text: "The base is stable enough to push active progression.",
           cta: "Open expedition",
@@ -1657,6 +1666,7 @@ function getOverviewBestAction({
         };
       }
       return {
+        key: "scale-efficiently",
         title: "Scale efficiently",
         text: "No urgent issue detected. Push your strongest economy upgrade.",
         cta: "Open Build",
@@ -1798,31 +1808,69 @@ function buildOverviewV2({
   };
 }
 
+const OVERVIEW_LOCK_MS = 7000;
+const OVERVIEW_BOTTLENECK_PRIORITY = {
+  "ship-cap": 1,
+  "energy-collapse": 2,
+  "ore-limited": 3,
+  "scrap-limited": 4,
+  "stability-drag": 5,
+  "weak-output": 6,
+  none: 7,
+};
+
+function isCriticalOverviewBottleneck(key) {
+  return key === "ship-cap" || key === "energy-collapse";
+}
+
+function isHigherPriorityBottleneck(nextKey, currentKey) {
+  const nextPriority = OVERVIEW_BOTTLENECK_PRIORITY[nextKey] || 99;
+  const currentPriority = OVERVIEW_BOTTLENECK_PRIORITY[currentKey] || 99;
+  return nextPriority < currentPriority;
+}
+
+function isOverviewBottleneckClearlyResolved(prevKey, context) {
+  const { state, derived, systemState, bankedSnapshot } = context;
+  const energy = Number(state?.resources?.ENERGY || 0);
+  const energyCap = Number(derived?.energyCap || 0);
+  const stability = Number(state?.stability || 100);
+  const banked = Number(state?.bankedMleo || 0);
+  const shipCap = Number(derived?.shipCap || 0);
+  const shipRatio = shipCap > 0 ? banked / shipCap : 0;
+
+  switch (prevKey) {
+    case "ship-cap":
+      return shipRatio < 0.82 && Number(bankedSnapshot?.remainingToCap || 0) > 120;
+    case "energy-collapse":
+      return energyCap > 0 ? energy >= energyCap * 0.18 : true;
+    case "ore-limited":
+      return !!bankedSnapshot?.hasOre;
+    case "scrap-limited":
+      return !!bankedSnapshot?.hasScrap;
+    case "stability-drag":
+      return stability >= 86 && systemState === "normal";
+    case "weak-output":
+      return !!bankedSnapshot?.active && Number(bankedSnapshot?.perHour || 0) > 0.04;
+    case "none":
+      return true;
+    default:
+      return false;
+  }
+}
+
 const INFO_COPY = {
   sharedVault: {
     title: "Shared Vault",
     focus: "Refinery + shipping + logistics scaling",
     text:
-      "Shared Vault is the real MLEO balance you move out of BASE.\n\n" +
-      "How it grows:\n" +
-      "• Refinery creates banked MLEO inside BASE.\n" +
-      "• Shipping moves that banked MLEO into Shared Vault.\n" +
-      "• Logistics and Blueprint improve long-term shipment quality.\n\n" +
-      "Important:\n" +
-      "Banked MLEO is not the same as Shared Vault MLEO. Nothing reaches the vault until you ship it.",
+      "Shared Vault is your exported MLEO total.\n" +
+      "Refinery creates banked MLEO, and shipping moves it into vault progress.",
     tips: {
       building: "Refinery",
-      supportBuildings: ["Logistics Center", "Power Cell", "Quarry", "Salvage Yard"],
-      research: "Logistics",
-      supportResearch: ["Routing AI"],
-      module: "Vault Compressor",
+      supportBuildings: ["Logistics Center", "Quarry", "Salvage Yard"],
       operation: "Ship to Shared Vault",
-      watch: "Strong shipping means nothing if Refinery is underfed.",
-      actions: [
-        "Feed Refinery with stable Ore + Scrap first.",
-        "Upgrade Logistics when shipping starts to matter daily.",
-        "Do not sit too long on banked MLEO if you need real vault progress.",
-      ],
+      watch: "Shipping is weak if banked flow is underfed.",
+      actions: ["Feed Refinery first, then ship before cap pressure rises."],
     },
     nextStep: {
       label: "Open Shipping",
@@ -1836,27 +1884,14 @@ const INFO_COPY = {
     title: "Base Banked",
     focus: "Refinery output before shipping",
     text:
-      "Banked MLEO is created inside BASE and waits there until you ship it.\n\n" +
-      "What controls it:\n" +
-      "• Refinery level.\n" +
-      "• Ore flow.\n" +
-      "• Scrap flow.\n" +
-      "• Enough Energy to keep Refinery running.\n\n" +
-      "Important:\n" +
-      "Refinery needs Ore, Scrap and Energy together. If one of them collapses, banked MLEO slows down.",
+      "Banked MLEO is generated by Refinery and stored until you ship.\n" +
+      "It depends on Ore, Scrap and stable Energy at the same time.",
     tips: {
       building: "Refinery",
-      supportBuildings: ["Quarry", "Salvage Yard", "Power Cell", "Logistics Center"],
-      research: "Routing AI",
-      supportResearch: ["Logistics"],
-      module: "Vault Compressor",
+      supportBuildings: ["Quarry", "Salvage Yard", "Power Cell"],
       operation: "Ship to Shared Vault",
-      watch: "Refinery is powerful, but it is also one of the heaviest systems in the base.",
-      actions: [
-        "Upgrade Refinery only when Ore and Scrap can feed it.",
-        "Fix Energy pressure before forcing more conversion.",
-        "Ship regularly once banked MLEO starts building up.",
-      ],
+      watch: "Any missing input stalls banked output.",
+      actions: ["Ship before near-cap pressure slows your loop."],
     },
     nextStep: {
       label: "Upgrade Refinery",
@@ -1939,27 +1974,16 @@ const INFO_COPY = {
     title: "Energy",
     focus: "Power Cell + Coolant Loops + runtime control",
     text:
-      "Energy powers passive production and many active systems.\n\n" +
-      "Main rule:\n" +
-      "• If total drain is higher than regen, the base starts choking.\n" +
-      "• Power Cell is the main long-term Energy fix.\n" +
-      "• Coolant Loops adds extra cap and regen.\n" +
-      "• Refill restores Energy now, but does not improve regen.\n\n" +
-      "Important:\n" +
-      "Do not solve every Energy problem with Refill. In many cases, the better fix is Power Cell, Coolant Loops, or reducing heavy buildings until the base is stable again.",
+      "Energy powers production uptime.\n" +
+      "If drain beats regen, progression stalls quickly.",
     tips: {
       building: "Power Cell",
-      supportBuildings: ["Repair Bay"],
+      supportBuildings: ["Repair Bay", "Refinery"],
       research: "Coolant Loops",
       supportResearch: ["Predictive Maintenance"],
-      module: "",
       operation: "Emergency Refill / Reduce building power mode",
-      watch: ["Refinery", "Research Lab", "Quarry", "Trade Hub", "Salvage Yard"],
-      actions: [
-        "Upgrade Power Cell before scaling many heavy buildings together.",
-        "Use Refill as recovery, not as your core Energy economy.",
-        "Reduce the heavy building power mode when Energy collapses, instead of relying only on Refill.",
-      ],
+      watch: "Refill recovers now, but does not fix long-term regen.",
+      actions: ["Use safe power mode while rebuilding reserves."],
     },
     nextStep: {
       label: "Upgrade Power Cell",
@@ -1973,28 +1997,16 @@ const INFO_COPY = {
     title: "Stability",
     focus: "Maintenance + Repair Bay + pressure control",
     text:
-      "Stability is the health of your base.\n\n" +
-      "How to protect it:\n" +
-      "• Maintenance restores Stability directly.\n" +
-      "• Repair Bay improves long-term stability support.\n" +
-      "• Predictive Maintenance slows pressure growth.\n" +
-      "• Miner Link helps reduce refinery-related stress.\n\n" +
-      "Important:\n" +
-      "Low Stability makes advanced expansion feel worse even when your resource numbers look fine. Heavy industrial growth should be supported before pressure turns into collapse.",
+      "Stability protects overall efficiency.\n" +
+      "Low stability makes growth feel worse even with good resources.",
     tips: {
       building: "Repair Bay",
       supportBuildings: ["Power Cell", "Refinery"],
       research: "Predictive Maintenance",
-      supportResearch: ["Field Ops"],
       module: "Miner Link",
       operation: "Maintenance Cycle",
-      watch:
-        "Refinery pressure, weak Energy support, and delayed maintenance are the fastest ways to destabilize the base.",
-      actions: [
-        "Use maintenance before Stability becomes ugly.",
-        "Build Repair Bay early if you plan a heavier mid-game base.",
-        "Do not force Refinery scaling while Stability is already weak.",
-      ],
+      watch: "Delayed maintenance and weak energy quickly compound pressure.",
+      actions: ["Maintain early, then scale heavy systems."],
     },
     nextStep: {
       label: "Perform maintenance",
@@ -2327,6 +2339,7 @@ export default function MleoBase() {
   const [commanderPath, setCommanderPath] = useState("industry");
   const [devTab, setDevTab] = useState("crew");
   const [activeBuildKey, setActiveBuildKey] = useState(null);
+  const [overviewGuidanceState, setOverviewGuidanceState] = useState(null);
 
   const actionLocksRef = useRef({});
 
@@ -2386,6 +2399,7 @@ export default function MleoBase() {
   }
 
   const mobilePanelScrollRef = useRef(null);
+  const desktopPanelScrollRef = useRef(null);
 
   const activeInfo = openInfoKey ? INFO_COPY[openInfoKey] : null;
   const shownInfo = activeInfo || buildInfo;
@@ -2475,6 +2489,27 @@ export default function MleoBase() {
     return true;
   }
 
+  function centerTargetInDesktopPanel(targetEl) {
+    const container = desktopPanelScrollRef.current;
+    if (!container || !targetEl) return false;
+
+    const containerRect = container.getBoundingClientRect();
+    const targetRect = targetEl.getBoundingClientRect();
+    const currentScrollTop = container.scrollTop;
+    const targetTopInsideContainer =
+      targetRect.top - containerRect.top + currentScrollTop;
+    const targetCenter = targetTopInsideContainer + targetRect.height / 2;
+    const visibleAnchor = container.clientHeight * 0.42;
+    const nextScrollTop = Math.max(0, targetCenter - visibleAnchor);
+
+    container.scrollTo({
+      top: nextScrollTop,
+      behavior: "smooth",
+    });
+
+    return true;
+  }
+
   function isElementVisible(el) {
     if (!el) return false;
     return el.getClientRects().length > 0;
@@ -2489,6 +2524,13 @@ export default function MleoBase() {
         const mobileMatches = Array.from(mobileContainer.querySelectorAll(selector));
         const visibleMobileMatch = mobileMatches.find((el) => isElementVisible(el));
         if (visibleMobileMatch) return visibleMobileMatch;
+      }
+    } else {
+      const desktopContainer = desktopPanelScrollRef.current;
+      if (desktopContainer) {
+        const desktopMatches = Array.from(desktopContainer.querySelectorAll(selector));
+        const visibleDesktopMatch = desktopMatches.find((el) => isElementVisible(el));
+        if (visibleDesktopMatch) return visibleDesktopMatch;
       }
     }
 
@@ -2624,7 +2666,7 @@ export default function MleoBase() {
       // no-op
     }
 
-    setTimeout(() => {
+    const attemptFocus = (attempt = 0) => {
       const missionFocusKey =
         step.target === "missions"
           ? (() => {
@@ -2662,7 +2704,12 @@ export default function MleoBase() {
         window.matchMedia("(max-width: 639px)").matches;
 
       const el = getBestTargetElement(targetForScroll, isMobile);
-      if (!el) return;
+      if (!el) {
+        if (attempt < 6) {
+          setTimeout(() => attemptFocus(attempt + 1), 140);
+        }
+        return;
+      }
 
       if (isMobile) {
         const centered = centerTargetInMobilePanel(el);
@@ -2675,13 +2722,11 @@ export default function MleoBase() {
           });
         }
       } else {
-        el.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-          inline: "nearest",
-        });
+        centerTargetInDesktopPanel(el);
       }
-    }, 320);
+    };
+
+    setTimeout(() => attemptFocus(0), 280);
 
     const highlightDurationMs =
       step.target === "expedition" || step.target === "expedition-action" ? 6200 : 4200;
@@ -2707,6 +2752,22 @@ export default function MleoBase() {
       tips.watch,
       tips.actions,
     ].some((item) => normalizeInfoTipItems(item).length > 0);
+  }
+
+  function getInfoMainSource(tips) {
+    if (!tips) return [];
+    return normalizeInfoTipItems(tips.building || tips.research || tips.module || tips.operation);
+  }
+
+  function getInfoBestSupport(tips) {
+    if (!tips) return [];
+    return [
+      ...normalizeInfoTipItems(tips.supportBuildings),
+      ...normalizeInfoTipItems(tips.supportResearch),
+      ...normalizeInfoTipItems(tips.research),
+      ...normalizeInfoTipItems(tips.module),
+      ...normalizeInfoTipItems(tips.operation),
+    ].filter(Boolean);
   }
 
   function renderInfoTipRow(label, value) {
@@ -2764,6 +2825,9 @@ export default function MleoBase() {
         }}
       >
         <div className="bg-transparent border-0 rounded-none shadow-none backdrop-blur-0 p-5">
+          <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-200/70">
+            What it does
+          </div>
           <div className="whitespace-pre-line text-sm leading-7 text-white/80">
             {shownInfo.text}
           </div>
@@ -2771,21 +2835,8 @@ export default function MleoBase() {
           {hasInfoTipContent(shownInfo?.tips) ? (
             <div className="mt-4 border-t border-white/10 pt-4">
               <div className="grid gap-2 text-sm text-white/78">
-                {renderInfoTipRow("Main building", shownInfo?.tips?.building)}
-                {renderInfoTipRow(
-                  "Support buildings",
-                  shownInfo?.tips?.supportBuildings
-                )}
-                {renderInfoTipRow("Main research", shownInfo?.tips?.research)}
-                {renderInfoTipRow(
-                  "Support research",
-                  shownInfo?.tips?.supportResearch
-                )}
-                {renderInfoTipRow("Best module", shownInfo?.tips?.module)}
-                {renderInfoTipRow(
-                  "Best operation",
-                  shownInfo?.tips?.operation
-                )}
+                {renderInfoTipRow("Main source", getInfoMainSource(shownInfo?.tips))}
+                {renderInfoTipRow("Best support", getInfoBestSupport(shownInfo?.tips))}
                 {renderInfoTipRow("Watch out", shownInfo?.tips?.watch)}
               </div>
 
@@ -2816,7 +2867,7 @@ export default function MleoBase() {
             >
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-200/70">
-                  Available action
+                  Best next upgrade
                 </div>
                 <div className="mt-1 text-base font-semibold text-white">
                   {shownInfo.nextStep.label}
@@ -3176,7 +3227,7 @@ export default function MleoBase() {
     [state, derived]
   );
 
-  const overview = useMemo(
+  const rawOverview = useMemo(
     () =>
       buildOverviewV2({
         state,
@@ -3201,6 +3252,73 @@ export default function MleoBase() {
       bankedSnapshot,
     ]
   );
+
+  useEffect(() => {
+    if (!rawOverview?.bottleneck?.key || !rawOverview?.nextAction?.key) return;
+    const now = Date.now();
+
+    setOverviewGuidanceState((prev) => {
+      if (!prev?.bottleneckKey) {
+        return {
+          bottleneckKey: rawOverview.bottleneck.key,
+          actionKey: rawOverview.nextAction.key,
+          lockedUntil: now + OVERVIEW_LOCK_MS,
+          lastUpdatedAt: now,
+          lockedBottleneck: rawOverview.bottleneck,
+          lockedAction: rawOverview.nextAction,
+        };
+      }
+
+      const currentKey = prev.bottleneckKey;
+      const nextKey = rawOverview.bottleneck.key;
+
+      if (nextKey === currentKey) {
+        const actionChanged = rawOverview.nextAction.key !== prev.actionKey;
+        const canUpdateAction = now >= Number(prev.lockedUntil || 0);
+        const didUpdateAction = actionChanged && canUpdateAction;
+        return {
+          ...prev,
+          actionKey: didUpdateAction ? rawOverview.nextAction.key : prev.actionKey,
+          lockedAction: didUpdateAction ? rawOverview.nextAction : prev.lockedAction,
+          lockedUntil: didUpdateAction ? now + OVERVIEW_LOCK_MS : prev.lockedUntil,
+          lastUpdatedAt: now,
+        };
+      }
+
+      const shouldSwitchNow =
+        isCriticalOverviewBottleneck(nextKey) ||
+        isHigherPriorityBottleneck(nextKey, currentKey) ||
+        isOverviewBottleneckClearlyResolved(currentKey, {
+          state,
+          derived,
+          systemState,
+          bankedSnapshot,
+        }) ||
+        now >= Number(prev.lockedUntil || 0);
+
+      if (!shouldSwitchNow) return prev;
+
+      return {
+        bottleneckKey: rawOverview.bottleneck.key,
+        actionKey: rawOverview.nextAction.key,
+        lockedUntil: now + OVERVIEW_LOCK_MS,
+        lastUpdatedAt: now,
+        lockedBottleneck: rawOverview.bottleneck,
+        lockedAction: rawOverview.nextAction,
+      };
+    });
+  }, [rawOverview, state, derived, systemState, bankedSnapshot]);
+
+  const overview = useMemo(() => {
+    if (!overviewGuidanceState?.lockedBottleneck || !overviewGuidanceState?.lockedAction) {
+      return rawOverview;
+    }
+    return {
+      ...rawOverview,
+      bottleneck: overviewGuidanceState.lockedBottleneck,
+      nextAction: overviewGuidanceState.lockedAction,
+    };
+  }, [rawOverview, overviewGuidanceState]);
 
   const availableStructuresCount = useMemo(() => {
     return BUILDINGS.filter((def) => {
@@ -3251,11 +3369,15 @@ export default function MleoBase() {
     99
   );
 
-  const overviewIdentityCount = 1;
   const liveContractsAvailableCount = readyCounts.contracts;
   const availableBlueprintCount = Number(canBuyBlueprintNow);
 
   const showToast = (message) => setToast(message);
+  const withBottleneckNote = (message, notesByKey = {}) => {
+    const key = overview?.bottleneck?.key;
+    const note = key ? notesByKey[key] : null;
+    return note ? `${message} · ${note}` : message;
+  };
 
   const updateState = (updater) => {
     setState((prev) => {
@@ -3405,7 +3527,7 @@ export default function MleoBase() {
 
         setState((prev) => mergeAuthoritativeServerState(prev, res.state));
         const contract = LIVE_CONTRACTS.find((item) => item.key === key);
-        showToast(`Contract claimed: ${contract?.title || key}`);
+        showToast("Contract claimed · rewards added");
       } catch (error) {
         console.error("Contract claim failed", error);
         showToast(error?.message || "Contract claim failed");
@@ -3446,7 +3568,15 @@ export default function MleoBase() {
           return next;
         });
 
-        showToast(`${def.name} upgraded to level ${res.new_level || level + 1}.`);
+        showToast(
+          withBottleneckNote(`${def.name} upgraded · output improved`, {
+            "energy-collapse": "Energy pressure eased",
+            "stability-drag": "Main pressure reduced",
+            "ore-limited": "Resource flow improved",
+            "scrap-limited": "Resource flow improved",
+            "weak-output": "Main pressure reduced",
+          })
+        );
       } else {
         if (res?.code === "RATE_LIMIT_DEVICE") {
           showToast("Too many taps detected. Please wait a moment and try again.");
@@ -3753,9 +3883,7 @@ export default function MleoBase() {
           return next;
         });
 
-        showToast(
-          `Expedition (${expeditionMode}) returned with ${loot.ore || 0} ORE, ${loot.gold || 0} GOLD, ${loot.scrap || 0} SCRAP, ${loot.data || 0} DATA${loot.bankedMleo ? ` and ${loot.bankedMleo} MLEO` : ""}.`
-        );
+        showToast("Expedition complete · field gains secured");
       } else {
         showToast(res?.message || "Expedition failed.");
       }
@@ -3795,7 +3923,11 @@ export default function MleoBase() {
 
         setNextShipBonus(0);
 
-        showToast(`+${fmt(shippedBase)} MLEO shipped.`);
+        showToast(
+          withBottleneckNote("Shipment complete · bank room restored", {
+            "ship-cap": "Export flow restored",
+          })
+        );
       } else {
         showToast(res?.message || "Ship failed.");
       }
@@ -3909,7 +4041,11 @@ export default function MleoBase() {
           };
           return applyLevelUps(next);
         });
-        showToast("Energy reserves restored.");
+        showToast(
+          withBottleneckNote("Recovery complete · energy reserves restored", {
+            "energy-collapse": "Energy pressure eased",
+          })
+        );
       } else {
         showToast(res?.message || "Refill failed.");
       }
@@ -3945,7 +4081,12 @@ export default function MleoBase() {
           };
           return applyLevelUps(next);
         });
-        showToast("Repair crews completed maintenance. Stability restored.");
+        showToast(
+          withBottleneckNote("Maintenance complete · stability pressure reduced", {
+            "stability-drag": "Main pressure reduced",
+            "energy-collapse": "Main pressure reduced",
+          })
+        );
       } else {
         showToast(res?.message || "Maintenance failed.");
       }
@@ -4298,22 +4439,7 @@ export default function MleoBase() {
     const claimed = !!state.missionState?.claimed?.[mission.key];
     const ready = done && !claimed;
 
-    const helpText =
-      mission.key === "upgrade_building"
-        ? "Good moment to upgrade a real bottleneck, not a random building."
-        : mission.key === "run_expedition"
-        ? "Only worth forcing when Energy and DATA are comfortable."
-        : mission.key === "generate_data"
-        ? "Research Lab is the cleanest answer."
-        : mission.key === "perform_maintenance"
-        ? "Best done before Stability starts feeling ugly."
-        : mission.key === "double_expedition"
-        ? "Can drain tempo if Energy is already weak."
-        : mission.key === "ship_mleo"
-        ? "First create banked MLEO, then ship."
-        : mission.key === "spend_vault"
-        ? "Blueprint is the cleanest long-term spend path."
-        : null;
+    const guidance = getMissionGuidance(mission.key);
 
     return {
       key: mission.key,
@@ -4324,13 +4450,30 @@ export default function MleoBase() {
       targetText: fmt(mission.target),
       rewardText: rewardText(mission.reward),
       quickTags: getMissionQuickTags(mission.key),
-      helpText,
+      helpText: guidance?.helperLine || null,
+      guidance,
       done,
       claimed,
       ready,
       highlighted: highlightTarget === mission.key,
     };
   });
+
+  const missionGuidanceFocus = useMemo(() => {
+    const list = Array.isArray(dailyMissionsVM) ? dailyMissionsVM : [];
+    if (!list.length) return null;
+    const readyMission = list.find((m) => m.ready);
+    const activeMission = list.find((m) => !m.claimed);
+    const pick = readyMission || activeMission;
+    if (!pick) return null;
+
+    return {
+      title: pick.name,
+      hint: pick.guidance?.bestActionHint || pick.helpText || "Keep mission pacing aligned with base health.",
+      target: pick.guidance?.target || null,
+      cta: pick.ready ? "Open missions" : "Focus mission",
+    };
+  }, [dailyMissionsVM]);
 
   const dailyMissionsContent = (
     <DailyMissionsPanel
@@ -4976,20 +5119,18 @@ export default function MleoBase() {
       linked: "ORE production · construction economy · refinery support · long-term industrial growth",
       impact: "More Quarry levels speed up nearly everything that depends on Ore, so this is one of the best tempo upgrades in early and mid game.",
       tips: {
-        building: "Trade Hub",
+        building: "Quarry",
+        supportBuildings: ["Power Cell", "Refinery"],
         research: "Miner Sync",
         module: "Servo Drill",
-        actions: [
-          "Build Quarry early if you want the base to feel active instead of stalled.",
-          "Keep Quarry healthy before pushing expensive structures.",
-          "Quarry pairs especially well with Refinery and Miner Control.",
-        ],
+        watch: "Weak energy can hide your real Ore potential.",
+        actions: ["Keep Quarry scaling steady before expensive expansion."],
       },
       nextStep: {
-        label: "Open Trade Hub",
+        label: "Upgrade Quarry",
         tab: "build",
-        target: "tradeHub",
-        why: "Trade Hub is one of the first major structures unlocked through strong Quarry progression.",
+        target: "quarry",
+        why: "Ore flow is your base production backbone.",
       },
     },
 
@@ -5055,25 +5196,17 @@ export default function MleoBase() {
         "A stronger Salvage Yard makes the mid-game much smoother.\n" +
         "It reduces the chance that Scrap quietly becomes the hidden bottleneck in your base.",
       tips: {
-        building: "Refinery",
-        supportBuildings: ["Expedition Bay", "Power Cell", "Repair Bay"],
-        research: "Deep Scan",
-        supportResearch: ["Field Ops"],
-        module: "Miner Link",
+        building: "Salvage Yard",
+        supportBuildings: ["Power Cell", "Refinery"],
         operation: "Field Expedition",
-        watch:
-          "Scrap often falls behind quietly. When that happens, Refinery and advanced support upgrades both start feeling worse.",
-        actions: [
-          "Upgrade Salvage before pushing advanced systems too hard.",
-          "Use expeditions for burst Scrap, but keep Salvage Yard as the permanent lane.",
-          "Especially important once Refinery becomes part of your real economy.",
-        ],
+        watch: "Scrap deficits quietly choke refinery growth.",
+        actions: ["Use expeditions for burst scrap, not as a replacement lane."],
       },
       nextStep: {
-        label: "Open Refinery",
+        label: "Upgrade Salvage Yard",
         tab: "build",
-        target: "refinery",
-        why: "Refinery is one of the main reasons Scrap becomes strategically important.",
+        target: "salvage",
+        why: "Stable scrap feed keeps advanced systems smooth.",
       },
     },
 
@@ -5103,26 +5236,17 @@ export default function MleoBase() {
         "A stronger Refinery increases your banked MLEO potential, but it also increases pressure on Ore, Scrap, Energy and Stability.\n" +
         "If one of those layers is weak, Refinery scaling starts feeling inefficient instead of exciting.",
       tips: {
-        building: "Logistics Center",
-        supportBuildings: ["Quarry", "Salvage Yard", "Power Cell", "Repair Bay"],
-        research: "Token Discipline",
-        supportResearch: ["Logistics", "Predictive Maintenance"],
-        module: "Vault Compressor",
+        building: "Refinery",
+        supportBuildings: ["Quarry", "Salvage Yard", "Power Cell", "Logistics Center"],
         operation: "Ship to Shared Vault",
-        watch:
-          "Refinery becomes a pressure point when Stability is weak or when Ore/Scrap support is not ready yet.",
-        actions: [
-          "Only push Refinery when ORE, SCRAP and Energy support are already healthy.",
-          "If Stability is weak, delay extra Refinery levels until the base is safer.",
-          "Refinery is strongest inside a balanced economy, not by itself.",
-          "Pair it with Logistics once shipping becomes part of your normal loop.",
-        ],
+        watch: "Refinery scales badly when Ore/Scrap or energy is unstable.",
+        actions: ["Feed inputs first, then push output and shipping."],
       },
       nextStep: {
-        label: "Open Logistics Center",
+        label: "Upgrade Refinery",
         tab: "build",
-        target: "logisticsCenter",
-        why: "Logistics is one of the best follow-up structures once Refinery starts mattering.",
+        target: "refinery",
+        why: "Refinery is the direct banked MLEO source.",
       },
     },
 
@@ -5151,24 +5275,18 @@ export default function MleoBase() {
         "It is one of the cleanest upgrades for making the whole base feel better.",
       tips: {
         building: "Power Cell",
-        supportBuildings: ["Trade Hub", "Repair Bay"],
+        supportBuildings: ["Repair Bay", "Research Lab"],
         research: "Coolant Loops",
         supportResearch: ["Predictive Maintenance"],
-        module: "",
         operation: "Emergency Refill / Reduce building power mode",
-        watch:
-          "Power Cell fixes long-term Energy pressure. Refill only fixes the current moment.",
-        actions: [
-          "Upgrade Power Cell when Energy starts feeling like the main bottleneck.",
-          "Very important if you are running Quarry, Trade Hub, Salvage and Refinery together.",
-          "Use runtime power reduction if one heavy lane is choking the base.",
-        ],
+        watch: "Refill is temporary; cap and regen are long-term control.",
+        actions: ["Use safe mode while rebuilding energy headroom."],
       },
       nextStep: {
-        label: "Open Maintenance",
-        tab: "operations",
-        target: "maintenance",
-        why: "If the base is already under pressure, recovery actions may be needed before more scaling.",
+        label: "Upgrade Power Cell",
+        tab: "build",
+        target: "powerCell",
+        why: "Energy cap and regen stabilize every production lane.",
       },
     },
 
@@ -5368,26 +5486,19 @@ export default function MleoBase() {
         "A stronger Research Lab improves your access to advanced progression systems and makes DATA milestones arrive more naturally.\n" +
         "At the same time, it adds pressure, so it feels best when Energy and Stability are already under control.",
       tips: {
-        building: "Miner Control",
-        supportBuildings: ["Arcade Hub", "Expedition Bay", "Power Cell", "Repair Bay"],
+        building: "Research Lab",
+        supportBuildings: ["Arcade Hub", "Miner Control", "Power Cell"],
         research: "Deep Scan",
-        supportResearch: ["Arcade Ops", "Token Discipline"],
-        module: "Arcade Relay",
+        supportResearch: ["Arcade Ops"],
         operation: "Field Expedition",
-        watch:
-          "Research Lab is powerful, but scaling it too early can make the base feel fragile if Energy and Stability are not ready.",
-        actions: [
-          "Upgrade Research Lab when you want stronger long-term strategic progression.",
-          "Slow down Research Lab scaling if Energy or Stability is already under pressure.",
-          "Use support DATA buildings and expeditions to smooth the lane instead of forcing only lab levels.",
-          "One of the best structures for advanced progression, but not a blind rush target.",
-        ],
+        watch: "Lab scaling can strain energy if support is weak.",
+        actions: ["Keep DATA steady; do not force lab while unstable."],
       },
       nextStep: {
-        label: "Open Deep Scan",
-        tab: "research",
-        target: "deepScan",
-        why: "Deep Scan is one of the best research follow-ups when DATA generation starts to matter.",
+        label: "Upgrade Research Lab",
+        tab: "build",
+        target: "researchLab",
+        why: "Lab is the strongest long-term DATA source.",
       },
     },
 
@@ -5411,22 +5522,15 @@ export default function MleoBase() {
         building: "Repair Bay",
         supportBuildings: ["Power Cell", "Refinery"],
         research: "Predictive Maintenance",
-        supportResearch: ["Field Ops"],
-        module: "Miner Link",
         operation: "Maintenance Cycle",
-        watch:
-          "Repair Bay makes recovery easier, but it does not replace doing maintenance when the base is already stressed.",
-        actions: [
-          "Upgrade Repair Bay when your base starts feeling fragile under growth.",
-          "Very strong if Refinery and advanced systems are becoming central.",
-          "Pair it with Predictive Maintenance for much better stability control.",
-        ],
+        watch: "Repair support helps, but delayed maintenance still hurts.",
+        actions: ["Maintain before pressure escalates."],
       },
       nextStep: {
-        label: "Open Maintenance",
-        tab: "operations",
-        target: "maintenance",
-        why: "Maintenance is the direct action that works together with Repair Bay.",
+        label: "Upgrade Repair Bay",
+        tab: "build",
+        target: "repairBay",
+        why: "Repair Bay improves long-term stability support.",
       },
     },
   };
@@ -8525,14 +8629,14 @@ export default function MleoBase() {
                     </div>
                       </div>
 
-                  <div className="h-[calc(100%-81px)] overflow-y-auto px-5 py-4">
+                  <div ref={desktopPanelScrollRef} className="h-[calc(100%-81px)] overflow-y-auto px-5 py-4">
                     {desktopPanel === "overview" ? (
                       <DesktopPanelSection resourceBar={compactResourceBar}>
                         <OverviewPanelCards
-                          buildSectionCardClass={buildSectionCardClass}
                           openInnerPanel={openInnerPanel}
                           toggleInnerPanel={toggleInnerPanel}
                           overview={overview}
+                          missionGuidance={missionGuidanceFocus}
                           nextStep={nextStep}
                           buildOpportunitiesCount={buildOpportunitiesCount}
                           availableStructuresCount={availableStructuresCount}
@@ -8542,16 +8646,12 @@ export default function MleoBase() {
                           onOpenBuildPanel={() => openDesktopPanel("build", "build-structures")}
                           onNavigate={navigateToBaseTarget}
                           showCrew={showCrew}
-                          overviewIdentityCount={overviewIdentityCount}
                           crewRoleInfo={crewRoleInfo}
                           roleBonusText={roleBonusText}
                           commanderPathInfo={commanderPathInfo}
                           commanderPathText={commanderPathText}
                           liveContractsAvailableCount={liveContractsAvailableCount}
                           liveContracts={liveContracts}
-                          highlightTarget={highlightTarget}
-                          isHighlightedTarget={isHighlightedTarget}
-                          highlightCard={highlightCard}
                           onClaimContract={claimContract}
                         />
                       </DesktopPanelSection>
@@ -8930,10 +9030,10 @@ export default function MleoBase() {
                   {mobilePanel === "overview" ? (
                     <MobilePanelSection resourceBar={mobileCompactResourceBar}>
                       <OverviewPanelCards
-                        buildSectionCardClass={buildSectionCardClass}
                         openInnerPanel={openInnerPanel}
                         toggleInnerPanel={toggleInnerPanel}
                         overview={overview}
+                        missionGuidance={missionGuidanceFocus}
                         nextStep={nextStep}
                         buildOpportunitiesCount={buildOpportunitiesCount}
                         availableStructuresCount={availableStructuresCount}
@@ -8943,16 +9043,12 @@ export default function MleoBase() {
                         onOpenBuildPanel={() => openMobilePanel("build")}
                         onNavigate={navigateToBaseTarget}
                         showCrew={showCrew}
-                        overviewIdentityCount={overviewIdentityCount}
                         crewRoleInfo={crewRoleInfo}
                         roleBonusText={roleBonusText}
                         commanderPathInfo={commanderPathInfo}
                         commanderPathText={commanderPathText}
                         liveContractsAvailableCount={liveContractsAvailableCount}
                         liveContracts={liveContracts}
-                        highlightTarget={highlightTarget}
-                        isHighlightedTarget={isHighlightedTarget}
-                        highlightCard={highlightCard}
                         onClaimContract={claimContract}
                       />
                     </MobilePanelSection>

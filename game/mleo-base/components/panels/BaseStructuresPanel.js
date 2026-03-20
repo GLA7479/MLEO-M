@@ -129,6 +129,11 @@ export function BaseStructuresPanel({
                     <div className="text-[11px] font-semibold text-cyan-100">
                       {card.upgradeImpactPreview.value}
                     </div>
+                    {card.upgradeImpactPreview.note ? (
+                      <div className="line-clamp-1 text-[10px] text-cyan-100/70">
+                        {card.upgradeImpactPreview.note}
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="h-[34px]" />
