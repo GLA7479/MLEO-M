@@ -2646,6 +2646,7 @@ export default function MleoBase() {
   const lastInteractionRef = useRef(Date.now());
   const lastPresenceSendRef = useRef(0);
   const presenceInFlightRef = useRef(false);
+  const presenceHeartbeatRef = useRef(null);
 
   const actionLocksRef = useRef({});
 
@@ -2705,23 +2706,31 @@ export default function MleoBase() {
   }
 
   async function pushPresence(interacted = false) {
-    if (typeof document === "undefined") return;
-    if (presenceInFlightRef.current) return;
+    if (typeof document === "undefined") return false;
+    if (presenceInFlightRef.current) return false;
 
     const now = Date.now();
     const minGap = interacted ? 8000 : 25000;
-    if (now - lastPresenceSendRef.current < minGap) return;
+    if (now - lastPresenceSendRef.current < minGap) return false;
 
     presenceInFlightRef.current = true;
     try {
-      await sendBasePresence({
+      const payload = await sendBasePresence({
         visibilityState: document.visibilityState || "hidden",
         pageName: "base",
         interacted,
       });
+
+      if (!payload?.success) {
+        console.error("BASE presence push rejected", payload);
+        return false;
+      }
+
       lastPresenceSendRef.current = now;
+      return true;
     } catch (error) {
       console.error("BASE presence push failed", error);
+      return false;
     } finally {
       presenceInFlightRef.current = false;
     }
@@ -2730,20 +2739,49 @@ export default function MleoBase() {
   useEffect(() => {
     if (!mounted || typeof window === "undefined") return;
 
+    const stopHeartbeat = () => {
+      if (presenceHeartbeatRef.current) {
+        window.clearInterval(presenceHeartbeatRef.current);
+        presenceHeartbeatRef.current = null;
+      }
+    };
+
+    const startHeartbeat = () => {
+      stopHeartbeat();
+      if (document.visibilityState !== "visible") return;
+
+      presenceHeartbeatRef.current = window.setInterval(() => {
+        if (document.visibilityState === "visible") {
+          pushPresence(false);
+        }
+      }, 30000);
+    };
+
     const markInteraction = () => {
       lastInteractionRef.current = Date.now();
-      pushPresence(true);
+      if (document.visibilityState === "visible") {
+        pushPresence(true);
+      }
     };
 
     const onVisibilityChange = () => {
-      pushPresence(false);
+      if (document.visibilityState === "visible") {
+        pushPresence(false);
+        startHeartbeat();
+      } else {
+        pushPresence(false);
+        stopHeartbeat();
+      }
     };
 
     const onFocus = () => {
-      pushPresence(false);
+      if (document.visibilityState === "visible") {
+        pushPresence(false);
+        startHeartbeat();
+      }
     };
 
-    const interactionEvents = ["pointerdown", "touchstart", "keydown", "wheel"];
+    const interactionEvents = ["pointerdown", "keydown", "wheel"];
 
     interactionEvents.forEach((eventName) => {
       window.addEventListener(eventName, markInteraction, { passive: true });
@@ -2752,14 +2790,13 @@ export default function MleoBase() {
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
-    pushPresence(false);
-
-    const heartbeatId = window.setInterval(() => {
+    if (document.visibilityState === "visible") {
       pushPresence(false);
-    }, 30000);
+      startHeartbeat();
+    }
 
     return () => {
-      window.clearInterval(heartbeatId);
+      stopHeartbeat();
       interactionEvents.forEach((eventName) => {
         window.removeEventListener(eventName, markInteraction);
       });
