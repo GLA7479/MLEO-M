@@ -959,9 +959,14 @@ function WindowBankedBadge({ value }) {
   );
 }
 
-function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
-  const s = snapshot;
-
+function DesktopFloatingPanelShell({
+  eyebrow,
+  title,
+  subtitle,
+  headerRight,
+  onClose,
+  children,
+}) {
   return (
     <div
       className="
@@ -974,23 +979,31 @@ function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200/65">
-            Banked MLEO
+          {eyebrow ? (
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200/65">
+              {eyebrow}
+            </div>
+          ) : null}
+
+          <div className={eyebrow ? "mt-1" : "mt-0"}>
+            <div className="text-[1.9rem] font-black leading-none text-white">
+              {title}
+            </div>
           </div>
-          <div className="mt-1 text-[1.9rem] font-black leading-none text-white">
-            {fmt(bankedValue)}
-          </div>
-          <div className="mt-0.5 text-[11px] text-white/55">
-            Live refinery output snapshot
-          </div>
+
+          {subtitle ? <div className="mt-0.5">{subtitle}</div> : null}
         </div>
 
-        <button
-          onClick={onClose}
-          className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/[0.09]"
-        >
-          Close
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {headerRight ? headerRight : null}
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/[0.09]"
+          >
+            Close
+          </button>
+        </div>
       </div>
 
       <div
@@ -1001,120 +1014,139 @@ function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
           [webkit-overflow-scrolling:touch]
         "
       >
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-[18px] border border-cyan-400/15 bg-cyan-500/[0.07] px-3 py-2">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/65">
-              Rate / hr
-            </div>
-            <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
-              {fmtRate(s.perHour)}
-            </div>
-          </div>
+        {children}
+      </div>
+    </div>
+  );
+}
 
-          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-              Per day
-            </div>
-            <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
-              {fmtRate(s.perDay)}
-            </div>
-          </div>
+function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
+  const s = snapshot;
 
-          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-              Ship cap
-            </div>
-            <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
-              {fmt(s.shipCap)}
-            </div>
+  return (
+    <DesktopFloatingPanelShell
+      eyebrow="Banked MLEO"
+      title={fmt(bankedValue)}
+      subtitle={
+        <span className="text-[11px] text-white/55">
+          Live refinery output snapshot
+        </span>
+      }
+      onClose={onClose}
+    >
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-[18px] border border-cyan-400/15 bg-cyan-500/[0.07] px-3 py-2">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/65">
+            Rate / hr
           </div>
-
-          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-              Cap ETA
-            </div>
-            <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
-              {s.etaHours == null ? "—" : `${fmtRate(s.etaHours, 1)}h`}
-            </div>
+          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
+            {fmtRate(s.perHour)}
           </div>
         </div>
 
-        <div className="mt-2.5 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
+        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
           <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-            Refinery status
+            Per day
           </div>
-          <div className="mt-2 text-sm font-semibold text-white">
-            {s.limitingSystem}
-          </div>
-
-          <div className="mt-2 flex flex-wrap gap-2">
-            <span
-              className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                s.hasOre
-                  ? "bg-emerald-500/15 text-emerald-200"
-                  : "bg-rose-500/15 text-rose-200"
-              }`}
-            >
-              {s.hasOre ? "Ore OK" : "Ore low"}
-            </span>
-            <span
-              className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                s.hasScrap
-                  ? "bg-emerald-500/15 text-emerald-200"
-                  : "bg-rose-500/15 text-rose-200"
-              }`}
-            >
-              {s.hasScrap ? "Scrap OK" : "Scrap low"}
-            </span>
-            <span
-              className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                s.hasEnergy
-                  ? "bg-emerald-500/15 text-emerald-200"
-                  : "bg-rose-500/15 text-rose-200"
-              }`}
-            >
-              {s.hasEnergy ? "Energy OK" : "Energy low"}
-            </span>
+          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
+            {fmtRate(s.perDay)}
           </div>
         </div>
 
-        <div className="mt-2.5 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
+        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
           <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-            Feed endurance
+            Ship cap
           </div>
-
-          <div className="mt-2 grid grid-cols-2 gap-3 text-sm text-white/80">
-            <div>
-              <div className="text-white/50">Ore support</div>
-              <div className="mt-1 font-semibold text-white">
-                {s.oreFeedHours == null ? "—" : `${fmtRate(s.oreFeedHours, 1)}h`}
-              </div>
-            </div>
-            <div>
-              <div className="text-white/50">Scrap support</div>
-              <div className="mt-1 font-semibold text-white">
-                {s.scrapFeedHours == null ? "—" : `${fmtRate(s.scrapFeedHours, 1)}h`}
-              </div>
-            </div>
+          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
+            {fmt(s.shipCap)}
           </div>
         </div>
 
-        <div className="mt-3 space-y-2.5 text-[13px] leading-6 text-white/76">
-          <div>
-            Base Banked grows only while Refinery is supplied with Ore, Scrap and enough
-            Energy.
+        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+            Cap ETA
           </div>
-          <div>
-            Shipping does not increase the rate. Shipping only moves banked MLEO into
-            the real shared vault.
-          </div>
-          <div>
-            To improve this number, focus on Refinery uptime, steady Ore + Scrap flow,
-            and stable Energy.
+          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
+            {s.etaHours == null ? "—" : `${fmtRate(s.etaHours, 1)}h`}
           </div>
         </div>
       </div>
-    </div>
+
+      <div className="mt-2.5 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+          Refinery status
+        </div>
+        <div className="mt-2 text-sm font-semibold text-white">
+          {s.limitingSystem}
+        </div>
+
+        <div className="mt-2 flex flex-wrap gap-2">
+          <span
+            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+              s.hasOre
+                ? "bg-emerald-500/15 text-emerald-200"
+                : "bg-rose-500/15 text-rose-200"
+            }`}
+          >
+            {s.hasOre ? "Ore OK" : "Ore low"}
+          </span>
+          <span
+            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+              s.hasScrap
+                ? "bg-emerald-500/15 text-emerald-200"
+                : "bg-rose-500/15 text-rose-200"
+            }`}
+          >
+            {s.hasScrap ? "Scrap OK" : "Scrap low"}
+          </span>
+          <span
+            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+              s.hasEnergy
+                ? "bg-emerald-500/15 text-emerald-200"
+                : "bg-rose-500/15 text-rose-200"
+            }`}
+          >
+            {s.hasEnergy ? "Energy OK" : "Energy low"}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-2.5 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+          Feed endurance
+        </div>
+
+        <div className="mt-2 grid grid-cols-2 gap-3 text-sm text-white/80">
+          <div>
+            <div className="text-white/50">Ore support</div>
+            <div className="mt-1 font-semibold text-white">
+              {s.oreFeedHours == null ? "—" : `${fmtRate(s.oreFeedHours, 1)}h`}
+            </div>
+          </div>
+          <div>
+            <div className="text-white/50">Scrap support</div>
+            <div className="mt-1 font-semibold text-white">
+              {s.scrapFeedHours == null ? "—" : `${fmtRate(s.scrapFeedHours, 1)}h`}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-2.5 text-[13px] leading-6 text-white/76">
+        <div>
+          Base Banked grows only while Refinery is supplied with Ore, Scrap and enough
+          Energy.
+        </div>
+        <div>
+          Shipping does not increase the rate. Shipping only moves banked MLEO into
+          the real shared vault.
+        </div>
+        <div>
+          To improve this number, focus on Refinery uptime, steady Ore + Scrap flow,
+          and stable Energy.
+        </div>
+      </div>
+    </DesktopFloatingPanelShell>
   );
 }
 
@@ -2261,6 +2293,110 @@ export default function MleoBase() {
     setBuildInfo(null);
 
     navigateToBaseTarget(info.nextStep);
+  }
+
+  function DesktopInfoFloatingPanel() {
+    if (!shownInfo) return null;
+
+    const subtitle =
+      shownInfo?.focus ? (
+        <div className="text-sm leading-6 text-cyan-200/80">
+          <span className="font-semibold text-white">Focus:</span> {shownInfo.focus}
+        </div>
+      ) : null;
+
+    const headerRight = infoUpgradeBuildingKey ? (
+      <button
+        type="button"
+        onClick={() => openHomeFlowTarget(infoUpgradeBuildingKey)}
+        className="mb-1 rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[12px] font-bold text-white/85 hover:bg-white/10"
+      >
+        UPGRADE
+      </button>
+    ) : null;
+
+    return (
+      <DesktopFloatingPanelShell
+        eyebrow="MLEO BASE INFO"
+        title={shownInfo.title}
+        subtitle={subtitle}
+        headerRight={headerRight}
+        onClose={() => {
+          setOpenInfoKey(null);
+          setBuildInfo(null);
+        }}
+      >
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+          <div className="whitespace-pre-line text-sm leading-7 text-white/80">
+            {shownInfo.text}
+          </div>
+
+          {hasInfoTipContent(shownInfo?.tips) ? (
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <div className="grid gap-2 text-sm text-white/78">
+                {renderInfoTipRow("Main building", shownInfo?.tips?.building)}
+                {renderInfoTipRow(
+                  "Support buildings",
+                  shownInfo?.tips?.supportBuildings
+                )}
+                {renderInfoTipRow("Main research", shownInfo?.tips?.research)}
+                {renderInfoTipRow(
+                  "Support research",
+                  shownInfo?.tips?.supportResearch
+                )}
+                {renderInfoTipRow("Best module", shownInfo?.tips?.module)}
+                {renderInfoTipRow(
+                  "Best operation",
+                  shownInfo?.tips?.operation
+                )}
+                {renderInfoTipRow("Watch out", shownInfo?.tips?.watch)}
+              </div>
+
+              {normalizeInfoTipItems(shownInfo?.tips?.actions).length ? (
+                <div className="mt-4">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-200/70">
+                    Quick actions
+                  </div>
+
+                  <ul className="mt-2 space-y-1.5 text-sm leading-6 text-white/78">
+                    {normalizeInfoTipItems(shownInfo?.tips?.actions).map((item) => (
+                      <li key={item} className="flex gap-2">
+                        <span className="mt-[8px] h-1.5 w-1.5 rounded-full bg-cyan-300/90" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {shownInfo?.nextStep ? (
+            <button
+              type="button"
+              onClick={handleInfoNextStep}
+              className="mt-4 flex w-full items-start justify-between rounded-2xl border border-cyan-400/20 bg-cyan-500/8 px-4 py-3 text-left transition hover:bg-cyan-500/14"
+            >
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-200/70">
+                  Available action
+                </div>
+                <div className="mt-1 text-base font-semibold text-white">
+                  {shownInfo.nextStep.label}
+                </div>
+                {shownInfo.nextStep.why ? (
+                  <div className="mt-1 text-sm text-white/68">
+                    Why: {shownInfo.nextStep.why}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="ml-4 pt-1 text-cyan-200/80">→</div>
+            </button>
+          ) : null}
+        </div>
+      </DesktopFloatingPanelShell>
+    );
   }
 
   function handleCommandHubItemClick(item) {
@@ -7520,13 +7656,19 @@ export default function MleoBase() {
                   </div>
                 </button>
 
-                {showBankedPanel ? (
+                {showBankedPanel && !shownInfo ? (
                   <div className="absolute right-0 top-[calc(100%+10px)] z-[130] w-[360px]">
                     <BankedQuickPanel
                       snapshot={bankedRateSnapshot}
                       bankedValue={state.bankedMleo || 0}
                       onClose={() => setShowBankedPanel(false)}
                     />
+                  </div>
+                ) : null}
+
+                {shownInfo ? (
+                  <div className="absolute right-0 top-[calc(100%+10px)] z-[130] w-[360px]">
+                    <DesktopInfoFloatingPanel />
                   </div>
                 ) : null}
               </div>
@@ -8120,7 +8262,7 @@ export default function MleoBase() {
 
           {shownInfo ? (
             <div
-              className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/78 backdrop-blur-sm px-4 lg:items-stretch lg:justify-end lg:px-0"
+              className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/78 backdrop-blur-sm px-4 lg:items-stretch lg:justify-end lg:px-0 sm:hidden"
               onClick={() => {
                 setOpenInfoKey(null);
                 setBuildInfo(null);
