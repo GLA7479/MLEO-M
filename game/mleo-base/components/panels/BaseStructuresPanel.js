@@ -155,9 +155,9 @@ export function BaseStructuresPanel({
                   </div>
                 </div>
 
-                <div className="mt-2 flex w-full flex-col gap-2">
+                <div className="mt-1 flex w-full flex-col gap-1.5">
                   {card.canThrottle && card.level > 0 ? (
-                    <div className="mt-3 grid grid-cols-5 gap-1.5">
+                    <div className="mt-2 grid grid-cols-5 gap-1.5">
                       {(powerSteps || []).map((mode) => {
                         const active = card.powerMode === mode;
                         return (
@@ -178,7 +178,7 @@ export function BaseStructuresPanel({
                     </div>
                   ) : (
                     // Keep exact visual spacing for buildings without power % controls.
-                    <div className="mt-3 grid grid-cols-5 gap-1.5 opacity-0 pointer-events-none">
+                    <div className="mt-2 grid grid-cols-5 gap-1.5 opacity-0 pointer-events-none">
                       {(powerSteps || []).map((mode) => (
                         <button
                           key={mode}
