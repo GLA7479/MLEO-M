@@ -2337,7 +2337,7 @@ export default function MleoBase() {
           setBuildInfo(null);
         }}
       >
-        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+        <div className="bg-transparent border-0 rounded-none shadow-none backdrop-blur-0 p-5">
           <div className="whitespace-pre-line text-sm leading-7 text-white/80">
             {shownInfo.text}
           </div>
