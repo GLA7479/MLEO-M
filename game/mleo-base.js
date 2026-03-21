@@ -381,16 +381,15 @@ function formatBankedBadgeCompact(value) {
   };
 
   let scaled = computeScaled(tier);
-  let compact = formatScaled(scaled);
+  let formatted = formatScaled(scaled);
 
-  // If rounding crosses 1000 in this tier, bump to the next suffix.
-  while (Number(compact) >= 1000 && tier < divisors.length - 1) {
+  if (Number(formatted) >= 1000 && tier < divisors.length - 1) {
     tier += 1;
     scaled = computeScaled(tier);
-    compact = formatScaled(scaled);
+    formatted = formatScaled(scaled);
   }
 
-  return `${sign}${compact}${suffixes[tier]}`;
+  return `${sign}${formatted}${suffixes[tier]}`;
 }
 
 function costTone(current, needed) {
@@ -1146,7 +1145,7 @@ function WindowBankedBadge({ value }) {
         Banked
       </div>
       <div className="text-xs font-extrabold text-cyan-100">
-        {formatResourceValue(value || 0)} MLEO
+        {formatBankedBadgeCompact(value || 0)} MLEO
       </div>
     </div>
   );
@@ -1427,7 +1426,7 @@ function BaseResourceBar({
               BANKED
             </div>
             <div className={`${compact ? "text-xs" : "text-sm"} font-extrabold text-cyan-100 leading-5`}>
-              {formatResourceValue(bankedMleo || 0)} MLEO
+              {formatBankedBadgeCompact(bankedMleo || 0)} MLEO
             </div>
           </div>
         ) : null}
@@ -2773,7 +2772,12 @@ export default function MleoBase() {
   const highlightTimeoutRef = useRef(null);
   const expeditionToastNonceRef = useRef(0);
   const bankedDisplayCurrentRef = useRef(0);
-  const bankedDisplayRafRef = useRef(null);
+  const bankedDisplaySettleRafRef = useRef(null);
+  const bankedDisplayPreviewRafRef = useRef(null);
+  const bankedDisplayInitializedRef = useRef(false);
+  const bankedDisplayConfirmedRef = useRef(0);
+  const bankedDisplayConfirmedAtRef = useRef(0);
+  const bankedDisplaySettlingRef = useRef(false);
 
   const lastInteractionRef = useRef(Date.now());
   const lastPresenceSendRef = useRef(0);
@@ -3920,6 +3924,8 @@ export default function MleoBase() {
     () => getBankedRateSnapshot(state, derived),
     [state, derived]
   );
+  const bankedLiveRatePerSecond = Number(bankedSnapshot?.perSecond || 0);
+  const bankedLiveActive = Boolean(bankedSnapshot?.active) && bankedLiveRatePerSecond > 0;
 
   useEffect(() => {
     bankedDisplayCurrentRef.current = Number(bankedDisplayValue || 0);
@@ -3928,23 +3934,38 @@ export default function MleoBase() {
   useEffect(() => {
     if (!mounted) return undefined;
     const confirmedBanked = Number(state.bankedMleo || 0);
+    const now = performance.now();
+
+    if (bankedDisplaySettleRafRef.current != null) {
+      window.cancelAnimationFrame(bankedDisplaySettleRafRef.current);
+      bankedDisplaySettleRafRef.current = null;
+    }
+
+    bankedDisplayConfirmedRef.current = confirmedBanked;
+    bankedDisplayConfirmedAtRef.current = now;
+
     const fromValue = Number(bankedDisplayCurrentRef.current || 0);
     const delta = confirmedBanked - fromValue;
     const absDelta = Math.abs(delta);
 
-    if (bankedDisplayRafRef.current != null) {
-      window.cancelAnimationFrame(bankedDisplayRafRef.current);
-      bankedDisplayRafRef.current = null;
-    }
-
-    if (absDelta < 0.005) {
+    if (!bankedDisplayInitializedRef.current) {
+      bankedDisplayInitializedRef.current = true;
       bankedDisplayCurrentRef.current = confirmedBanked;
       setBankedDisplayValue(confirmedBanked);
       return undefined;
     }
 
-    const startAt = performance.now();
-    const durationMs = absDelta >= 100 ? 1300 : absDelta >= 10 ? 1000 : 850;
+    if (absDelta < 0.005) {
+      bankedDisplaySettlingRef.current = false;
+      bankedDisplayCurrentRef.current = confirmedBanked;
+      setBankedDisplayValue(confirmedBanked);
+      return undefined;
+    }
+
+    bankedDisplaySettlingRef.current = true;
+
+    const startAt = now;
+    const durationMs = absDelta >= 25 ? 850 : absDelta >= 5 ? 700 : 550;
     const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
     const animate = (ts) => {
@@ -3955,24 +3976,72 @@ export default function MleoBase() {
       setBankedDisplayValue(nextValue);
 
       if (progress < 1) {
-        bankedDisplayRafRef.current = window.requestAnimationFrame(animate);
+        bankedDisplaySettleRafRef.current = window.requestAnimationFrame(animate);
         return;
       }
 
       bankedDisplayCurrentRef.current = confirmedBanked;
       setBankedDisplayValue(confirmedBanked);
-      bankedDisplayRafRef.current = null;
+      bankedDisplaySettlingRef.current = false;
+      bankedDisplaySettleRafRef.current = null;
     };
 
-    bankedDisplayRafRef.current = window.requestAnimationFrame(animate);
+    bankedDisplaySettleRafRef.current = window.requestAnimationFrame(animate);
 
     return () => {
-      if (bankedDisplayRafRef.current != null) {
-        window.cancelAnimationFrame(bankedDisplayRafRef.current);
-        bankedDisplayRafRef.current = null;
+      if (bankedDisplaySettleRafRef.current != null) {
+        window.cancelAnimationFrame(bankedDisplaySettleRafRef.current);
+        bankedDisplaySettleRafRef.current = null;
       }
     };
-  }, [mounted, state.bankedMleo, state.lastTickAt]);
+  }, [mounted, state.bankedMleo]);
+
+  useEffect(() => {
+    if (!mounted) return undefined;
+
+    if (bankedDisplayPreviewRafRef.current != null) {
+      window.cancelAnimationFrame(bankedDisplayPreviewRafRef.current);
+      bankedDisplayPreviewRafRef.current = null;
+    }
+
+    const PREVIEW_WINDOW_SECONDS = 8;
+    const MIN_STEP = 0.001;
+
+    const frame = () => {
+      const current = Number(bankedDisplayCurrentRef.current || 0);
+      const confirmed = Number(bankedDisplayConfirmedRef.current || 0);
+      let target = confirmed;
+
+      if (!bankedDisplaySettlingRef.current && bankedLiveActive) {
+        const elapsedSeconds = Math.max(
+          0,
+          (performance.now() - Number(bankedDisplayConfirmedAtRef.current || 0)) / 1000
+        );
+        const boundedElapsed = Math.min(PREVIEW_WINDOW_SECONDS, elapsedSeconds);
+        const previewGain = bankedLiveRatePerSecond * boundedElapsed;
+        target = confirmed + previewGain;
+      }
+
+      const diff = target - current;
+      if (Math.abs(diff) >= MIN_STEP) {
+        const smoothing = diff > 0 ? 0.22 : 0.35;
+        const nextValue = current + diff * smoothing;
+        bankedDisplayCurrentRef.current = nextValue;
+        setBankedDisplayValue(nextValue);
+      }
+
+      bankedDisplayPreviewRafRef.current = window.requestAnimationFrame(frame);
+    };
+
+    bankedDisplayPreviewRafRef.current = window.requestAnimationFrame(frame);
+
+    return () => {
+      if (bankedDisplayPreviewRafRef.current != null) {
+        window.cancelAnimationFrame(bankedDisplayPreviewRafRef.current);
+        bankedDisplayPreviewRafRef.current = null;
+      }
+    };
+  }, [mounted, bankedLiveActive, bankedLiveRatePerSecond]);
 
   const rawOverview = useMemo(
     () =>
@@ -9410,7 +9479,7 @@ export default function MleoBase() {
                       <div className="mt-1 text-2xl font-black text-white">{desktopPanelTitle}</div>
                         </div>
                     <div className="flex shrink-0 items-center gap-3">
-                      <WindowBankedBadge value={state.bankedMleo || 0} />
+                      <WindowBankedBadge value={bankedDisplayValue} />
                         <button
                         onClick={closeDesktopPanel}
                         className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-white/90 hover:bg-white/10"
@@ -9798,7 +9867,7 @@ export default function MleoBase() {
           {mobilePanel ? (
             <MobilePanelOverlayShell
               title={mobilePanelTitle}
-              bankedBadge={<WindowBankedBadge value={state.bankedMleo || 0} />}
+              bankedBadge={<WindowBankedBadge value={bankedDisplayValue} />}
               onClose={closeMobilePanel}
               scrollRef={mobilePanelScrollRef}
             >
