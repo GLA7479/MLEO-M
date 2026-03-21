@@ -2769,16 +2769,11 @@ export default function MleoBase() {
   const [activeBuildKey, setActiveBuildKey] = useState(null);
   const [overviewGuidanceState, setOverviewGuidanceState] = useState(null);
   const [bankedDisplayValue, setBankedDisplayValue] = useState(0);
+  const [bankedDisplayNow, setBankedDisplayNow] = useState(() => Date.now());
+  const bankedDisplayValueRef = useRef(0);
+  const bankedServerValueRef = useRef(0);
   const highlightTimeoutRef = useRef(null);
   const expeditionToastNonceRef = useRef(0);
-  const bankedDisplayCurrentRef = useRef(0);
-  const bankedDisplayIntervalRef = useRef(null);
-  const bankedDisplayInitializedRef = useRef(false);
-  const bankedDisplayServerTargetRef = useRef(null);
-  const bankedDisplayStorageKey = useMemo(
-    () => `mleo_base_banked_display_v3:${address || "guest"}`,
-    [address]
-  );
 
   const lastInteractionRef = useRef(Date.now());
   const lastPresenceSendRef = useRef(0);
@@ -3931,126 +3926,78 @@ export default function MleoBase() {
     bankedLiveRatePerSecond > 0;
 
   useEffect(() => {
-    bankedDisplayCurrentRef.current = Number(bankedDisplayValue || 0);
+    bankedDisplayValueRef.current = Number(bankedDisplayValue || 0);
   }, [bankedDisplayValue]);
 
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted) return undefined;
 
-    const serverValue = Number(state.bankedMleo || 0);
+    let rafId = null;
+    let lastCommit = 0;
 
-    let storedValue = 0;
-    try {
-      const raw = window.localStorage.getItem(bankedDisplayStorageKey);
-      const parsed = Number(raw || 0);
-      if (Number.isFinite(parsed) && parsed > 0) {
-        storedValue = parsed;
+    const tick = () => {
+      const now = Date.now();
+      if (now - lastCommit >= 120) {
+        lastCommit = now;
+        setBankedDisplayNow(now);
       }
-    } catch {}
-
-    const initialValue = Math.min(
-      Math.max(serverValue, storedValue),
-      serverValue + 5
-    );
-
-    bankedDisplayCurrentRef.current = initialValue;
-    bankedDisplayServerTargetRef.current = null;
-    setBankedDisplayValue(initialValue);
-    bankedDisplayInitializedRef.current = true;
-  }, [mounted, bankedDisplayStorageKey]);
-
-  useEffect(() => {
-    if (!mounted || !bankedDisplayInitializedRef.current) return;
-
-    const serverValue = Number(state.bankedMleo || 0);
-    const currentValue = Number(bankedDisplayCurrentRef.current || 0);
-    if (Math.abs(serverValue - currentValue) < 0.0008) {
-      bankedDisplayServerTargetRef.current = null;
-      bankedDisplayCurrentRef.current = serverValue;
-      setBankedDisplayValue(serverValue);
-      return;
-    }
-    // Server snapshot is authoritative target; interval settles smoothly to it.
-    bankedDisplayServerTargetRef.current = serverValue;
-  }, [mounted, state.bankedMleo, bankedDisplayStorageKey]);
-
-  useEffect(() => {
-    if (!mounted || !bankedDisplayInitializedRef.current) return undefined;
-
-    if (bankedDisplayIntervalRef.current != null) {
-      window.clearInterval(bankedDisplayIntervalRef.current);
-      bankedDisplayIntervalRef.current = null;
-    }
-
-    let persistCounter = 0;
-    const STALE_AFTER_MS = 20000;
-    const MIN_STEP = 0.0008;
-
-    bankedDisplayIntervalRef.current = window.setInterval(() => {
-      const current = Number(bankedDisplayCurrentRef.current || 0);
-      let nextValue = current;
-      const targetValue = bankedDisplayServerTargetRef.current;
-
-      if (targetValue != null) {
-        const diffToTarget = Number(targetValue) - current;
-        if (Math.abs(diffToTarget) < MIN_STEP) {
-          nextValue = Number(targetValue);
-          bankedDisplayServerTargetRef.current = null;
-        } else {
-          nextValue = current + diffToTarget * 0.2;
-        }
-      } else {
-        const lastTickAt = Number(state.lastTickAt || 0);
-        const hasFreshSnapshot =
-          Number.isFinite(lastTickAt) &&
-          lastTickAt > 0 &&
-          Date.now() - lastTickAt <= STALE_AFTER_MS;
-
-        if (bankedLiveActive && hasFreshSnapshot) {
-          const stepSeconds = 0.25;
-          const effectiveRate = Math.max(0.01, bankedLiveRatePerSecond * 0.9);
-          nextValue = current + effectiveRate * stepSeconds;
-        }
-      }
-
-      if (Math.abs(nextValue - current) >= MIN_STEP) {
-        bankedDisplayCurrentRef.current = nextValue;
-        setBankedDisplayValue(nextValue);
-      }
-
-      persistCounter += 1;
-      if (persistCounter >= 4) {
-        persistCounter = 0;
-        try {
-          window.localStorage.setItem(
-            bankedDisplayStorageKey,
-            String(bankedDisplayCurrentRef.current || 0)
-          );
-        } catch {}
-      }
-    }, 250);
-
-    return () => {
-      if (bankedDisplayIntervalRef.current != null) {
-        window.clearInterval(bankedDisplayIntervalRef.current);
-        bankedDisplayIntervalRef.current = null;
-      }
-
-      try {
-        window.localStorage.setItem(
-          bankedDisplayStorageKey,
-          String(bankedDisplayCurrentRef.current || 0)
-        );
-      } catch {}
+      rafId = window.requestAnimationFrame(tick);
     };
+
+    rafId = window.requestAnimationFrame(tick);
+    return () => {
+      if (rafId != null) window.cancelAnimationFrame(rafId);
+    };
+  }, [mounted]);
+
+  const bankedDisplayComputed = useMemo(() => {
+    const serverBanked = Number(state.bankedMleo || 0);
+    const lastTickAt = Number(state.lastTickAt || 0);
+
+    if (!mounted) return serverBanked;
+    if (!bankedLiveActive) return serverBanked;
+    if (!Number.isFinite(lastTickAt) || lastTickAt <= 0) return serverBanked;
+
+    const elapsedMs = Math.max(0, bankedDisplayNow - lastTickAt);
+    const freshnessCapMs = 20000;
+    if (elapsedMs > freshnessCapMs) return serverBanked;
+
+    const previewGain = bankedLiveRatePerSecond * (elapsedMs / 1000);
+
+    return serverBanked + previewGain;
   }, [
     mounted,
-    bankedDisplayInitializedRef.current,
+    state.bankedMleo,
+    state.lastTickAt,
     bankedLiveActive,
     bankedLiveRatePerSecond,
-    state.lastTickAt,
-    bankedDisplayStorageKey,
+    bankedDisplayNow,
   ]);
+
+  useEffect(() => {
+    const computed = Number(bankedDisplayComputed || 0);
+    const currentDisplay = Number(bankedDisplayValueRef.current || 0);
+    const serverValue = Number(state.bankedMleo || 0);
+    const prevServerValue = Number(bankedServerValueRef.current || 0);
+
+    // Legitimate reduction event (shipping/reset/etc): allow controlled downward convergence.
+    const hasServerReduction = serverValue + 0.0005 < prevServerValue;
+    const reductionMagnitude = prevServerValue - serverValue;
+    const allowDownward =
+      hasServerReduction && (reductionMagnitude >= 1 || serverValue <= 0.01);
+
+    let nextDisplay = computed;
+    if (!allowDownward) {
+      nextDisplay = Math.max(currentDisplay, computed);
+    } else if (computed < currentDisplay) {
+      nextDisplay = currentDisplay + (computed - currentDisplay) * 0.35;
+      if (Math.abs(nextDisplay - computed) < 0.005) nextDisplay = computed;
+    }
+
+    bankedServerValueRef.current = serverValue;
+    bankedDisplayValueRef.current = nextDisplay;
+    setBankedDisplayValue(nextDisplay);
+  }, [bankedDisplayComputed, state.bankedMleo]);
 
   const rawOverview = useMemo(
     () =>
