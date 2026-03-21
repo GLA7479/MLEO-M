@@ -3928,8 +3928,7 @@ export default function MleoBase() {
   const bankedLiveRatePerSecond = Number(bankedSnapshot?.perSecond || 0);
   const bankedLiveActive =
     Boolean(bankedSnapshot?.active) &&
-    bankedLiveRatePerSecond > 0 &&
-    Number(state.refineryLevel || 0) > 0;
+    bankedLiveRatePerSecond > 0;
 
   useEffect(() => {
     bankedDisplayCurrentRef.current = Number(bankedDisplayValue || 0);
@@ -3949,7 +3948,10 @@ export default function MleoBase() {
       }
     } catch {}
 
-    const initialValue = Math.max(serverValue, storedValue);
+    const initialValue = Math.min(
+      Math.max(serverValue, storedValue),
+      serverValue + 5
+    );
 
     bankedDisplayCurrentRef.current = initialValue;
     bankedDisplayServerTargetRef.current = null;
