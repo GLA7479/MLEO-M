@@ -83,8 +83,8 @@ export default async function handler(req, res) {
         return res.status(503).json({
           success: false,
           code: "ARCADE_FINISH_NOT_CONFIGURED",
-          message:
-            "Arcade finish RPC is missing this game on the server. In Supabase SQL Editor, run the full sql/arcade_sessions_add_slots_mystery.sql (replaces finish_arcade_session). See sql/DEPLOY_ARCADE.md.",
+          // Short for UI; full fix = deploy sql/arcade_sessions_add_slots_mystery.sql in Supabase
+          message: "Arcade server is not configured for this game yet.",
         });
       }
       return res.status(400).json({ success: false, message: raw });

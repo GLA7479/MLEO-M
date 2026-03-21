@@ -3,10 +3,12 @@
 1. **Vault / base schema** — whatever your project uses for `vault_balances`, etc.
 
 2. **`arcade_sessions_coinflip_pilot.sql`** — creates `arcade_device_sessions`, `start_paid_session`, `start_freeplay_session`.  
-   It does **not** define `finish_arcade_session` (so it cannot overwrite the full implementation).
+   It intentionally does **not** redefine `finish_arcade_session`, so you never overwrite the full multi-game implementation from step 3.
 
-3. **`arcade_sessions_add_slots_mystery.sql`** — defines **`finish_arcade_session`** for all arcade games (coin-flip, dice, **blackjack**, slots, poker, …) and grants `service_role` execute.
+3. **`arcade_sessions_add_slots_mystery.sql`** — **source of truth** for **`finish_arcade_session`**: coin-flip, dice, baccarat, slots, mystery, **blackjack**, poker, and all other arcade games in one function. Also sets `REVOKE`/`GRANT` for `service_role`.
 
-## Error: `finish_arcade_session is not configured for game_id=blackjack`
+**Never** paste an old “pilot-only” `finish_arcade_session` (two games) after step 3 — it will break blackjack and the rest.
 
-The database is still using an old **stub** `finish_arcade_session` that only knew coin-flip + dice (e.g. from a previous pilot script). **Fix:** run the full **`arcade_sessions_add_slots_mystery.sql`** in the Supabase SQL Editor (replace entire function). No app code change is required.
+## Error: `finish_arcade_session is not configured for game_id=...`
+
+Supabase still has a **truncated** `finish_arcade_session` (e.g. only coin-flip + dice). **Fix:** in SQL Editor, run the **entire** `sql/arcade_sessions_add_slots_mystery.sql` so `CREATE OR REPLACE FUNCTION public.finish_arcade_session` includes every game branch.

@@ -255,6 +255,16 @@ export default function BlackjackPage() {
     if (!activeSessionId) return null;
     const finishResult = await finishArcadeSession(activeSessionId, buildBlackjackPayload(decision));
     if (!finishResult?.success) {
+      // DB must run full sql/arcade_sessions_add_slots_mystery.sql (all arcade games share finish_arcade_session)
+      if (finishResult?.code === "ARCADE_FINISH_NOT_CONFIGURED") {
+        setSessionError(
+          "השרת לא מוגדר למשחק הזה. באדמין: להריץ ב-Supabase את sql/arcade_sessions_add_slots_mystery.sql (מעדכן את finish_arcade_session)."
+        );
+        setGameState("lobby");
+        sessionIdRef.current = null;
+        setSessionId(null);
+        return null;
+      }
       throw new Error(finishResult?.message || "Failed to finish session");
     }
 
@@ -519,7 +529,7 @@ export default function BlackjackPage() {
             if (await checkOpponentPerfect21(opponent, player)) {
               return;
             }
-            await finishBlackjackSession("play");
+            if ((await finishBlackjackSession("play")) === null) return;
           }, 700);
           return;
         }
@@ -549,7 +559,7 @@ export default function BlackjackPage() {
     // Check for opponent perfect 21
     const opponentVal = calculateHandValue(opponentHand);
     if (opponentVal === 21) {
-      await finishBlackjackSession("play");
+      if ((await finishBlackjackSession("play")) === null) return;
       return;
     }
 
@@ -600,10 +610,14 @@ export default function BlackjackPage() {
       const value = calculateHandValue(newHand);
       if (value > 21) {
         setGameState("finished");
-        setTimeout(() => finishBlackjackSession("double").catch((error) => {
-          console.error("Blackjack finish session error:", error);
-          setSessionError("Session failed to finish");
-        }), 800);
+        setTimeout(async () => {
+          try {
+            if ((await finishBlackjackSession("double")) === null) return;
+          } catch (error) {
+            console.error("Blackjack finish session error:", error);
+            setSessionError("Session failed to finish");
+          }
+        }, 800);
       } else {
         stand(newHand, play * 2, true);
       }
@@ -704,7 +718,7 @@ export default function BlackjackPage() {
   };
   
   const evaluateSplitResults = async () => {
-    await finishBlackjackSession("split");
+    if ((await finishBlackjackSession("split")) === null) return;
   };
 
   const surrender = async () => {
@@ -783,10 +797,14 @@ export default function BlackjackPage() {
         const value = calculateHandValue(newHand);
         if (value > 21) {
           setGameState("finished");
-          setTimeout(() => finishBlackjackSession("play").catch((error) => {
-            console.error("Blackjack finish session error:", error);
-            setSessionError("Session failed to finish");
-          }), 800);
+          setTimeout(async () => {
+            try {
+              if ((await finishBlackjackSession("play")) === null) return;
+            } catch (error) {
+              console.error("Blackjack finish session error:", error);
+              setSessionError("Session failed to finish");
+            }
+          }, 800);
         } else if (value === 21) {
           stand(newHand);
         }
@@ -844,10 +862,14 @@ export default function BlackjackPage() {
           setOpponentHand([...currentOpponentHand]);
           setDeck(currentDeck);
           setGameState("finished");
-          setTimeout(() => finishBlackjackSession(isDouble ? "double" : "play").catch((error) => {
-            console.error("Blackjack finish session error:", error);
-            setSessionError("Session failed to finish");
-          }), 1200);
+          setTimeout(async () => {
+            try {
+              if ((await finishBlackjackSession(isDouble ? "double" : "play")) === null) return;
+            } catch (error) {
+              console.error("Blackjack finish session error:", error);
+              setSessionError("Session failed to finish");
+            }
+          }, 1200);
           return;
         }
         
@@ -856,10 +878,14 @@ export default function BlackjackPage() {
           setOpponentHand([...currentOpponentHand]);
           setDeck(currentDeck);
           setGameState("finished");
-          setTimeout(() => finishBlackjackSession(isDouble ? "double" : "play").catch((error) => {
-            console.error("Blackjack finish session error:", error);
-            setSessionError("Session failed to finish");
-          }), 1200);
+          setTimeout(async () => {
+            try {
+              if ((await finishBlackjackSession(isDouble ? "double" : "play")) === null) return;
+            } catch (error) {
+              console.error("Blackjack finish session error:", error);
+              setSessionError("Session failed to finish");
+            }
+          }, 1200);
           return;
         }
         currentOpponentHand.push(currentDeck[0]);
