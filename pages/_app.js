@@ -30,6 +30,26 @@ export default function App({ Component, pageProps }) {
       }
     }
 
+    // --- Recover once from stale chunk references (dev/prod cache mismatch) ---
+    const CHUNK_RELOAD_KEY = "mleo_chunk_reload_once";
+    const isChunkLoadError = (reason) => {
+      const msg = String(reason?.message || reason || "");
+      return (
+        msg.includes("ChunkLoadError") ||
+        msg.includes("Loading chunk")
+      );
+    };
+    const reloadOnceForChunkError = (reason) => {
+      if (!isChunkLoadError(reason)) return;
+      if (window.sessionStorage.getItem(CHUNK_RELOAD_KEY) === "1") return;
+      window.sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+      window.location.reload();
+    };
+    const onUnhandledRejection = (event) => reloadOnceForChunkError(event?.reason);
+    const onWindowError = (event) => reloadOnceForChunkError(event?.error || event?.message);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+    window.addEventListener("error", onWindowError);
+
     // --- Fix scroll-behavior warning for Next.js ---
     if (typeof document !== "undefined") {
       document.documentElement.setAttribute("data-scroll-behavior", "smooth");
@@ -46,6 +66,8 @@ export default function App({ Component, pageProps }) {
     vv?.addEventListener("resize", setVH);
     window.addEventListener("resize", setVH);
     return () => {
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+      window.removeEventListener("error", onWindowError);
       vv?.removeEventListener("resize", setVH);
       window.removeEventListener("resize", setVH);
     };

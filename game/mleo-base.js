@@ -2772,7 +2772,8 @@ export default function MleoBase() {
   const [bankedDisplayValue, setBankedDisplayValue] = useState(0);
   const highlightTimeoutRef = useRef(null);
   const expeditionToastNonceRef = useRef(0);
-  const bankedDisplayAnchorRef = useRef({ value: 0, at: Date.now() });
+  const bankedDisplayCurrentRef = useRef(0);
+  const bankedDisplayRafRef = useRef(null);
 
   const lastInteractionRef = useRef(Date.now());
   const lastPresenceSendRef = useRef(0);
@@ -3921,42 +3922,57 @@ export default function MleoBase() {
   );
 
   useEffect(() => {
-    const confirmedBanked = Number(state.bankedMleo || 0);
-    bankedDisplayAnchorRef.current = { value: confirmedBanked, at: Date.now() };
-    setBankedDisplayValue(confirmedBanked);
-  }, [state.bankedMleo]);
+    bankedDisplayCurrentRef.current = Number(bankedDisplayValue || 0);
+  }, [bankedDisplayValue]);
 
   useEffect(() => {
     if (!mounted) return undefined;
+    const confirmedBanked = Number(state.bankedMleo || 0);
+    const fromValue = Number(bankedDisplayCurrentRef.current || 0);
+    const delta = confirmedBanked - fromValue;
+    const absDelta = Math.abs(delta);
 
-    const perSecond = Math.max(0, Number(bankedSnapshot?.perSecond || 0));
-    const remainingToCap = Math.max(0, Number(bankedSnapshot?.remainingToCap || 0));
-    const canTick = !!bankedSnapshot?.active && perSecond > 0;
-    const MAX_VISUAL_LEAD_SECONDS = 120;
+    if (bankedDisplayRafRef.current != null) {
+      window.cancelAnimationFrame(bankedDisplayRafRef.current);
+      bankedDisplayRafRef.current = null;
+    }
 
-    const updateDisplay = () => {
-      const anchor = bankedDisplayAnchorRef.current;
-      const elapsedSeconds = Math.max(0, (Date.now() - Number(anchor.at || 0)) / 1000);
-      const boundedElapsedSeconds = Math.min(elapsedSeconds, MAX_VISUAL_LEAD_SECONDS);
+    if (absDelta < 0.005) {
+      bankedDisplayCurrentRef.current = confirmedBanked;
+      setBankedDisplayValue(confirmedBanked);
+      return undefined;
+    }
 
-      let nextVisualValue = Number(anchor.value || 0);
-      if (canTick) {
-        nextVisualValue += boundedElapsedSeconds * perSecond;
-        nextVisualValue = Math.min(nextVisualValue, Number(anchor.value || 0) + remainingToCap);
+    const startAt = performance.now();
+    const durationMs = absDelta >= 100 ? 1300 : absDelta >= 10 ? 1000 : 850;
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+
+    const animate = (ts) => {
+      const progress = Math.max(0, Math.min(1, (ts - startAt) / durationMs));
+      const eased = easeOutCubic(progress);
+      const nextValue = fromValue + delta * eased;
+      bankedDisplayCurrentRef.current = nextValue;
+      setBankedDisplayValue(nextValue);
+
+      if (progress < 1) {
+        bankedDisplayRafRef.current = window.requestAnimationFrame(animate);
+        return;
       }
 
-      if (!Number.isFinite(nextVisualValue)) nextVisualValue = Number(anchor.value || 0);
-      setBankedDisplayValue((prev) =>
-        Math.abs(prev - nextVisualValue) < 0.0005 ? prev : nextVisualValue
-      );
+      bankedDisplayCurrentRef.current = confirmedBanked;
+      setBankedDisplayValue(confirmedBanked);
+      bankedDisplayRafRef.current = null;
     };
 
-    updateDisplay();
-    if (!canTick) return undefined;
+    bankedDisplayRafRef.current = window.requestAnimationFrame(animate);
 
-    const intervalId = setInterval(updateDisplay, 120);
-    return () => clearInterval(intervalId);
-  }, [mounted, bankedSnapshot?.active, bankedSnapshot?.perSecond, bankedSnapshot?.remainingToCap]);
+    return () => {
+      if (bankedDisplayRafRef.current != null) {
+        window.cancelAnimationFrame(bankedDisplayRafRef.current);
+        bankedDisplayRafRef.current = null;
+      }
+    };
+  }, [mounted, state.bankedMleo, state.lastTickAt]);
 
   const rawOverview = useMemo(
     () =>
