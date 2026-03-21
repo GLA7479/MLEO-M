@@ -5,6 +5,7 @@
 - `sql/debug/miners`
 - `sql/debug/vault`
 - `sql/debug/system`
+- `sql/debug/arcade`
 
 מה הכי בטוח לבדיקה יומיומית:
 - overview files
@@ -25,9 +26,11 @@
 2. MINERS
 3. VAULT
 4. SYSTEM
-5. CLIENT docs
+5. ARCADE (משחקי device / סשנים)
+6. CLIENT docs
 
 לפני הרצה של קבצים למשתמש ספציפי:
 - להחליף `PUT-DEVICE-ID-HERE`
+- בתיקיית `arcade`: גם `PUT-SESSION-ID-HERE` כשמדובר בסשן בודד
 
 לא להריץ קבצים הרסניים בלי לבדוק קודם overview ו-single-user files.
