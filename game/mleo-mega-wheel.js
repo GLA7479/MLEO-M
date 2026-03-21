@@ -278,19 +278,19 @@ export default function MegaWheelPage() {
 
     const payload = finishResult?.serverPayload || {};
     const segmentIndex = Math.max(0, Math.min(7, Number(payload.segmentIndex ?? 0)));
-    const multiplier = Number(payload.multiplier ?? WHEEL_SEGMENTS[segmentIndex] ?? 0);
+    /** Single source of truth from server (matches SQL v_mega_segments / approved_reward) */
+    const serverMultiplier = Number(payload.multiplier ?? WHEEL_SEGMENTS[segmentIndex] ?? 0);
     const color = String(payload.color || WHEEL_COLORS[segmentIndex] || "Segment");
     
-    // Calculate target rotation (5 full spins + land on segment)
-    const degreesPerSegment = 360 / WHEEL_SEGMENTS.length; // 45 degrees per segment
-    // Calculate the center of the target segment
+    // Pointer at top: align segment center under pointer after cumulative wheelRotation (fixes drift after spin 2+)
+    const degreesPerSegment = 360 / WHEEL_SEGMENTS.length;
     const segmentCenter = segmentIndex * degreesPerSegment + degreesPerSegment / 2;
-    // We need to rotate so the center of the target segment ends up at the top (0 degrees)
-    // The wheel rotates clockwise, so we need to rotate counter-clockwise
-    const finalRotation = 360 * 5 + (360 - segmentCenter); // 5 full rotations + target center
-    
-    // Animate with easing (fast -> slow)
     const startRotation = wheelRotation;
+    const startNorm = ((startRotation % 360) + 360) % 360;
+    const deltaToPointer = (360 - segmentCenter - startNorm + 360) % 360;
+    const finalRotation = 360 * 5 + deltaToPointer;
+
+    // Animate with easing (fast -> slow)
     const totalDuration = 3000; // 3 seconds
     const startTime = Date.now();
     
@@ -307,21 +307,23 @@ export default function MegaWheelPage() {
       if (progress < 1) {
         requestAnimationFrame(animateWheel);
       } else {
-        // Finished spinning
-        setResult(multiplier);
+        // Finished spinning — use server multiplier + approvedReward only (no mixed win/loss cues)
+        const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
+        const profit = prize - play;
+        setResult(serverMultiplier);
         setSpinning(false);
 
-        const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
         if (Number.isFinite(finishResult?.balanceAfter)) {
           setVaultState(finishResult.balanceAfter);
         }
-        if (prize > 0) {
+        if (profit > 0) {
           playSfx(winSound.current);
         }
         const resultData = {
-          multiplier,
+          segmentIndex,
+          multiplier: serverMultiplier,
           prize,
-          profit: prize - play,
+          profit,
           color,
           segmentLabel: `${color} · seg ${segmentIndex + 1}/8`,
           stake: play,
@@ -333,7 +335,7 @@ export default function MegaWheelPage() {
           totalPlay: prev.totalPlay + play,
           totalWon: prev.totalWon + prize,
           biggestWin: Math.max(prev.biggestWin, prize),
-          biggestMultiplier: Math.max(prev.biggestMultiplier, multiplier),
+          biggestMultiplier: Math.max(prev.biggestMultiplier, serverMultiplier),
           lastPlay: play,
         }));
       }
@@ -357,7 +359,7 @@ export default function MegaWheelPage() {
           <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
             <div className="absolute left-2 top-2 flex gap-2 pointer-events-auto">
               <button onClick={backSafe} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">BACK</button>
-              {freePlayTokens > 0 && (<button onClick={() => spinWheel(true)} disabled={spinning} className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50" title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}><span className="text-base">🎁</span><span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">{freePlayTokens}</span></button>)}
+              {freePlayTokens > 0 && (<button type="button" onClick={() => spinWheel(true)} disabled={spinning} className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50 disabled:pointer-events-none" title={`${freePlayTokens} Free Play${freePlayTokens > 1 ? 's' : ''} Available`}><span className="text-base">🎁</span><span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">{freePlayTokens}</span></button>)}
             </div>
             <div className="absolute right-2 top-2 flex gap-2 pointer-events-auto">
               <button onClick={() => { playSfx(clickSound.current); const el = wrapRef.current || document.documentElement; if (!document.fullscreenElement) { el.requestFullscreen?.().catch(() => {}); } else { document.exitFullscreen?.().catch(() => {}); } }} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10">{isFullscreen ? "EXIT" : "FULL"}</button>
@@ -423,7 +425,7 @@ export default function MegaWheelPage() {
             <div className="text-center mt-3" style={{ height: '28px' }}>
               <div className={`text-lg font-bold text-yellow-400 transition-opacity ${result != null && !spinning ? 'opacity-100' : 'opacity-0'}`}>
                 {result != null && gameResult
-                  ? `${gameResult.color} · ×${Number(gameResult.multiplier).toFixed(2)}`
+                  ? `${gameResult.color} · seg ${Number(gameResult.segmentIndex ?? 0) + 1}/8 · ×${Number(gameResult.multiplier).toFixed(2)}`
                   : ''}
               </div>
             </div>
@@ -474,12 +476,12 @@ export default function MegaWheelPage() {
             >
               100K
             </button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.max(MIN_PLAY, current - 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
+            <button type="button" onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.max(MIN_PLAY, current - 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning || gameResult} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50 disabled:pointer-events-none">−</button>
             <div className="relative">
               <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); setActiveAmountButton(null); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={spinning || gameResult} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
               <button onClick={() => { setPlayAmount(String(MIN_PLAY)); setActiveAmountButton("100"); playSfx(clickSound.current); }} disabled={spinning || gameResult} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
             </div>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
+            <button type="button" onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} disabled={spinning || gameResult} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50 disabled:pointer-events-none">+</button>
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
@@ -503,13 +505,13 @@ export default function MegaWheelPage() {
         {showResultPopup && gameResult && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
             <div className="bg-gradient-to-r from-yellow-500 to-orange-600 text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto max-w-sm" style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
-              <div className="text-4xl mb-2">{gameResult.prize > 0 ? '🎉' : '🎡'}</div>
+              <div className="text-4xl mb-2">{gameResult.profit >= 0 ? '🎉' : '🎡'}</div>
               <div className="text-lg font-semibold opacity-95 mb-1">{gameResult.segmentLabel || `${gameResult.color} · segment`}</div>
               <div className="text-2xl font-bold mb-1">
                 Multiplier ×{Number(gameResult.multiplier).toFixed(2)}
               </div>
               <div className="text-lg font-bold">
-                {gameResult.prize > 0 ? `+${fmtPrize(gameResult.prize)} MLEO` : `+0 MLEO (stake ×${Number(gameResult.multiplier).toFixed(2)} rounds down)`}
+                Payout +{fmtPrize(gameResult.prize)} MLEO
               </div>
               <div className="text-xs opacity-90 mt-2 space-y-0.5">
                 <div>Stake {fmtPrize(gameResult.stake ?? (Number(playAmount) || 0))} · Net {gameResult.profit >= 0 ? '+' : ''}{fmtPrize(gameResult.profit)} MLEO</div>

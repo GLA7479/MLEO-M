@@ -9,7 +9,7 @@
 
 **Never** paste an old “pilot-only” `finish_arcade_session` (two games) after step 3 — it will break blackjack and the rest.
 
-After pulling repo updates, re-apply `arcade_sessions_add_slots_mystery.sql` if you need fixes such as horse `won` semantics, the global “finish too quickly” window, or **arcade poker** (`game_id = 'poker'`) finish timing (was 1800ms, now aligned to 100ms after global guard).
+After pulling repo updates, re-apply `arcade_sessions_add_slots_mystery.sql` if you need fixes such as horse `won` semantics, the global “finish too quickly” window, or **arcade poker** (`game_id = 'poker'`) finish timing (was 1800ms, now aligned to 100ms after global guard). **Triple Cards** (`three-card-poker`): per-game window was 1500ms (blocked normal play); must be **100ms** in the same function — redeploy this file to Supabase for that fix to be live.
 
 ## Error: `finish_arcade_session is not configured for game_id=...`
 

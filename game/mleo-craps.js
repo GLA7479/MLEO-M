@@ -473,12 +473,12 @@ export default function DiceArenaPage() {
             >
               100K
             </button>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = Math.max(MIN_PLAY, current - 100); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={rolling} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">−</button>
+            <button type="button" onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = Math.max(MIN_PLAY, current - 100); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={rolling || gameResult} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50 disabled:pointer-events-none">−</button>
             <div className="relative">
               <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); setActiveAmountButton(null); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={rolling || gameResult} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6" />
               <button onClick={() => { setPlayAmount(String(MIN_PLAY)); setActiveAmountButton("100"); playSfx(clickSound.current); }} disabled={rolling || gameResult} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
             </div>
-            <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = Math.min(vault, current + 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={rolling} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50">+</button>
+            <button type="button" onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newPlay = Math.min(vault, current + 1000); setPlayAmount(String(newPlay)); playSfx(clickSound.current); }} disabled={rolling || gameResult} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50 disabled:pointer-events-none">+</button>
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>

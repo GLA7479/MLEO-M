@@ -1372,7 +1372,7 @@ BEGIN
       v_plinko_multiplier := 0.5;
     ELSIF v_plinko_pick < 0.7698 THEN
       v_plinko_bucket := 8;
-      v_plinko_multiplier := 0.668;
+      v_plinko_multiplier := 0.7;
     ELSIF v_plinko_pick < 0.8898 THEN
       v_plinko_bucket := 9;
       v_plinko_multiplier := 0.5;
@@ -1948,8 +1948,8 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'three-card-poker' THEN
-    -- Minimum time for three-card-poker (casino game)
-    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1500 milliseconds' THEN
+    -- Per-game finish window: 100ms (same pattern as arcade poker `game_id = 'poker'`; not 1500ms)
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '100 milliseconds' THEN
       RAISE EXCEPTION 'Session finished too quickly';
     END IF;
     

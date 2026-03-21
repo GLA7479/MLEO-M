@@ -63,29 +63,12 @@ function useIOSViewportFix() {
 const LS_KEY = "mleo_plinko2_v1";
 const MIN_PLAY = 100;
 
-// EXTREME Plinko - center bucket ×0.668 (server-aligned), corners ×0
-// High multipliers at edges for big wins, but low probability!
-const MULTIPLIERS = [0, 40, 18, 5, 2, 1.5, 1, 0.5, 0.668, 0.5, 1, 1.5, 2, 5, 18, 40, 0];
+// Must match sql/arcade_sessions_add_slots_mystery.sql `plinko` branch (bucketIndex 0–16; center = 8 → ×0.7)
+const MULTIPLIERS = [0, 40, 18, 5, 2, 1.5, 1, 0.5, 0.7, 0.5, 1, 1.5, 2, 5, 18, 40, 0];
 
-// Visual/sim probabilities (server authorizes payout via finish_arcade_session; ~94.5% RTP target)
+// Reference only — server draws outcome; payouts are server-authoritative
 const CUSTOM_PROBABILITIES = [
-  0.0002,   // 0.02% - corner ×0
-  0.0001,   // 0.01% - ×40 (big win but rare!)
-  0.003,    // 0.3% - ×2
-  0.0015,   // 0.15% - ×18
-  0.015,    // 1.5% - ×1.5
-  0.04,     // 4% - ×5
-  0.09,     // 9% - ×1
-  0.12,     // 12% - ×0.5
-  0.5,      // 50% - center ×0.668 (most common)
-  0.12,     // 12% - ×0.5
-  0.09,     // 9% - ×1
-  0.04,     // 4% - ×5
-  0.015,    // 1.5% - ×1.5
-  0.0015,   // 0.15% - ×18
-  0.003,    // 0.3% - ×2
-  0.0001,   // 0.01% - ×40 (big win but rare!)
-  0.0002    // 0.02% - corner ×0
+  0.0002, 0.0001, 0.003, 0.0015, 0.015, 0.04, 0.09, 0.12, 0.5, 0.12, 0.09, 0.04, 0.015, 0.0015, 0.003, 0.0001, 0.0002,
 ];
 const BUCKET_COLORS = ["from-black to-gray-900", "from-yellow-300 to-yellow-500", "from-orange-400 to-orange-600", "from-green-500 to-emerald-500", "from-blue-500 to-cyan-500", "from-purple-500 to-purple-600", "from-gray-600 to-gray-700", "from-red-600 to-red-700", "from-black to-gray-900", "from-red-600 to-red-700", "from-gray-600 to-gray-700", "from-purple-500 to-purple-600", "from-blue-500 to-cyan-500", "from-green-500 to-emerald-500", "from-orange-400 to-orange-600", "from-yellow-300 to-yellow-500", "from-black to-gray-900"];
 
@@ -135,6 +118,18 @@ function fmt(n) {
   return Math.floor(n).toString();
 }
 
+/** Plinko UI: &lt;1 → one decimal max; ≥1 → whole number (matches paytable cleanliness) */
+function formatPlinkoMultiplier(m) {
+  const x = Number(m);
+  if (!Number.isFinite(x)) return "0";
+  if (x < 1) {
+    const s = (Math.round(x * 10) / 10).toFixed(1);
+    if (s === "0.0" || s === "-0.0") return "0";
+    return s.replace(/\.0$/, "");
+  }
+  return String(Math.round(x));
+}
+
 function formatPlayDisplay(n) {
   const num = Number(n) || 0;
   if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M";
@@ -173,6 +168,11 @@ export default function Plinko2Page() {
   const [activeAmountButton, setActiveAmountButton] = useState("100"); // Track which amount button is active
   const [isEditingPlay, setIsEditingPlay] = useState(false);
   const [ballsDropping, setBallsDropping] = useState(0);
+  const [batchSize, setBatchSize] = useState(1);
+  const [batchRunning, setBatchRunning] = useState(false);
+
+  /** Always latest landing handler (canvas loop must not capture a stale closure). */
+  const landInBucketRef = useRef(() => {});
 
   // Game state
   const ballsRef = useRef([]);
@@ -217,6 +217,54 @@ export default function Plinko2Page() {
       sound.currentTime = 0;
       sound.play().catch(() => {});
     } catch {}
+  };
+
+  landInBucketRef.current = (ball, bucket) => {
+    const play = ball.play;
+    const fr = ball.finishResult;
+    const payload = fr?.serverPayload || {};
+    const bucketIndex = Number.isInteger(Number(payload.bucketIndex))
+      ? Number(payload.bucketIndex)
+      : bucket.index;
+    const multRaw = Number(payload.multiplier);
+    const multiplier = Number.isFinite(multRaw)
+      ? multRaw
+      : Number(MULTIPLIERS[bucketIndex] ?? 0);
+    const prize = Math.max(0, Number(fr?.approvedReward ?? 0));
+    const win = Boolean(
+      typeof payload.won === "boolean" ? payload.won : prize > 0
+    );
+
+    if (Number.isFinite(fr?.balanceAfter)) {
+      setVaultState(fr.balanceAfter);
+    }
+    if (win && prize > 0) {
+      playSfx(winSound.current);
+    }
+
+    const result = {
+      win,
+      multiplier,
+      prize,
+      profit: prize - play,
+      bucketIndex,
+    };
+
+    setLastResult(result);
+    setShowResultPopup(true);
+    setTimeout(() => setShowResultPopup(false), 3000);
+
+    setStats((prev) => ({
+      ...prev,
+      totalGames: prev.totalGames + 1,
+      wins: win ? prev.wins + 1 : prev.wins,
+      losses: win ? prev.losses : prev.losses + 1,
+      totalPlay: prev.totalPlay + play,
+      totalWon: prev.totalWon + prize,
+      biggestWin: Math.max(prev.biggestWin, prize),
+      biggestMultiplier: Math.max(prev.biggestMultiplier, multiplier),
+      lastPlay: play,
+    }));
   };
 
   // Init
@@ -423,7 +471,7 @@ export default function Plinko2Page() {
         ctx.font = "bold 10px sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(
-          `${bucket.multiplier}x`,
+          `${formatPlinkoMultiplier(bucket.multiplier)}x`,
           bucket.x + bucket.w / 2,
           bucket.y + bucket.h / 2 + 3
         );
@@ -467,12 +515,16 @@ export default function Plinko2Page() {
           }
         }
 
-        // Wall collision - REMOVE ball if hits walls (0x multiplier)
+        // Wall collision — snap to server-authoritative bucket (same as SQL target)
         if (ball.x - ball.r < 0 || ball.x + ball.r > canvas.width) {
-          const fallbackBucket = Number.isInteger(ball.targetBucketIndex)
-            ? bucketsRef.current[ball.targetBucketIndex]
-            : { multiplier: 0.668, index: 8 };
-          landInBucket(ball, fallbackBucket);
+          const idx = Number.isInteger(ball.targetBucketIndex)
+            ? ball.targetBucketIndex
+            : 8;
+          const fallbackBucket = bucketsRef.current[idx] || bucketsRef.current[8];
+          if (fallbackBucket) {
+            ball.x = fallbackBucket.x + fallbackBucket.w / 2;
+            landInBucketRef.current?.(ball, fallbackBucket);
+          }
           balls.splice(i, 1);
           continue;
         }
@@ -495,20 +547,17 @@ export default function Plinko2Page() {
           }
         });
 
-        // Bucket collision - only check if ball reached buckets area
+        // Bucket landing — always use server bucketIndex (authoritative); snap to center
         let landed = false;
         if (ball.y >= canvas.height - 80 && ball.vy > 0) {
-          const targetBucket = Number.isInteger(ball.targetBucketIndex)
-            ? bucketsRef.current[ball.targetBucketIndex]
-            : null;
-          const bucketWidth = canvas.width / MULTIPLIERS.length;
-          let bucketIndex = Math.floor(ball.x / bucketWidth);
-          bucketIndex = Math.max(0, Math.min(bucketIndex, bucketsRef.current.length - 1));
-          const bucket = targetBucket || bucketsRef.current[bucketIndex];
-          if (bucket && ball.y + ball.r >= bucket.y && ball.x >= bucket.x - 10 && ball.x <= bucket.x + bucket.w + 10) {
+          const targetBucket =
+            Number.isInteger(ball.targetBucketIndex)
+              ? bucketsRef.current[ball.targetBucketIndex]
+              : null;
+          if (targetBucket && ball.y + ball.r >= targetBucket.y) {
             landed = true;
-            ball.x = bucket.x + bucket.w / 2;
-            landInBucket(ball, bucket);
+            ball.x = targetBucket.x + targetBucket.w / 2;
+            landInBucketRef.current?.(ball, targetBucket);
             balls.splice(i, 1);
           }
         }
@@ -534,50 +583,9 @@ export default function Plinko2Page() {
     };
   }, [mounted]);
 
-  const landInBucket = async (ball, bucket) => {
-    const play = ball.play;
-    const payload = ball.finishResult?.serverPayload || {};
-    const bucketIndex = Number.isInteger(payload.bucketIndex) ? payload.bucketIndex : bucket.index;
-    const multiplier = Number(payload.multiplier ?? MULTIPLIERS[bucketIndex] ?? 0);
-    const prize = Math.max(0, Number(ball.finishResult?.approvedReward ?? Math.floor(play * multiplier)));
-    const win = Boolean(payload.won ?? (prize > 0));
-
-    if (Number.isFinite(ball.finishResult?.balanceAfter)) {
-      setVaultState(ball.finishResult.balanceAfter);
-    }
-    if (win && prize > 0) {
-      playSfx(winSound.current);
-    }
-
-    const result = {
-      win,
-      multiplier,
-      prize,
-      profit: win ? prize - play : -play,
-      bucketIndex: bucketIndex,
-    };
-
-    setLastResult(result);
-    setShowResultPopup(true);
-    setTimeout(() => setShowResultPopup(false), 3000);
-
-    const newStats = {
-      ...stats,
-      totalGames: stats.totalGames + 1,
-      wins: win ? stats.wins + 1 : stats.wins,
-      losses: win ? stats.losses : stats.losses + 1,
-      totalPlay: stats.totalPlay + play,
-      totalWon: win ? stats.totalWon + prize : stats.totalWon,
-      biggestWin: Math.max(stats.biggestWin, win ? prize : 0),
-      biggestMultiplier: Math.max(stats.biggestMultiplier, multiplier),
-      lastPlay: play,
-    };
-    setStats(newStats);
-  };
-
   // Handle amount button clicks
   const handleAmountButtonClick = (amountValue) => {
-    if (ballsDropping > 0) return;
+    if (ballsDropping > 0 || batchRunning) return;
     playSfx(clickSound.current);
     
     const currentAmount = Number(playAmount) || MIN_PLAY;
@@ -596,18 +604,79 @@ export default function Plinko2Page() {
   };
 
   const dropBall = async (isFreePlayParam = false) => {
-    if (ballsDropping > 0) return; // Prevent double clicks
+    if (ballsDropping > 0 || batchRunning) return;
+    const play = Number(playAmount) || MIN_PLAY;
+    if (play < MIN_PLAY) {
+      alert(`Minimum play is ${MIN_PLAY} MLEO`);
+      return;
+    }
+
+    const spawnBall = (finishResult, spawnOffsetY = 0) => {
+      const canvas = canvasRef.current;
+      if (!canvas || !finishResult?.success) return;
+      const payload = finishResult.serverPayload || {};
+      const bi = Number(payload.bucketIndex);
+      const targetIdx = Number.isInteger(bi) ? bi : 8;
+      const ball = {
+        x: canvas.width / 2 + (Math.random() - 0.5) * 20,
+        y: 20 + spawnOffsetY,
+        vx: (Math.random() - 0.5) * 50,
+        vy: 50,
+        r: 3,
+        play,
+        finishResult,
+        targetBucketIndex: targetIdx,
+      };
+      ballsRef.current.push(ball);
+    };
+
     playSfx(clickSound.current);
     setSessionError("");
+
+    const paidBatch = !isFreePlay && !isFreePlayParam && batchSize > 1;
+    if (paidBatch) {
+      const totalCost = play * batchSize;
+      if (totalCost > vault) {
+        alert(`Need ${fmt(totalCost)} MLEO in vault (${batchSize} × ${fmt(play)})`);
+        return;
+      }
+      setBatchRunning(true);
+      try {
+        for (let b = 0; b < batchSize; b++) {
+          const startResult = await startPaidArcadeSession("plinko", play);
+          if (!startResult.success) {
+            alert(startResult.message || "Failed to start session");
+            break;
+          }
+          setVaultState(startResult.balanceAfter);
+          const finishResult = await finishArcadeSession(startResult.sessionId, {});
+          if (!finishResult?.success) {
+            setSessionError("Session failed to finish");
+            alert(finishResult?.message || "Failed to finish session");
+            break;
+          }
+          setPlayAmount(String(play));
+          spawnBall(finishResult, b * 14);
+        }
+      } catch (error) {
+        console.error("Plinko batch error:", error);
+        setSessionError("Session failed to finish");
+        alert("Failed to finish session. Please refresh vault and try again.");
+      } finally {
+        setBatchRunning(false);
+      }
+      return;
+    }
+
     try {
-      let play = Number(playAmount) || MIN_PLAY;
       let finishResult;
+      let effectivePlay = play;
       if (isFreePlay || isFreePlayParam) {
-        const gameId = router.pathname.replace('/', '') || 'plinko';
+        const gameId = router.pathname.replace("/", "") || "plinko";
         try {
           const startResult = await startFreeplayArcadeSession(gameId);
           if (startResult.success) {
-            play = startResult.amount;
+            effectivePlay = startResult.amount;
             setFreePlayTokens(startResult.remainingTokens);
             setIsFreePlay(false);
             router.replace("/plinko", undefined, { shallow: true });
@@ -618,17 +687,17 @@ export default function Plinko2Page() {
             return;
           }
         } catch (error) {
-          console.error('Free play error:', error);
-          alert('Failed to use free play token. Please try again.');
+          console.error("Free play error:", error);
+          alert("Failed to use free play token. Please try again.");
           setIsFreePlay(false);
           return;
         }
       } else {
-        if (play < MIN_PLAY) {
-          alert(`Minimum play is ${MIN_PLAY} MLEO`);
+        if (effectivePlay > vault) {
+          alert(`Need ${fmt(effectivePlay)} MLEO in vault`);
           return;
         }
-        const startResult = await startPaidArcadeSession("plinko", play);
+        const startResult = await startPaidArcadeSession("plinko", effectivePlay);
         if (!startResult.success) {
           alert(startResult.message || "Failed to start session");
           return;
@@ -641,23 +710,8 @@ export default function Plinko2Page() {
         alert(finishResult?.message || "Failed to finish session");
         return;
       }
-      setPlayAmount(String(play));
-
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const ball = {
-        x: canvas.width / 2 + (Math.random() - 0.5) * 20,
-        y: 20,
-        vx: (Math.random() - 0.5) * 50,
-        vy: 50,
-        r: 3,
-        play,
-        finishResult,
-        targetBucketIndex: Number(finishResult?.serverPayload?.bucketIndex),
-      };
-
-      ballsRef.current.push(ball);
+      setPlayAmount(String(effectivePlay));
+      spawnBall(finishResult, 0);
     } catch (error) {
       console.error("Plinko session error:", error);
       setSessionError("Session failed to finish");
@@ -767,6 +821,7 @@ export default function Plinko2Page() {
               {freePlayTokens > 0 && (
                 <button
                   onClick={() => dropBall(true)}
+                  disabled={batchRunning || ballsDropping > 0}
                   className="relative px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition-all disabled:opacity-50"
                   title={`${freePlayTokens} Free Play${
                     freePlayTokens > 1 ? "s" : ""
@@ -835,10 +890,15 @@ export default function Plinko2Page() {
               </div>
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
-              <div className="text-[10px] text-white/60">Play</div>
+              <div className="text-[10px] text-white/60">Play / ball</div>
               <div className="text-sm font-bold text-amber-400">
                 {fmt(Number(playAmount))}
               </div>
+              {batchSize > 1 && !isFreePlay ? (
+                <div className="text-[9px] text-amber-200/80 leading-tight">
+                  Batch {batchSize} → {fmt(Number(playAmount) * batchSize)}
+                </div>
+              ) : null}
             </div>
             <div className="bg-black/30 border border-white/10 rounded-lg p-1 text-center">
               <div className="text-[10px] text-white/60">Balls</div>
@@ -874,16 +934,19 @@ export default function Plinko2Page() {
                     {lastResult.win ? "🎯" : "💥"}
                   </div>
                   <div className="text-sm font-bold mb-1">
-                    {lastResult.win ? `${lastResult.multiplier}x!` : "BETTER LUCK!"}
+                    {lastResult.win
+                      ? `${formatPlinkoMultiplier(lastResult.multiplier)}x!`
+                      : `×${formatPlinkoMultiplier(lastResult.multiplier)}`}
                   </div>
                   <div className="text-xs font-bold">
                     {lastResult.win
                       ? `+${fmt(lastResult.prize)} MLEO`
                       : `-${fmt(Math.abs(lastResult.profit))} MLEO`}
                   </div>
-                  {lastResult.win && lastResult.multiplier && (
+                  {Number.isFinite(lastResult.multiplier) && (
                     <div className="text-[10px] opacity-90 mt-0.5">
-                      Prize: {fmt(lastResult.prize)} MLEO (×{lastResult.multiplier.toFixed(2)})
+                      Prize {fmt(lastResult.prize)} MLEO • ×
+                      {formatPlinkoMultiplier(lastResult.multiplier)}
                     </div>
                   )}
                 </div>
@@ -894,7 +957,7 @@ export default function Plinko2Page() {
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
             <button
               onClick={() => handleAmountButtonClick(100)}
-              disabled={ballsDropping > 0}
+              disabled={ballsDropping > 0 || batchRunning}
               className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
                 activeAmountButton === "100"
                   ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
@@ -905,7 +968,7 @@ export default function Plinko2Page() {
             </button>
             <button
               onClick={() => handleAmountButtonClick(1000)}
-              disabled={ballsDropping > 0}
+              disabled={ballsDropping > 0 || batchRunning}
               className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
                 activeAmountButton === "1000"
                   ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
@@ -916,7 +979,7 @@ export default function Plinko2Page() {
             </button>
             <button
               onClick={() => handleAmountButtonClick(10000)}
-              disabled={ballsDropping > 0}
+              disabled={ballsDropping > 0 || batchRunning}
               className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
                 activeAmountButton === "10000"
                   ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
@@ -927,7 +990,7 @@ export default function Plinko2Page() {
             </button>
             <button
               onClick={() => handleAmountButtonClick(100000)}
-              disabled={ballsDropping > 0}
+              disabled={ballsDropping > 0 || batchRunning}
               className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
                 activeAmountButton === "100000"
                   ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
@@ -943,6 +1006,7 @@ export default function Plinko2Page() {
                 setPlayAmount(String(newBet));
                 playSfx(clickSound.current);
               }}
+              disabled={ballsDropping > 0 || batchRunning}
               className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
             >
               −
@@ -963,6 +1027,7 @@ export default function Plinko2Page() {
                   const current = Number(playAmount) || MIN_PLAY;
                   setPlayAmount(String(Math.max(MIN_PLAY, current)));
                 }}
+                disabled={ballsDropping > 0 || batchRunning}
                 className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold disabled:opacity-50 text-xs pr-6"
               />
               <button
@@ -971,6 +1036,7 @@ export default function Plinko2Page() {
                   setActiveAmountButton("100");
                   playSfx(clickSound.current);
                 }}
+                disabled={ballsDropping > 0 || batchRunning}
                 className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center"
                 title="Reset to minimum play"
               >
@@ -984,10 +1050,35 @@ export default function Plinko2Page() {
                 setPlayAmount(String(newBet));
                 playSfx(clickSound.current);
               }}
+              disabled={ballsDropping > 0 || batchRunning}
               className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm disabled:opacity-50"
             >
               +
             </button>
+          </div>
+
+          <div className="flex items-center justify-center gap-1 mb-1 flex-wrap max-w-md w-full">
+            <span className="text-[10px] text-white/50 uppercase tracking-wide">
+              Balls
+            </span>
+            {[1, 3, 5, 10].map((n) => (
+              <button
+                key={n}
+                type="button"
+                disabled={batchRunning || ballsDropping > 0}
+                onClick={() => {
+                  playSfx(clickSound.current);
+                  setBatchSize(n);
+                }}
+                className={`min-w-[2.25rem] px-2 py-0.5 rounded-md text-[11px] font-bold transition-all disabled:opacity-40 ${
+                  batchSize === n
+                    ? "bg-purple-600 text-white ring-1 ring-purple-300"
+                    : "bg-white/10 text-white/90 hover:bg-white/20"
+                }`}
+              >
+                ×{n}
+              </button>
+            ))}
           </div>
 
           <div
@@ -997,10 +1088,20 @@ export default function Plinko2Page() {
           >
             <button
               onClick={() => dropBall(false)}
-              disabled={ballsDropping > 0 || Number(playAmount) < MIN_PLAY}
+              disabled={
+                ballsDropping > 0 ||
+                batchRunning ||
+                Number(playAmount) < MIN_PLAY
+              }
               className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {ballsDropping > 0 ? "🎯 Dropping..." : "🎯 DROP BALL"}
+              {batchRunning
+                ? "⏳ Batch..."
+                : ballsDropping > 0
+                  ? "🎯 Dropping..."
+                  : batchSize > 1
+                    ? `🎯 DROP ×${batchSize}`
+                    : "🎯 DROP BALL"}
             </button>
             {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
@@ -1136,9 +1237,9 @@ export default function Plinko2Page() {
                   <div className="text-xs space-y-1">
                     <p className="text-white/80">🚀 <span className="text-yellow-300 font-bold text-base">×40</span> - Ultra rare grandPrize!</p>
                     <p className="text-white/80">🔥 Great prizes: <span className="text-orange-300 font-bold">×18, ×2</span></p>
-                    <p className="text-white/80">💎 Middle prizes: <span className="text-green-300 font-bold">×5, ×1.5</span></p>
+                    <p className="text-white/80">💎 Middle prizes: <span className="text-green-300 font-bold">×5, ×2</span></p>
                     <p className="text-white/80">⭐ Small prizes: <span className="text-blue-300">×1, ×0.5</span></p>
-                    <p className="text-white/80">🎯 <span className="text-amber-300 font-bold">Center (common): ×0.67</span></p>
+                    <p className="text-white/80">🎯 <span className="text-amber-300 font-bold">Center (common): ×0.7</span></p>
                     <p className="text-white/80">💀 <span className="text-red-400 font-bold">Corners: ×0</span></p>
                     <p className="text-yellow-200 mt-1 italic font-semibold">Aim for the middle zones!</p>
                   </div>
@@ -1196,7 +1297,7 @@ export default function Plinko2Page() {
                   <div className="bg-black/30 border border-white/10 rounded-lg p-3">
                     <div className="text-xs text-white/60">Best Multi</div>
                     <div className="text-lg font-bold text-purple-400">
-                      {stats.biggestMultiplier.toFixed(1)}x
+                      {formatPlinkoMultiplier(stats.biggestMultiplier)}x
                     </div>
                   </div>
                 </div>
