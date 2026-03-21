@@ -2769,8 +2769,10 @@ export default function MleoBase() {
   const [devTab, setDevTab] = useState("crew");
   const [activeBuildKey, setActiveBuildKey] = useState(null);
   const [overviewGuidanceState, setOverviewGuidanceState] = useState(null);
+  const [bankedDisplayValue, setBankedDisplayValue] = useState(0);
   const highlightTimeoutRef = useRef(null);
   const expeditionToastNonceRef = useRef(0);
+  const bankedDisplayAnchorRef = useRef({ value: 0, at: Date.now() });
 
   const lastInteractionRef = useRef(Date.now());
   const lastPresenceSendRef = useRef(0);
@@ -3917,6 +3919,44 @@ export default function MleoBase() {
     () => getBankedRateSnapshot(state, derived),
     [state, derived]
   );
+
+  useEffect(() => {
+    const confirmedBanked = Number(state.bankedMleo || 0);
+    bankedDisplayAnchorRef.current = { value: confirmedBanked, at: Date.now() };
+    setBankedDisplayValue(confirmedBanked);
+  }, [state.bankedMleo]);
+
+  useEffect(() => {
+    if (!mounted) return undefined;
+
+    const perSecond = Math.max(0, Number(bankedSnapshot?.perSecond || 0));
+    const remainingToCap = Math.max(0, Number(bankedSnapshot?.remainingToCap || 0));
+    const canTick = !!bankedSnapshot?.active && perSecond > 0;
+    const MAX_VISUAL_LEAD_SECONDS = 120;
+
+    const updateDisplay = () => {
+      const anchor = bankedDisplayAnchorRef.current;
+      const elapsedSeconds = Math.max(0, (Date.now() - Number(anchor.at || 0)) / 1000);
+      const boundedElapsedSeconds = Math.min(elapsedSeconds, MAX_VISUAL_LEAD_SECONDS);
+
+      let nextVisualValue = Number(anchor.value || 0);
+      if (canTick) {
+        nextVisualValue += boundedElapsedSeconds * perSecond;
+        nextVisualValue = Math.min(nextVisualValue, Number(anchor.value || 0) + remainingToCap);
+      }
+
+      if (!Number.isFinite(nextVisualValue)) nextVisualValue = Number(anchor.value || 0);
+      setBankedDisplayValue((prev) =>
+        Math.abs(prev - nextVisualValue) < 0.0005 ? prev : nextVisualValue
+      );
+    };
+
+    updateDisplay();
+    if (!canTick) return undefined;
+
+    const intervalId = setInterval(updateDisplay, 120);
+    return () => clearInterval(intervalId);
+  }, [mounted, bankedSnapshot?.active, bankedSnapshot?.perSecond, bankedSnapshot?.remainingToCap]);
 
   const rawOverview = useMemo(
     () =>
@@ -8852,7 +8892,7 @@ export default function MleoBase() {
                       BANKED
                     </div>
                     <div className="text-[11px] font-extrabold text-white leading-none">
-                      {formatBankedBadgeCompact(state.bankedMleo || 0)}
+                      {formatBankedBadgeCompact(bankedDisplayValue)}
                     </div>
                   </button>
                   <Link
@@ -8954,7 +8994,7 @@ export default function MleoBase() {
                     BANKED
                   </div>
                   <div className="text-xs font-extrabold leading-none">
-                    {formatBankedBadgeCompact(state.bankedMleo || 0)}
+                    {formatBankedBadgeCompact(bankedDisplayValue)}
                   </div>
                 </button>
 
@@ -8962,7 +9002,7 @@ export default function MleoBase() {
                   <div className="absolute right-0 top-[calc(100%+10px)] z-[130] w-[360px]">
                     <BankedQuickPanel
                       snapshot={bankedSnapshot}
-                      bankedValue={state.bankedMleo || 0}
+                      bankedValue={bankedDisplayValue}
                       onClose={() => setShowBankedPanel(false)}
                     />
                   </div>
