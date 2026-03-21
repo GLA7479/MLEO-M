@@ -8844,7 +8844,7 @@ export default function MleoBase() {
       key: "bankedMleo",
       infoKey: "bankedMleo",
       label: "Banked",
-      value: `${fmt(state.bankedMleo)}`,
+      value: `${formatBankedBadgeCompact(bankedDisplayValue)}`,
     },
     {
       key: "sharedVault",
@@ -9723,7 +9723,7 @@ export default function MleoBase() {
                 <div className="fixed inset-x-3 top-[88px] bottom-3 z-[126] sm:hidden">
                   <BankedQuickPanel
                     snapshot={bankedSnapshot}
-                    bankedValue={state.bankedMleo || 0}
+                    bankedValue={bankedDisplayValue}
                     onClose={() => setShowBankedPanel(false)}
                   />
                 </div>
