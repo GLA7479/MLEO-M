@@ -2772,12 +2772,13 @@ export default function MleoBase() {
   const highlightTimeoutRef = useRef(null);
   const expeditionToastNonceRef = useRef(0);
   const bankedDisplayCurrentRef = useRef(0);
-  const bankedDisplaySettleRafRef = useRef(null);
-  const bankedDisplayPreviewRafRef = useRef(null);
+  const bankedDisplayIntervalRef = useRef(null);
   const bankedDisplayInitializedRef = useRef(false);
-  const bankedDisplayConfirmedRef = useRef(0);
-  const bankedDisplayConfirmedAtRef = useRef(0);
-  const bankedDisplaySettlingRef = useRef(false);
+  const bankedDisplayServerTargetRef = useRef(null);
+  const bankedDisplayStorageKey = useMemo(
+    () => `mleo_base_banked_display_v3:${address || "guest"}`,
+    [address]
+  );
 
   const lastInteractionRef = useRef(Date.now());
   const lastPresenceSendRef = useRef(0);
@@ -3925,123 +3926,129 @@ export default function MleoBase() {
     [state, derived]
   );
   const bankedLiveRatePerSecond = Number(bankedSnapshot?.perSecond || 0);
-  const bankedLiveActive = Boolean(bankedSnapshot?.active) && bankedLiveRatePerSecond > 0;
+  const bankedLiveActive =
+    Boolean(bankedSnapshot?.active) &&
+    bankedLiveRatePerSecond > 0 &&
+    Number(state.refineryLevel || 0) > 0;
 
   useEffect(() => {
     bankedDisplayCurrentRef.current = Number(bankedDisplayValue || 0);
   }, [bankedDisplayValue]);
 
   useEffect(() => {
-    if (!mounted) return undefined;
-    const confirmedBanked = Number(state.bankedMleo || 0);
-    const now = performance.now();
+    if (!mounted) return;
 
-    if (bankedDisplaySettleRafRef.current != null) {
-      window.cancelAnimationFrame(bankedDisplaySettleRafRef.current);
-      bankedDisplaySettleRafRef.current = null;
-    }
+    const serverValue = Number(state.bankedMleo || 0);
 
-    bankedDisplayConfirmedRef.current = confirmedBanked;
-    bankedDisplayConfirmedAtRef.current = now;
-
-    const fromValue = Number(bankedDisplayCurrentRef.current || 0);
-    const delta = confirmedBanked - fromValue;
-    const absDelta = Math.abs(delta);
-
-    if (!bankedDisplayInitializedRef.current) {
-      bankedDisplayInitializedRef.current = true;
-      bankedDisplayCurrentRef.current = confirmedBanked;
-      setBankedDisplayValue(confirmedBanked);
-      return undefined;
-    }
-
-    if (absDelta < 0.005) {
-      bankedDisplaySettlingRef.current = false;
-      bankedDisplayCurrentRef.current = confirmedBanked;
-      setBankedDisplayValue(confirmedBanked);
-      return undefined;
-    }
-
-    bankedDisplaySettlingRef.current = true;
-
-    const startAt = now;
-    const durationMs = absDelta >= 25 ? 850 : absDelta >= 5 ? 700 : 550;
-    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
-
-    const animate = (ts) => {
-      const progress = Math.max(0, Math.min(1, (ts - startAt) / durationMs));
-      const eased = easeOutCubic(progress);
-      const nextValue = fromValue + delta * eased;
-      bankedDisplayCurrentRef.current = nextValue;
-      setBankedDisplayValue(nextValue);
-
-      if (progress < 1) {
-        bankedDisplaySettleRafRef.current = window.requestAnimationFrame(animate);
-        return;
+    let storedValue = 0;
+    try {
+      const raw = window.localStorage.getItem(bankedDisplayStorageKey);
+      const parsed = Number(raw || 0);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        storedValue = parsed;
       }
+    } catch {}
 
-      bankedDisplayCurrentRef.current = confirmedBanked;
-      setBankedDisplayValue(confirmedBanked);
-      bankedDisplaySettlingRef.current = false;
-      bankedDisplaySettleRafRef.current = null;
-    };
+    const initialValue = Math.max(serverValue, storedValue);
 
-    bankedDisplaySettleRafRef.current = window.requestAnimationFrame(animate);
-
-    return () => {
-      if (bankedDisplaySettleRafRef.current != null) {
-        window.cancelAnimationFrame(bankedDisplaySettleRafRef.current);
-        bankedDisplaySettleRafRef.current = null;
-      }
-    };
-  }, [mounted, state.bankedMleo]);
+    bankedDisplayCurrentRef.current = initialValue;
+    bankedDisplayServerTargetRef.current = null;
+    setBankedDisplayValue(initialValue);
+    bankedDisplayInitializedRef.current = true;
+  }, [mounted, bankedDisplayStorageKey]);
 
   useEffect(() => {
-    if (!mounted) return undefined;
+    if (!mounted || !bankedDisplayInitializedRef.current) return;
 
-    if (bankedDisplayPreviewRafRef.current != null) {
-      window.cancelAnimationFrame(bankedDisplayPreviewRafRef.current);
-      bankedDisplayPreviewRafRef.current = null;
+    const serverValue = Number(state.bankedMleo || 0);
+    const currentValue = Number(bankedDisplayCurrentRef.current || 0);
+    if (Math.abs(serverValue - currentValue) < 0.0008) {
+      bankedDisplayServerTargetRef.current = null;
+      bankedDisplayCurrentRef.current = serverValue;
+      setBankedDisplayValue(serverValue);
+      return;
+    }
+    // Server snapshot is authoritative target; interval settles smoothly to it.
+    bankedDisplayServerTargetRef.current = serverValue;
+  }, [mounted, state.bankedMleo, bankedDisplayStorageKey]);
+
+  useEffect(() => {
+    if (!mounted || !bankedDisplayInitializedRef.current) return undefined;
+
+    if (bankedDisplayIntervalRef.current != null) {
+      window.clearInterval(bankedDisplayIntervalRef.current);
+      bankedDisplayIntervalRef.current = null;
     }
 
-    const PREVIEW_WINDOW_SECONDS = 8;
-    const MIN_STEP = 0.001;
+    let persistCounter = 0;
+    const STALE_AFTER_MS = 20000;
+    const MIN_STEP = 0.0008;
 
-    const frame = () => {
+    bankedDisplayIntervalRef.current = window.setInterval(() => {
       const current = Number(bankedDisplayCurrentRef.current || 0);
-      const confirmed = Number(bankedDisplayConfirmedRef.current || 0);
-      let target = confirmed;
+      let nextValue = current;
+      const targetValue = bankedDisplayServerTargetRef.current;
 
-      if (!bankedDisplaySettlingRef.current && bankedLiveActive) {
-        const elapsedSeconds = Math.max(
-          0,
-          (performance.now() - Number(bankedDisplayConfirmedAtRef.current || 0)) / 1000
-        );
-        const boundedElapsed = Math.min(PREVIEW_WINDOW_SECONDS, elapsedSeconds);
-        const previewGain = bankedLiveRatePerSecond * boundedElapsed;
-        target = confirmed + previewGain;
+      if (targetValue != null) {
+        const diffToTarget = Number(targetValue) - current;
+        if (Math.abs(diffToTarget) < MIN_STEP) {
+          nextValue = Number(targetValue);
+          bankedDisplayServerTargetRef.current = null;
+        } else {
+          nextValue = current + diffToTarget * 0.2;
+        }
+      } else {
+        const lastTickAt = Number(state.lastTickAt || 0);
+        const hasFreshSnapshot =
+          Number.isFinite(lastTickAt) &&
+          lastTickAt > 0 &&
+          Date.now() - lastTickAt <= STALE_AFTER_MS;
+
+        if (bankedLiveActive && hasFreshSnapshot) {
+          const stepSeconds = 0.25;
+          const effectiveRate = Math.max(0.01, bankedLiveRatePerSecond * 0.9);
+          nextValue = current + effectiveRate * stepSeconds;
+        }
       }
 
-      const diff = target - current;
-      if (Math.abs(diff) >= MIN_STEP) {
-        const smoothing = diff > 0 ? 0.22 : 0.35;
-        const nextValue = current + diff * smoothing;
+      if (Math.abs(nextValue - current) >= MIN_STEP) {
         bankedDisplayCurrentRef.current = nextValue;
         setBankedDisplayValue(nextValue);
       }
 
-      bankedDisplayPreviewRafRef.current = window.requestAnimationFrame(frame);
-    };
-
-    bankedDisplayPreviewRafRef.current = window.requestAnimationFrame(frame);
+      persistCounter += 1;
+      if (persistCounter >= 4) {
+        persistCounter = 0;
+        try {
+          window.localStorage.setItem(
+            bankedDisplayStorageKey,
+            String(bankedDisplayCurrentRef.current || 0)
+          );
+        } catch {}
+      }
+    }, 250);
 
     return () => {
-      if (bankedDisplayPreviewRafRef.current != null) {
-        window.cancelAnimationFrame(bankedDisplayPreviewRafRef.current);
-        bankedDisplayPreviewRafRef.current = null;
+      if (bankedDisplayIntervalRef.current != null) {
+        window.clearInterval(bankedDisplayIntervalRef.current);
+        bankedDisplayIntervalRef.current = null;
       }
+
+      try {
+        window.localStorage.setItem(
+          bankedDisplayStorageKey,
+          String(bankedDisplayCurrentRef.current || 0)
+        );
+      } catch {}
     };
-  }, [mounted, bankedLiveActive, bankedLiveRatePerSecond]);
+  }, [
+    mounted,
+    bankedDisplayInitializedRef.current,
+    bankedLiveActive,
+    bankedLiveRatePerSecond,
+    state.lastTickAt,
+    bankedDisplayStorageKey,
+  ]);
 
   const rawOverview = useMemo(
     () =>
