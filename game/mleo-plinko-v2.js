@@ -63,11 +63,11 @@ function useIOSViewportFix() {
 const LS_KEY = "mleo_plinko2_v1";
 const MIN_PLAY = 100;
 
-// EXTREME Plinko - 0 center and corners (Custom Probabilities!)
+// EXTREME Plinko - center bucket ×0.668 (server-aligned), corners ×0
 // High multipliers at edges for big wins, but low probability!
-const MULTIPLIERS = [0, 40, 18, 5, 2, 1.5, 1, 0.5, 0, 0.5, 1, 1.5, 2, 5, 18, 40, 0];
+const MULTIPLIERS = [0, 40, 18, 5, 2, 1.5, 1, 0.5, 0.668, 0.5, 1, 1.5, 2, 5, 18, 40, 0];
 
-// Adjusted probabilities for RTP ~99%
+// Visual/sim probabilities (server authorizes payout via finish_arcade_session; ~94.5% RTP target)
 const CUSTOM_PROBABILITIES = [
   0.0002,   // 0.02% - corner ×0
   0.0001,   // 0.01% - ×40 (big win but rare!)
@@ -77,7 +77,7 @@ const CUSTOM_PROBABILITIES = [
   0.04,     // 4% - ×5
   0.09,     // 9% - ×1
   0.12,     // 12% - ×0.5
-  0.5,      // 50% - center ×0 (most common)
+  0.5,      // 50% - center ×0.668 (most common)
   0.12,     // 12% - ×0.5
   0.09,     // 9% - ×1
   0.04,     // 4% - ×5
@@ -471,7 +471,7 @@ export default function Plinko2Page() {
         if (ball.x - ball.r < 0 || ball.x + ball.r > canvas.width) {
           const fallbackBucket = Number.isInteger(ball.targetBucketIndex)
             ? bucketsRef.current[ball.targetBucketIndex]
-            : { multiplier: 0, index: 8 };
+            : { multiplier: 0.668, index: 8 };
           landInBucket(ball, fallbackBucket);
           balls.splice(i, 1);
           continue;
@@ -1138,7 +1138,8 @@ export default function Plinko2Page() {
                     <p className="text-white/80">🔥 Great prizes: <span className="text-orange-300 font-bold">×18, ×2</span></p>
                     <p className="text-white/80">💎 Middle prizes: <span className="text-green-300 font-bold">×5, ×1.5</span></p>
                     <p className="text-white/80">⭐ Small prizes: <span className="text-blue-300">×1, ×0.5</span></p>
-                    <p className="text-white/80">💀 <span className="text-red-400 font-bold">Center & Corners: ×0</span></p>
+                    <p className="text-white/80">🎯 <span className="text-amber-300 font-bold">Center (common): ×0.67</span></p>
+                    <p className="text-white/80">💀 <span className="text-red-400 font-bold">Corners: ×0</span></p>
                     <p className="text-yellow-200 mt-1 italic font-semibold">Aim for the middle zones!</p>
                   </div>
                 </div>

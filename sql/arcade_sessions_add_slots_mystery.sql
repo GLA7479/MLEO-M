@@ -835,8 +835,8 @@ BEGIN
     v_dice_roll := round((random() * 100)::numeric, 2);
     v_won := CASE WHEN v_dice_is_over THEN v_dice_roll > v_dice_target ELSE v_dice_roll < v_dice_target END;
     v_dice_multiplier := CASE
-      WHEN v_dice_is_over THEN ((100 - 0.04) / (100 - v_dice_target)) * 100
-      ELSE ((100 - 0.04) / v_dice_target) * 100
+      WHEN v_dice_is_over THEN (96::numeric / (100 - v_dice_target)) * 100
+      ELSE (96::numeric / v_dice_target) * 100
     END;
     v_reward := CASE WHEN v_won THEN floor(v_session.stake * (v_dice_multiplier / 100))::bigint ELSE 0 END;
     v_server_payload := jsonb_build_object(
@@ -869,9 +869,9 @@ BEGIN
       ELSE v_baccarat_player_score = v_baccarat_banker_score
     END;
     v_baccarat_multiplier := CASE
-      WHEN v_baccarat_play = 'player' THEN 2
-      WHEN v_baccarat_play = 'banker' THEN 1.95
-      ELSE 8
+      WHEN v_baccarat_play = 'player' THEN 2.12
+      WHEN v_baccarat_play = 'banker' THEN 2.12
+      ELSE 9.1
     END;
     v_reward := CASE WHEN v_won THEN floor(v_session.stake * v_baccarat_multiplier)::bigint ELSE 0 END;
     v_server_payload := jsonb_build_object(
@@ -1370,7 +1370,7 @@ BEGIN
       v_plinko_multiplier := 0.5;
     ELSIF v_plinko_pick < 0.7698 THEN
       v_plinko_bucket := 8;
-      v_plinko_multiplier := 0;
+      v_plinko_multiplier := 0.668;
     ELSIF v_plinko_pick < 0.8898 THEN
       v_plinko_bucket := 9;
       v_plinko_multiplier := 0.5;
@@ -1546,9 +1546,10 @@ BEGIN
       ELSE v_craps_sum IN (2, 3, 12)
     END;
     v_craps_multiplier := CASE
-      WHEN v_craps_play IN ('pass', 'dont_pass') THEN 2
-      WHEN v_craps_play = 'seven' THEN 5
-      ELSE 8
+      WHEN v_craps_play = 'pass' THEN 4.30
+      WHEN v_craps_play = 'dont_pass' THEN 8.60
+      WHEN v_craps_play = 'seven' THEN 5.6
+      ELSE 8.4
     END;
     v_reward := CASE WHEN v_won THEN floor(v_session.stake * v_craps_multiplier)::bigint ELSE 0 END;
     v_server_payload := jsonb_build_object(

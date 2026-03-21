@@ -88,10 +88,10 @@ function shortAddr(addr) {
 function normalizeWholeAmount(value) { return Math.max(0, Math.floor(Number(value) || 0)); }
 
 const PLAY_TYPES = {
-  pass: { name: "Pass Line", prize: 2 },
-  dont_pass: { name: "Don't Pass", prize: 2 },
-  seven: { name: "Any 7", prize: 5 },
-  craps: { name: "Any Dice Arena", prize: 8 },
+  pass: { name: "Pass Line", prize: 4.3 },
+  dont_pass: { name: "Don't Pass", prize: 8.6 },
+  seven: { name: "Any 7", prize: 5.6 },
+  craps: { name: "Any Dice Arena", prize: 8.4 },
 };
 
 export default function DiceArenaPage() {
@@ -526,10 +526,10 @@ export default function DiceArenaPage() {
                 <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
                   <p className="text-green-300 font-semibold">Play Types:</p>
                   <div className="text-xs text-white/80 mt-2 space-y-1">
-                    <p>• Pass Line (7,11): ×2</p>
-                    <p>• Don't Pass (2,3,12): ×2</p>
-                    <p>• Any 7: ×5</p>
-                    <p>• Any Dice Arena (2,3,12): ×8</p>
+                    <p>• Pass Line (7,11): ×4.3</p>
+                    <p>• Don't Pass (2,3,12): ×8.6</p>
+                    <p>• Any 7: ×5.6</p>
+                    <p>• Any Dice Arena (2,3,12): ×8.4</p>
                   </div>
                 </div>
               </div>

@@ -60,7 +60,8 @@ function useIOSViewportFix() {
 // ============================================================================
 const LS_KEY = "mleo_dice_v2";
 const MIN_PLAY = 100;
-const GAME_BALANCE = 0.04; // Game balance 4% - RTP 96%
+/** Matches server: numerator 96 in stake multiplier → ~96% RTP (see arcade_sessions_add_slots_mystery.sql dice branch). */
+const GAME_BALANCE = 4;
 
 // On-chain Claim Config
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
@@ -1029,7 +1030,7 @@ export default function DicePage() {
                   <p className="text-xs text-white/80 mt-2"><strong>You control the risk/reward!</strong></p>
                 </div>
                 <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-2 mt-2">
-                  <p className="text-purple-300 font-semibold text-xs">💡 Higher risk = bigger prize, and the final roll is approved by the server.</p>
+                  <p className="text-purple-300 font-semibold text-xs">💡 Higher risk = bigger prize. Odds target ~96% return-to-player; the server resolves the roll and payout.</p>
                 </div>
               </div>
               <button

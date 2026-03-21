@@ -66,9 +66,9 @@ function shortAddr(addr) { if (!addr || addr.length < 10) return addr || ""; ret
 function normalizeWholeAmount(value) { return Math.max(0, Math.floor(Number(value) || 0)); }
 
 const PLAY_TYPES = {
-  player: { name: "Player", prize: 2 },
-  banker: { name: "Banker", prize: 1.95 },
-  tie: { name: "Tie", prize: 8 }
+  player: { name: "Player", prize: 2.12 },
+  banker: { name: "Banker", prize: 2.12 },
+  tie: { name: "Tie", prize: 9.1 }
 };
 
 export default function CardDuelPage() {
@@ -449,9 +449,9 @@ export default function CardDuelPage() {
                 <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
                   <p className="text-purple-300 font-semibold">Prizes:</p>
                   <div className="text-xs text-white/80 mt-2 space-y-1">
-                    <p>• Player: ×2</p>
-                    <p>• Banker: ×1.95</p>
-                    <p>• Tie: ×8</p>
+                    <p>• Player: ×2.12</p>
+                    <p>• Banker: ×2.12</p>
+                    <p>• Tie: ×9.1</p>
         </div>
               </div>
               </div>

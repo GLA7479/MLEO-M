@@ -422,8 +422,8 @@ BEGIN
     END;
 
     v_dice_multiplier := CASE
-      WHEN v_dice_is_over THEN ((100 - 0.04) / (100 - v_dice_target)) * 100
-      ELSE ((100 - 0.04) / v_dice_target) * 100
+      WHEN v_dice_is_over THEN (96::numeric / (100 - v_dice_target)) * 100
+      ELSE (96::numeric / v_dice_target) * 100
     END;
 
     v_reward := CASE
