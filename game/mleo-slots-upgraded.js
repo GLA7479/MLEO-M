@@ -277,6 +277,11 @@ export default function SlotsPage() {
   };
 
   const checkResult = async (finishResult, play) => {
+    if (!finishResult?.success) {
+      setSessionError(finishResult?.message || "Session failed to finish");
+      alert(finishResult?.message || "Failed to finish session");
+      return;
+    }
     const payload = finishResult?.serverPayload || {};
     const finalReels = Array.isArray(payload.reels) ? payload.reels : ['🎰', '🎰', '🎰', '🎰', '🎰'];
     const prize = Math.max(0, Number(finishResult?.approvedReward || 0));

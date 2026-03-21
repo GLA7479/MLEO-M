@@ -331,6 +331,13 @@ export default function HiLoPage() {
     const play = Number(playAmount);
     try {
       const finishResult = await finishArcadeSession(sessionId, { cashout, streak });
+      if (!finishResult?.success) {
+        setGameActive(false);
+        setSessionId(null);
+        setSessionError(finishResult?.message || "Session failed to finish");
+        alert(finishResult?.message || "Failed to finish session");
+        return;
+      }
       const payload = finishResult?.serverPayload || {};
       const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
       const win = Boolean(payload.won);

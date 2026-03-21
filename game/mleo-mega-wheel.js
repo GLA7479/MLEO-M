@@ -327,8 +327,15 @@ export default function MegaWheelPage() {
           stake: play,
         };
         setGameResult(resultData);
-        const newStats = { ...stats, totalSpins: stats.totalSpins + 1, totalPlay: stats.totalPlay + play, totalWon: stats.totalWon + prize, biggestWin: Math.max(stats.biggestWin, prize), biggestMultiplier: Math.max(stats.biggestMultiplier, multiplier), lastPlay: play };
-        setStats(newStats);
+        setStats((prev) => ({
+          ...prev,
+          totalSpins: prev.totalSpins + 1,
+          totalPlay: prev.totalPlay + play,
+          totalWon: prev.totalWon + prize,
+          biggestWin: Math.max(prev.biggestWin, prize),
+          biggestMultiplier: Math.max(prev.biggestMultiplier, multiplier),
+          lastPlay: play,
+        }));
       }
     };
     

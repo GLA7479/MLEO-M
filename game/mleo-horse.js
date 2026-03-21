@@ -282,7 +282,7 @@ export default function HorseRacePage() {
     const payload = finishResult?.serverPayload || {};
     const positions = Array.isArray(payload.positions)
       ? payload.positions
-      : [...Array(HORSES.length)].map((_, i) => i);
+      : Array.from({ length: HORSES.length }, (_, i) => i);
     const winnerIndex = positions[0];
     const secondIndex = positions[1];
     const thirdIndex = positions[2];
