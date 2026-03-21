@@ -2772,6 +2772,10 @@ export default function MleoBase() {
   const [bankedDisplayNow, setBankedDisplayNow] = useState(() => Date.now());
   const bankedDisplayValueRef = useRef(0);
   const bankedServerValueRef = useRef(0);
+  const bankedDisplayStorageKey = useMemo(
+    () => `mleo_base_banked_display_floor_v1:${address || "guest"}`,
+    [address]
+  );
   const highlightTimeoutRef = useRef(null);
   const expeditionToastNonceRef = useRef(0);
 
@@ -3930,6 +3934,21 @@ export default function MleoBase() {
   }, [bankedDisplayValue]);
 
   useEffect(() => {
+    if (!mounted) return;
+    const serverValue = Number(state.bankedMleo || 0);
+    let storedValue = 0;
+    try {
+      const raw = window.localStorage.getItem(bankedDisplayStorageKey);
+      const parsed = Number(raw || 0);
+      if (Number.isFinite(parsed) && parsed > 0) storedValue = parsed;
+    } catch {}
+
+    const initial = Math.max(serverValue, storedValue);
+    bankedDisplayValueRef.current = initial;
+    setBankedDisplayValue(initial);
+  }, [mounted, bankedDisplayStorageKey]);
+
+  useEffect(() => {
     if (!mounted) return undefined;
 
     let rafId = null;
@@ -3950,35 +3969,14 @@ export default function MleoBase() {
     };
   }, [mounted]);
 
-  const bankedDisplayComputed = useMemo(() => {
-    const serverBanked = Number(state.bankedMleo || 0);
-    const lastTickAt = Number(state.lastTickAt || 0);
-
-    if (!mounted) return serverBanked;
-    if (!bankedLiveActive) return serverBanked;
-    if (!Number.isFinite(lastTickAt) || lastTickAt <= 0) return serverBanked;
-
-    const elapsedMs = Math.max(0, bankedDisplayNow - lastTickAt);
-    const freshnessCapMs = 20000;
-    if (elapsedMs > freshnessCapMs) return serverBanked;
-
-    const previewGain = bankedLiveRatePerSecond * (elapsedMs / 1000);
-
-    return serverBanked + previewGain;
-  }, [
-    mounted,
-    state.bankedMleo,
-    state.lastTickAt,
-    bankedLiveActive,
-    bankedLiveRatePerSecond,
-    bankedDisplayNow,
-  ]);
-
   useEffect(() => {
-    const computed = Number(bankedDisplayComputed || 0);
     const currentDisplay = Number(bankedDisplayValueRef.current || 0);
     const serverValue = Number(state.bankedMleo || 0);
     const prevServerValue = Number(bankedServerValueRef.current || 0);
+    const VISUAL_LAG_COINS = 6;
+    const PREVIEW_AHEAD_CAP = 6;
+    const STEP_SECONDS = 0.12;
+    const RATE_DAMPING = 0.65;
 
     // Legitimate reduction event (shipping/reset/etc): allow controlled downward convergence.
     const hasServerReduction = serverValue + 0.0005 < prevServerValue;
@@ -3986,18 +3984,44 @@ export default function MleoBase() {
     const allowDownward =
       hasServerReduction && (reductionMagnitude >= 1 || serverValue <= 0.01);
 
-    let nextDisplay = computed;
-    if (!allowDownward) {
-      nextDisplay = Math.max(currentDisplay, computed);
-    } else if (computed < currentDisplay) {
-      nextDisplay = currentDisplay + (computed - currentDisplay) * 0.35;
-      if (Math.abs(nextDisplay - computed) < 0.005) nextDisplay = computed;
+    let nextDisplay = currentDisplay;
+    const floorTarget = Math.max(0, serverValue - VISUAL_LAG_COINS);
+
+    // Keep display close to truth from below; never stick far behind.
+    if (nextDisplay < floorTarget) {
+      const catchUp = floorTarget - nextDisplay;
+      nextDisplay += catchUp * 0.3;
+      if (Math.abs(nextDisplay - floorTarget) < 0.005) nextDisplay = floorTarget;
+    }
+
+    // Live visual movement only while real mining is active.
+    if (bankedLiveActive) {
+      const effectiveRate = Math.max(0, bankedLiveRatePerSecond * RATE_DAMPING);
+      nextDisplay += effectiveRate * STEP_SECONDS;
+      nextDisplay = Math.min(nextDisplay, serverValue + PREVIEW_AHEAD_CAP);
+    }
+
+    if (allowDownward && nextDisplay > serverValue) {
+      nextDisplay = nextDisplay + (serverValue - nextDisplay) * 0.35;
+      if (Math.abs(nextDisplay - serverValue) < 0.005) nextDisplay = serverValue;
+    } else if (!allowDownward) {
+      nextDisplay = Math.max(nextDisplay, currentDisplay);
     }
 
     bankedServerValueRef.current = serverValue;
     bankedDisplayValueRef.current = nextDisplay;
     setBankedDisplayValue(nextDisplay);
-  }, [bankedDisplayComputed, state.bankedMleo]);
+
+    try {
+      window.localStorage.setItem(bankedDisplayStorageKey, String(nextDisplay));
+    } catch {}
+  }, [
+    bankedDisplayNow,
+    bankedLiveActive,
+    bankedLiveRatePerSecond,
+    state.bankedMleo,
+    bankedDisplayStorageKey,
+  ]);
 
   const rawOverview = useMemo(
     () =>
