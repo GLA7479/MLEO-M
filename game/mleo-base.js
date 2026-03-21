@@ -39,8 +39,8 @@ import {
   setBaseProfile,
   setBuildingPowerMode,
   sendBasePresence,
+  ensureCsrfToken,
 } from "../lib/baseVaultClient";
-import { ensureCsrfToken } from "../lib/arcadeDeviceClient";
 import {
   BASE_HOME_SCENE_IDENTITY,
   BASE_HOME_SCENE_ORDER,
@@ -2883,6 +2883,9 @@ export default function MleoBase() {
 
     presenceInFlightRef.current = true;
     try {
+      const csrfReady = await ensureCsrfToken();
+      if (!csrfReady) return false;
+
       const payload = await sendBasePresence({
         visibilityState: document.visibilityState || (isGameplay ? "visible" : "hidden"),
         pageName: "base",
@@ -2891,8 +2894,13 @@ export default function MleoBase() {
         keepalive: !!keepalive,
       });
 
+      if (payload?.skipped) return false;
+
       if (!payload?.success) {
-        if (payload?.skipped) return false;
+        const code = String(payload?.code || "");
+        if (code === "CSRF_UNAVAILABLE" || code === "CSRF_INVALID") {
+          return false;
+        }
         console.error(`BASE presence push rejected (${reason})`, payload);
         return false;
       }
@@ -2922,8 +2930,7 @@ export default function MleoBase() {
       }
 
       return true;
-    } catch (error) {
-      console.error(`BASE presence push failed (${reason})`, error);
+    } catch {
       return false;
     } finally {
       presenceInFlightRef.current = false;
@@ -2945,6 +2952,9 @@ export default function MleoBase() {
     const now = Date.now();
     gameActionInFlightRef.current = true;
     try {
+      const csrfReady = await ensureCsrfToken();
+      if (!csrfReady) return false;
+
       const payload = await sendBasePresence({
         visibilityState: document.visibilityState || "visible",
         pageName: "base",
@@ -2952,8 +2962,13 @@ export default function MleoBase() {
         gameAction: true,
       });
 
+      if (payload?.skipped) return false;
+
       if (!payload?.success) {
-        if (payload?.skipped) return false;
+        const code = String(payload?.code || "");
+        if (code === "CSRF_UNAVAILABLE" || code === "CSRF_INVALID") {
+          return false;
+        }
         console.error("BASE real game action push rejected", payload);
         return false;
       }
@@ -2962,8 +2977,7 @@ export default function MleoBase() {
       lastGameActionAtRef.current = now;
       setHubGameplayOnline(computeHubGameplayOnline(now));
       return true;
-    } catch (error) {
-      console.error("BASE real game action push failed", error);
+    } catch {
       return false;
     } finally {
       gameActionInFlightRef.current = false;
@@ -2984,11 +2998,9 @@ export default function MleoBase() {
       stopHeartbeat();
       if (document.visibilityState !== "visible") return;
 
-      presenceHeartbeatRef.current = window.setInterval(async () => {
+      presenceHeartbeatRef.current = window.setInterval(() => {
         if (document.visibilityState !== "visible") return;
-        const token = await ensureCsrfToken();
-        if (!token) return;
-        pushPresence({ interacted: false, gameAction: false, reason: "heartbeat" });
+        void pushPresence({ interacted: false, gameAction: false, reason: "heartbeat" });
       }, 45000);
     };
 
@@ -3014,7 +3026,6 @@ export default function MleoBase() {
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         void (async () => {
-          await ensureCsrfToken(true);
           await pushPresence({ interacted: false, gameAction: false, force: true, reason: "visible" });
           startHeartbeat();
         })();
@@ -3028,36 +3039,36 @@ export default function MleoBase() {
     const onFocus = () => {
       if (document.visibilityState === "visible") {
         void (async () => {
-          await ensureCsrfToken(true);
           await pushPresence({ interacted: false, gameAction: false, force: true, reason: "focus" });
           startHeartbeat();
         })();
       }
     };
 
+    const sendHiddenPresenceIfReady = () => {
+      void (async () => {
+        const csrfReady = await ensureCsrfToken();
+        if (!csrfReady) return;
+        await sendBasePresence({
+          visibilityState: "hidden",
+          pageName: "base",
+          interacted: false,
+          gameAction: false,
+          keepalive: true,
+        }).catch(() => {});
+      })();
+    };
+
     const onPageHide = () => {
-      // Ensure we don't get counted as gameplay online after leaving.
       setHubGameplayOnline(false);
       stopHeartbeat();
-      void sendBasePresence({
-        visibilityState: "hidden",
-        pageName: "base",
-        interacted: false,
-        gameAction: false,
-        keepalive: true,
-      }).catch(() => {});
+      sendHiddenPresenceIfReady();
     };
 
     const onBeforeUnload = () => {
       setHubGameplayOnline(false);
       stopHeartbeat();
-      void sendBasePresence({
-        visibilityState: "hidden",
-        pageName: "base",
-        interacted: false,
-        gameAction: false,
-        keepalive: true,
-      }).catch(() => {});
+      sendHiddenPresenceIfReady();
     };
 
     const uiInteractionEvents = ["pointerdown", "click", "keydown", "touchstart"];
@@ -3073,7 +3084,6 @@ export default function MleoBase() {
 
     if (document.visibilityState === "visible") {
       void (async () => {
-        await ensureCsrfToken(true);
         await pushPresence({
           interacted: false,
           gameAction: false,
