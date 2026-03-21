@@ -202,8 +202,11 @@ export default function CardDuelPage() {
   };
 
   const dealCards = async (isFreePlayParam = false) => {
-    if (dealing || gameResult) return; // Prevent double clicks
-    // Disable play button immediately to prevent double clicks
+    if (dealing) return;
+    setShowResultPopup(false);
+    setGameResult(null);
+    setPlayerScore(0);
+    setBankerScore(0);
     setDealing(true);
     playSfx(clickSound.current);
     setSessionError("");
@@ -238,8 +241,7 @@ export default function CardDuelPage() {
       setVaultState(startResult.balanceAfter);
     }
     setPlayAmount(String(play));
-    setGameResult(null);
-    
+
     setTimeout(async () => {
       try {
         const finishResult = await finishArcadeSession(sessionId, { selectedPlay });
@@ -255,6 +257,10 @@ export default function CardDuelPage() {
   };
 
   const checkResult = async (finishResult, play) => {
+    if (!finishResult?.success) {
+      setSessionError(finishResult?.message || "Session failed to finish");
+      return;
+    }
     const payload = finishResult?.serverPayload || {};
     const pScore = Number(payload.playerScore || 0);
     const bScore = Number(payload.bankerScore || 0);
@@ -281,7 +287,6 @@ export default function CardDuelPage() {
     setStats(newStats);
   };
 
-  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setPlayerScore(0); setBankerScore(0); setDealing(false); setActiveAmountButton("100"); };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-purple-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -398,7 +403,12 @@ export default function CardDuelPage() {
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            <button onClick={gameResult ? resetGame : () => dealCards(false)} disabled={dealing || (gameResult && !gameResult)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            <button
+              type="button"
+              onClick={() => dealCards(false)}
+              disabled={dealing}
+              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               {dealing ? "Dealing..." : gameResult ? "PLAY AGAIN" : "DEAL"}
             </button>
             {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}

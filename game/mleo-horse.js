@@ -120,7 +120,9 @@ export default function HorseRacePage() {
   const clickSound = useRef(null);
   const winSound = useRef(null);
 
-  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalRaces: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, lastPlay: MIN_PLAY }));
+  const [stats, setStats] = useState(() =>
+    safeRead(LS_KEY, { totalRaces: 0, wins: 0, losses: 0, partialPayouts: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, lastPlay: MIN_PLAY })
+  );
 
   const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
 
@@ -217,7 +219,11 @@ export default function HorseRacePage() {
   const startRace = async (isFreePlayParam = false) => {
     if (selectedHorse === null) { alert('Please select a horse!'); return; }
     if (racing) return;
-    // Disable play button immediately to prevent double clicks
+    // One-tap replay: clear last result before a new paid session (no separate "reset" click)
+    setGameResult(null);
+    setWinner(null);
+    setHorseProgress([0, 0, 0, 0, 0]);
+    setShowResultPopup(false);
     setRacing(true);
     playSfx(clickSound.current);
     setSessionError("");
@@ -250,9 +256,6 @@ export default function HorseRacePage() {
     setPlayAmount(String(play));
     setSessionId(nextSessionId);
     sessionIdRef.current = nextSessionId;
-    setGameResult(null);
-    setWinner(null);
-    setHorseProgress([0, 0, 0, 0, 0]);
 
     let finishResult;
     try {
@@ -264,6 +267,15 @@ export default function HorseRacePage() {
       sessionIdRef.current = null;
       setSessionError("Session failed to finish");
       alert("Failed to finish session. Please refresh vault and try again.");
+      return;
+    }
+
+    if (!finishResult?.success) {
+      setRacing(false);
+      setSessionId(null);
+      sessionIdRef.current = null;
+      setSessionError(finishResult?.message || "Session failed to finish");
+      alert(finishResult?.message || "Failed to finish session");
       return;
     }
 
@@ -310,42 +322,49 @@ export default function HorseRacePage() {
     const payload = finishResult?.serverPayload || {};
     const resolvedPositions = Array.isArray(payload.positions) ? payload.positions : positions;
     const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
-    const win = Boolean(payload.won);
+    const stake = Math.max(0, Math.floor(Number(play) || 0));
+    /** UI semantics (economy unchanged): WIN ≥ stake, PARTIAL 0<prize<stake, LOST prize=0 */
+    let outcome = "lost";
+    if (prize >= stake && stake > 0) outcome = "win";
+    else if (prize > 0 && prize < stake) outcome = "partial";
+
     const winnerIndex = resolvedPositions[0];
 
     if (Number.isFinite(finishResult?.balanceAfter)) {
       setVaultState(finishResult.balanceAfter);
     }
-    if (win) {
+    if (outcome === "win" || outcome === "partial") {
       playSfx(winSound.current);
     }
 
-    const resultData = { 
-      win, 
-      winner: HORSES[winnerIndex].name, 
-      selected: HORSES[selectedHorse].name, 
-      prize, 
-      profit: prize - play, 
+    const resultData = {
+      outcome,
+      win: outcome === "win",
+      winner: HORSES[winnerIndex].name,
+      selected: HORSES[selectedHorse].name,
+      prize,
+      profit: prize - stake,
       multiplier: Number(payload.multiplier || 0),
-      place: payload.place || ''
+      place: payload.place || "",
     };
     setGameResult(resultData);
     setSessionId(null);
     sessionIdRef.current = null;
 
-    const newStats = { ...stats, totalRaces: stats.totalRaces + 1, wins: win ? stats.wins + 1 : stats.wins, losses: win ? stats.losses : stats.losses + 1, totalPlay: stats.totalPlay + play, totalWon: stats.totalWon + prize, biggestWin: Math.max(stats.biggestWin, prize), lastPlay: play };
+    const newStats = {
+      ...stats,
+      totalRaces: stats.totalRaces + 1,
+      wins: outcome === "win" ? stats.wins + 1 : stats.wins,
+      partialPayouts: outcome === "partial" ? (Number(stats.partialPayouts) || 0) + 1 : Number(stats.partialPayouts) || 0,
+      losses: outcome === "lost" ? stats.losses + 1 : stats.losses,
+      totalPlay: stats.totalPlay + stake,
+      totalWon: stats.totalWon + prize,
+      biggestWin: Math.max(stats.biggestWin, prize),
+      lastPlay: stake,
+    };
     setStats(newStats);
   };
 
-  const resetGame = () => { 
-    setGameResult(null); 
-    setShowResultPopup(false); 
-    setWinner(null); 
-    setHorseProgress([0, 0, 0, 0, 0]);
-    setRacing(false);
-    setSessionId(null);
-    sessionIdRef.current = null;
-  };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-green-900 via-black to-emerald-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -428,8 +447,22 @@ export default function HorseRacePage() {
             </div>
 
             <div className="text-center mt-2" style={{ height: '24px' }}>
-              <div className={`text-sm font-bold transition-opacity ${gameResult ? 'opacity-100' : 'opacity-0'} ${gameResult?.win ? 'text-green-400' : 'text-red-400'}`}>
-                {gameResult ? (gameResult.win ? `🏆 ${gameResult.winner} WINS!` : `Winner: ${gameResult.winner}`) : ''}
+              <div
+                className={`text-sm font-bold transition-opacity ${gameResult ? "opacity-100" : "opacity-0"} ${
+                  gameResult?.outcome === "win"
+                    ? "text-green-400"
+                    : gameResult?.outcome === "partial"
+                      ? "text-amber-300"
+                      : "text-red-400"
+                }`}
+              >
+                {gameResult
+                  ? gameResult.outcome === "win"
+                    ? `WIN · ${gameResult.winner} · +${fmt(gameResult.prize)}`
+                    : gameResult.outcome === "partial"
+                      ? `PARTIAL · ${gameResult.place} · +${fmt(gameResult.prize)}`
+                      : `LOST · Winner: ${gameResult.winner}`
+                  : ""}
               </div>
             </div>
           </div>
@@ -488,7 +521,12 @@ export default function HorseRacePage() {
           </div>
             
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            <button onClick={gameResult ? resetGame : () => startRace(false)} disabled={racing || (!gameResult && (selectedHorse === null || Number(playAmount) < MIN_PLAY))} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            <button
+              type="button"
+              onClick={() => startRace(false)}
+              disabled={racing || (!gameResult && (selectedHorse === null || Number(playAmount) < MIN_PLAY))}
+              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               {racing ? "Racing..." : gameResult ? "RACE AGAIN" : "START RACE"}
             </button>
             {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
@@ -502,18 +540,34 @@ export default function HorseRacePage() {
 
         {showResultPopup && gameResult && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
-            <div className={`${gameResult.place === '1st 🥇' ? 'bg-yellow-500' : gameResult.place === '2nd 🥈' ? 'bg-green-500' : gameResult.prize > 0 ? 'bg-blue-500' : 'bg-red-500'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
-              <div className="text-4xl mb-2">{gameResult.place || '😔'}</div>
-              <div className="text-2xl font-bold mb-1">{gameResult.place === '1st 🥇' ? 'WINNER!' : gameResult.place === '2nd 🥈' ? 'NICE!' : gameResult.prize > 0 ? 'CLOSE!' : 'LOST'}</div>
-              <div className="text-lg font-bold">{gameResult.prize > 0 ? `+${fmt(gameResult.prize)} MLEO` : `-${fmt(Math.abs(gameResult.profit))} MLEO`}</div>
-              {gameResult.prize > 0 && gameResult.multiplier && (
-                <div className="text-xs opacity-90 mt-1">
-                  Prize: {fmt(gameResult.prize)} MLEO (×{gameResult.multiplier.toFixed(2)})
-                </div>
-              )}
+            <div
+              className={`${
+                gameResult.outcome === "win"
+                  ? "bg-yellow-500"
+                  : gameResult.outcome === "partial"
+                    ? "bg-amber-600"
+                    : "bg-red-600"
+              } text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto max-w-sm`}
+              style={{ animation: "fadeIn 0.3s ease-in-out" }}
+            >
+              <div className="text-4xl mb-2">{gameResult.place || "😔"}</div>
+              <div className="text-xl font-bold mb-1">
+                {gameResult.outcome === "win"
+                  ? "WIN"
+                  : gameResult.outcome === "partial"
+                    ? "PARTIAL PAYOUT"
+                    : "LOST"}
+              </div>
+              <div className="text-lg font-bold">
+                Stake {fmt(Number(playAmount) || 0)} · Prize +{fmt(gameResult.prize)} MLEO · Net {gameResult.profit >= 0 ? "+" : ""}
+                {fmt(gameResult.profit)} MLEO
+              </div>
+              {gameResult.prize > 0 && gameResult.multiplier ? (
+                <div className="text-xs opacity-90 mt-1">×{Number(gameResult.multiplier).toFixed(2)} on stake</div>
+              ) : null}
               <div className="text-sm opacity-80 mt-2">
-                {gameResult.selected} finished {gameResult.place}
-                {gameResult.place !== '1st 🥇' && (<div className="text-xs mt-1">Winner: {gameResult.winner}</div>)}
+                {gameResult.selected} — {gameResult.place}
+                {gameResult.outcome !== "win" ? <div className="text-xs mt-1">Winner: {gameResult.winner}</div> : null}
               </div>
             </div>
           </div>

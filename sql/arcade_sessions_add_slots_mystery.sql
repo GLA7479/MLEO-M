@@ -802,7 +802,8 @@ BEGIN
 
   -- Minimum session time check (prevent instant finish) - general check
   -- Individual games may have stricter requirements
-  IF now() < v_session.started_at + interval '800 milliseconds' THEN
+  -- Allow fast start→finish (e.g. limbo / wheel / plinko); still blocks instant double-submit abuse
+  IF now() < v_session.started_at + interval '100 milliseconds' THEN
     RAISE EXCEPTION 'Session finished too quickly';
   END IF;
 
@@ -1242,7 +1243,8 @@ BEGIN
       v_horse_place := '5th';
     END IF;
     v_reward := floor(v_session.stake * v_horse_multiplier)::bigint;
-    v_won := v_reward > v_session.stake;
+    -- Any paying place (1st–4th) should count as a "win" for UI; 5th is 0 reward
+    v_won := v_reward > 0;
     v_server_payload := jsonb_build_object(
       'game', 'horse',
       'mode', v_session.mode,
@@ -1912,8 +1914,8 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'poker' THEN
-    -- Minimum time for poker (casino game)
-    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '1800 milliseconds' THEN
+    -- Arcade poker: allow immediate finish after global min window (same as other fast arcade games)
+    IF v_session.started_at IS NOT NULL AND v_session.started_at > now() - interval '100 milliseconds' THEN
       RAISE EXCEPTION 'Session finished too quickly';
     END IF;
     

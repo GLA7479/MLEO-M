@@ -234,7 +234,15 @@ export default function PokerPage() {
 
   useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
   useEffect(() => { if (!wrapRef.current) return; const calc = () => { const rootH = window.visualViewport?.height ?? window.innerHeight; const safeBottom = Number(getComputedStyle(document.documentElement).getPropertyValue("--satb").replace("px", "")) || 0; const headH = headerRef.current?.offsetHeight || 0; document.documentElement.style.setProperty("--head-h", headH + "px"); const topPad = headH + 8; const used = headH + (metersRef.current?.offsetHeight || 0) + (betRef.current?.offsetHeight || 0) + (ctaRef.current?.offsetHeight || 0) + topPad + 48 + safeBottom + 24; const freeH = Math.max(200, rootH - used); document.documentElement.style.setProperty("--chart-h", freeH + "px"); }; calc(); window.addEventListener("resize", calc); window.visualViewport?.addEventListener("resize", calc); return () => { window.removeEventListener("resize", calc); window.visualViewport?.removeEventListener("resize", calc); }; }, [mounted]);
-  useEffect(() => { if (gameResult) { setShowResultPopup(true); const timer = setTimeout(() => setShowResultPopup(false), 4000); return () => clearTimeout(timer); } }, [gameResult]);
+  useEffect(() => {
+    const finalResult = gameResult && !gameResult.dealing && typeof gameResult.hand === "string";
+    if (finalResult) {
+      setShowResultPopup(true);
+      const timer = setTimeout(() => setShowResultPopup(false), 4000);
+      return () => clearTimeout(timer);
+    }
+    setShowResultPopup(false);
+  }, [gameResult]);
 
   const openWalletModalUnified = () => isConnected ? openAccountModal?.() : openConnectModal?.();
   const hardDisconnect = () => { disconnect?.(); setMenuOpen(false); };
@@ -278,8 +286,8 @@ export default function PokerPage() {
   };
 
   const dealHand = async (isFreePlayParam = false) => {
-    if (gameResult) return; // Prevent double clicks
-    // Disable play button immediately to prevent double clicks
+    if (gameResult?.dealing) return;
+    setShowResultPopup(false);
     setGameResult({ dealing: true });
     playSfx(clickSound.current);
     setSessionError("");
@@ -363,11 +371,11 @@ export default function PokerPage() {
     } catch (error) {
       console.error("Poker session error:", error);
       setSessionError("Session failed to finish");
+      setGameResult(null);
       alert("Failed to finish session. Please refresh vault and try again.");
     }
   };
 
-  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setPlayerCards([]); setCommunityCards([]); setPlayerHand(null); setSessionError(""); };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-green-900 via-black to-blue-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -433,7 +441,7 @@ export default function PokerPage() {
           <div ref={betRef} className="flex items-center justify-center gap-1 mb-1 flex-wrap">
             <button
               onClick={() => handleAmountButtonClick(100)}
-              disabled={gameResult && !gameResult.dealing}
+              disabled={!!gameResult}
               className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
                 activeAmountButton === "100"
                   ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
@@ -444,7 +452,7 @@ export default function PokerPage() {
             </button>
             <button
               onClick={() => handleAmountButtonClick(1000)}
-              disabled={gameResult && !gameResult.dealing}
+              disabled={!!gameResult}
               className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
                 activeAmountButton === "1000"
                   ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
@@ -455,7 +463,7 @@ export default function PokerPage() {
             </button>
             <button
               onClick={() => handleAmountButtonClick(10000)}
-              disabled={gameResult && !gameResult.dealing}
+              disabled={!!gameResult}
               className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
                 activeAmountButton === "10000"
                   ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
@@ -466,7 +474,7 @@ export default function PokerPage() {
             </button>
             <button
               onClick={() => handleAmountButtonClick(100000)}
-              disabled={gameResult && !gameResult.dealing}
+              disabled={!!gameResult}
               className={`w-12 h-8 rounded-lg font-bold text-xs disabled:opacity-50 transition-all ${
                 activeAmountButton === "100000"
                   ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg ring-2 ring-yellow-300'
@@ -477,14 +485,21 @@ export default function PokerPage() {
             </button>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.max(MIN_PLAY, current - 100); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm">−</button>
             <div className="relative">
-              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); setActiveAmountButton(null); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={gameResult && !gameResult.dealing} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-xs pr-6 disabled:opacity-50" />
-              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); setActiveAmountButton("100"); playSfx(clickSound.current); }} disabled={gameResult && !gameResult.dealing} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
+              <input type="text" value={isEditingPlay ? playAmount : formatPlayDisplay(playAmount)} onFocus={() => setIsEditingPlay(true)} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setPlayAmount(val || '0'); setActiveAmountButton(null); }} onBlur={() => { setIsEditingPlay(false); const current = Number(playAmount) || MIN_PLAY; setPlayAmount(String(Math.max(MIN_PLAY, current))); }} disabled={!!gameResult} className="w-20 h-8 bg-black/30 border border-white/20 rounded-lg text-center text-white font-bold text-xs pr-6 disabled:opacity-50" />
+              <button onClick={() => { setPlayAmount(String(MIN_PLAY)); setActiveAmountButton("100"); playSfx(clickSound.current); }} disabled={!!gameResult} className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs disabled:opacity-50 flex items-center justify-center" title="Reset to minimum play">↺</button>
             </div>
             <button onClick={() => { const current = Number(playAmount) || MIN_PLAY; const newBet = Math.min(vault, current + 1000); setPlayAmount(String(newBet)); playSfx(clickSound.current); }} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm">+</button>
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            <button onClick={gameResult && !gameResult.dealing ? resetGame : () => dealHand(false)} disabled={gameResult && gameResult.dealing} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-blue-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed">{gameResult && gameResult.dealing ? "Dealing..." : gameResult ? "NEW HAND" : "DEAL"}</button>
+            <button
+              type="button"
+              onClick={() => dealHand(false)}
+              disabled={Boolean(gameResult?.dealing)}
+              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-blue-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {gameResult?.dealing ? "Dealing..." : gameResult ? "NEW HAND" : "DEAL"}
+            </button>
             {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>
@@ -494,7 +509,7 @@ export default function PokerPage() {
           </div>
         </div>
 
-        {showResultPopup && gameResult && (
+        {showResultPopup && gameResult && !gameResult.dealing && gameResult.hand && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
             <div className={`${gameResult.win ? 'bg-green-500' : 'bg-gray-600'} text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto`} style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
               <div className="text-4xl mb-2">{gameResult.isRoyal ? '👑' : gameResult.win ? '🎉' : '🃏'}</div>

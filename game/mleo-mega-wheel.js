@@ -64,6 +64,14 @@ const S_WIN = "/sounds/gift.mp3";
 function safeRead(key, fallback = {}) { if (typeof window === "undefined") return fallback; try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
 function safeWrite(key, val) { if (typeof window === "undefined") return; try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
 function fmt(n) { if (n >= 1e9) return (n / 1e9).toFixed(2) + "B"; if (n >= 1e6) return (n / 1e6).toFixed(2) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(2) + "K"; return Math.floor(n).toString(); }
+/** Prize / profit display (fmt floors small wins to "0") */
+function fmtPrize(n) {
+  const x = Number(n) || 0;
+  if (!Number.isFinite(x)) return "0";
+  if (Math.abs(x) >= 1000) return fmt(x);
+  if (Number.isInteger(x)) return String(Math.floor(x));
+  return x.toFixed(2);
+}
 function formatPlayDisplay(n) { const num = Number(n) || 0; if (num >= 1e6) return (num / 1e6).toFixed(num % 1e6 === 0 ? 0 : 2) + "M"; if (num >= 1e3) return (num / 1e3).toFixed(num % 1e3 === 0 ? 0 : 2) + "K"; return num.toString(); }
 function shortAddr(addr) { if (!addr || addr.length < 10) return addr || ""; return `${addr.slice(0, 6)}...${addr.slice(-4)}`; }
 function normalizeWholeAmount(amount) {
@@ -208,8 +216,11 @@ export default function MegaWheelPage() {
   };
 
   const spinWheel = async (isFreePlayParam = false) => {
-    if (spinning || gameResult) return; // Prevent double clicks
-    // Disable play button immediately to prevent double clicks
+    if (spinning) return;
+    // Clear prior round in same action so replay is one tap (no separate "reset" click)
+    setGameResult(null);
+    setResult(null);
+    setShowResultPopup(false);
     setSpinning(true);
     playSfx(clickSound.current);
     setSessionError("");
@@ -258,10 +269,17 @@ export default function MegaWheelPage() {
       return;
     }
 
+    if (!finishResult?.success) {
+      setSpinning(false);
+      setSessionError(finishResult?.message || "Session failed to finish");
+      alert(finishResult?.message || "Failed to finish session");
+      return;
+    }
+
     const payload = finishResult?.serverPayload || {};
-    const segmentIndex = Number(payload.segmentIndex || 0);
-    const multiplier = Number(payload.multiplier || 0);
-    const color = payload.color || WHEEL_COLORS[segmentIndex] || "Unknown";
+    const segmentIndex = Math.max(0, Math.min(7, Number(payload.segmentIndex ?? 0)));
+    const multiplier = Number(payload.multiplier ?? WHEEL_SEGMENTS[segmentIndex] ?? 0);
+    const color = String(payload.color || WHEEL_COLORS[segmentIndex] || "Segment");
     
     // Calculate target rotation (5 full spins + land on segment)
     const degreesPerSegment = 360 / WHEEL_SEGMENTS.length; // 45 degrees per segment
@@ -300,7 +318,14 @@ export default function MegaWheelPage() {
         if (prize > 0) {
           playSfx(winSound.current);
         }
-        const resultData = { multiplier, prize, profit: prize - play, color };
+        const resultData = {
+          multiplier,
+          prize,
+          profit: prize - play,
+          color,
+          segmentLabel: `${color} · seg ${segmentIndex + 1}/8`,
+          stake: play,
+        };
         setGameResult(resultData);
         const newStats = { ...stats, totalSpins: stats.totalSpins + 1, totalPlay: stats.totalPlay + play, totalWon: stats.totalWon + prize, biggestWin: Math.max(stats.biggestWin, prize), biggestMultiplier: Math.max(stats.biggestMultiplier, multiplier), lastPlay: play };
         setStats(newStats);
@@ -310,7 +335,6 @@ export default function MegaWheelPage() {
     requestAnimationFrame(animateWheel);
   };
 
-  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setResult(null); setSpinning(false); setActiveAmountButton("100"); };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-yellow-900 via-black to-orange-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -382,7 +406,7 @@ export default function MegaWheelPage() {
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-24 h-24 rounded-full bg-white border-2 border-gray-400 flex items-center justify-center">
                     <div className="text-2xl font-bold text-gray-800">
-                      {result ? `×${result}` : '🎡'}
+                      {result != null ? `×${Number(result).toFixed(2)}` : '🎡'}
                     </div>
                   </div>
                 </div>
@@ -390,8 +414,10 @@ export default function MegaWheelPage() {
             </div>
             
             <div className="text-center mt-3" style={{ height: '28px' }}>
-              <div className={`text-lg font-bold text-yellow-400 transition-opacity ${result && !spinning ? 'opacity-100' : 'opacity-0'}`}>
-                {result && gameResult ? `${gameResult.color} ×${result} Multiplier!` : ''}
+              <div className={`text-lg font-bold text-yellow-400 transition-opacity ${result != null && !spinning ? 'opacity-100' : 'opacity-0'}`}>
+                {result != null && gameResult
+                  ? `${gameResult.color} · ×${Number(gameResult.multiplier).toFixed(2)}`
+                  : ''}
               </div>
             </div>
           </div>
@@ -450,7 +476,12 @@ export default function MegaWheelPage() {
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            <button onClick={gameResult ? resetGame : () => spinWheel(false)} disabled={spinning || (gameResult && !gameResult)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-yellow-500 to-orange-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            <button
+              type="button"
+              onClick={() => spinWheel(false)}
+              disabled={spinning}
+              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-yellow-500 to-orange-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               {spinning ? "Spinning..." : gameResult ? "SPIN AGAIN" : "SPIN"}
             </button>
             {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
@@ -464,15 +495,18 @@ export default function MegaWheelPage() {
 
         {showResultPopup && gameResult && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
-            <div className="bg-gradient-to-r from-yellow-500 to-orange-600 text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto" style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
-              <div className="text-4xl mb-2">🎉</div>
-              <div className="text-2xl font-bold mb-1">{gameResult.color} ×{gameResult.multiplier}!</div>
-              <div className="text-lg font-bold">+{fmt(gameResult.prize)} MLEO</div>
-              {gameResult.multiplier && (
-                <div className="text-xs opacity-90 mt-1">
-                  Prize: {fmt(gameResult.prize)} MLEO (×{gameResult.multiplier.toFixed(2)})
-                </div>
-              )}
+            <div className="bg-gradient-to-r from-yellow-500 to-orange-600 text-white px-8 py-6 rounded-2xl shadow-2xl text-center pointer-events-auto max-w-sm" style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
+              <div className="text-4xl mb-2">{gameResult.prize > 0 ? '🎉' : '🎡'}</div>
+              <div className="text-lg font-semibold opacity-95 mb-1">{gameResult.segmentLabel || `${gameResult.color} · segment`}</div>
+              <div className="text-2xl font-bold mb-1">
+                Multiplier ×{Number(gameResult.multiplier).toFixed(2)}
+              </div>
+              <div className="text-lg font-bold">
+                {gameResult.prize > 0 ? `+${fmtPrize(gameResult.prize)} MLEO` : `+0 MLEO (stake ×${Number(gameResult.multiplier).toFixed(2)} rounds down)`}
+              </div>
+              <div className="text-xs opacity-90 mt-2 space-y-0.5">
+                <div>Stake {fmtPrize(gameResult.stake ?? (Number(playAmount) || 0))} · Net {gameResult.profit >= 0 ? '+' : ''}{fmtPrize(gameResult.profit)} MLEO</div>
+              </div>
             </div>
           </div>
         )}

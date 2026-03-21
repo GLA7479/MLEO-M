@@ -254,8 +254,9 @@ export default function DiceArenaPage() {
   };
 
   const rollDice = async (isFreePlayParam = false) => {
-    if (rolling || gameResult) return; // Prevent double clicks
-    // Disable play button immediately to prevent double clicks
+    if (rolling) return;
+    setShowResultPopup(false);
+    setGameResult(null);
     setRolling(true);
     playSfx(clickSound.current);
     setSessionError("");
@@ -300,7 +301,6 @@ export default function DiceArenaPage() {
       setVaultState(startResult.balanceAfter);
     }
     setPlayAmount(String(play));
-    setGameResult(null);
     let rollCount = 0;
     const rollInterval = setInterval(async () => {
       setDice([Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1]);
@@ -322,6 +322,10 @@ export default function DiceArenaPage() {
   };
 
   const checkResult = async (finishResult, play) => {
+    if (!finishResult?.success) {
+      setSessionError(finishResult?.message || "Session failed to finish");
+      return;
+    }
     const payload = finishResult?.serverPayload || {};
     const finalDice = Array.isArray(payload.dice) ? payload.dice : [1, 1];
     const sum = Number(payload.sum || 0);
@@ -478,7 +482,14 @@ export default function DiceArenaPage() {
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            <button onClick={() => rollDice(false)} disabled={rolling || (gameResult && !gameResult)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed">{rolling ? "Rolling..." : gameResult ? "ROLL AGAIN" : "ROLL DICE"}</button>
+            <button
+              type="button"
+              onClick={() => rollDice(false)}
+              disabled={rolling}
+              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {rolling ? "Rolling..." : gameResult ? "ROLL AGAIN" : "ROLL DICE"}
+            </button>
             {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>

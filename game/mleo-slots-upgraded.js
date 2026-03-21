@@ -217,8 +217,9 @@ export default function SlotsPage() {
   };
 
   const spin = async (isFreePlayParam = false) => {
-    if (spinning || gameResult) return; // Prevent double clicks
-    // Disable play button immediately to prevent double clicks
+    if (spinning) return;
+    setShowResultPopup(false);
+    setGameResult(null);
     setSpinning(true);
     playSfx(clickSound.current);
     setSessionError("");
@@ -229,26 +230,26 @@ export default function SlotsPage() {
       try {
         const result = await startFreeplayArcadeSession(gameId);
         if (result.success) { play = result.amount; sessionId = result.sessionId; setFreePlayTokens(result.remainingTokens); setIsFreePlay(false); router.replace('/slots-upgraded', undefined, { shallow: true }); }
-        else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); return; }
+        else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); setSpinning(false); return; }
       } catch (error) {
         console.error('Free play error:', error);
         alert('Failed to use free play token. Please try again.');
         setIsFreePlay(false);
+        setSpinning(false);
         return;
       }
     } else {
-      if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); return; }
+      if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); setSpinning(false); return; }
       const startResult = await startPaidArcadeSession("slots-upgraded", play);
       if (!startResult.success) {
         alert(startResult.message || 'Failed to start session');
+        setSpinning(false);
         return;
       }
       sessionId = startResult.sessionId;
       setVaultState(startResult.balanceAfter);
     }
     setPlayAmount(String(play));
-    setSpinning(true);
-    setGameResult(null);
 
     let count = 0;
     const spinInterval = setInterval(async () => {
@@ -259,6 +260,11 @@ export default function SlotsPage() {
         try {
           const finishResult = await finishArcadeSession(sessionId, {});
           setSpinning(false);
+          if (!finishResult?.success) {
+            setSessionError(finishResult?.message || "Session failed to finish");
+            alert(finishResult?.message || "Failed to finish session");
+            return;
+          }
           checkResult(finishResult, play);
         } catch (error) {
           console.error("Finish session error:", error);
@@ -291,7 +297,6 @@ export default function SlotsPage() {
     setStats(newStats);
   };
 
-  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setReels(['🎰', '🎰', '🎰', '🎰', '🎰']); setSpinning(false); setActiveAmountButton("100"); };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-yellow-900 via-black to-purple-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -395,7 +400,14 @@ export default function SlotsPage() {
           </div>
 
           <div ref={ctaRef} className="flex flex-col gap-3 w-full max-w-sm" style={{ minHeight: '140px' }}>
-            <button onClick={gameResult ? resetGame : () => spin(false)} disabled={spinning || (gameResult && !gameResult)} className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-yellow-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed">{spinning ? "Spinning..." : gameResult ? "SPIN AGAIN" : "SPIN"}</button>
+            <button
+              type="button"
+              onClick={() => spin(false)}
+              disabled={spinning}
+              className="w-full py-3 rounded-lg font-bold text-base bg-gradient-to-r from-yellow-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {spinning ? "Spinning..." : gameResult ? "SPIN AGAIN" : "SPIN"}
+            </button>
             {sessionError ? <div className="text-center text-xs text-red-300">{sessionError}</div> : null}
             <div className="flex gap-2">
               <button onClick={() => { setShowHowToPlay(true); playSfx(clickSound.current); }} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 font-semibold text-xs transition-all">How to Play</button>

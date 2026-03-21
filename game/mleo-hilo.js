@@ -252,7 +252,8 @@ export default function HiLoPage() {
 
   const startGame = async (isFreePlayParam = false) => {
     if (gameActive) return;
-    // Disable play button immediately to prevent double clicks
+    setGameResult(null);
+    setShowResultPopup(false);
     setGameActive(true);
     playSfx(clickSound.current);
     setSessionError("");
@@ -294,7 +295,6 @@ export default function HiLoPage() {
     }
     setPlayAmount(String(play));
     setSessionId(nextSessionId);
-    setGameResult(null);
     setStreak(0);
     setTotalPrize(0);
     setCurrentCard(drawCard());
@@ -359,7 +359,6 @@ export default function HiLoPage() {
     }
   };
 
-  const resetGame = () => { setGameResult(null); setShowResultPopup(false); setCurrentCard(null); setNextCard(null); setStreak(0); setTotalPrize(0); setGameActive(false); setSessionId(null); };
   const backSafe = () => { playSfx(clickSound.current); router.push('/arcade'); };
 
   if (!mounted) return <div className="min-h-screen bg-gradient-to-br from-blue-900 via-black to-purple-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>;
@@ -485,8 +484,9 @@ export default function HiLoPage() {
                 <button onClick={() => guess("lower")} className="flex-1 h-12 rounded-lg font-bold text-xs bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:brightness-110">LOWER</button>
               </div>
             ) : (
-              <button 
-                onClick={gameResult ? resetGame : () => startGame(false)} 
+              <button
+                type="button"
+                onClick={() => startGame(false)}
                 disabled={gameActive || Number(playAmount) < MIN_PLAY}
                 className="w-full h-12 rounded-lg font-bold text-base bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >

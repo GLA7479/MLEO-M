@@ -470,11 +470,22 @@ export default function LimitRunPage() {
       setSessionId(null);
       setSessionError("Session failed to finish");
       alert("Failed to finish session. Please refresh vault and try again.");
+      setRolling(false);
+      return;
+    }
+
+    if (!finishResult?.success) {
+      setSessionId(null);
+      setSessionError(finishResult?.message || "Session failed to finish");
+      alert(finishResult?.message || "Failed to finish session");
+      setRolling(false);
       return;
     }
 
     const payload = finishResult?.serverPayload || {};
-    const finalResult = Number(payload.result || 0);
+    const finalResult = Number(
+      payload.result ?? payload.limboResult ?? payload.roll ?? 0
+    );
     const resolvedTarget = Number(payload.targetMultiplier || targetMultiplier);
 
     setRolling(true);

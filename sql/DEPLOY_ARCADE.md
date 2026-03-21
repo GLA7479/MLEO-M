@@ -9,6 +9,8 @@
 
 **Never** paste an old “pilot-only” `finish_arcade_session` (two games) after step 3 — it will break blackjack and the rest.
 
+After pulling repo updates, re-apply `arcade_sessions_add_slots_mystery.sql` if you need fixes such as horse `won` semantics, the global “finish too quickly” window, or **arcade poker** (`game_id = 'poker'`) finish timing (was 1800ms, now aligned to 100ms after global guard).
+
 ## Error: `finish_arcade_session is not configured for game_id=...`
 
 Supabase still has a **truncated** `finish_arcade_session` (e.g. only coin-flip + dice). **Fix:** in SQL Editor, run the **entire** `sql/arcade_sessions_add_slots_mystery.sql` so `CREATE OR REPLACE FUNCTION public.finish_arcade_session` includes every game branch.
