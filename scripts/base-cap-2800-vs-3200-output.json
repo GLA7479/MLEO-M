@@ -1,0 +1,2781 @@
+{
+  "note": "gain=0.40, softcut=A_current, upgrade/reinvest sensitivity = 1× (B_modeled)",
+  "longTerm": {
+    "cap2800": [
+      {
+        "archetype": "casual-light",
+        "firstDayMilestone": {
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null
+        },
+        "capWindows": {
+          "1-7": 0,
+          "8-30": 0,
+          "31-90": 0,
+          "91-180": 0
+        },
+        "weeklyAvg": {
+          "w1_7": 7.987142857142857,
+          "w8_30": 15.57739130434783,
+          "d31_90": 32.410166666666655,
+          "d91_180": 61.26355555555553
+        }
+      },
+      {
+        "archetype": "casual-consistent",
+        "firstDayMilestone": {
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null
+        },
+        "capWindows": {
+          "1-7": 0,
+          "8-30": 0,
+          "31-90": 0,
+          "91-180": 0
+        },
+        "weeklyAvg": {
+          "w1_7": 20.771428571428572,
+          "w8_30": 44.996086956521744,
+          "d31_90": 97.41066666666666,
+          "d91_180": 192.2037777777778
+        }
+      },
+      {
+        "archetype": "engaged",
+        "firstDayMilestone": {
+          "p25": 165,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null
+        },
+        "capWindows": {
+          "1-7": 0,
+          "8-30": 0,
+          "31-90": 0,
+          "91-180": 0
+        },
+        "weeklyAvg": {
+          "w1_7": 65.46285714285713,
+          "w8_30": 142.67391304347822,
+          "d31_90": 331.7368333333332,
+          "d91_180": 625.5080000000003
+        }
+      },
+      {
+        "archetype": "grinder",
+        "firstDayMilestone": {
+          "p25": 46,
+          "p50": 105,
+          "p75": null,
+          "p90": null,
+          "p100": null
+        },
+        "capWindows": {
+          "1-7": 0,
+          "8-30": 0,
+          "31-90": 0,
+          "91-180": 0
+        },
+        "weeklyAvg": {
+          "w1_7": 160.2957142857143,
+          "w8_30": 373.75043478260864,
+          "d31_90": 921.4673333333335,
+          "d91_180": 1542.650555555554
+        }
+      },
+      {
+        "archetype": "hardcore-optimizer",
+        "firstDayMilestone": {
+          "p25": 21,
+          "p50": 48,
+          "p75": 120,
+          "p90": null,
+          "p100": null
+        },
+        "capWindows": {
+          "1-7": 0,
+          "8-30": 0,
+          "31-90": 0,
+          "91-180": 0
+        },
+        "weeklyAvg": {
+          "w1_7": 259.4928571428572,
+          "w8_30": 667.2326086956523,
+          "d31_90": 1583.7228333333333,
+          "d91_180": 2142.8445555555572
+        }
+      },
+      {
+        "archetype": "extreme",
+        "firstDayMilestone": {
+          "p25": 8,
+          "p50": 23,
+          "p75": 46,
+          "p90": 83,
+          "p100": 169
+        },
+        "capWindows": {
+          "1-7": 0,
+          "8-30": 0,
+          "31-90": 0,
+          "91-180": 12
+        },
+        "weeklyAvg": {
+          "w1_7": 474.28000000000003,
+          "w8_30": 1264.8156521739131,
+          "d31_90": 2281.773,
+          "d91_180": 2677.208888888888
+        }
+      }
+    ],
+    "cap3200": [
+      {
+        "archetype": "casual-light",
+        "firstDayMilestone": {
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null
+        },
+        "capWindows": {
+          "1-7": 0,
+          "8-30": 0,
+          "31-90": 0,
+          "91-180": 0
+        },
+        "weeklyAvg": {
+          "w1_7": 7.987142857142857,
+          "w8_30": 15.57739130434783,
+          "d31_90": 32.410166666666655,
+          "d91_180": 61.26355555555553
+        }
+      },
+      {
+        "archetype": "casual-consistent",
+        "firstDayMilestone": {
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null
+        },
+        "capWindows": {
+          "1-7": 0,
+          "8-30": 0,
+          "31-90": 0,
+          "91-180": 0
+        },
+        "weeklyAvg": {
+          "w1_7": 20.771428571428572,
+          "w8_30": 44.996086956521744,
+          "d31_90": 97.41066666666666,
+          "d91_180": 192.2037777777778
+        }
+      },
+      {
+        "archetype": "engaged",
+        "firstDayMilestone": {
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null
+        },
+        "capWindows": {
+          "1-7": 0,
+          "8-30": 0,
+          "31-90": 0,
+          "91-180": 0
+        },
+        "weeklyAvg": {
+          "w1_7": 65.46285714285713,
+          "w8_30": 142.67391304347822,
+          "d31_90": 331.7368333333332,
+          "d91_180": 625.5080000000003
+        }
+      },
+      {
+        "archetype": "grinder",
+        "firstDayMilestone": {
+          "p25": 58,
+          "p50": 148,
+          "p75": null,
+          "p90": null,
+          "p100": null
+        },
+        "capWindows": {
+          "1-7": 0,
+          "8-30": 0,
+          "31-90": 0,
+          "91-180": 0
+        },
+        "weeklyAvg": {
+          "w1_7": 160.2957142857143,
+          "w8_30": 373.75043478260864,
+          "d31_90": 921.4673333333335,
+          "d91_180": 1573.831222222222
+        }
+      },
+      {
+        "archetype": "hardcore-optimizer",
+        "firstDayMilestone": {
+          "p25": 26,
+          "p50": 58,
+          "p75": 160,
+          "p90": null,
+          "p100": null
+        },
+        "capWindows": {
+          "1-7": 0,
+          "8-30": 0,
+          "31-90": 0,
+          "91-180": 0
+        },
+        "weeklyAvg": {
+          "w1_7": 259.4928571428572,
+          "w8_30": 667.2326086956523,
+          "d31_90": 1639.0596666666672,
+          "d91_180": 2289.370666666667
+        }
+      },
+      {
+        "archetype": "extreme",
+        "firstDayMilestone": {
+          "p25": 12,
+          "p50": 23,
+          "p75": 53,
+          "p90": 111,
+          "p100": null
+        },
+        "capWindows": {
+          "1-7": 0,
+          "8-30": 0,
+          "31-90": 0,
+          "91-180": 0
+        },
+        "weeklyAvg": {
+          "w1_7": 474.28000000000003,
+          "w8_30": 1286.8334782608697,
+          "d31_90": 2449.232833333335,
+          "d91_180": 2945.56411111111
+        }
+      }
+    ]
+  },
+  "stress": {
+    "cap2800": {
+      "stressValidation": {
+        "A_slower": {
+          "label": "A: slower (upgrade 0.75×, reinvest 0.75×)",
+          "upgradeMult": 0.75,
+          "reinvestMult": 0.75,
+          "dangerFlags": {
+            "engaged_p75_before_day_90": false,
+            "grinder_p100_before_day_120": false,
+            "hardcore_cap_hits_midgame": false,
+            "extreme_p100_before_day_45": false,
+            "extreme_cap_burst_early": false,
+            "extreme_cap_spam_midgame": false
+          },
+          "growthFeel": {
+            "casual_consistent": {
+              "produced": {
+                "d14": 33,
+                "d30": 52.67,
+                "d60": 77.9,
+                "d90": 92.94,
+                "d180": 193.86
+              },
+              "ratio_90_vs_14": 2.82,
+              "ratio_180_vs_30": 3.68
+            },
+            "engaged": {
+              "produced": {
+                "d14": 100.61,
+                "d30": 150.99,
+                "d60": 250.04,
+                "d90": 365.87,
+                "d180": 619.83
+              },
+              "ratio_90_vs_14": 3.64,
+              "ratio_180_vs_30": 4.11
+            }
+          },
+          "byArchetype": [
+            {
+              "archetype": "casual-light",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 7.345714285714284,
+                "w8_30": 13.036956521739132,
+                "d31_90": 27.171166666666682,
+                "d91_180": 48.24255555555555
+              }
+            },
+            {
+              "archetype": "casual-consistent",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 19.24285714285714,
+                "w8_30": 37.93086956521741,
+                "d31_90": 78.51833333333336,
+                "d91_180": 149.2886666666667
+              }
+            },
+            {
+              "archetype": "engaged",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 58.43142857142857,
+                "w8_30": 118.92130434782607,
+                "d31_90": 256.4748333333334,
+                "d91_180": 512.091555555556
+              }
+            },
+            {
+              "archetype": "grinder",
+              "firstDayMilestone": {
+                "p25": 62,
+                "p50": 149,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 144.70714285714288,
+                "w8_30": 309.2199999999998,
+                "d31_90": 697.9463333333333,
+                "d91_180": 1321.3311111111109
+              }
+            },
+            {
+              "archetype": "hardcore-optimizer",
+              "firstDayMilestone": {
+                "p25": 28,
+                "p50": 64,
+                "p75": 171,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 235.4457142857143,
+                "w8_30": 537.0760869565216,
+                "d31_90": 1270.6555,
+                "d91_180": 1939.7471111111117
+              }
+            },
+            {
+              "archetype": "extreme",
+              "firstDayMilestone": {
+                "p25": 10,
+                "p50": 30,
+                "p75": 61,
+                "p90": 132,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 425.3471428571429,
+                "w8_30": 1024.9969565217395,
+                "d31_90": 2029.2469999999992,
+                "d91_180": 2510.741888888887
+              }
+            }
+          ]
+        },
+        "B_modeled": {
+          "label": "B: as-modeled (1× / 1×)",
+          "upgradeMult": 1,
+          "reinvestMult": 1,
+          "dangerFlags": {
+            "engaged_p75_before_day_90": false,
+            "grinder_p100_before_day_120": false,
+            "hardcore_cap_hits_midgame": false,
+            "extreme_p100_before_day_45": false,
+            "extreme_cap_burst_early": false,
+            "extreme_cap_spam_midgame": false
+          },
+          "growthFeel": {
+            "casual_consistent": {
+              "produced": {
+                "d14": 36.85,
+                "d30": 54.74,
+                "d60": 92.94,
+                "d90": 128.66,
+                "d180": 239.14
+              },
+              "ratio_90_vs_14": 3.49,
+              "ratio_180_vs_30": 4.37
+            },
+            "engaged": {
+              "produced": {
+                "d14": 112.42,
+                "d30": 187.89,
+                "d60": 297.06,
+                "d90": 484.85,
+                "d180": 715.04
+              },
+              "ratio_90_vs_14": 4.31,
+              "ratio_180_vs_30": 3.81
+            }
+          },
+          "byArchetype": [
+            {
+              "archetype": "casual-light",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 7.987142857142857,
+                "w8_30": 15.57739130434783,
+                "d31_90": 32.410166666666655,
+                "d91_180": 61.26355555555553
+              }
+            },
+            {
+              "archetype": "casual-consistent",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 20.771428571428572,
+                "w8_30": 44.996086956521744,
+                "d31_90": 97.41066666666666,
+                "d91_180": 192.2037777777778
+              }
+            },
+            {
+              "archetype": "engaged",
+              "firstDayMilestone": {
+                "p25": 165,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 65.46285714285713,
+                "w8_30": 142.67391304347822,
+                "d31_90": 331.7368333333332,
+                "d91_180": 625.5080000000003
+              }
+            },
+            {
+              "archetype": "grinder",
+              "firstDayMilestone": {
+                "p25": 46,
+                "p50": 105,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 160.2957142857143,
+                "w8_30": 373.75043478260864,
+                "d31_90": 921.4673333333335,
+                "d91_180": 1542.650555555554
+              }
+            },
+            {
+              "archetype": "hardcore-optimizer",
+              "firstDayMilestone": {
+                "p25": 21,
+                "p50": 48,
+                "p75": 120,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 259.4928571428572,
+                "w8_30": 667.2326086956523,
+                "d31_90": 1583.7228333333333,
+                "d91_180": 2142.8445555555572
+              }
+            },
+            {
+              "archetype": "extreme",
+              "firstDayMilestone": {
+                "p25": 8,
+                "p50": 23,
+                "p75": 46,
+                "p90": 83,
+                "p100": 169
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 12
+              },
+              "weeklyAvg": {
+                "w1_7": 474.28000000000003,
+                "w8_30": 1264.8156521739131,
+                "d31_90": 2281.773,
+                "d91_180": 2677.208888888888
+              }
+            }
+          ]
+        },
+        "C_faster": {
+          "label": "C: faster (1.25× / 1.25×)",
+          "upgradeMult": 1.25,
+          "reinvestMult": 1.25,
+          "dangerFlags": {
+            "engaged_p75_before_day_90": false,
+            "grinder_p100_before_day_120": false,
+            "hardcore_cap_hits_midgame": false,
+            "extreme_p100_before_day_45": false,
+            "extreme_cap_burst_early": false,
+            "extreme_cap_spam_midgame": false
+          },
+          "growthFeel": {
+            "casual_consistent": {
+              "produced": {
+                "d14": 48.84,
+                "d30": 68.2,
+                "d60": 123.93,
+                "d90": 167.03,
+                "d180": 291.02
+              },
+              "ratio_90_vs_14": 3.42,
+              "ratio_180_vs_30": 4.27
+            },
+            "engaged": {
+              "produced": {
+                "d14": 139.97,
+                "d30": 245.27,
+                "d60": 389.51,
+                "d90": 571.21,
+                "d180": 831.49
+              },
+              "ratio_90_vs_14": 4.08,
+              "ratio_180_vs_30": 3.39
+            }
+          },
+          "byArchetype": [
+            {
+              "archetype": "casual-light",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 7.987142857142857,
+                "w8_30": 17.736086956521746,
+                "d31_90": 37.97549999999999,
+                "d91_180": 73.15688888888893
+              }
+            },
+            {
+              "archetype": "casual-consistent",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 22.3,
+                "w8_30": 52.043478260869584,
+                "d31_90": 118.1186666666666,
+                "d91_180": 232.70933333333335
+              }
+            },
+            {
+              "archetype": "engaged",
+              "firstDayMilestone": {
+                "p25": 128,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 68.97714285714285,
+                "w8_30": 166.93347826086955,
+                "d31_90": 410.89933333333323,
+                "d91_180": 716.321444444445
+              }
+            },
+            {
+              "archetype": "grinder",
+              "firstDayMilestone": {
+                "p25": 37,
+                "p50": 70,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 168.09,
+                "w8_30": 442.7965217391305,
+                "d31_90": 1139.4318333333329,
+                "d91_180": 1712.5696666666663
+              }
+            },
+            {
+              "archetype": "hardcore-optimizer",
+              "firstDayMilestone": {
+                "p25": 17,
+                "p50": 39,
+                "p75": 87,
+                "p90": 176,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 289.31142857142856,
+                "w8_30": 802.6686956521738,
+                "d31_90": 1815.275,
+                "d91_180": 2337.2496666666657
+              }
+            },
+            {
+              "archetype": "extreme",
+              "firstDayMilestone": {
+                "p25": 6,
+                "p50": 18,
+                "p75": 32,
+                "p90": 59,
+                "p100": 126
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 55
+              },
+              "weeklyAvg": {
+                "w1_7": 552.0985714285715,
+                "w8_30": 1452.3313043478263,
+                "d31_90": 2471.336166666666,
+                "d91_180": 2777.1652222222224
+              }
+            }
+          ]
+        },
+        "D_much_faster": {
+          "label": "D: much faster (1.5× / 1.5×)",
+          "upgradeMult": 1.5,
+          "reinvestMult": 1.5,
+          "dangerFlags": {
+            "engaged_p75_before_day_90": false,
+            "grinder_p100_before_day_120": false,
+            "hardcore_cap_hits_midgame": false,
+            "extreme_p100_before_day_45": false,
+            "extreme_cap_burst_early": false,
+            "extreme_cap_spam_midgame": false
+          },
+          "growthFeel": {
+            "casual_consistent": {
+              "produced": {
+                "d14": 48.84,
+                "d30": 77.9,
+                "d60": 131.79,
+                "d90": 202.38,
+                "d180": 341.2
+              },
+              "ratio_90_vs_14": 4.14,
+              "ratio_180_vs_30": 4.38
+            },
+            "engaged": {
+              "produced": {
+                "d14": 150.99,
+                "d30": 261.19,
+                "d60": 505.25,
+                "d90": 683.63,
+                "d180": 933.65
+              },
+              "ratio_90_vs_14": 4.53,
+              "ratio_180_vs_30": 3.57
+            }
+          },
+          "byArchetype": [
+            {
+              "archetype": "casual-light",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 8.628571428571428,
+                "w8_30": 19.80304347826087,
+                "d31_90": 44.37483333333333,
+                "d91_180": 85.28711111111106
+              }
+            },
+            {
+              "archetype": "casual-consistent",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 23.82857142857143,
+                "w8_30": 58.51086956521742,
+                "d31_90": 139.70516666666663,
+                "d91_180": 275.71044444444465
+              }
+            },
+            {
+              "archetype": "engaged",
+              "firstDayMilestone": {
+                "p25": 106,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 76.00714285714285,
+                "w8_30": 190.00608695652176,
+                "d31_90": 490.99249999999967,
+                "d91_180": 807.6652222222224
+              }
+            },
+            {
+              "archetype": "grinder",
+              "firstDayMilestone": {
+                "p25": 28,
+                "p50": 58,
+                "p75": 170,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 187.42000000000002,
+                "w8_30": 511.12782608695665,
+                "d31_90": 1327.4460000000004,
+                "d91_180": 1896.005666666665
+              }
+            },
+            {
+              "archetype": "hardcore-optimizer",
+              "firstDayMilestone": {
+                "p25": 14,
+                "p50": 31,
+                "p75": 60,
+                "p90": 134,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 322.9971428571429,
+                "w8_30": 929.9839130434782,
+                "d31_90": 2008.0679999999995,
+                "d91_180": 2498.220555555555
+              }
+            },
+            {
+              "archetype": "extreme",
+              "firstDayMilestone": {
+                "p25": 5,
+                "p50": 14,
+                "p75": 26,
+                "p90": 41,
+                "p100": 88
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 3,
+                "91-180": 90
+              },
+              "weeklyAvg": {
+                "w1_7": 608.37,
+                "w8_30": 1664.6986956521741,
+                "d31_90": 2609.4986666666664,
+                "d91_180": 2800
+              }
+            }
+          ]
+        },
+        "E_extreme_fast": {
+          "label": "E: extreme-fast (2× / 2×)",
+          "upgradeMult": 2,
+          "reinvestMult": 2,
+          "dangerFlags": {
+            "engaged_p75_before_day_90": false,
+            "grinder_p100_before_day_120": false,
+            "hardcore_cap_hits_midgame": false,
+            "extreme_p100_before_day_45": false,
+            "extreme_cap_burst_early": false,
+            "extreme_cap_spam_midgame": true
+          },
+          "growthFeel": {
+            "casual_consistent": {
+              "produced": {
+                "d14": 54.74,
+                "d30": 94.78,
+                "d60": 176.48,
+                "d90": 253.68,
+                "d180": 424.96
+              },
+              "ratio_90_vs_14": 4.63,
+              "ratio_180_vs_30": 4.48
+            },
+            "engaged": {
+              "produced": {
+                "d14": 196.25,
+                "d30": 315.4,
+                "d60": 709.72,
+                "d90": 823.05,
+                "d180": 1305.75
+              },
+              "ratio_90_vs_14": 4.19,
+              "ratio_180_vs_30": 4.14
+            }
+          },
+          "byArchetype": [
+            {
+              "archetype": "casual-light",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 10.14,
+                "w8_30": 24.42478260869565,
+                "d31_90": 56.276666666666685,
+                "d91_180": 111.43355555555549
+              }
+            },
+            {
+              "archetype": "casual-consistent",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 29.514285714285712,
+                "w8_30": 71.63043478260872,
+                "d31_90": 182.53883333333346,
+                "d91_180": 357.8356666666665
+              }
+            },
+            {
+              "archetype": "engaged",
+              "firstDayMilestone": {
+                "p25": 60,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 86.41142857142857,
+                "w8_30": 235.92565217391305,
+                "d31_90": 634.7396666666667,
+                "d91_180": 1053.3764444444448
+              }
+            },
+            {
+              "archetype": "grinder",
+              "firstDayMilestone": {
+                "p25": 20,
+                "p50": 40,
+                "p75": 110,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 221.90285714285713,
+                "w8_30": 661.3126086956522,
+                "d31_90": 1623.7455000000002,
+                "d91_180": 2198.2882222222242
+              }
+            },
+            {
+              "archetype": "hardcore-optimizer",
+              "firstDayMilestone": {
+                "p25": 11,
+                "p50": 24,
+                "p75": 39,
+                "p90": 83,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 376.6985714285714,
+                "w8_30": 1227.8060869565215,
+                "d31_90": 2296.6045,
+                "d91_180": 2633.48733333333
+              }
+            },
+            {
+              "archetype": "extreme",
+              "firstDayMilestone": {
+                "p25": 4,
+                "p50": 11,
+                "p75": 20,
+                "p90": 28,
+                "p100": 55
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 36,
+                "91-180": 90
+              },
+              "weeklyAvg": {
+                "w1_7": 739.6057142857144,
+                "w8_30": 1992.9478260869564,
+                "d31_90": 2751.043,
+                "d91_180": 2800
+              }
+            }
+          ]
+        }
+      },
+      "summaryTable": [
+        {
+          "scenario": "A_slower",
+          "archetype": "casual-light",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "A_slower",
+          "archetype": "casual-consistent",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "A_slower",
+          "archetype": "engaged",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "A_slower",
+          "archetype": "grinder",
+          "p25": 62,
+          "p50": 149,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "A_slower",
+          "archetype": "hardcore-optimizer",
+          "p25": 28,
+          "p50": 64,
+          "p75": 171,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "A_slower",
+          "archetype": "extreme",
+          "p25": 10,
+          "p50": 30,
+          "p75": 61,
+          "p90": 132,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "B_modeled",
+          "archetype": "casual-light",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "B_modeled",
+          "archetype": "casual-consistent",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "B_modeled",
+          "archetype": "engaged",
+          "p25": 165,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "B_modeled",
+          "archetype": "grinder",
+          "p25": 46,
+          "p50": 105,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "B_modeled",
+          "archetype": "hardcore-optimizer",
+          "p25": 21,
+          "p50": 48,
+          "p75": 120,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "B_modeled",
+          "archetype": "extreme",
+          "p25": 8,
+          "p50": 23,
+          "p75": 46,
+          "p90": 83,
+          "p100": 169,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 12
+        },
+        {
+          "scenario": "C_faster",
+          "archetype": "casual-light",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "C_faster",
+          "archetype": "casual-consistent",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "C_faster",
+          "archetype": "engaged",
+          "p25": 128,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "C_faster",
+          "archetype": "grinder",
+          "p25": 37,
+          "p50": 70,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "C_faster",
+          "archetype": "hardcore-optimizer",
+          "p25": 17,
+          "p50": 39,
+          "p75": 87,
+          "p90": 176,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "C_faster",
+          "archetype": "extreme",
+          "p25": 6,
+          "p50": 18,
+          "p75": 32,
+          "p90": 59,
+          "p100": 126,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 55
+        },
+        {
+          "scenario": "D_much_faster",
+          "archetype": "casual-light",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "D_much_faster",
+          "archetype": "casual-consistent",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "D_much_faster",
+          "archetype": "engaged",
+          "p25": 106,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "D_much_faster",
+          "archetype": "grinder",
+          "p25": 28,
+          "p50": 58,
+          "p75": 170,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "D_much_faster",
+          "archetype": "hardcore-optimizer",
+          "p25": 14,
+          "p50": 31,
+          "p75": 60,
+          "p90": 134,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "D_much_faster",
+          "archetype": "extreme",
+          "p25": 5,
+          "p50": 14,
+          "p75": 26,
+          "p90": 41,
+          "p100": 88,
+          "capHits_1_30": 0,
+          "capHits_31_90": 3,
+          "capHits_91_180": 90
+        },
+        {
+          "scenario": "E_extreme_fast",
+          "archetype": "casual-light",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "E_extreme_fast",
+          "archetype": "casual-consistent",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "E_extreme_fast",
+          "archetype": "engaged",
+          "p25": 60,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "E_extreme_fast",
+          "archetype": "grinder",
+          "p25": 20,
+          "p50": 40,
+          "p75": 110,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "E_extreme_fast",
+          "archetype": "hardcore-optimizer",
+          "p25": 11,
+          "p50": 24,
+          "p75": 39,
+          "p90": 83,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "E_extreme_fast",
+          "archetype": "extreme",
+          "p25": 4,
+          "p50": 11,
+          "p75": 20,
+          "p90": 28,
+          "p100": 55,
+          "capHits_1_30": 0,
+          "capHits_31_90": 36,
+          "capHits_91_180": 90
+        }
+      ],
+      "scenarios": {
+        "A_slower": {
+          "id": "A_slower",
+          "label": "A: slower (upgrade 0.75×, reinvest 0.75×)",
+          "upgradeMult": 0.75,
+          "reinvestMult": 0.75
+        },
+        "B_modeled": {
+          "id": "B_modeled",
+          "label": "B: as-modeled (1× / 1×)",
+          "upgradeMult": 1,
+          "reinvestMult": 1
+        },
+        "C_faster": {
+          "id": "C_faster",
+          "label": "C: faster (1.25× / 1.25×)",
+          "upgradeMult": 1.25,
+          "reinvestMult": 1.25
+        },
+        "D_much_faster": {
+          "id": "D_much_faster",
+          "label": "D: much faster (1.5× / 1.5×)",
+          "upgradeMult": 1.5,
+          "reinvestMult": 1.5
+        },
+        "E_extreme_fast": {
+          "id": "E_extreme_fast",
+          "label": "E: extreme-fast (2× / 2×)",
+          "upgradeMult": 2,
+          "reinvestMult": 2
+        }
+      }
+    },
+    "cap3200": {
+      "stressValidation": {
+        "A_slower": {
+          "label": "A: slower (upgrade 0.75×, reinvest 0.75×)",
+          "upgradeMult": 0.75,
+          "reinvestMult": 0.75,
+          "dangerFlags": {
+            "engaged_p75_before_day_90": false,
+            "grinder_p100_before_day_120": false,
+            "hardcore_cap_hits_midgame": false,
+            "extreme_p100_before_day_45": false,
+            "extreme_cap_burst_early": false,
+            "extreme_cap_spam_midgame": false
+          },
+          "growthFeel": {
+            "casual_consistent": {
+              "produced": {
+                "d14": 33,
+                "d30": 52.67,
+                "d60": 77.9,
+                "d90": 92.94,
+                "d180": 193.86
+              },
+              "ratio_90_vs_14": 2.82,
+              "ratio_180_vs_30": 3.68
+            },
+            "engaged": {
+              "produced": {
+                "d14": 100.61,
+                "d30": 150.99,
+                "d60": 250.04,
+                "d90": 365.87,
+                "d180": 619.83
+              },
+              "ratio_90_vs_14": 3.64,
+              "ratio_180_vs_30": 4.11
+            }
+          },
+          "byArchetype": [
+            {
+              "archetype": "casual-light",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 7.345714285714284,
+                "w8_30": 13.036956521739132,
+                "d31_90": 27.171166666666682,
+                "d91_180": 48.24255555555555
+              }
+            },
+            {
+              "archetype": "casual-consistent",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 19.24285714285714,
+                "w8_30": 37.93086956521741,
+                "d31_90": 78.51833333333336,
+                "d91_180": 149.2886666666667
+              }
+            },
+            {
+              "archetype": "engaged",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 58.43142857142857,
+                "w8_30": 118.92130434782607,
+                "d31_90": 256.4748333333334,
+                "d91_180": 512.091555555556
+              }
+            },
+            {
+              "archetype": "grinder",
+              "firstDayMilestone": {
+                "p25": 77,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 144.70714285714288,
+                "w8_30": 309.2199999999998,
+                "d31_90": 697.9463333333333,
+                "d91_180": 1321.3311111111109
+              }
+            },
+            {
+              "archetype": "hardcore-optimizer",
+              "firstDayMilestone": {
+                "p25": 35,
+                "p50": 77,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 235.4457142857143,
+                "w8_30": 537.0760869565216,
+                "d31_90": 1288.9314999999995,
+                "d91_180": 2039.1707777777797
+              }
+            },
+            {
+              "archetype": "extreme",
+              "firstDayMilestone": {
+                "p25": 16,
+                "p50": 33,
+                "p75": 70,
+                "p90": 175,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 425.3471428571429,
+                "w8_30": 1024.9969565217395,
+                "d31_90": 2159.755333333333,
+                "d91_180": 2726.427555555557
+              }
+            }
+          ]
+        },
+        "B_modeled": {
+          "label": "B: as-modeled (1× / 1×)",
+          "upgradeMult": 1,
+          "reinvestMult": 1,
+          "dangerFlags": {
+            "engaged_p75_before_day_90": false,
+            "grinder_p100_before_day_120": false,
+            "hardcore_cap_hits_midgame": false,
+            "extreme_p100_before_day_45": false,
+            "extreme_cap_burst_early": false,
+            "extreme_cap_spam_midgame": false
+          },
+          "growthFeel": {
+            "casual_consistent": {
+              "produced": {
+                "d14": 36.85,
+                "d30": 54.74,
+                "d60": 92.94,
+                "d90": 128.66,
+                "d180": 239.14
+              },
+              "ratio_90_vs_14": 3.49,
+              "ratio_180_vs_30": 4.37
+            },
+            "engaged": {
+              "produced": {
+                "d14": 112.42,
+                "d30": 187.89,
+                "d60": 297.06,
+                "d90": 484.85,
+                "d180": 715.04
+              },
+              "ratio_90_vs_14": 4.31,
+              "ratio_180_vs_30": 3.81
+            }
+          },
+          "byArchetype": [
+            {
+              "archetype": "casual-light",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 7.987142857142857,
+                "w8_30": 15.57739130434783,
+                "d31_90": 32.410166666666655,
+                "d91_180": 61.26355555555553
+              }
+            },
+            {
+              "archetype": "casual-consistent",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 20.771428571428572,
+                "w8_30": 44.996086956521744,
+                "d31_90": 97.41066666666666,
+                "d91_180": 192.2037777777778
+              }
+            },
+            {
+              "archetype": "engaged",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 65.46285714285713,
+                "w8_30": 142.67391304347822,
+                "d31_90": 331.7368333333332,
+                "d91_180": 625.5080000000003
+              }
+            },
+            {
+              "archetype": "grinder",
+              "firstDayMilestone": {
+                "p25": 58,
+                "p50": 148,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 160.2957142857143,
+                "w8_30": 373.75043478260864,
+                "d31_90": 921.4673333333335,
+                "d91_180": 1573.831222222222
+              }
+            },
+            {
+              "archetype": "hardcore-optimizer",
+              "firstDayMilestone": {
+                "p25": 26,
+                "p50": 58,
+                "p75": 160,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 259.4928571428572,
+                "w8_30": 667.2326086956523,
+                "d31_90": 1639.0596666666672,
+                "d91_180": 2289.370666666667
+              }
+            },
+            {
+              "archetype": "extreme",
+              "firstDayMilestone": {
+                "p25": 12,
+                "p50": 23,
+                "p75": 53,
+                "p90": 111,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 474.28000000000003,
+                "w8_30": 1286.8334782608697,
+                "d31_90": 2449.232833333335,
+                "d91_180": 2945.56411111111
+              }
+            }
+          ]
+        },
+        "C_faster": {
+          "label": "C: faster (1.25× / 1.25×)",
+          "upgradeMult": 1.25,
+          "reinvestMult": 1.25,
+          "dangerFlags": {
+            "engaged_p75_before_day_90": false,
+            "grinder_p100_before_day_120": false,
+            "hardcore_cap_hits_midgame": false,
+            "extreme_p100_before_day_45": false,
+            "extreme_cap_burst_early": false,
+            "extreme_cap_spam_midgame": false
+          },
+          "growthFeel": {
+            "casual_consistent": {
+              "produced": {
+                "d14": 48.84,
+                "d30": 68.2,
+                "d60": 123.93,
+                "d90": 167.03,
+                "d180": 291.02
+              },
+              "ratio_90_vs_14": 3.42,
+              "ratio_180_vs_30": 4.27
+            },
+            "engaged": {
+              "produced": {
+                "d14": 139.97,
+                "d30": 245.27,
+                "d60": 389.51,
+                "d90": 571.21,
+                "d180": 831.49
+              },
+              "ratio_90_vs_14": 4.08,
+              "ratio_180_vs_30": 3.39
+            }
+          },
+          "byArchetype": [
+            {
+              "archetype": "casual-light",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 7.987142857142857,
+                "w8_30": 17.736086956521746,
+                "d31_90": 37.97549999999999,
+                "d91_180": 73.15688888888893
+              }
+            },
+            {
+              "archetype": "casual-consistent",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 22.3,
+                "w8_30": 52.043478260869584,
+                "d31_90": 118.1186666666666,
+                "d91_180": 232.70933333333335
+              }
+            },
+            {
+              "archetype": "engaged",
+              "firstDayMilestone": {
+                "p25": 176,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 68.97714285714285,
+                "w8_30": 166.93347826086955,
+                "d31_90": 410.89933333333323,
+                "d91_180": 716.321444444445
+              }
+            },
+            {
+              "archetype": "grinder",
+              "firstDayMilestone": {
+                "p25": 44,
+                "p50": 96,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 168.09,
+                "w8_30": 442.7965217391305,
+                "d31_90": 1139.4318333333329,
+                "d91_180": 1791.8668888888903
+              }
+            },
+            {
+              "archetype": "hardcore-optimizer",
+              "firstDayMilestone": {
+                "p25": 21,
+                "p50": 44,
+                "p75": 107,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 289.31142857142856,
+                "w8_30": 802.6686956521738,
+                "d31_90": 1893.1749999999995,
+                "d91_180": 2523.9083333333338
+              }
+            },
+            {
+              "archetype": "extreme",
+              "firstDayMilestone": {
+                "p25": 9,
+                "p50": 18,
+                "p75": 37,
+                "p90": 77,
+                "p100": 154
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 27
+              },
+              "weeklyAvg": {
+                "w1_7": 552.0985714285715,
+                "w8_30": 1503.0804347826086,
+                "d31_90": 2686.5758333333342,
+                "d91_180": 3117.2722222222237
+              }
+            }
+          ]
+        },
+        "D_much_faster": {
+          "label": "D: much faster (1.5× / 1.5×)",
+          "upgradeMult": 1.5,
+          "reinvestMult": 1.5,
+          "dangerFlags": {
+            "engaged_p75_before_day_90": false,
+            "grinder_p100_before_day_120": false,
+            "hardcore_cap_hits_midgame": false,
+            "extreme_p100_before_day_45": false,
+            "extreme_cap_burst_early": false,
+            "extreme_cap_spam_midgame": false
+          },
+          "growthFeel": {
+            "casual_consistent": {
+              "produced": {
+                "d14": 48.84,
+                "d30": 77.9,
+                "d60": 131.79,
+                "d90": 202.38,
+                "d180": 341.2
+              },
+              "ratio_90_vs_14": 4.14,
+              "ratio_180_vs_30": 4.38
+            },
+            "engaged": {
+              "produced": {
+                "d14": 150.99,
+                "d30": 261.19,
+                "d60": 505.25,
+                "d90": 683.63,
+                "d180": 933.65
+              },
+              "ratio_90_vs_14": 4.53,
+              "ratio_180_vs_30": 3.57
+            }
+          },
+          "byArchetype": [
+            {
+              "archetype": "casual-light",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 8.628571428571428,
+                "w8_30": 19.80304347826087,
+                "d31_90": 44.37483333333333,
+                "d91_180": 85.28711111111106
+              }
+            },
+            {
+              "archetype": "casual-consistent",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 23.82857142857143,
+                "w8_30": 58.51086956521742,
+                "d31_90": 139.70516666666663,
+                "d91_180": 275.71044444444465
+              }
+            },
+            {
+              "archetype": "engaged",
+              "firstDayMilestone": {
+                "p25": 134,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 76.00714285714285,
+                "w8_30": 190.00608695652176,
+                "d31_90": 490.99249999999967,
+                "d91_180": 807.6652222222224
+              }
+            },
+            {
+              "archetype": "grinder",
+              "firstDayMilestone": {
+                "p25": 37,
+                "p50": 79,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 187.42000000000002,
+                "w8_30": 511.12782608695665,
+                "d31_90": 1343.8198333333341,
+                "d91_180": 1996.1271111111118
+              }
+            },
+            {
+              "archetype": "hardcore-optimizer",
+              "firstDayMilestone": {
+                "p25": 18,
+                "p50": 35,
+                "p75": 80,
+                "p90": 160,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 322.9971428571429,
+                "w8_30": 929.9839130434782,
+                "d31_90": 2126.4950000000013,
+                "d91_180": 2720.6444444444446
+              }
+            },
+            {
+              "archetype": "extreme",
+              "firstDayMilestone": {
+                "p25": 7,
+                "p50": 15,
+                "p75": 31,
+                "p90": 57,
+                "p100": 110
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 71
+              },
+              "weeklyAvg": {
+                "w1_7": 608.37,
+                "w8_30": 1737.8247826086954,
+                "d31_90": 2856.7536666666665,
+                "d91_180": 3184.6936666666666
+              }
+            }
+          ]
+        },
+        "E_extreme_fast": {
+          "label": "E: extreme-fast (2× / 2×)",
+          "upgradeMult": 2,
+          "reinvestMult": 2,
+          "dangerFlags": {
+            "engaged_p75_before_day_90": false,
+            "grinder_p100_before_day_120": false,
+            "hardcore_cap_hits_midgame": false,
+            "extreme_p100_before_day_45": false,
+            "extreme_cap_burst_early": false,
+            "extreme_cap_spam_midgame": false
+          },
+          "growthFeel": {
+            "casual_consistent": {
+              "produced": {
+                "d14": 54.74,
+                "d30": 94.78,
+                "d60": 176.48,
+                "d90": 253.68,
+                "d180": 424.96
+              },
+              "ratio_90_vs_14": 4.63,
+              "ratio_180_vs_30": 4.48
+            },
+            "engaged": {
+              "produced": {
+                "d14": 196.25,
+                "d30": 315.4,
+                "d60": 709.72,
+                "d90": 823.05,
+                "d180": 1305.75
+              },
+              "ratio_90_vs_14": 4.19,
+              "ratio_180_vs_30": 4.14
+            }
+          },
+          "byArchetype": [
+            {
+              "archetype": "casual-light",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 10.14,
+                "w8_30": 24.42478260869565,
+                "d31_90": 56.276666666666685,
+                "d91_180": 111.43355555555549
+              }
+            },
+            {
+              "archetype": "casual-consistent",
+              "firstDayMilestone": {
+                "p25": null,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 29.514285714285712,
+                "w8_30": 71.63043478260872,
+                "d31_90": 182.53883333333346,
+                "d91_180": 357.8356666666665
+              }
+            },
+            {
+              "archetype": "engaged",
+              "firstDayMilestone": {
+                "p25": 83,
+                "p50": null,
+                "p75": null,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 86.41142857142857,
+                "w8_30": 235.92565217391305,
+                "d31_90": 634.7396666666667,
+                "d91_180": 1053.3764444444448
+              }
+            },
+            {
+              "archetype": "grinder",
+              "firstDayMilestone": {
+                "p25": 23,
+                "p50": 47,
+                "p75": 138,
+                "p90": null,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 221.90285714285713,
+                "w8_30": 661.3126086956522,
+                "d31_90": 1687.806666666666,
+                "d91_180": 2359.2806666666647
+              }
+            },
+            {
+              "archetype": "hardcore-optimizer",
+              "firstDayMilestone": {
+                "p25": 13,
+                "p50": 24,
+                "p75": 52,
+                "p90": 120,
+                "p100": null
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 0,
+                "91-180": 0
+              },
+              "weeklyAvg": {
+                "w1_7": 376.6985714285714,
+                "w8_30": 1254.1821739130435,
+                "d31_90": 2470.0415000000003,
+                "d91_180": 2898.0901111111125
+              }
+            },
+            {
+              "archetype": "extreme",
+              "firstDayMilestone": {
+                "p25": 4,
+                "p50": 12,
+                "p75": 22,
+                "p90": 36,
+                "p100": 83
+              },
+              "capWindows": {
+                "1-7": 0,
+                "8-30": 0,
+                "31-90": 8,
+                "91-180": 90
+              },
+              "weeklyAvg": {
+                "w1_7": 739.6057142857144,
+                "w8_30": 2122.6982608695653,
+                "d31_90": 3077.719333333333,
+                "d91_180": 3200
+              }
+            }
+          ]
+        }
+      },
+      "summaryTable": [
+        {
+          "scenario": "A_slower",
+          "archetype": "casual-light",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "A_slower",
+          "archetype": "casual-consistent",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "A_slower",
+          "archetype": "engaged",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "A_slower",
+          "archetype": "grinder",
+          "p25": 77,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "A_slower",
+          "archetype": "hardcore-optimizer",
+          "p25": 35,
+          "p50": 77,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "A_slower",
+          "archetype": "extreme",
+          "p25": 16,
+          "p50": 33,
+          "p75": 70,
+          "p90": 175,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "B_modeled",
+          "archetype": "casual-light",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "B_modeled",
+          "archetype": "casual-consistent",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "B_modeled",
+          "archetype": "engaged",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "B_modeled",
+          "archetype": "grinder",
+          "p25": 58,
+          "p50": 148,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "B_modeled",
+          "archetype": "hardcore-optimizer",
+          "p25": 26,
+          "p50": 58,
+          "p75": 160,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "B_modeled",
+          "archetype": "extreme",
+          "p25": 12,
+          "p50": 23,
+          "p75": 53,
+          "p90": 111,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "C_faster",
+          "archetype": "casual-light",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "C_faster",
+          "archetype": "casual-consistent",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "C_faster",
+          "archetype": "engaged",
+          "p25": 176,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "C_faster",
+          "archetype": "grinder",
+          "p25": 44,
+          "p50": 96,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "C_faster",
+          "archetype": "hardcore-optimizer",
+          "p25": 21,
+          "p50": 44,
+          "p75": 107,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "C_faster",
+          "archetype": "extreme",
+          "p25": 9,
+          "p50": 18,
+          "p75": 37,
+          "p90": 77,
+          "p100": 154,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 27
+        },
+        {
+          "scenario": "D_much_faster",
+          "archetype": "casual-light",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "D_much_faster",
+          "archetype": "casual-consistent",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "D_much_faster",
+          "archetype": "engaged",
+          "p25": 134,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "D_much_faster",
+          "archetype": "grinder",
+          "p25": 37,
+          "p50": 79,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "D_much_faster",
+          "archetype": "hardcore-optimizer",
+          "p25": 18,
+          "p50": 35,
+          "p75": 80,
+          "p90": 160,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "D_much_faster",
+          "archetype": "extreme",
+          "p25": 7,
+          "p50": 15,
+          "p75": 31,
+          "p90": 57,
+          "p100": 110,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 71
+        },
+        {
+          "scenario": "E_extreme_fast",
+          "archetype": "casual-light",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "E_extreme_fast",
+          "archetype": "casual-consistent",
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "E_extreme_fast",
+          "archetype": "engaged",
+          "p25": 83,
+          "p50": null,
+          "p75": null,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "E_extreme_fast",
+          "archetype": "grinder",
+          "p25": 23,
+          "p50": 47,
+          "p75": 138,
+          "p90": null,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "E_extreme_fast",
+          "archetype": "hardcore-optimizer",
+          "p25": 13,
+          "p50": 24,
+          "p75": 52,
+          "p90": 120,
+          "p100": null,
+          "capHits_1_30": 0,
+          "capHits_31_90": 0,
+          "capHits_91_180": 0
+        },
+        {
+          "scenario": "E_extreme_fast",
+          "archetype": "extreme",
+          "p25": 4,
+          "p50": 12,
+          "p75": 22,
+          "p90": 36,
+          "p100": 83,
+          "capHits_1_30": 0,
+          "capHits_31_90": 8,
+          "capHits_91_180": 90
+        }
+      ],
+      "scenarios": {
+        "A_slower": {
+          "id": "A_slower",
+          "label": "A: slower (upgrade 0.75×, reinvest 0.75×)",
+          "upgradeMult": 0.75,
+          "reinvestMult": 0.75
+        },
+        "B_modeled": {
+          "id": "B_modeled",
+          "label": "B: as-modeled (1× / 1×)",
+          "upgradeMult": 1,
+          "reinvestMult": 1
+        },
+        "C_faster": {
+          "id": "C_faster",
+          "label": "C: faster (1.25× / 1.25×)",
+          "upgradeMult": 1.25,
+          "reinvestMult": 1.25
+        },
+        "D_much_faster": {
+          "id": "D_much_faster",
+          "label": "D: much faster (1.5× / 1.5×)",
+          "upgradeMult": 1.5,
+          "reinvestMult": 1.5
+        },
+        "E_extreme_fast": {
+          "id": "E_extreme_fast",
+          "label": "E: extreme-fast (2× / 2×)",
+          "upgradeMult": 2,
+          "reinvestMult": 2
+        }
+      }
+    }
+  }
+}

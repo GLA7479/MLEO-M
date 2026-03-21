@@ -392,8 +392,8 @@ DECLARE
   v_expedition_data_cost integer := 4;
   v_expedition_cooldown_ms bigint := 120000;
   v_mleo_produced_today numeric := 0;
-  v_daily_cap bigint := 2500;
-  v_mleo_gain_mult numeric := 0.5;
+  v_daily_cap bigint := 3400;
+  v_mleo_gain_mult numeric := 0.4;
   v_softcut numeric := 1;
   v_banked_add bigint := 0;
   v_raw_mleo numeric := 0;
@@ -458,8 +458,8 @@ BEGIN
   INTO v_daily_cap, v_mleo_gain_mult
   FROM public.base_economy_config bec
   WHERE bec.id = 1;
-  v_daily_cap := coalesce(v_daily_cap, 2500);
-  v_mleo_gain_mult := coalesce(v_mleo_gain_mult, 0.5);
+  v_daily_cap := coalesce(v_daily_cap, 3400);
+  v_mleo_gain_mult := coalesce(v_mleo_gain_mult, 0.4);
   v_raw_mleo := v_banked_mleo::numeric * v_mleo_gain_mult;
   v_softcut := public.base_softcut_factor(v_mleo_produced_today, v_daily_cap);
   v_banked_add := floor(

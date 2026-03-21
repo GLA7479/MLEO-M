@@ -540,6 +540,7 @@ function derive(state, now = Date.now()) {
   if (state.modules.servoDrill) oreMult *= 1.15;
   if (state.modules.vaultCompressor) {
     mleoMult *= 1.04;
+    bankBonus *= 1.08;
   }
   if (state.modules.arcadeRelay) {
     dataMult *= 1.12;
@@ -548,11 +549,14 @@ function derive(state, now = Date.now()) {
     oreMult *= 1.08;
   }
   if (state.research.minerSync) oreMult *= 1.12;
+  if (state.research.routing) bankBonus *= 1.08;
+  if (state.research.logistics) bankBonus *= 1.1;
   if (state.research.arcadeOps) dataMult *= 1.10;
   if (state.research.deepScan) dataMult *= 1.18;
   if (state.research.tokenDiscipline) {
     dataMult *= 1.22;
     mleoMult *= 0.88;
+    bankBonus *= 1.1;
   }
   if (state.research.predictiveMaintenance) {
     maintenanceRelief *= 1.25;
@@ -587,6 +591,8 @@ function derive(state, now = Date.now()) {
     shipCap: dailyMleoCap,
     dailyMleoCap,
     bankBonus,
+    /** Matches `base_economy_config.mleo_gain_mult` (server reconcile). */
+    baseMleoGainMult: CONFIG.baseMleoGainMult,
     maintenanceRelief,
     energyUseMult,
     stability,
@@ -594,6 +600,65 @@ function derive(state, now = Date.now()) {
     arcadeSupport,
     expeditionCooldownMs: CONFIG.expeditionCooldownMs,
   };
+}
+
+/**
+ * Raw refinery MLEO rate (per second) before daily softcut — aligned with `simulate()` / server core.
+ * Softcut is applied on top (see base_softcut_factor + mleo_produced_today).
+ */
+function computeRefineryRawMleoPerSecond(refineryLevel, derived, active) {
+  if (!active || refineryLevel <= 0) return 0;
+  const early = refineryLevel > 2 ? 1 : 1.08;
+  return (
+    REFINERY_BANKED_PER_LEVEL *
+    refineryLevel *
+    Number(derived?.mleoMult || 1) *
+    Number(derived?.bankBonus || 1) *
+    early *
+    Number(derived?.baseMleoGainMult ?? CONFIG.baseMleoGainMult)
+  );
+}
+
+/**
+ * Time (hours) to reach daily cap from `produced` at constant raw rate, with piecewise softcut.
+ * Uses 1s discrete steps — matches how `baseMleoSoftcutFactor` is applied in `simulate()`.
+ */
+function computeMleoEtaHoursToCap(produced, cap, rawPerSecond) {
+  const c = Number(cap || 0);
+  const p0 = Number(produced || 0);
+  const r = Number(rawPerSecond || 0);
+  if (!c || c <= 0) return null;
+  if (!r || r <= 0) return null;
+  if (p0 >= c) return 0;
+  let p = p0;
+  let s = 0;
+  const maxSec = 86400 * 60;
+  while (p < c - 1e-9 && s < maxSec) {
+    const f = baseMleoSoftcutFactor(p, c);
+    const add = Math.min(r * f, c - p);
+    if (add <= 1e-15) break;
+    p += add;
+    s += 1;
+  }
+  if (p < c - 1e-6) return null;
+  return s / 3600;
+}
+
+/** Total MLEO produced over `durationSeconds` from current `produced` toward cap (softcut-aware). */
+function integrateMleoProducedOverDuration(produced, cap, rawPerSecond, durationSeconds) {
+  const c = Number(cap || 0);
+  let p = Number(produced || 0);
+  const r = Number(rawPerSecond || 0);
+  const dur = Math.max(0, Math.floor(durationSeconds || 0));
+  let total = 0;
+  for (let s = 0; s < dur; s++) {
+    if (p >= c) break;
+    const f = baseMleoSoftcutFactor(p, c);
+    const add = Math.min(r * f, c - p);
+    p += add;
+    total += add;
+  }
+  return { endProduced: p, totalProduced: total };
 }
 
 function getBankedRateSnapshot(state, derived) {
@@ -626,23 +691,23 @@ function getBankedRateSnapshot(state, derived) {
 
   const active = hasRefinery && hasOre && hasScrap && hasEnergy;
 
-  const perSecond = active
-    ? REFINERY_BANKED_PER_LEVEL *
-      refineryLevel *
-      Number(derived?.mleoMult || 1) *
-      Number(derived?.bankBonus || 1) *
-      // `simulate()` applies earlyOutputBoostFor(refinery, level) when level <= 2.
-      (refineryLevel > 2 ? 1 : 1.08)
-    : 0;
-
-  const perHour = perSecond * 3600;
-  const perDay = perHour * 24;
-
+  const rawPerSecond = computeRefineryRawMleoPerSecond(refineryLevel, derived, active);
   const dailyCap = Number(derived?.dailyMleoCap ?? derived?.shipCap ?? CONFIG.dailyBaseMleoCap);
   const producedToday = Number(state?.mleoProducedToday || 0);
+  const softNow = baseMleoSoftcutFactor(producedToday, dailyCap);
+  const perSecond = rawPerSecond * softNow;
+  const perHour = perSecond * 3600;
+  const projected24h = integrateMleoProducedOverDuration(
+    producedToday,
+    dailyCap,
+    rawPerSecond,
+    86400
+  ).totalProduced;
+  const perDay = projected24h;
+
   const remainingToCap = Math.max(0, dailyCap - producedToday);
 
-  const etaHours = perHour > 0 ? remainingToCap / perHour : null;
+  const etaHours = active ? computeMleoEtaHoursToCap(producedToday, dailyCap, rawPerSecond) : null;
   const oreFeedHours =
     oreNeedPerSecond > 0 ? ore / (oreNeedPerSecond * 3600) : null;
   const scrapFeedHours =
@@ -662,12 +727,17 @@ function getBankedRateSnapshot(state, derived) {
     hasRefinery,
     active,
     refineryLevel,
+    /** Raw refinery MLEO/s before softcut (matches server core × gain mult). */
+    rawPerSecond,
+    /** Instantaneous effective rate (raw × softcut at current produced). */
     perSecond,
     perHour,
+    /** Expected MLEO toward cap over next 24h with softcut (not simply perHour×24). */
     perDay,
     shipCap: dailyCap,
     dailyMleoCap: dailyCap,
     mleoProducedToday: producedToday,
+    softcutFactorNow: softNow,
     remainingToCap,
     etaHours,
     oreFeedHours,

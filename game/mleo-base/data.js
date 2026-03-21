@@ -276,11 +276,11 @@ export const CONFIG = {
   baseEnergyCap: 148,
   baseEnergyRegen: 6.4,
   /** Daily cap on MLEO *production* into banked (server: base_economy_config.daily_mleo_cap). */
-  dailyBaseMleoCap: 2500,
+  dailyBaseMleoCap: 3400,
   /** Scales refinery MLEO rate vs legacy 0.015 core (server: base_economy_config.mleo_gain_mult). */
-  baseMleoGainMult: 0.5,
+  baseMleoGainMult: 0.4,
   /** @deprecated Renamed concept: was shipping cap; production cap is `dailyBaseMleoCap`. */
-  dailyShipCap: 2500,
+  dailyShipCap: 3400,
   expeditionCost: 36,
   expeditionCooldownMs: 120_000,
   overclockCost: 900,

@@ -40,8 +40,8 @@ ALTER TABLE public.base_device_state
 
 CREATE TABLE IF NOT EXISTS public.base_economy_config (
   id integer PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-  daily_mleo_cap bigint NOT NULL DEFAULT 2500,
-  mleo_gain_mult numeric(20, 8) NOT NULL DEFAULT 0.50,
+  daily_mleo_cap bigint NOT NULL DEFAULT 3400,
+  mleo_gain_mult numeric(20, 8) NOT NULL DEFAULT 0.40,
   softcut_json jsonb NOT NULL DEFAULT '[
     {"upto":0.55, "factor":1.00},
     {"upto":0.75, "factor":0.55},
@@ -58,8 +58,8 @@ ON CONFLICT (id) DO NOTHING;
 
 UPDATE public.base_economy_config
 SET
-  daily_mleo_cap = 2500,
-  mleo_gain_mult = 0.50,
+  daily_mleo_cap = 3400,
+  mleo_gain_mult = 0.40,
   softcut_json = '[
     {"upto":0.55, "factor":1.00},
     {"upto":0.75, "factor":0.55},
@@ -426,8 +426,8 @@ DECLARE
   v_data_gain numeric := 0;
   v_raw_banked_gain numeric := 0;
   v_mleo_produced_today numeric := 0;
-  v_daily_cap bigint := 2500;
-  v_mleo_gain_mult numeric := 0.5;
+  v_daily_cap bigint := 3400;
+  v_mleo_gain_mult numeric := 0.4;
   v_softcut numeric := 1;
   v_banked_add numeric := 0;
 
@@ -718,8 +718,8 @@ BEGIN
   FROM public.base_economy_config bec
   WHERE bec.id = 1;
 
-  v_daily_cap := coalesce(v_daily_cap, 2500);
-  v_mleo_gain_mult := coalesce(v_mleo_gain_mult, 0.5);
+  v_daily_cap := coalesce(v_daily_cap, 3400);
+  v_mleo_gain_mult := coalesce(v_mleo_gain_mult, 0.4);
 
   v_ore_gain := ((v_quarry * v_quarry_mode) * 1.35) * v_ore_mult;
   v_gold_gain := ((v_trade * v_trade_mode) * 0.60) * v_gold_mult;
