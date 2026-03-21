@@ -120,7 +120,7 @@ export const BUILDINGS = [
   {
     key: "logisticsCenter",
     name: "Logistics Center",
-    desc: "Improves shipment quality, export handling and daily ship efficiency.",
+    desc: "Improves export handling, vault-loop support and command flow.",
     baseCost: { ORE: 240, GOLD: 140, SCRAP: 95 },
     growth: 1.36,
     maxLevel: 15,
@@ -182,7 +182,7 @@ export const MODULES = [
   {
     key: "vaultCompressor",
     name: "Vault Compressor",
-    desc: "+8% bank efficiency and +5% ship yield.",
+    desc: "+8% bank efficiency and stronger vault-loop support.",
     cost: { GOLD: 420, ORE: 120, SCRAP: 70 },
   },
   {
@@ -232,7 +232,7 @@ export const RESEARCH = [
   {
     key: "logistics",
     name: "Logistics",
-    desc: "+10% ship efficiency and smoother export flow.",
+    desc: "Improves export flow and vault-loop handling.",
     cost: { ORE: 700, GOLD: 460, SCRAP: 220, DATA: 40 },
     requires: ["routing"],
   },
@@ -253,7 +253,7 @@ export const RESEARCH = [
   {
     key: "tokenDiscipline",
     name: "Token Discipline",
-    desc: "-12% raw banked MLEO output, +22% DATA output, +10% ship quality.",
+    desc: "-12% raw banked MLEO output, +22% DATA output, and a more controlled economy style.",
     cost: { ORE: 820, GOLD: 560, SCRAP: 280, DATA: 60 },
     requires: ["logistics", "deepScan"],
   },

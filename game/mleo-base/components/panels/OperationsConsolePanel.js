@@ -32,8 +32,8 @@ export function OperationsConsolePanel({
         <div className="flex min-h-[88px] flex-col pr-8">
           <div className="text-sm font-semibold text-emerald-200">Ship to Shared Vault</div>
           <p className="mt-1 text-sm text-white/70">
-            Move refined MLEO into the main vault with a daily softcut, so BASE supports Miners instead
-            of replacing it.
+            Sends all current banked MLEO to the shared vault. MLEO production inside BASE uses a daily cap
+            + softcut; shipping itself is not daily-limited.
           </p>
         </div>
 
@@ -130,8 +130,8 @@ export function OperationsConsolePanel({
         <div className="flex min-h-[160px] flex-col pr-8">
           <div className="text-sm font-semibold text-fuchsia-200">Blueprint Cache</div>
           <p className="mt-1 text-sm text-white/70">
-            Costs {blueprint.costText} shared MLEO + {blueprint.dataCostText} DATA. Raises banking efficiency
-            and daily ship cap permanently.
+            Costs {blueprint.costText} shared MLEO + {blueprint.dataCostText} DATA. Raises banking
+            efficiency permanently (stronger refinery bank bonus scaling).
           </p>
         </div>
 

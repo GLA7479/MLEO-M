@@ -66,7 +66,7 @@ export function printWindowResult(r: WindowResult): void {
 export function printFormulaMap(): void {
   console.log("\n=== FORMULA SOURCE MAP ===");
   console.log("- MINERS: sql/miners_server_authority.sql (daily_cap=2500, offline_factor=0.35, base_stage_v1=0.20, safe-growth softcut + stage multipliers)");
-  console.log("- BASE reconcile: sql/base_server_authority.sql (energy cap/regen, banked gain core formula, ship cap)");
+  console.log("- BASE reconcile: sql/base_server_authority.sql (energy cap/regen, banked gain core formula, daily MLEO production cap)");
   console.log("- BASE ship/spend: sql/base_atomic_rpc.sql (ship factor, ship bank bonus, refill=160, blueprint growth, overclock cost)");
   console.log("- Arcade paid/freeplay: sql/arcade_sessions_add_slots_mystery.sql (paid stake debit + reward credit; freeplay modeled separately as non-redeemable)");
   console.log("- Vault identity: sql/vault_schema_fixed.sql via sync_vault_delta usage pattern");

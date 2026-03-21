@@ -190,11 +190,15 @@ function RatesBlock({ rates }) {
         <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5">
           Refinery: {rates.refineryState || "Unknown"}
         </span>
-        {rates.etaToShipCapHours != null ? (
-          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5">
-            Ship cap ETA: {formatValue(rates.etaToShipCapHours, 1)}h
-          </span>
-        ) : null}
+        {(() => {
+          const eta =
+            rates.etaToMleoCapHours != null ? rates.etaToMleoCapHours : rates.etaToShipCapHours;
+          return eta != null ? (
+            <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5">
+              MLEO cap ETA: {formatValue(eta, 1)}h
+            </span>
+          ) : null;
+        })()}
       </div>
     </CardShell>
   );
@@ -230,8 +234,10 @@ function DailyProgressBlock({ progress }) {
       <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MiniStat
           label="Daily MLEO (BASE)"
-          value={`${formatValue(progress.shipProgress?.current || 0)}/${formatValue(
-            progress.shipProgress?.max || 0
+          value={`${formatValue(
+            (progress.mleoDailyProgress?.current ?? progress.shipProgress?.current) || 0
+          )}/${formatValue(
+            (progress.mleoDailyProgress?.max ?? progress.shipProgress?.max) || 0
           )}`}
         />
         <MiniStat label="Expeditions" value={formatValue(progress.expeditionsDone || 0, 0)} />

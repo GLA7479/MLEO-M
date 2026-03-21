@@ -2090,6 +2090,8 @@ function buildOverviewV2({
       orePerHour: estimateOrePerHour(state, derived),
       dataPerHour: estimateDataPerHour(state, derived),
       refineryState: bankedSnapshot?.limitingSystem || "Unknown",
+      /** Time to hit daily MLEO production cap (not shipping). */
+      etaToMleoCapHours: bankedSnapshot?.etaHours ?? null,
       etaToShipCapHours: bankedSnapshot?.etaHours ?? null,
     },
     stability: getOverviewStabilityBlock({
@@ -2099,6 +2101,10 @@ function buildOverviewV2({
       bankedSnapshot,
     }),
     dailyProgress: {
+      mleoDailyProgress: {
+        current: Number(state?.mleoProducedToday || 0),
+        max: Number(derived?.dailyMleoCap ?? derived?.shipCap ?? CONFIG.dailyBaseMleoCap),
+      },
       shipProgress: {
         current: Number(state?.mleoProducedToday || 0),
         max: Number(derived?.dailyMleoCap ?? derived?.shipCap ?? CONFIG.dailyBaseMleoCap),
@@ -2175,7 +2181,9 @@ const INFO_COPY = {
       supportBuildings: ["Logistics Center", "Quarry", "Salvage Yard"],
       operation: "Ship to Shared Vault",
       watch: "Shipping is weak if banked flow is underfed.",
-      actions: ["Feed Refinery first, then ship before cap pressure rises."],
+      actions: [
+        "Feed Refinery first, then watch your daily MLEO production budget (production is capped, not shipping).",
+      ],
     },
     nextStep: {
       label: "Open Shipping",
@@ -2196,7 +2204,9 @@ const INFO_COPY = {
       supportBuildings: ["Quarry", "Salvage Yard", "Power Cell"],
       operation: "Ship to Shared Vault",
       watch: "Any missing input stalls banked output.",
-      actions: ["Ship before near-cap pressure slows your loop."],
+      actions: [
+        "If refinery output feels slow, check Ore/Scrap/Energy — daily production cap is separate from shipping.",
+      ],
     },
     nextStep: {
       label: "Upgrade Refinery",
@@ -4540,8 +4550,8 @@ export default function MleoBase() {
         setNextShipBonus(0);
 
         showToast(
-          withBottleneckNote("Shipment complete · bank room restored", {
-            "ship-cap": "Export flow restored",
+          withBottleneckNote("Shipment complete · banked MLEO sent to shared vault", {
+            "ship-cap": "Daily production headroom improved",
           })
         );
       } else {
@@ -4574,7 +4584,7 @@ export default function MleoBase() {
           return next;
         });
         markRealGameAction();
-        showToast("Blueprint upgraded. Daily shipping cap increased and banking efficiency improved.");
+        showToast("Blueprint upgraded. Banking efficiency improved.");
       } else {
         showToast(res?.message || "Blueprint purchase failed.");
       }
@@ -4949,7 +4959,7 @@ export default function MleoBase() {
       case "engineer":
         return "+6% maintenance relief";
       case "logistician":
-        return "+3% bank / ship bonus";
+        return "+3% bank bonus";
       case "researcher":
         return "+5% DATA multiplier";
       case "scout":
@@ -4966,7 +4976,7 @@ export default function MleoBase() {
       case "industry":
         return "+3% ORE and +3% maintenance relief";
       case "logistics":
-        return "+4% bank / ship bonus";
+        return "+4% bank bonus";
       case "research":
         return "+6% DATA multiplier";
       case "ecosystem":
@@ -6166,15 +6176,15 @@ export default function MleoBase() {
 
     vaultCompressor: {
       title: "Vault Compressor",
-      focus: "Better bank and ship efficiency",
+      focus: "Better banking + vault-loop support",
       text:
-        "Vault Compressor improves the quality of your MLEO export loop.\n\n" +
+        "Vault Compressor improves the quality of your banking and vault loop.\n\n" +
         "What it helps:\n" +
         "• Better bank efficiency.\n" +
-        "• Better ship yield.\n" +
-        "• Stronger value from a mature Refinery + shipping setup.\n\n" +
+        "• Stronger vault-loop value when you move banked MLEO to the shared vault.\n" +
+        "• Stronger value from a mature Refinery + export setup.\n\n" +
         "Important:\n" +
-        "It is most valuable after banked MLEO and shipping are already active.",
+        "It is most valuable after banked MLEO and vault transfers are already active.",
       tips: {
         building: "Refinery",
         supportBuildings: ["Logistics Center"],
@@ -6304,9 +6314,9 @@ export default function MleoBase() {
         "What it helps:\n" +
         "• Better bank efficiency.\n" +
         "• Smoother export foundation.\n" +
-        "• Better long-term value from shipping systems.\n\n" +
+        "• Better long-term value from your refinery → banked → vault loop.\n\n" +
         "Important:\n" +
-        "Routing AI is part of a shipping chain, not a standalone economy fix.",
+        "Routing AI is part of that production and vault loop, not a standalone economy fix.",
       tips: {
         building: "Logistics Center",
         supportBuildings: ["Refinery"],
@@ -6316,7 +6326,7 @@ export default function MleoBase() {
         operation: "Ship to Shared Vault",
         watch: "Weak Refinery output means this research has little to optimize.",
         actions: [
-          "Take Routing AI when shipping starts to matter.",
+          "Take Routing AI when your refinery → banked → vault loop starts to matter.",
           "Use it as setup for stronger logistics-focused progression.",
           "Good value once banked MLEO becomes steady.",
         ],
@@ -6430,15 +6440,15 @@ export default function MleoBase() {
 
     logistics: {
       title: "Logistics",
-      focus: "Shipping efficiency and export flow",
+      focus: "Export flow and vault-loop handling",
       text:
         "Logistics is one of the main export researches.\n\n" +
         "What it helps:\n" +
-        "• Better ship efficiency.\n" +
-        "• Smoother export rhythm.\n" +
+        "• Smoother export rhythm and better vault-loop handling.\n" +
+        "• Stronger bank bonus scaling for refinery output.\n" +
         "• Better value from mature banked MLEO flow.\n\n" +
         "Important:\n" +
-        "It is strongest after Refinery and shipping are already alive.",
+        "It is strongest after Refinery and shared-vault transfers are already part of your loop.",
       tips: {
         building: "Logistics Center",
         supportBuildings: ["Refinery"],
@@ -6534,7 +6544,6 @@ export default function MleoBase() {
         "Token Discipline is an advanced balancing research.\n\n" +
         "What it helps:\n" +
         "• Higher DATA output.\n" +
-        "• Better ship quality.\n" +
         "• A more controlled advanced economy style.\n\n" +
         "Tradeoff:\n" +
         "It reduces raw banked MLEO output while improving the quality of the broader strategic loop.",
@@ -6548,7 +6557,7 @@ export default function MleoBase() {
         watch: "Do not take it blindly if you only care about raw banked MLEO speed.",
         actions: [
           "Choose this when you want a more advanced, balanced economy style.",
-          "Strong for DATA + shipping synergy builds.",
+          "Strong for DATA-heavy builds that also lean on the shared vault loop.",
           "Less attractive if your goal is only raw Refinery throughput.",
         ],
       },
@@ -6586,13 +6595,13 @@ export default function MleoBase() {
       title: "Ship to Shared Vault",
       focus: "Move banked MLEO out of BASE",
       text:
-        "Shipping transfers banked MLEO from BASE into the Shared Vault.\n\n" +
-        "What improves it:\n" +
-        "• More banked MLEO from Refinery.\n" +
-        "• Better ship quality from Logistics Center.\n" +
-        "• Better long-term export scaling from Blueprint and Logistics research.\n\n" +
+        "Shipping sends your current banked MLEO from BASE into the Shared Vault (full transfer).\n\n" +
+        "What improves the economy around it:\n" +
+        "• More banked MLEO from Refinery (production is daily-capped + softcut inside BASE).\n" +
+        "• Logistics Center and Blueprint improve bank bonus scaling and export rhythm.\n" +
+        "• Logistics research supports smoother vault-loop handling.\n\n" +
         "Important:\n" +
-        "Shipping is the final conversion step. No shipping means no real Shared Vault growth.",
+        "There is no daily limit on shipping itself. The daily cap and softcut apply to MLEO production inside BASE, before it becomes banked.",
       tips: {
         building: "Logistics Center",
         supportBuildings: ["Refinery"],
@@ -6600,18 +6609,18 @@ export default function MleoBase() {
         supportResearch: ["Routing AI"],
         module: "Vault Compressor",
         operation: "Ship to Shared Vault",
-        watch: "Banked MLEO sitting inside BASE is not yet real Shared Vault value.",
+        watch: "Banked MLEO sitting inside BASE is not yet shared vault value until you ship.",
         actions: [
-          "Make sure Refinery is feeding the lane first.",
-          "Improve Logistics when shipping becomes part of your daily loop.",
-          "Avoid wasting good shipping timing near cap pressure.",
+          "Make sure Refinery is feeding banked MLEO first.",
+          "Improve Logistics when vault transfers become part of your daily loop.",
+          "If refinery feels slow, check production pressure — that is separate from shipping limits.",
         ],
       },
       nextStep: {
         label: "Open Refinery",
         tab: "build",
         target: "refinery",
-        why: "Shipping matters only when Refinery is already producing banked MLEO.",
+        why: "Shipping matters when Refinery is already producing banked MLEO.",
       },
     },
 
@@ -6990,11 +6999,11 @@ export default function MleoBase() {
 
     logistician: {
       title: "Logistician",
-      focus: "Shipping + vault flow",
+      focus: "Shared Vault loop + export flow",
       text:
         "Logistician is the export-focused crew role.\n\n" +
         "What it helps:\n" +
-        "• Better bank / ship value.\n" +
+        "• Better bank bonus and vault transfer value.\n" +
         "• Stronger Shared Vault conversion.\n" +
         "• Better fit for mature Refinery loops.",
       tips: {
@@ -7006,7 +7015,7 @@ export default function MleoBase() {
         operation: "Ship to Shared Vault",
         watch: "Feels weak if you are not producing and shipping enough yet.",
         actions: [
-          "Choose this when shipping matters daily.",
+          "Choose this when vault transfers are part of your daily loop.",
           "Great once banked MLEO production is stable.",
           "Not ideal if your base is still struggling with basics.",
         ],
@@ -7015,7 +7024,7 @@ export default function MleoBase() {
         label: "Open Shipping",
         tab: "operations",
         target: "shipping",
-        why: "Logistician is strongest in a real export loop.",
+        why: "Logistician is strongest when you regularly move banked MLEO to the shared vault.",
       },
     },
 
@@ -7149,9 +7158,9 @@ export default function MleoBase() {
       title: "Logistics Path",
       focus: "Bank bonus + export identity",
       text:
-        "Logistics is the commander path for shipping-focused progression.\n\n" +
+        "Logistics is the commander path for vault-export and banking-focused progression.\n\n" +
         "What it helps:\n" +
-        "• Better bank / ship bonus.\n" +
+        "• Better bank bonus for refinery output.\n" +
         "• Better fit for mature Refinery loops.\n" +
         "• Strong Shared Vault identity.",
       tips: {
@@ -7309,7 +7318,7 @@ export default function MleoBase() {
         module: "Vault Compressor",
         actions: [
           "This contract is about timing, not just production.",
-          "Great for teaching better shipment discipline.",
+          "Great for teaching better vault-transfer timing.",
           "Best with Logistician role or Logistics path.",
         ],
       },
@@ -7427,19 +7436,19 @@ export default function MleoBase() {
 
     logistics_window: {
       title: "Event: Logistics Window",
-      focus: "Temporary shipment opportunity",
+      focus: "Temporary vault-transfer opportunity",
       text:
-        "Logistics Window is a timing event around shipping value.\n\n" +
+        "Logistics Window is a timing event around your next transfer to the shared vault.\n\n" +
         "What it means:\n" +
-        "• It can improve the next shipment if used well.\n" +
+        "• It can improve the next transfer if used well.\n" +
         "• Sometimes skipping is smarter if you are not ready to capitalize.\n" +
-        "• Best decision depends on your current banked MLEO and ship timing.",
+        "• Best decision depends on your current banked MLEO and when you plan to ship.",
       tips: {
         building: "Logistics Center",
         research: "Logistics",
         module: "Vault Compressor",
         actions: [
-          "Best used when shipment is already close and meaningful.",
+          "Best used when a vault transfer is already close and meaningful.",
           "Skipping is fine if your pipeline is not ready.",
           "This event rewards export discipline.",
         ],
@@ -7448,7 +7457,7 @@ export default function MleoBase() {
         label: "Open Shipping",
         tab: "operations",
         target: "shipping",
-        why: "This event matters most when your next shipment timing is relevant.",
+        why: "This event matters most when your next vault transfer timing is relevant.",
       },
     },
   };
@@ -7511,15 +7520,14 @@ export default function MleoBase() {
   const SYSTEM_INFO_COPY = {
     blueprint: {
       title: "Blueprint Cache",
-      focus: "Permanent shipping support upgrade",
+      focus: "Permanent banking upgrade",
       text:
         "Blueprint is a long-term reinvestment system.\n\n" +
         "What it improves:\n" +
-        "• Better bank / ship efficiency.\n" +
-        "• Higher daily ship cap.\n" +
-        "• Better value from a strong shipping loop.\n\n" +
+        "• Stronger banking efficiency (bank bonus scaling for refinery output).\n" +
+        "• Better value from a strong refinery + vault transfer loop.\n\n" +
         "Important:\n" +
-        "Blueprint is strongest after your Refinery and shipping lane already work well.",
+        "Blueprint is strongest after your Refinery and shared-vault loop already work well.",
       tips: {
         building: "Logistics Center",
         supportBuildings: ["Refinery"],
@@ -7644,35 +7652,35 @@ export default function MleoBase() {
     },
 
     shipDiscipline: {
-      title: "Ship Discipline",
-      focus: "How much shipping pressure you already used today",
+      title: "Production Discipline",
+      focus: "How close you are to today's MLEO production budget in BASE",
       text:
-        "Ship Discipline compares today's shipped amount to your current cap.\n\n" +
+        "Production Discipline compares today's MLEO produced inside BASE to your daily production cap.\n\n" +
         "What it helps with:\n" +
-        "• Reading export pressure.\n" +
-        "• Timing shipments more smartly.\n" +
-        "• Understanding when softcut starts to matter more.\n\n" +
+        "• Reading refinery pressure before MLEO is banked.\n" +
+        "• Understanding when production softcut starts to matter more.\n" +
+        "• Separating production pacing from vault transfers.\n\n" +
         "Important:\n" +
-        "The cap is not the only thing that matters. Timing and efficiency still matter too.",
+        "Shipping to the shared vault is not daily-limited. The daily cap and softcut apply to MLEO production inside BASE.",
       tips: {
-        building: "Logistics Center",
-        supportBuildings: ["Refinery"],
+        building: "Refinery",
+        supportBuildings: ["Logistics Center"],
         research: "Logistics",
         supportResearch: ["Routing AI"],
         module: "Vault Compressor",
         operation: "Ship to Shared Vault",
-        watch: "Shipping too aggressively near cap can feel less efficient.",
+        watch: "Pushing production hard near the daily cap can feel slower due to softcut — that is separate from shipping.",
         actions: [
-          "Use this card to pace exports.",
-          "Blueprint and Logistics make shipping more forgiving over time.",
-          "Good timing can matter almost as much as raw quantity.",
+          "Use this card to pace refinery and production upgrades.",
+          "Blueprint and Logistics improve bank bonus scaling and vault-loop rhythm.",
+          "Good refinery timing matters as much as when you transfer to the vault.",
         ],
       },
       nextStep: {
-        label: "Open Shipping",
-        tab: "operations",
-        target: "shipping",
-        why: "This card exists to support your shipping timing decisions.",
+        label: "Open Refinery",
+        tab: "build",
+        target: "refinery",
+        why: "This card is about MLEO production inside BASE before it becomes banked.",
       },
     },
 
@@ -7685,7 +7693,7 @@ export default function MleoBase() {
         "• Energy pressure.\n" +
         "• Stability pressure.\n" +
         "• Expedition readiness.\n" +
-        "• Shipping pressure.\n" +
+        "• Daily MLEO production pressure (near cap).\n" +
         "• Claimable rewards.\n\n" +
         "Important:\n" +
         "Alerts are guidance, not orders. They help the player focus without taking control away.",
@@ -9969,13 +9977,13 @@ export default function MleoBase() {
                       <div className="mt-1 text-sm text-white/70">
                         {activeEvent
                           ? activeEvent.text
-                          : "A previous command decision improved your next vault shipment."}
+                          : "A previous command decision improved your next transfer to the shared vault."}
                       </div>
                     </div>
 
                     {nextShipBonus > 0 ? (
                       <div className="rounded-2xl bg-emerald-500/15 px-4 py-3 text-sm text-emerald-200">
-                        Next ship bonus: +{Math.round(nextShipBonus * 100)}%
+                        Next vault transfer bonus: +{Math.round(nextShipBonus * 100)}%
                       </div>
                     ) : null}
                   </div>
@@ -10250,7 +10258,8 @@ export default function MleoBase() {
                       <div className="flex min-h-[88px] flex-col pr-8">
                         <div className="text-sm font-semibold text-emerald-200">Ship to Shared Vault</div>
                         <p className="mt-1 text-sm text-white/70">
-                          Move refined MLEO into the main vault with a daily softcut, so BASE supports Miners instead of replacing it.
+                          Sends all current banked MLEO to the shared vault. Production uses a daily cap + softcut;
+                          shipping does not.
                         </p>
                       </div>
                       <button
@@ -10349,7 +10358,8 @@ export default function MleoBase() {
                       <div className="flex min-h-[156px] flex-col pr-8">
                         <div className="text-sm font-semibold text-fuchsia-200">Blueprint Cache</div>
                         <p className="mt-1 text-sm text-white/70">
-                          Costs {fmt(blueprintCost)} shared MLEO + {fmt(blueprintDataCost)} DATA. Raises banking efficiency and daily ship cap permanently.
+                          Costs {fmt(blueprintCost)} shared MLEO + {fmt(blueprintDataCost)} DATA. Raises banking
+                          efficiency permanently.
                         </p>
                       </div>
                       <div className="mt-auto grid grid-cols-1 gap-2 pt-1">
@@ -10753,7 +10763,7 @@ export default function MleoBase() {
                   <ul className="mt-2 list-disc space-y-1 pl-5">
                     <li>produce resources</li>
                     <li>refine into banked MLEO</li>
-                    <li>decide whether to reinvest or ship part of it</li>
+                    <li>decide whether to reinvest or ship banked MLEO to the shared vault</li>
                   </ul>
                   <p className="mt-2">
                     This makes BASE a controlled system, not an unlimited faucet.
@@ -10763,7 +10773,8 @@ export default function MleoBase() {
                 <section>
                   <h3 className="text-lg font-bold text-white">8. Shipping to the Shared Vault</h3>
                   <p className="mt-2">
-                    Shipping moves part of your banked MLEO into the <strong className="text-white">shared vault</strong>.
+                    Shipping moves your current <strong className="text-white">banked MLEO</strong> into the{" "}
+                    <strong className="text-white">shared vault</strong> (full transfer).
                   </p>
                   <p className="mt-2">Why it matters:</p>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
@@ -10772,8 +10783,9 @@ export default function MleoBase() {
                     <li>it keeps BASE tied to long-term ecosystem utility</li>
                   </ul>
                   <p className="mt-2">
-                    Shipping is controlled by a <strong className="text-white">daily cap and softcut system</strong>.
-                    This means big exports become less efficient over time, so smart pacing matters.
+                    Shipping itself is <strong className="text-white">not</strong> daily-capped. The daily cap and
+                    softcut apply to <strong className="text-white">MLEO production inside BASE</strong> (before it
+                    becomes banked).
                   </p>
                 </section>
 

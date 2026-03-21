@@ -21,12 +21,12 @@ export const MISSION_GUIDANCE = {
     target: { tab: "build", target: "powerCell" },
   },
   ship_mleo: {
-    shortTitle: "Ship before cap",
+    shortTitle: "Ship banked MLEO",
     priority: 2,
-    learningFocus: "Export timing",
-    whyItMatters: "Shipping before cap keeps your bank loop efficient.",
-    bestActionHint: "Ship before overflow slows your loop.",
-    helperLine: "Ship before overflow slows your loop.",
+    learningFocus: "Shared Vault loop",
+    whyItMatters: "Shipping clears banked MLEO into the shared vault and keeps your vault loop active.",
+    bestActionHint: "Ship when banked MLEO is ready.",
+    helperLine: "Clear banked MLEO into the shared vault.",
     target: { tab: "ops", target: "shipping" },
   },
   run_expedition: {
