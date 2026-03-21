@@ -77,7 +77,17 @@ export default async function handler(req, res) {
     });
 
     if (error) {
-      return res.status(400).json({ success: false, message: error.message || "Failed to finish session" });
+      const raw = error.message || "Failed to finish session";
+      // DB still has the old pilot stub (coin-flip + dice only) instead of sql/arcade_sessions_add_slots_mystery.sql
+      if (typeof raw === "string" && raw.includes("not configured for game_id")) {
+        return res.status(503).json({
+          success: false,
+          code: "ARCADE_FINISH_NOT_CONFIGURED",
+          message:
+            "Arcade finish RPC is missing this game on the server. In Supabase SQL Editor, run the full sql/arcade_sessions_add_slots_mystery.sql (replaces finish_arcade_session). See sql/DEPLOY_ARCADE.md.",
+        });
+      }
+      return res.status(400).json({ success: false, message: raw });
     }
 
     const row = extractRow(data);
