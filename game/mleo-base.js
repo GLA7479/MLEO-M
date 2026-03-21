@@ -40,6 +40,7 @@ import {
   setBuildingPowerMode,
   sendBasePresence,
 } from "../lib/baseVaultClient";
+import { ensureCsrfToken } from "../lib/arcadeDeviceClient";
 import {
   BASE_HOME_SCENE_IDENTITY,
   BASE_HOME_SCENE_ORDER,
@@ -354,7 +355,12 @@ function formatResourceValue(value) {
 
 function formatBankedDetailedValue(value) {
   const n = Number(value || 0);
-  return n >= 100000 ? n.toFixed(1) : n.toFixed(2);
+  const abs = Math.abs(n);
+
+  if (abs < 10) return n.toFixed(4);
+  if (abs < 1000) return n.toFixed(2);
+  if (abs < 100000) return n.toFixed(1);
+  return n.toFixed(0);
 }
 
 function formatBankedBadgeCompact(value) {
@@ -363,17 +369,19 @@ function formatBankedBadgeCompact(value) {
   const abs = Math.abs(n);
 
   if (abs < 1000) {
-    if (abs < 10) return `${sign}${abs.toFixed(2)}`;
-    if (abs < 100) return `${sign}${abs.toFixed(1)}`;
-    return `${sign}${Math.min(999, Math.round(abs))}`;
+    if (abs < 10) return `${sign}${abs.toFixed(4)}`;
+    if (abs < 100) return `${sign}${abs.toFixed(2)}`;
+    return `${sign}${abs.toFixed(1)}`;
   }
 
   const suffixes = ["K", "M", "B", "T"];
   const divisors = [1e3, 1e6, 1e9, 1e12];
+
   let tier = 0;
   while (tier < divisors.length - 1 && abs >= divisors[tier + 1]) tier += 1;
 
   const computeScaled = (currentTier) => abs / divisors[currentTier];
+
   const formatScaled = (scaled) => {
     if (scaled < 10) return scaled.toFixed(2);
     if (scaled < 100) return scaled.toFixed(1);
@@ -2884,6 +2892,7 @@ export default function MleoBase() {
       });
 
       if (!payload?.success) {
+        if (payload?.skipped) return false;
         console.error(`BASE presence push rejected (${reason})`, payload);
         return false;
       }
@@ -2944,6 +2953,7 @@ export default function MleoBase() {
       });
 
       if (!payload?.success) {
+        if (payload?.skipped) return false;
         console.error("BASE real game action push rejected", payload);
         return false;
       }
@@ -2974,10 +2984,11 @@ export default function MleoBase() {
       stopHeartbeat();
       if (document.visibilityState !== "visible") return;
 
-      presenceHeartbeatRef.current = window.setInterval(() => {
-        if (document.visibilityState === "visible") {
-          pushPresence({ interacted: false, gameAction: false, reason: "heartbeat" });
-        }
+      presenceHeartbeatRef.current = window.setInterval(async () => {
+        if (document.visibilityState !== "visible") return;
+        const token = await ensureCsrfToken();
+        if (!token) return;
+        pushPresence({ interacted: false, gameAction: false, reason: "heartbeat" });
       }, 45000);
     };
 
@@ -3002,8 +3013,11 @@ export default function MleoBase() {
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        pushPresence({ interacted: false, gameAction: false, force: true, reason: "visible" });
-        startHeartbeat();
+        void (async () => {
+          await ensureCsrfToken(true);
+          await pushPresence({ interacted: false, gameAction: false, force: true, reason: "visible" });
+          startHeartbeat();
+        })();
       } else {
         pushPresence({ interacted: false, gameAction: false, force: true, reason: "hidden" });
         stopHeartbeat();
@@ -3013,8 +3027,11 @@ export default function MleoBase() {
 
     const onFocus = () => {
       if (document.visibilityState === "visible") {
-        pushPresence({ interacted: false, gameAction: false, force: true, reason: "focus" });
-        startHeartbeat();
+        void (async () => {
+          await ensureCsrfToken(true);
+          await pushPresence({ interacted: false, gameAction: false, force: true, reason: "focus" });
+          startHeartbeat();
+        })();
       }
     };
 
@@ -3055,8 +3072,16 @@ export default function MleoBase() {
     window.addEventListener("beforeunload", onBeforeUnload);
 
     if (document.visibilityState === "visible") {
-      pushPresence({ interacted: false, gameAction: false, force: true, reason: "init_visible" });
-      startHeartbeat();
+      void (async () => {
+        await ensureCsrfToken(true);
+        await pushPresence({
+          interacted: false,
+          gameAction: false,
+          force: true,
+          reason: "init_visible",
+        });
+        startHeartbeat();
+      })();
     }
 
     return () => {

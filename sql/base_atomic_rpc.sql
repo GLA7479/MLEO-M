@@ -4,9 +4,14 @@
 
 BEGIN;
 
+-- Needed when OUT types change (fractional banked_mleo on device vs whole MLEO to vault).
+DROP FUNCTION IF EXISTS public.base_ship_to_vault(text);
+DROP FUNCTION IF EXISTS public.base_launch_expedition(text);
+
 -- ============================================================================
 -- 1) base_ship_to_vault - Ship banked MLEO to shared vault (ATOMIC)
 -- ============================================================================
+-- Vault delta is whole MLEO (bigint). Fractional banked stays on device after ship.
 
 CREATE OR REPLACE FUNCTION public.base_ship_to_vault(
   p_device_id text
@@ -14,7 +19,7 @@ CREATE OR REPLACE FUNCTION public.base_ship_to_vault(
 RETURNS TABLE(
   shipped bigint,
   consumed bigint,
-  new_banked_mleo bigint,
+  new_banked_mleo numeric,
   new_sent_today bigint,
   new_total_banked bigint,
   new_commander_xp bigint,
@@ -27,13 +32,13 @@ SET search_path = public
 AS $$
 DECLARE
   v_state public.base_device_state%ROWTYPE;
-  v_banked_mleo bigint;
+  v_banked_mleo numeric;
   v_sent_today bigint;
   v_blueprint_level integer;
   v_logistics_level integer;
+  v_ship_whole bigint;
   v_shipped bigint;
-  v_consumed bigint;
-  v_new_banked_mleo bigint;
+  v_new_banked_mleo numeric;
   v_new_sent_today bigint;
   v_new_total_banked bigint;
   v_commander_xp bigint;
@@ -50,22 +55,23 @@ BEGIN
   WHERE device_id = p_device_id
   FOR UPDATE;
 
-  v_banked_mleo := coalesce(v_state.banked_mleo, 0);
+  v_banked_mleo := round(coalesce(v_state.banked_mleo, 0::numeric), 4);
   v_sent_today := coalesce(v_state.sent_today, 0);
   v_blueprint_level := coalesce(v_state.blueprint_level, 0);
   v_logistics_level := coalesce((coalesce(v_state.buildings, '{}'::jsonb)->>'logisticsCenter')::integer, 0);
   v_stats := coalesce(v_state.stats, '{}'::jsonb);
 
-  -- Validation: must have banked MLEO
   IF v_banked_mleo <= 0 THEN
     RAISE EXCEPTION 'Nothing ready to ship yet';
   END IF;
 
-  -- Ship all banked MLEO to shared vault (no daily shipping cap; daily cap applies to production only).
-  v_shipped := v_banked_mleo;
-  v_consumed := v_banked_mleo;
+  v_ship_whole := floor(v_banked_mleo)::bigint;
+  IF v_ship_whole < 1 THEN
+    RAISE EXCEPTION 'Nothing ready to ship yet';
+  END IF;
 
-  -- Update vault (atomic)
+  v_shipped := v_ship_whole;
+
   SELECT * INTO v_vault_delta_result
   FROM public.sync_vault_delta(
     'mleo-base-ship',
@@ -77,8 +83,7 @@ BEGIN
 
   v_vault_balance := coalesce((v_vault_delta_result.new_balance), 0);
 
-  -- Update state
-  v_new_banked_mleo := 0;
+  v_new_banked_mleo := round(v_banked_mleo - v_ship_whole::numeric, 4);
   v_new_sent_today := v_sent_today;
   v_new_total_banked := coalesce(v_state.total_banked, 0) + v_shipped;
   v_commander_xp := coalesce(v_state.commander_xp, 0) + greatest(10, floor(v_shipped / 50));
@@ -105,7 +110,7 @@ BEGIN
     'ship',
     jsonb_build_object(
       'shipped', v_shipped,
-      'consumed', v_consumed,
+      'consumed', v_shipped,
       'mode', 'full_banked_transfer',
       'sent_today_before', v_sent_today,
       'sent_today_after', v_new_sent_today,
@@ -123,7 +128,7 @@ BEGIN
   RETURN QUERY
   SELECT
     v_shipped,
-    v_consumed,
+    v_shipped,
     v_new_banked_mleo,
     v_new_sent_today,
     v_new_total_banked,
@@ -355,7 +360,7 @@ RETURNS TABLE(
   loot jsonb,
   xp_gain integer,
   new_resources jsonb,
-  new_banked_mleo bigint,
+  new_banked_mleo numeric,
   new_expedition_ready_at timestamptz,
   new_commander_xp bigint,
   state jsonb
@@ -384,7 +389,7 @@ DECLARE
   v_mleo_chance numeric;
   v_xp_gain integer;
   v_new_resources jsonb;
-  v_new_banked_mleo bigint;
+  v_new_banked_mleo numeric;
   v_new_expedition_ready_at timestamptz;
   v_commander_xp bigint;
   v_stats jsonb;
@@ -395,7 +400,7 @@ DECLARE
   v_daily_cap bigint := 3400;
   v_mleo_gain_mult numeric := 0.4;
   v_softcut numeric := 1;
-  v_banked_add bigint := 0;
+  v_banked_add numeric := 0;
   v_raw_mleo numeric := 0;
 BEGIN
   -- Get and lock state
@@ -462,12 +467,13 @@ BEGIN
   v_mleo_gain_mult := coalesce(v_mleo_gain_mult, 0.4);
   v_raw_mleo := v_banked_mleo::numeric * v_mleo_gain_mult;
   v_softcut := public.base_softcut_factor(v_mleo_produced_today, v_daily_cap);
-  v_banked_add := floor(
+  v_banked_add := round(
     least(
       v_raw_mleo * v_softcut,
       greatest(0::numeric, v_daily_cap::numeric - v_mleo_produced_today)
-    )
-  )::bigint;
+    ),
+    4
+  );
   v_mleo_produced_today := v_mleo_produced_today + v_banked_add;
 
   v_loot := jsonb_build_object(
@@ -490,7 +496,7 @@ BEGIN
     'DATA', greatest(0, coalesce((v_resources->>'DATA')::integer, 0) - v_expedition_data_cost) + v_data
   );
 
-  v_new_banked_mleo := coalesce(v_state.banked_mleo, 0) + v_banked_add;
+  v_new_banked_mleo := round(coalesce(v_state.banked_mleo, 0::numeric) + v_banked_add, 4);
   v_new_expedition_ready_at := now() + (v_expedition_cooldown_ms || ' milliseconds')::interval;
   v_commander_xp := coalesce(v_state.commander_xp, 0) + v_xp_gain;
 
