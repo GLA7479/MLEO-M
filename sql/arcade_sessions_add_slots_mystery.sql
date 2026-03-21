@@ -686,6 +686,7 @@ DECLARE
   v_plinko_bucket integer := 0;
   v_plinko_pick numeric := 0;
   v_plinko_multiplier numeric := 0;
+  v_plinko_bucket_count integer := 9;
   v_crash_hex text := '';
   v_crash_value numeric := 0;
   v_crash_u numeric := 0;
@@ -1345,58 +1346,85 @@ BEGIN
     );
 
   ELSIF coalesce(v_session.game_id, '') = 'plinko' THEN
+    -- bucketCount 9 / 11 / 13: symmetric boards, RTP matched to legacy 17-bucket (~E[m]≈0.92439)
+    v_plinko_bucket_count := floor(coalesce((p_payload->>'bucketCount')::numeric, 9))::integer;
+    IF v_plinko_bucket_count NOT IN (9, 11, 13) THEN
+      RAISE EXCEPTION 'plinko payload must include bucketCount=9, 11, or 13';
+    END IF;
     v_plinko_pick := random() * 1.0396;
-    IF v_plinko_pick < 0.0002 THEN
-      v_plinko_bucket := 0;
-      v_plinko_multiplier := 0;
-    ELSIF v_plinko_pick < 0.0003 THEN
-      v_plinko_bucket := 1;
-      v_plinko_multiplier := 40;
-    ELSIF v_plinko_pick < 0.0033 THEN
-      v_plinko_bucket := 2;
-      v_plinko_multiplier := 18;
-    ELSIF v_plinko_pick < 0.0048 THEN
-      v_plinko_bucket := 3;
-      v_plinko_multiplier := 5;
-    ELSIF v_plinko_pick < 0.0198 THEN
-      v_plinko_bucket := 4;
-      v_plinko_multiplier := 2;
-    ELSIF v_plinko_pick < 0.0598 THEN
-      v_plinko_bucket := 5;
-      v_plinko_multiplier := 1.5;
-    ELSIF v_plinko_pick < 0.1498 THEN
-      v_plinko_bucket := 6;
-      v_plinko_multiplier := 1;
-    ELSIF v_plinko_pick < 0.2698 THEN
-      v_plinko_bucket := 7;
-      v_plinko_multiplier := 0.5;
-    ELSIF v_plinko_pick < 0.7698 THEN
-      v_plinko_bucket := 8;
-      v_plinko_multiplier := 0.7;
-    ELSIF v_plinko_pick < 0.8898 THEN
-      v_plinko_bucket := 9;
-      v_plinko_multiplier := 0.5;
-    ELSIF v_plinko_pick < 0.9798 THEN
-      v_plinko_bucket := 10;
-      v_plinko_multiplier := 1;
-    ELSIF v_plinko_pick < 1.0198 THEN
-      v_plinko_bucket := 11;
-      v_plinko_multiplier := 1.5;
-    ELSIF v_plinko_pick < 1.0348 THEN
-      v_plinko_bucket := 12;
-      v_plinko_multiplier := 2;
-    ELSIF v_plinko_pick < 1.0363 THEN
-      v_plinko_bucket := 13;
-      v_plinko_multiplier := 5;
-    ELSIF v_plinko_pick < 1.0393 THEN
-      v_plinko_bucket := 14;
-      v_plinko_multiplier := 18;
-    ELSIF v_plinko_pick < 1.0394 THEN
-      v_plinko_bucket := 15;
-      v_plinko_multiplier := 40;
+    IF v_plinko_bucket_count = 9 THEN
+      IF v_plinko_pick < 0.0001996032000000 THEN
+        v_plinko_bucket := 0; v_plinko_multiplier := 0;
+      ELSIF v_plinko_pick < 0.0002994048000000 THEN
+        v_plinko_bucket := 1; v_plinko_multiplier := 18;
+      ELSIF v_plinko_pick < 0.0034182048000000 THEN
+        v_plinko_bucket := 2; v_plinko_multiplier := 5;
+      ELSIF v_plinko_pick < 0.0816044416000000 THEN
+        v_plinko_bucket := 3; v_plinko_multiplier := 2;
+      ELSIF v_plinko_pick < 0.9579955584000001 THEN
+        v_plinko_bucket := 4; v_plinko_multiplier := 0.7;
+      ELSIF v_plinko_pick < 1.0361817952000001 THEN
+        v_plinko_bucket := 5; v_plinko_multiplier := 2;
+      ELSIF v_plinko_pick < 1.0393005952000001 THEN
+        v_plinko_bucket := 6; v_plinko_multiplier := 5;
+      ELSIF v_plinko_pick < 1.0394003968000001 THEN
+        v_plinko_bucket := 7; v_plinko_multiplier := 18;
+      ELSE
+        v_plinko_bucket := 8; v_plinko_multiplier := 0;
+      END IF;
+    ELSIF v_plinko_bucket_count = 11 THEN
+      IF v_plinko_pick < 0.0001996032000000 THEN
+        v_plinko_bucket := 0; v_plinko_multiplier := 0;
+      ELSIF v_plinko_pick < 0.0002994048000000 THEN
+        v_plinko_bucket := 1; v_plinko_multiplier := 18;
+      ELSIF v_plinko_pick < 0.0008192048000000 THEN
+        v_plinko_bucket := 2; v_plinko_multiplier := 5;
+      ELSIF v_plinko_pick < 0.0030543448000000 THEN
+        v_plinko_bucket := 3; v_plinko_multiplier := 2;
+      ELSIF v_plinko_pick < 0.3694287866666777 THEN
+        v_plinko_bucket := 4; v_plinko_multiplier := 1;
+      ELSIF v_plinko_pick < 0.6701712133333224 THEN
+        v_plinko_bucket := 5; v_plinko_multiplier := 0.7;
+      ELSIF v_plinko_pick < 1.0365456552000001 THEN
+        v_plinko_bucket := 6; v_plinko_multiplier := 1;
+      ELSIF v_plinko_pick < 1.0387807952000001 THEN
+        v_plinko_bucket := 7; v_plinko_multiplier := 2;
+      ELSIF v_plinko_pick < 1.0393005952000001 THEN
+        v_plinko_bucket := 8; v_plinko_multiplier := 5;
+      ELSIF v_plinko_pick < 1.0394003968000001 THEN
+        v_plinko_bucket := 9; v_plinko_multiplier := 18;
+      ELSE
+        v_plinko_bucket := 10; v_plinko_multiplier := 0;
+      END IF;
     ELSE
-      v_plinko_bucket := 16;
-      v_plinko_multiplier := 0;
+      -- 13 buckets
+      IF v_plinko_pick < 0.0001996032000000 THEN
+        v_plinko_bucket := 0; v_plinko_multiplier := 0;
+      ELSIF v_plinko_pick < 0.0002994048000000 THEN
+        v_plinko_bucket := 1; v_plinko_multiplier := 18;
+      ELSIF v_plinko_pick < 0.0005073248000000 THEN
+        v_plinko_bucket := 2; v_plinko_multiplier := 5;
+      ELSIF v_plinko_pick < 0.0057053248000000 THEN
+        v_plinko_bucket := 3; v_plinko_multiplier := 2;
+      ELSIF v_plinko_pick < 0.3639882133333443 THEN
+        v_plinko_bucket := 4; v_plinko_multiplier := 1;
+      ELSIF v_plinko_pick < 0.3644040533333444 THEN
+        v_plinko_bucket := 5; v_plinko_multiplier := 0.5;
+      ELSIF v_plinko_pick < 0.6751959466666557 THEN
+        v_plinko_bucket := 6; v_plinko_multiplier := 0.7;
+      ELSIF v_plinko_pick < 0.6756117866666557 THEN
+        v_plinko_bucket := 7; v_plinko_multiplier := 0.5;
+      ELSIF v_plinko_pick < 1.0338946752000000 THEN
+        v_plinko_bucket := 8; v_plinko_multiplier := 1;
+      ELSIF v_plinko_pick < 1.0390926752000001 THEN
+        v_plinko_bucket := 9; v_plinko_multiplier := 2;
+      ELSIF v_plinko_pick < 1.0393005952000001 THEN
+        v_plinko_bucket := 10; v_plinko_multiplier := 5;
+      ELSIF v_plinko_pick < 1.0394003968000001 THEN
+        v_plinko_bucket := 11; v_plinko_multiplier := 18;
+      ELSE
+        v_plinko_bucket := 12; v_plinko_multiplier := 0;
+      END IF;
     END IF;
     v_reward := floor(v_session.stake * v_plinko_multiplier)::bigint;
     v_won := v_reward > 0;
@@ -1404,6 +1432,7 @@ BEGIN
       'game', 'plinko',
       'mode', v_session.mode,
       'stake', v_session.stake,
+      'bucketCount', v_plinko_bucket_count,
       'bucketIndex', v_plinko_bucket,
       'multiplier', v_plinko_multiplier,
       'won', v_won,
