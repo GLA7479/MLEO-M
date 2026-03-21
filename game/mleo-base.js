@@ -2897,10 +2897,8 @@ export default function MleoBase() {
       if (payload?.skipped) return false;
 
       if (!payload?.success) {
-        const code = String(payload?.code || "");
-        if (code === "CSRF_UNAVAILABLE" || code === "CSRF_INVALID") {
-          return false;
-        }
+        const code = payload?.code || "";
+        if (code === "CSRF_UNAVAILABLE" || code === "CSRF_INVALID") return false;
         console.error(`BASE presence push rejected (${reason})`, payload);
         return false;
       }
@@ -2965,10 +2963,8 @@ export default function MleoBase() {
       if (payload?.skipped) return false;
 
       if (!payload?.success) {
-        const code = String(payload?.code || "");
-        if (code === "CSRF_UNAVAILABLE" || code === "CSRF_INVALID") {
-          return false;
-        }
+        const code = payload?.code || "";
+        if (code === "CSRF_UNAVAILABLE" || code === "CSRF_INVALID") return false;
         console.error("BASE real game action push rejected", payload);
         return false;
       }
