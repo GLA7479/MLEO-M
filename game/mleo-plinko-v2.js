@@ -199,6 +199,8 @@ export default function Plinko2Page() {
   /** Always latest landing handler (canvas loop must not capture a stale closure). */
   const landInBucketRef = useRef(() => {});
   const bucketModeRef = useRef(9);
+  /** While true, paid start→finish vault sync must not update visible Vault (until ball spawns, see ballsRef). */
+  const vaultDisplayHoldRef = useRef(false);
 
   // Game state
   const ballsRef = useRef([]);
@@ -320,8 +322,12 @@ export default function Plinko2Page() {
     setPlayAmount("100");
     setActiveAmountButton("100");
 
-    const unsubscribeVault = subscribeSharedVault(snapshot => {
-      if (!cancelled) setVaultState(snapshot.balance);
+    const unsubscribeVault = subscribeSharedVault((snapshot) => {
+      if (cancelled) return;
+      // Do not update visible Vault while a ball is in flight or during paid start→spawn gap
+      // (arcadeSessionClient refreshVaultSnapshot still runs; we defer display to landing).
+      if (ballsRef.current.length > 0 || vaultDisplayHoldRef.current) return;
+      setVaultState(snapshot.balance);
     });
 
     const interval = setInterval(() => {
@@ -682,29 +688,48 @@ export default function Plinko2Page() {
       setBatchRunning(true);
       try {
         for (let b = 0; b < batchSize; b++) {
+          vaultDisplayHoldRef.current = true;
           const startResult = await startPaidArcadeSession("plinko", play);
           if (!startResult.success) {
+            vaultDisplayHoldRef.current = false;
+            readSharedVault({ fresh: true })
+              .then((s) => setVaultState(s.balance))
+              .catch(() => {});
             alert(startResult.message || "Failed to start session");
             break;
           }
-          setVaultState(startResult.balanceAfter);
           const finishResult = await finishArcadeSession(startResult.sessionId, {
             bucketCount: bucketMode,
           });
           if (!finishResult?.success) {
+            vaultDisplayHoldRef.current = false;
+            readSharedVault({ fresh: true })
+              .then((s) => setVaultState(s.balance))
+              .catch(() => {});
             setSessionError("Session failed to finish");
             alert(finishResult?.message || "Failed to finish session");
             break;
           }
           setPlayAmount(String(play));
           spawnBall(finishResult, b * 14);
+          vaultDisplayHoldRef.current = false;
         }
       } catch (error) {
         console.error("Plinko batch error:", error);
+        vaultDisplayHoldRef.current = false;
+        readSharedVault({ fresh: true })
+          .then((s) => setVaultState(s.balance))
+          .catch(() => {});
         setSessionError("Session failed to finish");
         alert("Failed to finish session. Please refresh vault and try again.");
       } finally {
         setBatchRunning(false);
+        if (vaultDisplayHoldRef.current) {
+          vaultDisplayHoldRef.current = false;
+          readSharedVault({ fresh: true })
+            .then((s) => setVaultState(s.balance))
+            .catch(() => {});
+        }
       }
       return;
     }
@@ -740,25 +765,38 @@ export default function Plinko2Page() {
           alert(`Need ${fmt(effectivePlay)} MLEO in vault`);
           return;
         }
+        vaultDisplayHoldRef.current = true;
         const startResult = await startPaidArcadeSession("plinko", effectivePlay);
         if (!startResult.success) {
+          vaultDisplayHoldRef.current = false;
+          readSharedVault({ fresh: true })
+            .then((s) => setVaultState(s.balance))
+            .catch(() => {});
           alert(startResult.message || "Failed to start session");
           return;
         }
-        setVaultState(startResult.balanceAfter);
         finishResult = await finishArcadeSession(startResult.sessionId, {
           bucketCount: bucketMode,
         });
       }
       if (!finishResult?.success) {
+        vaultDisplayHoldRef.current = false;
+        readSharedVault({ fresh: true })
+          .then((s) => setVaultState(s.balance))
+          .catch(() => {});
         setSessionError("Session failed to finish");
         alert(finishResult?.message || "Failed to finish session");
         return;
       }
       setPlayAmount(String(effectivePlay));
       spawnBall(finishResult, 0);
+      vaultDisplayHoldRef.current = false;
     } catch (error) {
       console.error("Plinko session error:", error);
+      vaultDisplayHoldRef.current = false;
+      readSharedVault({ fresh: true })
+        .then((s) => setVaultState(s.balance))
+        .catch(() => {});
       setSessionError("Session failed to finish");
       alert("Failed to finish session. Please refresh vault and try again.");
     }
