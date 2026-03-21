@@ -352,6 +352,47 @@ function formatResourceValue(value) {
   return `${Math.floor(n)}`;
 }
 
+function formatBankedDetailedValue(value) {
+  const n = Number(value || 0);
+  return n >= 100000 ? n.toFixed(1) : n.toFixed(2);
+}
+
+function formatBankedBadgeCompact(value) {
+  const n = Number(value || 0);
+  const sign = n < 0 ? "-" : "";
+  const abs = Math.abs(n);
+
+  if (abs < 1000) {
+    if (abs < 10) return `${sign}${abs.toFixed(2)}`;
+    if (abs < 100) return `${sign}${abs.toFixed(1)}`;
+    return `${sign}${Math.min(999, Math.round(abs))}`;
+  }
+
+  const suffixes = ["K", "M", "B", "T"];
+  const divisors = [1e3, 1e6, 1e9, 1e12];
+  let tier = 0;
+  while (tier < divisors.length - 1 && abs >= divisors[tier + 1]) tier += 1;
+
+  const computeScaled = (currentTier) => abs / divisors[currentTier];
+  const formatScaled = (scaled) => {
+    if (scaled < 10) return scaled.toFixed(2);
+    if (scaled < 100) return scaled.toFixed(1);
+    return scaled.toFixed(0);
+  };
+
+  let scaled = computeScaled(tier);
+  let compact = formatScaled(scaled);
+
+  // If rounding crosses 1000 in this tier, bump to the next suffix.
+  while (Number(compact) >= 1000 && tier < divisors.length - 1) {
+    tier += 1;
+    scaled = computeScaled(tier);
+    compact = formatScaled(scaled);
+  }
+
+  return `${sign}${compact}${suffixes[tier]}`;
+}
+
 function costTone(current, needed) {
   return Number(current || 0) >= Number(needed || 0)
     ? "text-emerald-300"
@@ -1188,7 +1229,7 @@ function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
   return (
     <DesktopFloatingPanelShell
       eyebrow="Banked MLEO"
-      title={fmt(bankedValue)}
+      title={formatBankedDetailedValue(bankedValue)}
       subtitle={
         <span className="text-[11px] text-white/55">
           Live refinery output snapshot
@@ -8811,7 +8852,7 @@ export default function MleoBase() {
                       BANKED
                     </div>
                     <div className="text-[11px] font-extrabold text-white leading-none">
-                      {formatResourceValue(state.bankedMleo || 0)}
+                      {formatBankedBadgeCompact(state.bankedMleo || 0)}
                     </div>
                   </button>
                   <Link
@@ -8913,7 +8954,7 @@ export default function MleoBase() {
                     BANKED
                   </div>
                   <div className="text-xs font-extrabold leading-none">
-                    {formatResourceValue(state.bankedMleo || 0)}
+                    {formatBankedBadgeCompact(state.bankedMleo || 0)}
                   </div>
                 </button>
 
