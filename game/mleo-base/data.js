@@ -1,10 +1,20 @@
+/** Aligned with `sql/base_economy_config` + MINERS softcut (daily MLEO production into banked). */
 export const DAILY_SOFTCUT = [
-  { upto: 0.60, factor: 1.0 },
-  { upto: 0.85, factor: 0.72 },
-  { upto: 1.0, factor: 0.5 },
-  { upto: 1.15, factor: 0.3 },
-  { upto: 9.99, factor: 0.16 },
+  { upto: 0.55, factor: 1.0 },
+  { upto: 0.75, factor: 0.55 },
+  { upto: 0.9, factor: 0.3 },
+  { upto: 1.0, factor: 0.15 },
+  { upto: 9.99, factor: 0.06 },
 ];
+
+export function baseMleoSoftcutFactor(used, cap) {
+  if (!cap || cap <= 0) return 1;
+  const ratio = Math.max(0, Number(used || 0)) / cap;
+  for (const step of DAILY_SOFTCUT) {
+    if (ratio <= step.upto) return step.factor;
+  }
+  return 0.06;
+}
 
 export const OFFLINE_TIERS = [
   { hours: 2, factor: 0.55 },
@@ -265,7 +275,12 @@ export const CONFIG = {
   startingGold: 332,
   baseEnergyCap: 148,
   baseEnergyRegen: 6.4,
-  dailyShipCap: 1800,
+  /** Daily cap on MLEO *production* into banked (server: base_economy_config.daily_mleo_cap). */
+  dailyBaseMleoCap: 2500,
+  /** Scales refinery MLEO rate vs legacy 0.015 core (server: base_economy_config.mleo_gain_mult). */
+  baseMleoGainMult: 0.5,
+  /** @deprecated Renamed concept: was shipping cap; production cap is `dailyBaseMleoCap`. */
+  dailyShipCap: 2500,
   expeditionCost: 36,
   expeditionCooldownMs: 120_000,
   overclockCost: 900,

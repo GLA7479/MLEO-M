@@ -229,7 +229,7 @@ function DailyProgressBlock({ progress }) {
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MiniStat
-          label="Ship Progress"
+          label="Daily MLEO (BASE)"
           value={`${formatValue(progress.shipProgress?.current || 0)}/${formatValue(
             progress.shipProgress?.max || 0
           )}`}

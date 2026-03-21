@@ -307,6 +307,7 @@ export function freshState() {
     modules: {},
     research: {},
     bankedMleo: 0,
+    mleoProducedToday: 0,
     sentToday: 0,
     totalBanked: 0,
     blueprintLevel: 0,
@@ -410,6 +411,7 @@ export function sanitizeBaseState(raw, fallback = null) {
     modules: src.modules && typeof src.modules === "object" ? src.modules : {},
     research: src.research && typeof src.research === "object" ? src.research : {},
     bankedMleo: safeNumber(src.bankedMleo, seed.bankedMleo, 0),
+    mleoProducedToday: safeNumber(src.mleoProducedToday, seed.mleoProducedToday, 0),
     sentToday: safeNumber(src.sentToday, seed.sentToday, 0),
     totalBanked: safeNumber(src.totalBanked, seed.totalBanked, 0),
     blueprintLevel: safeInteger(src.blueprintLevel, seed.blueprintLevel, 0),
@@ -496,6 +498,9 @@ export function normalizeServerState(raw, prevState = null) {
       crewRole: raw.crewRole ?? raw.crew_role ?? prev?.crewRole ?? "engineer",
       commanderPath: raw.commanderPath ?? raw.commander_path ?? prev?.commanderPath ?? "industry",
       bankedMleo: Number(raw.bankedMleo ?? raw.banked_mleo ?? prev?.bankedMleo ?? 0),
+      mleoProducedToday: Number(
+        raw.mleoProducedToday ?? raw.mleo_produced_today ?? prev?.mleoProducedToday ?? 0
+      ),
       sentToday: Number(raw.sentToday ?? raw.sent_today ?? prev?.sentToday ?? 0),
       totalBanked: Number(raw.totalBanked ?? raw.total_banked ?? prev?.totalBanked ?? 0),
       blueprintLevel: Number(raw.blueprintLevel ?? raw.blueprint_level ?? prev?.blueprintLevel ?? 0),

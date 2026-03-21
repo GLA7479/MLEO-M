@@ -46,6 +46,7 @@ import {
   BASE_HOME_SCENE_POSITIONS_DESKTOP,
   BASE_HOME_SCENE_POSITIONS_MOBILE,
   BUILDINGS,
+  baseMleoSoftcutFactor,
   BUILDING_POWER_STEPS,
   COMMANDER_PATHS,
   CONFIG,
@@ -563,7 +564,7 @@ function derive(state, now = Date.now()) {
   mleoMult *= hqBonus * stabilityFactor;
   dataMult *= hqBonus * stabilityFactor;
 
-  const shipCap = 1800 + logisticsLevel * 320 + state.blueprintLevel * 90;
+  const dailyMleoCap = CONFIG.dailyBaseMleoCap;
 
   const minersBonus = {
     offlineRetention: minerLink * 0.015,
@@ -583,7 +584,8 @@ function derive(state, now = Date.now()) {
     scrapMult,
     mleoMult,
     dataMult,
-    shipCap,
+    shipCap: dailyMleoCap,
+    dailyMleoCap,
     bankBonus,
     maintenanceRelief,
     energyUseMult,
@@ -636,9 +638,9 @@ function getBankedRateSnapshot(state, derived) {
   const perHour = perSecond * 3600;
   const perDay = perHour * 24;
 
-  const shipCap = Number(derived?.shipCap || 0);
-  const bankedNow = Number(state?.bankedMleo || 0);
-  const remainingToCap = Math.max(0, shipCap - bankedNow);
+  const dailyCap = Number(derived?.dailyMleoCap ?? derived?.shipCap ?? CONFIG.dailyBaseMleoCap);
+  const producedToday = Number(state?.mleoProducedToday || 0);
+  const remainingToCap = Math.max(0, dailyCap - producedToday);
 
   const etaHours = perHour > 0 ? remainingToCap / perHour : null;
   const oreFeedHours =
@@ -663,7 +665,9 @@ function getBankedRateSnapshot(state, derived) {
     perSecond,
     perHour,
     perDay,
-    shipCap,
+    shipCap: dailyCap,
+    dailyMleoCap: dailyCap,
+    mleoProducedToday: producedToday,
     remainingToCap,
     etaHours,
     oreFeedHours,
@@ -696,6 +700,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
   if (next.lastDay !== todayKey()) {
     next.lastDay = todayKey();
     next.sentToday = 0;
+    next.mleoProducedToday = 0;
     next.stats = {
       upgradesToday: 0,
       shippedToday: 0,
@@ -709,7 +714,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
       completed: {},
       claimed: {},
     };
-    next.log = pushLog(next.log, "New day: shipment cap and missions refreshed.");
+    next.log = pushLog(next.log, "New day: daily MLEO production budget and missions refreshed.");
   }
 
   const dt = clamp(elapsedMs / 1000, 0, 60 * 60 * 12);
@@ -822,13 +827,21 @@ function simulate(state, elapsedMs, efficiency = 1) {
     next.resources.ENERGY -= energyNeed;
     next.resources.ORE -= oreNeed;
     next.resources.SCRAP -= scrapNeed;
-    next.bankedMleo +=
+    const cap = CONFIG.dailyBaseMleoCap;
+    const produced = Number(next.mleoProducedToday || 0);
+    const rawGain =
       REFINERY_BANKED_PER_LEVEL *
       level *
       d.mleoMult *
       d.bankBonus *
       effective *
-      earlyOutputBoostFor("refinery", level);
+      earlyOutputBoostFor("refinery", level) *
+      CONFIG.baseMleoGainMult;
+    const soft = baseMleoSoftcutFactor(produced, cap);
+    const room = Math.max(0, cap - produced);
+    const add = Math.min(rawGain * soft, room);
+    next.bankedMleo += add;
+    next.mleoProducedToday = produced + add;
   });
 
   const elapsedMinutes = dt / 60;
@@ -1134,10 +1147,10 @@ function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
 
         <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
           <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-            Ship cap
+            Daily prod. cap
           </div>
           <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
-            {fmt(s.shipCap)}
+            {fmt(s.dailyMleoCap ?? s.shipCap)}
           </div>
         </div>
 
@@ -1607,7 +1620,7 @@ function getOverviewBaseStatus({ systemState, stability, energy, energyCap, bank
     return {
       label: "Bottlenecked",
       tone: "warning",
-      text: "Ship cap is almost full and export flow is now your main limiter.",
+      text: "Daily MLEO production budget is almost full; further refinery output is heavily reduced until reset.",
     };
   }
 
@@ -1648,11 +1661,11 @@ function getOverviewBottleneck({
   shipRatio,
   canShipNow,
 }) {
-  if (shipRatio >= 0.92 || (canShipNow && Number(bankedSnapshot?.remainingToCap || 0) <= 40)) {
+  if (shipRatio >= 0.92 || Number(bankedSnapshot?.remainingToCap || 0) <= 40) {
     return {
       key: "ship-cap",
-      label: "Near ship cap",
-      text: "Refined MLEO is piling up and shipping is becoming the main limiter.",
+      label: "Near daily MLEO cap",
+      text: "You are close to today's MLEO production limit in BASE. Shipping to vault is unaffected.",
       target: { tab: "ops", target: "shipping" },
       tone: "warning",
     };
@@ -1875,9 +1888,9 @@ function buildOverviewV2({
   const energy = Number(state.resources?.ENERGY || 0);
   const energyCap = Number(derived.energyCap || 0);
   const stability = Number(state.stability || 100);
-  const banked = Number(state.bankedMleo || 0);
-  const shipCap = Number(derived.shipCap || 0);
-  const shipRatio = shipCap > 0 ? banked / shipCap : 0;
+  const dailyCap = Number(derived.dailyMleoCap ?? derived.shipCap ?? CONFIG.dailyBaseMleoCap);
+  const producedToday = Number(state.mleoProducedToday || 0);
+  const shipRatio = dailyCap > 0 ? producedToday / dailyCap : 0;
 
   const bottleneck = getOverviewBottleneck({
     systemState,
@@ -1914,8 +1927,8 @@ function buildOverviewV2({
     };
 
     const energyRatio = energyCap > 0 ? energy / energyCap : 1;
-    const shipCap = Number(derived?.shipCap || 0);
-    const shipRatio = shipCap > 0 ? Number(state?.bankedMleo || 0) / shipCap : 0;
+    const dc = Number(derived?.dailyMleoCap ?? derived?.shipCap ?? CONFIG.dailyBaseMleoCap);
+    const shipRatio = dc > 0 ? Number(state?.mleoProducedToday || 0) / dc : 0;
     const claimableContracts = (liveContracts || []).filter((c) => c.done && !c.claimed).length;
     const claimableMissions = Number(readyCounts?.missions || 0);
 
@@ -1953,8 +1966,8 @@ function buildOverviewV2({
       push("Maintain stability rhythm", "Done");
     }
 
-    if (shipRatio >= 0.85 || canShipNow) {
-      push("Ship before cap pressure", canShipNow ? "Ready" : "Soon", {
+    if (canShipNow) {
+      push("Ship banked MLEO to Shared Vault", "Ready", {
         tab: "ops",
         target: "shipping",
       });
@@ -1984,7 +1997,7 @@ function buildOverviewV2({
     // First chip: current main bottleneck.
     switch (bottleneck?.key) {
       case "ship-cap":
-        push("ship-cap", "Near ship cap", "warning");
+        push("ship-cap", "Near daily MLEO cap", "warning");
         break;
       case "energy-collapse":
         push("energy-pressure", "Energy pressure", "critical");
@@ -2009,9 +2022,8 @@ function buildOverviewV2({
     const energy = Number(state?.resources?.ENERGY || 0);
     const energyCap = Number(derived?.energyCap || 0);
     const stability = Number(state?.stability || 100);
-    const shipCap = Number(derived?.shipCap || 0);
-    const banked = Number(state?.bankedMleo || 0);
-    const shipRatio = shipCap > 0 ? banked / shipCap : 0;
+    const dc = Number(derived?.dailyMleoCap ?? derived?.shipCap ?? CONFIG.dailyBaseMleoCap);
+    const shipRatio = dc > 0 ? Number(state?.mleoProducedToday || 0) / dc : 0;
 
     if (chips.length < 2) {
       if (
@@ -2025,7 +2037,7 @@ function buildOverviewV2({
         bottleneck?.key !== "ship-cap" &&
         shipRatio >= 0.88
       ) {
-        push("ship-cap", "Near ship cap", "warning");
+        push("ship-cap", "Near daily MLEO cap", "warning");
       } else if (
         chips.length < 2 &&
         bottleneck?.key !== "stability-drag" &&
@@ -2088,8 +2100,8 @@ function buildOverviewV2({
     }),
     dailyProgress: {
       shipProgress: {
-        current: Number(state?.stats?.shippedToday || 0),
-        max: Number(derived?.shipCap || 0),
+        current: Number(state?.mleoProducedToday || 0),
+        max: Number(derived?.dailyMleoCap ?? derived?.shipCap ?? CONFIG.dailyBaseMleoCap),
       },
       expeditionsDone: Number(state?.stats?.expeditionsToday || 0),
       maintenanceDone: Number(state?.stats?.maintenanceToday || 0),
@@ -2128,9 +2140,8 @@ function isOverviewBottleneckClearlyResolved(prevKey, context) {
   const energy = Number(state?.resources?.ENERGY || 0);
   const energyCap = Number(derived?.energyCap || 0);
   const stability = Number(state?.stability || 100);
-  const banked = Number(state?.bankedMleo || 0);
-  const shipCap = Number(derived?.shipCap || 0);
-  const shipRatio = shipCap > 0 ? banked / shipCap : 0;
+  const dc = Number(derived?.dailyMleoCap ?? derived?.shipCap ?? CONFIG.dailyBaseMleoCap);
+  const shipRatio = dc > 0 ? Number(state?.mleoProducedToday || 0) / dc : 0;
 
   switch (prevKey) {
     case "ship-cap":
@@ -10045,11 +10056,13 @@ export default function MleoBase() {
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-white/45">Ship Discipline</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-white/45">Daily MLEO (base)</div>
                   <div className="mt-1 text-lg font-bold text-white">
-                    {fmt(state.sentToday)} / {fmt(derived.shipCap)}
+                    {fmt(state.mleoProducedToday || 0)} / {fmt(derived.dailyMleoCap ?? derived.shipCap)}
                   </div>
-                  <div className="mt-1 text-xs text-white/60">Softcut and cap remain active.</div>
+                  <div className="mt-1 text-xs text-white/60">
+                    Production cap + softcut (MINERS-aligned). Shipping to vault is not daily-limited.
+                  </div>
                 </div>
               </div>
 
@@ -10204,7 +10217,9 @@ export default function MleoBase() {
               <div className="mt-4 hidden xl:grid xl:grid-cols-[1fr_0.92fr] gap-4">
                 <Section
                   title="Operations Console"
-                  subtitle={`Ship cap today: ${fmt(state.sentToday)} / ${fmt(derived.shipCap)} MLEO. Utilities and exports keep BASE productive without becoming an uncontrolled faucet.`}
+                  subtitle={`Daily MLEO produced in BASE: ${fmt(state.mleoProducedToday || 0)} / ${fmt(
+                    derived.dailyMleoCap ?? derived.shipCap
+                  )}. Ship banked MLEO to Shared Vault anytime (no daily ship limit).`}
                 >
                   <div className="grid gap-3 md:grid-cols-2">
                     <div

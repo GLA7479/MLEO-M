@@ -36,6 +36,41 @@ CREATE TABLE IF NOT EXISTS public.base_device_state (
 );
 
 ALTER TABLE public.base_device_state
+  ADD COLUMN IF NOT EXISTS mleo_produced_today numeric(20, 4) NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS public.base_economy_config (
+  id integer PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  daily_mleo_cap bigint NOT NULL DEFAULT 2500,
+  mleo_gain_mult numeric(20, 8) NOT NULL DEFAULT 0.50,
+  softcut_json jsonb NOT NULL DEFAULT '[
+    {"upto":0.55, "factor":1.00},
+    {"upto":0.75, "factor":0.55},
+    {"upto":0.90, "factor":0.30},
+    {"upto":1.00, "factor":0.15},
+    {"upto":9.99, "factor":0.06}
+  ]'::jsonb,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+INSERT INTO public.base_economy_config (id)
+VALUES (1)
+ON CONFLICT (id) DO NOTHING;
+
+UPDATE public.base_economy_config
+SET
+  daily_mleo_cap = 2500,
+  mleo_gain_mult = 0.50,
+  softcut_json = '[
+    {"upto":0.55, "factor":1.00},
+    {"upto":0.75, "factor":0.55},
+    {"upto":0.90, "factor":0.30},
+    {"upto":1.00, "factor":0.15},
+    {"upto":9.99, "factor":0.06}
+  ]'::jsonb,
+  updated_at = now()
+WHERE id = 1;
+
+ALTER TABLE public.base_device_state
   ADD COLUMN IF NOT EXISTS paused_buildings jsonb NOT NULL DEFAULT '{}'::jsonb;
 
 ALTER TABLE public.base_device_state
@@ -174,6 +209,46 @@ AS $$
   SELECT greatest(vmin, least(vmax, v));
 $$;
 
+-- Daily MLEO production softcut (same curve as MINERS; reads base_economy_config id=1).
+DROP FUNCTION IF EXISTS public.base_softcut_factor(numeric, bigint);
+CREATE OR REPLACE FUNCTION public.base_softcut_factor(
+  p_used numeric,
+  p_cap bigint
+)
+RETURNS numeric
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_cfg jsonb;
+  v_ratio numeric := 0;
+  v_result numeric := 1;
+  v_elem record;
+BEGIN
+  IF p_cap IS NULL OR p_cap <= 0 THEN
+    RETURN 1;
+  END IF;
+
+  SELECT bec.softcut_json INTO v_cfg
+  FROM public.base_economy_config bec
+  WHERE bec.id = 1;
+
+  v_ratio := greatest(0, coalesce(p_used, 0)::numeric) / p_cap::numeric;
+
+  FOR v_elem IN
+    SELECT x FROM jsonb_array_elements(coalesce(v_cfg, '[]'::jsonb)) AS x
+  LOOP
+    IF v_ratio <= coalesce((v_elem.x->>'upto')::numeric, 999999) THEN
+      v_result := coalesce((v_elem.x->>'factor')::numeric, 1);
+      RETURN greatest(0, v_result);
+    END IF;
+  END LOOP;
+
+  RETURN greatest(0, v_result);
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.base_runtime_mode(j jsonb, k text)
 RETURNS numeric
 LANGUAGE sql
@@ -247,6 +322,7 @@ BEGIN
     SET
       last_day = current_date,
       sent_today = 0,
+      mleo_produced_today = 0,
       stats = public.base_default_stats(),
       mission_state = public.base_default_mission_state(current_date::text),
       updated_at = now()
@@ -334,7 +410,6 @@ DECLARE
   v_scrap_mult numeric := 1.0;
   v_mleo_mult numeric := 1.0;
   v_maintenance_relief numeric := 1.0;
-  v_ship_cap numeric := 1800;
   v_expedition_cooldown_seconds numeric := 120;
 
   v_energy_now numeric := 0;
@@ -350,6 +425,11 @@ DECLARE
   v_scrap_gain numeric := 0;
   v_data_gain numeric := 0;
   v_raw_banked_gain numeric := 0;
+  v_mleo_produced_today numeric := 0;
+  v_daily_cap bigint := 2500;
+  v_mleo_gain_mult numeric := 0.5;
+  v_softcut numeric := 1;
+  v_banked_add numeric := 0;
 
   v_ore_use numeric := 0;
   v_scrap_use numeric := 0;
@@ -621,8 +701,6 @@ BEGIN
     v_energy_regen := v_energy_regen + 1.35;
   END IF;
 
-  v_ship_cap := 1800 + (v_logistics * 320) + (v_blueprint * 90);
-
   v_expedition_cooldown_seconds := 120;
 
   v_energy_now := greatest(0, public.base_jsonb_num(v_resources, 'ENERGY', 0));
@@ -632,7 +710,16 @@ BEGIN
   v_data_now := greatest(0, public.base_jsonb_num(v_resources, 'DATA', 0));
   v_banked_now := greatest(0, coalesce(v_state.banked_mleo, 0));
   v_sent_today := greatest(0, coalesce(v_state.sent_today, 0));
+  v_mleo_produced_today := greatest(0, coalesce(v_state.mleo_produced_today, 0));
   v_maintenance_due := greatest(0, coalesce(v_state.maintenance_due, 0));
+
+  SELECT bec.daily_mleo_cap, bec.mleo_gain_mult
+  INTO v_daily_cap, v_mleo_gain_mult
+  FROM public.base_economy_config bec
+  WHERE bec.id = 1;
+
+  v_daily_cap := coalesce(v_daily_cap, 2500);
+  v_mleo_gain_mult := coalesce(v_mleo_gain_mult, 0.5);
 
   v_ore_gain := ((v_quarry * v_quarry_mode) * 1.35) * v_ore_mult;
   v_gold_gain := ((v_trade * v_trade_mode) * 0.60) * v_gold_mult;
@@ -694,14 +781,21 @@ BEGIN
         v_raw_banked_gain := least(
           v_ore_use / 1.8,
           v_scrap_use / 0.7
-        ) * 0.015 * v_mleo_mult * v_bank_bonus;
+        ) * 0.015 * v_mleo_mult * v_bank_bonus * v_mleo_gain_mult;
+        v_softcut := public.base_softcut_factor(v_mleo_produced_today, v_daily_cap);
+        v_banked_add := least(
+          v_raw_banked_gain * v_softcut,
+          greatest(0::numeric, v_daily_cap::numeric - v_mleo_produced_today)
+        );
       ELSE
         v_raw_banked_gain := 0;
+        v_banked_add := 0;
       END IF;
 
       v_ore_now := greatest(0, v_ore_now - (least(v_ore_use / 1.8, v_scrap_use / 0.7) * 1.8));
       v_scrap_now := greatest(0, v_scrap_now - (least(v_ore_use / 1.8, v_scrap_use / 0.7) * 0.7));
-      v_banked_now := v_banked_now + v_raw_banked_gain;
+      v_banked_now := v_banked_now + v_banked_add;
+      v_mleo_produced_today := v_mleo_produced_today + v_banked_add;
     END IF;
 
     v_maintenance_due := v_maintenance_due + (
@@ -813,6 +907,7 @@ BEGIN
       stats = v_stats,
       mission_state = v_mission_state,
       banked_mleo = floor(v_banked_now),
+      mleo_produced_today = round(v_mleo_produced_today, 4),
       maintenance_due = v_maintenance_due,
       stability = v_stability,
       last_tick_at = v_now,

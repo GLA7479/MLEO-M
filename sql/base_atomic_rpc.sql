@@ -31,10 +31,6 @@ DECLARE
   v_sent_today bigint;
   v_blueprint_level integer;
   v_logistics_level integer;
-  v_ship_cap bigint;
-  v_room bigint;
-  v_factor numeric;
-  v_bank_bonus numeric;
   v_shipped bigint;
   v_consumed bigint;
   v_new_banked_mleo bigint;
@@ -43,7 +39,6 @@ DECLARE
   v_commander_xp bigint;
   v_vault_balance bigint;
   v_stats jsonb;
-  v_daily_ship_cap bigint := 1800;
   v_vault_delta_result record;
 BEGIN
   -- Get and lock state
@@ -66,43 +61,9 @@ BEGIN
     RAISE EXCEPTION 'Nothing ready to ship yet';
   END IF;
 
-  -- Calculate ship cap
-  v_ship_cap := v_daily_ship_cap + (v_logistics_level * 320) + (v_blueprint_level * 90);
-  v_room := greatest(0, v_ship_cap - v_sent_today);
-
-  IF v_room <= 0 THEN
-    RAISE EXCEPTION 'Today''s shipping cap is already full';
-  END IF;
-
-  -- Linear softcut, aligned with client
-  IF v_ship_cap > 0 THEN
-    v_factor := greatest(0.5, 1 - ((v_sent_today::numeric / v_ship_cap::numeric) * 0.5));
-  ELSE
-    v_factor := 0.5;
-  END IF;
-
-  -- Calculate bank bonus
-  v_bank_bonus := 1 + (v_blueprint_level * 0.02) + (v_logistics_level * 0.025);
-
-  IF coalesce(v_state.crew_role, '') = 'logistician' THEN
-    v_bank_bonus := v_bank_bonus * 1.03;
-  END IF;
-
-  -- Calculate shipped amount
-  v_shipped := least(
-    floor(v_banked_mleo::numeric * v_factor * v_bank_bonus)::bigint,
-    v_room
-  );
-
-  IF v_shipped <= 0 THEN
-    RAISE EXCEPTION 'Shipment too small after softcut';
-  END IF;
-
-  -- Calculate consumed
-  v_consumed := least(
-    v_banked_mleo,
-    greatest(1, ceil(v_shipped::numeric / greatest(0.01, v_factor * v_bank_bonus))::bigint)
-  );
+  -- Ship all banked MLEO to shared vault (no daily shipping cap; daily cap applies to production only).
+  v_shipped := v_banked_mleo;
+  v_consumed := v_banked_mleo;
 
   -- Update vault (atomic)
   SELECT * INTO v_vault_delta_result
@@ -117,8 +78,8 @@ BEGIN
   v_vault_balance := coalesce((v_vault_delta_result.new_balance), 0);
 
   -- Update state
-  v_new_banked_mleo := greatest(0, v_banked_mleo - v_consumed);
-  v_new_sent_today := v_sent_today + v_shipped;
+  v_new_banked_mleo := 0;
+  v_new_sent_today := v_sent_today;
   v_new_total_banked := coalesce(v_state.total_banked, 0) + v_shipped;
   v_commander_xp := coalesce(v_state.commander_xp, 0) + greatest(10, floor(v_shipped / 50));
 
@@ -145,10 +106,9 @@ BEGIN
     jsonb_build_object(
       'shipped', v_shipped,
       'consumed', v_consumed,
-      'factor', v_factor,
-      'ship_cap', v_ship_cap,
+      'mode', 'full_banked_transfer',
       'sent_today_before', v_sent_today,
-      'sent_today_after', v_sent_today + v_shipped,
+      'sent_today_after', v_new_sent_today,
       'banked_before', v_banked_mleo,
       'banked_after', v_new_banked_mleo,
       'blueprint_level', v_blueprint_level,
@@ -156,15 +116,8 @@ BEGIN
       'commander_xp_after', v_commander_xp,
       'vault_balance_after', v_vault_balance
     ),
-    CASE
-      WHEN v_shipped >= greatest(1, floor(v_ship_cap * 0.9)) THEN 2
-      ELSE 0
-    END,
-    CASE
-      WHEN v_shipped >= greatest(1, floor(v_ship_cap * 0.9))
-        THEN jsonb_build_array('near_daily_cap_single_ship')
-      ELSE '[]'::jsonb
-    END
+    0,
+    '[]'::jsonb
   );
 
   RETURN QUERY
@@ -438,6 +391,12 @@ DECLARE
   v_expedition_cost integer := 36;
   v_expedition_data_cost integer := 4;
   v_expedition_cooldown_ms bigint := 120000;
+  v_mleo_produced_today numeric := 0;
+  v_daily_cap bigint := 2500;
+  v_mleo_gain_mult numeric := 0.5;
+  v_softcut numeric := 1;
+  v_banked_add bigint := 0;
+  v_raw_mleo numeric := 0;
 BEGIN
   -- Get and lock state
   v_state := public.base_get_or_create_state(p_device_id);
@@ -494,12 +453,29 @@ BEGIN
     ELSE 0 
   END;
 
+  v_mleo_produced_today := greatest(0, coalesce(v_state.mleo_produced_today, 0));
+  SELECT bec.daily_mleo_cap, bec.mleo_gain_mult
+  INTO v_daily_cap, v_mleo_gain_mult
+  FROM public.base_economy_config bec
+  WHERE bec.id = 1;
+  v_daily_cap := coalesce(v_daily_cap, 2500);
+  v_mleo_gain_mult := coalesce(v_mleo_gain_mult, 0.5);
+  v_raw_mleo := v_banked_mleo::numeric * v_mleo_gain_mult;
+  v_softcut := public.base_softcut_factor(v_mleo_produced_today, v_daily_cap);
+  v_banked_add := floor(
+    least(
+      v_raw_mleo * v_softcut,
+      greatest(0::numeric, v_daily_cap::numeric - v_mleo_produced_today)
+    )
+  )::bigint;
+  v_mleo_produced_today := v_mleo_produced_today + v_banked_add;
+
   v_loot := jsonb_build_object(
     'ore', v_ore,
     'gold', v_gold,
     'scrap', v_scrap,
     'data', v_data,
-    'bankedMleo', v_banked_mleo
+    'bankedMleo', v_banked_add
   );
 
   -- Calculate XP gain
@@ -514,7 +490,7 @@ BEGIN
     'DATA', greatest(0, coalesce((v_resources->>'DATA')::integer, 0) - v_expedition_data_cost) + v_data
   );
 
-  v_new_banked_mleo := coalesce(v_state.banked_mleo, 0) + v_banked_mleo;
+  v_new_banked_mleo := coalesce(v_state.banked_mleo, 0) + v_banked_add;
   v_new_expedition_ready_at := now() + (v_expedition_cooldown_ms || ' milliseconds')::interval;
   v_commander_xp := coalesce(v_state.commander_xp, 0) + v_xp_gain;
 
@@ -528,6 +504,7 @@ BEGIN
   SET
     resources = v_new_resources,
     banked_mleo = v_new_banked_mleo,
+    mleo_produced_today = round(v_mleo_produced_today, 4),
     expedition_ready_at = v_new_expedition_ready_at,
     stats = v_stats,
     commander_xp = v_commander_xp,
