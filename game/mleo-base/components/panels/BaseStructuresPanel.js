@@ -21,6 +21,8 @@ export function BaseStructuresPanel({
   onBuyBuilding,
   onAdvanceTier,
   activeTierKey,
+  onUnlockSupportProgram,
+  onSetSupportProgram,
 }) {
   return (
     <div>
@@ -155,6 +157,75 @@ export function BaseStructuresPanel({
               {card.costRow}
 
               {card.tierAdvanceBlock}
+
+              {card.supportsPrograms && card.programCards?.length ? (
+                <div className="mt-2 rounded-2xl border border-violet-400/20 bg-violet-500/8 px-2.5 py-2">
+                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-violet-200/80">
+                    Support Programs
+                  </div>
+                  <div className="mt-1 text-[11px] font-semibold text-white/80">
+                    {card.activeProgramLabel ? (
+                      <span>
+                        Active:{" "}
+                        <span className="text-violet-100">{card.activeProgramLabel}</span>
+                      </span>
+                    ) : (
+                      <span className="text-white/55">No active program</span>
+                    )}
+                  </div>
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    {card.programCards.map((program) => (
+                      <div
+                        key={program.key}
+                        className="rounded-xl border border-white/10 bg-black/25 px-2 py-1.5"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-1">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[11px] font-bold text-white/90">{program.label}</div>
+                            <div className="text-[10px] text-white/50">Requires T{program.minTier}</div>
+                            <div className="text-[10px] text-violet-200/75">{program.effects}</div>
+                          </div>
+                          <div className="shrink-0 flex flex-col items-end gap-1">
+                            {!program.unlocked && !program.tierReady ? (
+                              <span className="inline-flex rounded-full border border-amber-400/25 bg-amber-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] text-amber-100">
+                                Needs T{program.minTier}
+                              </span>
+                            ) : null}
+                            {program.active ? (
+                              <span className="inline-flex rounded-full border border-cyan-400/30 bg-cyan-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-cyan-100">
+                                Active
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                        {!program.unlocked && program.tierReady ? (
+                          <div className="mt-1 border-t border-white/5 pt-1">
+                            {program.costRow}
+                            <button
+                              type="button"
+                              onClick={() => onUnlockSupportProgram?.(card.key, program.key)}
+                              disabled={program.unlockDisabled || program.unlockBusy}
+                              className="mt-1 w-full rounded-lg border border-violet-400/30 bg-violet-500/15 px-2 py-1 text-[10px] font-bold text-violet-100 transition hover:bg-violet-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              {program.unlockBusy ? "Unlocking..." : "Unlock"}
+                            </button>
+                          </div>
+                        ) : null}
+                        {program.unlocked && !program.active ? (
+                          <button
+                            type="button"
+                            onClick={() => onSetSupportProgram?.(card.key, program.key)}
+                            disabled={program.setDisabled || program.setBusy}
+                            className="mt-1.5 w-full rounded-lg border border-cyan-400/25 bg-cyan-500/10 px-2 py-1 text-[10px] font-bold text-cyan-100 transition hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {program.setBusy ? "Activating..." : "Activate"}
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="mt-auto flex flex-col justify-end pt-0 pb-3">
                 {/* Fixed-height bottom info block (stabilizes Upgrade button Y across cards) */}

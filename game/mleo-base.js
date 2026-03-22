@@ -28,6 +28,8 @@ import {
   getBaseState,
   buildBuilding,
   advanceBuildingTier,
+  unlockSupportProgram,
+  setSupportProgram,
   installModule,
   researchTech,
   launchExpedition as launchExpeditionAction,
@@ -497,6 +499,108 @@ function getTierAdvancePreviewCost(buildingKey, currentTier) {
     out[key] = Math.ceil(Number(value) * factor);
   }
   return out;
+}
+
+/** UI + server-aligned catalog (keys, tiers, costs, copy). */
+const SUPPORT_PROGRAM_CATALOG = {
+  logisticsCenter: [
+    {
+      key: "routeDiscipline",
+      label: "Route Discipline",
+      minTier: 2,
+      cost: { ORE: 900, GOLD: 750, SCRAP: 320, DATA: 45 },
+      effects: "Bank +6% · Data +2%",
+    },
+    {
+      key: "reserveBuffer",
+      label: "Reserve Buffer",
+      minTier: 3,
+      cost: { ORE: 1200, GOLD: 980, SCRAP: 420, DATA: 70 },
+      effects: "Maintenance +8% · Bank -2%",
+    },
+    {
+      key: "vaultCalibration",
+      label: "Vault Calibration",
+      minTier: 4,
+      cost: { ORE: 1500, GOLD: 1200, SCRAP: 520, DATA: 95 },
+      effects: "Bank +8% · Data -3%",
+    },
+  ],
+  researchLab: [
+    {
+      key: "analysisMatrix",
+      label: "Analysis Matrix",
+      minTier: 2,
+      cost: { ORE: 850, GOLD: 820, SCRAP: 340, DATA: 55 },
+      effects: "Data +8% · Maintenance -3%",
+    },
+    {
+      key: "predictiveTelemetry",
+      label: "Predictive Telemetry",
+      minTier: 3,
+      cost: { ORE: 1100, GOLD: 1050, SCRAP: 420, DATA: 80 },
+      effects: "Data +6% · Bank +3%",
+    },
+    {
+      key: "cleanroomProtocol",
+      label: "Cleanroom Protocol",
+      minTier: 4,
+      cost: { ORE: 1350, GOLD: 1300, SCRAP: 500, DATA: 110 },
+      effects: "Data +10% · Bank -4%",
+    },
+  ],
+  repairBay: [
+    {
+      key: "preventiveCycle",
+      label: "Preventive Cycle",
+      minTier: 2,
+      cost: { ORE: 820, GOLD: 700, SCRAP: 460, DATA: 35 },
+      effects: "Maintenance +10% · Data -3%",
+    },
+    {
+      key: "stabilizationMesh",
+      label: "Stabilization Mesh",
+      minTier: 3,
+      cost: { ORE: 1050, GOLD: 920, SCRAP: 580, DATA: 55 },
+      effects: "Maintenance +8% · Bank +2%",
+    },
+    {
+      key: "serviceDiscipline",
+      label: "Service Discipline",
+      minTier: 4,
+      cost: { ORE: 1300, GOLD: 1100, SCRAP: 720, DATA: 80 },
+      effects: "Maintenance +12% · Bank -4%",
+    },
+  ],
+};
+
+function supportsPrograms(buildingKey) {
+  return TIER_BUILDINGS.has(buildingKey);
+}
+
+function getSupportPrograms(buildingKey) {
+  return SUPPORT_PROGRAM_CATALOG[buildingKey] || [];
+}
+
+function getActiveSupportProgram(state, buildingKey) {
+  const active = state?.supportProgramActive || state?.support_program_active || {};
+  const v = active[buildingKey];
+  return typeof v === "string" && v.length ? v : null;
+}
+
+function isSupportProgramUnlocked(state, buildingKey, programKey) {
+  const u =
+    state?.supportProgramUnlocks?.[buildingKey] ||
+    state?.support_program_unlocks?.[buildingKey] ||
+    {};
+  return u[programKey] === true;
+}
+
+function canUnlockSupportProgram(state, buildingKey, program) {
+  const tier = getBuildingTier(state, buildingKey);
+  if (tier < program.minTier) return false;
+  if (isSupportProgramUnlocked(state, buildingKey, program.key)) return false;
+  return canCoverCost(state.resources, program.cost);
 }
 
 /** Matches `base_support_program_definition` in sql/base_server_authority.sql (bank/data/maint only). */
@@ -4127,6 +4231,8 @@ export default function MleoBase() {
   const [activeBuildKey, setActiveBuildKey] = useState(null);
   const [tierPromptKey, setTierPromptKey] = useState(null);
   const [activeTierKey, setActiveTierKey] = useState(null);
+  const [activeProgramUnlockKey, setActiveProgramUnlockKey] = useState(null);
+  const [activeProgramSetKey, setActiveProgramSetKey] = useState(null);
   const [overviewGuidanceState, setOverviewGuidanceState] = useState(null);
   const [bankedDisplayValue, setBankedDisplayValue] = useState(0);
   const [bankedDisplayNow, setBankedDisplayNow] = useState(() => Date.now());
@@ -5869,6 +5975,75 @@ export default function MleoBase() {
         }
       } finally {
         setActiveTierKey((prev) => (prev === key ? null : prev));
+      }
+    });
+  };
+
+  const handleUnlockSupportProgram = async (buildingKey, programKey) => {
+    const lockId = `prog-unlock:${buildingKey}:${programKey}`;
+    if (isActionLocked(lockId)) return;
+    const busyKey = `${buildingKey}:${programKey}:unlock`;
+    return runLockedAction(lockId, async () => {
+      setActiveProgramUnlockKey(busyKey);
+      try {
+        const res = await unlockSupportProgram(buildingKey, programKey);
+        const label =
+          SUPPORT_PROGRAM_CATALOG[buildingKey]?.find((p) => p.key === programKey)?.label ||
+          programKey;
+        if (res?.success && res?.state) {
+          setState((prev) => mergeAuthoritativeServerState(prev, res.state));
+          markRealGameAction();
+          showToast(`${label} unlocked.`);
+        } else {
+          const code = res?.code || "";
+          if (code === "BASE_SUPPORT_PROGRAM_TIER_REQUIRED") {
+            showToast("Tier too low for this program.");
+          } else if (code === "BASE_SUPPORT_PROGRAM_ALREADY_UNLOCKED") {
+            showToast("Program already unlocked.");
+          } else if (code === "BASE_INSUFFICIENT_RESOURCES") {
+            showToast("Not enough resources to unlock.");
+          } else if (code === "RATE_LIMIT_DEVICE") {
+            showToast("Too many taps detected. Please wait a moment and try again.");
+          } else {
+            showToast(res?.message || "Could not unlock program.");
+          }
+        }
+      } catch (error) {
+        console.error("unlockSupportProgram failed", error);
+        showToast(error?.message || "Unlock failed.");
+      } finally {
+        setActiveProgramUnlockKey((prev) => (prev === busyKey ? null : prev));
+      }
+    });
+  };
+
+  const handleSetSupportProgram = async (buildingKey, programKey) => {
+    const lockId = `prog-set:${buildingKey}:${programKey}`;
+    if (isActionLocked(lockId)) return;
+    const busyKey = `${buildingKey}:${programKey}:set`;
+    return runLockedAction(lockId, async () => {
+      setActiveProgramSetKey(busyKey);
+      try {
+        const res = await setSupportProgram(buildingKey, programKey);
+        if (res?.success && res?.state) {
+          setState((prev) => mergeAuthoritativeServerState(prev, res.state));
+          markRealGameAction();
+          showToast("Active program updated.");
+        } else {
+          const code = res?.code || "";
+          if (code === "BASE_SUPPORT_PROGRAM_NOT_UNLOCKED") {
+            showToast("Unlock this program first.");
+          } else if (code === "RATE_LIMIT_DEVICE") {
+            showToast("Too many taps detected. Please wait a moment and try again.");
+          } else {
+            showToast(res?.message || "Could not set active program.");
+          }
+        }
+      } catch (error) {
+        console.error("setSupportProgram failed", error);
+        showToast(error?.message || "Set program failed.");
+      } finally {
+        setActiveProgramSetKey((prev) => (prev === busyKey ? null : prev));
       }
     });
   };
@@ -9659,6 +9834,46 @@ export default function MleoBase() {
       buttonText = "Tier ready";
     }
 
+    const supportsProgramsUi = supportsPrograms(building.key) && level >= 1;
+    const activeProgramKey = supportsProgramsUi ? getActiveSupportProgram(state, building.key) : null;
+    const activeProgramLabel = activeProgramKey
+      ? SUPPORT_PROGRAM_CATALOG[building.key]?.find((p) => p.key === activeProgramKey)?.label ||
+        activeProgramKey
+      : null;
+
+    const programCards = supportsProgramsUi
+      ? getSupportPrograms(building.key).map((program) => {
+          const tierReady = (tier || 1) >= program.minTier;
+          const unlocked = isSupportProgramUnlocked(state, building.key, program.key);
+          const active = activeProgramKey === program.key;
+          const canUnlock = canUnlockSupportProgram(state, building.key, program);
+          const unlockDisabled =
+            !tierReady || unlocked || !canCoverCost(state.resources, program.cost);
+          const setDisabled = !unlocked || active;
+          const unlockBusy = activeProgramUnlockKey === `${building.key}:${program.key}:unlock`;
+          const setBusy = activeProgramSetKey === `${building.key}:${program.key}:set`;
+          return {
+            key: program.key,
+            label: program.label,
+            effects: program.effects,
+            minTier: program.minTier,
+            cost: program.cost,
+            unlocked,
+            active,
+            tierReady,
+            canUnlock,
+            unlockDisabled,
+            setDisabled,
+            unlockBusy,
+            setBusy,
+            costRow:
+              !unlocked && tierReady ? (
+                <ResourceCostRow cost={program.cost} resources={state.resources} />
+              ) : null,
+          };
+        })
+      : [];
+
     return {
       key: building.key,
       name: building.name,
@@ -9679,6 +9894,10 @@ export default function MleoBase() {
       canAffordTierCost,
       tierText,
       tierAdvanceBlock,
+      supportsPrograms: supportsProgramsUi,
+      activeProgramKey,
+      activeProgramLabel,
+      programCards,
       requirementsText,
       ready,
       buildBusy: activeBuildKey === building.key,
@@ -9713,6 +9932,8 @@ export default function MleoBase() {
       onBuyBuilding={buyBuilding}
       onAdvanceTier={handleAdvanceTier}
       activeTierKey={activeTierKey}
+      onUnlockSupportProgram={handleUnlockSupportProgram}
+      onSetSupportProgram={handleSetSupportProgram}
     />
   );
 
