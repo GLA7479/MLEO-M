@@ -274,9 +274,40 @@ export function getMissionProgress(state) {
   };
 }
 
+const DEFAULT_SUPPORT_PROGRAM_UNLOCKS = () => ({
+  logisticsCenter: {},
+  researchLab: {},
+  repairBay: {},
+});
+
+const DEFAULT_SUPPORT_PROGRAM_ACTIVE = () => ({
+  logisticsCenter: null,
+  researchLab: null,
+  repairBay: null,
+});
+
+function normalizeSupportProgramUnlocks(raw) {
+  const base = DEFAULT_SUPPORT_PROGRAM_UNLOCKS();
+  if (!raw || typeof raw !== "object") return base;
+  for (const k of Object.keys(base)) {
+    base[k] = raw[k] && typeof raw[k] === "object" ? { ...raw[k] } : {};
+  }
+  return base;
+}
+
+function normalizeSupportProgramActive(raw) {
+  const base = DEFAULT_SUPPORT_PROGRAM_ACTIVE();
+  if (!raw || typeof raw !== "object") return base;
+  for (const k of Object.keys(base)) {
+    const v = raw[k];
+    base[k] = typeof v === "string" && v.length ? v : null;
+  }
+  return base;
+}
+
 export function freshState() {
   return {
-    version: 7,
+    version: 9,
     lastDay: todayKey(),
     lastHiddenAt: 0,
     resources: {
@@ -304,6 +335,10 @@ export function freshState() {
     buildingPowerModes: {},
     /** Server-only support-building tiers (logisticsCenter, researchLab, repairBay). */
     buildingTiers: {},
+    /** Unlocked specialization programs per support building (server). */
+    supportProgramUnlocks: DEFAULT_SUPPORT_PROGRAM_UNLOCKS(),
+    /** Active program key per support building, or null (server). */
+    supportProgramActive: DEFAULT_SUPPORT_PROGRAM_ACTIVE(),
     crew: 0,
     crewRole: "engineer",
     modules: {},
@@ -403,6 +438,16 @@ export function sanitizeBaseState(raw, fallback = null) {
       researchLab: safeInteger(src?.buildings?.researchLab, seed.buildings.researchLab, 0),
       repairBay: safeInteger(src?.buildings?.repairBay, seed.buildings.repairBay, 0),
     },
+    buildingTiers: {
+      ...seed.buildingTiers,
+      ...(src.buildingTiers || src.building_tiers || {}),
+    },
+    supportProgramUnlocks: normalizeSupportProgramUnlocks(
+      src.supportProgramUnlocks || src.support_program_unlocks
+    ),
+    supportProgramActive: normalizeSupportProgramActive(
+      src.supportProgramActive || src.support_program_active
+    ),
     buildingPowerModes: normalizeBuildingPowerModes(
       src?.buildingPowerModes || src?.building_power_modes || {},
       src?.pausedBuildings || src?.paused_buildings || {}
@@ -493,6 +538,18 @@ export function normalizeServerState(raw, prevState = null) {
         prev?.buildingTiers ||
         seed.buildingTiers ||
         {},
+      supportProgramUnlocks: normalizeSupportProgramUnlocks(
+        raw.supportProgramUnlocks ||
+          raw.support_program_unlocks ||
+          prev?.supportProgramUnlocks ||
+          seed.supportProgramUnlocks
+      ),
+      supportProgramActive: normalizeSupportProgramActive(
+        raw.supportProgramActive ||
+          raw.support_program_active ||
+          prev?.supportProgramActive ||
+          seed.supportProgramActive
+      ),
       buildingPowerModes: normalizeBuildingPowerModes(
         raw.buildingPowerModes ||
           raw.building_power_modes ||

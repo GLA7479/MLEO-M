@@ -872,6 +872,268 @@ END;
 $$;
 
 -- ============================================================================
+-- 4c) base_unlock_support_program - Unlock specialization (support buildings)
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.base_unlock_support_program(
+  p_device_id text,
+  p_building_key text,
+  p_program_key text
+)
+RETURNS TABLE(
+  building_key text,
+  program_key text,
+  cost jsonb,
+  new_resources jsonb,
+  support_program_unlocks jsonb,
+  support_program_active jsonb,
+  new_commander_xp bigint,
+  state jsonb
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_state public.base_device_state%ROWTYPE;
+  v_resources jsonb;
+  v_buildings jsonb;
+  v_tiers jsonb;
+  v_unlocks jsonb;
+  v_active jsonb;
+  v_def jsonb;
+  v_build_unlocks jsonb;
+  v_cost jsonb;
+  v_new_resources jsonb;
+  v_cur_tier integer;
+  v_min_tier integer;
+  v_prog text;
+  kv record;
+  v_xp bigint;
+BEGIN
+  v_prog := trim(coalesce(p_program_key, ''));
+
+  IF p_building_key IS NULL OR p_building_key NOT IN ('logisticsCenter', 'researchLab', 'repairBay') THEN
+    RAISE EXCEPTION 'Support specialization invalid: building';
+  END IF;
+
+  IF v_prog = '' OR lower(v_prog) = 'none' THEN
+    RAISE EXCEPTION 'Support specialization invalid: program';
+  END IF;
+
+  v_state := public.base_get_or_create_state(p_device_id);
+
+  SELECT *
+  INTO v_state
+  FROM public.base_device_state
+  WHERE device_id = p_device_id
+  FOR UPDATE;
+
+  v_resources := coalesce(v_state.resources, '{}'::jsonb);
+  v_buildings := coalesce(v_state.buildings, '{}'::jsonb);
+  v_tiers := coalesce(v_state.building_tiers, '{}'::jsonb);
+  v_unlocks := coalesce(v_state.support_program_unlocks, public.base_default_support_program_unlocks());
+  v_active := coalesce(v_state.support_program_active, public.base_default_support_program_active());
+
+  IF coalesce((v_buildings->>p_building_key)::integer, 0) < 1 THEN
+    RAISE EXCEPTION 'Support specialization invalid: building not constructed';
+  END IF;
+
+  v_def := public.base_support_program_definition(p_building_key, v_prog);
+  IF v_def IS NULL THEN
+    RAISE EXCEPTION 'Support specialization invalid: program';
+  END IF;
+
+  v_cur_tier := public.base_building_tier(v_tiers, p_building_key);
+  v_min_tier := coalesce((v_def->>'minTier')::integer, 99);
+  IF v_cur_tier < v_min_tier THEN
+    RAISE EXCEPTION 'Support specialization tier requirement not met';
+  END IF;
+
+  v_build_unlocks := coalesce(v_unlocks->p_building_key, '{}'::jsonb);
+  IF coalesce((v_build_unlocks->>v_prog)::boolean, false) THEN
+    RAISE EXCEPTION 'Support specialization already unlocked';
+  END IF;
+
+  v_cost := coalesce(v_def->'cost', '{}'::jsonb);
+  v_new_resources := v_resources;
+
+  FOR kv IN SELECT key, value FROM jsonb_each(v_cost)
+  LOOP
+    IF coalesce((v_new_resources->>kv.key)::bigint, 0) < (kv.value::text::bigint) THEN
+      RAISE EXCEPTION 'Insufficient resources';
+    END IF;
+
+    v_new_resources := jsonb_set(
+      v_new_resources,
+      ARRAY[kv.key],
+      to_jsonb(greatest(0, coalesce((v_new_resources->>kv.key)::bigint, 0) - (kv.value::text::bigint))),
+      true
+    );
+  END LOOP;
+
+  v_build_unlocks := jsonb_set(v_build_unlocks, ARRAY[v_prog], 'true'::jsonb, true);
+  v_unlocks := jsonb_set(v_unlocks, ARRAY[p_building_key], v_build_unlocks, true);
+
+  IF public.base_active_support_program(v_active, p_building_key) IS NULL THEN
+    v_active := jsonb_set(v_active, ARRAY[p_building_key], to_jsonb(v_prog), true);
+  END IF;
+
+  v_xp := coalesce(v_state.commander_xp, 0) + 55;
+
+  UPDATE public.base_device_state
+  SET
+    resources = v_new_resources,
+    support_program_unlocks = v_unlocks,
+    support_program_active = v_active,
+    commander_xp = v_xp,
+    updated_at = now()
+  WHERE device_id = p_device_id
+  RETURNING * INTO v_state;
+
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'unlock_support_program',
+    jsonb_build_object(
+      'building_key', p_building_key,
+      'program_key', v_prog,
+      'cost', coalesce(v_cost, '{}'::jsonb),
+      'resources_after', v_new_resources,
+      'support_program_unlocks', v_unlocks,
+      'support_program_active', v_active,
+      'commander_xp_after', v_xp
+    ),
+    0,
+    '[]'::jsonb
+  );
+
+  RETURN QUERY
+  SELECT
+    p_building_key,
+    v_prog,
+    v_cost,
+    v_new_resources,
+    v_unlocks,
+    v_active,
+    v_xp,
+    to_jsonb(v_state);
+END;
+$$;
+
+-- ============================================================================
+-- 4d) base_set_support_program - Set active specialization (support buildings)
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.base_set_support_program(
+  p_device_id text,
+  p_building_key text,
+  p_program_key text
+)
+RETURNS TABLE(
+  building_key text,
+  program_key text,
+  support_program_active jsonb,
+  state jsonb
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_state public.base_device_state%ROWTYPE;
+  v_unlocks jsonb;
+  v_active jsonb;
+  v_prog text;
+  v_norm text;
+BEGIN
+  IF p_building_key IS NULL OR p_building_key NOT IN ('logisticsCenter', 'researchLab', 'repairBay') THEN
+    RAISE EXCEPTION 'Support specialization invalid: building';
+  END IF;
+
+  v_state := public.base_get_or_create_state(p_device_id);
+
+  SELECT *
+  INTO v_state
+  FROM public.base_device_state
+  WHERE device_id = p_device_id
+  FOR UPDATE;
+
+  v_unlocks := coalesce(v_state.support_program_unlocks, public.base_default_support_program_unlocks());
+  v_active := coalesce(v_state.support_program_active, public.base_default_support_program_active());
+
+  v_norm := nullif(trim(lower(coalesce(p_program_key, ''))), '');
+  IF v_norm IS NULL OR v_norm = 'none' THEN
+    v_active := jsonb_set(v_active, ARRAY[p_building_key], 'null'::jsonb, true);
+
+    UPDATE public.base_device_state
+    SET
+      support_program_active = v_active,
+      updated_at = now()
+    WHERE device_id = p_device_id
+    RETURNING * INTO v_state;
+
+    PERFORM public.base_write_audit(
+      p_device_id,
+      'set_support_program',
+      jsonb_build_object(
+        'building_key', p_building_key,
+        'program_key', null,
+        'support_program_active', v_active
+      ),
+      0,
+      '[]'::jsonb
+    );
+
+    RETURN QUERY
+    SELECT
+      p_building_key,
+      NULL::text,
+      v_active,
+      to_jsonb(v_state);
+    RETURN;
+  END IF;
+
+  v_prog := trim(p_program_key);
+
+  IF public.base_support_program_definition(p_building_key, v_prog) IS NULL THEN
+    RAISE EXCEPTION 'Support specialization invalid: program';
+  END IF;
+
+  IF NOT coalesce((coalesce(v_unlocks->p_building_key, '{}'::jsonb)->>v_prog)::boolean, false) THEN
+    RAISE EXCEPTION 'Support specialization not unlocked';
+  END IF;
+
+  v_active := jsonb_set(v_active, ARRAY[p_building_key], to_jsonb(v_prog), true);
+
+  UPDATE public.base_device_state
+  SET
+    support_program_active = v_active,
+    updated_at = now()
+  WHERE device_id = p_device_id
+  RETURNING * INTO v_state;
+
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'set_support_program',
+    jsonb_build_object(
+      'building_key', p_building_key,
+      'program_key', v_prog,
+      'support_program_active', v_active
+    ),
+    0,
+    '[]'::jsonb
+  );
+
+  RETURN QUERY
+  SELECT
+    p_building_key,
+    v_prog,
+    v_active,
+    to_jsonb(v_state);
+END;
+$$;
+
+-- ============================================================================
 -- 5) base_hire_crew - Hire crew (ATOMIC)
 -- ============================================================================
 
@@ -1353,6 +1615,8 @@ REVOKE EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text) FROM PUBLI
 REVOKE EXECUTE ON FUNCTION public.base_launch_expedition(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_build_upgrade(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_advance_building_tier(text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_unlock_support_program(text, text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_set_support_program(text, text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_hire_crew(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_perform_maintenance(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_install_module(text, text) FROM PUBLIC, anon, authenticated;
@@ -1363,6 +1627,8 @@ GRANT EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text) TO service_
 GRANT EXECUTE ON FUNCTION public.base_launch_expedition(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_build_upgrade(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_advance_building_tier(text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.base_unlock_support_program(text, text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.base_set_support_program(text, text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_hire_crew(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_perform_maintenance(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_install_module(text, text) TO service_role;

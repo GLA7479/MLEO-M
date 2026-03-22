@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.base_device_state (
   device_id text PRIMARY KEY,
-  version integer NOT NULL DEFAULT 8,
+  version integer NOT NULL DEFAULT 9,
   last_day date NOT NULL DEFAULT current_date,
   banked_mleo numeric(20,4) NOT NULL DEFAULT 0,
   sent_today bigint NOT NULL DEFAULT 0,
@@ -118,6 +118,93 @@ $$;
 UPDATE public.base_device_state
 SET building_tiers = public.base_default_building_tiers()
 WHERE building_tiers IS NULL OR building_tiers = '{}'::jsonb;
+
+ALTER TABLE public.base_device_state
+  ADD COLUMN IF NOT EXISTS support_program_unlocks jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+ALTER TABLE public.base_device_state
+  ADD COLUMN IF NOT EXISTS support_program_active jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+CREATE OR REPLACE FUNCTION public.base_default_support_program_unlocks()
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT jsonb_build_object(
+    'logisticsCenter', '{}'::jsonb,
+    'researchLab', '{}'::jsonb,
+    'repairBay', '{}'::jsonb
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.base_default_support_program_active()
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT jsonb_build_object(
+    'logisticsCenter', 'null'::jsonb,
+    'researchLab', 'null'::jsonb,
+    'repairBay', 'null'::jsonb
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.base_active_support_program(p_active jsonb, p_building_key text)
+RETURNS text
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT CASE
+    WHEN p_active IS NULL OR NOT (p_active ? p_building_key) THEN NULL::text
+    WHEN jsonb_typeof(p_active->p_building_key) = 'null' THEN NULL::text
+    WHEN jsonb_typeof(p_active->p_building_key) = 'string' THEN NULLIF(trim(p_active->>p_building_key), '')
+    ELSE NULL::text
+  END;
+$$;
+
+-- Fixed catalog: minTier, cost, bank/data/maint multipliers (only v_bank_bonus, v_data_mult, v_maintenance_relief).
+CREATE OR REPLACE FUNCTION public.base_support_program_definition(p_building text, p_program text)
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT CASE
+    WHEN p_building = 'logisticsCenter' AND p_program = 'routeDiscipline' THEN
+      '{"minTier":2,"cost":{"ORE":900,"GOLD":750,"SCRAP":320,"DATA":45},"bank":1.06,"data":1.02,"maint":1}'::jsonb
+    WHEN p_building = 'logisticsCenter' AND p_program = 'reserveBuffer' THEN
+      '{"minTier":3,"cost":{"ORE":1200,"GOLD":980,"SCRAP":420,"DATA":70},"bank":0.98,"data":1,"maint":1.08}'::jsonb
+    WHEN p_building = 'logisticsCenter' AND p_program = 'vaultCalibration' THEN
+      '{"minTier":4,"cost":{"ORE":1500,"GOLD":1200,"SCRAP":520,"DATA":95},"bank":1.08,"data":0.97,"maint":1}'::jsonb
+    WHEN p_building = 'researchLab' AND p_program = 'analysisMatrix' THEN
+      '{"minTier":2,"cost":{"ORE":850,"GOLD":820,"SCRAP":340,"DATA":55},"bank":1,"data":1.08,"maint":0.97}'::jsonb
+    WHEN p_building = 'researchLab' AND p_program = 'predictiveTelemetry' THEN
+      '{"minTier":3,"cost":{"ORE":1100,"GOLD":1050,"SCRAP":420,"DATA":80},"bank":1.03,"data":1.06,"maint":1}'::jsonb
+    WHEN p_building = 'researchLab' AND p_program = 'cleanroomProtocol' THEN
+      '{"minTier":4,"cost":{"ORE":1350,"GOLD":1300,"SCRAP":500,"DATA":110},"bank":0.96,"data":1.10,"maint":1}'::jsonb
+    WHEN p_building = 'repairBay' AND p_program = 'preventiveCycle' THEN
+      '{"minTier":2,"cost":{"ORE":820,"GOLD":700,"SCRAP":460,"DATA":35},"bank":1,"data":0.97,"maint":1.10}'::jsonb
+    WHEN p_building = 'repairBay' AND p_program = 'stabilizationMesh' THEN
+      '{"minTier":3,"cost":{"ORE":1050,"GOLD":920,"SCRAP":580,"DATA":55},"bank":1.02,"data":1,"maint":1.08}'::jsonb
+    WHEN p_building = 'repairBay' AND p_program = 'serviceDiscipline' THEN
+      '{"minTier":4,"cost":{"ORE":1300,"GOLD":1100,"SCRAP":720,"DATA":80},"bank":0.96,"data":1,"maint":1.12}'::jsonb
+    ELSE NULL::jsonb
+  END;
+$$;
+
+ALTER TABLE public.base_device_state
+  ALTER COLUMN support_program_unlocks SET DEFAULT public.base_default_support_program_unlocks();
+
+ALTER TABLE public.base_device_state
+  ALTER COLUMN support_program_active SET DEFAULT public.base_default_support_program_active();
+
+UPDATE public.base_device_state
+SET
+  support_program_unlocks = public.base_default_support_program_unlocks(),
+  support_program_active = public.base_default_support_program_active()
+WHERE support_program_unlocks = '{}'::jsonb
+   OR support_program_active = '{}'::jsonb
+   OR NOT (support_program_unlocks ? 'logisticsCenter')
+   OR NOT (support_program_active ? 'logisticsCenter');
 
 CREATE INDEX IF NOT EXISTS idx_base_device_state_updated_at
   ON public.base_device_state(updated_at DESC);
@@ -321,6 +408,8 @@ BEGIN
     resources,
     buildings,
     building_tiers,
+    support_program_unlocks,
+    support_program_active,
     modules,
     research,
     stats,
@@ -333,10 +422,12 @@ BEGIN
   )
   VALUES (
     p_device_id,
-    8,
+    9,
     public.base_default_resources(),
     public.base_default_buildings(),
     public.base_default_building_tiers(),
+    public.base_default_support_program_unlocks(),
+    public.base_default_support_program_active(),
     '{}'::jsonb,
     '{}'::jsonb,
     public.base_default_stats(),
@@ -363,6 +454,33 @@ BEGIN
         WHEN building_tiers IS NULL OR building_tiers = '{}'::jsonb
           THEN public.base_default_building_tiers()
         ELSE building_tiers
+      END
+    WHERE device_id = p_device_id;
+
+    SELECT *
+    INTO v_state
+    FROM public.base_device_state
+    WHERE device_id = p_device_id
+    FOR UPDATE;
+  END IF;
+
+  IF v_state.version < 9 THEN
+    UPDATE public.base_device_state
+    SET
+      version = 9,
+      support_program_unlocks = CASE
+        WHEN support_program_unlocks IS NULL
+          OR support_program_unlocks = '{}'::jsonb
+          OR NOT (support_program_unlocks ? 'logisticsCenter')
+          THEN public.base_default_support_program_unlocks()
+        ELSE support_program_unlocks
+      END,
+      support_program_active = CASE
+        WHEN support_program_active IS NULL
+          OR support_program_active = '{}'::jsonb
+          OR NOT (support_program_active ? 'logisticsCenter')
+          THEN public.base_default_support_program_active()
+        ELSE support_program_active
       END
     WHERE device_id = p_device_id;
 
@@ -492,6 +610,12 @@ DECLARE
   v_energy_use numeric := 0;
 
   v_maintenance_due numeric := 0;
+
+  v_supp text;
+  v_prog text;
+  v_def jsonb;
+  v_sp_active jsonb;
+  v_sp_unlocks jsonb;
 BEGIN
   SELECT *
   INTO v_state
@@ -542,6 +666,33 @@ BEGIN
         WHEN building_tiers IS NULL OR building_tiers = '{}'::jsonb
           THEN public.base_default_building_tiers()
         ELSE building_tiers
+      END
+    WHERE device_id = p_device_id;
+
+    SELECT *
+    INTO v_state
+    FROM public.base_device_state
+    WHERE device_id = p_device_id
+    FOR UPDATE;
+  END IF;
+
+  IF v_state.version < 9 THEN
+    UPDATE public.base_device_state
+    SET
+      version = 9,
+      support_program_unlocks = CASE
+        WHEN support_program_unlocks IS NULL
+          OR support_program_unlocks = '{}'::jsonb
+          OR NOT (support_program_unlocks ? 'logisticsCenter')
+          THEN public.base_default_support_program_unlocks()
+        ELSE support_program_unlocks
+      END,
+      support_program_active = CASE
+        WHEN support_program_active IS NULL
+          OR support_program_active = '{}'::jsonb
+          OR NOT (support_program_active ? 'logisticsCenter')
+          THEN public.base_default_support_program_active()
+        ELSE support_program_active
       END
     WHERE device_id = p_device_id;
 
@@ -768,6 +919,27 @@ BEGIN
     * (1 + 0.04 * greatest(0, public.base_building_tier(coalesce(v_state.building_tiers, '{}'::jsonb), 'researchLab') - 1));
   v_maintenance_relief := v_maintenance_relief
     * (1 + 0.05 * greatest(0, public.base_building_tier(coalesce(v_state.building_tiers, '{}'::jsonb), 'repairBay') - 1));
+
+  -- Support specialization programs (active only, unlocked, valid catalog): bank / data / maintenance only.
+  v_sp_active := coalesce(v_state.support_program_active, public.base_default_support_program_active());
+  v_sp_unlocks := coalesce(v_state.support_program_unlocks, public.base_default_support_program_unlocks());
+
+  FOR v_supp IN SELECT unnest(ARRAY['logisticsCenter', 'researchLab', 'repairBay']::text[])
+  LOOP
+    v_prog := public.base_active_support_program(v_sp_active, v_supp);
+    CONTINUE WHEN v_prog IS NULL OR trim(v_prog) = '' OR lower(v_prog) = 'none';
+
+    v_def := public.base_support_program_definition(v_supp, v_prog);
+    CONTINUE WHEN v_def IS NULL;
+
+    IF NOT coalesce((coalesce(v_sp_unlocks->v_supp, '{}'::jsonb)->>v_prog)::boolean, false) THEN
+      CONTINUE;
+    END IF;
+
+    v_bank_bonus := v_bank_bonus * coalesce((v_def->>'bank')::numeric, 1.0);
+    v_data_mult := v_data_mult * coalesce((v_def->>'data')::numeric, 1.0);
+    v_maintenance_relief := v_maintenance_relief * coalesce((v_def->>'maint')::numeric, 1.0);
+  END LOOP;
 
   v_ore_mult := v_ore_mult * v_hq_bonus * v_miner_bonus * v_stability_factor;
   v_gold_mult := v_gold_mult * v_hq_bonus * v_stability_factor;

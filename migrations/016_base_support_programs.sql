@@ -1,0 +1,13 @@
+-- ============================================================================
+-- NOT A DEPLOYABLE MIGRATION — DO NOT RUN THIS FILE AS YOUR MAIN SCHEMA UPDATE.
+--
+-- For BASE support specialization programs (columns + reconcile + RPCs), run in order:
+--   1) sql/base_server_authority.sql
+--   2) sql/base_atomic_rpc.sql
+--
+-- State version bumps 8 → 9; new columns:
+--   support_program_unlocks, support_program_active
+--
+-- API: /api/base/action/unlock-support-program, /api/base/action/set-support-program
+-- Client: unlockSupportProgram, setSupportProgram in lib/baseVaultClient.js
+-- ============================================================================

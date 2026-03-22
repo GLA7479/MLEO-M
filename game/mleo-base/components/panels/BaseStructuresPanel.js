@@ -19,6 +19,8 @@ export function BaseStructuresPanel({
   onOpenBuildingInfo,
   onChangePowerMode,
   onBuyBuilding,
+  onAdvanceTier,
+  activeTierKey,
 }) {
   return (
     <div>
@@ -152,6 +154,8 @@ export function BaseStructuresPanel({
 
               {card.costRow}
 
+              {card.tierAdvanceBlock}
+
               <div className="mt-auto flex flex-col justify-end pt-0 pb-3">
                 {/* Fixed-height bottom info block (stabilizes Upgrade button Y across cards) */}
                 <div className="flex flex-col">
@@ -200,17 +204,41 @@ export function BaseStructuresPanel({
                     </div>
                   )}
 
-                  <button
-                    onClick={() => onBuyBuilding?.(card.key)}
-                    disabled={!card.ready || card.buildBusy}
-                    className={`w-full rounded-xl px-3 py-2 text-xs font-semibold leading-none transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
-                      card.canAffordCost
-                        ? "bg-white/10"
-                        : "bg-white/10 opacity-70"
-                    }`}
-                  >
-                    {card.buildBusy ? "Building..." : card.buttonText}
-                  </button>
+                  {card.tierAdvanceAvailable ? (
+                    <button
+                      type="button"
+                      onClick={() => onAdvanceTier?.(card.key)}
+                      disabled={
+                        activeTierKey === card.key ||
+                        !card.canAffordTierCost ||
+                        !card.tierCost
+                      }
+                      className={`w-full rounded-xl px-3 py-2 text-xs font-semibold leading-none transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
+                        card.canAffordTierCost && card.tierCost
+                          ? "bg-cyan-500/15 border border-cyan-400/25 text-cyan-100"
+                          : "bg-white/10 opacity-70"
+                      }`}
+                    >
+                      {activeTierKey === card.key
+                        ? "Advancing..."
+                        : !card.tierCost
+                        ? "Tier unavailable"
+                        : `Advance to T${card.nextTier}`}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onBuyBuilding?.(card.key)}
+                      disabled={!card.ready || card.buildBusy}
+                      className={`w-full rounded-xl px-3 py-2 text-xs font-semibold leading-none transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
+                        card.canAffordCost
+                          ? "bg-white/10"
+                          : "bg-white/10 opacity-70"
+                      }`}
+                    >
+                      {card.buildBusy ? "Building..." : card.buttonText}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

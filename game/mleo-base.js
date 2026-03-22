@@ -27,6 +27,7 @@ import {
   getBaseVaultBalance,
   getBaseState,
   buildBuilding,
+  advanceBuildingTier,
   installModule,
   researchTech,
   launchExpedition as launchExpeditionAction,
@@ -469,6 +470,71 @@ function buildingCost(def, level) {
   return out;
 }
 
+const TIER_BUILDINGS = new Set(["logisticsCenter", "researchLab", "repairBay"]);
+
+function getBuildingTier(state, buildingKey) {
+  return Math.max(1, Number(state?.buildingTiers?.[buildingKey] || 1));
+}
+
+function isTierBuilding(buildingKey) {
+  return TIER_BUILDINGS.has(buildingKey);
+}
+
+function getTierAdvancePreviewCost(buildingKey, currentTier) {
+  const baseCosts = {
+    logisticsCenter: { ORE: 2200, GOLD: 1700, SCRAP: 950, DATA: 80 },
+    researchLab: { ORE: 2100, GOLD: 1850, SCRAP: 980, DATA: 90 },
+    repairBay: { ORE: 1800, GOLD: 1500, SCRAP: 1200, DATA: 65 },
+  };
+
+  const base = baseCosts[buildingKey];
+  if (!base) return null;
+
+  const growth = 1.85;
+  const factor = Math.pow(growth, Math.max(0, Number(currentTier || 1) - 1));
+  const out = {};
+  for (const [key, value] of Object.entries(base)) {
+    out[key] = Math.ceil(Number(value) * factor);
+  }
+  return out;
+}
+
+/** Matches `base_support_program_definition` in sql/base_server_authority.sql (bank/data/maint only). */
+const SUPPORT_PROGRAM_DERIVE_FACTORS = {
+  logisticsCenter: {
+    routeDiscipline: { bank: 1.06, data: 1.02, maint: 1 },
+    reserveBuffer: { bank: 0.98, data: 1, maint: 1.08 },
+    vaultCalibration: { bank: 1.08, data: 0.97, maint: 1 },
+  },
+  researchLab: {
+    analysisMatrix: { bank: 1, data: 1.08, maint: 0.97 },
+    predictiveTelemetry: { bank: 1.03, data: 1.06, maint: 1 },
+    cleanroomProtocol: { bank: 0.96, data: 1.1, maint: 1 },
+  },
+  repairBay: {
+    preventiveCycle: { bank: 1, data: 0.97, maint: 1.1 },
+    stabilizationMesh: { bank: 1.02, data: 1, maint: 1.08 },
+    serviceDiscipline: { bank: 0.96, data: 1, maint: 1.12 },
+  },
+};
+
+function applySupportProgramFactorsToDerived(state, bankBonus, dataMult, maintenanceRelief) {
+  const active = state?.supportProgramActive || state?.support_program_active || {};
+  const unlocks = state?.supportProgramUnlocks || state?.support_program_unlocks || {};
+  for (const buildingKey of TIER_BUILDINGS) {
+    const prog = active[buildingKey];
+    if (!prog || typeof prog !== "string") continue;
+    const u = unlocks[buildingKey];
+    if (!u || typeof u !== "object" || u[prog] !== true) continue;
+    const f = SUPPORT_PROGRAM_DERIVE_FACTORS[buildingKey]?.[prog];
+    if (!f) continue;
+    bankBonus *= f.bank;
+    dataMult *= f.data;
+    maintenanceRelief *= f.maint;
+  }
+  return { bankBonus, dataMult, maintenanceRelief };
+}
+
 function crewCost(count) {
   return {
     GOLD: Math.ceil(120 * Math.pow(1.16, count)),
@@ -609,6 +675,16 @@ function derive(state, now = Date.now()) {
   if (state.research.predictiveMaintenance) {
     maintenanceRelief *= 1.25;
   }
+
+  // Server reconcile: support-building tiers then active specialization (bank / data / maintenance only).
+  bankBonus *= 1 + 0.03 * Math.max(0, getBuildingTier(state, "logisticsCenter") - 1);
+  dataMult *= 1 + 0.04 * Math.max(0, getBuildingTier(state, "researchLab") - 1);
+  maintenanceRelief *= 1 + 0.05 * Math.max(0, getBuildingTier(state, "repairBay") - 1);
+  ({
+    bankBonus,
+    dataMult,
+    maintenanceRelief,
+  } = applySupportProgramFactorsToDerived(state, bankBonus, dataMult, maintenanceRelief));
 
   oreMult *= hqBonus * minerBonus * stabilityFactor;
   goldMult *= hqBonus * stabilityFactor;
@@ -4049,6 +4125,8 @@ export default function MleoBase() {
   const [commanderPath, setCommanderPath] = useState("industry");
   const [devTab, setDevTab] = useState("crew");
   const [activeBuildKey, setActiveBuildKey] = useState(null);
+  const [tierPromptKey, setTierPromptKey] = useState(null);
+  const [activeTierKey, setActiveTierKey] = useState(null);
   const [overviewGuidanceState, setOverviewGuidanceState] = useState(null);
   const [bankedDisplayValue, setBankedDisplayValue] = useState(0);
   const [bankedDisplayNow, setBankedDisplayNow] = useState(() => Date.now());
@@ -4070,6 +4148,17 @@ export default function MleoBase() {
   const lastGameActionAtRef = useRef(0);
   const gameActionInFlightRef = useRef(false);
   const [hubGameplayOnline, setHubGameplayOnline] = useState(false);
+
+  useEffect(() => {
+    if (!tierPromptKey) return;
+
+    const level = Number(state?.buildings?.[tierPromptKey] || 0);
+    const tier = getBuildingTier(state, tierPromptKey);
+
+    if (!isTierBuilding(tierPromptKey) || level < 15 || tier >= 4) {
+      setTierPromptKey(null);
+    }
+  }, [tierPromptKey, state?.buildings, state?.buildingTiers]);
 
   const actionLocksRef = useRef({});
 
@@ -5709,6 +5798,10 @@ export default function MleoBase() {
       } else {
         if (res?.code === "RATE_LIMIT_DEVICE") {
           showToast("Too many taps detected. Please wait a moment and try again.");
+        } else if (res?.code === "BASE_BUILDING_TIER_REQUIRED") {
+          setTierPromptKey(key);
+          showToast("Tier advancement available · upgrade to the next tier to continue.");
+          return;
         } else {
           showToast(res?.message || "Build failed.");
         }
@@ -5720,6 +5813,64 @@ export default function MleoBase() {
       setActiveBuildKey((prev) => (prev === key ? null : prev));
     }
   });
+  };
+
+  const handleAdvanceTier = async (key) => {
+    if (!isTierBuilding(key)) return;
+    if (activeTierKey === key || isActionLocked(`tier:${key}`)) return;
+
+    setActiveTierKey(key);
+
+    return runLockedAction(`tier:${key}`, async () => {
+      try {
+        const def = BUILDINGS.find((item) => item.key === key);
+        if (!def) return;
+
+        const currentTier = getBuildingTier(state, key);
+        const previewCost = getTierAdvancePreviewCost(key, currentTier);
+
+        if (!previewCost || !canCoverCost(state.resources, previewCost)) {
+          showToast("Not enough resources for tier advancement.");
+          return;
+        }
+
+        try {
+          const res = await advanceBuildingTier(key);
+
+          if (res?.success && res?.state) {
+            setState((prev) => {
+              const next = mergeAuthoritativeServerState(prev, res.state);
+              next.log = pushLog(
+                next.log,
+                `${def.name} advanced to Tier ${res.new_tier}. Level reset to ${res.new_level}.`
+              );
+              return next;
+            });
+
+            setTierPromptKey((prev) => (prev === key ? null : prev));
+            markRealGameAction();
+
+            showToast(`${def.name} advanced to T${res.new_tier}.`);
+          } else {
+            if (res?.code === "BASE_INSUFFICIENT_RESOURCES") {
+              showToast("Not enough resources for tier advancement.");
+            } else if (res?.code === "BASE_TIER_MAX") {
+              showToast("This building is already at maximum tier.");
+              setTierPromptKey((prev) => (prev === key ? null : prev));
+            } else if (res?.code === "RATE_LIMIT_DEVICE") {
+              showToast("Too many taps detected. Please wait a moment and try again.");
+            } else {
+              showToast(res?.message || "Tier advancement failed.");
+            }
+          }
+        } catch (error) {
+          console.error("Tier advancement failed", error);
+          showToast(error?.message || "Tier advancement failed.");
+        }
+      } finally {
+        setActiveTierKey((prev) => (prev === key ? null : prev));
+      }
+    });
   };
 
   const changeBuildingPowerMode = async (key, powerMode) => {
@@ -9465,11 +9616,33 @@ export default function MleoBase() {
     const powerMode = getBuildingPowerMode(state, building.key);
     const canThrottle = canThrottleBuilding(building.key);
 
-    const supportsTier = ["logisticsCenter", "researchLab", "repairBay"].includes(building.key);
-    const tier = supportsTier
-      ? Math.max(1, Number(state?.buildingTiers?.[building.key] || 1))
-      : null;
+    const supportsTier = isTierBuilding(building.key);
+    const tier = supportsTier ? getBuildingTier(state, building.key) : null;
+    const nextTier = supportsTier ? Math.min(4, (tier || 1) + 1) : null;
+    const atTierCap = supportsTier && level >= 15;
+    const tierMaxed = supportsTier && (tier || 1) >= 4;
+    const tierAdvanceAvailable = supportsTier && atTierCap && !tierMaxed;
+    const tierAdvancePrompted = tierPromptKey === building.key;
+    const tierCost = tierAdvanceAvailable ? getTierAdvancePreviewCost(building.key, tier) : null;
+    const canAffordTierCost = tierCost ? canCoverCost(state.resources, tierCost) : false;
     const tierText = tier != null ? `T${tier}` : null;
+
+    const tierAdvanceBlock =
+      tierAdvanceAvailable ? (
+        <div className="mt-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-200">
+              Tier upgrade available
+            </div>
+            <div className="text-[11px] font-semibold text-white/75">
+              T{tier} → T{nextTier} · resets to Lv 1
+            </div>
+          </div>
+          <div className="mt-1">
+            <ResourceCostRow cost={tierCost} resources={state.resources} />
+          </div>
+        </div>
+      ) : null;
 
     const requirementsText = building.requires?.length
       ? building.requires
@@ -9477,11 +9650,14 @@ export default function MleoBase() {
           .join(" · ")
       : "";
 
-    const buttonText = ready
+    let buttonText = ready
       ? "Upgrade"
       : isUnlocked
       ? "Need resources"
       : "Need requirements";
+    if (tierAdvanceAvailable && tierAdvancePrompted) {
+      buttonText = "Tier ready";
+    }
 
     return {
       key: building.key,
@@ -9494,7 +9670,15 @@ export default function MleoBase() {
       sectorStatusText: sectorStatusForBuilding(building.key, state).toUpperCase(),
       supportsTier,
       tier,
+      nextTier,
+      atTierCap,
+      tierMaxed,
+      tierAdvanceAvailable,
+      tierAdvancePrompted,
+      tierCost,
+      canAffordTierCost,
       tierText,
+      tierAdvanceBlock,
       requirementsText,
       ready,
       buildBusy: activeBuildKey === building.key,
@@ -9527,6 +9711,8 @@ export default function MleoBase() {
       onOpenBuildingInfo={openBuildingInfoByKey}
       onChangePowerMode={changeBuildingPowerMode}
       onBuyBuilding={buyBuilding}
+      onAdvanceTier={handleAdvanceTier}
+      activeTierKey={activeTierKey}
     />
   );
 
