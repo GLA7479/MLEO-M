@@ -16,14 +16,17 @@ function toneClasses(tone = "info") {
   return "border-cyan-400/30 bg-cyan-500/10 text-cyan-100";
 }
 
-function CardShell({ className = "", children, ...rest }) {
+function CardShell({ className = "", weight = "default", children, ...rest }) {
   const pt = useContext(BaseOverviewPanelToneContext);
   const shell = pt?.cardShell ? ` ${pt.cardShell}` : "";
+  const weightCls =
+    weight === "attention"
+      ? "rounded-2xl border border-white/16 bg-white/[0.09] p-3.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] ring-1 ring-cyan-400/25 md:p-4"
+      : weight === "muted"
+      ? "rounded-2xl border border-white/[0.06] bg-white/[0.028] p-3 md:p-3.5"
+      : "rounded-2xl border border-white/10 bg-white/[0.05] p-4";
   return (
-    <div
-      {...rest}
-      className={`rounded-2xl border border-white/10 bg-white/[0.05] p-4${shell} ${className}`}
-    >
+    <div {...rest} className={`${weightCls}${shell} ${className}`}>
       {children}
     </div>
   );
@@ -43,17 +46,27 @@ function MiniStat({ label, value, note }) {
   );
 }
 
-function SectionHeader({ title, hint, right }) {
+function SectionHeader({ title, hint, right, quiet = false }) {
   const pt = useContext(BaseOverviewPanelToneContext);
   const bar = pt?.sectionBar;
   return (
     <div className="mb-2.5 flex items-start justify-between gap-3">
-      <div>
-        <div className="text-sm font-black uppercase tracking-[0.16em] text-white">
+      <div className="min-w-0">
+        <div
+          className={
+            quiet
+              ? "text-xs font-bold uppercase tracking-[0.14em] text-white/60"
+              : "text-sm font-black uppercase tracking-[0.16em] text-white"
+          }
+        >
           {title}
         </div>
         {bar ? <div className={bar} aria-hidden /> : null}
-        {hint ? <div className="mt-1 text-xs text-white/55">{hint}</div> : null}
+        {hint ? (
+          <div className={`mt-1 text-[11px] leading-snug ${quiet ? "text-white/42 line-clamp-2" : "text-xs text-white/55"}`}>
+            {hint}
+          </div>
+        ) : null}
       </div>
       {right}
     </div>
@@ -82,20 +95,28 @@ function formatValue(value, digits = 2) {
   return n.toFixed(digits).replace(/\.?0+$/, "").replace(/\.$/, "");
 }
 
-function ActionButton({ action, onNavigate }) {
+function isBaseStatusUrgent(status) {
+  if (!status) return false;
+  const t = status.tone;
+  return t === "critical" || t === "warning";
+}
+
+function ActionButton({ action, onNavigate, emphasis = "default" }) {
   if (!action?.target || typeof onNavigate !== "function") return null;
 
+  const cls =
+    emphasis === "high"
+      ? "mt-3 rounded-xl border border-cyan-400/45 bg-cyan-500/25 px-3 py-2 text-sm font-semibold text-cyan-50 shadow-[0_0_20px_rgba(34,211,238,0.12)] hover:bg-cyan-500/35"
+      : "mt-4 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20";
+
   return (
-    <button
-      onClick={() => onNavigate(action.target)}
-      className="mt-4 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
-    >
+    <button onClick={() => onNavigate(action.target)} className={cls}>
       {action.cta || "Open"}
     </button>
   );
 }
 
-function BaseStatusBlock({ status }) {
+function BaseStatusBlock({ status, variant = "prominent" }) {
   if (!status) return null;
   const chips = Array.isArray(status?.chips) ? status.chips.slice(0, 2) : [];
   const chipClass = (tone) =>
@@ -105,13 +126,19 @@ function BaseStatusBlock({ status }) {
       ? "border-amber-300/35 bg-amber-400/12 text-amber-100"
       : "border-cyan-300/30 bg-cyan-500/10 text-cyan-100";
 
+  const support = variant === "support";
+  const shellWeight = support ? "muted" : "attention";
   return (
-    <CardShell className={toneClasses(status.tone)}>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">
+    <CardShell weight={shellWeight} className={toneClasses(status.tone)}>
+      <div
+        className={`font-semibold uppercase tracking-[0.18em] ${
+          support ? "text-[10px] text-white/45" : "text-[11px] text-white/60"
+        }`}
+      >
         Base Status
       </div>
       {chips.length ? (
-        <div className="mt-2 flex flex-wrap gap-1.5">
+        <div className={`flex flex-wrap gap-1.5 ${support ? "mt-1.5" : "mt-2"}`}>
           {chips.map((chip) => (
             <span
               key={chip.key}
@@ -124,8 +151,14 @@ function BaseStatusBlock({ status }) {
           ))}
         </div>
       ) : null}
-      <div className="mt-2 text-2xl font-black">{status.label}</div>
-      <div className="mt-2 text-sm leading-6 text-white/85">{status.text}</div>
+      <div className={`font-black ${support ? "mt-1.5 text-base text-white/90" : "mt-2 text-2xl"}`}>
+        {status.label}
+      </div>
+      <div
+        className={`text-white/80 ${support ? "mt-1 text-xs leading-snug text-white/60 line-clamp-2" : "mt-2 text-sm leading-6 text-white/85"}`}
+      >
+        {status.text}
+      </div>
     </CardShell>
   );
 }
@@ -133,17 +166,17 @@ function BaseStatusBlock({ status }) {
 function BottleneckBlock({ bottleneck, onNavigate }) {
   if (!bottleneck) return null;
   return (
-    <CardShell>
+    <CardShell weight="attention">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
             Main Bottleneck
           </div>
-          <div className="mt-2 text-lg font-black text-white">{bottleneck.label}</div>
-          <div className="mt-2 text-sm leading-6 text-white/70">{bottleneck.text}</div>
+          <div className="mt-1.5 text-lg font-black leading-tight text-white">{bottleneck.label}</div>
+          <div className="mt-1.5 text-sm leading-snug text-white/75 line-clamp-3">{bottleneck.text}</div>
         </div>
         <div
-          className={`rounded-xl border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${toneClasses(
+          className={`shrink-0 rounded-xl border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${toneClasses(
             bottleneck.tone
           )}`}
         >
@@ -154,7 +187,7 @@ function BottleneckBlock({ bottleneck, onNavigate }) {
       {bottleneck.target ? (
         <button
           onClick={() => onNavigate?.(bottleneck.target)}
-          className="mt-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10"
+          className="mt-3 w-full rounded-xl border border-cyan-400/45 bg-cyan-500/20 px-3 py-2 text-sm font-semibold text-cyan-50 hover:bg-cyan-500/30 sm:w-auto"
         >
           Inspect
         </button>
@@ -166,13 +199,13 @@ function BottleneckBlock({ bottleneck, onNavigate }) {
 function NextActionBlock({ action, onNavigate }) {
   if (!action) return null;
   return (
-    <CardShell className="border-cyan-400/25 bg-cyan-500/[0.08]">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
+    <CardShell weight="attention" className="border-cyan-400/35 bg-cyan-500/[0.1]">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/85">
         Best Next Action
       </div>
-      <div className="mt-2 text-lg font-black text-white">{action.title}</div>
-      <div className="mt-2 text-sm leading-6 text-white/80">{action.text}</div>
-      <ActionButton action={action} onNavigate={onNavigate} />
+      <div className="mt-1.5 text-lg font-black leading-tight text-white">{action.title}</div>
+      <div className="mt-1.5 text-sm leading-snug text-white/82 line-clamp-3">{action.text}</div>
+      <ActionButton action={action} onNavigate={onNavigate} emphasis="high" />
     </CardShell>
   );
 }
@@ -182,9 +215,9 @@ function RatesBlock({ rates, openInnerPanel, toggleInnerPanel }) {
   const openKey = "overview-rates";
   const isOpen = openInnerPanel === openKey;
   const ratesHint = !isOpen
-    ? `Refinery ${rates.refineryState || "—"} · Banked/hr ${formatValue(rates.bankedPerHour)} · Proj/day ${formatValue(
+    ? `${rates.refineryState || "—"} refinery · ${formatValue(rates.bankedPerHour)}/hr banked · +${formatValue(
         rates.projectedPerDay
-      )}`
+      )}/d proj`
     : null;
 
   return (
@@ -194,8 +227,10 @@ function RatesBlock({ rates, openInnerPanel, toggleInnerPanel }) {
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
       >
-        <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Live Rates</div>
-        {ratesHint ? <div className="mt-1 text-xs text-white/55">{ratesHint}</div> : null}
+        <div className="text-xs font-bold uppercase tracking-[0.14em] text-white/82">Live Rates</div>
+        {ratesHint ? (
+          <div className="mt-0.5 text-[11px] leading-snug text-white/48 line-clamp-2">{ratesHint}</div>
+        ) : null}
       </ExpandablePanelSectionHeader>
 
       {isOpen ? (
@@ -233,9 +268,7 @@ function StabilityBlock({ stability, openInnerPanel, toggleInnerPanel }) {
   const openKey = "overview-stability";
   const isOpen = openInnerPanel === openKey;
   const stabilityHint = !isOpen
-    ? `${formatValue(stability.value)}% stability · ${stability.impactLabel || "Impact"} · ${
-        stability.pressureLabel || "Pressure"
-      }`
+    ? `${formatValue(stability.value)}% · ${stability.impactLabel || "—"} impact · ${stability.pressureLabel || "—"} pressure`
     : null;
 
   return (
@@ -245,8 +278,10 @@ function StabilityBlock({ stability, openInnerPanel, toggleInnerPanel }) {
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
       >
-        <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Stability Insight</div>
-        {stabilityHint ? <div className="mt-1 text-xs text-white/55">{stabilityHint}</div> : null}
+        <div className="text-xs font-bold uppercase tracking-[0.14em] text-white/82">Stability Insight</div>
+        {stabilityHint ? (
+          <div className="mt-0.5 text-[11px] leading-snug text-white/48 line-clamp-2">{stabilityHint}</div>
+        ) : null}
       </ExpandablePanelSectionHeader>
 
       {isOpen ? (
@@ -270,10 +305,10 @@ function DailyProgressBlock({ progress, openInnerPanel, toggleInnerPanel }) {
     (progress.mleoDailyProgress?.current ?? progress.shipProgress?.current) || 0;
   const mleoMax = (progress.mleoDailyProgress?.max ?? progress.shipProgress?.max) || 0;
   const dailyHint = !isOpen
-    ? `MLEO ${formatValue(mleoCur)}/${formatValue(mleoMax)} · Expeditions ${formatValue(
-        progress.expeditionsDone || 0,
+    ? `MLEO ${formatValue(mleoCur)}/${formatValue(mleoMax)} · exp ${formatValue(progress.expeditionsDone || 0, 0)} · ${formatValue(
+        progress.missionsReady || 0,
         0
-      )} · Missions ${formatValue(progress.missionsReady || 0, 0)} ready`
+      )} missions ready`
     : null;
 
   return (
@@ -283,8 +318,10 @@ function DailyProgressBlock({ progress, openInnerPanel, toggleInnerPanel }) {
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
       >
-        <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Daily Progress</div>
-        {dailyHint ? <div className="mt-1 text-xs text-white/55">{dailyHint}</div> : null}
+        <div className="text-xs font-bold uppercase tracking-[0.14em] text-white/82">Daily Progress</div>
+        {dailyHint ? (
+          <div className="mt-0.5 text-[11px] leading-snug text-white/48 line-clamp-2">{dailyHint}</div>
+        ) : null}
       </ExpandablePanelSectionHeader>
 
       {isOpen ? (
@@ -309,16 +346,16 @@ function DailyProgressBlock({ progress, openInnerPanel, toggleInnerPanel }) {
 function MissionFocusBlock({ missionGuidance, onNavigate }) {
   if (!missionGuidance?.title) return null;
   return (
-    <CardShell className="border-cyan-400/20 bg-cyan-500/[0.06]">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
+    <CardShell weight="attention" className="border-cyan-400/28 bg-cyan-500/[0.07]">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/80">
         Mission Focus
       </div>
-      <div className="mt-2 text-sm font-bold text-white">{missionGuidance.title}</div>
-      <div className="mt-1 text-sm text-white/75">{missionGuidance.hint}</div>
+      <div className="mt-1.5 text-sm font-bold leading-snug text-white">{missionGuidance.title}</div>
+      <div className="mt-1 text-sm leading-snug text-white/78 line-clamp-2">{missionGuidance.hint}</div>
       {missionGuidance.target ? (
         <button
           onClick={() => onNavigate?.(missionGuidance.target)}
-          className="mt-3 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
+          className="mt-3 rounded-xl border border-cyan-400/40 bg-cyan-500/22 px-3 py-2 text-sm font-semibold text-cyan-50 hover:bg-cyan-500/32"
         >
           {missionGuidance.cta || "Open missions"}
         </button>
@@ -330,15 +367,15 @@ function MissionFocusBlock({ missionGuidance, onNavigate }) {
 function RecoveryHintBlock({ hint, onNavigate }) {
   if (!hint?.text) return null;
   return (
-    <CardShell className="border-amber-300/25 bg-amber-500/[0.07]">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">
+    <CardShell weight="attention" className="border-amber-400/35 bg-amber-500/[0.09] ring-amber-400/15">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/85">
         {hint.title || "Recovery hint"}
       </div>
-      <div className="mt-1 text-sm text-white/80">{hint.text}</div>
+      <div className="mt-1.5 text-sm leading-snug text-white/82 line-clamp-3">{hint.text}</div>
       {hint?.target ? (
         <button
           onClick={() => onNavigate?.(hint.target)}
-          className="mt-3 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
+          className="mt-3 rounded-xl border border-amber-400/40 bg-amber-500/20 px-3 py-2 text-sm font-semibold text-amber-50 hover:bg-amber-500/30"
         >
           Open recovery actions
         </button>
@@ -361,8 +398,8 @@ function TodaysLoopBlock({ steps, onNavigate }) {
   const firstActionable = list.find((s) => s?.target);
 
   return (
-    <CardShell className="border-white/12 bg-white/[0.04]">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+    <CardShell className="border-white/10 bg-white/[0.045]">
+      <div className="text-xs font-bold uppercase tracking-[0.14em] text-white/68">
         Today&apos;s Loop
       </div>
       <div className="mt-2 space-y-1.5">
@@ -398,29 +435,32 @@ function BuildOpportunitiesCard({
   availableBlueprintCount,
   onOpenBuildPanel,
 }) {
+  const hintLine = [
+    availableStructuresCount > 0 ? `${availableStructuresCount} struct` : null,
+    availableModulesCount > 0 ? `${availableModulesCount} mod` : null,
+    availableResearchCount > 0 ? `${availableResearchCount} research` : null,
+    availableBlueprintCount > 0 ? "blueprint" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <CardShell className="h-full">
+    <CardShell weight="muted" className="h-full">
       <SectionHeader
+        quiet
         title="Build Opportunities"
-        hint={[
-          availableStructuresCount > 0 ? `${availableStructuresCount} structures` : null,
-          availableModulesCount > 0 ? `${availableModulesCount} modules` : null,
-          availableResearchCount > 0 ? `${availableResearchCount} research` : null,
-          availableBlueprintCount > 0 ? "blueprint ready" : null,
-        ]
-          .filter(Boolean)
-          .join(" · ") || "No build opportunities right now"}
+        hint={hintLine || "Nothing queued — keep resourcing"}
         right={<AvailabilityBadge count={buildOpportunitiesCount > 0 ? buildOpportunitiesCount : 0} />}
       />
       {buildOpportunitiesCount > 0 ? (
         <button
           onClick={onOpenBuildPanel}
-          className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
+          className="rounded-xl border border-white/[0.08] bg-white/[0.06] px-3 py-2 text-sm font-semibold text-white/90 hover:bg-white/[0.1]"
         >
           Open Build
         </button>
       ) : (
-        <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/60">
+        <div className="rounded-xl border border-white/[0.06] bg-black/15 px-3 py-2 text-xs leading-snug text-white/48">
           Keep gathering resources to unlock upgrades.
         </div>
       )}
@@ -442,15 +482,17 @@ function IdentityCard({
   const isOpen = openInnerPanel === openKey;
 
   return (
-    <CardShell className="h-full">
+    <CardShell weight="muted" className="h-full">
       <ExpandablePanelSectionHeader
         panelKey={openKey}
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
       >
-        <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Command Identity</div>
+        <div className="text-xs font-bold uppercase tracking-[0.14em] text-white/60">Command Identity</div>
         {!isOpen ? (
-          <div className="mt-1 text-xs text-white/55">Current crew role and commander path</div>
+          <div className="mt-0.5 text-[11px] leading-snug text-white/42 line-clamp-2">
+            Crew role · commander path
+          </div>
         ) : null}
       </ExpandablePanelSectionHeader>
       {isOpen ? (
@@ -479,9 +521,9 @@ function SpecializationSummaryCard({ summary, onNavigate, openInnerPanel, toggle
   const openKey = "overview-specialization";
   const isOpen = openInnerPanel === openKey;
   const specHint = !isOpen
-    ? `Late-game · Tiers ${t.supportBuildingsTier2Plus ?? 0}/3 · Programs ${t.totalUnlockedPrograms ?? 0} unlocked · ${
+    ? `T${t.supportBuildingsTier2Plus ?? 0}/3 · ${t.totalUnlockedPrograms ?? 0} programs · ${
         t.totalClaimableMilestones ?? 0
-      } milestone${(t.totalClaimableMilestones ?? 0) === 1 ? "" : "s"} ready`
+      } milestone${(t.totalClaimableMilestones ?? 0) === 1 ? "" : "s"}`
     : null;
 
   const statMini = (label, value, accentClass = "text-white") => (
@@ -494,14 +536,19 @@ function SpecializationSummaryCard({ summary, onNavigate, openInnerPanel, toggle
   );
 
   return (
-    <CardShell className="border-cyan-400/15 bg-gradient-to-br from-cyan-500/[0.06] via-violet-500/[0.04] to-amber-500/[0.04]">
+    <CardShell
+      weight="muted"
+      className="border-cyan-400/10 bg-gradient-to-br from-cyan-500/[0.035] via-violet-500/[0.025] to-amber-500/[0.025]"
+    >
       <ExpandablePanelSectionHeader
         panelKey={openKey}
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
       >
-        <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Specialization</div>
-        {specHint ? <div className="mt-1 text-xs text-white/55">{specHint}</div> : null}
+        <div className="text-xs font-bold uppercase tracking-[0.14em] text-white/62">Specialization</div>
+        {specHint ? (
+          <div className="mt-0.5 text-[11px] leading-snug text-white/42 line-clamp-2">{specHint}</div>
+        ) : null}
       </ExpandablePanelSectionHeader>
 
       {isOpen ? (
@@ -619,24 +666,24 @@ function ContractsCard({
 
   const contractsHint = !isOpen
     ? liveContractsAvailableCount > 0
-      ? `${liveContractsAvailableCount} contract reward${
-          liveContractsAvailableCount > 1 ? "s" : ""
-        } ready`
-      : "No contract rewards ready right now"
+      ? `${liveContractsAvailableCount} reward${liveContractsAvailableCount > 1 ? "s" : ""} ready`
+      : "None ready"
     : null;
 
   return (
-    <CardShell data-base-target="contracts" className="h-full">
+    <CardShell weight="muted" data-base-target="contracts" className="h-full">
       <ExpandablePanelSectionHeader
         panelKey={openKey}
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Live Contracts</div>
+          <div className="text-xs font-bold uppercase tracking-[0.14em] text-white/62">Live Contracts</div>
           <AvailabilityBadge count={liveContractsAvailableCount} />
         </div>
-        {contractsHint ? <div className="mt-1 text-xs text-white/55">{contractsHint}</div> : null}
+        {contractsHint ? (
+          <div className="mt-0.5 text-[11px] leading-snug text-white/42">{contractsHint}</div>
+        ) : null}
       </ExpandablePanelSectionHeader>
 
       {isOpen ? (
@@ -763,14 +810,19 @@ export function OverviewPanelCards({
   );
   const hasTopContextRail = Boolean(worldOverviewHint || systemsHint || showDoctrineStrip);
 
+  const baseStatusPayload = {
+    ...(safeOverview.baseStatus || {}),
+    chips: safeOverview.bottleneckChips || [],
+  };
+  const baseStatusUrgent = isBaseStatusUrgent(baseStatusPayload);
+
   return (
     <BaseOverviewPanelToneContext.Provider value={panelTone || null}>
       <div className={`space-y-4${stackTone}`}>
-      <div>
         {hasTopContextRail ? (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {worldOverviewHint ? (
-              <div className={overviewStripShellClassName}>
+              <div className={`${overviewStripShellClassName} !py-1.5`.trim()}>
                 {overviewStripTitle ? (
                   <span className={overviewStripTitleClassName}>
                     {overviewStripTitle}
@@ -782,95 +834,115 @@ export function OverviewPanelCards({
             ) : null}
             {systemsHint ? (
               <div
-                className={`rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/65${systemsTone}`}
+                className={`rounded-lg border border-white/[0.08] bg-white/[0.025] px-2.5 py-1.5 text-[10px] leading-snug text-white/55${systemsTone}`}
               >
                 {systemsHint}
               </div>
             ) : null}
             {showDoctrineStrip ? (
-              <div className="rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-[11px] font-normal leading-snug text-white/52">
+              <div className="rounded-lg border border-white/[0.08] bg-white/[0.028] px-2.5 py-1.5 text-[10px] font-normal leading-snug text-white/48 line-clamp-3">
                 {doctrineContextHint}
               </div>
             ) : null}
           </div>
         ) : null}
-        <div
-          data-base-target="systems"
-          className={hasTopContextRail ? "mt-3 border-t border-white/[0.06] pt-3" : undefined}
-        >
-          <BaseStatusBlock
-            status={{
-              ...(safeOverview.baseStatus || {}),
-              chips: safeOverview.bottleneckChips || [],
-            }}
+
+        {hasTopContextRail ? <div className="border-t border-white/[0.05]" aria-hidden /> : null}
+
+        {/* A) Primary — attention now */}
+        <section className="space-y-3" aria-label="Needs attention">
+          <div className="grid gap-3 lg:grid-cols-2 lg:items-stretch">
+            <BottleneckBlock bottleneck={safeOverview.bottleneck} onNavigate={onNavigate} />
+            <NextActionBlock action={safeOverview.nextAction || actionFallback} onNavigate={onNavigate} />
+          </div>
+          <RecoveryHintBlock hint={safeOverview.recoveryHint} onNavigate={onNavigate} />
+          <MissionFocusBlock missionGuidance={missionGuidance} onNavigate={onNavigate} />
+          {baseStatusUrgent ? (
+            <div data-base-target="systems">
+              <BaseStatusBlock status={baseStatusPayload} variant="prominent" />
+            </div>
+          ) : null}
+        </section>
+
+        {/* B) Secondary — operating picture */}
+        <section className="space-y-3 border-t border-white/[0.07] pt-4" aria-label="Status and rhythm">
+          {!baseStatusUrgent ? (
+            <div data-base-target="systems">
+              <BaseStatusBlock status={baseStatusPayload} variant="support" />
+            </div>
+          ) : null}
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <RatesBlock
+              rates={safeOverview.rates}
+              openInnerPanel={openInnerPanel}
+              toggleInnerPanel={toggleInnerPanel}
+            />
+            <StabilityBlock
+              stability={safeOverview.stability}
+              openInnerPanel={openInnerPanel}
+              toggleInnerPanel={toggleInnerPanel}
+            />
+            <DailyProgressBlock
+              progress={safeOverview.dailyProgress}
+              openInnerPanel={openInnerPanel}
+              toggleInnerPanel={toggleInnerPanel}
+            />
+            <TodaysLoopBlock steps={safeOverview.todaysLoop} onNavigate={onNavigate} />
+          </div>
+        </section>
+
+        {/* World sector — contextual bridge before planning */}
+        {sectorWorldSnapshot ? (
+          <div className="border-t border-white/[0.06] pt-3">
+            <WorldSectorPanel
+              snapshot={sectorWorldSnapshot}
+              onDeploy={onDeployNextSector}
+              deployBusy={!!sectorDeployBusy}
+              openInnerPanel={openInnerPanel}
+              toggleInnerPanel={toggleInnerPanel}
+            />
+          </div>
+        ) : null}
+
+        {/* C) Tertiary — planning & identity */}
+        <section className="space-y-3 border-t border-white/[0.06] pt-4" aria-label="Build and long-term">
+          <div className="grid gap-3 xl:grid-cols-3">
+            <BuildOpportunitiesCard
+              buildOpportunitiesCount={buildOpportunitiesCount}
+              availableStructuresCount={availableStructuresCount}
+              availableModulesCount={availableModulesCount}
+              availableResearchCount={availableResearchCount}
+              availableBlueprintCount={availableBlueprintCount}
+              onOpenBuildPanel={onOpenBuildPanel}
+            />
+
+            <IdentityCard
+              showCrew={showCrew}
+              crewRoleInfo={crewRoleInfo}
+              roleBonusText={roleBonusText}
+              commanderPathInfo={commanderPathInfo}
+              commanderPathText={commanderPathText}
+              openInnerPanel={openInnerPanel}
+              toggleInnerPanel={toggleInnerPanel}
+            />
+
+            <ContractsCard
+              liveContractsAvailableCount={liveContractsAvailableCount}
+              liveContracts={liveContracts}
+              openInnerPanel={openInnerPanel}
+              toggleInnerPanel={toggleInnerPanel}
+              onClaimContract={onClaimContract}
+            />
+          </div>
+
+          <SpecializationSummaryCard
+            summary={specializationSummary}
+            onNavigate={onNavigate}
+            openInnerPanel={openInnerPanel}
+            toggleInnerPanel={toggleInnerPanel}
           />
-        </div>
+        </section>
       </div>
-      <BottleneckBlock bottleneck={safeOverview.bottleneck} onNavigate={onNavigate} />
-      <NextActionBlock action={safeOverview.nextAction || actionFallback} onNavigate={onNavigate} />
-      <RecoveryHintBlock hint={safeOverview.recoveryHint} onNavigate={onNavigate} />
-      <MissionFocusBlock missionGuidance={missionGuidance} onNavigate={onNavigate} />
-      <TodaysLoopBlock steps={safeOverview.todaysLoop} onNavigate={onNavigate} />
-      <RatesBlock
-        rates={safeOverview.rates}
-        openInnerPanel={openInnerPanel}
-        toggleInnerPanel={toggleInnerPanel}
-      />
-      <StabilityBlock
-        stability={safeOverview.stability}
-        openInnerPanel={openInnerPanel}
-        toggleInnerPanel={toggleInnerPanel}
-      />
-      <DailyProgressBlock
-        progress={safeOverview.dailyProgress}
-        openInnerPanel={openInnerPanel}
-        toggleInnerPanel={toggleInnerPanel}
-      />
-
-      <SpecializationSummaryCard
-        summary={specializationSummary}
-        onNavigate={onNavigate}
-        openInnerPanel={openInnerPanel}
-        toggleInnerPanel={toggleInnerPanel}
-      />
-
-      <WorldSectorPanel
-        snapshot={sectorWorldSnapshot}
-        onDeploy={onDeployNextSector}
-        deployBusy={!!sectorDeployBusy}
-        openInnerPanel={openInnerPanel}
-        toggleInnerPanel={toggleInnerPanel}
-      />
-
-      <div className="grid gap-4 xl:grid-cols-3">
-        <BuildOpportunitiesCard
-          buildOpportunitiesCount={buildOpportunitiesCount}
-          availableStructuresCount={availableStructuresCount}
-          availableModulesCount={availableModulesCount}
-          availableResearchCount={availableResearchCount}
-          availableBlueprintCount={availableBlueprintCount}
-          onOpenBuildPanel={onOpenBuildPanel}
-        />
-
-        <IdentityCard
-          showCrew={showCrew}
-          crewRoleInfo={crewRoleInfo}
-          roleBonusText={roleBonusText}
-          commanderPathInfo={commanderPathInfo}
-          commanderPathText={commanderPathText}
-          openInnerPanel={openInnerPanel}
-          toggleInnerPanel={toggleInnerPanel}
-        />
-
-        <ContractsCard
-          liveContractsAvailableCount={liveContractsAvailableCount}
-          liveContracts={liveContracts}
-          openInnerPanel={openInnerPanel}
-          toggleInnerPanel={toggleInnerPanel}
-          onClaimContract={onClaimContract}
-        />
-      </div>
-    </div>
     </BaseOverviewPanelToneContext.Provider>
   );
 }
