@@ -412,6 +412,127 @@ function IdentityCard({
   );
 }
 
+function SpecializationSummaryCard({ summary, onNavigate }) {
+  if (!summary?.buildings?.length) return null;
+  const t = summary.totals || {};
+  const rec = summary.topRecommendation || {};
+
+  const statMini = (label, value, accentClass = "text-white") => (
+    <div className="rounded-xl border border-white/10 bg-black/25 px-2 py-2 sm:px-3 sm:py-2.5">
+      <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/45 sm:text-[10px] sm:tracking-[0.18em]">
+        {label}
+      </div>
+      <div className={`mt-0.5 text-xs font-black leading-tight sm:text-sm ${accentClass}`}>{value}</div>
+    </div>
+  );
+
+  return (
+    <CardShell className="border-cyan-400/15 bg-gradient-to-br from-cyan-500/[0.06] via-violet-500/[0.04] to-amber-500/[0.04]">
+      <SectionHeader
+        title="Specialization"
+        hint="Late-game command layer"
+        right={null}
+      />
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {statMini(
+          "Tiers",
+          `${t.supportBuildingsTier2Plus ?? 0}/3`,
+          "text-cyan-200"
+        )}
+        {statMini(
+          "Programs",
+          `${t.totalUnlockedPrograms ?? 0} unlocked · ${t.totalActivePrograms ?? 0} active`,
+          "text-violet-200"
+        )}
+        {statMini(
+          "Milestones",
+          `${t.totalClaimedMilestones ?? 0}/${t.totalMilestoneSlots || 6} · ${
+            t.totalClaimableMilestones ?? 0
+          } ready`,
+          "text-amber-100"
+        )}
+        {statMini(
+          "Adv. contracts",
+          `${t.totalVisibleAdvancedContracts ?? 0} shown · ${t.totalReadyAdvancedContracts ?? 0} ready`,
+          "text-cyan-100"
+        )}
+      </div>
+
+      {rec.text ? (
+        <button
+          type="button"
+          onClick={() => rec.navigateTarget && onNavigate?.(rec.navigateTarget)}
+          disabled={!rec.navigateTarget}
+          className={`mt-3 w-full rounded-xl border px-3 py-2.5 text-left text-sm font-semibold leading-snug transition ${
+            rec.navigateTarget
+              ? "border-cyan-400/30 bg-cyan-500/10 text-cyan-50 hover:bg-cyan-500/18"
+              : "cursor-default border-white/10 bg-white/5 text-white/70"
+          }`}
+        >
+          <span className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-200/75">
+            Next focus
+          </span>
+          <div className="mt-1 text-white">{rec.text}</div>
+          {rec.navigateTarget ? (
+            <div className="mt-1 text-[11px] text-cyan-200/80">Tap to open in Structures</div>
+          ) : null}
+        </button>
+      ) : null}
+
+      <div className="mt-3 space-y-2">
+        {summary.buildings.map((row) => (
+          <button
+            key={row.buildingKey}
+            type="button"
+            onClick={() => onNavigate?.({ tab: "build", target: row.buildingKey })}
+            className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left transition hover:border-cyan-400/25 hover:bg-black/30"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0 text-[13px] font-bold text-white">{row.buildingName}</div>
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                <span className="inline-flex rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-cyan-100">
+                  T{row.tier}
+                </span>
+                {row.activeProgramKey ? (
+                  <span className="inline-flex max-w-[120px] truncate rounded-full border border-violet-400/30 bg-violet-500/12 px-2 py-0.5 text-[9px] font-bold text-violet-100">
+                    Active
+                  </span>
+                ) : null}
+                {row.claimableMilestones > 0 ? (
+                  <span className="inline-flex rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-amber-100">
+                    Milestone
+                  </span>
+                ) : null}
+                {row.advancedContractsReady > 0 ? (
+                  <span className="inline-flex rounded-full border border-emerald-400/30 bg-emerald-500/12 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-emerald-100">
+                    Contract
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <div className="mt-1 text-[11px] text-white/60">
+              {row.activeProgramLabel || "No active program"}
+            </div>
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-white/45">
+              <span>
+                Milestones: {row.claimedMilestones}/{row.totalMilestones || 0}
+              </span>
+              <span>Ready items: {row.readyItemsCount}</span>
+              <span className="text-white/35">
+                Next: {row.nextMilestoneLabel}
+              </span>
+            </div>
+            {row.nextActionText ? (
+              <div className="mt-0.5 text-[10px] text-amber-100/55">{row.nextActionText}</div>
+            ) : null}
+          </button>
+        ))}
+      </div>
+    </CardShell>
+  );
+}
+
 function ContractsCard({
   liveContractsAvailableCount,
   liveContracts,
@@ -508,6 +629,7 @@ export function OverviewPanelCards({
   liveContractsAvailableCount,
   liveContracts,
   onClaimContract,
+  specializationSummary,
 }) {
   const actionFallback =
     nextStep && (nextStep?.title || nextStep?.text)
@@ -536,6 +658,8 @@ export function OverviewPanelCards({
       <RatesBlock rates={safeOverview.rates} />
       <StabilityBlock stability={safeOverview.stability} />
       <DailyProgressBlock progress={safeOverview.dailyProgress} />
+
+      <SpecializationSummaryCard summary={specializationSummary} onNavigate={onNavigate} />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <BuildOpportunitiesCard

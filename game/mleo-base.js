@@ -5330,6 +5330,273 @@ export default function MleoBase() {
     }));
   }, [state, derived, contractClaimedMap]);
 
+  const specializationSummary = useMemo(() => {
+    const SUPPORT_ORDER = ["logisticsCenter", "researchLab", "repairBay"];
+    const buildings = SUPPORT_ORDER.map((buildingKey) => {
+      const def = BUILDINGS.find((b) => b.key === buildingKey);
+      const buildingName = def?.name || buildingKey;
+      const level = Math.max(0, Math.floor(Number(state?.buildings?.[buildingKey] || 0)));
+      const tier = getBuildingTier(state, buildingKey);
+      const activeProgramKey = level >= 1 ? getActiveSupportProgram(state, buildingKey) : null;
+      const activeProgramLabel = activeProgramKey
+        ? SUPPORT_PROGRAM_CATALOG[buildingKey]?.find((p) => p.key === activeProgramKey)?.label ||
+          activeProgramKey
+        : null;
+
+      const mKeys = SPECIALIZATION_MILESTONES_BY_BUILDING[buildingKey] || [];
+      const bucket = state?.specializationMilestonesClaimed?.[buildingKey] || {};
+      let claimedMilestones = 0;
+      let claimableMilestones = 0;
+      for (const mk of mKeys) {
+        if (bucket[mk]) claimedMilestones += 1;
+        const prev = getSpecializationMilestonePreview(state, derived, buildingKey, mk);
+        if (prev.done && !prev.claimed) claimableMilestones += 1;
+      }
+
+      const firstClaimableKey = mKeys.find((mk) => {
+        const p = getSpecializationMilestonePreview(state, derived, buildingKey, mk);
+        return p.done && !p.claimed;
+      });
+      const firstUnclaimedKey = mKeys.find((mk) => !bucket[mk]);
+      let nextMilestoneLabel = "—";
+      let nextActionText = "No milestone actions";
+      if (firstClaimableKey) {
+        nextMilestoneLabel = SPECIALIZATION_MILESTONE_META[firstClaimableKey]?.label || firstClaimableKey;
+        nextActionText = `Claim ${nextMilestoneLabel}`;
+      } else if (firstUnclaimedKey) {
+        nextMilestoneLabel =
+          SPECIALIZATION_MILESTONE_META[firstUnclaimedKey]?.label || firstUnclaimedKey;
+        nextActionText = `Progress ${nextMilestoneLabel}`;
+      } else if (mKeys.length) {
+        nextMilestoneLabel = "All claimed";
+        nextActionText = "Milestones complete";
+      }
+
+      const advContracts = liveContracts.filter(
+        (c) => c.contractClass === "advanced" && c.supportBuilding === buildingKey
+      );
+      const advancedContractsVisible = advContracts.length;
+      const advancedContractsReady = advContracts.filter((c) => c.done && !c.claimed).length;
+      const readyItemsCount = claimableMilestones + advancedContractsReady;
+
+      return {
+        buildingKey,
+        buildingName,
+        level,
+        tier,
+        activeProgramKey,
+        activeProgramLabel,
+        claimedMilestones,
+        totalMilestones: mKeys.length,
+        claimableMilestones,
+        advancedContractsVisible,
+        advancedContractsReady,
+        nextMilestoneLabel,
+        nextActionText,
+        readyItemsCount,
+      };
+    });
+
+    let supportBuildingsTier2Plus = 0;
+    let totalUnlockedPrograms = 0;
+    let totalActivePrograms = 0;
+    let totalClaimedMilestones = 0;
+    let totalMilestoneSlots = 0;
+
+    for (const row of buildings) {
+      if (row.level >= 1 && row.tier >= 2) supportBuildingsTier2Plus += 1;
+      if (row.level >= 1 && row.activeProgramKey) totalActivePrograms += 1;
+      totalClaimedMilestones += row.claimedMilestones;
+      totalMilestoneSlots += row.totalMilestones;
+      const programs = getSupportPrograms(row.buildingKey);
+      for (const p of programs) {
+        if (isSupportProgramUnlocked(state, row.buildingKey, p.key)) totalUnlockedPrograms += 1;
+      }
+    }
+
+    const advancedOnly = liveContracts.filter((c) => c.contractClass === "advanced");
+    const totalVisibleAdvancedContracts = advancedOnly.length;
+    const totalReadyAdvancedContracts = advancedOnly.filter((c) => c.done && !c.claimed).length;
+    const totalClaimableMilestones = countClaimableSpecializationMilestones(state, derived);
+
+    const nav = (buildingKey) => ({ tab: "build", target: buildingKey });
+
+    const firstReadyAdv = liveContracts.find(
+      (c) => c.contractClass === "advanced" && c.done && !c.claimed
+    );
+    if (firstReadyAdv) {
+      return {
+        buildings,
+        totals: {
+          supportBuildingsTier2Plus,
+          totalUnlockedPrograms,
+          totalActivePrograms,
+          totalClaimedMilestones,
+          totalMilestoneSlots,
+          totalClaimableMilestones,
+          totalVisibleAdvancedContracts,
+          totalReadyAdvancedContracts,
+        },
+        topRecommendation: {
+          text: `Claim ${firstReadyAdv.title} contract`,
+          navigateTarget: nav(firstReadyAdv.supportBuilding),
+          focusBuildingKey: firstReadyAdv.supportBuilding,
+        },
+      };
+    }
+
+    for (const row of buildings) {
+      if (row.claimableMilestones > 0) {
+        const mk = (SPECIALIZATION_MILESTONES_BY_BUILDING[row.buildingKey] || []).find((k) => {
+          const p = getSpecializationMilestonePreview(state, derived, row.buildingKey, k);
+          return p.done && !p.claimed;
+        });
+        const label = mk ? SPECIALIZATION_MILESTONE_META[mk]?.label || mk : "milestone";
+        return {
+          buildings,
+          totals: {
+            supportBuildingsTier2Plus,
+            totalUnlockedPrograms,
+            totalActivePrograms,
+            totalClaimedMilestones,
+            totalMilestoneSlots,
+            totalClaimableMilestones,
+            totalVisibleAdvancedContracts,
+            totalReadyAdvancedContracts,
+          },
+          topRecommendation: {
+            text: `Claim ${label} milestone`,
+            navigateTarget: nav(row.buildingKey),
+            focusBuildingKey: row.buildingKey,
+          },
+        };
+      }
+    }
+
+    for (const row of buildings) {
+      if (row.level < 1) {
+        return {
+          buildings,
+          totals: {
+            supportBuildingsTier2Plus,
+            totalUnlockedPrograms,
+            totalActivePrograms,
+            totalClaimedMilestones,
+            totalMilestoneSlots,
+            totalClaimableMilestones,
+            totalVisibleAdvancedContracts,
+            totalReadyAdvancedContracts,
+          },
+          topRecommendation: {
+            text: `Build ${row.buildingName} to unlock specialization`,
+            navigateTarget: nav(row.buildingKey),
+            focusBuildingKey: row.buildingKey,
+          },
+        };
+      }
+    }
+
+    for (const row of buildings) {
+      if (row.level >= 1 && row.tier < 2) {
+        return {
+          buildings,
+          totals: {
+            supportBuildingsTier2Plus,
+            totalUnlockedPrograms,
+            totalActivePrograms,
+            totalClaimedMilestones,
+            totalMilestoneSlots,
+            totalClaimableMilestones,
+            totalVisibleAdvancedContracts,
+            totalReadyAdvancedContracts,
+          },
+          topRecommendation: {
+            text: `Advance ${row.buildingName} to T2`,
+            navigateTarget: nav(row.buildingKey),
+            focusBuildingKey: row.buildingKey,
+          },
+        };
+      }
+    }
+
+    for (const row of buildings) {
+      if (row.level < 1) continue;
+      const programs = getSupportPrograms(row.buildingKey);
+      const nextUnlock = programs.find(
+        (p) =>
+          row.tier >= p.minTier &&
+          !isSupportProgramUnlocked(state, row.buildingKey, p.key)
+      );
+      if (nextUnlock) {
+        return {
+          buildings,
+          totals: {
+            supportBuildingsTier2Plus,
+            totalUnlockedPrograms,
+            totalActivePrograms,
+            totalClaimedMilestones,
+            totalMilestoneSlots,
+            totalClaimableMilestones,
+            totalVisibleAdvancedContracts,
+            totalReadyAdvancedContracts,
+          },
+          topRecommendation: {
+            text: canUnlockSupportProgram(state, row.buildingKey, nextUnlock)
+              ? `Unlock ${nextUnlock.label}`
+              : `Work toward unlocking ${nextUnlock.label}`,
+            navigateTarget: nav(row.buildingKey),
+            focusBuildingKey: row.buildingKey,
+          },
+        };
+      }
+    }
+
+    for (const row of buildings) {
+      if (row.level < 1) continue;
+      const programs = getSupportPrograms(row.buildingKey);
+      const anyUnlocked = programs.some((p) => isSupportProgramUnlocked(state, row.buildingKey, p.key));
+      if (anyUnlocked && !row.activeProgramKey) {
+        return {
+          buildings,
+          totals: {
+            supportBuildingsTier2Plus,
+            totalUnlockedPrograms,
+            totalActivePrograms,
+            totalClaimedMilestones,
+            totalMilestoneSlots,
+            totalClaimableMilestones,
+            totalVisibleAdvancedContracts,
+            totalReadyAdvancedContracts,
+          },
+          topRecommendation: {
+            text: `Activate a support program at ${row.buildingName}`,
+            navigateTarget: nav(row.buildingKey),
+            focusBuildingKey: row.buildingKey,
+          },
+        };
+      }
+    }
+
+    return {
+      buildings,
+      totals: {
+        supportBuildingsTier2Plus,
+        totalUnlockedPrograms,
+        totalActivePrograms,
+        totalClaimedMilestones,
+        totalMilestoneSlots,
+        totalClaimableMilestones,
+        totalVisibleAdvancedContracts,
+        totalReadyAdvancedContracts,
+      },
+      topRecommendation: {
+        text: "Specialization on track — finish contracts and milestones when ready",
+        navigateTarget: null,
+        focusBuildingKey: null,
+      },
+    };
+  }, [state, derived, liveContracts]);
+
   const missionProgress = useMemo(() => getMissionProgress(state), [state]);
 
   const readyCounts = useMemo(() => {
@@ -11599,6 +11866,7 @@ export default function MleoBase() {
                           liveContractsAvailableCount={liveContractsAvailableCount}
                           liveContracts={liveContracts}
                           onClaimContract={claimContract}
+                          specializationSummary={specializationSummary}
                         />
                       </DesktopPanelSection>
                     ) : null}
@@ -12040,6 +12308,7 @@ export default function MleoBase() {
                         liveContractsAvailableCount={liveContractsAvailableCount}
                         liveContracts={liveContracts}
                         onClaimContract={claimContract}
+                        specializationSummary={specializationSummary}
                       />
                     </MobilePanelSection>
                   ) : null}
