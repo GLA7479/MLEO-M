@@ -42,6 +42,7 @@ import {
   claimSpecializationMilestone,
   deployNextBaseSector,
   setBaseProfile,
+  setCommandProtocol,
   setBuildingPowerMode,
   sendBasePresence,
   ensureCsrfToken,
@@ -72,6 +73,13 @@ import {
   STRUCTURES_TAB_A,
   STRUCTURES_TAB_B,
 } from "./mleo-base/data";
+import {
+  applyPhase1ACommandProtocolToDerivedRates,
+  isCommandProtocolUnlocked,
+  normalizeCommandProtocolId,
+  PHASE_1A_COMMAND_PROTOCOLS,
+  resolveEffectiveCommandProtocol,
+} from "./mleo-base/commandProtocols";
 import {
   applyLevelUps,
   buildingRiskTag,
@@ -944,6 +952,17 @@ function derive(state, now = Date.now()) {
   scrapMult *= hqBonus * stabilityFactor;
   mleoMult *= hqBonus * stabilityFactor;
   dataMult *= hqBonus * stabilityFactor;
+
+  const effProto = resolveEffectiveCommandProtocol(state);
+  ({
+    maintenanceRelief,
+    goldMult,
+    dataMult,
+  } = applyPhase1ACommandProtocolToDerivedRates(effProto, {
+    maintenanceRelief,
+    goldMult,
+    dataMult,
+  }));
 
   const sectorWorldOrder = resolveSectorWorldOrder(state);
   const dailyMleoCap = getWorldDailyMleoCapByOrder(sectorWorldOrder);
@@ -4498,6 +4517,18 @@ export default function MleoBase() {
           normalized?.specializationMilestonesClaimed ??
           prev?.specializationMilestonesClaimed
       ),
+      commandProtocolActive:
+        serverState?.commandProtocolActive ??
+        serverState?.command_protocol_active ??
+        normalized?.commandProtocolActive ??
+        prev?.commandProtocolActive ??
+        "none",
+      commandProtocolLastSwapDay:
+        serverState?.commandProtocolLastSwapDay ??
+        serverState?.command_protocol_last_swap_day ??
+        normalized?.commandProtocolLastSwapDay ??
+        prev?.commandProtocolLastSwapDay ??
+        "",
     });
   }
 
@@ -5609,6 +5640,32 @@ export default function MleoBase() {
     return "Command style: wider MLEO ecosystem support.";
   }, [commanderPath]);
 
+  const commandProtocolUi = useMemo(() => {
+    const day = todayKey();
+    const lastSwap = String(state.commandProtocolLastSwapDay || "").trim();
+    const swappedToday = lastSwap === day && lastSwap.length > 0;
+    const storedId = normalizeCommandProtocolId(state.commandProtocolActive);
+    const effectiveId = resolveEffectiveCommandProtocol(state);
+    const canSwapToday = !swappedToday;
+    const rows = PHASE_1A_COMMAND_PROTOCOLS.map((p) => ({
+      ...p,
+      locked: !isCommandProtocolUnlocked(p.id, state.commanderLevel),
+      selected: storedId === p.id,
+    }));
+    return {
+      rows,
+      effectiveId,
+      storedId,
+      canSwapToday,
+      swappedToday,
+      commanderLevel: state.commanderLevel,
+    };
+  }, [
+    state.commandProtocolActive,
+    state.commandProtocolLastSwapDay,
+    state.commanderLevel,
+  ]);
+
   const contractClaimedMap = useMemo(
     () => state?.contractState?.claimed || state?.contract_state?.claimed || {},
     [state?.contractState, state?.contract_state]
@@ -6606,6 +6663,32 @@ export default function MleoBase() {
       } catch (error) {
         console.error("Commander path update failed", error);
         showToast(error?.message || "Commander path update failed");
+      }
+    });
+  };
+
+  const handleSetCommandProtocol = async (protocolId) => {
+    const next = normalizeCommandProtocolId(protocolId);
+    const cur = normalizeCommandProtocolId(state.commandProtocolActive);
+    if (next === cur) return;
+
+    return runLockedAction(`commandProtocol:${next}`, async () => {
+      try {
+        const res = await setCommandProtocol({ protocol_id: next });
+
+        if (!res?.success || !res?.state) {
+          showToast(res?.message || "Protocol update failed");
+          return;
+        }
+
+        setState((prev) => mergeAuthoritativeServerState(prev, res.state));
+        markRealGameAction();
+        const label =
+          PHASE_1A_COMMAND_PROTOCOLS.find((p) => p.id === next)?.name || next;
+        showToast(`Command protocol: ${label}`);
+      } catch (error) {
+        console.error("Command protocol update failed", error);
+        showToast(error?.message || "Command protocol update failed");
       }
     });
   };
@@ -8151,6 +8234,12 @@ export default function MleoBase() {
         setBuildInfo(getDevelopmentInfo(item));
         setOpenInfoKey(null);
       }}
+      commandProtocolRows={commandProtocolUi.rows}
+      commandProtocolEffectiveId={commandProtocolUi.effectiveId}
+      commandProtocolStoredId={commandProtocolUi.storedId}
+      commandProtocolCommanderLevel={commandProtocolUi.commanderLevel}
+      commandProtocolCanSwapToday={commandProtocolUi.canSwapToday}
+      onSetCommandProtocol={handleSetCommandProtocol}
     />
   );
 

@@ -124,6 +124,12 @@ export function CrewModulesResearchPanel({
   onOpenModuleInfo,
   onBuyResearch,
   onOpenResearchInfo,
+  commandProtocolRows = null,
+  commandProtocolEffectiveId = "none",
+  commandProtocolStoredId = "none",
+  commandProtocolCommanderLevel = 1,
+  commandProtocolCanSwapToday = true,
+  onSetCommandProtocol = null,
 }) {
   const crewHireAvailableCount = crewTab?.hireDisabled ? 0 : 1;
 
@@ -329,6 +335,68 @@ export function CrewModulesResearchPanel({
               })}
             </div>
           </div>
+
+          {commandProtocolRows && onSetCommandProtocol ? (
+            <div className="rounded-xl border border-white/10 bg-black/20 p-3" data-base-target="command-protocol">
+              <div className="text-sm font-semibold text-white">Command Protocol</div>
+              <div className="mt-1 text-xs text-white/60">
+                One active modifier. Commander level unlocks options. Saved on server — one change per UTC day.
+              </div>
+              <div className="mt-2 text-[11px] text-white/45">
+                In effect:{" "}
+                <span className="font-semibold text-cyan-200/90">
+                  {commandProtocolRows.find((r) => r.id === commandProtocolEffectiveId)?.name || "Standard Posture"}
+                </span>
+                {commandProtocolEffectiveId === "none" ? null : (
+                  <span className="text-white/35"> · Cmdr Lv {commandProtocolCommanderLevel}</span>
+                )}
+              </div>
+              {commandProtocolStoredId !== commandProtocolEffectiveId && commandProtocolStoredId !== "none" ? (
+                <div className="mt-1 text-[10px] text-amber-200/75">
+                  Selection saved but inactive until commander level unlocks it.
+                </div>
+              ) : null}
+              {!commandProtocolCanSwapToday ? (
+                <div className="mt-2 text-[11px] text-amber-200/80">Next protocol swap: tomorrow (UTC).</div>
+              ) : null}
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {commandProtocolRows.map((row) => {
+                  const isSel = !!row.selected;
+                  const disableSelect =
+                    row.locked ||
+                    (!commandProtocolCanSwapToday && !isSel);
+                  return (
+                    <button
+                      key={row.id}
+                      type="button"
+                      onClick={() => onSetCommandProtocol(row.id)}
+                      disabled={disableSelect}
+                      className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                        isSel
+                          ? "border-cyan-400/60 bg-cyan-500/15"
+                          : "border-white/10 bg-white/5 hover:bg-white/10"
+                      } ${disableSelect && !isSel ? "cursor-not-allowed opacity-50" : ""}`}
+                    >
+                      <div className="text-sm font-semibold text-white">{row.name}</div>
+                      <div className="mt-0.5 text-[11px] text-white/55">{row.shortDesc}</div>
+                      {row.locked ? (
+                        <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/85">
+                          Unlocks Cmdr Lv {row.minCommanderLevel}
+                        </div>
+                      ) : null}
+                      {isSel ? (
+                        <div className="mt-2">
+                          <span className="inline-flex rounded-full border border-cyan-400/35 bg-cyan-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-cyan-100">
+                            Selected
+                          </span>
+                        </div>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
 

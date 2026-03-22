@@ -213,6 +213,13 @@ ALTER TABLE public.base_device_state
 ALTER TABLE public.base_device_state
   ADD COLUMN IF NOT EXISTS sector_world integer NOT NULL DEFAULT 1;
 
+-- Command Protocols Phase 1A (must match game/mleo-base/commandProtocols.js)
+ALTER TABLE public.base_device_state
+  ADD COLUMN IF NOT EXISTS command_protocol_active text NOT NULL DEFAULT 'none';
+
+ALTER TABLE public.base_device_state
+  ADD COLUMN IF NOT EXISTS command_protocol_last_swap_day date;
+
 CREATE OR REPLACE FUNCTION public.base_sector_world_daily_cap(p_order integer)
 RETURNS bigint
 LANGUAGE sql
@@ -924,6 +931,9 @@ DECLARE
   v_def jsonb;
   v_sp_active jsonb;
   v_sp_unlocks jsonb;
+
+  v_cmd_protocol text;
+  v_cmd_level integer;
 BEGIN
   SELECT *
   INTO v_state
@@ -1036,6 +1046,18 @@ BEGIN
     SET
       version = 11,
       sector_world = greatest(1, least(6, coalesce(sector_world, 1)))
+    WHERE device_id = p_device_id;
+
+    SELECT *
+    INTO v_state
+    FROM public.base_device_state
+    WHERE device_id = p_device_id
+    FOR UPDATE;
+  END IF;
+
+  IF v_state.version < 12 THEN
+    UPDATE public.base_device_state
+    SET version = 12
     WHERE device_id = p_device_id;
 
     SELECT *
@@ -1288,6 +1310,20 @@ BEGIN
   v_scrap_mult := v_scrap_mult * v_hq_bonus * v_stability_factor;
   v_mleo_mult := v_mleo_mult * v_hq_bonus * v_stability_factor;
   v_data_mult := v_data_mult * v_hq_bonus * v_stability_factor;
+
+  -- Command Protocols Phase 1A (must match game/mleo-base/commandProtocols.js)
+  v_cmd_protocol := lower(trim(coalesce(v_state.command_protocol_active, 'none')));
+  IF v_cmd_protocol NOT IN ('none', 'steady_ops', 'liquidity_drill', 'signal_focus') THEN
+    v_cmd_protocol := 'none';
+  END IF;
+  v_cmd_level := greatest(1, coalesce(v_state.commander_level, 1));
+  IF v_cmd_protocol = 'steady_ops' AND v_cmd_level >= 2 THEN
+    v_maintenance_relief := v_maintenance_relief * 1.025;
+  ELSIF v_cmd_protocol = 'liquidity_drill' AND v_cmd_level >= 3 THEN
+    v_gold_mult := v_gold_mult * 1.02;
+  ELSIF v_cmd_protocol = 'signal_focus' AND v_cmd_level >= 4 THEN
+    v_data_mult := v_data_mult * 1.025;
+  END IF;
 
   v_energy_cap := 148 + (v_power * 42);
   v_energy_regen := 6.4 + (v_power * 2.5);
@@ -1887,6 +1923,84 @@ BEGIN
   SELECT *
   FROM public.base_device_state
   WHERE device_id = p_device_id;
+END;
+$$;
+
+-- Command Protocol Phase 1A: set active protocol (one swap per UTC day)
+CREATE OR REPLACE FUNCTION public.base_set_command_protocol(
+  p_device_id text,
+  p_protocol_id text
+)
+RETURNS TABLE(state jsonb)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_state public.base_device_state%ROWTYPE;
+  v_new text;
+  v_old text;
+  v_level integer;
+BEGIN
+  IF coalesce(trim(p_device_id), '') = '' THEN
+    RAISE EXCEPTION 'device_id is required';
+  END IF;
+
+  PERFORM public.base_reconcile_state(p_device_id);
+
+  SELECT *
+  INTO v_state
+  FROM public.base_device_state
+  WHERE device_id = p_device_id
+  FOR UPDATE;
+
+  v_new := lower(trim(coalesce(p_protocol_id, 'none')));
+  IF v_new NOT IN ('none', 'steady_ops', 'liquidity_drill', 'signal_focus') THEN
+    RAISE EXCEPTION 'Invalid command protocol';
+  END IF;
+
+  v_level := greatest(1, coalesce(v_state.commander_level, 1));
+  IF v_new = 'steady_ops' AND v_level < 2 THEN
+    RAISE EXCEPTION 'Protocol not unlocked yet';
+  END IF;
+  IF v_new = 'liquidity_drill' AND v_level < 3 THEN
+    RAISE EXCEPTION 'Protocol not unlocked yet';
+  END IF;
+  IF v_new = 'signal_focus' AND v_level < 4 THEN
+    RAISE EXCEPTION 'Protocol not unlocked yet';
+  END IF;
+
+  v_old := lower(trim(coalesce(v_state.command_protocol_active, 'none')));
+
+  IF v_new = v_old THEN
+    RETURN QUERY
+    SELECT to_jsonb(v_state) AS state;
+    RETURN;
+  END IF;
+
+  IF v_state.command_protocol_last_swap_day IS NOT NULL
+    AND v_state.command_protocol_last_swap_day = CURRENT_DATE THEN
+    RAISE EXCEPTION 'Command protocol can only be changed once per day';
+  END IF;
+
+  UPDATE public.base_device_state
+  SET
+    command_protocol_active = v_new,
+    command_protocol_last_swap_day = CURRENT_DATE,
+    updated_at = now()
+  WHERE device_id = p_device_id
+  RETURNING * INTO v_state;
+
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'command_protocol_set',
+    jsonb_build_object('protocol_after', v_new, 'protocol_before', v_old),
+    0,
+    '[]'::jsonb
+  );
+
+  RETURN QUERY
+  SELECT to_jsonb(v_state) AS state;
 END;
 $$;
 
@@ -2538,6 +2652,7 @@ REVOKE EXECUTE ON FUNCTION public.base_get_or_create_state(text) FROM PUBLIC, an
 REVOKE EXECUTE ON FUNCTION public.base_reconcile_state(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_claim_mission_reward(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_set_profile(text, text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_set_command_protocol(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_claim_contract(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_elite_daily_offer_templates(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_set_building_paused(text, text, boolean) FROM PUBLIC, anon, authenticated;
@@ -2547,6 +2662,7 @@ GRANT EXECUTE ON FUNCTION public.base_get_or_create_state(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_reconcile_state(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_claim_mission_reward(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_set_profile(text, text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.base_set_command_protocol(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_claim_contract(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_elite_daily_offer_templates(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_set_building_paused(text, text, boolean) TO service_role;

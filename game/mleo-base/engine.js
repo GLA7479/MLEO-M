@@ -531,7 +531,7 @@ export function countClaimableSpecializationMilestones(state, derived) {
 
 export function freshState() {
   return {
-    version: 10,
+    version: 12,
     lastDay: todayKey(),
     lastHiddenAt: 0,
     resources: {
@@ -599,6 +599,9 @@ export function freshState() {
     log: pushLog([], "MLEO BASE online. HQ is active."),
     /** Active sector / world (1–6). Server column `sector_world`. */
     sectorWorld: 1,
+    /** Command Protocol Phase 1A — server columns `command_protocol_*`. */
+    commandProtocolActive: "none",
+    commandProtocolLastSwapDay: "",
   };
 }
 
@@ -729,6 +732,26 @@ export function sanitizeBaseState(raw, fallback = null) {
       6,
       Math.max(1, safeInteger(src.sectorWorld ?? src.sector_world, seed.sectorWorld, 1))
     ),
+    commandProtocolActive: (() => {
+      const raw =
+        src.commandProtocolActive ??
+        src.command_protocol_active ??
+        seed.commandProtocolActive;
+      const s = String(raw ?? "none").trim().toLowerCase();
+      if (s === "none" || s === "") return "none";
+      if (
+        s === "steady_ops" ||
+        s === "liquidity_drill" ||
+        s === "signal_focus"
+      ) {
+        return s;
+      }
+      return "none";
+    })(),
+    commandProtocolLastSwapDay:
+      typeof (src.commandProtocolLastSwapDay ?? src.command_protocol_last_swap_day) === "string"
+        ? String(src.commandProtocolLastSwapDay ?? src.command_protocol_last_swap_day).trim()
+        : seed.commandProtocolLastSwapDay,
     log: Array.isArray(src.log) ? src.log.slice(0, MAX_LOG_ITEMS) : seed.log,
   };
 }
@@ -829,6 +852,16 @@ export function normalizeServerState(raw, prevState = null) {
       sectorWorld: Number(
         raw.sectorWorld ?? raw.sector_world ?? prev?.sectorWorld ?? seed.sectorWorld ?? 1
       ),
+      commandProtocolActive:
+        raw.commandProtocolActive ??
+        raw.command_protocol_active ??
+        prev?.commandProtocolActive ??
+        seed.commandProtocolActive,
+      commandProtocolLastSwapDay:
+        raw.commandProtocolLastSwapDay ??
+        raw.command_protocol_last_swap_day ??
+        prev?.commandProtocolLastSwapDay ??
+        seed.commandProtocolLastSwapDay,
       log: prev?.log || seed.log,
     },
     seed
