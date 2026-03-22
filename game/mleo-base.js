@@ -2948,7 +2948,103 @@ function rewardText(reward) {
     .join(" · ");
 }
 
-function getNextStep(state, derived, systemState, liveContracts = []) {
+function getSpecializationGuidanceAction(state, derived, specializationSummary, liveContracts = []) {
+  if (!specializationSummary || typeof specializationSummary !== "object") return null;
+
+  const totals = specializationSummary.totals || {};
+  const buildings = specializationSummary.buildings || [];
+  const top = specializationSummary.topRecommendation;
+
+  const totalReadyAdvanced = Number(totals.totalReadyAdvancedContracts || 0);
+  if (totalReadyAdvanced > 0) {
+    const c = liveContracts.find((x) => x.contractClass === "advanced" && x.done && !x.claimed);
+    if (c?.title) {
+      return {
+        title: "Claim advanced contract",
+        text: `${c.title} is complete — claim the reward in Contracts to keep specialization progress.`,
+      };
+    }
+  }
+
+  const totalClaimableM = Number(totals.totalClaimableMilestones || 0);
+  if (totalClaimableM > 0) {
+    for (const row of buildings) {
+      if (row.claimableMilestones > 0) {
+        const mk = (SPECIALIZATION_MILESTONES_BY_BUILDING[row.buildingKey] || []).find((k) => {
+          const p = getSpecializationMilestonePreview(state, derived, row.buildingKey, k);
+          return p.done && !p.claimed;
+        });
+        const label = mk ? SPECIALIZATION_MILESTONE_META[mk]?.label || mk : "milestone";
+        return {
+          title: "Claim specialization milestone",
+          text: `${label} is ready — open ${row.buildingName} and claim your specialization reward.`,
+        };
+      }
+    }
+    return {
+      title: "Claim specialization milestones",
+      text: `${totalClaimableM} specialization milestone${totalClaimableM > 1 ? "s are" : " is"} ready to claim.`,
+    };
+  }
+
+  for (const row of buildings) {
+    if (row.level < 1) {
+      return {
+        title: `Build ${row.buildingName}`,
+        text: `${row.buildingName} unlocks specialization tracks, programs, and milestones for your command path.`,
+      };
+    }
+  }
+
+  for (const row of buildings) {
+    if (row.level >= 1 && row.tier < 2) {
+      return {
+        title: `Advance ${row.buildingName} to T2`,
+        text: `Tier 2 unlocks advanced contracts and stronger support programs at ${row.buildingName}.`,
+      };
+    }
+  }
+
+  for (const row of buildings) {
+    if (row.level < 1) continue;
+    const programs = getSupportPrograms(row.buildingKey);
+    const nextUnlock = programs.find(
+      (p) => row.tier >= p.minTier && !isSupportProgramUnlocked(state, row.buildingKey, p.key)
+    );
+    if (nextUnlock) {
+      const can = canUnlockSupportProgram(state, row.buildingKey, nextUnlock);
+      return {
+        title: can ? `Unlock ${nextUnlock.label}` : `Work toward ${nextUnlock.label}`,
+        text: can
+          ? `You can unlock ${nextUnlock.label} at ${row.buildingName} now.`
+          : `Meet the requirements to unlock ${nextUnlock.label} at ${row.buildingName}.`,
+      };
+    }
+  }
+
+  for (const row of buildings) {
+    if (row.level < 1) continue;
+    const programs = getSupportPrograms(row.buildingKey);
+    const anyUnlocked = programs.some((p) => isSupportProgramUnlocked(state, row.buildingKey, p.key));
+    if (anyUnlocked && !row.activeProgramKey) {
+      return {
+        title: "Activate support program",
+        text: `Select and activate a support program at ${row.buildingName} to apply specialization bonuses.`,
+      };
+    }
+  }
+
+  if (top?.text && (top.navigateTarget != null || top.focusBuildingKey)) {
+    return {
+      title: "Specialization focus",
+      text: top.text,
+    };
+  }
+
+  return null;
+}
+
+function getNextStep(state, derived, systemState, liveContracts = [], specializationSummary = null) {
   const b = state.buildings || {};
   const energy = Number(state.resources?.ENERGY || 0);
   const energyCap = Number(derived?.energyCap || 0);
@@ -2976,6 +3072,9 @@ function getNextStep(state, derived, systemState, liveContracts = []) {
       text: "Energy reserve is critically low. Refill now or allow systems to recover.",
     };
   }
+
+  const specStep = getSpecializationGuidanceAction(state, derived, specializationSummary, liveContracts);
+  if (specStep) return specStep;
 
   if ((b.tradeHub || 0) < 1) {
     return {
@@ -5718,6 +5817,19 @@ export default function MleoBase() {
       });
     }
 
+    if (readyCounts.specializationMilestones > 0) {
+      items.push({
+        key: "specialization-milestones",
+        type: "ready",
+        tone: "success",
+        title: "Specialization milestone ready",
+        text: `${readyCounts.specializationMilestones} specialization milestone${
+          readyCounts.specializationMilestones > 1 ? "s are" : " is"
+        } ready to claim.`,
+        count: readyCounts.specializationMilestones,
+      });
+    }
+
     if (readyCounts.missions > 0) {
       items.push({
         key: "missions",
@@ -5761,8 +5873,8 @@ export default function MleoBase() {
       : "text-sm";
 
   const nextStep = useMemo(
-    () => getNextStep(state, derived, systemState, liveContracts),
-    [state, derived, systemState, liveContracts]
+    () => getNextStep(state, derived, systemState, liveContracts, specializationSummary),
+    [state, derived, systemState, liveContracts, specializationSummary]
   );
 
   const bankedSnapshot = useMemo(
