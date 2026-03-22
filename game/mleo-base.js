@@ -105,9 +105,11 @@ import {
 import {
   buildWorld2FreightAlert,
   buildWorld3TelemetryAlert,
+  buildWorld4ReactorAlert,
   getSectorWorldProgressSnapshot,
   getWorld2ThroughputSnapshot,
   getWorld3TelemetrySnapshot,
+  getWorld4ReactorSnapshot,
   getWorldDailyMleoCapByOrder,
   resolveSectorWorldOrder,
 } from "./mleo-base/worlds";
@@ -135,6 +137,16 @@ function worldSignalToneClass(signalKey) {
   }
   if (signalKey === "noisy") {
     return "border-amber-400/30 bg-amber-500/[0.12] text-amber-100";
+  }
+  return "border-sky-400/25 bg-sky-500/[0.08] text-sky-100";
+}
+
+function worldReactorToneClass(loadKey) {
+  if (loadKey === "primed") {
+    return "border-orange-400/30 bg-orange-500/[0.12] text-orange-100";
+  }
+  if (loadKey === "strained") {
+    return "border-rose-400/30 bg-rose-500/[0.12] text-rose-100";
   }
   return "border-sky-400/25 bg-sky-500/[0.08] text-sky-100";
 }
@@ -280,7 +292,8 @@ function getAlerts(
   systemState,
   liveContracts = [],
   world2FreightAlertRow = null,
-  world3TelemetryAlertRow = null
+  world3TelemetryAlertRow = null,
+  world4ReactorAlertRow = null
 ) {
   const alerts = [];
 
@@ -342,6 +355,16 @@ function getAlerts(
       tone: "success",
       title: "Contract reward ready",
       text: `${claimableContracts} command contract${claimableContracts > 1 ? "s are" : " is"} ready to claim.`,
+    });
+  }
+
+  if (world4ReactorAlertRow) {
+    alerts.unshift({
+      key: world4ReactorAlertRow.key,
+      tone: world4ReactorAlertRow.tone,
+      title: world4ReactorAlertRow.title,
+      text: world4ReactorAlertRow.text,
+      world4Target: world4ReactorAlertRow.target,
     });
   }
 
@@ -4840,6 +4863,7 @@ export default function MleoBase() {
   }
 
   function getAlertNavigationTarget(item) {
+    if (item?.world4Target) return item.world4Target;
     if (item?.world3Target) return item.world3Target;
     if (item?.world2Target) return item.world2Target;
 
@@ -4847,6 +4871,13 @@ export default function MleoBase() {
 
     if (key === "world3-telemetry-noisy" || key === "world3-telemetry-clean") {
       return { tab: "crew", target: "research" };
+    }
+
+    if (key === "world4-reactor-strained") {
+      return { tab: "operations", target: "maintenance" };
+    }
+    if (key === "world4-reactor-primed") {
+      return { tab: "operations", target: "overclock" };
     }
 
     switch (key) {
@@ -5011,6 +5042,7 @@ export default function MleoBase() {
       if (
         normalizedStep.target === "shipping" ||
         normalizedStep.target === "maintenance" ||
+        normalizedStep.target === "overclock" ||
         normalizedStep.target === "expedition" ||
         normalizedStep.target === "expedition-action"
       ) {
@@ -5529,6 +5561,16 @@ export default function MleoBase() {
     [world3Telemetry]
   );
 
+  const world4Reactor = useMemo(() => {
+    if (activeWorldOrder !== 4) return null;
+    return getWorld4ReactorSnapshot(state, derived);
+  }, [activeWorldOrder, state, derived]);
+
+  const world4ReactorAlert = useMemo(
+    () => buildWorld4ReactorAlert(world4Reactor),
+    [world4Reactor]
+  );
+
   const sectorWorldSnapshot = useMemo(
     () =>
       getSectorWorldProgressSnapshot(state, derived, {
@@ -5962,9 +6004,18 @@ export default function MleoBase() {
         systemState,
         liveContracts,
         world2FreightAlert,
-        world3TelemetryAlert
+        world3TelemetryAlert,
+        world4ReactorAlert
       ),
-    [state, derived, systemState, liveContracts, world2FreightAlert, world3TelemetryAlert]
+    [
+      state,
+      derived,
+      systemState,
+      liveContracts,
+      world2FreightAlert,
+      world3TelemetryAlert,
+      world4ReactorAlert,
+    ]
   );
   const desktopPriorityAlert = alerts[0] || null;
 
@@ -5994,6 +6045,7 @@ export default function MleoBase() {
         count: 0,
         ...(alert.world2Target ? { world2Target: alert.world2Target } : {}),
         ...(alert.world3Target ? { world3Target: alert.world3Target } : {}),
+        ...(alert.world4Target ? { world4Target: alert.world4Target } : {}),
       });
     });
 
@@ -7237,13 +7289,19 @@ export default function MleoBase() {
         const serverState = res.state;
         const latestVault = await readVaultSafe();
         if (latestVault != null) setSharedVault(latestVault);
+        const overclockSuffix = world4Reactor
+          ? ` [${world4Reactor.loadLabel} · ${world4Reactor.disciplineScore}/100]`
+          : "";
         setState((prev) => {
           const next = mergeAuthoritativeServerState(prev, serverState);
-          next.log = pushLog(next.log, "Overclock activated.");
+          next.log = pushLog(next.log, `Overclock engaged.${overclockSuffix}`);
           return next;
         });
         markRealGameAction();
-        showToast("Overclock engaged. Base output is temporarily boosted.");
+        const overclockToastBase = world4Reactor
+          ? `Overclock engaged · ${world4Reactor.loadLabel} · ${world4Reactor.disciplineScore}/100`
+          : "Overclock engaged. Base output is temporarily boosted.";
+        showToast(overclockToastBase);
       } else {
         showToast(res?.message || "Overclock failed.");
       }
@@ -7305,20 +7363,32 @@ export default function MleoBase() {
       const res = await performMaintenanceAction();
       if (res?.success && res?.state) {
         const serverState = res.state;
+        const maintenanceSuffix = world4Reactor
+          ? ` [${world4Reactor.loadLabel} · ${world4Reactor.disciplineScore}/100]`
+          : "";
         setState((prev) => {
           const next = mergeAuthoritativeServerState(prev, serverState);
-          next.log = pushLog(next.log, "Maintenance completed. Base stability improved.");
+          next.log = pushLog(
+            next.log,
+            `Maintenance completed. Base stability improved.${maintenanceSuffix}`
+          );
           return next;
         });
 
         markRealGameAction();
 
-        showToast(
-          withBottleneckNote("Maintenance complete · stability pressure reduced", {
-            "stability-drag": "Main pressure reduced",
-            "energy-collapse": "Main pressure reduced",
-          })
-        );
+        if (world4Reactor) {
+          showToast(
+            `Maintenance complete · ${world4Reactor.loadLabel} · ${world4Reactor.disciplineScore}/100`
+          );
+        } else {
+          showToast(
+            withBottleneckNote("Maintenance complete · stability pressure reduced", {
+              "stability-drag": "Main pressure reduced",
+              "energy-collapse": "Main pressure reduced",
+            })
+          );
+        }
       } else {
         showToast(res?.message || "Maintenance failed.");
       }
@@ -7798,6 +7868,7 @@ export default function MleoBase() {
       }}
       maintenance={{
         highlighted: isHighlightedTarget("maintenance", highlightTarget),
+        highlightOverclock: isHighlightedTarget("overclock", highlightTarget),
         highlightClass:
           systemState === "critical"
             ? highlightCard(true, "critical")
@@ -7827,12 +7898,50 @@ export default function MleoBase() {
         onRefill: refillEnergy,
         refillButtonText: `Refill ${fmt(CONFIG.refillCost)}`,
         onMaintain: performMaintenance,
+        overclockHint:
+          world4Reactor != null ? (
+            <span className="mt-1 block text-[11px] text-white/65">
+              Reactor: {world4Reactor.loadLabel} ·{" "}
+              {world4Reactor.recommendedOverclockNow
+                ? "good overclock window"
+                : "better to stabilize first"}
+            </span>
+          ) : null,
+        maintenanceHint:
+          world4Reactor != null ? (
+            <span className="mt-1 block text-[11px] text-white/65">
+              Thermal state: {world4Reactor.reactorState} · {world4Reactor.priority}
+            </span>
+          ) : null,
       }}
     />
   );
 
   const operationsConsoleContentMobile = (
     <>
+      {world4Reactor ? (
+        <div
+          className={`mb-3 rounded-2xl border px-3 py-2.5 ${worldReactorToneClass(
+            world4Reactor.loadKey
+          )}`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-[0.16em] opacity-75">
+                Reactor Scar
+              </div>
+              <div className="truncate text-sm font-semibold">
+                {world4Reactor.loadLabel} · {world4Reactor.disciplineScore}/100
+              </div>
+            </div>
+            <div className="rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-bold">
+              {world4Reactor.recommendedOverclockNow ? "PUSH" : "HOLD"}
+            </div>
+          </div>
+
+          <div className="mt-2 text-[11px] opacity-80">{world4Reactor.priority}</div>
+        </div>
+      ) : null}
       {world2Throughput ? (
         <div
           className={`mb-3 rounded-2xl border px-3 py-2.5 ${worldLaneToneClass(
@@ -11135,6 +11244,20 @@ export default function MleoBase() {
         setHighlightTarget("research");
         return;
       }
+
+      if (item.alertKey === "world4-reactor-strained") {
+        openMobilePanel("ops");
+        setOpenInnerPanel("ops-console");
+        setHighlightTarget("maintenance");
+        return;
+      }
+
+      if (item.alertKey === "world4-reactor-primed") {
+        openMobilePanel("ops");
+        setOpenInnerPanel("ops-console");
+        setHighlightTarget("overclock");
+        return;
+      }
     }
   };
 
@@ -13407,6 +13530,59 @@ export default function MleoBase() {
                     derived.dailyMleoCap ?? derived.shipCap
                   )}. Ship banked MLEO to Shared Vault anytime (no daily ship limit).`}
                 >
+                  {world4Reactor ? (
+                    <div
+                      className={`mb-3 rounded-2xl border px-3 py-3 ${worldReactorToneClass(
+                        world4Reactor.loadKey
+                      )}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-black uppercase tracking-[0.18em] opacity-80">
+                            Reactor Scar
+                          </div>
+                          <div className="text-sm font-semibold">
+                            {world4Reactor.flowHeadline} · {world4Reactor.loadLabel}
+                          </div>
+                          <div className="mt-1 text-[12px] opacity-85">
+                            {world4Reactor.actionHint}
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] font-bold">
+                          {world4Reactor.chipText}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-1 gap-2 text-[11px] opacity-85 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Discipline</div>
+                          <div className="mt-1 text-sm font-semibold">
+                            {world4Reactor.disciplineScore}/100
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Priority</div>
+                          <div className="mt-1 text-sm font-semibold">{world4Reactor.priority}</div>
+                        </div>
+
+                        <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Support</div>
+                          <div className="mt-1 text-sm font-semibold">{world4Reactor.supportLine}</div>
+                        </div>
+
+                        <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Thermal</div>
+                          <div className="mt-1 text-sm font-semibold">{world4Reactor.thermalLine}</div>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 text-[11px] opacity-75">
+                        {world4Reactor.recommendation}
+                      </div>
+                    </div>
+                  ) : null}
                   {world2Throughput ? (
                     <div
                       className={`mb-3 rounded-2xl border px-3 py-3 ${worldLaneToneClass(
@@ -13751,10 +13927,32 @@ export default function MleoBase() {
                         <p className="mt-2 text-xs text-white/55">
                           Stability: {fmt(state.stability)}%
                         </p>
+                        {world4Reactor ? (
+                          <span className="mt-1 block text-[11px] text-white/65">
+                            Reactor: {world4Reactor.loadLabel} ·{" "}
+                            {world4Reactor.recommendedOverclockNow
+                              ? "good overclock window"
+                              : "better to stabilize first"}
+                          </span>
+                        ) : null}
+                        {world4Reactor ? (
+                          <span className="mt-1 block text-[11px] text-white/65">
+                            Thermal state: {world4Reactor.reactorState} · {world4Reactor.priority}
+                          </span>
+                        ) : null}
                       </div>
 
                       <div className="mt-auto grid grid-cols-3 gap-2 pt-1">
-                        <button onClick={activateOverclock} className="rounded-xl bg-amber-600 px-3 py-3 text-sm font-bold hover:bg-amber-500">
+                        <button
+                          type="button"
+                          data-base-target="overclock"
+                          onClick={activateOverclock}
+                          className={`rounded-xl bg-amber-600 px-3 py-3 text-sm font-bold hover:bg-amber-500 ${
+                            isHighlightedTarget("overclock", highlightTarget)
+                              ? "ring-2 ring-cyan-300/90 ring-offset-2 ring-offset-amber-500/10"
+                              : ""
+                          }`}
+                        >
                           {overclockLeft > 0 ? `Overclock ${Math.ceil(overclockLeft / 1000)}s` : `Overclock ${fmt(CONFIG.overclockCost)}`}
                         </button>
                         <button onClick={refillEnergy} className="rounded-xl bg-white/10 px-3 py-3 text-sm font-bold hover:bg-white/20">

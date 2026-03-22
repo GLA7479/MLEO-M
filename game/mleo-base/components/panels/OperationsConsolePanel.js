@@ -275,12 +275,20 @@ export function OperationsConsolePanel({
           <p className="mt-2 text-xs text-white/55">
             Stability: {maintenance.stabilityText}%
           </p>
+          {maintenance.overclockHint}
+          {maintenance.maintenanceHint}
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-2">
           <button
+            type="button"
+            data-base-target="overclock"
             onClick={maintenance.onOverclock}
-            className="rounded-xl bg-amber-600 px-3 py-3 text-sm font-bold text-white hover:bg-amber-500"
+            className={`rounded-xl bg-amber-600 px-3 py-3 text-sm font-bold text-white hover:bg-amber-500 ${
+              maintenance.highlightOverclock
+                ? "ring-2 ring-cyan-300/90 ring-offset-2 ring-offset-amber-500/10"
+                : ""
+            }`}
           >
             {maintenance.overclockButtonText}
           </button>

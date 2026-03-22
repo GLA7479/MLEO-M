@@ -1,7 +1,12 @@
 /**
- * World 4 — Reactor Scar (sector identity + panel copy only).
- * Read-only display helpers — no economy, cap, or progression changes.
+ * World 4 — Reactor Scar
+ * Sector identity + reactor gameplay readout.
  */
+
+import {
+  buildWorld4ReactorAlert,
+  getWorld4ReactorSnapshot,
+} from "./world4Gameplay";
 
 export const world4ReactorScar = {
   id: "world4",
@@ -27,61 +32,46 @@ function fmtInt(n) {
   return Number.isFinite(v) ? String(v) : "0";
 }
 
-function fmtPct(num, den) {
-  const n = Number(num);
-  const d = Math.max(1, Number(den));
-  if (!Number.isFinite(n)) return "0";
-  return Math.min(100, Math.max(0, Math.round((n / d) * 100))).toString();
+function world4ProgressionNote(ctx) {
+  const nextName = ctx?.nextWorldName;
+  const canDeploy = !!ctx?.canDeployToNextWorld;
+
+  if (!nextName) return "Terminal sector posture — keep the scar cool and the stack honest.";
+
+  if (canDeploy) {
+    return `Next: ${nextName} — reactor gates satisfied. Deploy when ready for the next pressure band.`;
+  }
+
+  return `Working toward ${nextName}: full support tiers, broader program grid, and elite spread must stabilize before advance.`;
 }
 
-/**
- * Read-only load line: energy vs cap, refinery tier proxy, overclock window (from existing state + derived).
- * @param {object} state
- * @param {object} derived
- */
-export function getWorld4LoadSnapshot(state, derived) {
+export function getWorld4LoadSnapshot(state, derived = {}) {
+  const reactor = getWorld4ReactorSnapshot(state, derived);
   const energyNow = Math.floor(Number(state?.resources?.ENERGY ?? 0));
-  const energyCap = Math.max(1, Math.floor(Number(derived?.energyCap ?? 148)));
-  const pct = fmtPct(energyNow, energyCap);
-
-  const refineryLevel = Math.max(0, Math.floor(Number(state?.buildings?.refinery ?? 0)));
-
-  const ocUntil = Number(state?.overclockUntil ?? state?.overclock_until ?? 0);
-  const now = Date.now();
-  const overclockActive = ocUntil > now;
-
-  const summaryLine = `Energy ${fmtInt(energyNow)} / ${fmtInt(energyCap)} (${pct}% reserve) · Refinery L${fmtInt(
-    refineryLevel
-  )} · Overclock ${overclockActive ? "live" : "idle"}`;
+  const energyCap = Math.max(1, Math.floor(Number(derived?.energyCap ?? 1)));
 
   return {
     energyNow,
     energyCap,
-    pct: Number(pct),
-    refineryLevel,
-    overclockActive,
-    summaryLine,
+    reactor,
+    alert: buildWorld4ReactorAlert(reactor),
+    summaryLine: reactor
+      ? `${reactor.compactLine} · ${reactor.thermalLine}`
+      : `Energy ${fmtInt(energyNow)} / ${fmtInt(energyCap)}`,
   };
 }
 
-function world4ProgressionNote(ctx) {
-  const nextName = ctx?.nextWorldName;
-  const canDeploy = !!ctx?.canDeployToNextWorld;
-  if (!nextName) return "Terminal sector posture — keep the scar cool and the stack honest.";
-  if (canDeploy) {
-    return `Next: ${nextName} — reactor gates satisfied. Deploy when ready for the next pressure band.`;
-  }
-  return `Working toward ${nextName}: full support tiers, broader program grid, and elite spread must stabilize before advance.`;
-}
-
-/**
- * @param {object} state
- * @param {object} derived
- * @param {{ nextWorldName?: string | null, canDeployToNextWorld?: boolean }} [ctx]
- */
 export function buildWorld4PanelFlavor(state, derived, ctx = {}) {
   const id = WORLD4_SECTOR_IDENTITY;
   const load = getWorld4LoadSnapshot(state, derived);
+  const reactor = load.reactor;
+
+  const overviewHint =
+    reactor?.loadKey === "primed"
+      ? "Primed stack: strong moment for output push or controlled overclock."
+      : reactor?.loadKey === "strained"
+        ? "Strained stack: recover reserve and maintenance before pushing harder."
+        : "Managed load: keep reserve healthy and avoid sloppy overclock timing.";
 
   return {
     worldOrder: 4,
@@ -91,16 +81,29 @@ export function buildWorld4PanelFlavor(state, derived, ctx = {}) {
     tagline: id.tagline,
     descriptor: id.descriptor,
     focusShort: id.focusShort,
-    playstyleHint: id.playstyleHint,
-    sectorPressureNote: id.sectorPressureNote,
+    playstyleHint: reactor?.actionHint || id.playstyleHint,
+    sectorPressureNote: reactor?.reason || id.sectorPressureNote,
     progressionNote: world4ProgressionNote(ctx),
     flowMetricLine: load.summaryLine,
-    overviewStripTitle: "Reactor scar",
-    overviewHint:
-      "Ride production surges with energy discipline — higher cap means faster strain; stage overclock and refinery pushes deliberately.",
+    overviewStripTitle: reactor ? `${id.badgeLabel} · ${reactor.loadLabel}` : "Reactor scar",
+    overviewHint,
     overviewStripShellClassName:
-      "rounded-xl border border-orange-400/25 bg-orange-500/[0.08] px-3 py-2 text-[11px] leading-snug text-orange-50/90",
+      reactor?.loadKey === "primed"
+        ? "rounded-xl border border-orange-400/25 bg-orange-500/[0.10] px-3 py-2 text-[11px] leading-snug text-orange-50/90"
+        : reactor?.loadKey === "strained"
+          ? "rounded-xl border border-rose-400/25 bg-rose-500/[0.10] px-3 py-2 text-[11px] leading-snug text-rose-50/90"
+          : "rounded-xl border border-orange-400/25 bg-orange-500/[0.08] px-3 py-2 text-[11px] leading-snug text-orange-50/90",
     overviewStripTitleClassName:
-      "font-black uppercase tracking-[0.14em] text-orange-200/90",
+      reactor?.loadKey === "strained"
+        ? "font-black uppercase tracking-[0.14em] text-rose-200/90"
+        : "font-black uppercase tracking-[0.14em] text-orange-200/90",
+    extraLines: reactor
+      ? [
+          reactor.supportLine,
+          reactor.thermalLine,
+          `Priority: ${reactor.priority}`,
+          `Recommendation: ${reactor.recommendation}`,
+        ]
+      : [],
   };
 }
