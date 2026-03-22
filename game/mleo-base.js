@@ -10713,20 +10713,11 @@ export default function MleoBase() {
   };
 
   const openDesktopPanel = (panel, inner = null) => {
-    const defaults = {
-      overview: "overview-contracts",
-      ops: "ops-console",
-      build: "build-structures",
-      intel: "intel-summary",
-    };
-
     setDesktopPanel(panel);
-    // Normal tab entry should start with ALL inner sections closed for ops/build/intel.
-    // Targeted navigation passes an explicit `inner`, so it should keep its current behavior.
-    const isOpsBuildIntel = panel === "ops" || panel === "build" || panel === "intel";
-    const autoInner =
-      isOpsBuildIntel && inner == null ? null : defaults[panel] ?? null;
-    setOpenInnerPanel(inner ?? autoInner);
+    // Tab-only entry (single argument / inner omitted): every panel starts with all
+    // expandable rows closed — including Overview (identity, contracts).
+    // Deep links pass `inner` explicitly (e.g. overview-contracts, build-structures).
+    setOpenInnerPanel(inner != null ? inner : null);
     setDesktopPanelOpen(true);
   };
 

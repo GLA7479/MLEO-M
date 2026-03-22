@@ -1,3 +1,5 @@
+import { ExpandablePanelSectionHeader } from "./ExpandablePanelSectionHeader";
+
 function toneClasses(tone = "info") {
   if (tone === "critical") {
     return "border-rose-400/30 bg-rose-500/10 text-rose-100";
@@ -31,21 +33,6 @@ function MiniStat({ label, value, note }) {
       <div className="mt-0.5 text-base font-black text-white">{value}</div>
       {note ? <div className="mt-0.5 text-xs text-white/55">{note}</div> : null}
     </div>
-  );
-}
-
-function SectionButton({ isOpen, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.(e);
-      }}
-      className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-    >
-      {isOpen ? "CLOSE" : "OPEN"}
-    </button>
   );
 }
 
@@ -393,13 +380,18 @@ function IdentityCard({
 
   return (
     <CardShell className="h-full">
-      <SectionHeader
-        title="Command Identity"
-        hint={!isOpen ? "Current crew role and commander path" : null}
-        right={<SectionButton isOpen={isOpen} onClick={() => toggleInnerPanel(openKey)} />}
-      />
+      <ExpandablePanelSectionHeader
+        panelKey={openKey}
+        openInnerPanel={openInnerPanel}
+        toggleInnerPanel={toggleInnerPanel}
+      >
+        <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Command Identity</div>
+        {!isOpen ? (
+          <div className="mt-1 text-xs text-white/55">Current crew role and commander path</div>
+        ) : null}
+      </ExpandablePanelSectionHeader>
       {isOpen ? (
-        <div className="space-y-3 text-sm">
+        <div className="mt-3 space-y-3 text-sm">
           <div className="rounded-xl border border-white/10 bg-black/20 p-3">
             <div className="text-xs uppercase tracking-[0.16em] text-white/45">Crew Role</div>
             <div className="mt-1 font-bold text-white">{crewRoleInfo?.name}</div>
@@ -547,29 +539,30 @@ function ContractsCard({
   const openKey = "overview-contracts";
   const isOpen = openInnerPanel === openKey;
 
+  const contractsHint = !isOpen
+    ? liveContractsAvailableCount > 0
+      ? `${liveContractsAvailableCount} contract reward${
+          liveContractsAvailableCount > 1 ? "s" : ""
+        } ready`
+      : "No contract rewards ready right now"
+    : null;
+
   return (
     <CardShell data-base-target="contracts" className="h-full">
-      <SectionHeader
-        title="Live Contracts"
-        hint={
-          !isOpen
-            ? liveContractsAvailableCount > 0
-              ? `${liveContractsAvailableCount} contract reward${
-                  liveContractsAvailableCount > 1 ? "s" : ""
-                } ready`
-              : "No contract rewards ready right now"
-            : null
-        }
-        right={
-          <div className="flex items-center gap-2">
-            <AvailabilityBadge count={liveContractsAvailableCount} />
-            <SectionButton isOpen={isOpen} onClick={() => toggleInnerPanel(openKey)} />
-          </div>
-        }
-      />
+      <ExpandablePanelSectionHeader
+        panelKey={openKey}
+        openInnerPanel={openInnerPanel}
+        toggleInnerPanel={toggleInnerPanel}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Live Contracts</div>
+          <AvailabilityBadge count={liveContractsAvailableCount} />
+        </div>
+        {contractsHint ? <div className="mt-1 text-xs text-white/55">{contractsHint}</div> : null}
+      </ExpandablePanelSectionHeader>
 
       {isOpen ? (
-        <div className="space-y-3">
+        <div className="mt-3 space-y-3">
           {[...(liveContracts || [])]
             .sort((a, b) => {
               const aReady = a.done && !a.claimed ? 1 : 0;
