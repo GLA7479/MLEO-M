@@ -20,14 +20,28 @@ export const COMMAND_PROTOCOL_FAMILY_LABEL = {
   tradeoff: "Tradeoff",
 };
 
+/**
+ * Phase 1E / 1H: mismatch copy (Crew + Overview); single source so surfaces stay aligned.
+ */
+export const COMMAND_PROTOCOL_STORED_INACTIVE_OVERVIEW =
+  "Stored protocol is not yet effective at your commander level.";
+
+export const COMMAND_PROTOCOL_DOCTRINE_CONTEXT_OVERVIEW = {
+  steady_ops: "Effective doctrine: slightly higher maintenance relief.",
+  liquidity_drill: "Effective doctrine: gold routines emphasized.",
+  signal_focus: "Effective doctrine: DATA routines emphasized.",
+  gold_over_watch: "Effective doctrine: gold focus with a small maintenance offset.",
+  data_over_watch: "Effective doctrine: DATA focus with a small gold offset.",
+};
+
 /** UI + docs: unlock thresholds and copy */
 export const PHASE_1A_COMMAND_PROTOCOLS = [
   {
     id: "none",
     name: "Standard Posture",
-    shortDesc: "No protocol modifier.",
+    shortDesc: "Baseline doctrine; no protocol modifiers.",
     minCommanderLevel: 1,
-    bestWhen: "Best when: you want a neutral baseline with no protocol tradeoff.",
+    bestWhen: "Fit: neutral baseline, no doctrine offset.",
   },
   {
     id: "steady_ops",
@@ -35,7 +49,7 @@ export const PHASE_1A_COMMAND_PROTOCOLS = [
     shortDesc: "Maintenance relief +2.5%",
     minCommanderLevel: 2,
     family: "clean",
-    bestWhen: "Best when: maintenance pressure is rising and you want smoother operations.",
+    bestWhen: "Fit: rising maintenance load; steadier ops.",
   },
   {
     id: "liquidity_drill",
@@ -43,7 +57,7 @@ export const PHASE_1A_COMMAND_PROTOCOLS = [
     shortDesc: "Gold output +2%",
     minCommanderLevel: 3,
     family: "clean",
-    bestWhen: "Best when: you want extra gold without taking on a new drawback.",
+    bestWhen: "Fit: extra gold without adding a new drawback.",
   },
   {
     id: "signal_focus",
@@ -51,8 +65,7 @@ export const PHASE_1A_COMMAND_PROTOCOLS = [
     shortDesc: "DATA output +2.5%",
     minCommanderLevel: 4,
     family: "clean",
-    bestWhen:
-      "Best when: you want extra DATA without weakening other economic pressure points.",
+    bestWhen: "Fit: extra DATA without spreading pressure elsewhere.",
   },
   {
     id: "gold_over_watch",
@@ -60,8 +73,7 @@ export const PHASE_1A_COMMAND_PROTOCOLS = [
     shortDesc: "Gold +2.5%, maintenance relief −1.5%",
     minCommanderLevel: 5,
     family: "tradeoff",
-    bestWhen:
-      "Best when: gold demand matters more than a small maintenance comfort loss.",
+    bestWhen: "Fit: gold priority over a small maintenance comfort cost.",
   },
   {
     id: "data_over_watch",
@@ -69,7 +81,7 @@ export const PHASE_1A_COMMAND_PROTOCOLS = [
     shortDesc: "DATA +3%, gold −1.5%",
     minCommanderLevel: 6,
     family: "tradeoff",
-    bestWhen: "Best when: DATA demand matters more than a small gold efficiency loss.",
+    bestWhen: "Fit: DATA priority over a small gold efficiency cost.",
   },
 ];
 

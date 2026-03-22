@@ -732,6 +732,7 @@ export function OverviewPanelCards({
   onDeployNextSector,
   sectorDeployBusy,
   systemsHint,
+  doctrineContextHint = null,
 }) {
   const actionFallback =
     nextStep && (nextStep?.title || nextStep?.text)
@@ -757,34 +758,53 @@ export function OverviewPanelCards({
   const stackTone = panelTone?.overviewStack ? ` ${panelTone.overviewStack}` : "";
   const systemsTone = panelTone?.systemsHint ? ` ${panelTone.systemsHint}` : "";
 
+  const showDoctrineStrip = Boolean(
+    doctrineContextHint && !worldOverviewHint && !systemsHint
+  );
+  const hasTopContextRail = Boolean(worldOverviewHint || systemsHint || showDoctrineStrip);
+
   return (
     <BaseOverviewPanelToneContext.Provider value={panelTone || null}>
       <div className={`space-y-4${stackTone}`}>
-      {worldOverviewHint ? (
-        <div className={overviewStripShellClassName}>
-          {overviewStripTitle ? (
-            <span className={overviewStripTitleClassName}>
-              {overviewStripTitle}
-              {" · "}
-            </span>
-          ) : null}
-          {worldOverviewHint}
-        </div>
-      ) : null}
-      {systemsHint ? (
+      <div>
+        {hasTopContextRail ? (
+          <div className="space-y-2">
+            {worldOverviewHint ? (
+              <div className={overviewStripShellClassName}>
+                {overviewStripTitle ? (
+                  <span className={overviewStripTitleClassName}>
+                    {overviewStripTitle}
+                    {" · "}
+                  </span>
+                ) : null}
+                {worldOverviewHint}
+              </div>
+            ) : null}
+            {systemsHint ? (
+              <div
+                className={`rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/65${systemsTone}`}
+              >
+                {systemsHint}
+              </div>
+            ) : null}
+            {showDoctrineStrip ? (
+              <div className="rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-[11px] font-normal leading-snug text-white/52">
+                {doctrineContextHint}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div
-          className={`rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/65${systemsTone}`}
+          data-base-target="systems"
+          className={hasTopContextRail ? "mt-3 border-t border-white/[0.06] pt-3" : undefined}
         >
-          {systemsHint}
+          <BaseStatusBlock
+            status={{
+              ...(safeOverview.baseStatus || {}),
+              chips: safeOverview.bottleneckChips || [],
+            }}
+          />
         </div>
-      ) : null}
-      <div data-base-target="systems">
-        <BaseStatusBlock
-          status={{
-            ...(safeOverview.baseStatus || {}),
-            chips: safeOverview.bottleneckChips || [],
-          }}
-        />
       </div>
       <BottleneckBlock bottleneck={safeOverview.bottleneck} onNavigate={onNavigate} />
       <NextActionBlock action={safeOverview.nextAction || actionFallback} onNavigate={onNavigate} />

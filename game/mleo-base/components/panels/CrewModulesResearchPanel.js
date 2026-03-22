@@ -1,4 +1,7 @@
-import { COMMAND_PROTOCOL_FAMILY_LABEL } from "../../commandProtocols";
+import {
+  COMMAND_PROTOCOL_FAMILY_LABEL,
+  COMMAND_PROTOCOL_STORED_INACTIVE_OVERVIEW,
+} from "../../commandProtocols";
 
 function fmt(value) {
   const n = Number(value || 0);
@@ -342,28 +345,48 @@ export function CrewModulesResearchPanel({
             <div className="rounded-xl border border-white/10 bg-black/20 p-3" data-base-target="command-protocol">
               <div className="text-sm font-semibold text-white">Command Protocol</div>
               <div className="mt-1 text-xs text-white/60">
-                One active modifier. Commander level unlocks options. Saved on server — one change per UTC day.
+                One effective protocol. Cmdr level gates options. Server-side; one swap per UTC day.
               </div>
-              <div className="mt-2 text-xs text-white/55">
-                <span className="font-semibold text-white/75">In effect:</span>{" "}
-                <span className="font-semibold text-cyan-200">
-                  {commandProtocolRows.find((r) => r.id === commandProtocolEffectiveId)?.name || "Standard Posture"}
-                </span>
-                {commandProtocolEffectiveId === "none" ? null : (
-                  <span className="text-white/40"> · Cmdr Lv {commandProtocolCommanderLevel}</span>
-                )}
+              <div
+                className={`mt-2 rounded-lg px-2.5 py-1.5 ${
+                  commandProtocolEffectiveId === "none"
+                    ? "border border-white/10 bg-white/[0.03]"
+                    : "border border-cyan-400/25 bg-cyan-500/[0.09]"
+                }`}
+              >
+                <div className="text-xs text-white/55">
+                  <span
+                    className={`font-semibold ${
+                      commandProtocolEffectiveId === "none" ? "text-white/65" : "text-cyan-100/85"
+                    }`}
+                  >
+                    Effective:
+                  </span>{" "}
+                  <span
+                    className={`font-semibold ${
+                      commandProtocolEffectiveId === "none" ? "text-white/75" : "text-cyan-100"
+                    }`}
+                  >
+                    {commandProtocolRows.find((r) => r.id === commandProtocolEffectiveId)?.name || "Standard Posture"}
+                  </span>
+                  {commandProtocolEffectiveId === "none" ? null : (
+                    <span className="text-white/45"> · Cmdr Lv {commandProtocolCommanderLevel}</span>
+                  )}
+                </div>
               </div>
               {commandProtocolStoredId !== commandProtocolEffectiveId && commandProtocolStoredId !== "none" ? (
-                <div className="mt-1 text-[11px] font-medium leading-snug text-amber-200/85">
-                  Selection saved but inactive until commander level unlocks it.
+                <div className="mt-1.5 rounded-md border border-amber-400/10 bg-amber-400/[0.04] px-2 py-1 text-[11px] font-normal leading-snug text-amber-100/65">
+                  {COMMAND_PROTOCOL_STORED_INACTIVE_OVERVIEW}
                 </div>
               ) : null}
               {!commandProtocolCanSwapToday ? (
-                <div className="mt-2 text-[11px] text-amber-200/80">Next protocol swap: tomorrow (UTC).</div>
+                <div className="mt-2 text-[11px] font-normal text-amber-100/60">Next swap: tomorrow (UTC).</div>
               ) : null}
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {commandProtocolRows.map((row) => {
                   const isSel = !!row.selected;
+                  const isEffectiveLive =
+                    row.id === commandProtocolEffectiveId && commandProtocolEffectiveId !== "none";
                   const disableSelect =
                     row.locked ||
                     (!commandProtocolCanSwapToday && !isSel);
@@ -374,27 +397,35 @@ export function CrewModulesResearchPanel({
                       onClick={() => onSetCommandProtocol(row.id)}
                       disabled={disableSelect}
                       className={`rounded-xl border px-3 py-2.5 text-left transition ${
-                        isSel
-                          ? "border-cyan-400/70 bg-cyan-500/15 ring-1 ring-cyan-400/25"
+                        isEffectiveLive
+                          ? "border-cyan-400/50 bg-cyan-500/[0.11] ring-1 ring-cyan-400/18"
+                          : isSel
+                          ? "border-white/12 border-l-[3px] border-l-cyan-400/35 bg-white/[0.04] hover:bg-white/[0.07]"
                           : "border-white/10 bg-white/5 hover:bg-white/10"
                       } ${disableSelect && !isSel ? "cursor-not-allowed opacity-50" : ""}`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1 text-sm font-semibold text-white">{row.name}</div>
                         {isSel ? (
-                          <span className="shrink-0 rounded-full border border-cyan-400/40 bg-cyan-500/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-cyan-100">
-                            Selected
+                          <span
+                            className={`shrink-0 rounded-full border px-2 py-0.5 text-[8px] uppercase tracking-[0.1em] ${
+                              isEffectiveLive
+                                ? "border-cyan-400/25 bg-cyan-500/10 font-semibold text-cyan-200/55"
+                                : "border-white/14 bg-white/[0.05] font-semibold text-cyan-200/70"
+                            }`}
+                          >
+                            Stored
                           </span>
                         ) : null}
                       </div>
                       <div className="mt-0.5 text-[11px] leading-snug text-white/55">{row.shortDesc}</div>
                       {row.locked ? (
                         <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-amber-200/90">
-                          Unlocks Cmdr Lv {row.minCommanderLevel}
+                          Requires Cmdr Lv {row.minCommanderLevel}
                         </div>
                       ) : null}
                       {row.family && COMMAND_PROTOCOL_FAMILY_LABEL[row.family] ? (
-                        <span className="mt-1 inline-flex max-w-full rounded-md border border-white/12 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/50">
+                        <span className="mt-1 inline-flex max-w-full rounded border border-white/[0.07] bg-transparent px-1 py-px text-[9px] font-medium uppercase tracking-wide text-white/38">
                           {COMMAND_PROTOCOL_FAMILY_LABEL[row.family]}
                         </span>
                       ) : null}

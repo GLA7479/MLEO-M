@@ -77,7 +77,9 @@ import {
 } from "./mleo-base/data";
 import {
   applyPhase1ACommandProtocolToDerivedRates,
+  COMMAND_PROTOCOL_DOCTRINE_CONTEXT_OVERVIEW,
   COMMAND_PROTOCOL_FAMILY_LABEL,
+  COMMAND_PROTOCOL_STORED_INACTIVE_OVERVIEW,
   isCommandProtocolUnlocked,
   normalizeCommandProtocolId,
   PHASE_1A_COMMAND_PROTOCOLS,
@@ -6456,6 +6458,40 @@ export default function MleoBase() {
     };
   }, [rawOverview, overviewGuidanceState]);
 
+  /** Phase 1E: single quiet Overview strip; gated to avoid stacking over world / stress signals. */
+  const commandProtocolOverviewDoctrineHint = useMemo(() => {
+    const effectiveId = commandProtocolUi.effectiveId;
+    const storedId = commandProtocolUi.storedId;
+    const mismatch = storedId !== effectiveId && storedId !== "none";
+
+    const worldFlavorHint = Boolean(sectorWorldSnapshot?.panelFlavor?.overviewHint);
+    const world6SystemsHint = Boolean(world6Command?.overviewSystemsHint);
+    if (worldFlavorHint || world6SystemsHint) return null;
+
+    if (mismatch) {
+      return COMMAND_PROTOCOL_STORED_INACTIVE_OVERVIEW;
+    }
+
+    if (effectiveId === "none") return null;
+
+    if (rawOverview?.recoveryHint) return null;
+
+    const baseTone = overview?.baseStatus?.tone;
+    const bnTone = overview?.bottleneck?.tone;
+    if (baseTone !== "success") return null;
+    if (bnTone === "warning" || bnTone === "critical") return null;
+
+    return COMMAND_PROTOCOL_DOCTRINE_CONTEXT_OVERVIEW[effectiveId] || null;
+  }, [
+    commandProtocolUi.effectiveId,
+    commandProtocolUi.storedId,
+    overview?.baseStatus?.tone,
+    overview?.bottleneck?.tone,
+    rawOverview?.recoveryHint,
+    sectorWorldSnapshot?.panelFlavor?.overviewHint,
+    world6Command?.overviewSystemsHint,
+  ]);
+
   const availableStructuresCount = useMemo(() => {
     return BUILDINGS.filter((def) => {
       const level = Number(state.buildings?.[def.key] || 0);
@@ -6731,10 +6767,10 @@ export default function MleoBase() {
         markRealGameAction();
         const label =
           PHASE_1A_COMMAND_PROTOCOLS.find((p) => p.id === next)?.name || next;
-        showToast(`Command protocol: ${label}`);
+        showToast(`Stored protocol: ${label}`);
       } catch (error) {
         console.error("Command protocol update failed", error);
-        showToast(error?.message || "Command protocol update failed");
+        showToast(error?.message || "Protocol update failed");
       }
     });
   };
@@ -12077,10 +12113,10 @@ export default function MleoBase() {
     <Layout title="MLEO BASE">
       <main className="h-[100dvh] overflow-hidden overflow-x-hidden bg-[#07111f] text-white sm:min-h-screen sm:h-auto sm:overflow-visible lg:h-[100dvh] lg:overflow-hidden">
         <div className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:flex lg:h-full lg:flex-col lg:px-8 lg:pb-32">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3 lg:gap-4">
+            <div className="min-w-0 w-full md:flex-1">
               {/* Title pill removed for a cleaner V3 look */}
-              <div className="mt-3 flex items-center justify-between sm:block">
+              <div className="mt-2 flex items-center justify-between sm:mt-3 sm:block">
                 <h1 className="whitespace-nowrap text-2xl font-black tracking-tight sm:text-4xl">
                   {CONFIG.title}
                 </h1>
@@ -12146,12 +12182,12 @@ export default function MleoBase() {
                   </button>
                 </div>
               </div>
-              <div className="mt-2.5 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
+              <div className="mt-1 flex min-w-0 w-full flex-nowrap items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar sm:mt-1.5 sm:gap-1.5 md:mt-2 md:flex-wrap md:overflow-visible md:pb-0 lg:gap-2">
                 {isBaseDevToolsEnabled() ? (
                   <button
                     type="button"
                     onClick={() => setDevSectorModalOpen(true)}
-                    className="inline-flex max-w-full items-center rounded-full border border-cyan-400/30 bg-gradient-to-r from-cyan-500/[0.12] to-slate-950/50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-cyan-100 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.1)] transition hover:from-cyan-500/[0.18] hover:to-slate-950/55 sm:text-[10px] sm:tracking-[0.17em]"
+                    className="inline-flex min-w-0 max-w-[min(100%,11rem)] items-center rounded-full border border-cyan-400/30 bg-gradient-to-r from-cyan-500/[0.12] to-slate-950/50 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-cyan-100 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.1)] transition hover:from-cyan-500/[0.18] hover:to-slate-950/55 sm:max-w-[min(100%,18rem)] sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.17em]"
                     title={`Active sector · world ${activeWorldOrder} · DEV: open sector switch`}
                   >
                     <span className="truncate sm:hidden">{baseWorldHeaderIdentity.compactLine}</span>
@@ -12159,7 +12195,7 @@ export default function MleoBase() {
                   </button>
                 ) : (
                   <span
-                    className="inline-flex max-w-full items-center rounded-full border border-cyan-400/30 bg-gradient-to-r from-cyan-500/[0.12] to-slate-950/50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-cyan-100 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.1)] sm:text-[10px] sm:tracking-[0.17em]"
+                    className="inline-flex min-w-0 max-w-[min(100%,11rem)] items-center rounded-full border border-cyan-400/30 bg-gradient-to-r from-cyan-500/[0.12] to-slate-950/50 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-cyan-100 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.1)] sm:max-w-[min(100%,18rem)] sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.17em]"
                     title={`Active sector · world ${activeWorldOrder}`}
                   >
                     <span className="truncate sm:hidden">{baseWorldHeaderIdentity.compactLine}</span>
@@ -12168,7 +12204,7 @@ export default function MleoBase() {
                 )}
                 {baseWorldHeaderIdentity.stateChip ? (
                   <span
-                    className="inline-flex max-w-[min(100%,13rem)] shrink-0 truncate rounded-full border border-white/12 bg-white/[0.06] px-2 py-0.5 text-[9px] font-semibold capitalize leading-tight text-white/80 sm:max-w-[17rem] sm:text-[10px]"
+                    className="inline-flex max-w-[min(100%,8.5rem)] shrink-0 truncate rounded-full border border-white/12 bg-white/[0.06] px-1.5 py-0.5 text-[8px] font-semibold capitalize leading-tight text-white/75 sm:max-w-[12rem] sm:px-2 sm:text-[10px] lg:max-w-[min(11rem,28vw)]"
                     title={baseWorldHeaderIdentity.stateChip}
                   >
                     {baseWorldHeaderIdentity.stateChip}
@@ -12177,13 +12213,13 @@ export default function MleoBase() {
                 <button
                   type="button"
                   onClick={() => navigateToBaseTarget({ tab: "build", target: "command-protocol" })}
-                  title="Open Command Protocol (Development → Crew)"
-                  className={`inline-flex max-w-[min(100%,16rem)] shrink-0 items-center gap-1.5 truncate rounded-full border px-2 py-0.5 text-left transition hover:bg-white/[0.08] sm:max-w-[20rem] ${
+                  title="Protocol stack · Build → Development → Crew"
+                  className={`inline-flex min-w-0 max-w-[min(100%,11rem)] shrink-0 items-center gap-1 truncate rounded-full border px-1.5 py-0.5 text-left transition hover:bg-white/[0.08] sm:max-w-[14rem] sm:gap-1.5 sm:px-2 lg:max-w-[min(15rem,24vw)] ${
                     commandProtocolSurface.mismatch
-                      ? "border-amber-400/35 bg-amber-500/[0.07]"
+                      ? "border-amber-400/15 bg-amber-400/[0.05]"
                       : commandProtocolSurface.effectiveId !== "none"
-                      ? "border-cyan-400/30 bg-cyan-500/[0.06]"
-                      : "border-white/12 bg-white/[0.05]"
+                      ? "border-cyan-400/35 bg-cyan-500/[0.08]"
+                      : "border-white/10 bg-white/[0.03]"
                   }`}
                 >
                   <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/40">
@@ -12191,21 +12227,21 @@ export default function MleoBase() {
                   </span>
                   <span
                     className={`min-w-0 truncate text-[10px] font-semibold leading-tight ${
-                      commandProtocolSurface.effectiveId === "none" ? "text-white/55" : "text-white/90"
+                      commandProtocolSurface.effectiveId === "none" ? "text-white/50" : "text-cyan-50/95"
                     }`}
                   >
                     {commandProtocolSurface.name}
                   </span>
                   {commandProtocolSurface.mismatch ? (
-                    <span className="shrink-0 text-[9px] font-bold text-amber-200/90">Pending</span>
+                    <span className="shrink-0 text-[9px] font-medium text-amber-100/70">Not effective</span>
                   ) : commandProtocolSurface.effectiveId === "none" ? (
-                    <span className="shrink-0 text-[9px] text-white/35">Neutral</span>
+                    <span className="shrink-0 text-[9px] font-normal text-white/32">Baseline</span>
                   ) : (
-                    <span className="shrink-0 text-[9px] font-semibold text-cyan-200/65">Active</span>
+                    <span className="shrink-0 text-[9px] font-semibold text-cyan-200/80">Live</span>
                   )}
                   {commandProtocolSurface.family &&
                   COMMAND_PROTOCOL_FAMILY_LABEL[commandProtocolSurface.family] ? (
-                    <span className="hidden shrink-0 rounded border border-white/10 px-1 py-px text-[8px] font-semibold uppercase tracking-wide text-white/45 sm:inline">
+                    <span className="hidden shrink-0 rounded border border-white/[0.08] px-1 py-px text-[8px] font-medium uppercase tracking-wide text-white/35 sm:inline">
                       {COMMAND_PROTOCOL_FAMILY_LABEL[commandProtocolSurface.family]}
                     </span>
                   ) : null}
@@ -12214,11 +12250,11 @@ export default function MleoBase() {
               {/* subtitle removed */}
             </div>
 
-            <div className="hidden sm:flex flex-wrap items-center gap-2 sm:justify-start">
+            <div className="hidden w-full min-w-0 flex-nowrap items-center justify-start gap-1.5 overflow-x-auto pb-0.5 no-scrollbar sm:flex md:mt-0 md:flex-1 md:justify-end md:pb-0 lg:mt-0 lg:flex-none lg:w-auto lg:shrink-0 lg:justify-end lg:overflow-visible lg:gap-2">
               <button
                 type="button"
                 onClick={handleCommandHubBarClick}
-                className={`flex items-center rounded-2xl border px-4 py-0 transition h-[42px] min-h-[42px] max-h-[42px] overflow-visible ${
+                className={`flex min-w-0 shrink-0 items-center rounded-2xl border px-2.5 py-0 transition h-[42px] min-h-[42px] max-h-[42px] overflow-visible sm:px-3 md:max-w-[min(17rem,22vw)] lg:max-w-[min(19rem,24vw)] xl:max-w-[21rem] ${
                   commandHubCount > 0
                     ? `cursor-pointer shadow-[0_0_24px_rgba(34,211,238,0.18)] hover:border-cyan-400/80 ${
                         primaryCommandItem?.type === "alert"
@@ -12260,7 +12296,7 @@ export default function MleoBase() {
 
               <Link
                 href="/mining"
-                className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
+                className={`shrink-0 rounded-xl border px-3 py-2.5 text-sm font-semibold transition lg:px-4 ${
                   hubGameplayOnline
                     ? "border-cyan-400/70 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/20 shadow-[0_0_24px_rgba(34,211,238,0.22)]"
                     : "border-cyan-400/35 bg-cyan-500/8 text-cyan-200/85 hover:bg-cyan-500/12"
@@ -12269,7 +12305,7 @@ export default function MleoBase() {
                 Hub
               </Link>
 
-              <div className="relative">
+              <div className="relative shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -12331,7 +12367,7 @@ export default function MleoBase() {
 
               <button
                 onClick={() => setShowHowToPlay(true)}
-                className="rounded-xl border border-blue-500/25 bg-blue-500/10 px-4 py-2.5 text-sm font-semibold text-blue-200 hover:bg-blue-500/20"
+                className="shrink-0 rounded-xl border border-blue-500/25 bg-blue-500/10 px-3 py-2.5 text-sm font-semibold text-blue-200 hover:bg-blue-500/20 lg:px-4"
               >
                 HOW TO PLAY
               </button>
@@ -12339,7 +12375,7 @@ export default function MleoBase() {
               <button
                 type="button"
                 onClick={() => setOpenInfoKey("sharedVault")}
-                className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-2.5 text-sm font-semibold text-violet-200 hover:bg-violet-500/18"
+                className="shrink-0 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2.5 text-sm font-semibold text-violet-200 hover:bg-violet-500/18 lg:px-4"
                 title="Shared Vault"
               >
                 VAULT {fmt(sharedVault)} MLEO
@@ -12348,14 +12384,14 @@ export default function MleoBase() {
               {isConnected ? (
                 <button
                   onClick={() => openAccountModal?.()}
-                  className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-white/20"
+                  className="shrink-0 rounded-xl bg-white/10 px-3 py-2.5 text-sm font-semibold hover:bg-white/20 lg:px-4"
                 >
                   {address?.slice(0, 6)}…{address?.slice(-4)}
                 </button>
               ) : (
                 <button
                   onClick={() => openConnectModal?.()}
-                  className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold hover:bg-rose-500"
+                  className="shrink-0 rounded-xl bg-rose-600 px-3 py-2.5 text-sm font-semibold hover:bg-rose-500 lg:px-4"
                 >
                   Connect
                 </button>
@@ -12814,6 +12850,7 @@ export default function MleoBase() {
                           onDeployNextSector={handleDeployNextSector}
                           sectorDeployBusy={isActionLocked("sectorDeploy")}
                           systemsHint={world6Command?.overviewSystemsHint ?? null}
+                          doctrineContextHint={commandProtocolOverviewDoctrineHint}
                         />
                       </DesktopPanelSection>
                     ) : null}
@@ -13292,6 +13329,7 @@ export default function MleoBase() {
                         onDeployNextSector={handleDeployNextSector}
                         sectorDeployBusy={isActionLocked("sectorDeploy")}
                         systemsHint={world6Command?.overviewSystemsHint ?? null}
+                        doctrineContextHint={commandProtocolOverviewDoctrineHint}
                       />
                     </MobilePanelSection>
                   ) : null}
