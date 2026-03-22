@@ -1,7 +1,12 @@
 /**
- * World 2 — Freight Orbit (sector identity + panel copy only).
- * Gameplay math and deploy rules live elsewhere; this module is display / light flavor.
+ * World 2 — Freight Orbit
+ * Sector identity + throughput gameplay readout.
  */
+
+import {
+  buildWorld2FreightAlert,
+  getWorld2ThroughputSnapshot,
+} from "./world2Gameplay";
 
 export const world2FreightOrbit = {
   id: "world2",
@@ -10,7 +15,6 @@ export const world2FreightOrbit = {
   dailyMleoCap: 3700,
 };
 
-/** Static identity strings for UI (command-center tone). */
 export const WORLD2_SECTOR_IDENTITY = {
   badgeLabel: "Freight orbit",
   tagline: "Orbital logistics lanes · export rhythm · bank throughput",
@@ -18,9 +22,9 @@ export const WORLD2_SECTOR_IDENTITY = {
     "This sector rewards disciplined shipping windows, vault cadence, and keeping logistics support ahead of refinery pressure.",
   focusShort: "Logistics · shipping rhythm · bank flow",
   playstyleHint:
-    "Batch shipments when the pad is healthy; let logistics tiers and programs carry throughput before you chase raw refinery spikes.",
+    "Batch shipments on clean windows; let logistics tiers and support systems carry throughput before you push raw refinery output.",
   sectorPressureNote:
-    "Higher daily cap invites faster fills — watch energy and stability so exports stay clean under load.",
+    "Higher daily cap invites faster fills — watch support quality so exports stay clean under load.",
 };
 
 function fmtFlow(n) {
@@ -30,60 +34,85 @@ function fmtFlow(n) {
   return v % 1 === 0 ? String(Math.round(v)) : v.toFixed(1).replace(/\.0$/, "");
 }
 
-/**
- * Small read-only flow readout from existing state (no economy changes).
- */
-export function getWorld2FlowSnapshot(state) {
+function world2ProgressionNote(ctx) {
+  const nextName = ctx?.nextWorldName;
+  const canDeploy = !!ctx?.canDeployToNextWorld;
+
+  if (!nextName) return "Final sector protocols — hold orbit discipline.";
+
+  if (canDeploy) {
+    return `Next: ${nextName} — all gates clear. Deploy when you are ready to shift cap and pressure profile.`;
+  }
+
+  return `Working toward ${nextName}: keep support lines tiered, spread programs, and maintain clean logistics rhythm.`;
+}
+
+export function getWorld2FlowSnapshot(state, derived = {}) {
+  const lane = getWorld2ThroughputSnapshot(state, derived);
   const banked = Number(state?.bankedMleo ?? state?.banked_mleo ?? 0);
   const shippedToday = Number(state?.stats?.shippedToday ?? state?.stats?.shipped_today ?? 0);
   const sentToday = Number(state?.sentToday ?? state?.sent_today ?? 0);
+
   return {
     banked,
     shippedToday,
     sentToday,
-    summaryLine: `Pad ${fmtFlow(banked)} banked · ${fmtFlow(shippedToday)} MLEO shipped today · ${fmtFlow(sentToday)} to vault today`,
+    lane,
+    alert: buildWorld2FreightAlert(lane),
+    summaryLine: lane
+      ? `${lane.compactLine} · ${lane.shippingLine}`
+      : `Pad ${fmtFlow(banked)} banked · ${fmtFlow(shippedToday)} MLEO shipped today · ${fmtFlow(sentToday)} to vault today`,
   };
-}
-
-function world2ProgressionNote(ctx) {
-  const nextName = ctx?.nextWorldName;
-  const canDeploy = !!ctx?.canDeployToNextWorld;
-  if (!nextName) return "Final sector protocols — hold orbit discipline.";
-  if (canDeploy) {
-    return `Next: ${nextName} — all gates clear. Deploy when you are ready to shift cap and pressure profile.`;
-  }
-  return `Working toward ${nextName}: keep three support lines tiered, programs spread, and stability/energy within sector gates.`;
 }
 
 /**
  * @param {object} state
- * @param {object} _derived reserved for future light flavor (unused — avoids economy coupling)
+ * @param {object} derived
  * @param {{ nextWorldName?: string | null, canDeployToNextWorld?: boolean }} [ctx]
  */
-export function buildWorld2PanelFlavor(state, _derived, ctx = {}) {
+export function buildWorld2PanelFlavor(state, derived, ctx = {}) {
   const id = WORLD2_SECTOR_IDENTITY;
-  const flow = getWorld2FlowSnapshot(state);
+  const flow = getWorld2FlowSnapshot(state, derived);
+  const lane = flow.lane;
+
+  const overviewHint =
+    lane?.laneKey === "open"
+      ? "Open lane: strong moment to export. Freight support is matching pressure."
+      : lane?.laneKey === "congested"
+        ? "Congested lane: stabilize support and catch logistics up before pushing harder."
+        : "Steady lane: keep exports measured and maintain clean throughput discipline.";
 
   return {
     worldOrder: 2,
-    /** Optional shell accent (Tailwind classes) */
     panelShellClassName:
       "border-amber-400/25 bg-gradient-to-br from-amber-500/[0.06] via-transparent to-cyan-500/[0.04]",
     badgeLabel: id.badgeLabel,
     tagline: id.tagline,
     descriptor: id.descriptor,
     focusShort: id.focusShort,
-    playstyleHint: id.playstyleHint,
-    sectorPressureNote: id.sectorPressureNote,
+    playstyleHint: lane?.actionHint || id.playstyleHint,
+    sectorPressureNote: lane?.reason || id.sectorPressureNote,
     progressionNote: world2ProgressionNote(ctx),
     flowMetricLine: flow.summaryLine,
-    /** Shown once near top of Overview when in Freight Orbit */
-    overviewStripTitle: "Freight orbit",
-    overviewHint:
-      "Prioritize logistics throughput and clean shipment timing — cap is higher; pace exports with stability.",
+    overviewStripTitle: lane ? `${id.badgeLabel} · ${lane.laneLabel}` : "Freight orbit",
+    overviewHint,
     overviewStripShellClassName:
-      "rounded-xl border border-amber-400/25 bg-amber-500/[0.07] px-3 py-2 text-[11px] leading-snug text-amber-50/90",
+      lane?.laneKey === "open"
+        ? "rounded-xl border border-emerald-400/25 bg-emerald-500/[0.08] px-3 py-2 text-[11px] leading-snug text-emerald-50/90"
+        : lane?.laneKey === "congested"
+          ? "rounded-xl border border-amber-400/25 bg-amber-500/[0.09] px-3 py-2 text-[11px] leading-snug text-amber-50/90"
+          : "rounded-xl border border-amber-400/25 bg-amber-500/[0.07] px-3 py-2 text-[11px] leading-snug text-amber-50/90",
     overviewStripTitleClassName:
-      "font-black uppercase tracking-[0.14em] text-amber-200/85",
+      lane?.laneKey === "open"
+        ? "font-black uppercase tracking-[0.14em] text-emerald-200/85"
+        : "font-black uppercase tracking-[0.14em] text-amber-200/85",
+    extraLines: lane
+      ? [
+          lane.logisticsLine,
+          lane.shippingLine,
+          `Priority: ${lane.priority}`,
+          `Recommendation: ${lane.recommendation}`,
+        ]
+      : [],
   };
 }

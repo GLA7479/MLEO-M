@@ -35,6 +35,7 @@ export function OperationsConsolePanel({
             Sends all current banked MLEO to the shared vault. MLEO production inside BASE uses a daily cap
             + softcut; shipping itself is not daily-limited.
           </p>
+          {shipping.freightHint}
         </div>
 
         <button

@@ -103,7 +103,9 @@ import {
   xpForLevel,
 } from "./mleo-base/engine";
 import {
+  buildWorld2FreightAlert,
   getSectorWorldProgressSnapshot,
+  getWorld2ThroughputSnapshot,
   getWorldDailyMleoCapByOrder,
   resolveSectorWorldOrder,
 } from "./mleo-base/worlds";
@@ -115,6 +117,15 @@ const REFINERY_ENERGY_NEED_PER_LEVEL = 0.82;
 const REFINERY_BANKED_PER_LEVEL = 0.0165;
 const SHIP_READY_BANKED_THRESHOLD = 100;
 
+function worldLaneToneClass(laneKey) {
+  if (laneKey === "open") {
+    return "border-emerald-400/30 bg-emerald-500/[0.10] text-emerald-100";
+  }
+  if (laneKey === "congested") {
+    return "border-amber-400/30 bg-amber-500/[0.12] text-amber-100";
+  }
+  return "border-sky-400/25 bg-sky-500/[0.08] text-sky-100";
+}
 
 function fmtRate(value, digits = 2) {
   const n = Number(value || 0);
@@ -251,7 +262,7 @@ function pickLiveEvent(state) {
 }
 
 
-function getAlerts(state, derived, systemState, liveContracts = []) {
+function getAlerts(state, derived, systemState, liveContracts = [], world2FreightAlertRow = null) {
   const alerts = [];
 
   const energy = Number(state.resources?.ENERGY || 0);
@@ -312,6 +323,16 @@ function getAlerts(state, derived, systemState, liveContracts = []) {
       tone: "success",
       title: "Contract reward ready",
       text: `${claimableContracts} command contract${claimableContracts > 1 ? "s are" : " is"} ready to claim.`,
+    });
+  }
+
+  if (world2FreightAlertRow) {
+    alerts.unshift({
+      key: world2FreightAlertRow.key,
+      tone: world2FreightAlertRow.tone,
+      title: world2FreightAlertRow.title,
+      text: world2FreightAlertRow.text,
+      world2Target: world2FreightAlertRow.target,
     });
   }
 
@@ -4790,6 +4811,8 @@ export default function MleoBase() {
   }
 
   function getAlertNavigationTarget(item) {
+    if (item?.world2Target) return item.world2Target;
+
     const key = item?.alertKey || item?.key;
 
     switch (key) {
@@ -4809,6 +4832,10 @@ export default function MleoBase() {
       case "contracts-ready":
       case "contracts":
         return { tab: "overview", target: "contracts" };
+
+      case "world2-freight-pressure":
+      case "world2-freight-open":
+        return { tab: "operations", target: "shipping" };
 
       case "missions":
         return { tab: "operations", target: "missions" };
@@ -5436,6 +5463,18 @@ export default function MleoBase() {
   }, [mounted]);
 
   const derived = useMemo(() => derive(state), [state]);
+  const activeWorldOrder = useMemo(() => resolveSectorWorldOrder(state), [state]);
+
+  const world2Throughput = useMemo(() => {
+    if (activeWorldOrder !== 2) return null;
+    return getWorld2ThroughputSnapshot(state, derived);
+  }, [activeWorldOrder, state, derived]);
+
+  const world2FreightAlert = useMemo(
+    () => buildWorld2FreightAlert(world2Throughput),
+    [world2Throughput]
+  );
+
   const sectorWorldSnapshot = useMemo(
     () =>
       getSectorWorldProgressSnapshot(state, derived, {
@@ -5862,8 +5901,8 @@ export default function MleoBase() {
   const expeditionLeft = Math.max(0, (state.expeditionReadyAt || 0) - Date.now());
   const overclockLeft = Math.max(0, (state.overclockUntil || 0) - Date.now());
   const alerts = useMemo(
-    () => getAlerts(state, derived, systemState, liveContracts),
-    [state, derived, systemState, liveContracts]
+    () => getAlerts(state, derived, systemState, liveContracts, world2FreightAlert),
+    [state, derived, systemState, liveContracts, world2FreightAlert]
   );
   const desktopPriorityAlert = alerts[0] || null;
 
@@ -5891,6 +5930,7 @@ export default function MleoBase() {
         title: alert.title,
         text: alert.text,
         count: 0,
+        ...(alert.world2Target ? { world2Target: alert.world2Target } : {}),
       });
     });
 
@@ -7047,9 +7087,13 @@ export default function MleoBase() {
 
         setState((prev) => {
           const next = mergeAuthoritativeServerState(prev, serverState);
+          const laneSuffix = world2Throughput
+            ? ` [${world2Throughput.laneLabel} · ${world2Throughput.disciplineScore}/100]`
+            : "";
+
           next.log = pushLog(
             next.log,
-            `Shipped ${fmt(shippedBase)} MLEO to shared vault.`
+            `Shipped ${fmt(shippedBase)} MLEO to shared vault.${laneSuffix}`
           );
           return next;
         });
@@ -7057,8 +7101,12 @@ export default function MleoBase() {
         markRealGameAction();
         setNextShipBonus(0);
 
+        const shipToastBase = world2Throughput
+          ? `Shipment complete · ${world2Throughput.laneLabel} · ${world2Throughput.disciplineScore}/100`
+          : "Shipment complete · banked MLEO sent to shared vault";
+
         showToast(
-          withBottleneckNote("Shipment complete · banked MLEO sent to shared vault", {
+          withBottleneckNote(shipToastBase, {
             "ship-cap": "Daily production headroom improved",
           })
         );
@@ -7635,6 +7683,13 @@ export default function MleoBase() {
           setOpenInfoKey(null);
         },
         onShip: bankToSharedVault,
+        freightHint:
+          world2Throughput != null ? (
+            <span className="mt-1 block text-[11px] text-white/65">
+              Freight lane: {world2Throughput.laneLabel} ·{" "}
+              {world2Throughput.recommendedShipNow ? "good export window" : "better to stabilize first"}
+            </span>
+          ) : null,
       }}
       expedition={{
         highlighted:
@@ -7700,6 +7755,35 @@ export default function MleoBase() {
         onMaintain: performMaintenance,
       }}
     />
+  );
+
+  const operationsConsoleContentMobile = (
+    <>
+      {world2Throughput ? (
+        <div
+          className={`mb-3 rounded-2xl border px-3 py-2.5 ${worldLaneToneClass(
+            world2Throughput.laneKey
+          )}`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-[0.16em] opacity-75">
+                Freight Orbit
+              </div>
+              <div className="truncate text-sm font-semibold">
+                {world2Throughput.laneLabel} · {world2Throughput.disciplineScore}/100
+              </div>
+            </div>
+            <div className="rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-bold">
+              {world2Throughput.recommendedShipNow ? "SHIP" : "HOLD"}
+            </div>
+          </div>
+
+          <div className="mt-2 text-[11px] opacity-80">{world2Throughput.priority}</div>
+        </div>
+      ) : null}
+      {operationsConsoleContent}
+    </>
   );
 
   const crewModulesResearchContent = (
@@ -10924,6 +11008,13 @@ export default function MleoBase() {
         setOpenInnerPanel("overview-contracts");
         return;
       }
+
+      if (item.alertKey === "world2-freight-pressure" || item.alertKey === "world2-freight-open") {
+        openMobilePanel("ops");
+        setOpenInnerPanel("ops-console");
+        setHighlightTarget("shipping");
+        return;
+      }
     }
   };
 
@@ -12625,7 +12716,7 @@ export default function MleoBase() {
                         })}
                         openInnerPanel={openInnerPanel}
                         toggleInnerPanel={toggleInnerPanel}
-                        operationsConsoleContent={operationsConsoleContent}
+                        operationsConsoleContent={operationsConsoleContentMobile}
                         dailyMissionsContent={dailyMissionsContent}
                       />
                     </MobilePanelSection>
@@ -13196,6 +13287,59 @@ export default function MleoBase() {
                     derived.dailyMleoCap ?? derived.shipCap
                   )}. Ship banked MLEO to Shared Vault anytime (no daily ship limit).`}
                 >
+                  {world2Throughput ? (
+                    <div
+                      className={`mb-3 rounded-2xl border px-3 py-3 ${worldLaneToneClass(
+                        world2Throughput.laneKey
+                      )}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-black uppercase tracking-[0.18em] opacity-80">
+                            Freight Orbit
+                          </div>
+                          <div className="text-sm font-semibold">
+                            {world2Throughput.flowHeadline} · {world2Throughput.laneLabel}
+                          </div>
+                          <div className="mt-1 text-[12px] opacity-85">
+                            {world2Throughput.actionHint}
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] font-bold">
+                          {world2Throughput.chipText}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-1 gap-2 text-[11px] opacity-85 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Discipline</div>
+                          <div className="mt-1 text-sm font-semibold">
+                            {world2Throughput.disciplineScore}/100
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Priority</div>
+                          <div className="mt-1 text-sm font-semibold">{world2Throughput.priority}</div>
+                        </div>
+
+                        <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Support</div>
+                          <div className="mt-1 text-sm font-semibold">{world2Throughput.logisticsLine}</div>
+                        </div>
+
+                        <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Flow</div>
+                          <div className="mt-1 text-sm font-semibold">{world2Throughput.shippingLine}</div>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 text-[11px] opacity-75">
+                        {world2Throughput.recommendation}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="grid gap-3 md:grid-cols-2">
                     <div
                       data-base-target="shipping"
@@ -13227,6 +13371,14 @@ export default function MleoBase() {
                         <p className="mt-1 text-sm text-white/70">
                           Sends all current banked MLEO to the shared vault. Production uses a daily cap + softcut;
                           shipping does not.
+                          {world2Throughput ? (
+                            <span className="mt-1 block text-[11px] text-white/65">
+                              Freight lane: {world2Throughput.laneLabel} ·{" "}
+                              {world2Throughput.recommendedShipNow
+                                ? "good export window"
+                                : "better to stabilize first"}
+                            </span>
+                          ) : null}
                         </p>
                       </div>
                       <button
