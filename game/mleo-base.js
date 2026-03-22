@@ -836,14 +836,6 @@ function buildingMeetsRequires(state, buildingKey) {
   );
 }
 
-/** Throttled buildings: append " · N% mode · running|off" when level > 0. */
-function bankedGuidanceThrottleModePart(state, buildingKey, baseLevel) {
-  if (!canThrottleBuilding(buildingKey) || Number(baseLevel || 0) <= 0) return "";
-  const mode = getBuildingPowerMode(state, buildingKey);
-  if (mode === 0) return " · 0% mode · off";
-  return ` · ${mode}% mode · running`;
-}
-
 function resolveBankedActionTarget(state, targetKey) {
   if (!targetKey) return "bankedMleo";
   if (targetKey === "maintenance" || targetKey === "shipping" || targetKey === "bankedMleo") {
@@ -940,12 +932,11 @@ function analyticalLevelTargetFloor(current, floor) {
   return f;
 }
 
-/** One-line building/system snapshot for Banked guidance cards (no "Current:" prefix). */
-function getBankedGuidanceCurrentStateText(itemKey, ctx) {
+/** Main title line for Banked guidance cards (building level lives in level badge, not here). */
+function getBankedGuidanceStateTitle(itemKey, ctx, item) {
   const {
     state,
     derived,
-    s,
     refineryBaseLevel,
     quarryBaseLevel,
     salvageBaseLevel,
@@ -959,32 +950,32 @@ function getBankedGuidanceCurrentStateText(itemKey, ctx) {
     stability,
     producedToday,
     dailyCap,
-    oreFeedHours,
-    scrapFeedHours,
   } = ctx;
 
+  const tone = item?.tone || "success";
   const rName = buildingDisplayName("refinery");
   const qName = buildingDisplayName("quarry");
   const salName = buildingDisplayName("salvage");
   const pcName = buildingDisplayName("powerCell");
   const rbName = buildingDisplayName("repairBay");
   const lcName = buildingDisplayName("logisticsCenter");
-  const bankBonusStr = Number(derived?.bankBonus || 1).toFixed(2);
+  const stabPct = `${fmtRate(stability, 0)}%`;
 
   if (itemKey === "refinery") {
     if (refineryBaseLevel <= 0) return `${rName} not built`;
-    if (refineryOff) return `${rName} Lv ${refineryBaseLevel} · 0% power · off`;
-    return `${rName} Lv ${refineryBaseLevel} · ${refineryMode}% power · running`;
+    if (refineryOff) return `${rName} off · 0% mode`;
+    return `${rName} running · ${refineryMode}% mode`;
   }
 
   if (itemKey === "ore") {
     if (!buildingMeetsRequires(state, "quarry") && quarryBaseLevel <= 0) {
-      return `${qName} not unlocked yet`;
+      return `${qName} locked`;
     }
     if (quarryBaseLevel <= 0) return `${qName} not built`;
-    const qTh = bankedGuidanceThrottleModePart(state, "quarry", quarryBaseLevel);
-    if (oreFeedHours == null) return `${qName} Lv ${quarryBaseLevel}${qTh}`;
-    return `${qName} Lv ${quarryBaseLevel}${qTh} · support ~${fmtRate(oreFeedHours, 1)}h`;
+    if (!canThrottleBuilding("quarry")) return `${qName} active`;
+    const mode = getBuildingPowerMode(state, "quarry");
+    if (mode === 0) return `${qName} off · 0% mode`;
+    return `${qName} running · ${mode}% mode`;
   }
 
   if (itemKey === "scrap") {
@@ -992,49 +983,119 @@ function getBankedGuidanceCurrentStateText(itemKey, ctx) {
       return `${salName} locked`;
     }
     if (salvageBaseLevel <= 0) return `${salName} not built`;
-    const sTh = bankedGuidanceThrottleModePart(state, "salvage", salvageBaseLevel);
-    if (scrapFeedHours == null) return `${salName} Lv ${salvageBaseLevel}${sTh}`;
-    return `${salName} Lv ${salvageBaseLevel}${sTh} · support ~${fmtRate(scrapFeedHours, 1)}h`;
+    if (!canThrottleBuilding("salvage")) return `${salName} active`;
+    const mode = getBuildingPowerMode(state, "salvage");
+    if (mode === 0) return `${salName} off · 0% mode`;
+    return `${salName} running · ${mode}% mode`;
   }
 
   if (itemKey === "energy") {
     if (!buildingMeetsRequires(state, "powerCell") && powerCellBaseLevel <= 0) {
       return `${pcName} locked`;
     }
-    return `${pcName} Lv ${powerCellBaseLevel} · energy ${fmtRate(energy, 0)}/${fmtRate(energyCap, 0)}`;
+    const strained = tone === "critical" || tone === "warning";
+    const adj = strained ? "strained" : "stable";
+    return `${pcName} ${adj} · energy ${fmtRate(energy, 0)}/${fmtRate(energyCap, 0)}`;
   }
 
   if (itemKey === "stability") {
     if (!buildingMeetsRequires(state, "repairBay") && repairBayBaseLevel <= 0) {
-      return `${rbName} locked · stability ${fmtRate(stability, 0)}%`;
+      return `${rbName} locked · stability ${stabPct}`;
     }
     if (repairBayBaseLevel <= 0) {
-      return `${rbName} Lv 0 · stability ${fmtRate(stability, 0)}%`;
+      return `${rbName} missing · stability ${stabPct}`;
     }
-    const rbTh = bankedGuidanceThrottleModePart(state, "repairBay", repairBayBaseLevel);
-    return `${rbName} Lv ${repairBayBaseLevel}${rbTh} · stability ${fmtRate(stability, 0)}%`;
+    let adj = "stable";
+    if (tone === "critical") adj = "strained";
+    else if (tone === "warning") adj = "watch";
+    return `${rbName} ${adj} · stability ${stabPct}`;
   }
 
   if (itemKey === "logistics") {
     if (!buildingMeetsRequires(state, "logisticsCenter") && logisticsBaseLevel <= 0) {
-      return `${lcName} locked · bank bonus x${bankBonusStr}`;
+      return `${lcName} locked`;
     }
-    if (logisticsBaseLevel <= 0) {
-      return `${lcName} not built · bank bonus x${bankBonusStr}`;
-    }
-    const lcTh = bankedGuidanceThrottleModePart(state, "logisticsCenter", logisticsBaseLevel);
-    return `${lcName} Lv ${logisticsBaseLevel}${lcTh} · bank bonus x${bankBonusStr}`;
+    if (logisticsBaseLevel <= 0) return `${lcName} not built`;
+    if (!canThrottleBuilding("logisticsCenter")) return `${lcName} active`;
+    const mode = getBuildingPowerMode(state, "logisticsCenter");
+    if (mode === 0) return `${lcName} off · 0% mode`;
+    return `${lcName} active · ${mode}% mode`;
   }
 
   if (itemKey === "daily-cap") {
-    const capped = dailyCap > 0 && producedToday >= dailyCap - 1e-9;
-    if (capped) {
-      return `${fmtRate(producedToday, 1)} / ${fmtRate(dailyCap, 0)} · cap reached`;
-    }
-    return `${fmtRate(producedToday, 1)} / ${fmtRate(dailyCap, 0)} produced today`;
+    if (tone === "critical") return "Daily cap reached";
+    if (tone === "warning") return "Daily cap close";
+    return "Daily cap healthy";
   }
 
   return "—";
+}
+
+/** Level pill text for top-right badges; null for daily cap and not-built buildings. */
+function getBankedGuidanceLevelBadgeText(itemKey, ctx) {
+  const { state, refineryBaseLevel, quarryBaseLevel, salvageBaseLevel, powerCellBaseLevel, repairBayBaseLevel, logisticsBaseLevel } =
+    ctx;
+
+  if (itemKey === "daily-cap") return null;
+
+  if (itemKey === "refinery") {
+    return refineryBaseLevel > 0 ? `Lv ${refineryBaseLevel}` : null;
+  }
+
+  if (itemKey === "ore") {
+    if (!buildingMeetsRequires(state, "quarry") && quarryBaseLevel <= 0) return null;
+    if (quarryBaseLevel <= 0) return null;
+    return `Lv ${quarryBaseLevel}`;
+  }
+
+  if (itemKey === "scrap") {
+    if (!buildingMeetsRequires(state, "salvage") && salvageBaseLevel <= 0) return null;
+    if (salvageBaseLevel <= 0) return null;
+    return `Lv ${salvageBaseLevel}`;
+  }
+
+  if (itemKey === "energy") {
+    if (!buildingMeetsRequires(state, "powerCell") && powerCellBaseLevel <= 0) return null;
+    return `Lv ${powerCellBaseLevel}`;
+  }
+
+  if (itemKey === "stability") {
+    if (!buildingMeetsRequires(state, "repairBay") && repairBayBaseLevel <= 0) return null;
+    if (repairBayBaseLevel < 1) return null;
+    return `Lv ${repairBayBaseLevel}`;
+  }
+
+  if (itemKey === "logistics") {
+    if (!buildingMeetsRequires(state, "logisticsCenter") && logisticsBaseLevel <= 0) return null;
+    if (logisticsBaseLevel <= 0) return null;
+    return `Lv ${logisticsBaseLevel}`;
+  }
+
+  return null;
+}
+
+function augmentBankedGuidanceBodyText(items, ctx) {
+  const { refineryBaseLevel, oreFeedHours, scrapFeedHours, derived, producedToday, dailyCap } = ctx;
+  const bankBonusStr = Number(derived?.bankBonus || 1).toFixed(2);
+
+  for (const it of items) {
+    if (refineryBaseLevel > 0) {
+      if (it.key === "ore" && oreFeedHours != null) {
+        const h = fmtRate(oreFeedHours, 1);
+        it.text = `Refinery feed ~${h}h · ${it.text}`;
+      }
+      if (it.key === "scrap" && scrapFeedHours != null) {
+        const h = fmtRate(scrapFeedHours, 1);
+        it.text = `Refinery feed ~${h}h · ${it.text}`;
+      }
+    }
+    if (it.key === "logistics") {
+      it.text = `Bank bonus x${bankBonusStr} · ${it.text}`;
+    }
+    if (it.key === "daily-cap" && dailyCap > 0) {
+      it.text = `${fmtRate(producedToday, 1)} / ${fmtRate(dailyCap, 0)} produced today · ${it.text}`;
+    }
+  }
 }
 
 function enrichBankedGuidanceItem(item, ctx) {
@@ -1616,8 +1677,10 @@ function getBankedGuidanceItems({
     scrapFeedHours,
   };
 
+  augmentBankedGuidanceBodyText(items, stateTextCtx);
   for (const it of items) {
-    it.currentStateText = getBankedGuidanceCurrentStateText(it.key, stateTextCtx);
+    it.stateTitle = getBankedGuidanceStateTitle(it.key, stateTextCtx, it);
+    it.levelBadgeText = getBankedGuidanceLevelBadgeText(it.key, stateTextCtx);
   }
 
   if (!resolveTargets) return items;
@@ -2229,15 +2292,22 @@ function BankedQuickPanel({
                 <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
                   {item.label}
                 </div>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${getBankedIndicatorPillClasses(item.tone)}`}
-                >
-                  {getBankedIndicatorToneLabel(item.tone)}
-                </span>
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                  {item.levelBadgeText ? (
+                    <span className="rounded-full border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white/70">
+                      {item.levelBadgeText}
+                    </span>
+                  ) : null}
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${getBankedIndicatorPillClasses(item.tone)}`}
+                  >
+                    {getBankedIndicatorToneLabel(item.tone)}
+                  </span>
+                </div>
               </div>
 
               <div className="mt-1 text-sm font-semibold text-white">
-                {item.headline}
+                {item.stateTitle || item.headline}
               </div>
 
               <div className="mt-1 text-[12px] leading-5 text-white/72">
@@ -2245,10 +2315,6 @@ function BankedQuickPanel({
               </div>
 
               <div className="mt-2 space-y-0.5 border-t border-white/10 pt-2 text-[11px] leading-4 text-white/58">
-                <div>
-                  <span className="text-white/40">Current: </span>
-                  {item.currentStateText || "—"}
-                </div>
                 <div>
                   <span className="text-white/40">Target: </span>
                   {item.targetLabel || "—"}
