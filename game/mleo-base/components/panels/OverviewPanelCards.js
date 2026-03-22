@@ -1,8 +1,6 @@
 import { createContext, useContext } from "react";
 import { ExpandablePanelSectionHeader } from "./ExpandablePanelSectionHeader";
 import { WorldSectorPanel } from "./WorldSectorPanel";
-import { DevSectorSwitchPanel } from "./DevSectorSwitchPanel";
-
 const BaseOverviewPanelToneContext = createContext(null);
 
 function toneClasses(tone = "info") {
@@ -669,8 +667,6 @@ export function OverviewPanelCards({
   sectorWorldSnapshot,
   onDeployNextSector,
   sectorDeployBusy,
-  onDevSectorServerStateApplied,
-  devSectorShowToast,
   systemsHint,
 }) {
   const actionFallback =
@@ -741,12 +737,6 @@ export function OverviewPanelCards({
         snapshot={sectorWorldSnapshot}
         onDeploy={onDeployNextSector}
         deployBusy={!!sectorDeployBusy}
-      />
-
-      <DevSectorSwitchPanel
-        snapshot={sectorWorldSnapshot}
-        onServerStateApplied={onDevSectorServerStateApplied}
-        showToast={devSectorShowToast}
       />
 
       <div className="grid gap-4 xl:grid-cols-3">

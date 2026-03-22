@@ -46,7 +46,9 @@ import {
   setBuildingPowerMode,
   sendBasePresence,
   ensureCsrfToken,
+  devSetBaseSectorWorld,
 } from "../lib/baseVaultClient";
+import { isBaseDevToolsEnabled } from "../lib/baseDevToolsShared";
 import {
   BASE_HOME_SCENE_IDENTITY,
   BASE_HOME_SCENE_ORDER,
@@ -127,6 +129,7 @@ import {
   getWorldMapTheme,
   getBaseInternalPanelTone,
   WORLD_BY_ORDER,
+  WORLDS,
 } from "./mleo-base/worlds";
 
 const MAX_LOG_ITEMS = 16;
@@ -4432,6 +4435,8 @@ export default function MleoBase() {
   const gameActionInFlightRef = useRef(false);
   const [hubGameplayOnline, setHubGameplayOnline] = useState(false);
   const [eliteRotation, setEliteRotation] = useState(null);
+  const [devSectorModalOpen, setDevSectorModalOpen] = useState(false);
+  const [devSectorBusy, setDevSectorBusy] = useState(false);
 
   useEffect(() => {
     if (!tierPromptKey) return;
@@ -4549,6 +4554,31 @@ export default function MleoBase() {
   function handleDevSectorServerState(serverState) {
     if (!serverState) return;
     setState((prev) => mergeAuthoritativeServerState(prev, serverState));
+  }
+
+  async function applyDevSectorWorldOrder(targetOrder) {
+    const n = Math.floor(Number(targetOrder));
+    if (!Number.isFinite(n) || n < 1 || n > 6) {
+      setToast("Invalid sector (1–6)");
+      return;
+    }
+    setDevSectorBusy(true);
+    try {
+      const res = await devSetBaseSectorWorld(n);
+      if (!res?.success) {
+        const parts = [res?.code, res?.message, res?.details, res?.rpcMessage].filter(Boolean);
+        setToast(parts.length ? parts.join(" — ") : "Dev sector update failed");
+        return;
+      }
+      if (res.state) handleDevSectorServerState(res.state);
+      setToast(`DEV: sector_world → ${n} (server)`);
+      setDevSectorModalOpen(false);
+    } catch (e) {
+      console.error("devSetBaseSectorWorld", e);
+      setToast("Dev sector request failed");
+    } finally {
+      setDevSectorBusy(false);
+    }
   }
 
   async function pushPresence({
@@ -12101,13 +12131,25 @@ export default function MleoBase() {
                 </div>
               </div>
               <div className="mt-2.5 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
-                <span
-                  className="inline-flex max-w-full items-center rounded-full border border-cyan-400/30 bg-gradient-to-r from-cyan-500/[0.12] to-slate-950/50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-cyan-100 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.1)] sm:text-[10px] sm:tracking-[0.17em]"
-                  title={`Active sector · world ${activeWorldOrder}`}
-                >
-                  <span className="truncate sm:hidden">{baseWorldHeaderIdentity.compactLine}</span>
-                  <span className="hidden truncate sm:inline">{baseWorldHeaderIdentity.primaryLine}</span>
-                </span>
+                {isBaseDevToolsEnabled() ? (
+                  <button
+                    type="button"
+                    onClick={() => setDevSectorModalOpen(true)}
+                    className="inline-flex max-w-full items-center rounded-full border border-cyan-400/30 bg-gradient-to-r from-cyan-500/[0.12] to-slate-950/50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-cyan-100 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.1)] transition hover:from-cyan-500/[0.18] hover:to-slate-950/55 sm:text-[10px] sm:tracking-[0.17em]"
+                    title={`Active sector · world ${activeWorldOrder} · DEV: open sector switch`}
+                  >
+                    <span className="truncate sm:hidden">{baseWorldHeaderIdentity.compactLine}</span>
+                    <span className="hidden truncate sm:inline">{baseWorldHeaderIdentity.primaryLine}</span>
+                  </button>
+                ) : (
+                  <span
+                    className="inline-flex max-w-full items-center rounded-full border border-cyan-400/30 bg-gradient-to-r from-cyan-500/[0.12] to-slate-950/50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-cyan-100 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.1)] sm:text-[10px] sm:tracking-[0.17em]"
+                    title={`Active sector · world ${activeWorldOrder}`}
+                  >
+                    <span className="truncate sm:hidden">{baseWorldHeaderIdentity.compactLine}</span>
+                    <span className="hidden truncate sm:inline">{baseWorldHeaderIdentity.primaryLine}</span>
+                  </span>
+                )}
                 {baseWorldHeaderIdentity.stateChip ? (
                   <span
                     className="inline-flex max-w-[min(100%,13rem)] shrink-0 truncate rounded-full border border-white/12 bg-white/[0.06] px-2 py-0.5 text-[9px] font-semibold capitalize leading-tight text-white/80 sm:max-w-[17rem] sm:text-[10px]"
@@ -12719,8 +12761,6 @@ export default function MleoBase() {
                           sectorWorldSnapshot={sectorWorldSnapshot}
                           onDeployNextSector={handleDeployNextSector}
                           sectorDeployBusy={isActionLocked("sectorDeploy")}
-                          onDevSectorServerStateApplied={handleDevSectorServerState}
-                          devSectorShowToast={showToast}
                           systemsHint={world6Command?.overviewSystemsHint ?? null}
                         />
                       </DesktopPanelSection>
@@ -13199,8 +13239,6 @@ export default function MleoBase() {
                         sectorWorldSnapshot={sectorWorldSnapshot}
                         onDeployNextSector={handleDeployNextSector}
                         sectorDeployBusy={isActionLocked("sectorDeploy")}
-                        onDevSectorServerStateApplied={handleDevSectorServerState}
-                        devSectorShowToast={showToast}
                         systemsHint={world6Command?.overviewSystemsHint ?? null}
                       />
                     </MobilePanelSection>
@@ -14392,6 +14430,74 @@ export default function MleoBase() {
         {toast ? (
           <div className="fixed left-1/2 top-20 z-[120] -translate-x-1/2 rounded-2xl border border-emerald-400/30 bg-emerald-500/20 px-5 py-3 text-sm font-semibold text-white shadow-2xl backdrop-blur">
             {toast}
+          </div>
+        ) : null}
+
+        {devSectorModalOpen && isBaseDevToolsEnabled() ? (
+          <div
+            className="fixed inset-0 z-[132] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+            onClick={() => !devSectorBusy && setDevSectorModalOpen(false)}
+            role="presentation"
+          >
+            <div
+              className="w-full max-w-md rounded-2xl border border-rose-500/35 bg-[#0d1626] p-4 text-white shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="dev-sector-modal-title"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2
+                    id="dev-sector-modal-title"
+                    className="text-sm font-black uppercase tracking-[0.14em] text-rose-200/90"
+                  >
+                    DEV sector switch
+                  </h2>
+                  <p className="mt-1 text-[11px] text-white/50">
+                    Temporary · sets server <span className="text-rose-200/80">sector_world</span> for this device
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={devSectorBusy}
+                  onClick={() => setDevSectorModalOpen(false)}
+                  className="shrink-0 rounded-lg bg-white/10 px-2.5 py-1 text-xs font-semibold text-white hover:bg-white/20 disabled:opacity-40"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="mt-4 grid gap-2">
+                {WORLDS.map((w) => {
+                  const active = w.order === activeWorldOrder;
+                  return (
+                    <button
+                      key={w.id}
+                      type="button"
+                      disabled={devSectorBusy || active}
+                      onClick={() => applyDevSectorWorldOrder(w.order)}
+                      className={`rounded-xl border px-3 py-2.5 text-left text-sm transition ${
+                        active
+                          ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-50"
+                          : "border-white/10 bg-white/[0.04] text-white/90 hover:border-white/20 hover:bg-white/[0.07]"
+                      } disabled:cursor-not-allowed disabled:opacity-50`}
+                    >
+                      <span className="font-bold">World {w.order}</span>
+                      <span className="text-white/50"> · </span>
+                      <span className="text-white/80">{w.name}</span>
+                      {active ? (
+                        <span className="ml-2 text-[10px] font-semibold uppercase tracking-wider text-cyan-200/80">
+                          current
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+              {devSectorBusy ? (
+                <p className="mt-3 text-center text-[11px] text-white/45">Updating…</p>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
