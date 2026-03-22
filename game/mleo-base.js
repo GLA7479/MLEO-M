@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useAccount } from "wagmi";
 import { useAccountModal, useConnectModal } from "@rainbow-me/rainbowkit";
@@ -1157,6 +1157,12 @@ function enrichBankedGuidanceItem(item, ctx) {
 
   if (item.key === "ore") {
     next.currentLevel = quarryBaseLevel;
+    const quarryOff = quarryBaseLevel > 0 && getBuildingPowerMode(state, "quarry") === 0;
+    if (item.tone === "critical" && quarryOff) {
+      next.targetLabel = `Set ${qTitle} power above 0%`;
+      next.actionHint = `Open ${qTitle} and raise power mode above 0%`;
+      return next;
+    }
     if (item.tone === "success") {
       next.targetLabel = "Keep ORE support ≥ 4.0h while Refinery runs";
       return next;
@@ -1193,6 +1199,12 @@ function enrichBankedGuidanceItem(item, ctx) {
 
   if (item.key === "scrap") {
     next.currentLevel = salvageBaseLevel;
+    const salvageOff = salvageBaseLevel > 0 && getBuildingPowerMode(state, "salvage") === 0;
+    if (item.tone === "critical" && salvageOff) {
+      next.targetLabel = `Set ${salTitle} power above 0%`;
+      next.actionHint = `Open ${salTitle} and raise power mode above 0%`;
+      return next;
+    }
     if (item.tone === "success") {
       next.targetLabel = "Keep SCRAP support ≥ 4.0h while Refinery runs";
       return next;
@@ -1271,6 +1283,19 @@ function enrichBankedGuidanceItem(item, ctx) {
   }
 
   if (item.key === "stability") {
+    const repairBayOff =
+      repairBayBaseLevel > 0 && getBuildingPowerMode(state, "repairBay") === 0;
+    if (
+      repairBayOff &&
+      item.tone === "critical" &&
+      stability >= 70 &&
+      systemState !== "critical"
+    ) {
+      next.targetLabel = `Set ${rbTitle} power above 0%`;
+      next.actionHint = `Open ${rbTitle} and raise power mode above 0%`;
+      return next;
+    }
+
     if (item.tone === "success") {
       next.targetLabel = "Maintain stability ≥ 85%";
       if (repairBayBaseLevel < 1) {
@@ -1282,7 +1307,9 @@ function enrichBankedGuidanceItem(item, ctx) {
     next.targetLabel = "Stability ≥ 85% for green";
 
     if (item.tone === "critical" || systemState === "critical") {
-      next.actionHint = "Open Operations maintenance / repair flow";
+      next.actionHint = repairBayOff
+        ? `Open Operations maintenance / repair flow; ${rbTitle} is at 0% power — raise mode for support`
+        : "Open Operations maintenance / repair flow";
       return next;
     }
 
@@ -1309,6 +1336,14 @@ function enrichBankedGuidanceItem(item, ctx) {
 
   if (item.key === "logistics") {
     next.currentLevel = logisticsBaseLevel;
+    const logisticsOff =
+      logisticsBaseLevel > 0 && getBuildingPowerMode(state, "logisticsCenter") === 0;
+    if (item.tone === "critical" && logisticsOff) {
+      next.targetLabel = `Set ${lcTitle} power above 0%`;
+      next.actionHint = `Open ${lcTitle} and raise power mode above 0%`;
+      return next;
+    }
+
     if (item.tone === "success") {
       next.targetLabel =
         refineryBaseLevel > 0
@@ -1349,6 +1384,161 @@ function enrichBankedGuidanceItem(item, ctx) {
   }
 
   return next;
+}
+
+/** Banked guidance: runtime power — 0% = critical, partial = warning (matches Refinery behavior). */
+function bankedGuidanceThrottleSeverity(state, buildingKey, baseLevel) {
+  const lv = Number(baseLevel || 0);
+  if (lv <= 0 || !canThrottleBuilding(buildingKey)) return null;
+  const mode = getBuildingPowerMode(state, buildingKey);
+  if (mode <= 0) return "critical";
+  if (mode < 100) return "warning";
+  return null;
+}
+
+function bankedGuidanceToneMax(a, b) {
+  const rank = { critical: 3, warning: 2, success: 1 };
+  return (rank[b] || 0) > (rank[a] || 0) ? b : a;
+}
+
+function applyQuarryThrottleToOreItem(state, quarryBaseLevel, item) {
+  const sev = bankedGuidanceThrottleSeverity(state, "quarry", quarryBaseLevel);
+  if (!sev) return item;
+  const mode = getBuildingPowerMode(state, "quarry");
+  if (sev === "critical") {
+    return {
+      ...item,
+      tone: "critical",
+      headline: "Quarry is off",
+      text: "Quarry is at 0% power mode. Passive ORE production is stopped — raise power mode to restore feed growth.",
+    };
+  }
+  if (item.tone === "critical") {
+    return {
+      ...item,
+      text: `${item.text} Quarry power is ${mode}% — ORE output is reduced further.`,
+    };
+  }
+  if (item.tone === "success") {
+    return {
+      ...item,
+      tone: "warning",
+      headline: `Quarry throttled · ${mode}% mode`,
+      text: `Quarry is at ${mode}% power mode, so ORE output is reduced. Raise power when you need faster refinery feed recovery.`,
+    };
+  }
+  return {
+    ...item,
+    tone: "warning",
+    text: `${item.text} Quarry power is ${mode}% — ORE output is scaled down.`,
+  };
+}
+
+function applySalvageThrottleToScrapItem(state, salvageBaseLevel, item) {
+  const sev = bankedGuidanceThrottleSeverity(state, "salvage", salvageBaseLevel);
+  if (!sev) return item;
+  const mode = getBuildingPowerMode(state, "salvage");
+  if (sev === "critical") {
+    return {
+      ...item,
+      tone: "critical",
+      headline: "Salvage Yard is off",
+      text: "Salvage Yard is at 0% power mode. Passive SCRAP production is stopped — raise power mode to restore feed growth.",
+    };
+  }
+  if (item.tone === "critical") {
+    return {
+      ...item,
+      text: `${item.text} Salvage power is ${mode}% — SCRAP output is reduced further.`,
+    };
+  }
+  if (item.tone === "success") {
+    return {
+      ...item,
+      tone: "warning",
+      headline: `Salvage throttled · ${mode}% mode`,
+      text: `Salvage Yard is at ${mode}% power mode, so SCRAP output is reduced. Raise power when you need faster refinery feed recovery.`,
+    };
+  }
+  return {
+    ...item,
+    tone: "warning",
+    text: `${item.text} Salvage power is ${mode}% — SCRAP output is scaled down.`,
+  };
+}
+
+function applyLogisticsThrottleToItem(state, logisticsBaseLevel, item) {
+  if (logisticsBaseLevel <= 0) return item;
+  const sev = bankedGuidanceThrottleSeverity(state, "logisticsCenter", logisticsBaseLevel);
+  if (!sev) return item;
+  const mode = getBuildingPowerMode(state, "logisticsCenter");
+  if (sev === "critical") {
+    return {
+      ...item,
+      tone: "critical",
+      headline: "Logistics Center is off",
+      text: "Logistics Center is at 0% power mode. Logistics output and bank bonus scaling from this building are stopped — raise power mode.",
+    };
+  }
+  if (item.tone === "critical") {
+    return {
+      ...item,
+      text: `${item.text} Logistics power is ${mode}% — bonus contribution is scaled down.`,
+    };
+  }
+  if (item.tone === "success") {
+    return {
+      ...item,
+      tone: "warning",
+      headline: `Logistics throttled · ${mode}% mode`,
+      text: `Logistics Center is at ${mode}% power mode, so logistics-driven bonuses are reduced. Raise power for full bank support.`,
+    };
+  }
+  return {
+    ...item,
+    tone: bankedGuidanceToneMax(item.tone, "warning"),
+    text: `${item.text} Logistics power is ${mode}% — bonus scaling is reduced.`,
+  };
+}
+
+function applyRepairBayThrottleToStabilityItem(state, repairBayBaseLevel, item) {
+  if (repairBayBaseLevel <= 0) return item;
+  const sev = bankedGuidanceThrottleSeverity(state, "repairBay", repairBayBaseLevel);
+  if (!sev) return item;
+  const mode = getBuildingPowerMode(state, "repairBay");
+  if (sev === "critical") {
+    return {
+      ...item,
+      tone: bankedGuidanceToneMax(item.tone, "critical"),
+      headline:
+        item.tone === "critical" && (Number(state?.stability ?? 100) < 70)
+          ? item.headline
+          : "Repair Bay is off",
+      text:
+        item.tone === "critical" && (Number(state?.stability ?? 100) < 70)
+          ? `${item.text} Repair Bay is at 0% power — stability recovery from this building is paused.`
+          : "Repair Bay is at 0% power mode. Stability support from this structure is stopped — raise power mode when you need recovery help.",
+    };
+  }
+  if (item.tone === "critical") {
+    return {
+      ...item,
+      text: `${item.text} Repair Bay power is ${mode}% — recovery support is reduced.`,
+    };
+  }
+  if (item.tone === "success") {
+    return {
+      ...item,
+      tone: "warning",
+      headline: `Repair Bay throttled · ${mode}% mode`,
+      text: `Repair Bay is at ${mode}% power mode, so stability-related support is reduced. Raise power for full effectiveness.`,
+    };
+  }
+  return {
+    ...item,
+    tone: "warning",
+    text: `${item.text} Repair Bay power is ${mode}% — support is scaled down.`,
+  };
 }
 
 function getBankedGuidanceItems({
@@ -1428,16 +1618,18 @@ function getBankedGuidanceItems({
     });
   }
 
-  // 2) ORE
+  // 2) ORE (feed health + runtime Quarry power mode)
   if (refineryBaseLevel > 0 && !s.hasOre) {
-    items.push({
-      key: "ore",
-      label: "ORE feed",
-      tone: "critical",
-      headline: "ORE is stopping output",
-      text: "Refinery cannot keep producing because ORE feed is too weak right now.",
-      target: resolveBankedActionTarget(state, "quarry"),
-    });
+    items.push(
+      applyQuarryThrottleToOreItem(state, quarryBaseLevel, {
+        key: "ore",
+        label: "ORE feed",
+        tone: "critical",
+        headline: "ORE is stopping output",
+        text: "Refinery cannot keep producing because ORE feed is too weak right now.",
+        target: resolveBankedActionTarget(state, "quarry"),
+      })
+    );
   } else if (
     refineryBaseLevel > 0 &&
     (
@@ -1445,41 +1637,47 @@ function getBankedGuidanceItems({
       quarryBaseLevel < Math.max(1, Math.ceil(refineryBaseLevel * 0.9))
     )
   ) {
-    items.push({
-      key: "ore",
-      label: "ORE feed",
-      tone: "warning",
-      headline: oreFeedHours == null
-        ? "ORE support is thin"
-        : `ORE support ~${fmtRate(oreFeedHours, 1)}h`,
-      text: "Quarry support is getting thin. Strengthening Quarry should improve refinery uptime.",
-      target: resolveBankedActionTarget(state, "quarry"),
-    });
+    items.push(
+      applyQuarryThrottleToOreItem(state, quarryBaseLevel, {
+        key: "ore",
+        label: "ORE feed",
+        tone: "warning",
+        headline: oreFeedHours == null
+          ? "ORE support is thin"
+          : `ORE support ~${fmtRate(oreFeedHours, 1)}h`,
+        text: "Quarry support is getting thin. Strengthening Quarry should improve refinery uptime.",
+        target: resolveBankedActionTarget(state, "quarry"),
+      })
+    );
   } else {
-    items.push({
-      key: "ore",
-      label: "ORE feed",
-      tone: "success",
-      headline: oreFeedHours == null
-        ? "ORE ready"
-        : `ORE support ~${fmtRate(oreFeedHours, 1)}h`,
-      text: refineryBaseLevel > 0
-        ? "ORE supply looks healthy for the current refinery load."
-        : "ORE is not the current blocker. Refinery comes first.",
-      target: resolveBankedActionTarget(state, "quarry"),
-    });
+    items.push(
+      applyQuarryThrottleToOreItem(state, quarryBaseLevel, {
+        key: "ore",
+        label: "ORE feed",
+        tone: "success",
+        headline: oreFeedHours == null
+          ? "ORE ready"
+          : `ORE support ~${fmtRate(oreFeedHours, 1)}h`,
+        text: refineryBaseLevel > 0
+          ? "ORE supply looks healthy for the current refinery load."
+          : "ORE is not the current blocker. Refinery comes first.",
+        target: resolveBankedActionTarget(state, "quarry"),
+      })
+    );
   }
 
-  // 3) SCRAP
+  // 3) SCRAP (feed health + runtime Salvage power mode)
   if (refineryBaseLevel > 0 && !s.hasScrap) {
-    items.push({
-      key: "scrap",
-      label: "SCRAP feed",
-      tone: "critical",
-      headline: "SCRAP is stopping output",
-      text: "Refinery is starved by SCRAP right now.",
-      target: resolveBankedActionTarget(state, "salvage"),
-    });
+    items.push(
+      applySalvageThrottleToScrapItem(state, salvageBaseLevel, {
+        key: "scrap",
+        label: "SCRAP feed",
+        tone: "critical",
+        headline: "SCRAP is stopping output",
+        text: "Refinery is starved by SCRAP right now.",
+        target: resolveBankedActionTarget(state, "salvage"),
+      })
+    );
   } else if (
     refineryBaseLevel > 0 &&
     (
@@ -1487,29 +1685,33 @@ function getBankedGuidanceItems({
       salvageBaseLevel < Math.max(1, Math.ceil(refineryBaseLevel * 0.9))
     )
   ) {
-    items.push({
-      key: "scrap",
-      label: "SCRAP feed",
-      tone: "warning",
-      headline: scrapFeedHours == null
-        ? "SCRAP support is thin"
-        : `SCRAP support ~${fmtRate(scrapFeedHours, 1)}h`,
-      text: "Salvage support is getting thin. Strengthening Salvage should stabilize refinery feed.",
-      target: resolveBankedActionTarget(state, "salvage"),
-    });
+    items.push(
+      applySalvageThrottleToScrapItem(state, salvageBaseLevel, {
+        key: "scrap",
+        label: "SCRAP feed",
+        tone: "warning",
+        headline: scrapFeedHours == null
+          ? "SCRAP support is thin"
+          : `SCRAP support ~${fmtRate(scrapFeedHours, 1)}h`,
+        text: "Salvage support is getting thin. Strengthening Salvage should stabilize refinery feed.",
+        target: resolveBankedActionTarget(state, "salvage"),
+      })
+    );
   } else {
-    items.push({
-      key: "scrap",
-      label: "SCRAP feed",
-      tone: "success",
-      headline: scrapFeedHours == null
-        ? "SCRAP ready"
-        : `SCRAP support ~${fmtRate(scrapFeedHours, 1)}h`,
-      text: refineryBaseLevel > 0
-        ? "SCRAP supply looks healthy for the current refinery load."
-        : "SCRAP is not the current blocker. Refinery comes first.",
-      target: resolveBankedActionTarget(state, "salvage"),
-    });
+    items.push(
+      applySalvageThrottleToScrapItem(state, salvageBaseLevel, {
+        key: "scrap",
+        label: "SCRAP feed",
+        tone: "success",
+        headline: scrapFeedHours == null
+          ? "SCRAP ready"
+          : `SCRAP support ~${fmtRate(scrapFeedHours, 1)}h`,
+        text: refineryBaseLevel > 0
+          ? "SCRAP supply looks healthy for the current refinery load."
+          : "SCRAP is not the current blocker. Refinery comes first.",
+        target: resolveBankedActionTarget(state, "salvage"),
+      })
+    );
   }
 
   // 4) ENERGY
@@ -1548,82 +1750,94 @@ function getBankedGuidanceItems({
     });
   }
 
-  // 5) Stability
+  // 5) Stability (+ runtime Repair Bay power when built)
   if (stability < 70 || systemState === "critical") {
-    items.push({
-      key: "stability",
-      label: "Stability",
-      tone: "critical",
-      headline: `Stability drag · ${fmtRate(stability, 0)}%`,
-      text: "Instability is now part of the slowdown. Fix stability first before scaling harder.",
-      target: "maintenance",
-    });
+    items.push(
+      applyRepairBayThrottleToStabilityItem(state, repairBayBaseLevel, {
+        key: "stability",
+        label: "Stability",
+        tone: "critical",
+        headline: `Stability drag · ${fmtRate(stability, 0)}%`,
+        text: "Instability is now part of the slowdown. Fix stability first before scaling harder.",
+        target: "maintenance",
+      })
+    );
   } else if (
     stability < 85 ||
     (refineryBaseLevel > 0 && repairBayBaseLevel < 1)
   ) {
-    items.push({
-      key: "stability",
-      label: "Stability",
-      tone: "warning",
-      headline: `Stability watch · ${fmtRate(stability, 0)}%`,
-      text:
-        repairBayBaseLevel < 1
-          ? "Repair Bay support is still missing. Building it should make the refinery lane safer and smoother."
-          : "Stability is okay, but not comfortably strong yet for aggressive scaling.",
-      target:
-        repairBayBaseLevel < 1
-          ? resolveBankedActionTarget(state, "repairBay")
-          : "maintenance",
-    });
+    items.push(
+      applyRepairBayThrottleToStabilityItem(state, repairBayBaseLevel, {
+        key: "stability",
+        label: "Stability",
+        tone: "warning",
+        headline: `Stability watch · ${fmtRate(stability, 0)}%`,
+        text:
+          repairBayBaseLevel < 1
+            ? "Repair Bay support is still missing. Building it should make the refinery lane safer and smoother."
+            : "Stability is okay, but not comfortably strong yet for aggressive scaling.",
+        target:
+          repairBayBaseLevel < 1
+            ? resolveBankedActionTarget(state, "repairBay")
+            : "maintenance",
+      })
+    );
   } else {
-    items.push({
-      key: "stability",
-      label: "Stability",
-      tone: "success",
-      headline: `Stability healthy · ${fmtRate(stability, 0)}%`,
-      text: "Stability is not meaningfully dragging the current refinery lane.",
-      target:
-        repairBayBaseLevel < 1
-          ? resolveBankedActionTarget(state, "repairBay")
-          : "maintenance",
-    });
+    items.push(
+      applyRepairBayThrottleToStabilityItem(state, repairBayBaseLevel, {
+        key: "stability",
+        label: "Stability",
+        tone: "success",
+        headline: `Stability healthy · ${fmtRate(stability, 0)}%`,
+        text: "Stability is not meaningfully dragging the current refinery lane.",
+        target:
+          repairBayBaseLevel < 1
+            ? resolveBankedActionTarget(state, "repairBay")
+            : "maintenance",
+      })
+    );
   }
 
-  // 6) Logistics / bank bonus
+  // 6) Logistics / bank bonus (+ runtime Logistics Center power when built)
   if (refineryBaseLevel > 0 && logisticsBaseLevel < 1) {
-    items.push({
-      key: "logistics",
-      label: "Logistics",
-      tone: "warning",
-      headline: "No logistics support yet",
-      text: "Logistics Center is not required to start production, but it is one of the best support upgrades once Refinery is online.",
-      target: resolveBankedActionTarget(state, "logisticsCenter"),
-    });
+    items.push(
+      applyLogisticsThrottleToItem(state, logisticsBaseLevel, {
+        key: "logistics",
+        label: "Logistics",
+        tone: "warning",
+        headline: "No logistics support yet",
+        text: "Logistics Center is not required to start production, but it is one of the best support upgrades once Refinery is online.",
+        target: resolveBankedActionTarget(state, "logisticsCenter"),
+      })
+    );
   } else if (
     refineryBaseLevel >= 3 &&
     logisticsBaseLevel < Math.max(1, Math.ceil(refineryBaseLevel / 3))
   ) {
-    items.push({
-      key: "logistics",
-      label: "Logistics",
-      tone: "warning",
-      headline: `Bank bonus x${Number(derived?.bankBonus || 1).toFixed(2)}`,
-      text: "Your refinery loop is already running well enough that Logistics support should noticeably help now.",
-      target: resolveBankedActionTarget(state, "logisticsCenter"),
-    });
+    items.push(
+      applyLogisticsThrottleToItem(state, logisticsBaseLevel, {
+        key: "logistics",
+        label: "Logistics",
+        tone: "warning",
+        headline: `Bank bonus x${Number(derived?.bankBonus || 1).toFixed(2)}`,
+        text: "Your refinery loop is already running well enough that Logistics support should noticeably help now.",
+        target: resolveBankedActionTarget(state, "logisticsCenter"),
+      })
+    );
   } else {
-    items.push({
-      key: "logistics",
-      label: "Logistics",
-      tone: "success",
-      headline: `Bank bonus x${Number(derived?.bankBonus || 1).toFixed(2)}`,
-      text:
-        refineryBaseLevel > 0
-          ? "Logistics support is currently balanced for your refinery lane."
-          : "Logistics is not the current blocker before Refinery is online.",
-      target: resolveBankedActionTarget(state, "logisticsCenter"),
-    });
+    items.push(
+      applyLogisticsThrottleToItem(state, logisticsBaseLevel, {
+        key: "logistics",
+        label: "Logistics",
+        tone: "success",
+        headline: `Bank bonus x${Number(derived?.bankBonus || 1).toFixed(2)}`,
+        text:
+          refineryBaseLevel > 0
+            ? "Logistics support is currently balanced for your refinery lane."
+            : "Logistics is not the current blocker before Refinery is online.",
+        target: resolveBankedActionTarget(state, "logisticsCenter"),
+      })
+    );
   }
 
   // 7) Daily cap (always last in popup order)
@@ -1743,6 +1957,29 @@ function getBankedSummaryFromItems(items) {
   };
 }
 
+/**
+ * Which guidance card to emphasize when opening Banked MLEO: first critical (red), else first
+ * warning in pipeline order (Refinery → … → Daily cap). Matches “fix reds first, then first orange”.
+ */
+function getBankedGuidanceFocusKey(items) {
+  const list = Array.isArray(items) ? items : [];
+  const critical = list.find((i) => i?.tone === "critical");
+  if (critical?.key) return critical.key;
+  const warning = list.find((i) => i?.tone === "warning");
+  if (warning?.key) return warning.key;
+  return null;
+}
+
+function getBankedGuidanceFocusRingClass(tone) {
+  if (tone === "critical") {
+    return "ring-2 ring-rose-400/70 ring-offset-2 ring-offset-slate-950 shadow-[0_0_0_1px_rgba(244,63,94,0.25)]";
+  }
+  if (tone === "warning") {
+    return "ring-2 ring-amber-400/65 ring-offset-2 ring-offset-slate-950 shadow-[0_0_0_1px_rgba(250,204,21,0.2)]";
+  }
+  return "";
+}
+
 function getBankedSummaryButtonClasses(tone, isOpen = false) {
   if (tone === "critical") {
     return isOpen
@@ -1758,7 +1995,20 @@ function getBankedSummaryButtonClasses(tone, isOpen = false) {
 
   return isOpen
     ? "border-emerald-400/45 bg-emerald-500/12 text-emerald-100 shadow-[0_0_18px_rgba(52,211,153,0.10)]"
-    : "border-emerald-400/28 bg-white/[0.04] text-white hover:bg-white/[0.06]";
+    : "border-emerald-400/40 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/14 shadow-[0_0_16px_rgba(52,211,153,0.08)]";
+}
+
+/** Eyebrow + value text inside BANKED chip (avoid hardcoded white overriding tone). */
+function getBankedSummaryButtonEyebrowClass(tone) {
+  if (tone === "critical") return "text-rose-200/60";
+  if (tone === "warning") return "text-amber-200/60";
+  return "text-emerald-200/70";
+}
+
+function getBankedSummaryButtonValueClass(tone) {
+  if (tone === "critical") return "text-rose-50";
+  if (tone === "warning") return "text-amber-50";
+  return "text-emerald-50";
 }
 
 function getBankedSummaryBadgeClasses(tone) {
@@ -2140,6 +2390,8 @@ function DesktopFloatingPanelShell({
   subtitleFullWidth = false,
   headerRight,
   onClose,
+  /** Optional: scroll container ref (e.g. scroll focused guidance card into view). */
+  bodyScrollRef,
   children,
 }) {
   const actionBtnBase =
@@ -2192,6 +2444,7 @@ function DesktopFloatingPanelShell({
       </div>
 
       <div
+        ref={bodyScrollRef}
         className="
           min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pr-1 pb-10 md:pb-12
           banked-scroll [webkit-overflow-scrolling:touch]
@@ -2225,6 +2478,24 @@ function BankedQuickPanel({
       systemState,
     });
 
+  const bodyScrollRef = useRef(null);
+  const guidanceCardRefs = useRef({});
+
+  const focusGuidanceKey = useMemo(
+    () => getBankedGuidanceFocusKey(guidanceItems),
+    [guidanceItems]
+  );
+
+  useLayoutEffect(() => {
+    if (!focusGuidanceKey) return;
+    const el = guidanceCardRefs.current[focusGuidanceKey];
+    if (!el) return;
+    const run = () => {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+    };
+    requestAnimationFrame(() => requestAnimationFrame(run));
+  }, [focusGuidanceKey]);
+
   const handleNavigate = (target) => {
     onClose?.();
     onNavigate?.(target);
@@ -2240,6 +2511,7 @@ function BankedQuickPanel({
         </span>
       }
       onClose={onClose}
+      bodyScrollRef={bodyScrollRef}
     >
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-[18px] border border-cyan-400/15 bg-cyan-500/[0.07] px-3 py-2">
@@ -2288,9 +2560,18 @@ function BankedQuickPanel({
           {guidanceItems.map((item) => (
             <button
               key={item.key}
+              ref={(node) => {
+                if (node) guidanceCardRefs.current[item.key] = node;
+                else delete guidanceCardRefs.current[item.key];
+              }}
               type="button"
               onClick={() => handleNavigate(item.target)}
-              className={`w-full rounded-[18px] border px-3 py-2.5 text-left transition ${getBankedIndicatorCardClasses(item.tone)}`}
+              aria-current={focusGuidanceKey === item.key ? "true" : undefined}
+              className={`scroll-mt-28 w-full rounded-[18px] border px-3 py-2.5 text-left transition ${getBankedIndicatorCardClasses(
+                item.tone
+              )} ${
+                focusGuidanceKey === item.key ? getBankedGuidanceFocusRingClass(item.tone) : ""
+              }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
@@ -9997,10 +10278,18 @@ export default function MleoBase() {
                     )}`}
                     title="Banked MLEO quick view"
                   >
-                    <div className="text-[9px] font-black uppercase tracking-[0.12em] text-white/40 leading-none">
+                    <div
+                      className={`text-[9px] font-black uppercase tracking-[0.12em] leading-none ${getBankedSummaryButtonEyebrowClass(
+                        bankedSummary.tone
+                      )}`}
+                    >
                       BANKED
                     </div>
-                    <div className="text-[11px] font-extrabold text-white leading-none">
+                    <div
+                      className={`text-[11px] font-extrabold leading-none ${getBankedSummaryButtonValueClass(
+                        bankedSummary.tone
+                      )}`}
+                    >
                       {formatBankedBadgeCompact(bankedDisplayValue)}
                     </div>
                     {bankedSummary.count > 0 ? (
@@ -10110,10 +10399,18 @@ export default function MleoBase() {
                   )}`}
                   title="Banked MLEO quick view"
                 >
-                  <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white/40 leading-none">
+                  <div
+                    className={`text-[10px] font-black uppercase tracking-[0.12em] leading-none ${getBankedSummaryButtonEyebrowClass(
+                      bankedSummary.tone
+                    )}`}
+                  >
                     BANKED
                   </div>
-                  <div className="text-xs font-extrabold leading-none">
+                  <div
+                    className={`text-xs font-extrabold leading-none ${getBankedSummaryButtonValueClass(
+                      bankedSummary.tone
+                    )}`}
+                  >
                     {formatBankedBadgeCompact(bankedDisplayValue)}
                   </div>
                   {bankedSummary.count > 0 ? (
@@ -10159,7 +10456,7 @@ export default function MleoBase() {
               <button
                 type="button"
                 onClick={() => setOpenInfoKey("sharedVault")}
-                className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20"
+                className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-2.5 text-sm font-semibold text-violet-200 hover:bg-violet-500/18"
                 title="Shared Vault"
               >
                 VAULT {fmt(sharedVault)} MLEO
@@ -10825,10 +11122,20 @@ export default function MleoBase() {
                         showBankedPanel
                       )}`}
                     >
-                      <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
+                      <div
+                        className={`text-[10px] uppercase tracking-[0.16em] ${getBankedSummaryButtonEyebrowClass(
+                          bankedSummary.tone
+                        )}`}
+                      >
                         {item.label}
                       </div>
-                      <div className="mt-1 text-sm font-bold text-white">{item.value}</div>
+                      <div
+                        className={`mt-1 text-sm font-bold ${getBankedSummaryButtonValueClass(
+                          bankedSummary.tone
+                        )}`}
+                      >
+                        {item.value}
+                      </div>
 
                       {bankedSummary.count > 0 ? (
                         <span
