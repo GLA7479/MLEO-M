@@ -16,6 +16,17 @@ function pickDotTone(theme, state) {
   return theme.dots.normal;
 }
 
+function mergeLineTone(base, boost) {
+  if (!boost) return base;
+  return { ...base, ...boost };
+}
+
+function selectedRingForNode(theme, isHq, isSelected) {
+  if (!isSelected) return "hover:scale-[1.03]";
+  if (isHq && theme.selectedRingHqClassName) return theme.selectedRingHqClassName;
+  return theme.selectedRingClassName;
+}
+
 export function BaseHomeFlowScenePanel({
   layout,
   hq,
@@ -71,7 +82,11 @@ export function BaseHomeFlowScenePanel({
           preserveAspectRatio="none"
         >
           {links.map((node) => {
-            const lineTone = pickLinkTone(theme, node.state);
+            const baseTone = pickLinkTone(theme, node.state);
+            const lineTone =
+              selected === node.key && theme.linkSelected
+                ? mergeLineTone(baseTone, theme.linkSelected)
+                : baseTone;
             return (
               <line
                 key={`line-${node.key}`}
@@ -88,15 +103,20 @@ export function BaseHomeFlowScenePanel({
 
           {links.map((node) => {
             const dotTone = pickDotTone(theme, node.state);
-            const fill = selected === node.key ? theme.dots.selectedFill : dotTone.fill;
-            const filterStyle = dotTone.filter ? { filter: dotTone.filter } : undefined;
+            const isLinkSelected = selected === node.key;
+            const fill = isLinkSelected ? theme.dots.selectedFill : dotTone.fill;
+            const boosted =
+              isLinkSelected && theme.dots.selectedActive
+                ? { ...dotTone, ...theme.dots.selectedActive }
+                : dotTone;
+            const filterStyle = boosted.filter ? { filter: boosted.filter } : undefined;
 
             return (
               <circle
                 key={`dot-${node.key}`}
                 cx={(hq.pos.x + node.pos.x) / 2}
                 cy={(hq.pos.y + node.pos.y) / 2}
-                r={dotTone.r}
+                r={boosted.r}
                 fill={fill}
                 style={filterStyle}
               />
@@ -132,9 +152,11 @@ export function BaseHomeFlowScenePanel({
                   : isDesktop
                   ? "min-w-[74px] rounded-[16px] px-3 py-2 text-[11px]"
                   : "min-w-[64px] rounded-xl px-2.5 py-2 text-[11px]"
-              } ${node.glowClass || ""} ${nodeSurface || ""} ${stateExtra || ""} ${
-                isSelected ? theme.selectedRingClassName : "hover:scale-[1.03]"
-              }`}
+              } ${node.glowClass || ""} ${nodeSurface || ""} ${stateExtra || ""} ${selectedRingForNode(
+                theme,
+                isHq,
+                isSelected
+              )}`}
               style={{
                 left: `${node.pos.x}%`,
                 top: `${node.pos.y}%`,
