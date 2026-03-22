@@ -13,11 +13,11 @@ function quickTagToneClass(tone = "neutral") {
   }
 }
 
-function QuickTags({ tags }) {
+function QuickTags({ tags, quiet }) {
   if (!Array.isArray(tags) || tags.length === 0) return null;
 
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
+    <div className={`mt-2 flex flex-wrap gap-1.5 ${quiet ? "opacity-80" : ""}`}>
       {tags.map((tag) => (
         <span
           key={`${tag?.label}-${tag?.tone || "neutral"}`}
@@ -44,8 +44,8 @@ export function DailyMissionsPanel({ panelTone, missions, onClaimMission, onOpen
           data-base-target={mission.key}
           className={`relative rounded-xl border p-2 ${
             mission.ready
-              ? "border-amber-400/40 bg-amber-500/10"
-              : "border-white/10 bg-black/20"
+              ? "border-amber-400/45 bg-amber-500/[0.12] shadow-[0_0_16px_rgba(251,191,36,0.08)]"
+              : "border-white/[0.08] bg-white/[0.03]"
           } ${
             mission.highlighted
               ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
@@ -59,7 +59,7 @@ export function DailyMissionsPanel({ panelTone, missions, onClaimMission, onOpen
                 e.stopPropagation();
                 onOpenMissionInfo?.(mission.key);
               }}
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-white/5 text-[11px] font-bold text-cyan-200/80 outline-none transition hover:border-cyan-400/35 hover:bg-cyan-500/15 hover:text-cyan-100 focus-visible:ring-2 focus-visible:ring-cyan-400/35"
               aria-label={`Open info for ${mission.name}`}
               title={`Info about ${mission.name}`}
             >
@@ -77,7 +77,7 @@ export function DailyMissionsPanel({ panelTone, missions, onClaimMission, onOpen
                 Reward: {mission.rewardText}
               </div>
 
-              <QuickTags tags={mission.quickTags} />
+              <QuickTags tags={mission.quickTags} quiet={!mission.ready} />
 
               {mission.helpText ? (
                 <div className="mt-1.5 text-[11px] leading-snug text-white/45">{mission.helpText}</div>
@@ -87,10 +87,10 @@ export function DailyMissionsPanel({ panelTone, missions, onClaimMission, onOpen
             <button
               onClick={() => onClaimMission?.(mission.key)}
               disabled={!mission.done || mission.claimed}
-              className={`flex min-h-11 shrink-0 items-center justify-center rounded-xl px-3 py-2 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
+              className={`flex min-h-11 shrink-0 items-center justify-center rounded-xl px-3 py-2 text-[11px] outline-none transition disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.99] motion-reduce:active:scale-100 ${
                 mission.ready
-                  ? "bg-cyan-500 text-white hover:bg-cyan-400"
-                  : "bg-white/10 hover:bg-white/20"
+                  ? "font-extrabold bg-cyan-500 text-white shadow-[0_0_14px_rgba(34,211,238,0.25)] hover:bg-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+                  : "font-semibold bg-white/[0.07] text-white/65 hover:bg-white/12 hover:text-white/80 focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
               }`}
             >
               {mission.claimed ? "Claimed" : mission.done ? "Claim" : "In Progress"}

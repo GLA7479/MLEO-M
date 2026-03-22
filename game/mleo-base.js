@@ -2660,13 +2660,15 @@ function sectionStatusHint(type, data = {}) {
     if (data.ship) parts.push("Ship ready");
     if (data.refill) parts.push("Refill up");
     if (data.maintain) parts.push("Maintain up");
-    return parts.length ? parts.join(" · ") : "Idle · ship · field · vault inside";
+    return parts.length
+      ? `${parts.join(" · ")} — open to act`
+      : "Field run, vault tools, transfers — open when ready";
   }
 
   if (type === "daily-missions") {
     return data.count > 0
-      ? `${data.count} ready · claim`
-      : "None ready · preview";
+      ? `${data.count} to claim — open to collect`
+      : "No claims yet — preview tasks inside";
   }
 
   if (type === "intel-summary") {
@@ -2693,17 +2695,17 @@ function buildSectionHint(type, counts) {
     if (counts.research > 0) {
       parts.push(`${counts.research} research`);
     }
-    return parts.length ? `${parts.join(" · ")} available` : "Nothing available right now";
+    return parts.length ? `${parts.join(" · ")} — open to add` : "Nothing affordable — open to preview";
   }
 
   if (type === "structures") {
     return counts.structures > 0
-      ? `${counts.structures} upgrade${counts.structures > 1 ? "s" : ""} available`
-      : "Nothing available right now";
+      ? `${counts.structures} upgrade${counts.structures > 1 ? "s" : ""} — open to build`
+      : "No upgrades ready — open to plan";
   }
 
   if (type === "support") {
-    return "Vault blueprint and runtime tools.";
+    return "Blueprint & vault tools — open when needed";
   }
 
   return "";
@@ -13284,7 +13286,7 @@ export default function MleoBase() {
                       readyCounts.missions +
                       (readyCounts.specializationMilestones || 0),
                   },
-                  { key: "ops", label: "Operations", badge: readyCounts.expedition + readyCounts.shipment },
+                  { key: "ops", label: "Ops", badge: readyCounts.expedition + readyCounts.shipment },
                   { key: "build", label: "Build", badge: buildOpportunitiesCount },
                   { key: "intel", label: "Intel", badge: 0 },
                 ].map((tab) => {
@@ -13294,6 +13296,8 @@ export default function MleoBase() {
                   return (
                     <button
                       key={tab.key}
+                      type="button"
+                      aria-label={tab.key === "ops" ? "Operations" : undefined}
                       onClick={() => openMobilePanel(tab.key)}
                       className={`relative rounded-2xl px-3 py-3 text-xs font-bold transition ${
                         active

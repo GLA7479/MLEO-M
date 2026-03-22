@@ -22,7 +22,7 @@ export function OperationsConsolePanel({
       {showExpeditions ? (
         <div
           data-base-target="expedition"
-          className={`relative flex h-full flex-col gap-2.5 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-3 sm:p-3.5 ${
+          className={`relative flex h-full flex-col gap-2.5 rounded-2xl border border-cyan-500/28 bg-cyan-500/[0.11] p-3 shadow-[0_0_22px_rgba(34,211,238,0.07)] sm:p-3.5 ${
             expedition.highlightClass || ""
           } ${expedition.highlighted ? highlightRingClass : ""}`}
         >
@@ -33,7 +33,7 @@ export function OperationsConsolePanel({
                 e.stopPropagation();
                 expedition.onOpenInfo?.();
               }}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-500/15 text-[13px] font-black text-cyan-100 outline-none transition hover:bg-cyan-500/25 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-400/45 active:scale-95 motion-reduce:active:scale-100"
               aria-label="Open expedition info"
               title="Info about expedition"
             >
@@ -63,9 +63,9 @@ export function OperationsConsolePanel({
             data-base-target="expedition-action"
             onClick={expedition.onLaunch}
             disabled={!expedition.canExpeditionNow}
-            className={`mt-auto flex min-h-11 w-full items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-extrabold transition ${
+            className={`mt-auto flex min-h-11 w-full items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-extrabold outline-none transition active:scale-[0.99] motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-cyan-300/55 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:active:scale-100 ${
               expedition.canExpeditionNow
-                ? "bg-cyan-600 text-slate-950 hover:bg-cyan-500"
+                ? "bg-cyan-600 text-slate-950 shadow-[0_0_18px_rgba(34,211,238,0.22)] hover:bg-cyan-500"
                 : "bg-white/10 text-white/45"
             } ${expedition.buttonHighlighted ? highlightRingClass : ""}`}
           >
@@ -76,7 +76,7 @@ export function OperationsConsolePanel({
 
       <div
         data-base-target="maintenance"
-        className={`flex flex-col rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 sm:p-3.5 ${
+        className={`flex flex-col rounded-2xl border border-amber-500/22 bg-amber-500/[0.09] p-3 sm:p-3.5 ${
           maintenance.highlightClass || ""
         } ${maintenance.highlighted ? highlightRingClass : ""}`}
       >
@@ -95,7 +95,7 @@ export function OperationsConsolePanel({
                 e.stopPropagation();
                 maintenance.onOpenRefillInfo?.();
               }}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/12 bg-white/5 text-[11px] font-bold text-cyan-200/85 outline-none transition hover:border-cyan-400/35 hover:bg-cyan-500/15 hover:text-cyan-100 focus-visible:ring-2 focus-visible:ring-cyan-400/35 active:scale-95 motion-reduce:active:scale-100"
               aria-label="Open refill info"
               title="Info about refill"
             >
@@ -107,7 +107,7 @@ export function OperationsConsolePanel({
                 e.stopPropagation();
                 maintenance.onOpenMaintenanceInfo?.();
               }}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/12 bg-white/5 text-[13px] font-bold text-cyan-200/85 outline-none transition hover:border-cyan-400/35 hover:bg-cyan-500/15 hover:text-cyan-100 focus-visible:ring-2 focus-visible:ring-cyan-400/35 active:scale-95 motion-reduce:active:scale-100"
               aria-label="Open maintenance info"
               title="Info about maintenance"
             >
@@ -144,7 +144,7 @@ export function OperationsConsolePanel({
                     ? "Safe 50% is ON (all runtime buildings match this preset)"
                     : "Safe 50% is OFF — click to apply"
                 }
-                className={`relative z-10 flex min-h-11 w-full cursor-pointer touch-manipulation select-none items-center justify-center gap-1 rounded-full px-2 py-1.5 text-[10px] font-bold transition-all duration-200 active:scale-[0.98] sm:text-[11px] ${
+                className={`relative z-10 flex min-h-11 w-full cursor-pointer touch-manipulation select-none items-center justify-center gap-1 rounded-full px-2 py-1.5 text-[10px] font-bold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-cyan-400/40 focus-visible:ring-offset-2 focus-visible:ring-offset-amber-500/10 active:scale-[0.98] sm:text-[11px] ${
                   maintenance.powerPresetActive === "safe"
                     ? "border-2 border-cyan-200/80 bg-gradient-to-b from-cyan-500/35 to-cyan-800/25 text-white shadow-[0_0_12px_rgba(34,211,238,0.3)] ring-1 ring-cyan-400/35"
                     : "border border-white/15 bg-slate-950/80 text-cyan-100/75 hover:border-cyan-400/35 hover:bg-slate-900/80 hover:text-cyan-50"
@@ -176,7 +176,7 @@ export function OperationsConsolePanel({
                     ? "Normal 100% is ON (all runtime buildings at 100%)"
                     : "Normal 100% is OFF — click to apply"
                 }
-                className={`relative z-10 flex min-h-11 w-full cursor-pointer touch-manipulation select-none items-center justify-center gap-1 rounded-full px-2 py-1.5 text-[10px] font-bold transition-all duration-200 active:scale-[0.98] sm:text-[11px] ${
+                className={`relative z-10 flex min-h-11 w-full cursor-pointer touch-manipulation select-none items-center justify-center gap-1 rounded-full px-2 py-1.5 text-[10px] font-bold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/35 focus-visible:ring-offset-2 focus-visible:ring-offset-amber-500/10 active:scale-[0.98] sm:text-[11px] ${
                   maintenance.powerPresetActive === "normal"
                     ? "border-2 border-white/70 bg-gradient-to-b from-white/20 to-white/[0.06] text-white shadow-[0_0_10px_rgba(255,255,255,0.12)] ring-1 ring-white/28"
                     : "border border-white/15 bg-slate-950/80 text-white/75 hover:border-white/30 hover:bg-white/[0.06] hover:text-white"
@@ -229,7 +229,7 @@ export function OperationsConsolePanel({
             type="button"
             data-base-target="overclock"
             onClick={maintenance.onOverclock}
-            className={`flex min-h-11 items-center justify-center rounded-xl bg-amber-600 px-1.5 py-2 text-center text-[11px] font-bold leading-tight text-white hover:bg-amber-500 sm:px-2 sm:text-sm ${
+            className={`flex min-h-11 items-center justify-center rounded-xl bg-amber-600 px-1.5 py-2 text-center text-[11px] font-bold leading-tight text-white outline-none transition hover:bg-amber-500 focus-visible:ring-2 focus-visible:ring-amber-200/50 focus-visible:ring-offset-2 focus-visible:ring-offset-amber-500/15 active:scale-[0.99] motion-reduce:active:scale-100 sm:px-2 sm:text-sm ${
               maintenance.highlightOverclock
                 ? "ring-2 ring-cyan-300/90 ring-offset-2 ring-offset-amber-500/10"
                 : ""
@@ -239,18 +239,18 @@ export function OperationsConsolePanel({
           </button>
           <button
             onClick={maintenance.onRefill}
-            className="flex min-h-11 items-center justify-center rounded-xl bg-white/10 px-1.5 py-2 text-center text-[11px] font-bold leading-tight text-white hover:bg-white/20 sm:px-2 sm:text-sm"
+            className="flex min-h-11 items-center justify-center rounded-xl bg-white/10 px-1.5 py-2 text-center text-[11px] font-bold leading-tight text-white outline-none transition hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-amber-500/15 active:scale-[0.99] motion-reduce:active:scale-100 sm:px-2 sm:text-sm"
           >
             {maintenance.refillButtonText}
           </button>
           <button
             onClick={maintenance.onMaintain}
-            className={`flex min-h-11 items-center justify-center rounded-xl px-1.5 py-2 text-center text-[11px] font-bold leading-tight text-white sm:px-2 sm:text-sm ${
+            className={`flex min-h-11 items-center justify-center rounded-xl px-1.5 py-2 text-center text-[11px] font-bold leading-tight text-white outline-none transition focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-amber-500/15 active:scale-[0.99] motion-reduce:active:scale-100 sm:px-2 sm:text-sm ${
               maintenance.systemState === "critical"
-                ? "bg-rose-600 hover:bg-rose-500"
+                ? "bg-rose-600 hover:bg-rose-500 focus-visible:ring-rose-300/55"
                 : maintenance.systemState === "warning"
-                ? "bg-amber-600 hover:bg-amber-500"
-                : "bg-white/10 hover:bg-white/20"
+                ? "bg-amber-600 hover:bg-amber-500 focus-visible:ring-amber-200/50"
+                : "bg-white/10 hover:bg-white/20 focus-visible:ring-white/30"
             }`}
           >
             Maintain
@@ -261,7 +261,7 @@ export function OperationsConsolePanel({
       {/* Vault transfer + long-term upgrade — calmer shells */}
       <div
         data-base-target="shipping"
-        className={`relative flex h-full flex-col gap-2 rounded-2xl border border-emerald-500/12 bg-emerald-500/[0.045] p-3 sm:p-3.5 ${
+        className={`relative flex h-full flex-col gap-2 rounded-2xl border border-emerald-500/10 bg-emerald-500/[0.03] p-3 sm:p-3.5 ${
           shipping.highlightClass || ""
         } ${shipping.highlighted ? highlightRingClass : ""}`}
       >
@@ -272,7 +272,7 @@ export function OperationsConsolePanel({
               e.stopPropagation();
               shipping.onOpenInfo?.();
             }}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[13px] font-semibold text-emerald-200/70 outline-none transition hover:border-emerald-400/25 hover:bg-emerald-500/10 hover:text-emerald-100 focus-visible:ring-2 focus-visible:ring-emerald-400/30 active:scale-95 motion-reduce:active:scale-100"
             aria-label="Open shipping info"
             title="Info about shipping"
           >
@@ -281,8 +281,8 @@ export function OperationsConsolePanel({
         </div>
 
         <div className="flex min-h-0 flex-col pr-8">
-          <div className="text-sm font-semibold text-emerald-100/88">Ship to Shared Vault</div>
-          <p className="mt-0.5 text-[13px] leading-snug text-white/58">
+          <div className="text-sm font-medium text-emerald-200/72">Ship to Shared Vault</div>
+          <p className="mt-0.5 text-[12px] leading-snug text-white/52">
             Banked MLEO → shared vault. Daily cap is on production, not this transfer.
           </p>
           <OpsHintSurface wrapClass={hintWrap}>{shipping.freightHint}</OpsHintSurface>
@@ -291,9 +291,9 @@ export function OperationsConsolePanel({
         <button
           onClick={shipping.onShip}
           disabled={!shipping.canShipNow}
-          className={`mt-auto flex min-h-11 w-full items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-extrabold transition ${
+          className={`mt-auto flex min-h-11 w-full items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-bold outline-none transition active:scale-[0.99] motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-emerald-300/45 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:active:scale-100 ${
             shipping.canShipNow
-              ? "bg-emerald-600 text-white hover:bg-emerald-500"
+              ? "bg-emerald-600 text-white shadow-[0_0_14px_rgba(16,185,129,0.15)] hover:bg-emerald-500"
               : "bg-white/10 text-white/45"
           }`}
         >
@@ -303,7 +303,7 @@ export function OperationsConsolePanel({
 
       <div
         data-base-target="blueprint"
-        className={`relative rounded-2xl border border-fuchsia-500/12 bg-fuchsia-500/[0.045] p-3 sm:p-3.5 ${
+        className={`relative rounded-2xl border border-fuchsia-500/10 bg-fuchsia-500/[0.03] p-3 sm:p-3.5 ${
           blueprint.highlightClass || ""
         } ${blueprint.highlighted ? highlightRingClass : ""}`}
       >
@@ -314,7 +314,7 @@ export function OperationsConsolePanel({
               e.stopPropagation();
               blueprint.onOpenInfo?.();
             }}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[13px] font-semibold text-fuchsia-200/70 outline-none transition hover:border-fuchsia-400/25 hover:bg-fuchsia-500/10 hover:text-fuchsia-100 focus-visible:ring-2 focus-visible:ring-fuchsia-400/35 active:scale-95 motion-reduce:active:scale-100"
             aria-label="Open blueprint info"
             title="Info about blueprint"
           >
@@ -323,8 +323,8 @@ export function OperationsConsolePanel({
         </div>
 
         <div className="flex min-h-0 flex-col pr-8">
-          <div className="text-sm font-semibold text-fuchsia-100/88">Blueprint Cache</div>
-          <p className="mt-0.5 text-[13px] leading-snug text-white/58">
+          <div className="text-sm font-medium text-fuchsia-200/72">Blueprint Cache</div>
+          <p className="mt-0.5 text-[12px] leading-snug text-white/52">
             {blueprint.costText} shared MLEO + {blueprint.dataCostText} DATA — permanent refinery efficiency.
           </p>
         </div>
@@ -333,8 +333,10 @@ export function OperationsConsolePanel({
           <button
             onClick={blueprint.onBuy}
             disabled={!blueprint.canBuy}
-            className={`flex min-h-11 w-full items-center justify-center rounded-xl px-3 py-2 text-sm font-bold transition ${
-              blueprint.canBuy ? "bg-fuchsia-600 text-white hover:bg-fuchsia-500" : "bg-white/10 text-white/45"
+            className={`flex min-h-11 w-full items-center justify-center rounded-xl px-3 py-2 text-sm font-bold outline-none transition active:scale-[0.99] motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-fuchsia-300/45 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:active:scale-100 ${
+              blueprint.canBuy
+                ? "bg-fuchsia-600 text-white shadow-[0_0_12px_rgba(192,38,211,0.14)] hover:bg-fuchsia-500"
+                : "bg-white/10 text-white/45"
             }`}
           >
             {blueprint.buttonText}

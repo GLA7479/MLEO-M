@@ -1,13 +1,16 @@
 import { ExpandablePanelSectionHeader } from "./ExpandablePanelSectionHeader";
 
-function SectionAvailabilityBadge({ count, panelTone }) {
+function SectionAvailabilityBadge({ count, panelTone, variant = "default" }) {
   const extra = panelTone?.sectionCountBadge ? ` ${panelTone.sectionCountBadge}` : "";
   if (!count) return null;
 
+  const tone =
+    variant === "claim"
+      ? "bg-amber-400 text-slate-950 shadow-[0_0_10px_rgba(251,191,36,0.25)]"
+      : "bg-cyan-400 text-slate-950";
+
   return (
-    <span
-      className={`inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-cyan-400 px-1.5 text-[10px] font-black text-slate-950${extra}`}
-    >
+    <span className={`inline-flex min-h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-black ${tone}${extra}`}>
       {count}
     </span>
   );
@@ -33,23 +36,34 @@ export function OpsPanelCards({
     <div className="flex flex-col gap-3">
       {/* A) Action now — daily missions */}
       <section aria-label="Daily missions">
-        <div className={`rounded-2xl border p-2.5 transition sm:rounded-3xl sm:p-3${shell} ${missionsCardClass}`}>
+        <div
+          className={`rounded-2xl border p-2.5 transition sm:rounded-3xl sm:p-3${shell} ${missionsCardClass} ${
+            missionsAvailableCount > 0 ? "shadow-[0_0_20px_rgba(251,191,36,0.06)]" : ""
+          }`}
+        >
           <ExpandablePanelSectionHeader
             panelKey="ops-missions"
             openInnerPanel={openInnerPanel}
             toggleInnerPanel={toggleInnerPanel}
             overviewTapRow
+            subtlePill={missionsAvailableCount === 0}
           >
             <div className="flex flex-wrap items-center gap-1.5">
               <div className="text-[15px] font-extrabold tracking-tight text-white sm:text-lg">
                 Daily Missions
               </div>
-              <SectionAvailabilityBadge count={missionsAvailableCount} panelTone={panelTone} />
+              <SectionAvailabilityBadge
+                count={missionsAvailableCount}
+                panelTone={panelTone}
+                variant={missionsAvailableCount > 0 ? "claim" : "default"}
+              />
             </div>
             {panelTone?.sectionBar ? <div className={panelTone.sectionBar} aria-hidden /> : null}
             {openInnerPanel !== "ops-missions" ? (
               <div
-                className={`mt-0.5 line-clamp-2 text-[11px] leading-snug text-white/55 sm:text-xs sm:text-white/60${hintRow}`}
+                className={`mt-0.5 line-clamp-2 text-[11px] leading-snug sm:text-xs${hintRow} ${
+                  missionsAvailableCount > 0 ? "text-amber-100/78" : "text-white/48 sm:text-white/52"
+                }`}
               >
                 {missionsHintText}
               </div>
@@ -70,6 +84,7 @@ export function OpsPanelCards({
             openInnerPanel={openInnerPanel}
             toggleInnerPanel={toggleInnerPanel}
             overviewTapRow
+            subtlePill={opsAvailableCount === 0}
           >
             <div className="flex flex-wrap items-center gap-1.5">
               <div className="text-[15px] font-bold text-white/90 sm:text-lg">Operations Console</div>
@@ -78,7 +93,9 @@ export function OpsPanelCards({
             {panelTone?.sectionBar ? <div className={panelTone.sectionBar} aria-hidden /> : null}
             {openInnerPanel !== "ops-console" ? (
               <div
-                className={`mt-0.5 line-clamp-2 text-[11px] leading-snug text-white/48 sm:text-xs sm:text-white/52${hintRow}`}
+                className={`mt-0.5 line-clamp-2 text-[11px] leading-snug sm:text-xs${hintRow} ${
+                  opsAvailableCount > 0 ? "text-cyan-100/70" : "text-white/45 sm:text-white/50"
+                }`}
               >
                 {opsHintText}
               </div>
