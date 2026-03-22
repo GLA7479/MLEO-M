@@ -1941,7 +1941,10 @@ DECLARE
   v_new text;
   v_old text;
   v_level integer;
+  -- Calendar date in UTC (matches client todayKey() = ISO date string from UTC).
+  v_swap_utc date;
 BEGIN
+  v_swap_utc := (now() AT TIME ZONE 'UTC')::date;
   IF coalesce(trim(p_device_id), '') = '' THEN
     RAISE EXCEPTION 'device_id is required';
   END IF;
@@ -1979,14 +1982,14 @@ BEGIN
   END IF;
 
   IF v_state.command_protocol_last_swap_day IS NOT NULL
-    AND v_state.command_protocol_last_swap_day = CURRENT_DATE THEN
+    AND v_state.command_protocol_last_swap_day = v_swap_utc THEN
     RAISE EXCEPTION 'Command protocol can only be changed once per day';
   END IF;
 
   UPDATE public.base_device_state
   SET
     command_protocol_active = v_new,
-    command_protocol_last_swap_day = CURRENT_DATE,
+    command_protocol_last_swap_day = v_swap_utc,
     updated_at = now()
   WHERE device_id = p_device_id
   RETURNING * INTO v_state;
