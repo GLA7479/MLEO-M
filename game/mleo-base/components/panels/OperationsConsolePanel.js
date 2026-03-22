@@ -76,64 +76,65 @@ export function OperationsConsolePanel({
 
       <div
         data-base-target="maintenance"
-        className={`relative flex flex-col rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 sm:p-3.5 ${
+        className={`flex flex-col rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 sm:p-3.5 ${
           maintenance.highlightClass || ""
         } ${maintenance.highlighted ? highlightRingClass : ""}`}
       >
-        <div className="absolute right-3 top-3 z-10 flex gap-1">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              maintenance.onOpenRefillInfo?.();
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-            aria-label="Open refill info"
-            title="Info about refill"
-          >
-            i
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              maintenance.onOpenMaintenanceInfo?.();
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-            aria-label="Open maintenance info"
-            title="Info about maintenance"
-          >
-            i
-          </button>
-        </div>
-
-        {/* 1–4: header → cost reference → power toggles → context (no mixed “chip cloud” on mobile) */}
-        <div className="flex min-h-0 flex-col gap-3 pr-8">
-          <div>
+        {/* Band 1 — title, purpose, info (no inner shell) */}
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold text-amber-200">Shared Vault Utilities</div>
-            <p className="mt-0.5 text-[12px] leading-snug text-white/55">
-              Spend shared MLEO on overclock, refill, and stability.
+            <p className="mt-0.5 text-[11px] leading-snug text-white/52">
+              Overclock, refill, stability — shared MLEO.
             </p>
           </div>
+          <div className="flex shrink-0 gap-1 pt-0.5">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                maintenance.onOpenRefillInfo?.();
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+              aria-label="Open refill info"
+              title="Info about refill"
+            >
+              i
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                maintenance.onOpenMaintenanceInfo?.();
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+              aria-label="Open maintenance info"
+              title="Info about maintenance"
+            >
+              i
+            </button>
+          </div>
+        </div>
 
-          <div className="rounded-lg border border-white/[0.07] bg-black/25 px-2.5 py-2">
-            <div className="text-[9px] font-semibold uppercase tracking-wider text-white/35">Reference costs</div>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-white/58">
+        {/* Band 2 — costs + presets: side-by-side on sm+, stacked on narrow; light labels only */}
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:items-start sm:gap-x-4">
+          <div>
+            <div className="text-[9px] font-semibold uppercase tracking-wider text-white/35">Costs</div>
+            <div className="mt-0.5 flex flex-wrap gap-1">
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[9px] font-semibold text-white/55 sm:text-[10px]">
                 OVERCLOCK: 900 + 12 DATA
               </span>
-              <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-white/58">
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[9px] font-semibold text-white/55 sm:text-[10px]">
                 REFILL: 180 + 5 DATA
               </span>
-              <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-white/58">
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[9px] font-semibold text-white/55 sm:text-[10px]">
                 MAINTAIN: STABILITY
               </span>
             </div>
           </div>
-
-          <div className="border-t border-white/10 pt-3">
-            <div className="text-[9px] font-semibold uppercase tracking-wider text-amber-200/55">Building power</div>
-            <div className="mt-2 flex flex-wrap gap-2">
+          <div>
+            <div className="text-[9px] font-semibold uppercase tracking-wider text-white/35">Preset</div>
+            <div className="mt-0.5 grid grid-cols-2 gap-1.5">
               <button
                 type="button"
                 onClick={maintenance.onSafeMode}
@@ -143,23 +144,23 @@ export function OperationsConsolePanel({
                     ? "Safe 50% is ON (all runtime buildings match this preset)"
                     : "Safe 50% is OFF — click to apply"
                 }
-                className={`relative z-10 inline-flex min-h-9 cursor-pointer touch-manipulation select-none items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-all duration-200 active:scale-[0.98] ${
+                className={`relative z-10 flex min-h-11 w-full cursor-pointer touch-manipulation select-none items-center justify-center gap-1 rounded-full px-2 py-1.5 text-[10px] font-bold transition-all duration-200 active:scale-[0.98] sm:text-[11px] ${
                   maintenance.powerPresetActive === "safe"
-                    ? "border-2 border-cyan-200/80 bg-gradient-to-b from-cyan-500/35 to-cyan-800/25 text-white shadow-[0_0_14px_rgba(34,211,238,0.35)] ring-1 ring-cyan-400/40"
-                    : "border border-white/15 bg-slate-950/80 text-cyan-100/75 shadow-sm hover:border-cyan-400/40 hover:bg-slate-900/80 hover:text-cyan-50"
+                    ? "border-2 border-cyan-200/80 bg-gradient-to-b from-cyan-500/35 to-cyan-800/25 text-white shadow-[0_0_12px_rgba(34,211,238,0.3)] ring-1 ring-cyan-400/35"
+                    : "border border-white/15 bg-slate-950/80 text-cyan-100/75 hover:border-cyan-400/35 hover:bg-slate-900/80 hover:text-cyan-50"
                 }`}
               >
                 <span
-                  className={`h-2 w-2 shrink-0 rounded-full ${
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${
                     maintenance.powerPresetActive === "safe"
-                      ? "bg-cyan-300 shadow-[0_0_8px_#67e8f9]"
+                      ? "bg-cyan-300 shadow-[0_0_6px_#67e8f9]"
                       : "bg-cyan-950 ring-1 ring-cyan-800/50"
                   }`}
                   aria-hidden
                 />
-                {maintenance.safeModeButtonText || "Safe 50%"}
+                <span className="truncate">{maintenance.safeModeButtonText || "Safe 50%"}</span>
                 <span
-                  className={`text-[9px] font-black uppercase tracking-wider ${
+                  className={`shrink-0 text-[8px] font-black uppercase tracking-wider sm:text-[9px] ${
                     maintenance.powerPresetActive === "safe" ? "text-cyan-100" : "text-cyan-400/45"
                   }`}
                 >
@@ -175,23 +176,23 @@ export function OperationsConsolePanel({
                     ? "Normal 100% is ON (all runtime buildings at 100%)"
                     : "Normal 100% is OFF — click to apply"
                 }
-                className={`relative z-10 inline-flex min-h-9 cursor-pointer touch-manipulation select-none items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-all duration-200 active:scale-[0.98] ${
+                className={`relative z-10 flex min-h-11 w-full cursor-pointer touch-manipulation select-none items-center justify-center gap-1 rounded-full px-2 py-1.5 text-[10px] font-bold transition-all duration-200 active:scale-[0.98] sm:text-[11px] ${
                   maintenance.powerPresetActive === "normal"
-                    ? "border-2 border-white/70 bg-gradient-to-b from-white/20 to-white/[0.06] text-white shadow-[0_0_12px_rgba(255,255,255,0.14)] ring-1 ring-white/30"
-                    : "border border-white/15 bg-slate-950/80 text-white/75 shadow-sm hover:border-white/30 hover:bg-white/[0.06] hover:text-white"
+                    ? "border-2 border-white/70 bg-gradient-to-b from-white/20 to-white/[0.06] text-white shadow-[0_0_10px_rgba(255,255,255,0.12)] ring-1 ring-white/28"
+                    : "border border-white/15 bg-slate-950/80 text-white/75 hover:border-white/30 hover:bg-white/[0.06] hover:text-white"
                 }`}
               >
                 <span
-                  className={`h-2 w-2 shrink-0 rounded-full ${
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${
                     maintenance.powerPresetActive === "normal"
-                      ? "bg-white shadow-[0_0_8px_rgba(255,255,255,0.85)]"
+                      ? "bg-white shadow-[0_0_6px_rgba(255,255,255,0.85)]"
                       : "bg-white/12 ring-1 ring-white/20"
                   }`}
                   aria-hidden
                 />
-                {maintenance.normalModeButtonText || "Normal 100%"}
+                <span className="truncate">{maintenance.normalModeButtonText || "Normal 100%"}</span>
                 <span
-                  className={`text-[9px] font-black uppercase tracking-wider ${
+                  className={`shrink-0 text-[8px] font-black uppercase tracking-wider sm:text-[9px] ${
                     maintenance.powerPresetActive === "normal" ? "text-white" : "text-white/45"
                   }`}
                 >
@@ -200,37 +201,35 @@ export function OperationsConsolePanel({
               </button>
             </div>
           </div>
-
-          <div className="space-y-1 border-t border-white/[0.06] pt-2.5">
-            {maintenance.powerPresetActive === "mixed" ? (
-              <p className="text-[10px] leading-snug text-amber-200/70">
-                Custom mix — align with Safe 50% or Normal 100%
-              </p>
-            ) : maintenance.powerPresetActive === "none" ? (
-              <p className="text-[10px] leading-snug text-white/42">Presets need runtime production buildings.</p>
-            ) : null}
-            <p className="text-[11px] text-white/48">Stability: {maintenance.stabilityText}%</p>
-            {hintWrap && (maintenance.overclockHint || maintenance.maintenanceHint) ? (
-              <div className={hintWrap}>
-                {maintenance.overclockHint}
-                {maintenance.maintenanceHint}
-              </div>
-            ) : (
-              <>
-                {maintenance.overclockHint}
-                {maintenance.maintenanceHint}
-              </>
-            )}
-          </div>
         </div>
 
-        {/* 5: actions — mobile: overclock full width, refill + maintain balanced row */}
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2">
+        {/* Band 3 — context then actions (single tight block) */}
+        <div className="mt-2 space-y-0.5">
+          {maintenance.powerPresetActive === "mixed" ? (
+            <p className="text-[10px] leading-snug text-amber-200/65">Custom mix — align with Safe 50% or Normal 100%</p>
+          ) : maintenance.powerPresetActive === "none" ? (
+            <p className="text-[10px] leading-snug text-white/42">Presets need runtime production buildings.</p>
+          ) : null}
+          <p className="text-[11px] text-white/48">Stability: {maintenance.stabilityText}%</p>
+          {hintWrap && (maintenance.overclockHint || maintenance.maintenanceHint) ? (
+            <div className={hintWrap}>
+              {maintenance.overclockHint}
+              {maintenance.maintenanceHint}
+            </div>
+          ) : (
+            <>
+              {maintenance.overclockHint}
+              {maintenance.maintenanceHint}
+            </>
+          )}
+        </div>
+
+        <div className="mt-2 grid grid-cols-3 gap-1.5">
           <button
             type="button"
             data-base-target="overclock"
             onClick={maintenance.onOverclock}
-            className={`col-span-2 flex min-h-11 items-center justify-center rounded-xl bg-amber-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-amber-500 sm:col-span-1 sm:px-3 sm:py-2 sm:text-sm ${
+            className={`flex min-h-11 items-center justify-center rounded-xl bg-amber-600 px-1.5 py-2 text-center text-[11px] font-bold leading-tight text-white hover:bg-amber-500 sm:px-2 sm:text-sm ${
               maintenance.highlightOverclock
                 ? "ring-2 ring-cyan-300/90 ring-offset-2 ring-offset-amber-500/10"
                 : ""
@@ -240,13 +239,13 @@ export function OperationsConsolePanel({
           </button>
           <button
             onClick={maintenance.onRefill}
-            className="flex min-h-11 items-center justify-center rounded-xl bg-white/10 px-2 py-2.5 text-xs font-bold text-white hover:bg-white/20 sm:px-3 sm:py-2 sm:text-sm"
+            className="flex min-h-11 items-center justify-center rounded-xl bg-white/10 px-1.5 py-2 text-center text-[11px] font-bold leading-tight text-white hover:bg-white/20 sm:px-2 sm:text-sm"
           >
             {maintenance.refillButtonText}
           </button>
           <button
             onClick={maintenance.onMaintain}
-            className={`flex min-h-11 items-center justify-center rounded-xl px-2 py-2.5 text-xs font-bold text-white sm:px-3 sm:py-2 sm:text-sm ${
+            className={`flex min-h-11 items-center justify-center rounded-xl px-1.5 py-2 text-center text-[11px] font-bold leading-tight text-white sm:px-2 sm:text-sm ${
               maintenance.systemState === "critical"
                 ? "bg-rose-600 hover:bg-rose-500"
                 : maintenance.systemState === "warning"
