@@ -83,10 +83,10 @@ export function BaseHomeFlowScenePanel({
 
         {theme.mapBadgeText ? (
           <div
-            className={`pointer-events-none absolute top-2 z-[2] sm:top-2.5 ${
+            className={`pointer-events-none absolute z-[2] ${
               isDesktop
-                ? "left-2 sm:left-2.5"
-                : "right-2 text-right sm:right-2.5"
+                ? "left-2 top-2 sm:left-2.5 sm:top-2.5"
+                : "right-2.5 top-3 text-right"
             } ${theme.mapBadgeClassName}`}
           >
             {theme.mapBadgeText}

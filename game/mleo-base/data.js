@@ -754,17 +754,17 @@ export const BASE_HOME_SCENE_ORDER = [
 
 export const BASE_HOME_SCENE_POSITIONS_MOBILE = {
   hq: { x: 50, y: 46 },
-  powerCell: { x: 80, y: 14 },
-  researchLab: { x: 51, y: 16 },
-  tradeHub: { x: 20, y: 11 },
+  powerCell: { x: 80, y: 15 },
+  researchLab: { x: 51, y: 17 },
+  tradeHub: { x: 20, y: 12 },
   salvage: { x: 15, y: 37 },
-  arcadeHub: { x: 50, y: 67 },
+  arcadeHub: { x: 50, y: 66 },
   minerControl: { x: 16, y: 24 },
   refinery: { x: 21, y: 53 },
-  quarry: { x: 18, y: 68 },
+  quarry: { x: 18, y: 67 },
   expeditionBay: { x: 85, y: 35 },
   logisticsCenter: { x: 86, y: 51 },
-  repairBay: { x: 78, y: 66 },
+  repairBay: { x: 78, y: 65 },
 };
 
 export const BASE_HOME_SCENE_POSITIONS_DESKTOP = {

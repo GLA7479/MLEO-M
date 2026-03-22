@@ -189,7 +189,7 @@ const WORLD_3_MAP_THEME = {
   linkStrokeLinecap: "round",
   mapShellClassName: "rounded-3xl",
   mapInnerClassName:
-    "rounded-3xl bg-gradient-to-br from-violet-950/22 via-slate-950/48 to-slate-950/55 ring-1 ring-inset ring-violet-400/32 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.08),inset_0_0_48px_rgba(167,139,250,0.05)]",
+    "rounded-3xl bg-gradient-to-br from-violet-950/22 via-slate-950/48 to-slate-950/55 ring-1 ring-inset ring-violet-400/25 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.08),inset_0_0_48px_rgba(167,139,250,0.05)]",
   mapBadgeClassName:
     "pointer-events-none z-[2] max-w-[46%] truncate rounded-md border border-cyan-400/45 bg-violet-950/70 px-2 py-0.5 text-[8px] font-black uppercase leading-tight tracking-[0.2em] text-cyan-100 shadow-[0_0_16px_rgba(167,139,250,0.22)] sm:max-w-none sm:px-2.5 sm:text-[9px] sm:tracking-[0.24em]",
   mapBadgeText: "Signal scan",
@@ -244,7 +244,7 @@ const WORLD_3_MAP_THEME = {
   overlays: [
     overlay(
       "w3-field",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.55]",
+      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.48]",
       {
         background:
           "radial-gradient(circle at 20% 26%, rgba(167,139,250,0.11), transparent 42%), radial-gradient(circle at 84% 74%, rgba(34,211,238,0.08), transparent 44%)",
@@ -252,7 +252,7 @@ const WORLD_3_MAP_THEME = {
     ),
     overlay(
       "w3-scan-trace",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.22]",
+      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.18]",
       {
         background:
           "repeating-linear-gradient(180deg, rgba(167,139,250,0.065) 0 1px, transparent 1px 5px), repeating-linear-gradient(92deg, rgba(34,211,238,0.045) 0 1px, transparent 1px 7px), repeating-linear-gradient(-8deg, rgba(196,181,253,0.04) 0 1px, transparent 1px 9px)",
@@ -276,7 +276,7 @@ const WORLD_3_MAP_THEME = {
     overlays: [
       overlay(
         "w3-field-m",
-        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.5]",
+        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.44]",
         {
           background:
             "radial-gradient(circle at 50% 36%, rgba(167,139,250,0.09), transparent 50%)",
@@ -284,7 +284,7 @@ const WORLD_3_MAP_THEME = {
       ),
       overlay(
         "w3-scan-m",
-        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.14]",
+        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.12]",
         {
           background:
             "repeating-linear-gradient(180deg, rgba(34,211,238,0.055) 0 1px, transparent 1px 7px)",
@@ -308,7 +308,7 @@ const WORLD_4_MAP_THEME = {
   linkStrokeLinecap: "round",
   mapShellClassName: "rounded-3xl",
   mapInnerClassName:
-    "rounded-3xl bg-gradient-to-b from-orange-950/25 via-orange-950/10 to-slate-950/48 ring-1 ring-inset ring-orange-400/38 shadow-[inset_0_0_0_1px_rgba(251,113,133,0.12),inset_0_0_64px_rgba(249,115,22,0.07),inset_0_-28px_56px_rgba(251,113,133,0.05)]",
+    "rounded-3xl bg-gradient-to-b from-orange-950/25 via-orange-950/10 to-slate-950/48 ring-1 ring-inset ring-orange-400/30 shadow-[inset_0_0_0_1px_rgba(251,113,133,0.12),inset_0_0_64px_rgba(249,115,22,0.07),inset_0_-28px_56px_rgba(251,113,133,0.05)]",
   mapBadgeClassName:
     "pointer-events-none z-[2] max-w-[46%] truncate rounded-md border border-rose-400/50 bg-orange-950/58 px-2 py-0.5 text-[8px] font-black uppercase leading-tight tracking-[0.2em] text-orange-50 shadow-[0_0_18px_rgba(249,115,22,0.22)] sm:max-w-none sm:px-2.5 sm:text-[9px] sm:tracking-[0.22em]",
   mapBadgeText: "Thermal grid",
@@ -363,7 +363,7 @@ const WORLD_4_MAP_THEME = {
   overlays: [
     overlay(
       "w4-chamber",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.72]",
+      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.64]",
       {
         background:
           "radial-gradient(circle at 50% 46%, rgba(249,115,22,0.14), transparent 54%), radial-gradient(ellipse 125% 80% at 50% 112%, rgba(251,113,133,0.11), transparent 50%)",
@@ -371,7 +371,7 @@ const WORLD_4_MAP_THEME = {
     ),
     overlay(
       "w4-conduit-heat",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.18]",
+      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.15]",
       {
         background:
           "repeating-linear-gradient(180deg, rgba(255,210,170,0.06) 0 2px, transparent 2px 9px), repeating-radial-gradient(circle at 50% 44%, rgba(255,255,255,0.05) 0 1px, transparent 1px 11px)",
@@ -387,7 +387,7 @@ const WORLD_4_MAP_THEME = {
     overlays: [
       overlay(
         "w4-chamber-m",
-        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.65]",
+        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.56]",
         {
           background:
             "radial-gradient(circle at 50% 50%, rgba(249,115,22,0.12), transparent 52%)",
@@ -515,7 +515,7 @@ const WORLD_6_MAP_THEME = {
   linkStrokeLinecap: "round",
   mapShellClassName: "rounded-3xl",
   mapInnerClassName:
-    "rounded-3xl bg-gradient-to-b from-slate-900/55 via-slate-950/50 to-slate-900/55 ring-1 ring-inset ring-cyan-200/28 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),inset_0_0_56px_rgba(34,211,238,0.05),inset_0_0_72px_rgba(167,139,250,0.04)]",
+    "rounded-3xl bg-gradient-to-b from-slate-900/55 via-slate-950/50 to-slate-900/55 ring-1 ring-inset ring-cyan-200/22 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),inset_0_0_56px_rgba(34,211,238,0.05),inset_0_0_72px_rgba(167,139,250,0.04)]",
   mapBadgeClassName:
     "pointer-events-none z-[2] max-w-[46%] truncate rounded-sm border border-cyan-200/50 bg-slate-950/82 px-2 py-0.5 text-[8px] font-black uppercase leading-tight tracking-[0.22em] text-white shadow-[0_0_16px_rgba(34,211,238,0.22),inset_0_1px_0_rgba(255,255,255,0.1)] sm:max-w-none sm:rounded sm:px-2.5 sm:text-[9px] sm:tracking-[0.26em]",
   mapBadgeText: "Command nexus",
@@ -570,7 +570,7 @@ const WORLD_6_MAP_THEME = {
   overlays: [
     overlay(
       "w6-command-grid",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.14]",
+      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.11]",
       {
         background:
           "linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.038) 1px, transparent 1px), linear-gradient(45deg, transparent 47.5%, rgba(167,139,250,0.04) 48.5%, rgba(167,139,250,0.04) 51.5%, transparent 52.5%), linear-gradient(-45deg, transparent 47.5%, rgba(34,211,238,0.032) 48.5%, rgba(34,211,238,0.032) 51.5%, transparent 52.5%)",
@@ -579,7 +579,7 @@ const WORLD_6_MAP_THEME = {
     ),
     overlay(
       "w6-nexus",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.48]",
+      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.40]",
       {
         background:
           "radial-gradient(circle at 50% 42%, rgba(34,211,238,0.09), transparent 50%), radial-gradient(circle at 50% 54%, rgba(167,139,250,0.07), transparent 56%)",
@@ -595,7 +595,7 @@ const WORLD_6_MAP_THEME = {
     overlays: [
       overlay(
         "w6-nexus-m",
-        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.42]",
+        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.36]",
         {
           background:
             "radial-gradient(circle at 50% 46%, rgba(34,211,238,0.08), transparent 52%)",
@@ -603,7 +603,7 @@ const WORLD_6_MAP_THEME = {
       ),
       overlay(
         "w6-grid-m",
-        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.09]",
+        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.075]",
         {
           background:
             "linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
