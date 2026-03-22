@@ -2656,17 +2656,17 @@ function availabilityCardClass(isAvailable) {
 function sectionStatusHint(type, data = {}) {
   if (type === "operations-console") {
     const parts = [];
-    if (data.expedition) parts.push("expedition ready");
-    if (data.ship) parts.push("shipment ready");
-    if (data.refill) parts.push("refill available");
-    if (data.maintain) parts.push("maintenance available");
-    return parts.length ? parts.join(" · ") : "Nothing available right now";
+    if (data.expedition) parts.push("Expedition ready");
+    if (data.ship) parts.push("Ship ready");
+    if (data.refill) parts.push("Refill up");
+    if (data.maintain) parts.push("Maintain up");
+    return parts.length ? parts.join(" · ") : "Idle · ship · field · vault inside";
   }
 
   if (type === "daily-missions") {
     return data.count > 0
-      ? `${data.count} mission reward${data.count > 1 ? "s" : ""} ready`
-      : "Nothing available right now";
+      ? `${data.count} ready · claim`
+      : "None ready · preview";
   }
 
   if (type === "intel-summary") {

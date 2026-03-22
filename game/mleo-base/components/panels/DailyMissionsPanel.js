@@ -17,7 +17,7 @@ function QuickTags({ tags }) {
   if (!Array.isArray(tags) || tags.length === 0) return null;
 
   return (
-    <div className="mt-3 flex flex-wrap gap-2">
+    <div className="mt-2 flex flex-wrap gap-1.5">
       {tags.map((tag) => (
         <span
           key={`${tag?.label}-${tag?.tone || "neutral"}`}
@@ -34,7 +34,7 @@ function QuickTags({ tags }) {
 
 export function DailyMissionsPanel({ panelTone, missions, onClaimMission, onOpenMissionInfo }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {(Array.isArray(missions) ? missions : []).map((mission) => {
         const rowAccent =
           !mission.highlighted && panelTone?.missionRowAccent ? ` ${panelTone.missionRowAccent}` : "";
@@ -42,7 +42,7 @@ export function DailyMissionsPanel({ panelTone, missions, onClaimMission, onOpen
         <div
           key={mission.key}
           data-base-target={mission.key}
-          className={`relative rounded-xl border p-2.5 ${
+          className={`relative rounded-xl border p-2 ${
             mission.ready
               ? "border-amber-400/40 bg-amber-500/10"
               : "border-white/10 bg-black/20"
@@ -67,29 +67,27 @@ export function DailyMissionsPanel({ panelTone, missions, onClaimMission, onOpen
             </button>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="pr-8">
               <div className="text-xs font-semibold">{mission.name}</div>
-              <div className="mt-1 text-[11px] text-white/60">
+              <div className="mt-0.5 text-[11px] text-white/58">
                 Progress: {mission.progressText} / {mission.targetText}
               </div>
-              <div className="mt-1 text-[11px] text-white/55">
-                Potential reward: {mission.rewardText}
+              <div className="mt-0.5 text-[11px] text-white/52">
+                Reward: {mission.rewardText}
               </div>
 
               <QuickTags tags={mission.quickTags} />
 
               {mission.helpText ? (
-                <div className="mt-2 text-[11px] text-white/45">{mission.helpText}</div>
-              ) : (
-                <div className="mt-2 text-[11px] text-white/45" />
-              )}
+                <div className="mt-1.5 text-[11px] leading-snug text-white/45">{mission.helpText}</div>
+              ) : null}
             </div>
 
             <button
               onClick={() => onClaimMission?.(mission.key)}
               disabled={!mission.done || mission.claimed}
-              className={`shrink-0 rounded-xl px-3 py-1.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
+              className={`flex min-h-11 shrink-0 items-center justify-center rounded-xl px-3 py-2 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
                 mission.ready
                   ? "bg-cyan-500 text-white hover:bg-cyan-400"
                   : "bg-white/10 hover:bg-white/20"
