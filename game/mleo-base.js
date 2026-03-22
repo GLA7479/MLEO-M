@@ -6245,10 +6245,10 @@ export default function MleoBase() {
   const desktopPrimaryTitle = primaryCommandItem?.title || "Base is stable";
   const desktopPrimaryTitleClass =
     desktopPrimaryTitle.length > 26
-      ? "text-[12px]"
+      ? "text-[13px] md:text-sm"
       : desktopPrimaryTitle.length >= 18
-      ? "text-[13px]"
-      : "text-sm";
+      ? "text-sm"
+      : "text-sm md:text-[15px]";
 
   const nextStep = useMemo(
     () => getNextStep(state, derived, systemState, liveContracts, specializationSummary),
@@ -12129,7 +12129,7 @@ export default function MleoBase() {
       <main className="h-[100dvh] overflow-hidden overflow-x-hidden bg-[#07111f] text-white sm:min-h-screen sm:h-auto sm:overflow-visible lg:h-[100dvh] lg:overflow-hidden">
         <div className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:flex lg:h-full lg:flex-col lg:px-8 lg:pb-32">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3 lg:gap-4">
-            <div className="min-w-0 w-full md:flex-1">
+            <div className="min-w-0 w-full md:max-w-[min(100%,46%)] md:flex-[0_1_auto] md:shrink md:min-w-0 lg:max-w-[min(100%,42%)] xl:max-w-[min(100%,38%)]">
               {/* Title pill removed for a cleaner V3 look */}
               <div className="mt-2 flex items-center justify-between sm:mt-3 sm:block">
                 <h1 className="whitespace-nowrap text-2xl font-black tracking-tight sm:text-4xl">
@@ -12310,13 +12310,13 @@ export default function MleoBase() {
               {/* subtitle removed */}
             </div>
 
-            <div className="hidden w-full min-w-0 flex-nowrap items-center justify-start gap-1.5 overflow-x-auto pb-0.5 no-scrollbar sm:flex md:mt-0 md:min-w-0 md:flex-1 md:justify-end md:pb-0 lg:mt-0 lg:max-w-full lg:justify-end lg:gap-1.5 xl:gap-2">
+            <div className="hidden w-full min-w-0 flex-nowrap items-center justify-start gap-1.5 pb-0.5 max-md:overflow-x-auto max-md:no-scrollbar sm:flex md:mt-0 md:min-w-0 md:flex-1 md:overflow-visible md:justify-start md:pb-0 lg:mt-0 lg:max-w-full lg:justify-start lg:gap-1.5 xl:gap-2">
               <button
                 type="button"
                 onClick={handleCommandHubBarClick}
-                className={`group flex h-[42px] min-h-[42px] max-h-[42px] items-center overflow-hidden rounded-2xl border px-2.5 py-0 transition sm:px-3 ${
+                className={`group relative isolate flex h-[42px] min-h-[42px] max-h-[42px] items-center overflow-hidden rounded-2xl border px-2.5 py-0 transition sm:px-3 ${
                   commandHubCount > 0
-                    ? "w-full min-w-[14rem] flex-1 basis-0 sm:min-w-[15rem] md:min-w-[18rem] lg:min-w-[20rem] lg:max-w-[min(52rem,72%)] xl:min-w-[22rem] xl:max-w-[56rem]"
+                    ? "w-full min-w-0 max-w-none flex-1 max-md:min-w-[14rem]"
                     : "w-auto max-w-[18rem] shrink-0 min-w-[11rem]"
                 } ${
                   commandHubCount > 0
@@ -12326,13 +12326,13 @@ export default function MleoBase() {
                           : "border-cyan-400/60 bg-cyan-500/10 hover:bg-cyan-500/15"
                       }`
                     : "border-white/10 bg-white/5"
-                } ${commandHubCount > 0 ? "animate-pulse" : ""}`}
+                } ${commandHubCount > 0 ? "animate-pulse md:animate-none" : ""}`}
               >
                 <div className="flex w-full min-w-0 items-center justify-between gap-2">
                   <div className="min-w-0 flex-1 overflow-hidden pr-1">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <div
-                        className={`min-w-0 whitespace-nowrap overflow-hidden text-ellipsis font-bold text-white leading-[1.1] ${desktopPrimaryTitleClass}`}
+                        className={`z-[1] min-w-0 max-w-[min(100%,36rem)] flex-1 whitespace-nowrap overflow-hidden text-ellipsis text-left font-bold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.85)] leading-[1.1] ${desktopPrimaryTitleClass}`}
                         title={desktopPrimaryTitle}
                       >
                         {desktopPrimaryTitle}
