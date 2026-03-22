@@ -1,6 +1,9 @@
+import { createContext, useContext } from "react";
 import { ExpandablePanelSectionHeader } from "./ExpandablePanelSectionHeader";
 import { WorldSectorPanel } from "./WorldSectorPanel";
 import { DevSectorSwitchPanel } from "./DevSectorSwitchPanel";
+
+const BaseOverviewPanelToneContext = createContext(null);
 
 function toneClasses(tone = "info") {
   if (tone === "critical") {
@@ -16,10 +19,12 @@ function toneClasses(tone = "info") {
 }
 
 function CardShell({ className = "", children, ...rest }) {
+  const pt = useContext(BaseOverviewPanelToneContext);
+  const shell = pt?.cardShell ? ` ${pt.cardShell}` : "";
   return (
     <div
       {...rest}
-      className={`rounded-2xl border border-white/10 bg-white/[0.05] p-4 ${className}`}
+      className={`rounded-2xl border border-white/10 bg-white/[0.05] p-4${shell} ${className}`}
     >
       {children}
     </div>
@@ -27,8 +32,10 @@ function CardShell({ className = "", children, ...rest }) {
 }
 
 function MiniStat({ label, value, note }) {
+  const pt = useContext(BaseOverviewPanelToneContext);
+  const ms = pt?.miniStat ? ` ${pt.miniStat}` : "";
   return (
-    <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
+    <div className={`rounded-xl border border-white/10 bg-black/20 px-3 py-2.5${ms}`}>
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
         {label}
       </div>
@@ -39,12 +46,15 @@ function MiniStat({ label, value, note }) {
 }
 
 function SectionHeader({ title, hint, right }) {
+  const pt = useContext(BaseOverviewPanelToneContext);
+  const bar = pt?.sectionBar;
   return (
     <div className="mb-2.5 flex items-start justify-between gap-3">
       <div>
         <div className="text-sm font-black uppercase tracking-[0.16em] text-white">
           {title}
         </div>
+        {bar ? <div className={bar} aria-hidden /> : null}
         {hint ? <div className="mt-1 text-xs text-white/55">{hint}</div> : null}
       </div>
       {right}
@@ -53,9 +63,13 @@ function SectionHeader({ title, hint, right }) {
 }
 
 function AvailabilityBadge({ count }) {
+  const pt = useContext(BaseOverviewPanelToneContext);
+  const badge = pt?.availabilityBadge ? ` ${pt.availabilityBadge}` : "";
   if (!count) return null;
   return (
-    <span className="ml-2 inline-flex min-w-[24px] items-center justify-center rounded-full border border-cyan-300/40 bg-cyan-400/10 px-2 py-0.5 text-[11px] font-black text-cyan-200">
+    <span
+      className={`ml-2 inline-flex min-w-[24px] items-center justify-center rounded-full border border-cyan-300/40 bg-cyan-400/10 px-2 py-0.5 text-[11px] font-black text-cyan-200${badge}`}
+    >
       {count}
     </span>
   );
@@ -630,6 +644,7 @@ function ContractsCard({
 }
 
 export function OverviewPanelCards({
+  panelTone,
   overview,
   missionGuidance,
   nextStep,
@@ -679,8 +694,12 @@ export function OverviewPanelCards({
     flavor?.overviewStripTitleClassName ||
     "font-black uppercase tracking-[0.14em] text-amber-200/85";
 
+  const stackTone = panelTone?.overviewStack ? ` ${panelTone.overviewStack}` : "";
+  const systemsTone = panelTone?.systemsHint ? ` ${panelTone.systemsHint}` : "";
+
   return (
-    <div className="space-y-4">
+    <BaseOverviewPanelToneContext.Provider value={panelTone || null}>
+      <div className={`space-y-4${stackTone}`}>
       {worldOverviewHint ? (
         <div className={overviewStripShellClassName}>
           {overviewStripTitle ? (
@@ -693,7 +712,9 @@ export function OverviewPanelCards({
         </div>
       ) : null}
       {systemsHint ? (
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/65">
+        <div
+          className={`rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/65${systemsTone}`}
+        >
           {systemsHint}
         </div>
       ) : null}
@@ -757,5 +778,6 @@ export function OverviewPanelCards({
         />
       </div>
     </div>
+    </BaseOverviewPanelToneContext.Provider>
   );
 }

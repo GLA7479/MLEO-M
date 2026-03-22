@@ -117,6 +117,7 @@ import {
   getWorldDailyMleoCapByOrder,
   resolveSectorWorldOrder,
   getWorldMapTheme,
+  getBaseInternalPanelTone,
   WORLD_BY_ORDER,
 } from "./mleo-base/worlds";
 
@@ -5501,6 +5502,10 @@ export default function MleoBase() {
   const activeWorldOrder = useMemo(() => resolveSectorWorldOrder(state), [state]);
 
   const worldMapTheme = useMemo(() => getWorldMapTheme(activeWorldOrder), [activeWorldOrder]);
+  const internalPanelTone = useMemo(
+    () => getBaseInternalPanelTone(activeWorldOrder),
+    [activeWorldOrder]
+  );
 
   const world2Throughput = useMemo(() => {
     if (activeWorldOrder !== 2) return null;
@@ -7834,6 +7839,7 @@ export default function MleoBase() {
   // Keep it presentation-only: the action handlers already contain the real game/server logic.
   const operationsConsoleContent = (
     <OperationsConsolePanel
+      panelTone={internalPanelTone}
       showExpeditions={showExpeditions}
       highlightRingClass="ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
       shipping={{
@@ -12597,6 +12603,7 @@ export default function MleoBase() {
                           </div>
                         ) : null}
                         <OverviewPanelCards
+                          panelTone={internalPanelTone}
                           openInnerPanel={openInnerPanel}
                           toggleInnerPanel={toggleInnerPanel}
                           overview={overview}
@@ -13072,6 +13079,7 @@ export default function MleoBase() {
                         </div>
                       ) : null}
                       <OverviewPanelCards
+                        panelTone={internalPanelTone}
                         openInnerPanel={openInnerPanel}
                         toggleInnerPanel={toggleInnerPanel}
                         overview={overview}

@@ -61,3 +61,5 @@ export {
   getWorldMapTheme,
   resolveWorldMapTheme,
 } from "./worldMapTheme";
+
+export { getBaseInternalPanelTone } from "./baseInternalPanelTone";

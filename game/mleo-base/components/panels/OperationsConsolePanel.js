@@ -1,4 +1,11 @@
+function OpsHintSurface({ wrapClass, children }) {
+  if (!children) return null;
+  if (!wrapClass) return children;
+  return <div className={wrapClass}>{children}</div>;
+}
+
 export function OperationsConsolePanel({
+  panelTone,
   showExpeditions,
   highlightRingClass,
   shipping,
@@ -6,8 +13,11 @@ export function OperationsConsolePanel({
   blueprint,
   maintenance,
 }) {
+  const tone = panelTone || {};
+  const hintWrap = tone.opsHintWrap || "";
+
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className={`grid gap-3 md:grid-cols-2 ${tone.opsGrid || ""}`}>
       <div
         data-base-target="shipping"
         className={`relative flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 ${
@@ -35,7 +45,7 @@ export function OperationsConsolePanel({
             Sends all current banked MLEO to the shared vault. MLEO production inside BASE uses a daily cap
             + softcut; shipping itself is not daily-limited.
           </p>
-          {shipping.freightHint}
+          <OpsHintSurface wrapClass={hintWrap}>{shipping.freightHint}</OpsHintSurface>
         </div>
 
         <button
@@ -78,7 +88,7 @@ export function OperationsConsolePanel({
             <p className="mt-1 text-sm text-white/70">
               Send your field team to gather resources.
             </p>
-            {expedition.expeditionHint}
+            <OpsHintSurface wrapClass={hintWrap}>{expedition.expeditionHint}</OpsHintSurface>
 
             <div className="mt-3 flex flex-wrap gap-2">
               <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-bold text-cyan-200">
@@ -276,8 +286,17 @@ export function OperationsConsolePanel({
           <p className="mt-2 text-xs text-white/55">
             Stability: {maintenance.stabilityText}%
           </p>
-          {maintenance.overclockHint}
-          {maintenance.maintenanceHint}
+          {hintWrap && (maintenance.overclockHint || maintenance.maintenanceHint) ? (
+            <div className={hintWrap}>
+              {maintenance.overclockHint}
+              {maintenance.maintenanceHint}
+            </div>
+          ) : (
+            <>
+              {maintenance.overclockHint}
+              {maintenance.maintenanceHint}
+            </>
+          )}
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-2">
