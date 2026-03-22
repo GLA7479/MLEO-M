@@ -15,7 +15,14 @@ function fmtCap(n) {
   return new Intl.NumberFormat("en-US").format(Math.floor(v));
 }
 
-export function WorldSectorPanel({ snapshot, onDeploy, deployBusy, openInnerPanel, toggleInnerPanel }) {
+export function WorldSectorPanel({
+  snapshot,
+  onDeploy,
+  deployBusy,
+  openInnerPanel,
+  toggleInnerPanel,
+  compactHeader = false,
+}) {
   if (!snapshot) return null;
 
   const {
@@ -39,29 +46,51 @@ export function WorldSectorPanel({ snapshot, onDeploy, deployBusy, openInnerPane
       ? "Ready to deploy"
       : "Locked";
   const worldHint = !isOpen
-    ? `${currentWorldName} · Daily cap ${fmtCap(currentDailyCap)} · ${statusLabel}${
-        panelFlavor?.badgeLabel ? ` · ${panelFlavor.badgeLabel}` : ""
-      }`
+    ? compactHeader
+      ? `${currentWorldName} · ${fmtCap(currentDailyCap)} cap · ${statusLabel}`
+      : `${currentWorldName} · Daily cap ${fmtCap(currentDailyCap)} · ${statusLabel}${
+          panelFlavor?.badgeLabel ? ` · ${panelFlavor.badgeLabel}` : ""
+        }`
     : null;
+
+  const shellBorder = compactHeader ? "border-cyan-400/14" : "border-cyan-400/20";
+  const shellFrom = compactHeader ? "from-cyan-500/[0.045]" : "from-cyan-500/[0.07]";
 
   return (
     <div
-      className={`rounded-2xl border border-cyan-400/20 bg-gradient-to-br from-cyan-500/[0.07] to-transparent p-4 ${shellExtra}`.trim()}
+      className={`rounded-2xl border ${shellBorder} bg-gradient-to-br ${shellFrom} to-transparent ${
+        compactHeader ? "p-3" : "p-4"
+      } ${shellExtra}`.trim()}
     >
       <ExpandablePanelSectionHeader
         panelKey={openKey}
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
+        compact={compactHeader}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Sector / world</div>
+          <div
+            className={
+              compactHeader
+                ? "text-xs font-bold uppercase tracking-[0.14em] text-white/78"
+                : "text-sm font-black uppercase tracking-[0.16em] text-white"
+            }
+          >
+            Sector / world
+          </div>
           {isOpen && panelFlavor?.badgeLabel ? (
             <span className="inline-flex max-w-full rounded-full border border-amber-400/35 bg-amber-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-amber-100/95">
               {panelFlavor.badgeLabel}
             </span>
           ) : null}
         </div>
-        {worldHint ? <div className="mt-1 text-xs text-white/55">{worldHint}</div> : null}
+        {worldHint ? (
+          <div
+            className={`text-white/50 ${compactHeader ? "mt-0.5 text-[10px] leading-snug line-clamp-2" : "mt-1 text-xs"}`}
+          >
+            {worldHint}
+          </div>
+        ) : null}
       </ExpandablePanelSectionHeader>
 
       {isOpen ? (

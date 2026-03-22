@@ -21,10 +21,10 @@ function CardShell({ className = "", weight = "default", children, ...rest }) {
   const shell = pt?.cardShell ? ` ${pt.cardShell}` : "";
   const weightCls =
     weight === "attention"
-      ? "rounded-2xl border border-white/16 bg-white/[0.09] p-3.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] ring-1 ring-cyan-400/25 md:p-4"
+      ? "rounded-xl border border-white/12 bg-white/[0.065] p-3 ring-1 ring-cyan-400/12 sm:rounded-2xl sm:p-3.5"
       : weight === "muted"
-      ? "rounded-2xl border border-white/[0.06] bg-white/[0.028] p-3 md:p-3.5"
-      : "rounded-2xl border border-white/10 bg-white/[0.05] p-4";
+      ? "rounded-xl border border-white/[0.04] bg-white/[0.012] p-2.5 sm:p-3"
+      : "rounded-xl border border-white/[0.07] bg-white/[0.03] p-3 sm:rounded-2xl sm:p-3.5";
   return (
     <div {...rest} className={`${weightCls}${shell} ${className}`}>
       {children}
@@ -36,12 +36,12 @@ function MiniStat({ label, value, note }) {
   const pt = useContext(BaseOverviewPanelToneContext);
   const ms = pt?.miniStat ? ` ${pt.miniStat}` : "";
   return (
-    <div className={`rounded-xl border border-white/10 bg-black/20 px-3 py-2.5${ms}`}>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
+    <div className={`rounded-lg border border-white/[0.06] bg-black/[0.14] px-2.5 py-2${ms}`}>
+      <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/38">
         {label}
       </div>
-      <div className="mt-0.5 text-base font-black text-white">{value}</div>
-      {note ? <div className="mt-0.5 text-xs text-white/55">{note}</div> : null}
+      <div className="mt-0.5 text-sm font-bold text-white/95">{value}</div>
+      {note ? <div className="mt-0.5 text-[11px] leading-snug text-white/46 line-clamp-2">{note}</div> : null}
     </div>
   );
 }
@@ -50,12 +50,12 @@ function SectionHeader({ title, hint, right, quiet = false }) {
   const pt = useContext(BaseOverviewPanelToneContext);
   const bar = pt?.sectionBar;
   return (
-    <div className="mb-2.5 flex items-start justify-between gap-3">
+    <div className={`flex items-start justify-between gap-2 ${quiet ? "mb-1.5" : "mb-2"}`}>
       <div className="min-w-0">
         <div
           className={
             quiet
-              ? "text-xs font-bold uppercase tracking-[0.14em] text-white/60"
+              ? "text-[11px] font-semibold uppercase tracking-[0.11em] text-white/44"
               : "text-sm font-black uppercase tracking-[0.16em] text-white"
           }
         >
@@ -63,7 +63,9 @@ function SectionHeader({ title, hint, right, quiet = false }) {
         </div>
         {bar ? <div className={bar} aria-hidden /> : null}
         {hint ? (
-          <div className={`mt-1 text-[11px] leading-snug ${quiet ? "text-white/42 line-clamp-2" : "text-xs text-white/55"}`}>
+          <div
+            className={`leading-snug ${quiet ? "mt-0.5 text-[10px] text-white/32 line-clamp-2" : "mt-1 text-xs text-white/55"}`}
+          >
             {hint}
           </div>
         ) : null}
@@ -73,17 +75,14 @@ function SectionHeader({ title, hint, right, quiet = false }) {
   );
 }
 
-function AvailabilityBadge({ count }) {
+function AvailabilityBadge({ count, subdued = false }) {
   const pt = useContext(BaseOverviewPanelToneContext);
   const badge = pt?.availabilityBadge ? ` ${pt.availabilityBadge}` : "";
   if (!count) return null;
-  return (
-    <span
-      className={`ml-2 inline-flex min-w-[24px] items-center justify-center rounded-full border border-cyan-300/40 bg-cyan-400/10 px-2 py-0.5 text-[11px] font-black text-cyan-200${badge}`}
-    >
-      {count}
-    </span>
-  );
+  const cls = subdued
+    ? `ml-1.5 inline-flex min-w-[20px] items-center justify-center rounded-full border border-white/[0.07] bg-white/[0.035] px-1.5 py-px text-[10px] font-semibold text-white/48${badge}`
+    : `ml-1.5 inline-flex min-w-[20px] items-center justify-center rounded-full border border-cyan-300/22 bg-cyan-400/[0.06] px-1.5 py-px text-[10px] font-bold text-cyan-200/80${badge}`;
+  return <span className={cls}>{count}</span>;
 }
 
 function formatValue(value, digits = 2) {
@@ -101,13 +100,31 @@ function isBaseStatusUrgent(status) {
   return t === "critical" || t === "warning";
 }
 
+/** Phase 2C — shared CTA chrome per hierarchy (shape aligned, fill tiered). */
+const ovEyebrowPrimary =
+  "text-[10px] font-medium uppercase tracking-[0.14em] text-white/38 sm:tracking-[0.15em]";
+const ovTitlePrimary = "font-black leading-tight text-white";
+const ovCtaPrimaryCyan =
+  "mt-2 w-full rounded-lg border border-cyan-400/32 bg-cyan-500/14 px-2.5 py-1.5 text-xs font-semibold text-cyan-100 transition hover:border-cyan-400/40 hover:bg-cyan-500/20 sm:mt-2.5 sm:w-auto sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/22";
+const ovCtaPrimaryCyanLead =
+  "mt-2 w-full rounded-lg border border-cyan-400/38 bg-cyan-500/18 px-2.5 py-1.5 text-xs font-semibold text-cyan-50 transition hover:border-cyan-400/45 hover:bg-cyan-500/24 sm:mt-2.5 sm:w-auto sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/28";
+const ovCtaPrimaryAmber =
+  "mt-2 w-full rounded-lg border border-amber-400/30 bg-amber-500/12 px-2.5 py-1.5 text-xs font-semibold text-amber-100 transition hover:border-amber-400/38 hover:bg-amber-500/18 sm:mt-2.5 sm:w-auto sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/22";
+const ovCtaSecondaryNeutral =
+  "mt-2 w-full rounded-lg border border-white/[0.11] bg-white/[0.05] px-2.5 py-1.5 text-xs font-medium text-white/85 transition hover:border-white/[0.14] hover:bg-white/[0.075] sm:mt-2 sm:w-auto sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/12";
+const ovCtaTertiaryQuiet =
+  "rounded-lg border border-white/[0.07] bg-white/[0.028] px-2.5 py-1.5 text-xs font-medium text-white/72 transition hover:border-white/[0.1] hover:bg-white/[0.05] sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/12";
+
+const ovSecondaryHeading =
+  "text-[11px] font-semibold uppercase tracking-[0.11em] text-white/64 sm:text-xs sm:tracking-[0.13em]";
+const ovTertiaryHeading =
+  "text-[11px] font-medium uppercase tracking-[0.11em] text-white/40 sm:text-xs sm:tracking-[0.12em]";
+
 function ActionButton({ action, onNavigate, emphasis = "default" }) {
   if (!action?.target || typeof onNavigate !== "function") return null;
 
   const cls =
-    emphasis === "high"
-      ? "mt-3 rounded-xl border border-cyan-400/45 bg-cyan-500/25 px-3 py-2 text-sm font-semibold text-cyan-50 shadow-[0_0_20px_rgba(34,211,238,0.12)] hover:bg-cyan-500/35"
-      : "mt-4 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20";
+    emphasis === "high" ? ovCtaPrimaryCyanLead : "mt-3 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20";
 
   return (
     <button onClick={() => onNavigate(action.target)} className={cls}>
@@ -130,15 +147,11 @@ function BaseStatusBlock({ status, variant = "prominent" }) {
   const shellWeight = support ? "muted" : "attention";
   return (
     <CardShell weight={shellWeight} className={toneClasses(status.tone)}>
-      <div
-        className={`font-semibold uppercase tracking-[0.18em] ${
-          support ? "text-[10px] text-white/45" : "text-[11px] text-white/60"
-        }`}
-      >
+      <div className={support ? "text-[10px] font-medium uppercase tracking-[0.16em] text-white/40" : ovEyebrowPrimary}>
         Base Status
       </div>
       {chips.length ? (
-        <div className={`flex flex-wrap gap-1.5 ${support ? "mt-1.5" : "mt-2"}`}>
+        <div className={`flex flex-wrap gap-1 ${support ? "mt-1" : "mt-1.5"}`}>
           {chips.map((chip) => (
             <span
               key={chip.key}
@@ -151,11 +164,13 @@ function BaseStatusBlock({ status, variant = "prominent" }) {
           ))}
         </div>
       ) : null}
-      <div className={`font-black ${support ? "mt-1.5 text-base text-white/90" : "mt-2 text-2xl"}`}>
+      <div
+        className={`${ovTitlePrimary} ${support ? "mt-1 text-sm text-white/86" : "mt-1.5 text-xl sm:text-2xl"}`}
+      >
         {status.label}
       </div>
       <div
-        className={`text-white/80 ${support ? "mt-1 text-xs leading-snug text-white/60 line-clamp-2" : "mt-2 text-sm leading-6 text-white/85"}`}
+        className={`${support ? "mt-0.5 text-[11px] leading-snug text-white/50 line-clamp-2" : "mt-1.5 text-sm leading-snug text-white/78 line-clamp-3"}`}
       >
         {status.text}
       </div>
@@ -167,16 +182,16 @@ function BottleneckBlock({ bottleneck, onNavigate }) {
   if (!bottleneck) return null;
   return (
     <CardShell weight="attention">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
-            Main Bottleneck
+          <div className={ovEyebrowPrimary}>Main Bottleneck</div>
+          <div className={`mt-1 text-base ${ovTitlePrimary} sm:text-lg`}>{bottleneck.label}</div>
+          <div className="mt-1 text-xs leading-snug text-white/68 line-clamp-2 sm:line-clamp-3 sm:text-sm">
+            {bottleneck.text}
           </div>
-          <div className="mt-1.5 text-lg font-black leading-tight text-white">{bottleneck.label}</div>
-          <div className="mt-1.5 text-sm leading-snug text-white/75 line-clamp-3">{bottleneck.text}</div>
         </div>
         <div
-          className={`shrink-0 rounded-xl border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${toneClasses(
+          className={`shrink-0 rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] sm:rounded-xl sm:px-2.5 sm:py-1 sm:text-[11px] sm:tracking-[0.14em] ${toneClasses(
             bottleneck.tone
           )}`}
         >
@@ -185,10 +200,7 @@ function BottleneckBlock({ bottleneck, onNavigate }) {
       </div>
 
       {bottleneck.target ? (
-        <button
-          onClick={() => onNavigate?.(bottleneck.target)}
-          className="mt-3 w-full rounded-xl border border-cyan-400/45 bg-cyan-500/20 px-3 py-2 text-sm font-semibold text-cyan-50 hover:bg-cyan-500/30 sm:w-auto"
-        >
+        <button onClick={() => onNavigate?.(bottleneck.target)} className={ovCtaPrimaryCyan}>
           Inspect
         </button>
       ) : null}
@@ -199,12 +211,12 @@ function BottleneckBlock({ bottleneck, onNavigate }) {
 function NextActionBlock({ action, onNavigate }) {
   if (!action) return null;
   return (
-    <CardShell weight="attention" className="border-cyan-400/35 bg-cyan-500/[0.1]">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/85">
-        Best Next Action
+    <CardShell weight="attention" className="border-cyan-400/22 bg-cyan-500/[0.055]">
+      <div className={`${ovEyebrowPrimary} text-cyan-100/75`}>Best Next Action</div>
+      <div className={`mt-1 text-base ${ovTitlePrimary} sm:text-lg`}>{action.title}</div>
+      <div className="mt-1 text-xs leading-snug text-white/76 line-clamp-2 sm:line-clamp-3 sm:text-sm">
+        {action.text}
       </div>
-      <div className="mt-1.5 text-lg font-black leading-tight text-white">{action.title}</div>
-      <div className="mt-1.5 text-sm leading-snug text-white/82 line-clamp-3">{action.text}</div>
       <ActionButton action={action} onNavigate={onNavigate} emphasis="high" />
     </CardShell>
   );
@@ -215,9 +227,9 @@ function RatesBlock({ rates, openInnerPanel, toggleInnerPanel }) {
   const openKey = "overview-rates";
   const isOpen = openInnerPanel === openKey;
   const ratesHint = !isOpen
-    ? `${rates.refineryState || "—"} refinery · ${formatValue(rates.bankedPerHour)}/hr banked · +${formatValue(
-        rates.projectedPerDay
-      )}/d proj`
+    ? `${formatValue(rates.bankedPerHour)}/hr · +${formatValue(rates.projectedPerDay)}/d · ${
+        rates.refineryState || "—"
+      }`
     : null;
 
   return (
@@ -226,32 +238,35 @@ function RatesBlock({ rates, openInnerPanel, toggleInnerPanel }) {
         panelKey={openKey}
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
+        compact
       >
-        <div className="text-xs font-bold uppercase tracking-[0.14em] text-white/82">Live Rates</div>
+        <div className={ovSecondaryHeading}>Live Rates</div>
         {ratesHint ? (
-          <div className="mt-0.5 text-[11px] leading-snug text-white/48 line-clamp-2">{ratesHint}</div>
+          <div className="mt-0.5 text-[10px] leading-snug text-white/40 line-clamp-1 sm:line-clamp-2 sm:text-[11px]">
+            {ratesHint}
+          </div>
         ) : null}
       </ExpandablePanelSectionHeader>
 
       {isOpen ? (
         <>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-2 grid gap-2 sm:mt-2.5 sm:gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
             <MiniStat label="Banked / hr" value={`${formatValue(rates.bankedPerHour)}`} />
             <MiniStat label="Projected / day" value={`${formatValue(rates.projectedPerDay)}`} />
             <MiniStat label="ORE / hr" value={`${formatValue(rates.orePerHour)}`} />
             <MiniStat label="DATA / hr" value={`${formatValue(rates.dataPerHour)}`} />
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/55">
-            <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5">
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-white/44">
+            <span className="rounded-lg border border-white/[0.07] bg-black/[0.14] px-2 py-1">
               Refinery: {rates.refineryState || "Unknown"}
             </span>
             {(() => {
               const eta =
                 rates.etaToMleoCapHours != null ? rates.etaToMleoCapHours : rates.etaToShipCapHours;
               return eta != null ? (
-                <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5">
-                  MLEO cap ETA: {formatValue(eta, 1)}h
+                <span className="rounded-lg border border-white/[0.07] bg-black/[0.14] px-2 py-1">
+                  Cap ETA {formatValue(eta, 1)}h
                 </span>
               ) : null;
             })()}
@@ -268,7 +283,7 @@ function StabilityBlock({ stability, openInnerPanel, toggleInnerPanel }) {
   const openKey = "overview-stability";
   const isOpen = openInnerPanel === openKey;
   const stabilityHint = !isOpen
-    ? `${formatValue(stability.value)}% · ${stability.impactLabel || "—"} impact · ${stability.pressureLabel || "—"} pressure`
+    ? `${formatValue(stability.value)}% · ${stability.impactLabel || "—"} / ${stability.pressureLabel || "—"}`
     : null;
 
   return (
@@ -277,15 +292,18 @@ function StabilityBlock({ stability, openInnerPanel, toggleInnerPanel }) {
         panelKey={openKey}
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
+        compact
       >
-        <div className="text-xs font-bold uppercase tracking-[0.14em] text-white/82">Stability Insight</div>
+        <div className={ovSecondaryHeading}>Stability Insight</div>
         {stabilityHint ? (
-          <div className="mt-0.5 text-[11px] leading-snug text-white/48 line-clamp-2">{stabilityHint}</div>
+          <div className="mt-0.5 text-[10px] leading-snug text-white/40 line-clamp-1 sm:line-clamp-2 sm:text-[11px]">
+            {stabilityHint}
+          </div>
         ) : null}
       </ExpandablePanelSectionHeader>
 
       {isOpen ? (
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-2 grid gap-2 sm:mt-2.5 sm:gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
           <MiniStat label="Stability" value={`${formatValue(stability.value)}%`} />
           <MiniStat label="Impact" value={stability.impactLabel} note={stability.impactText} />
           <MiniStat label="Pressure" value={stability.pressureLabel} note={stability.pressureText} />
@@ -305,10 +323,10 @@ function DailyProgressBlock({ progress, openInnerPanel, toggleInnerPanel }) {
     (progress.mleoDailyProgress?.current ?? progress.shipProgress?.current) || 0;
   const mleoMax = (progress.mleoDailyProgress?.max ?? progress.shipProgress?.max) || 0;
   const dailyHint = !isOpen
-    ? `MLEO ${formatValue(mleoCur)}/${formatValue(mleoMax)} · exp ${formatValue(progress.expeditionsDone || 0, 0)} · ${formatValue(
+    ? `${formatValue(mleoCur)}/${formatValue(mleoMax)} MLEO · ${formatValue(progress.expeditionsDone || 0, 0)}ex · ${formatValue(
         progress.missionsReady || 0,
         0
-      )} missions ready`
+      )} mis`
     : null;
 
   return (
@@ -317,15 +335,18 @@ function DailyProgressBlock({ progress, openInnerPanel, toggleInnerPanel }) {
         panelKey={openKey}
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
+        compact
       >
-        <div className="text-xs font-bold uppercase tracking-[0.14em] text-white/82">Daily Progress</div>
+        <div className={ovSecondaryHeading}>Daily Progress</div>
         {dailyHint ? (
-          <div className="mt-0.5 text-[11px] leading-snug text-white/48 line-clamp-2">{dailyHint}</div>
+          <div className="mt-0.5 text-[10px] leading-snug text-white/40 line-clamp-1 sm:line-clamp-2 sm:text-[11px]">
+            {dailyHint}
+          </div>
         ) : null}
       </ExpandablePanelSectionHeader>
 
       {isOpen ? (
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-2 grid gap-2 sm:mt-2.5 sm:gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
           <MiniStat
             label="Daily MLEO (BASE)"
             value={`${formatValue(mleoCur)}/${formatValue(mleoMax)}`}
@@ -346,17 +367,14 @@ function DailyProgressBlock({ progress, openInnerPanel, toggleInnerPanel }) {
 function MissionFocusBlock({ missionGuidance, onNavigate }) {
   if (!missionGuidance?.title) return null;
   return (
-    <CardShell weight="attention" className="border-cyan-400/28 bg-cyan-500/[0.07]">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/80">
-        Mission Focus
+    <CardShell weight="attention" className="border-cyan-400/18 bg-cyan-500/[0.04]">
+      <div className={`${ovEyebrowPrimary} text-cyan-100/72`}>Mission Focus</div>
+      <div className={`mt-1 text-sm ${ovTitlePrimary} leading-snug`}>{missionGuidance.title}</div>
+      <div className="mt-0.5 text-xs leading-snug text-white/70 line-clamp-2 sm:text-sm">
+        {missionGuidance.hint}
       </div>
-      <div className="mt-1.5 text-sm font-bold leading-snug text-white">{missionGuidance.title}</div>
-      <div className="mt-1 text-sm leading-snug text-white/78 line-clamp-2">{missionGuidance.hint}</div>
       {missionGuidance.target ? (
-        <button
-          onClick={() => onNavigate?.(missionGuidance.target)}
-          className="mt-3 rounded-xl border border-cyan-400/40 bg-cyan-500/22 px-3 py-2 text-sm font-semibold text-cyan-50 hover:bg-cyan-500/32"
-        >
+        <button onClick={() => onNavigate?.(missionGuidance.target)} className={ovCtaPrimaryCyan}>
           {missionGuidance.cta || "Open missions"}
         </button>
       ) : null}
@@ -367,16 +385,13 @@ function MissionFocusBlock({ missionGuidance, onNavigate }) {
 function RecoveryHintBlock({ hint, onNavigate }) {
   if (!hint?.text) return null;
   return (
-    <CardShell weight="attention" className="border-amber-400/35 bg-amber-500/[0.09] ring-amber-400/15">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/85">
-        {hint.title || "Recovery hint"}
+    <CardShell weight="attention" className="border-amber-400/26 bg-amber-500/[0.055]">
+      <div className={`${ovEyebrowPrimary} text-amber-100/78`}>{hint.title || "Recovery hint"}</div>
+      <div className="mt-1 text-xs leading-snug text-white/76 line-clamp-2 sm:line-clamp-3 sm:text-sm">
+        {hint.text}
       </div>
-      <div className="mt-1.5 text-sm leading-snug text-white/82 line-clamp-3">{hint.text}</div>
       {hint?.target ? (
-        <button
-          onClick={() => onNavigate?.(hint.target)}
-          className="mt-3 rounded-xl border border-amber-400/40 bg-amber-500/20 px-3 py-2 text-sm font-semibold text-amber-50 hover:bg-amber-500/30"
-        >
+        <button onClick={() => onNavigate?.(hint.target)} className={ovCtaPrimaryAmber}>
           Open recovery actions
         </button>
       ) : null}
@@ -398,29 +413,27 @@ function TodaysLoopBlock({ steps, onNavigate }) {
   const firstActionable = list.find((s) => s?.target);
 
   return (
-    <CardShell className="border-white/10 bg-white/[0.045]">
-      <div className="text-xs font-bold uppercase tracking-[0.14em] text-white/68">
-        Today&apos;s Loop
-      </div>
-      <div className="mt-2 space-y-1.5">
+    <CardShell>
+      <div className={ovSecondaryHeading}>Today&apos;s Loop</div>
+      <div className="mt-1.5 space-y-1">
         {list.map((step, idx) => (
-          <div key={`${step.title}-${idx}`} className="flex items-center justify-between gap-3 text-sm">
-            <div className="min-w-0 text-white/82">
-              <span className="mr-2 text-white/45">{idx + 1}.</span>
+          <div
+            key={`${step.title}-${idx}`}
+            className="flex items-center justify-between gap-2 text-xs sm:text-sm"
+          >
+            <div className="min-w-0 truncate text-white/78">
+              <span className="mr-1.5 text-white/40">{idx + 1}.</span>
               <span>{step.title}</span>
             </div>
-            <span className={`shrink-0 text-[11px] font-semibold ${statusClass(step.status)}`}>
+            <span className={`shrink-0 text-[10px] font-semibold sm:text-[11px] ${statusClass(step.status)}`}>
               {step.status || "Soon"}
             </span>
           </div>
         ))}
       </div>
       {firstActionable ? (
-        <button
-          onClick={() => onNavigate?.(firstActionable.target)}
-          className="mt-3 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
-        >
-          Focus first step
+        <button onClick={() => onNavigate?.(firstActionable.target)} className={ovCtaSecondaryNeutral}>
+          First step
         </button>
       ) : null}
     </CardShell>
@@ -449,19 +462,18 @@ function BuildOpportunitiesCard({
       <SectionHeader
         quiet
         title="Build Opportunities"
-        hint={hintLine || "Nothing queued — keep resourcing"}
-        right={<AvailabilityBadge count={buildOpportunitiesCount > 0 ? buildOpportunitiesCount : 0} />}
+        hint={hintLine || "No build queue"}
+        right={
+          <AvailabilityBadge subdued count={buildOpportunitiesCount > 0 ? buildOpportunitiesCount : 0} />
+        }
       />
       {buildOpportunitiesCount > 0 ? (
-        <button
-          onClick={onOpenBuildPanel}
-          className="rounded-xl border border-white/[0.08] bg-white/[0.06] px-3 py-2 text-sm font-semibold text-white/90 hover:bg-white/[0.1]"
-        >
+        <button onClick={onOpenBuildPanel} className={ovCtaTertiaryQuiet}>
           Open Build
         </button>
       ) : (
-        <div className="rounded-xl border border-white/[0.06] bg-black/15 px-3 py-2 text-xs leading-snug text-white/48">
-          Keep gathering resources to unlock upgrades.
+        <div className="rounded-lg border border-white/[0.05] bg-black/12 px-2.5 py-1.5 text-[10px] leading-snug text-white/40 sm:text-[11px]">
+          Gather resources to unlock upgrades.
         </div>
       )}
     </CardShell>
@@ -487,22 +499,24 @@ function IdentityCard({
         panelKey={openKey}
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
+        compact
+        subtlePill
       >
-        <div className="text-xs font-bold uppercase tracking-[0.14em] text-white/60">Command Identity</div>
+        <div className={ovTertiaryHeading}>Command Identity</div>
         {!isOpen ? (
-          <div className="mt-0.5 text-[11px] leading-snug text-white/42 line-clamp-2">
-            Crew role · commander path
+          <div className="mt-0.5 text-[10px] leading-snug text-white/36 line-clamp-1 sm:line-clamp-2 sm:text-[11px]">
+            Role · path
           </div>
         ) : null}
       </ExpandablePanelSectionHeader>
       {isOpen ? (
-        <div className="mt-3 space-y-3 text-sm">
-          <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+        <div className="mt-2 space-y-2 text-sm sm:mt-2.5 sm:space-y-2.5">
+          <div className="rounded-lg border border-white/[0.08] bg-black/18 p-2.5 sm:rounded-xl sm:p-3">
             <div className="text-xs uppercase tracking-[0.16em] text-white/45">Crew Role</div>
             <div className="mt-1 font-bold text-white">{crewRoleInfo?.name}</div>
             <div className="mt-1 text-white/70">{roleBonusText}</div>
           </div>
-          <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+          <div className="rounded-lg border border-white/[0.08] bg-black/18 p-2.5 sm:rounded-xl sm:p-3">
             <div className="text-xs uppercase tracking-[0.16em] text-white/45">Commander Path</div>
             <div className="mt-1 font-bold text-white">{commanderPathInfo?.name}</div>
             <div className="mt-1 text-white/70">{commanderPathText}</div>
@@ -521,39 +535,45 @@ function SpecializationSummaryCard({ summary, onNavigate, openInnerPanel, toggle
   const openKey = "overview-specialization";
   const isOpen = openInnerPanel === openKey;
   const specHint = !isOpen
-    ? `T${t.supportBuildingsTier2Plus ?? 0}/3 · ${t.totalUnlockedPrograms ?? 0} programs · ${
+    ? `T${t.supportBuildingsTier2Plus ?? 0}/3 · ${t.totalUnlockedPrograms ?? 0} prog · ${
         t.totalClaimableMilestones ?? 0
-      } milestone${(t.totalClaimableMilestones ?? 0) === 1 ? "" : "s"}`
+      } claim`
     : null;
 
   const statMini = (label, value, accentClass = "text-white") => (
-    <div className="rounded-xl border border-white/10 bg-black/25 px-2 py-2 sm:px-3 sm:py-2.5">
-      <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/45 sm:text-[10px] sm:tracking-[0.18em]">
+    <div className="rounded-lg border border-white/[0.08] bg-black/22 px-2 py-1.5 sm:px-2.5 sm:py-2">
+      <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/40 sm:tracking-[0.14em]">
         {label}
       </div>
-      <div className={`mt-0.5 text-xs font-black leading-tight sm:text-sm ${accentClass}`}>{value}</div>
+      <div className={`mt-0.5 text-[11px] font-black leading-tight sm:text-xs md:text-sm ${accentClass}`}>
+        {value}
+      </div>
     </div>
   );
 
   return (
     <CardShell
       weight="muted"
-      className="border-cyan-400/10 bg-gradient-to-br from-cyan-500/[0.035] via-violet-500/[0.025] to-amber-500/[0.025]"
+      className="border-white/[0.045] bg-gradient-to-br from-cyan-500/[0.016] via-violet-500/[0.01] to-transparent"
     >
       <ExpandablePanelSectionHeader
         panelKey={openKey}
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
+        compact
+        subtlePill
       >
-        <div className="text-xs font-bold uppercase tracking-[0.14em] text-white/62">Specialization</div>
+        <div className={ovTertiaryHeading}>Specialization</div>
         {specHint ? (
-          <div className="mt-0.5 text-[11px] leading-snug text-white/42 line-clamp-2">{specHint}</div>
+          <div className="mt-0.5 text-[10px] leading-snug text-white/36 line-clamp-1 sm:line-clamp-2 sm:text-[11px]">
+            {specHint}
+          </div>
         ) : null}
       </ExpandablePanelSectionHeader>
 
       {isOpen ? (
         <>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:mt-2.5 sm:grid-cols-4 sm:gap-2">
             {statMini(
               "Tiers",
               `${t.supportBuildingsTier2Plus ?? 0}/3`,
@@ -583,29 +603,29 @@ function SpecializationSummaryCard({ summary, onNavigate, openInnerPanel, toggle
               type="button"
               onClick={() => rec.navigateTarget && onNavigate?.(rec.navigateTarget)}
               disabled={!rec.navigateTarget}
-              className={`mt-3 w-full rounded-xl border px-3 py-2.5 text-left text-sm font-semibold leading-snug transition ${
+              className={`mt-2 w-full rounded-lg border px-2.5 py-2 text-left text-xs font-medium leading-snug transition sm:mt-2.5 sm:rounded-xl sm:px-3 sm:py-2.5 sm:text-sm ${
                 rec.navigateTarget
-                  ? "border-cyan-400/30 bg-cyan-500/10 text-cyan-50 hover:bg-cyan-500/18"
-                  : "cursor-default border-white/10 bg-white/5 text-white/70"
+                  ? "border-cyan-400/18 bg-cyan-500/[0.055] text-cyan-100/88 hover:border-cyan-400/24 hover:bg-cyan-500/[0.09]"
+                  : "cursor-default border-white/[0.06] bg-white/[0.025] text-white/58"
               }`}
             >
-              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-200/75">
+              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-cyan-200/70 sm:text-[10px] sm:tracking-[0.16em]">
                 Next focus
               </span>
-              <div className="mt-1 text-white">{rec.text}</div>
+              <div className="mt-0.5 text-white sm:mt-1">{rec.text}</div>
               {rec.navigateTarget ? (
-                <div className="mt-1 text-[11px] text-cyan-200/80">Tap to open in Structures</div>
+                <div className="mt-0.5 text-[10px] text-cyan-200/75 sm:mt-1 sm:text-[11px]">Open in Structures</div>
               ) : null}
             </button>
           ) : null}
 
-          <div className="mt-3 space-y-2">
+          <div className="mt-2 space-y-1.5 sm:mt-2.5 sm:space-y-2">
             {summary.buildings.map((row) => (
               <button
                 key={row.buildingKey}
                 type="button"
                 onClick={() => onNavigate?.({ tab: "build", target: row.buildingKey })}
-                className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left transition hover:border-cyan-400/25 hover:bg-black/30"
+                className="w-full rounded-lg border border-white/[0.08] bg-black/18 px-2.5 py-1.5 text-left transition hover:border-cyan-400/22 hover:bg-black/26 sm:rounded-xl sm:px-3 sm:py-2"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0 text-[13px] font-bold text-white">{row.buildingName}</div>
@@ -676,18 +696,22 @@ function ContractsCard({
         panelKey={openKey}
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
+        compact
+        subtlePill
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="text-xs font-bold uppercase tracking-[0.14em] text-white/62">Live Contracts</div>
-          <AvailabilityBadge count={liveContractsAvailableCount} />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <div className={ovTertiaryHeading}>Live Contracts</div>
+          <AvailabilityBadge subdued count={liveContractsAvailableCount} />
         </div>
         {contractsHint ? (
-          <div className="mt-0.5 text-[11px] leading-snug text-white/42">{contractsHint}</div>
+          <div className="mt-0.5 text-[10px] leading-snug text-white/36 sm:text-[11px] sm:text-white/40">
+            {contractsHint}
+          </div>
         ) : null}
       </ExpandablePanelSectionHeader>
 
       {isOpen ? (
-        <div className="mt-3 space-y-3">
+        <div className="mt-2 space-y-2 sm:mt-2.5 sm:space-y-2.5">
           {[...(liveContracts || [])]
             .sort((a, b) => {
               const aReady = a.done && !a.claimed ? 1 : 0;
@@ -695,8 +719,8 @@ function ContractsCard({
               return bReady - aReady;
             })
             .map((contract) => (
-              <div key={contract.key} className="rounded-xl border border-white/10 bg-black/20 p-3">
-                <div className="font-bold text-white">{contract.title}</div>
+              <div key={contract.key} className="rounded-lg border border-white/[0.08] bg-black/18 p-2.5 sm:rounded-xl sm:p-3">
+                <div className="text-sm font-bold text-white">{contract.title}</div>
                 {contract.contractClass === "elite" ? (
                   <div className="mt-1 flex flex-wrap gap-1">
                     <span className="inline-flex rounded-full border border-amber-400/40 bg-amber-500/15 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-amber-100">
@@ -736,11 +760,11 @@ function ContractsCard({
                 {contract.contractClass === "elite" && contract.desc ? (
                   <div className="mt-1 text-[11px] leading-snug text-white/50">{contract.desc}</div>
                 ) : null}
-                <div className="mt-1 text-sm text-white/65">{contract.rewardText}</div>
+                <div className="mt-1 text-xs text-white/60 sm:text-sm">{contract.rewardText}</div>
                 <button
                   onClick={() => onClaimContract(contract.key)}
                   disabled={!contract.done || contract.claimed}
-                  className="mt-3 w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-40"
+                  className={`mt-2 w-full sm:mt-2.5 ${ovCtaTertiaryQuiet} disabled:pointer-events-none disabled:opacity-40`}
                 >
                   {contract.claimed ? "Claimed" : contract.done ? "Claim" : "In Progress"}
                 </button>
@@ -818,9 +842,9 @@ export function OverviewPanelCards({
 
   return (
     <BaseOverviewPanelToneContext.Provider value={panelTone || null}>
-      <div className={`space-y-4${stackTone}`}>
+      <div className={`space-y-3 sm:space-y-4${stackTone}`}>
         {hasTopContextRail ? (
-          <div className="space-y-1.5">
+          <div className="space-y-1 sm:space-y-1.5">
             {worldOverviewHint ? (
               <div className={`${overviewStripShellClassName} !py-1.5`.trim()}>
                 {overviewStripTitle ? (
@@ -834,13 +858,13 @@ export function OverviewPanelCards({
             ) : null}
             {systemsHint ? (
               <div
-                className={`rounded-lg border border-white/[0.08] bg-white/[0.025] px-2.5 py-1.5 text-[10px] leading-snug text-white/55${systemsTone}`}
+                className={`rounded-lg border border-white/[0.08] bg-white/[0.025] px-2.5 py-1.5 text-[10px] leading-snug text-white/55 line-clamp-3 sm:line-clamp-none${systemsTone}`}
               >
                 {systemsHint}
               </div>
             ) : null}
             {showDoctrineStrip ? (
-              <div className="rounded-lg border border-white/[0.08] bg-white/[0.028] px-2.5 py-1.5 text-[10px] font-normal leading-snug text-white/48 line-clamp-3">
+              <div className="rounded-lg border border-white/[0.08] bg-white/[0.028] px-2.5 py-1.5 text-[10px] font-normal leading-snug text-white/48 line-clamp-2">
                 {doctrineContextHint}
               </div>
             ) : null}
@@ -850,8 +874,11 @@ export function OverviewPanelCards({
         {hasTopContextRail ? <div className="border-t border-white/[0.05]" aria-hidden /> : null}
 
         {/* A) Primary — attention now */}
-        <section className="space-y-3" aria-label="Needs attention">
-          <div className="grid gap-3 lg:grid-cols-2 lg:items-stretch">
+        <section
+          className="space-y-2.5 rounded-xl border border-white/[0.07] bg-white/[0.012] p-1.5 sm:space-y-3 sm:rounded-2xl sm:p-2"
+          aria-label="Needs attention"
+        >
+          <div className="grid gap-2.5 sm:gap-3 lg:grid-cols-2 lg:items-stretch">
             <BottleneckBlock bottleneck={safeOverview.bottleneck} onNavigate={onNavigate} />
             <NextActionBlock action={safeOverview.nextAction || actionFallback} onNavigate={onNavigate} />
           </div>
@@ -865,13 +892,16 @@ export function OverviewPanelCards({
         </section>
 
         {/* B) Secondary — operating picture */}
-        <section className="space-y-3 border-t border-white/[0.07] pt-4" aria-label="Status and rhythm">
+        <section
+          className="space-y-2.5 border-t border-white/[0.07] pt-3 sm:space-y-3 sm:pt-4"
+          aria-label="Status and rhythm"
+        >
           {!baseStatusUrgent ? (
             <div data-base-target="systems">
               <BaseStatusBlock status={baseStatusPayload} variant="support" />
             </div>
           ) : null}
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-2.5 sm:gap-3 md:grid-cols-2 xl:grid-cols-4">
             <RatesBlock
               rates={safeOverview.rates}
               openInnerPanel={openInnerPanel}
@@ -893,20 +923,24 @@ export function OverviewPanelCards({
 
         {/* World sector — contextual bridge before planning */}
         {sectorWorldSnapshot ? (
-          <div className="border-t border-white/[0.06] pt-3">
+          <div className="border-t border-white/[0.06] pt-2.5 sm:pt-3">
             <WorldSectorPanel
               snapshot={sectorWorldSnapshot}
               onDeploy={onDeployNextSector}
               deployBusy={!!sectorDeployBusy}
               openInnerPanel={openInnerPanel}
               toggleInnerPanel={toggleInnerPanel}
+              compactHeader
             />
           </div>
         ) : null}
 
         {/* C) Tertiary — planning & identity */}
-        <section className="space-y-3 border-t border-white/[0.06] pt-4" aria-label="Build and long-term">
-          <div className="grid gap-3 xl:grid-cols-3">
+        <section
+          className="space-y-2.5 border-t border-white/[0.06] pt-3 sm:space-y-3 sm:rounded-xl sm:bg-white/[0.006] sm:p-1.5 sm:pt-3"
+          aria-label="Build and long-term"
+        >
+          <div className="grid gap-2.5 sm:gap-3 xl:grid-cols-3">
             <BuildOpportunitiesCard
               buildOpportunitiesCount={buildOpportunitiesCount}
               availableStructuresCount={availableStructuresCount}
