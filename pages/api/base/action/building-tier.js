@@ -47,31 +47,17 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log("BASE_BUILD_REQUEST", {
-      deviceId,
-      buildingKey: req.body?.building_key || req.body?.buildingKey || null,
-      ua: req.headers["user-agent"] || "unknown",
-      ts: Date.now(),
-    });
-
     const rateLimit = await checkArcadeRateLimit(
-      "base-action-build",
+      "base-action-building-tier",
       deviceId,
-      120,
+      60,
       60_000
     );
     if (!rateLimit.allowed) {
-      console.log("BASE_BUILD_RATE_LIMITED", {
-        deviceId,
-        remaining: rateLimit.remaining,
-        retryAfterMs: rateLimit.retryAfterMs,
-        ua: req.headers["user-agent"] || "unknown",
-        ts: Date.now(),
-      });
       return res.status(429).json({
         success: false,
         code: "RATE_LIMIT_DEVICE",
-        message: "Too many build requests",
+        message: "Too many tier advance requests",
       });
     }
 
@@ -88,7 +74,7 @@ export default async function handler(req, res) {
     const supabase = getSupabaseAdmin();
 
     const { data: rpcData, error: rpcError } = await supabase.rpc(
-      "base_build_upgrade",
+      "base_advance_building_tier",
       {
         p_device_id: deviceId,
         p_building_key: buildingKey,
@@ -96,28 +82,28 @@ export default async function handler(req, res) {
     );
 
     if (rpcError) {
-      const errorMessage = rpcError.message || "Build failed";
+      const errorMessage = rpcError.message || "Tier advance failed";
 
-      if (errorMessage.includes("Invalid building key")) {
+      if (errorMessage.includes("Tier advancement is only available")) {
         return res.status(400).json({
           success: false,
-          code: "BASE_BUILDING_NOT_FOUND",
+          code: "BASE_TIER_BUILDING_INVALID",
           message: errorMessage,
         });
       }
 
-      if (errorMessage.includes("tier advancement")) {
+      if (errorMessage.includes("level 15")) {
         return res.status(400).json({
           success: false,
-          code: "BASE_BUILDING_TIER_REQUIRED",
+          code: "BASE_TIER_LEVEL_NOT_READY",
           message: errorMessage,
         });
       }
 
-      if (errorMessage.includes("max level")) {
+      if (errorMessage.includes("already at maximum")) {
         return res.status(400).json({
           success: false,
-          code: "BASE_BUILDING_MAX_LEVEL",
+          code: "BASE_TIER_MAX",
           message: errorMessage,
         });
       }
@@ -132,7 +118,7 @@ export default async function handler(req, res) {
 
       return res.status(400).json({
         success: false,
-        code: "BASE_BUILD_FAILED",
+        code: "BASE_TIER_ADVANCE_FAILED",
         message: errorMessage,
       });
     }
@@ -141,7 +127,7 @@ export default async function handler(req, res) {
     if (!result) {
       return res.status(400).json({
         success: false,
-        code: "BASE_BUILD_FAILED",
+        code: "BASE_TIER_ADVANCE_FAILED",
         message: "RPC returned no data",
       });
     }
@@ -150,15 +136,17 @@ export default async function handler(req, res) {
       success: true,
       state: result.state,
       building_key: buildingKey,
+      new_tier: Number(result.new_tier || 0),
       new_level: Number(result.new_level || 0),
       cost: result.cost || null,
+      new_commander_xp: result.new_commander_xp != null ? Number(result.new_commander_xp) : null,
     });
   } catch (error) {
-    console.error("base/action/build failed", error);
+    console.error("base/action/building-tier failed", error);
     return res.status(500).json({
       success: false,
-      code: "BASE_BUILD_INTERNAL_ERROR",
-      message: "Build action failed",
+      code: "BASE_TIER_INTERNAL_ERROR",
+      message: "Tier advance action failed",
     });
   }
 }

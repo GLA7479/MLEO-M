@@ -633,6 +633,9 @@ BEGIN
   END;
 
   IF v_max_level IS NOT NULL AND v_current_level >= v_max_level THEN
+    IF p_building_key IN ('logisticsCenter', 'researchLab', 'repairBay') THEN
+      RAISE EXCEPTION 'Building requires tier advancement';
+    END IF;
     RAISE EXCEPTION 'Building is at max level';
   END IF;
 
@@ -717,6 +720,149 @@ BEGIN
   RETURN QUERY
   SELECT
     v_new_level,
+    v_cost,
+    v_new_resources,
+    v_new_buildings,
+    v_commander_xp,
+    to_jsonb(v_state);
+END;
+$$;
+
+-- ============================================================================
+-- 4b) base_advance_building_tier - Tier up support buildings at Lv 15 (ATOMIC)
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.base_advance_building_tier(
+  p_device_id text,
+  p_building_key text
+)
+RETURNS TABLE(
+  new_tier integer,
+  new_level integer,
+  cost jsonb,
+  new_resources jsonb,
+  new_buildings jsonb,
+  new_commander_xp bigint,
+  state jsonb
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_state public.base_device_state%ROWTYPE;
+  v_resources jsonb;
+  v_buildings jsonb;
+  v_tiers jsonb;
+  v_current_tier integer;
+  v_new_tier integer;
+  v_current_level integer;
+  v_base_cost jsonb;
+  v_cost jsonb;
+  v_growth numeric := 1.85;
+  kv record;
+  v_new_resources jsonb;
+  v_new_buildings jsonb;
+  v_new_tiers jsonb;
+  v_commander_xp bigint;
+  v_xp_gain bigint;
+BEGIN
+  IF p_building_key IS NULL OR p_building_key NOT IN ('logisticsCenter', 'researchLab', 'repairBay') THEN
+    RAISE EXCEPTION 'Tier advancement is only available for logisticsCenter, researchLab, or repairBay';
+  END IF;
+
+  v_state := public.base_get_or_create_state(p_device_id);
+
+  SELECT *
+  INTO v_state
+  FROM public.base_device_state
+  WHERE device_id = p_device_id
+  FOR UPDATE;
+
+  v_resources := coalesce(v_state.resources, '{}'::jsonb);
+  v_buildings := coalesce(v_state.buildings, '{}'::jsonb);
+  v_tiers := coalesce(v_state.building_tiers, '{}'::jsonb);
+
+  v_current_level := coalesce((v_buildings->>p_building_key)::integer, 0);
+  IF v_current_level <> 15 THEN
+    RAISE EXCEPTION 'Building must be level 15 before tier advancement (current level %)', v_current_level;
+  END IF;
+
+  v_current_tier := public.base_building_tier(v_tiers, p_building_key);
+  IF v_current_tier >= 4 THEN
+    RAISE EXCEPTION 'Building tier is already at maximum';
+  END IF;
+
+  v_base_cost := CASE p_building_key
+    WHEN 'logisticsCenter' THEN '{"ORE": 2200, "GOLD": 1700, "SCRAP": 950, "DATA": 80}'::jsonb
+    WHEN 'researchLab' THEN '{"ORE": 2100, "GOLD": 1850, "SCRAP": 980, "DATA": 90}'::jsonb
+    WHEN 'repairBay' THEN '{"ORE": 1800, "GOLD": 1500, "SCRAP": 1200, "DATA": 65}'::jsonb
+    ELSE '{}'::jsonb
+  END;
+
+  v_cost := '{}'::jsonb;
+  FOR kv IN SELECT key, value FROM jsonb_each(v_base_cost)
+  LOOP
+    v_cost := jsonb_set(
+      v_cost,
+      ARRAY[kv.key],
+      to_jsonb(ceil(kv.value::text::numeric * power(v_growth, v_current_tier - 1))::bigint),
+      true
+    );
+  END LOOP;
+
+  v_new_resources := v_resources;
+  FOR kv IN SELECT key, value FROM jsonb_each(v_cost)
+  LOOP
+    IF coalesce((v_new_resources->>kv.key)::bigint, 0) < (kv.value::text::bigint) THEN
+      RAISE EXCEPTION 'Insufficient resources';
+    END IF;
+
+    v_new_resources := jsonb_set(
+      v_new_resources,
+      ARRAY[kv.key],
+      to_jsonb(greatest(0, coalesce((v_new_resources->>kv.key)::bigint, 0) - (kv.value::text::bigint))),
+      true
+    );
+  END LOOP;
+
+  v_new_tier := v_current_tier + 1;
+  v_new_tiers := jsonb_set(v_tiers, ARRAY[p_building_key], to_jsonb(v_new_tier), true);
+  v_new_buildings := jsonb_set(v_buildings, ARRAY[p_building_key], to_jsonb(1), true);
+
+  v_xp_gain := 100 + 35 * v_current_tier;
+  v_commander_xp := coalesce(v_state.commander_xp, 0) + v_xp_gain;
+
+  UPDATE public.base_device_state
+  SET
+    resources = v_new_resources,
+    buildings = v_new_buildings,
+    building_tiers = v_new_tiers,
+    commander_xp = v_commander_xp,
+    updated_at = now()
+  WHERE device_id = p_device_id
+  RETURNING * INTO v_state;
+
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'building_tier',
+    jsonb_build_object(
+      'building_key', p_building_key,
+      'previous_tier', v_current_tier,
+      'new_tier', v_new_tier,
+      'new_level', 1,
+      'cost', coalesce(v_cost, '{}'::jsonb),
+      'resources_after', v_new_resources,
+      'commander_xp_gain', v_xp_gain
+    ),
+    0,
+    '[]'::jsonb
+  );
+
+  RETURN QUERY
+  SELECT
+    v_new_tier,
+    1,
     v_cost,
     v_new_resources,
     v_new_buildings,
@@ -1206,6 +1352,7 @@ REVOKE EXECUTE ON FUNCTION public.base_ship_to_vault(text) FROM PUBLIC, anon, au
 REVOKE EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_launch_expedition(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_build_upgrade(text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_advance_building_tier(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_hire_crew(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_perform_maintenance(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_install_module(text, text) FROM PUBLIC, anon, authenticated;
@@ -1215,6 +1362,7 @@ GRANT EXECUTE ON FUNCTION public.base_ship_to_vault(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_launch_expedition(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_build_upgrade(text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.base_advance_building_tier(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_hire_crew(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_perform_maintenance(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_install_module(text, text) TO service_role;

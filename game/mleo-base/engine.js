@@ -302,6 +302,8 @@ export function freshState() {
       repairBay: 0,
     },
     buildingPowerModes: {},
+    /** Server-only support-building tiers (logisticsCenter, researchLab, repairBay). */
+    buildingTiers: {},
     crew: 0,
     crewRole: "engineer",
     modules: {},
@@ -485,6 +487,12 @@ export function normalizeServerState(raw, prevState = null) {
       lastHiddenAt: 0,
       resources: raw.resources || prev?.resources || seed.resources,
       buildings: raw.buildings || prev?.buildings || seed.buildings,
+      buildingTiers:
+        raw.buildingTiers ||
+        raw.building_tiers ||
+        prev?.buildingTiers ||
+        seed.buildingTiers ||
+        {},
       buildingPowerModes: normalizeBuildingPowerModes(
         raw.buildingPowerModes ||
           raw.building_power_modes ||

@@ -1,0 +1,9 @@
+-- ============================================================================
+-- NOT A DEPLOYABLE MIGRATION — DO NOT RUN THIS FILE AS YOUR MAIN SCHEMA UPDATE.
+--
+-- For BASE building tiers (building_tiers column + reconcile + RPC), run in order:
+--   1) sql/base_server_authority.sql
+--   2) sql/base_atomic_rpc.sql
+--
+-- This file exists only as a pointer / reminder in the repo.
+-- ============================================================================

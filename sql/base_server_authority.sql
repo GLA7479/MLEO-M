@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.base_device_state (
   device_id text PRIMARY KEY,
-  version integer NOT NULL DEFAULT 7,
+  version integer NOT NULL DEFAULT 8,
   last_day date NOT NULL DEFAULT current_date,
   banked_mleo numeric(20,4) NOT NULL DEFAULT 0,
   sent_today bigint NOT NULL DEFAULT 0,
@@ -82,6 +82,42 @@ ALTER TABLE public.base_device_state
 UPDATE public.base_device_state
 SET contract_state = '{"claimed":{}}'::jsonb
 WHERE contract_state IS NULL OR contract_state = '{}'::jsonb;
+
+ALTER TABLE public.base_device_state
+  ADD COLUMN IF NOT EXISTS building_tiers jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+CREATE OR REPLACE FUNCTION public.base_default_building_tiers()
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT jsonb_build_object(
+    'hq', 1,
+    'quarry', 1,
+    'tradeHub', 1,
+    'salvage', 1,
+    'refinery', 1,
+    'powerCell', 1,
+    'minerControl', 1,
+    'arcadeHub', 1,
+    'expeditionBay', 1,
+    'logisticsCenter', 1,
+    'researchLab', 1,
+    'repairBay', 1
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.base_building_tier(p_tiers jsonb, p_building_key text)
+RETURNS integer
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT greatest(1, coalesce((coalesce(p_tiers, '{}'::jsonb)->>p_building_key)::integer, 1));
+$$;
+
+UPDATE public.base_device_state
+SET building_tiers = public.base_default_building_tiers()
+WHERE building_tiers IS NULL OR building_tiers = '{}'::jsonb;
 
 CREATE INDEX IF NOT EXISTS idx_base_device_state_updated_at
   ON public.base_device_state(updated_at DESC);
@@ -284,6 +320,7 @@ BEGIN
     version,
     resources,
     buildings,
+    building_tiers,
     modules,
     research,
     stats,
@@ -296,9 +333,10 @@ BEGIN
   )
   VALUES (
     p_device_id,
-    7,
+    8,
     public.base_default_resources(),
     public.base_default_buildings(),
+    public.base_default_building_tiers(),
     '{}'::jsonb,
     '{}'::jsonb,
     public.base_default_stats(),
@@ -316,6 +354,24 @@ BEGIN
   FROM public.base_device_state
   WHERE device_id = p_device_id
   FOR UPDATE;
+
+  IF v_state.version < 8 THEN
+    UPDATE public.base_device_state
+    SET
+      version = 8,
+      building_tiers = CASE
+        WHEN building_tiers IS NULL OR building_tiers = '{}'::jsonb
+          THEN public.base_default_building_tiers()
+        ELSE building_tiers
+      END
+    WHERE device_id = p_device_id;
+
+    SELECT *
+    INTO v_state
+    FROM public.base_device_state
+    WHERE device_id = p_device_id
+    FOR UPDATE;
+  END IF;
 
   IF v_state.last_day <> current_date THEN
     UPDATE public.base_device_state
@@ -469,6 +525,24 @@ BEGIN
       crew_role = coalesce(crew_role, 'engineer'),
       commander_path = coalesce(commander_path, 'industry'),
       last_tick_at = coalesce(last_tick_at, now())
+    WHERE device_id = p_device_id;
+
+    SELECT *
+    INTO v_state
+    FROM public.base_device_state
+    WHERE device_id = p_device_id
+    FOR UPDATE;
+  END IF;
+
+  IF v_state.version < 8 THEN
+    UPDATE public.base_device_state
+    SET
+      version = 8,
+      building_tiers = CASE
+        WHEN building_tiers IS NULL OR building_tiers = '{}'::jsonb
+          THEN public.base_default_building_tiers()
+        ELSE building_tiers
+      END
     WHERE device_id = p_device_id;
 
     SELECT *
@@ -686,6 +760,14 @@ BEGIN
   IF public.base_jsonb_bool(v_research, 'predictiveMaintenance', false) THEN
     v_maintenance_relief := v_maintenance_relief * 1.25;
   END IF;
+
+  -- Support-building tiers (logistics / research lab / repair bay): modest multipliers on top of existing balance.
+  v_bank_bonus := v_bank_bonus
+    * (1 + 0.03 * greatest(0, public.base_building_tier(coalesce(v_state.building_tiers, '{}'::jsonb), 'logisticsCenter') - 1));
+  v_data_mult := v_data_mult
+    * (1 + 0.04 * greatest(0, public.base_building_tier(coalesce(v_state.building_tiers, '{}'::jsonb), 'researchLab') - 1));
+  v_maintenance_relief := v_maintenance_relief
+    * (1 + 0.05 * greatest(0, public.base_building_tier(coalesce(v_state.building_tiers, '{}'::jsonb), 'repairBay') - 1));
 
   v_ore_mult := v_ore_mult * v_hq_bonus * v_miner_bonus * v_stability_factor;
   v_gold_mult := v_gold_mult * v_hq_bonus * v_stability_factor;
