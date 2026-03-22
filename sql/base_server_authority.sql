@@ -209,6 +209,25 @@ WHERE support_program_unlocks = '{}'::jsonb
 ALTER TABLE public.base_device_state
   ADD COLUMN IF NOT EXISTS specialization_milestones_claimed jsonb NOT NULL DEFAULT '{}'::jsonb;
 
+-- Worlds / sectors: active daily MLEO softcut cap (1–6). Deploy RPC advances this; reconcile reads it.
+ALTER TABLE public.base_device_state
+  ADD COLUMN IF NOT EXISTS sector_world integer NOT NULL DEFAULT 1;
+
+CREATE OR REPLACE FUNCTION public.base_sector_world_daily_cap(p_order integer)
+RETURNS bigint
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT CASE greatest(1, least(6, coalesce(p_order, 1)))
+    WHEN 1 THEN 3400::bigint
+    WHEN 2 THEN 3700::bigint
+    WHEN 3 THEN 4000::bigint
+    WHEN 4 THEN 4300::bigint
+    WHEN 5 THEN 4600::bigint
+    ELSE 4900::bigint
+  END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.base_default_specialization_milestones_claimed()
 RETURNS jsonb
 LANGUAGE sql
@@ -690,7 +709,7 @@ BEGIN
   )
   VALUES (
     p_device_id,
-    10,
+    11,
     public.base_default_resources(),
     public.base_default_buildings(),
     public.base_default_building_tiers(),
@@ -1012,6 +1031,20 @@ BEGIN
     FOR UPDATE;
   END IF;
 
+  IF v_state.version < 11 THEN
+    UPDATE public.base_device_state
+    SET
+      version = 11,
+      sector_world = greatest(1, least(6, coalesce(sector_world, 1)))
+    WHERE device_id = p_device_id;
+
+    SELECT *
+    INTO v_state
+    FROM public.base_device_state
+    WHERE device_id = p_device_id
+    FOR UPDATE;
+  END IF;
+
   IF v_state.last_tick_at IS NULL THEN
     UPDATE public.base_device_state
     SET last_tick_at = v_now
@@ -1276,13 +1309,15 @@ BEGIN
   v_mleo_produced_today := greatest(0, coalesce(v_state.mleo_produced_today, 0));
   v_maintenance_due := greatest(0, coalesce(v_state.maintenance_due, 0));
 
-  SELECT bec.daily_mleo_cap, bec.mleo_gain_mult
-  INTO v_daily_cap, v_mleo_gain_mult
+  SELECT bec.mleo_gain_mult
+  INTO v_mleo_gain_mult
   FROM public.base_economy_config bec
   WHERE bec.id = 1;
 
-  v_daily_cap := coalesce(v_daily_cap, 3400);
   v_mleo_gain_mult := coalesce(v_mleo_gain_mult, 0.4);
+  v_daily_cap := public.base_sector_world_daily_cap(
+    greatest(1, least(6, coalesce(v_state.sector_world, 1)))
+  );
 
   v_ore_gain := ((v_quarry * v_quarry_mode) * 1.35) * v_ore_mult;
   v_gold_gain := ((v_trade * v_trade_mode) * 0.60) * v_gold_mult;

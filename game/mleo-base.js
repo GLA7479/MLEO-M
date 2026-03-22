@@ -40,6 +40,7 @@ import {
   claimBaseMission,
   claimBaseContract,
   claimSpecializationMilestone,
+  deployNextBaseSector,
   setBaseProfile,
   setBuildingPowerMode,
   sendBasePresence,
@@ -101,6 +102,11 @@ import {
   todayKey,
   xpForLevel,
 } from "./mleo-base/engine";
+import {
+  getSectorWorldProgressSnapshot,
+  getWorldDailyMleoCapByOrder,
+  resolveSectorWorldOrder,
+} from "./mleo-base/worlds";
 
 const MAX_LOG_ITEMS = 16;
 const REFINERY_ORE_NEED_PER_LEVEL = 1.65;
@@ -817,7 +823,8 @@ function derive(state, now = Date.now()) {
   mleoMult *= hqBonus * stabilityFactor;
   dataMult *= hqBonus * stabilityFactor;
 
-  const dailyMleoCap = CONFIG.dailyBaseMleoCap;
+  const sectorWorldOrder = resolveSectorWorldOrder(state);
+  const dailyMleoCap = getWorldDailyMleoCapByOrder(sectorWorldOrder);
 
   const minersBonus = {
     offlineRetention: minerLink * 0.015,
@@ -2370,7 +2377,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
     next.resources.ENERGY -= energyNeed;
     next.resources.ORE -= oreNeed;
     next.resources.SCRAP -= scrapNeed;
-    const cap = CONFIG.dailyBaseMleoCap;
+    const cap = Number(d.dailyMleoCap ?? d.shipCap ?? CONFIG.dailyBaseMleoCap);
     const produced = Number(next.mleoProducedToday || 0);
     const rawGain =
       REFINERY_BANKED_PER_LEVEL *
@@ -4438,6 +4445,19 @@ export default function MleoBase() {
         normalized?.contractState ??
         prev?.contractState ??
         { claimed: {} },
+      sectorWorld: Math.min(
+        6,
+        Math.max(
+          1,
+          Number(
+            serverState?.sectorWorld ??
+              serverState?.sector_world ??
+              normalized?.sectorWorld ??
+              prev?.sectorWorld ??
+              1
+          )
+        )
+      ),
       missionState: {
         dailySeed:
           normalized?.missionState?.dailySeed ||
@@ -4458,6 +4478,20 @@ export default function MleoBase() {
           normalized?.specializationMilestonesClaimed ??
           prev?.specializationMilestonesClaimed
       ),
+    });
+  }
+
+  async function handleDeployNextSector() {
+    await runLockedAction("sectorDeploy", async () => {
+      const res = await deployNextBaseSector();
+      if (!res?.success) {
+        setToast(res?.message || "Sector deploy failed");
+        return;
+      }
+      if (res.state) {
+        setState((prev) => mergeAuthoritativeServerState(prev, res.state));
+      }
+      setToast("Sector deployed. New daily cap is active.");
     });
   }
 
@@ -5397,6 +5431,13 @@ export default function MleoBase() {
   }, [mounted]);
 
   const derived = useMemo(() => derive(state), [state]);
+  const sectorWorldSnapshot = useMemo(
+    () =>
+      getSectorWorldProgressSnapshot(state, derived, {
+        supportProgramCatalog: SUPPORT_PROGRAM_CATALOG,
+      }),
+    [state, derived]
+  );
   const systemState = useMemo(() => getSystemState(state.stability), [state.stability]);
   const systemMeta = useMemo(() => systemStateMeta(systemState), [systemState]);
   const workerNextCost = useMemo(() => crewCost(state.crew), [state.crew]);
@@ -12103,6 +12144,9 @@ export default function MleoBase() {
                           liveContracts={liveContracts}
                           onClaimContract={claimContract}
                           specializationSummary={specializationSummary}
+                          sectorWorldSnapshot={sectorWorldSnapshot}
+                          onDeployNextSector={handleDeployNextSector}
+                          sectorDeployBusy={isActionLocked("sectorDeploy")}
                         />
                       </DesktopPanelSection>
                     ) : null}
@@ -12547,6 +12591,9 @@ export default function MleoBase() {
                         liveContracts={liveContracts}
                         onClaimContract={claimContract}
                         specializationSummary={specializationSummary}
+                        sectorWorldSnapshot={sectorWorldSnapshot}
+                        onDeployNextSector={handleDeployNextSector}
+                        sectorDeployBusy={isActionLocked("sectorDeploy")}
                       />
                     </MobilePanelSection>
                   ) : null}

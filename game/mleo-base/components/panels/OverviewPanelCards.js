@@ -1,4 +1,5 @@
 import { ExpandablePanelSectionHeader } from "./ExpandablePanelSectionHeader";
+import { WorldSectorPanel } from "./WorldSectorPanel";
 
 function toneClasses(tone = "info") {
   if (tone === "critical") {
@@ -649,6 +650,9 @@ export function OverviewPanelCards({
   liveContracts,
   onClaimContract,
   specializationSummary,
+  sectorWorldSnapshot,
+  onDeployNextSector,
+  sectorDeployBusy,
 }) {
   const actionFallback =
     nextStep && (nextStep?.title || nextStep?.text)
@@ -679,6 +683,12 @@ export function OverviewPanelCards({
       <DailyProgressBlock progress={safeOverview.dailyProgress} />
 
       <SpecializationSummaryCard summary={specializationSummary} onNavigate={onNavigate} />
+
+      <WorldSectorPanel
+        snapshot={sectorWorldSnapshot}
+        onDeploy={onDeployNextSector}
+        deployBusy={!!sectorDeployBusy}
+      />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <BuildOpportunitiesCard

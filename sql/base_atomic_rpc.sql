@@ -459,12 +459,14 @@ BEGIN
   END;
 
   v_mleo_produced_today := greatest(0, coalesce(v_state.mleo_produced_today, 0));
-  SELECT bec.daily_mleo_cap, bec.mleo_gain_mult
-  INTO v_daily_cap, v_mleo_gain_mult
+  SELECT bec.mleo_gain_mult
+  INTO v_mleo_gain_mult
   FROM public.base_economy_config bec
   WHERE bec.id = 1;
-  v_daily_cap := coalesce(v_daily_cap, 3400);
   v_mleo_gain_mult := coalesce(v_mleo_gain_mult, 0.4);
+  v_daily_cap := public.base_sector_world_daily_cap(
+    greatest(1, least(6, coalesce(v_state.sector_world, 1)))
+  );
   v_raw_mleo := v_banked_mleo::numeric * v_mleo_gain_mult;
   v_softcut := public.base_softcut_factor(v_mleo_produced_today, v_daily_cap);
   v_banked_add := round(
@@ -1711,6 +1713,350 @@ END;
 $$;
 
 -- ============================================================================
+-- base_deploy_next_sector — manual world / sector advance (validates gates in SQL)
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.base_deploy_next_sector(
+  p_device_id text
+)
+RETURNS TABLE(new_sector_world integer, state jsonb)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_state public.base_device_state%ROWTYPE;
+  v_cur integer;
+  v_next integer;
+  v_buildings jsonb;
+  v_tiers jsonb;
+  v_unlocks jsonb;
+  v_active jsonb;
+  v_mile jsonb;
+  v_contract jsonb;
+  v_cclaimed jsonb;
+  v_resources jsonb;
+  v_research jsonb;
+  v_stability numeric;
+  v_energy numeric;
+  v_energy_cap numeric;
+  v_power integer;
+  n_prog integer;
+  n_mile integer;
+  n_lines integer;
+  n_elite integer;
+  n_fam integer;
+  b text;
+  r record;
+  v_prog text;
+  v_def jsonb;
+  v_lv integer;
+  v_tier integer;
+  t1 integer;
+  t2 integer;
+  t3 integer;
+  v_pass boolean;
+BEGIN
+  IF coalesce(trim(p_device_id), '') = '' THEN
+    RAISE EXCEPTION 'device_id is required';
+  END IF;
+
+  PERFORM public.base_reconcile_state(p_device_id);
+
+  SELECT *
+  INTO v_state
+  FROM public.base_device_state
+  WHERE device_id = p_device_id
+  FOR UPDATE;
+
+  v_cur := greatest(1, least(6, coalesce(v_state.sector_world, 1)));
+  IF v_cur >= 6 THEN
+    RAISE EXCEPTION 'Already at final sector';
+  END IF;
+  v_next := v_cur + 1;
+
+  v_buildings := coalesce(v_state.buildings, '{}'::jsonb);
+  v_tiers := coalesce(v_state.building_tiers, '{}'::jsonb);
+  v_unlocks := coalesce(v_state.support_program_unlocks, '{}'::jsonb);
+  v_active := coalesce(v_state.support_program_active, '{}'::jsonb);
+  v_mile := coalesce(v_state.specialization_milestones_claimed, '{}'::jsonb);
+  v_contract := coalesce(v_state.contract_state, '{}'::jsonb);
+  v_cclaimed := coalesce(v_contract->'claimed', '{}'::jsonb);
+  v_resources := coalesce(v_state.resources, '{}'::jsonb);
+  v_research := coalesce(v_state.research, '{}'::jsonb);
+  v_stability := coalesce(v_state.stability, 100::numeric);
+  v_energy := greatest(0, floor(coalesce((v_resources->>'ENERGY')::numeric, 0)));
+  v_power := greatest(0, coalesce((v_buildings->>'powerCell')::integer, 0));
+  v_energy_cap := 148 + v_power * 42;
+  IF public.base_jsonb_bool(v_research, 'coolant', false) THEN
+    v_energy_cap := v_energy_cap + 22;
+  END IF;
+
+  n_prog := 0;
+  FOREACH b IN ARRAY ARRAY['logisticsCenter', 'researchLab', 'repairBay']
+  LOOP
+    FOR r IN SELECT * FROM jsonb_each(coalesce(v_unlocks->b, '{}'::jsonb))
+    LOOP
+      IF r.value = 'true'::jsonb THEN
+        n_prog := n_prog + 1;
+      END IF;
+    END LOOP;
+  END LOOP;
+
+  n_mile := 0;
+  IF coalesce(v_mile->'logisticsCenter', '{}'::jsonb) @> '{"disciplined_pipeline": true}'::jsonb THEN
+    n_mile := n_mile + 1;
+  END IF;
+  IF coalesce(v_mile->'logisticsCenter', '{}'::jsonb) @> '{"buffer_authority": true}'::jsonb THEN
+    n_mile := n_mile + 1;
+  END IF;
+  IF coalesce(v_mile->'researchLab', '{}'::jsonb) @> '{"matrix_operator": true}'::jsonb THEN
+    n_mile := n_mile + 1;
+  END IF;
+  IF coalesce(v_mile->'researchLab', '{}'::jsonb) @> '{"telemetry_controller": true}'::jsonb THEN
+    n_mile := n_mile + 1;
+  END IF;
+  IF coalesce(v_mile->'repairBay', '{}'::jsonb) @> '{"preventive_standard": true}'::jsonb THEN
+    n_mile := n_mile + 1;
+  END IF;
+  IF coalesce(v_mile->'repairBay', '{}'::jsonb) @> '{"mesh_discipline": true}'::jsonb THEN
+    n_mile := n_mile + 1;
+  END IF;
+
+  n_lines := 0;
+  IF coalesce(v_mile->'logisticsCenter', '{}'::jsonb) @> '{"disciplined_pipeline": true}'::jsonb
+     OR coalesce(v_mile->'logisticsCenter', '{}'::jsonb) @> '{"buffer_authority": true}'::jsonb
+  THEN
+    n_lines := n_lines + 1;
+  END IF;
+  IF coalesce(v_mile->'researchLab', '{}'::jsonb) @> '{"matrix_operator": true}'::jsonb
+     OR coalesce(v_mile->'researchLab', '{}'::jsonb) @> '{"telemetry_controller": true}'::jsonb
+  THEN
+    n_lines := n_lines + 1;
+  END IF;
+  IF coalesce(v_mile->'repairBay', '{}'::jsonb) @> '{"preventive_standard": true}'::jsonb
+     OR coalesce(v_mile->'repairBay', '{}'::jsonb) @> '{"mesh_discipline": true}'::jsonb
+  THEN
+    n_lines := n_lines + 1;
+  END IF;
+
+  n_elite := 0;
+  FOR r IN SELECT * FROM jsonb_each(v_cclaimed)
+  LOOP
+    IF r.key LIKE 'elite:%' AND r.value = 'true'::jsonb THEN
+      n_elite := n_elite + 1;
+    END IF;
+  END LOOP;
+
+  n_fam := 0;
+  IF EXISTS (
+    SELECT 1
+    FROM jsonb_each(v_cclaimed) e
+    WHERE e.value = 'true'::jsonb
+      AND split_part(e.key, ':', 2) ~ '^elite_log'
+  ) THEN
+    n_fam := n_fam + 1;
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM jsonb_each(v_cclaimed) e
+    WHERE e.value = 'true'::jsonb
+      AND split_part(e.key, ':', 2) ~ '^elite_res'
+  ) THEN
+    n_fam := n_fam + 1;
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM jsonb_each(v_cclaimed) e
+    WHERE e.value = 'true'::jsonb
+      AND split_part(e.key, ':', 2) ~ '^elite_rep'
+  ) THEN
+    n_fam := n_fam + 1;
+  END IF;
+
+  IF v_next = 2 THEN
+    v_pass :=
+      coalesce((v_buildings->>'logisticsCenter')::integer, 0) >= 1
+      AND coalesce((v_buildings->>'researchLab')::integer, 0) >= 1
+      AND coalesce((v_buildings->>'repairBay')::integer, 0) >= 1
+      AND greatest(
+        CASE WHEN coalesce((v_buildings->>'logisticsCenter')::integer, 0) >= 1
+          THEN public.base_building_tier(v_tiers, 'logisticsCenter') ELSE 0 END,
+        CASE WHEN coalesce((v_buildings->>'researchLab')::integer, 0) >= 1
+          THEN public.base_building_tier(v_tiers, 'researchLab') ELSE 0 END,
+        CASE WHEN coalesce((v_buildings->>'repairBay')::integer, 0) >= 1
+          THEN public.base_building_tier(v_tiers, 'repairBay') ELSE 0 END
+      ) >= 2
+      AND v_stability >= 84
+      AND v_stability >= 50
+      AND n_mile >= 1;
+
+    IF NOT v_pass THEN
+      RAISE EXCEPTION 'Sector deploy requirements not met (frontier → freight)';
+    END IF;
+
+    v_pass := false;
+    FOREACH b IN ARRAY ARRAY['logisticsCenter', 'researchLab', 'repairBay']
+    LOOP
+      v_prog := public.base_active_support_program(v_active, b);
+      IF v_prog IS NOT NULL
+        AND (coalesce(v_unlocks->b, '{}'::jsonb)->v_prog) = 'true'::jsonb
+      THEN
+        v_pass := true;
+        EXIT;
+      END IF;
+    END LOOP;
+    IF NOT v_pass THEN
+      RAISE EXCEPTION 'Sector deploy requirements not met (active program)';
+    END IF;
+
+  ELSIF v_next = 3 THEN
+    v_pass :=
+      coalesce((v_buildings->>'logisticsCenter')::integer, 0) >= 1
+      AND public.base_building_tier(v_tiers, 'logisticsCenter') >= 2
+      AND coalesce((v_buildings->>'researchLab')::integer, 0) >= 1
+      AND public.base_building_tier(v_tiers, 'researchLab') >= 2
+      AND coalesce((v_buildings->>'repairBay')::integer, 0) >= 1
+      AND public.base_building_tier(v_tiers, 'repairBay') >= 2
+      AND n_prog >= 3
+      AND v_stability >= 86
+      AND v_energy >= floor(v_energy_cap * 0.4)
+      AND n_mile >= 2
+      AND n_lines >= 2;
+
+    IF NOT v_pass THEN
+      RAISE EXCEPTION 'Sector deploy requirements not met (freight → signal)';
+    END IF;
+
+    v_pass := true;
+    FOREACH b IN ARRAY ARRAY['logisticsCenter', 'researchLab', 'repairBay']
+    LOOP
+      IF NOT EXISTS (
+        SELECT 1
+        FROM jsonb_each(coalesce(v_unlocks->b, '{}'::jsonb)) e
+        WHERE e.value = 'true'::jsonb
+      ) THEN
+        v_pass := false;
+        EXIT;
+      END IF;
+    END LOOP;
+    IF NOT v_pass THEN
+      RAISE EXCEPTION 'Sector deploy requirements not met (program coverage)';
+    END IF;
+
+  ELSIF v_next = 4 THEN
+    v_pass :=
+      greatest(
+        CASE WHEN coalesce((v_buildings->>'logisticsCenter')::integer, 0) >= 1
+          THEN public.base_building_tier(v_tiers, 'logisticsCenter') ELSE 0 END,
+        CASE WHEN coalesce((v_buildings->>'researchLab')::integer, 0) >= 1
+          THEN public.base_building_tier(v_tiers, 'researchLab') ELSE 0 END,
+        CASE WHEN coalesce((v_buildings->>'repairBay')::integer, 0) >= 1
+          THEN public.base_building_tier(v_tiers, 'repairBay') ELSE 0 END
+      ) >= 3
+      AND n_mile >= 3
+      AND n_elite >= 1
+      AND v_stability >= 88
+      AND v_stability >= 50;
+
+    IF NOT v_pass THEN
+      RAISE EXCEPTION 'Sector deploy requirements not met (signal → reactor)';
+    END IF;
+
+    v_pass := false;
+    FOREACH b IN ARRAY ARRAY['logisticsCenter', 'researchLab', 'repairBay']
+    LOOP
+      v_lv := coalesce((v_buildings->>b)::integer, 0);
+      v_tier := public.base_building_tier(v_tiers, b);
+      IF v_lv < 1 OR v_tier < 3 THEN
+        CONTINUE;
+      END IF;
+      v_prog := public.base_active_support_program(v_active, b);
+      IF v_prog IS NULL THEN
+        CONTINUE;
+      END IF;
+      IF (coalesce(v_unlocks->b, '{}'::jsonb)->v_prog) IS DISTINCT FROM 'true'::jsonb THEN
+        CONTINUE;
+      END IF;
+      v_def := public.base_support_program_definition(b, v_prog);
+      IF v_def IS NOT NULL AND coalesce((v_def->>'minTier')::integer, 0) >= 3 THEN
+        v_pass := true;
+        EXIT;
+      END IF;
+    END LOOP;
+    IF NOT v_pass THEN
+      RAISE EXCEPTION 'Sector deploy requirements not met (tier-3 program)';
+    END IF;
+
+  ELSIF v_next = 5 THEN
+    v_pass :=
+      coalesce((v_buildings->>'logisticsCenter')::integer, 0) >= 1
+      AND public.base_building_tier(v_tiers, 'logisticsCenter') >= 3
+      AND coalesce((v_buildings->>'researchLab')::integer, 0) >= 1
+      AND public.base_building_tier(v_tiers, 'researchLab') >= 3
+      AND coalesce((v_buildings->>'repairBay')::integer, 0) >= 1
+      AND public.base_building_tier(v_tiers, 'repairBay') >= 3
+      AND n_prog >= 6
+      AND n_mile >= 4
+      AND (n_fam >= 2 OR n_elite >= 2)
+      AND v_stability >= 90
+      AND v_energy >= floor(v_energy_cap * 0.45);
+
+    IF NOT v_pass THEN
+      RAISE EXCEPTION 'Sector deploy requirements not met (reactor → salvage)';
+    END IF;
+
+  ELSIF v_next = 6 THEN
+    t1 := CASE WHEN coalesce((v_buildings->>'logisticsCenter')::integer, 0) >= 1
+      THEN public.base_building_tier(v_tiers, 'logisticsCenter') ELSE 0 END;
+    t2 := CASE WHEN coalesce((v_buildings->>'researchLab')::integer, 0) >= 1
+      THEN public.base_building_tier(v_tiers, 'researchLab') ELSE 0 END;
+    t3 := CASE WHEN coalesce((v_buildings->>'repairBay')::integer, 0) >= 1
+      THEN public.base_building_tier(v_tiers, 'repairBay') ELSE 0 END;
+
+    IF NOT (
+      t1 > 0 AND t2 > 0 AND t3 > 0
+      AND least(t1, t2, t3) >= 3
+      AND greatest(t1, t2, t3) >= 4
+    ) THEN
+      RAISE EXCEPTION 'Sector deploy requirements not met (tier layout for Nexus)';
+    END IF;
+
+    v_pass :=
+      n_prog >= 7
+      AND n_mile >= 5
+      AND n_elite >= 3
+      AND v_stability >= 90
+      AND v_energy >= floor(v_energy_cap * 0.5)
+      AND v_stability >= 50;
+
+    IF NOT v_pass THEN
+      RAISE EXCEPTION 'Sector deploy requirements not met (salvage → nexus)';
+    END IF;
+  END IF;
+
+  UPDATE public.base_device_state
+  SET
+    sector_world = v_next,
+    updated_at = now()
+  WHERE device_id = p_device_id
+  RETURNING *
+  INTO v_state;
+
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'deploy_next_sector',
+    jsonb_build_object('from', v_cur, 'to', v_next),
+    0,
+    '[]'::jsonb
+  );
+
+  RETURN QUERY
+  SELECT v_next, to_jsonb(v_state);
+END;
+$$;
+
+-- ============================================================================
 -- Audit table for base actions (ship, spend)
 -- ============================================================================
 
@@ -1778,6 +2124,7 @@ REVOKE EXECUTE ON FUNCTION public.base_perform_maintenance(text) FROM PUBLIC, an
 REVOKE EXECUTE ON FUNCTION public.base_install_module(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_unlock_research(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_claim_specialization_milestone(text, text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_deploy_next_sector(text) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.base_ship_to_vault(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text) TO service_role;
@@ -1791,6 +2138,7 @@ GRANT EXECUTE ON FUNCTION public.base_perform_maintenance(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_install_module(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_unlock_research(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_claim_specialization_milestone(text, text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.base_deploy_next_sector(text) TO service_role;
 
 REVOKE ALL ON public.base_action_audit FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT ON public.base_action_audit TO service_role;

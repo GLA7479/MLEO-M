@@ -597,6 +597,8 @@ export function freshState() {
       claimed: {},
     },
     log: pushLog([], "MLEO BASE online. HQ is active."),
+    /** Active sector / world (1–6). Server column `sector_world`. */
+    sectorWorld: 1,
   };
 }
 
@@ -723,6 +725,10 @@ export function sanitizeBaseState(raw, fallback = null) {
           ? src.missionState.claimed
           : {},
     },
+    sectorWorld: Math.min(
+      6,
+      Math.max(1, safeInteger(src.sectorWorld ?? src.sector_world, seed.sectorWorld, 1))
+    ),
     log: Array.isArray(src.log) ? src.log.slice(0, MAX_LOG_ITEMS) : seed.log,
   };
 }
@@ -820,8 +826,13 @@ export function normalizeServerState(raw, prevState = null) {
       ),
       stats: raw.stats || prev?.stats || seed.stats,
       missionState: raw.missionState || raw.mission_state || prev?.missionState || seed.missionState,
+      sectorWorld: Number(
+        raw.sectorWorld ?? raw.sector_world ?? prev?.sectorWorld ?? seed.sectorWorld ?? 1
+      ),
       log: prev?.log || seed.log,
     },
     seed
   );
 }
+
+export { getSectorWorldProgressSnapshot } from "./worlds";
