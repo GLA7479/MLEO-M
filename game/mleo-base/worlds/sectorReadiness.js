@@ -5,6 +5,7 @@ import {
   WORLD_MAX_ORDER,
   WORLDS,
 } from "./catalog";
+import { buildActiveWorldPanelFlavor } from "./worldPanelFlavor";
 
 const SUPPORT_KEYS = ["logisticsCenter", "researchLab", "repairBay"];
 
@@ -427,5 +428,9 @@ export function getSectorWorldProgressSnapshot(state, derived, deps) {
     canDeployToNextWorld: !!next && canDeploy,
     readiness: groups,
     worldsCatalog: WORLDS,
+    panelFlavor: buildActiveWorldPanelFlavor(state, derived, {
+      nextWorldName: next?.name ?? null,
+      canDeployToNextWorld: !!next && canDeploy,
+    }),
   };
 }

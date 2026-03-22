@@ -8,3 +8,4 @@ export {
 } from "./catalog";
 
 export { getSectorWorldProgressSnapshot } from "./sectorReadiness";
+export { buildActiveWorldPanelFlavor } from "./worldPanelFlavor";

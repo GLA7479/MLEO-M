@@ -24,18 +24,32 @@ export function WorldSectorPanel({ snapshot, onDeploy, deployBusy }) {
     nextWorldOrder,
     canDeployToNextWorld,
     readiness,
+    panelFlavor,
   } = snapshot;
 
   const atMax = !nextWorldOrder;
+  const shellExtra = panelFlavor?.panelShellClassName || "";
 
   return (
-    <div className="rounded-2xl border border-cyan-400/20 bg-gradient-to-br from-cyan-500/[0.07] to-transparent p-4">
+    <div
+      className={`rounded-2xl border border-cyan-400/20 bg-gradient-to-br from-cyan-500/[0.07] to-transparent p-4 ${shellExtra}`.trim()}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-200/75">
-            Sector / world
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-200/75">
+              Sector / world
+            </div>
+            {panelFlavor?.badgeLabel ? (
+              <span className="inline-flex max-w-full rounded-full border border-amber-400/35 bg-amber-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-amber-100/95">
+                {panelFlavor.badgeLabel}
+              </span>
+            ) : null}
           </div>
           <div className="mt-1 text-lg font-black text-white">{currentWorldName}</div>
+          {panelFlavor?.tagline ? (
+            <div className="mt-1 text-[11px] leading-snug text-amber-100/75">{panelFlavor.tagline}</div>
+          ) : null}
           <div className="mt-0.5 text-xs text-white/55">
             Daily MLEO cap: <span className="font-semibold text-white/80">{fmtCap(currentDailyCap)}</span>
           </div>
@@ -56,6 +70,39 @@ export function WorldSectorPanel({ snapshot, onDeploy, deployBusy }) {
           )}
         </div>
       </div>
+
+      {panelFlavor ? (
+        <div className="mt-3 space-y-2 rounded-xl border border-white/10 bg-black/25 px-3 py-2.5">
+          {panelFlavor.focusShort ? (
+            <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-200/70">
+              World focus · {panelFlavor.focusShort}
+            </div>
+          ) : null}
+          {panelFlavor.flowMetricLine ? (
+            <div className="text-[11px] leading-snug text-white/70">{panelFlavor.flowMetricLine}</div>
+          ) : null}
+          {panelFlavor.playstyleHint ? (
+            <div className="text-[11px] leading-snug text-white/60">
+              <span className="font-semibold text-white/50">Playstyle · </span>
+              {panelFlavor.playstyleHint}
+            </div>
+          ) : null}
+          {panelFlavor.sectorPressureNote ? (
+            <div className="text-[11px] leading-snug text-amber-100/55">
+              <span className="font-semibold text-amber-200/50">Sector pressure · </span>
+              {panelFlavor.sectorPressureNote}
+            </div>
+          ) : null}
+          {panelFlavor.descriptor ? (
+            <div className="border-t border-white/10 pt-2 text-[11px] leading-snug text-white/55">
+              {panelFlavor.descriptor}
+            </div>
+          ) : null}
+          {panelFlavor.progressionNote ? (
+            <div className="text-[11px] leading-snug text-cyan-100/60">{panelFlavor.progressionNote}</div>
+          ) : null}
+        </div>
+      ) : null}
 
       {!atMax ? (
         <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">

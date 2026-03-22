@@ -665,8 +665,23 @@ export function OverviewPanelCards({
 
   const safeOverview = overview || {};
 
+  const flavor = sectorWorldSnapshot?.panelFlavor;
+  const worldOverviewHint = flavor?.overviewHint;
+  const overviewStripTitle = flavor?.overviewStripTitle;
+
   return (
     <div className="space-y-4">
+      {worldOverviewHint ? (
+        <div className="rounded-xl border border-amber-400/25 bg-amber-500/[0.07] px-3 py-2 text-[11px] leading-snug text-amber-50/90">
+          {overviewStripTitle ? (
+            <span className="font-black uppercase tracking-[0.14em] text-amber-200/85">
+              {overviewStripTitle}
+              {" · "}
+            </span>
+          ) : null}
+          {worldOverviewHint}
+        </div>
+      ) : null}
       <BaseStatusBlock
         status={{
           ...(safeOverview.baseStatus || {}),
