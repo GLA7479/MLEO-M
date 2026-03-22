@@ -10598,15 +10598,36 @@ export default function MleoBase() {
       buttonText = "Tier ready";
     }
 
-    const supportsProgramsUi = supportsPrograms(building.key) && level >= 1;
-    const activeProgramKey = supportsProgramsUi ? getActiveSupportProgram(state, building.key) : null;
+    const supportsProgramsBuilding = supportsPrograms(building.key);
+    const supportsProgramsInteractive = supportsProgramsBuilding && level >= 1;
+    const activeProgramKey = supportsProgramsInteractive
+      ? getActiveSupportProgram(state, building.key)
+      : null;
     const activeProgramLabel = activeProgramKey
       ? SUPPORT_PROGRAM_CATALOG[building.key]?.find((p) => p.key === activeProgramKey)?.label ||
         activeProgramKey
       : null;
 
-    const programCards = supportsProgramsUi
+    const programCards = supportsProgramsBuilding
       ? getSupportPrograms(building.key).map((program) => {
+          if (!supportsProgramsInteractive) {
+            return {
+              key: program.key,
+              label: program.label,
+              effects: program.effects,
+              minTier: program.minTier,
+              cost: program.cost,
+              unlocked: false,
+              active: false,
+              tierReady: false,
+              canUnlock: false,
+              unlockDisabled: true,
+              setDisabled: true,
+              unlockBusy: false,
+              setBusy: false,
+              costRow: null,
+            };
+          }
           const tierReady = (tier || 1) >= program.minTier;
           const unlocked = isSupportProgramUnlocked(state, building.key, program.key);
           const active = activeProgramKey === program.key;
@@ -10639,7 +10660,7 @@ export default function MleoBase() {
       : [];
 
     const milestoneCards =
-      supportsProgramsUi && Array.isArray(SPECIALIZATION_MILESTONES_BY_BUILDING[building.key])
+      supportsProgramsBuilding && Array.isArray(SPECIALIZATION_MILESTONES_BY_BUILDING[building.key])
         ? SPECIALIZATION_MILESTONES_BY_BUILDING[building.key]
             .map((milestoneKey) => {
               const meta = SPECIALIZATION_MILESTONE_META[milestoneKey];
@@ -10697,7 +10718,8 @@ export default function MleoBase() {
       canAffordTierCost,
       tierText,
       tierAdvanceBlock,
-      supportsPrograms: supportsProgramsUi,
+      supportsPrograms: supportsProgramsBuilding,
+      supportProgramsSectionsLocked: supportsProgramsBuilding && !supportsProgramsInteractive,
       activeProgramKey,
       activeProgramLabel,
       programCards,
