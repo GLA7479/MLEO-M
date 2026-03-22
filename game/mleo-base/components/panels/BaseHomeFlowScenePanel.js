@@ -50,7 +50,21 @@ export function BaseHomeFlowScenePanel({
   const shellClass = [theme.mapShellClassName].filter(Boolean).join(" ").trim();
   const innerClass = [aspectOuter, theme.mapInnerClassName].filter(Boolean).join(" ").trim();
 
-  return (
+  /** Selected route paints last so it reads above crossings (no double-stroke). */
+  const linksPaintOrder = useMemo(() => {
+    return [...links].sort((a, b) => {
+      if (a.key === selected) return 1;
+      if (b.key === selected) return -1;
+      return 0;
+    });
+  }, [links, selected]);
+
+  const mobileRootClass =
+    layout === "mobile" && theme.mapMobileRootClassName
+      ? theme.mapMobileRootClassName.trim()
+      : "";
+
+  const mapCore = (
     <div className={shellClass || undefined} style={theme.mapShellStyle}>
       <div className={innerClass} style={theme.mapInnerStyle}>
         {theme.overlays?.length
@@ -81,7 +95,7 @@ export function BaseHomeFlowScenePanel({
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
         >
-          {links.map((node) => {
+          {linksPaintOrder.map((node) => {
             const baseTone = pickLinkTone(theme, node.state);
             const lineTone =
               selected === node.key && theme.linkSelected
@@ -97,11 +111,11 @@ export function BaseHomeFlowScenePanel({
                 stroke={lineTone.stroke}
                 strokeWidth={lineTone.width}
                 strokeDasharray={lineTone.dash}
+                strokeLinecap={theme.linkStrokeLinecap || "butt"}
               />
             );
           })}
-
-          {links.map((node) => {
+          {linksPaintOrder.map((node) => {
             const dotTone = pickDotTone(theme, node.state);
             const isLinkSelected = selected === node.key;
             const fill = isLinkSelected ? theme.dots.selectedFill : dotTone.fill;
@@ -110,7 +124,6 @@ export function BaseHomeFlowScenePanel({
                 ? { ...dotTone, ...theme.dots.selectedActive }
                 : dotTone;
             const filterStyle = boosted.filter ? { filter: boosted.filter } : undefined;
-
             return (
               <circle
                 key={`dot-${node.key}`}
@@ -178,4 +191,9 @@ export function BaseHomeFlowScenePanel({
       </div>
     </div>
   );
+
+  if (mobileRootClass) {
+    return <div className={mobileRootClass}>{mapCore}</div>;
+  }
+  return mapCore;
 }

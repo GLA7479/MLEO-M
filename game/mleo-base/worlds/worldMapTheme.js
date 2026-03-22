@@ -31,6 +31,8 @@ export const DEFAULT_WORLD_MAP_THEME = {
   regularIconClassName: "",
   /** Merged onto the active link line when that destination node is selected. */
   linkSelected: null,
+  /** SVG line caps: unset = browser default (butt). Worlds 2–6 set "round" for softer lanes. */
+  linkStrokeLinecap: undefined,
   node: {
     regularClassName: "",
     hqClassName: "",
@@ -45,6 +47,8 @@ export const DEFAULT_WORLD_MAP_THEME = {
     selectedActive: null,
   },
   overlays: [],
+  /** Mobile-only: optional root wrapper classes on the flow map (e.g. vertical nudge). */
+  mapMobileRootClassName: "",
   mobileAdjustments: null,
 };
 
@@ -52,591 +56,574 @@ function overlay(key, className, style) {
   return { key, className, style };
 }
 
-/** Orbital freight — disciplined logistics grid, amber + cyan corridors */
+/** Orbital freight — corridor discipline: shell vs one grid layer, routes read sharp */
 const WORLD_2_MAP_THEME = {
-  mapShellClassName:
-    "rounded-3xl bg-gradient-to-b from-slate-950/90 via-slate-950/70 to-amber-950/25 shadow-[inset_0_0_100px_rgba(251,191,36,0.09),inset_0_-40px_80px_rgba(34,211,238,0.05)] ring-1 ring-inset ring-amber-400/35",
+  linkStrokeLinecap: "round",
+  mapShellClassName: "rounded-3xl",
   mapInnerClassName:
-    "rounded-[1.15rem] ring-1 ring-cyan-400/30 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.06)]",
+    "rounded-3xl bg-gradient-to-b from-amber-950/18 via-slate-950/45 to-slate-950/52 ring-1 ring-inset ring-cyan-400/28 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.1),inset_0_0_56px_rgba(251,191,36,0.035)]",
   mapBadgeClassName:
-    "pointer-events-none z-[2] rounded-md border border-amber-400/45 bg-amber-950/70 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.22em] text-amber-50 shadow-[0_0_24px_rgba(251,191,36,0.2),inset_0_1px_0_rgba(255,255,255,0.08)]",
+    "pointer-events-none z-[2] max-w-[46%] truncate rounded-md border border-amber-400/50 bg-amber-950/75 px-2 py-0.5 text-[8px] font-black uppercase leading-tight tracking-[0.2em] text-amber-50 shadow-[0_0_18px_rgba(251,191,36,0.18),inset_0_1px_0_rgba(255,255,255,0.07)] sm:max-w-none sm:px-2.5 sm:text-[9px] sm:tracking-[0.22em]",
   mapBadgeText: "Freight orbit",
-  labelClassName: "text-cyan-100/75",
+  labelClassName: "text-cyan-100/80",
   linkSelected: {
-    stroke: "rgba(34,211,238,0.48)",
-    width: "0.62",
-    dash: "1.1 0.75",
+    stroke: "rgba(34,211,238,0.58)",
+    width: "0.68",
+    dash: "1.35 0.65",
   },
   selectedRingClassName:
-    "ring-2 ring-cyan-300/90 ring-offset-2 ring-offset-slate-950 scale-[1.04] shadow-[0_0_26px_rgba(34,211,238,0.4),0_0_10px_rgba(251,191,36,0.15)]",
+    "ring-2 ring-cyan-200/95 ring-offset-2 ring-offset-slate-950 scale-[1.04] shadow-[0_0_22px_rgba(34,211,238,0.45)]",
   selectedRingHqClassName:
-    "ring-2 ring-amber-200/95 ring-offset-2 ring-offset-slate-950 scale-[1.05] shadow-[0_0_32px_rgba(251,191,36,0.38),0_0_18px_rgba(34,211,238,0.22)]",
-  hqIconClassName: "text-amber-100 drop-shadow-[0_0_10px_rgba(251,191,36,0.55)]",
-  regularIconClassName: "text-cyan-200 drop-shadow-[0_0_6px_rgba(34,211,238,0.35)]",
+    "ring-2 ring-amber-100/95 ring-offset-2 ring-offset-slate-950 scale-[1.05] shadow-[0_0_28px_rgba(251,191,36,0.42),0_0_12px_rgba(34,211,238,0.2)]",
+  hqIconClassName: "text-amber-50 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]",
+  regularIconClassName: "text-cyan-100 drop-shadow-[0_0_4px_rgba(34,211,238,0.3)]",
   node: {
     regularClassName:
-      "ring-1 ring-cyan-400/22 shadow-[0_0_16px_rgba(34,211,238,0.14),inset_0_1px_0_rgba(255,255,255,0.04)]",
+      "ring-1 ring-cyan-400/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
     hqClassName:
-      "ring-2 ring-amber-400/45 shadow-[0_0_28px_rgba(251,191,36,0.28),0_0_14px_rgba(34,211,238,0.15),inset_0_1px_0_rgba(255,255,255,0.06)]",
+      "ring-2 ring-amber-400/55 shadow-[0_0_22px_rgba(251,191,36,0.3),inset_0_1px_0_rgba(255,255,255,0.08)]",
     warningClassName: "",
     criticalClassName: "",
   },
   links: {
-    normal: { stroke: "rgba(251,191,36,0.26)", width: "0.52", dash: "1.65 0.95" },
-    warning: { stroke: "rgba(251,191,36,0.38)", width: "0.58", dash: "1.15 0.85" },
-    critical: { stroke: "rgba(244,63,94,0.36)", width: "0.66", dash: "1.9 1.0" },
+    normal: { stroke: "rgba(251,191,36,0.24)", width: "0.5", dash: "2.05 1.0" },
+    warning: { stroke: "rgba(251,191,36,0.36)", width: "0.56", dash: "1.5 0.85" },
+    critical: { stroke: "rgba(244,63,94,0.38)", width: "0.64", dash: "1.75 0.95" },
   },
   dots: {
     normal: {
-      fill: "rgba(34,211,238,0.52)",
-      r: "0.78",
-      filter: "drop-shadow(0 0 2px rgba(251,191,36,0.75))",
+      fill: "rgba(34,211,238,0.5)",
+      r: "0.74",
+      filter: "drop-shadow(0 0 1.5px rgba(251,191,36,0.55))",
     },
     warning: {
-      fill: "rgba(251,191,36,0.62)",
-      r: "0.9",
-      filter: "drop-shadow(0 0 2px rgba(251,191,36,0.85))",
+      fill: "rgba(251,191,36,0.58)",
+      r: "0.86",
+      filter: "drop-shadow(0 0 1.6px rgba(251,191,36,0.7))",
     },
     critical: {
-      fill: "rgba(244,63,94,0.72)",
-      r: "1.08",
-      filter: "drop-shadow(0 0 2.5px rgba(244,63,94,0.82))",
+      fill: "rgba(244,63,94,0.7)",
+      r: "1.02",
+      filter: "drop-shadow(0 0 2px rgba(244,63,94,0.78))",
     },
-    selectedFill: "rgba(253,250,232,0.98)",
+    selectedFill: "rgba(255,253,240,0.99)",
     selectedActive: {
-      r: "1.0",
-      filter: "drop-shadow(0 0 4px rgba(34,211,238,0.95)) drop-shadow(0 0 2px rgba(251,191,36,0.8))",
+      r: "1.02",
+      filter: "drop-shadow(0 0 3.5px rgba(34,211,238,0.95)) drop-shadow(0 0 2px rgba(251,191,36,0.75))",
     },
   },
   overlays: [
     overlay(
-      "w2-orbit-glow",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.95]",
+      "w2-orbit",
+      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.72]",
       {
         background:
-          "radial-gradient(ellipse 100% 70% at 50% 112%, rgba(251,191,36,0.18), transparent 55%), radial-gradient(ellipse 55% 40% at 10% 15%, rgba(34,211,238,0.1), transparent 48%)",
+          "radial-gradient(ellipse 95% 68% at 50% 108%, rgba(251,191,36,0.13), transparent 56%), radial-gradient(ellipse 50% 38% at 12% 14%, rgba(34,211,238,0.07), transparent 50%)",
       }
     ),
     overlay(
-      "w2-traffic-grid",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.4]",
+      "w2-corridor-grid",
+      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.26]",
       {
         backgroundImage: `repeating-linear-gradient(
           0deg,
           transparent,
-          transparent 11px,
-          rgba(34,211,238,0.045) 11px,
-          rgba(34,211,238,0.045) 12px
+          transparent 13px,
+          rgba(34,211,238,0.038) 13px,
+          rgba(34,211,238,0.038) 14px
         ), repeating-linear-gradient(
           90deg,
           transparent,
-          transparent 11px,
-          rgba(251,191,36,0.035) 11px,
-          rgba(251,191,36,0.035) 12px
-        )`,
-      }
-    ),
-    overlay(
-      "w2-lanes",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.38]",
-      {
-        backgroundImage: `repeating-linear-gradient(
-          -18deg,
+          transparent 13px,
+          rgba(251,191,36,0.03) 13px,
+          rgba(251,191,36,0.03) 14px
+        ), repeating-linear-gradient(
+          -16deg,
           transparent,
-          transparent 8px,
-          rgba(34,211,238,0.055) 8px,
-          rgba(34,211,238,0.055) 9px
+          transparent 10px,
+          rgba(34,211,238,0.028) 10px,
+          rgba(34,211,238,0.028) 11px
         )`,
-      }
-    ),
-    overlay(
-      "w2-arc-hint",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.14]",
-      {
-        background:
-          "radial-gradient(ellipse 120% 55% at 50% 38%, transparent 40%, rgba(34,211,238,0.06) 41%, transparent 42%), radial-gradient(ellipse 90% 50% at 50% 62%, transparent 44%, rgba(251,191,36,0.05) 45%, transparent 46%)",
       }
     ),
   ],
   mobileAdjustments: {
-    mapInnerClassName: "ring-cyan-400/18",
-    linkSelected: { stroke: "rgba(34,211,238,0.38)", width: "0.54", dash: "1.2 0.85" },
+    mapMobileRootClassName: "-mt-1 translate-y-2",
+    mapInnerClassName: "ring-cyan-400/20",
+    linkStrokeLinecap: "round",
+    linkSelected: { stroke: "rgba(34,211,238,0.5)", width: "0.58", dash: "1.2 0.7" },
+    selectedRingClassName:
+      "ring-2 ring-cyan-200/95 ring-offset-1 ring-offset-slate-950 scale-[1.03] shadow-[0_0_16px_rgba(34,211,238,0.4)]",
+    selectedRingHqClassName:
+      "ring-2 ring-amber-100/95 ring-offset-1 ring-offset-slate-950 scale-[1.04] shadow-[0_0_20px_rgba(251,191,36,0.38)]",
     overlays: [
       overlay(
-        "w2-orbit-glow-m",
-        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.82]",
+        "w2-orbit-m",
+        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.68]",
         {
           background:
-            "radial-gradient(ellipse 100% 72% at 50% 100%, rgba(251,191,36,0.14), transparent 54%)",
+            "radial-gradient(ellipse 100% 70% at 50% 100%, rgba(251,191,36,0.11), transparent 55%)",
         }
       ),
       overlay(
         "w2-grid-m",
-        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.22]",
+        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.18]",
         {
-          backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 14px, rgba(34,211,238,0.04) 14px, rgba(34,211,238,0.04) 15px)`,
+          backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 16px, rgba(34,211,238,0.032) 16px, rgba(34,211,238,0.032) 17px)`,
         }
       ),
     ],
     mapBadgeText: "Freight",
-    mapBadgeClassName: "opacity-95",
+    mapBadgeClassName: "max-w-[42%] sm:max-w-none",
     links: {
-      normal: { stroke: "rgba(251,191,36,0.2)", width: "0.48", dash: "1.5 1.0" },
+      normal: { stroke: "rgba(251,191,36,0.2)", width: "0.46", dash: "1.85 0.95" },
     },
     dots: {
-      normal: { r: "0.7", filter: "drop-shadow(0 0 1px rgba(251,191,36,0.65))" },
-      selectedActive: { r: "0.88", filter: "drop-shadow(0 0 2.5px rgba(34,211,238,0.85))" },
+      normal: { r: "0.66", filter: "drop-shadow(0 0 1px rgba(251,191,36,0.5))" },
+      selectedActive: { r: "0.84", filter: "drop-shadow(0 0 3px rgba(34,211,238,0.9))" },
     },
   },
 };
 
-/** Signal wastes — telemetry traces, interference, signal lock */
+/** Signal wastes — scan field + lock: fewer layers, traces read as telemetry */
 const WORLD_3_MAP_THEME = {
-  mapShellClassName:
-    "rounded-3xl bg-gradient-to-br from-violet-950/50 via-slate-950/85 to-slate-950/90 shadow-[inset_0_0_90px_rgba(167,139,250,0.12),inset_0_0_60px_rgba(34,211,238,0.05)] ring-1 ring-inset ring-violet-400/40",
+  linkStrokeLinecap: "round",
+  mapShellClassName: "rounded-3xl",
   mapInnerClassName:
-    "rounded-[1.15rem] ring-1 ring-cyan-400/25 shadow-[inset_0_0_32px_rgba(167,139,250,0.06)]",
+    "rounded-3xl bg-gradient-to-br from-violet-950/22 via-slate-950/48 to-slate-950/55 ring-1 ring-inset ring-violet-400/32 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.08),inset_0_0_48px_rgba(167,139,250,0.05)]",
   mapBadgeClassName:
-    "pointer-events-none z-[2] rounded-md border border-cyan-400/40 bg-violet-950/65 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.24em] text-cyan-100 shadow-[0_0_22px_rgba(167,139,250,0.28),inset_0_0_12px_rgba(34,211,238,0.08)]",
+    "pointer-events-none z-[2] max-w-[46%] truncate rounded-md border border-cyan-400/45 bg-violet-950/70 px-2 py-0.5 text-[8px] font-black uppercase leading-tight tracking-[0.2em] text-cyan-100 shadow-[0_0_16px_rgba(167,139,250,0.22)] sm:max-w-none sm:px-2.5 sm:text-[9px] sm:tracking-[0.24em]",
   mapBadgeText: "Signal scan",
-  labelClassName: "text-violet-100/70",
+  labelClassName: "text-violet-100/75",
   linkSelected: {
-    stroke: "rgba(196,181,253,0.72)",
-    width: "0.64",
-    dash: "0.35 1.1",
+    stroke: "rgba(224,242,254,0.78)",
+    width: "0.7",
+    dash: "0.28 0.95",
   },
   selectedRingClassName:
-    "ring-2 ring-cyan-300/95 ring-offset-2 ring-offset-slate-950 scale-[1.04] shadow-[0_0_28px_rgba(34,211,238,0.45),0_0_14px_rgba(167,139,250,0.35)]",
+    "ring-2 ring-cyan-200/98 ring-offset-2 ring-offset-slate-950 scale-[1.04] shadow-[0_0_24px_rgba(34,211,238,0.5)]",
   selectedRingHqClassName:
-    "ring-2 ring-violet-200/95 ring-offset-2 ring-offset-violet-950/80 scale-[1.05] shadow-[0_0_34px_rgba(167,139,250,0.42),0_0_12px_rgba(34,211,238,0.3)]",
-  hqIconClassName: "text-cyan-200 drop-shadow-[0_0_12px_rgba(34,211,238,0.55)]",
-  regularIconClassName: "text-violet-200 drop-shadow-[0_0_8px_rgba(167,139,250,0.4)]",
+    "ring-2 ring-violet-100/95 ring-offset-2 ring-offset-violet-950/70 scale-[1.05] shadow-[0_0_28px_rgba(167,139,250,0.38),0_0_12px_rgba(34,211,238,0.28)]",
+  hqIconClassName: "text-cyan-100 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]",
+  regularIconClassName: "text-violet-200 drop-shadow-[0_0_5px_rgba(167,139,250,0.35)]",
   node: {
     regularClassName:
-      "ring-1 ring-violet-400/28 shadow-[0_0_18px_rgba(167,139,250,0.18),inset_0_0_20px_rgba(34,211,238,0.04)]",
+      "ring-1 ring-violet-400/32 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
     hqClassName:
-      "ring-2 ring-cyan-400/40 shadow-[0_0_26px_rgba(34,211,238,0.25),0_0_16px_rgba(167,139,250,0.2),inset_0_1px_0_rgba(255,255,255,0.05)]",
+      "ring-2 ring-cyan-400/48 shadow-[0_0_20px_rgba(34,211,238,0.28),inset_0_1px_0_rgba(255,255,255,0.06)]",
     warningClassName: "",
     criticalClassName: "",
   },
   links: {
-    normal: { stroke: "rgba(167,139,250,0.3)", width: "0.48", dash: "0.65 1.35" },
-    warning: { stroke: "rgba(34,211,238,0.36)", width: "0.54", dash: "0.4 0.9" },
-    critical: { stroke: "rgba(244,63,94,0.36)", width: "0.62", dash: "1.6 0.85" },
+    normal: { stroke: "rgba(167,139,250,0.26)", width: "0.46", dash: "0.5 1.15" },
+    warning: { stroke: "rgba(34,211,238,0.34)", width: "0.52", dash: "0.32 0.75" },
+    critical: { stroke: "rgba(244,63,94,0.38)", width: "0.6", dash: "1.45 0.75" },
   },
   dots: {
     normal: {
-      fill: "rgba(196,181,253,0.58)",
-      r: "0.76",
-      filter: "drop-shadow(0 0 2px rgba(34,211,238,0.75))",
+      fill: "rgba(196,181,253,0.54)",
+      r: "0.72",
+      filter: "drop-shadow(0 0 1.5px rgba(34,211,238,0.55))",
     },
     warning: {
-      fill: "rgba(34,211,238,0.56)",
-      r: "0.9",
-      filter: "drop-shadow(0 0 2.2px rgba(167,139,250,0.8))",
+      fill: "rgba(34,211,238,0.54)",
+      r: "0.86",
+      filter: "drop-shadow(0 0 1.6px rgba(167,139,250,0.65))",
     },
     critical: {
       fill: "rgba(244,63,94,0.72)",
-      r: "1.06",
-      filter: "drop-shadow(0 0 2.5px rgba(244,63,94,0.85))",
+      r: "1.02",
+      filter: "drop-shadow(0 0 2.2px rgba(244,63,94,0.82))",
     },
-    selectedFill: "rgba(250,245,255,0.99)",
+    selectedFill: "rgba(255,255,255,0.995)",
     selectedActive: {
-      r: "1.05",
+      r: "1.06",
       filter:
-        "drop-shadow(0 0 3px rgba(34,211,238,1)) drop-shadow(0 0 2px rgba(196,181,253,0.9))",
+        "drop-shadow(0 0 3.5px rgba(34,211,238,1)) drop-shadow(0 0 2px rgba(196,181,253,0.85))",
     },
   },
   overlays: [
     overlay(
       "w3-field",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.9]",
+      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.55]",
       {
         background:
-          "radial-gradient(circle at 18% 28%, rgba(167,139,250,0.16), transparent 40%), radial-gradient(circle at 85% 72%, rgba(34,211,238,0.12), transparent 42%)",
+          "radial-gradient(circle at 20% 26%, rgba(167,139,250,0.11), transparent 42%), radial-gradient(circle at 84% 74%, rgba(34,211,238,0.08), transparent 44%)",
       }
     ),
     overlay(
-      "w3-trace",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.28]",
+      "w3-scan-trace",
+      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.22]",
       {
         background:
-          "repeating-linear-gradient(95deg, rgba(167,139,250,0.08) 0 1px, transparent 1px 6px), repeating-linear-gradient(-5deg, rgba(34,211,238,0.06) 0 1px, transparent 1px 8px)",
-      }
-    ),
-    overlay(
-      "w3-scan",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.26]",
-      {
-        background:
-          "repeating-linear-gradient(180deg, rgba(167,139,250,0.09) 0 1px, transparent 1px 4px), repeating-linear-gradient(90deg, rgba(34,211,238,0.06) 0 1px, transparent 1px 5px)",
+          "repeating-linear-gradient(180deg, rgba(167,139,250,0.065) 0 1px, transparent 1px 5px), repeating-linear-gradient(92deg, rgba(34,211,238,0.045) 0 1px, transparent 1px 7px), repeating-linear-gradient(-8deg, rgba(196,181,253,0.04) 0 1px, transparent 1px 9px)",
       }
     ),
     overlay(
       "w3-noise",
-      "pointer-events-none absolute inset-0 rounded-[inherit] mix-blend-screen opacity-[0.14]",
+      "pointer-events-none absolute inset-0 rounded-[inherit] mix-blend-screen opacity-[0.09]",
       {
         backgroundImage:
-          "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E\")",
+          "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E\")",
       }
     ),
   ],
   mobileAdjustments: {
-    linkSelected: { stroke: "rgba(196,181,253,0.55)", width: "0.54", dash: "0.4 1.0" },
+    mapMobileRootClassName: "-mt-1 translate-y-2",
+    linkSelected: { stroke: "rgba(224,242,254,0.62)", width: "0.58", dash: "0.35 0.85" },
+    selectedRingClassName:
+      "ring-2 ring-cyan-200/98 ring-offset-1 ring-offset-slate-950 scale-[1.03] shadow-[0_0_18px_rgba(34,211,238,0.48)]",
+    selectedRingHqClassName:
+      "ring-2 ring-violet-100/95 ring-offset-1 ring-offset-violet-950/70 scale-[1.04] shadow-[0_0_20px_rgba(167,139,250,0.32)]",
     overlays: [
       overlay(
         "w3-field-m",
-        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.78]",
+        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.5]",
         {
           background:
-            "radial-gradient(circle at 50% 38%, rgba(167,139,250,0.12), transparent 48%)",
+            "radial-gradient(circle at 50% 36%, rgba(167,139,250,0.09), transparent 50%)",
         }
       ),
       overlay(
         "w3-scan-m",
-        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.16]",
+        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.14]",
         {
           background:
-            "repeating-linear-gradient(180deg, rgba(34,211,238,0.07) 0 1px, transparent 1px 6px)",
+            "repeating-linear-gradient(180deg, rgba(34,211,238,0.055) 0 1px, transparent 1px 7px)",
         }
       ),
     ],
     mapBadgeText: "Signal",
-    mapBadgeClassName: "tracking-[0.18em]",
+    mapBadgeClassName: "max-w-[42%] sm:max-w-none tracking-[0.16em] sm:tracking-[0.24em]",
     links: {
-      normal: { stroke: "rgba(167,139,250,0.24)", width: "0.44", dash: "0.7 1.25" },
+      normal: { stroke: "rgba(167,139,250,0.22)", width: "0.42", dash: "0.55 1.05" },
     },
     dots: {
-      selectedActive: { r: "0.92", filter: "drop-shadow(0 0 2.5px rgba(34,211,238,0.9))" },
+      normal: { r: "0.66", filter: "drop-shadow(0 0 1px rgba(34,211,238,0.45))" },
+      selectedActive: { r: "0.9", filter: "drop-shadow(0 0 3px rgba(34,211,238,0.95))" },
     },
   },
 };
 
-/** Reactor scar — thermal conduit, chamber pressure, flare lock */
+/** Reactor scar — chamber + conduit stress; heat stays behind nodes */
 const WORLD_4_MAP_THEME = {
-  mapShellClassName:
-    "rounded-3xl bg-gradient-to-b from-orange-950/35 via-slate-950/88 to-slate-950/95 shadow-[inset_0_0_120px_rgba(249,115,22,0.14),inset_0_-30px_90px_rgba(251,113,133,0.1)] ring-1 ring-inset ring-orange-500/45",
+  linkStrokeLinecap: "round",
+  mapShellClassName: "rounded-3xl",
   mapInnerClassName:
-    "rounded-[1.15rem] ring-1 ring-rose-400/35 shadow-[inset_0_0_48px_rgba(251,113,133,0.08)]",
+    "rounded-3xl bg-gradient-to-b from-orange-950/25 via-orange-950/10 to-slate-950/48 ring-1 ring-inset ring-orange-400/38 shadow-[inset_0_0_0_1px_rgba(251,113,133,0.12),inset_0_0_64px_rgba(249,115,22,0.07),inset_0_-28px_56px_rgba(251,113,133,0.05)]",
   mapBadgeClassName:
-    "pointer-events-none z-[2] rounded-md border border-rose-400/45 bg-orange-950/55 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.22em] text-orange-50 shadow-[0_0_28px_rgba(249,115,22,0.3),inset_0_1px_0_rgba(255,200,180,0.12)]",
+    "pointer-events-none z-[2] max-w-[46%] truncate rounded-md border border-rose-400/50 bg-orange-950/58 px-2 py-0.5 text-[8px] font-black uppercase leading-tight tracking-[0.2em] text-orange-50 shadow-[0_0_18px_rgba(249,115,22,0.22)] sm:max-w-none sm:px-2.5 sm:text-[9px] sm:tracking-[0.22em]",
   mapBadgeText: "Thermal grid",
-  labelClassName: "text-orange-100/72",
+  labelClassName: "text-orange-100/78",
   linkSelected: {
-    stroke: "rgba(255,237,213,0.55)",
-    width: "0.68",
-    dash: "0.9 0.7",
+    stroke: "rgba(255,247,230,0.62)",
+    width: "0.72",
+    dash: "0.55 0.55",
   },
   selectedRingClassName:
-    "ring-2 ring-orange-200/95 ring-offset-2 ring-offset-slate-950 scale-[1.04] shadow-[0_0_32px_rgba(249,115,22,0.48),0_0_16px_rgba(251,113,133,0.35)]",
+    "ring-2 ring-orange-100/98 ring-offset-2 ring-offset-slate-950 scale-[1.04] shadow-[0_0_26px_rgba(249,115,22,0.52)]",
   selectedRingHqClassName:
-    "ring-2 ring-rose-200/95 ring-offset-2 ring-offset-orange-950/50 scale-[1.05] shadow-[0_0_38px_rgba(251,113,133,0.45),0_0_20px_rgba(249,115,22,0.35)]",
-  hqIconClassName: "text-orange-100 drop-shadow-[0_0_14px_rgba(249,115,22,0.6)]",
-  regularIconClassName: "text-rose-100 drop-shadow-[0_0_8px_rgba(251,113,133,0.45)]",
+    "ring-2 ring-rose-100/98 ring-offset-2 ring-offset-orange-950/45 scale-[1.05] shadow-[0_0_30px_rgba(251,113,133,0.42),0_0_14px_rgba(249,115,22,0.32)]",
+  hqIconClassName: "text-orange-50 drop-shadow-[0_0_10px_rgba(249,115,22,0.55)]",
+  regularIconClassName: "text-rose-100 drop-shadow-[0_0_5px_rgba(251,113,133,0.4)]",
   node: {
     regularClassName:
-      "ring-1 ring-orange-500/30 shadow-[0_0_18px_rgba(249,115,22,0.2),inset_0_0_24px_rgba(251,113,133,0.06)]",
+      "ring-1 ring-orange-500/34 shadow-[inset_0_1px_0_rgba(255,220,200,0.06)]",
     hqClassName:
-      "ring-2 ring-orange-400/50 shadow-[0_0_32px_rgba(249,115,22,0.32),0_0_18px_rgba(251,113,133,0.22),inset_0_1px_0_rgba(255,220,200,0.08)]",
+      "ring-2 ring-orange-400/55 shadow-[0_0_24px_rgba(249,115,22,0.34),inset_0_1px_0_rgba(255,230,210,0.09)]",
     warningClassName: "",
     criticalClassName: "",
   },
   links: {
-    normal: { stroke: "rgba(249,115,22,0.32)", width: "0.54", dash: "0.45 0.85" },
-    warning: { stroke: "rgba(251,191,36,0.38)", width: "0.58", dash: "0.35 0.65" },
-    critical: { stroke: "rgba(244,63,94,0.4)", width: "0.68", dash: "1.5 0.75" },
+    normal: { stroke: "rgba(249,115,22,0.28)", width: "0.52", dash: "0.4 0.72" },
+    warning: { stroke: "rgba(251,191,36,0.36)", width: "0.56", dash: "0.3 0.55" },
+    critical: { stroke: "rgba(244,63,94,0.42)", width: "0.66", dash: "1.35 0.65" },
   },
   dots: {
     normal: {
-      fill: "rgba(253,186,116,0.62)",
-      r: "0.8",
-      filter: "drop-shadow(0 0 2.5px rgba(249,115,22,0.9))",
+      fill: "rgba(253,186,116,0.58)",
+      r: "0.76",
+      filter: "drop-shadow(0 0 2px rgba(249,115,22,0.75))",
     },
     warning: {
-      fill: "rgba(251,191,36,0.62)",
-      r: "0.92",
-      filter: "drop-shadow(0 0 2.5px rgba(251,191,36,0.85))",
-    },
-    critical: {
-      fill: "rgba(244,63,94,0.76)",
-      r: "1.1",
-      filter: "drop-shadow(0 0 3px rgba(244,63,94,0.9))",
-    },
-    selectedFill: "rgba(255,251,235,0.99)",
-    selectedActive: {
-      r: "1.12",
-      filter:
-        "drop-shadow(0 0 4px rgba(255,237,213,0.95)) drop-shadow(0 0 3px rgba(249,115,22,0.85))",
-    },
-  },
-  overlays: [
-    overlay(
-      "w4-core",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.98]",
-      {
-        background:
-          "radial-gradient(circle at 50% 48%, rgba(249,115,22,0.2), transparent 52%), radial-gradient(ellipse 130% 85% at 50% 115%, rgba(251,113,133,0.16), transparent 48%)",
-      }
-    ),
-    overlay(
-      "w4-conduit",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.22]",
-      {
-        background:
-          "repeating-linear-gradient(180deg, rgba(255,200,150,0.07) 0 2px, transparent 2px 10px)",
-      }
-    ),
-    overlay(
-      "w4-heat",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.2]",
-      {
-        background:
-          "repeating-radial-gradient(circle at 50% 45%, rgba(255,255,255,0.07) 0 1px, transparent 1px 12px)",
-      }
-    ),
-  ],
-  mobileAdjustments: {
-    linkSelected: { stroke: "rgba(255,237,213,0.42)", width: "0.56", dash: "1.0 0.75" },
-    overlays: [
-      overlay(
-        "w4-core-m",
-        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.82]",
-        {
-          background:
-            "radial-gradient(circle at 50% 52%, rgba(249,115,22,0.15), transparent 50%)",
-        }
-      ),
-    ],
-    mapBadgeText: "Reactor",
-    links: {
-      normal: { stroke: "rgba(249,115,22,0.26)", width: "0.5", dash: "0.5 0.9" },
-    },
-    dots: {
-      normal: { r: "0.74", filter: "drop-shadow(0 0 2px rgba(249,115,22,0.75))" },
-      selectedActive: { r: "0.95", filter: "drop-shadow(0 0 3px rgba(249,115,22,0.8))" },
-    },
-  },
-};
-
-/** Salvage graveyard — reclaimed hardware, scrap haze, patched conduits */
-const WORLD_5_MAP_THEME = {
-  mapShellClassName:
-    "rounded-3xl bg-gradient-to-tl from-amber-950/30 via-slate-950/88 to-emerald-950/25 shadow-[inset_0_0_100px_rgba(16,185,129,0.1),inset_0_0_70px_rgba(180,83,9,0.06)] ring-1 ring-inset ring-emerald-500/35",
-  mapInnerClassName:
-    "rounded-[1.15rem] ring-1 ring-amber-600/28 shadow-[inset_0_0_40px_rgba(245,158,11,0.05)]",
-  mapBadgeClassName:
-    "pointer-events-none z-[2] rounded-md border border-dashed border-emerald-400/50 bg-emerald-950/60 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.2em] text-emerald-50 shadow-[0_0_20px_rgba(16,185,129,0.22)]",
-  mapBadgeText: "Salvage field",
-  labelClassName: "text-amber-100/65",
-  linkSelected: {
-    stroke: "rgba(52,211,153,0.52)",
-    width: "0.62",
-    dash: "2.2 0.55",
-  },
-  selectedRingClassName:
-    "ring-2 ring-emerald-300/90 ring-offset-2 ring-offset-slate-950 scale-[1.04] shadow-[0_0_26px_rgba(16,185,129,0.38),0_0_12px_rgba(245,158,11,0.2)]",
-  selectedRingHqClassName:
-    "ring-2 ring-amber-300/90 ring-offset-2 ring-offset-emerald-950/40 scale-[1.05] shadow-[0_0_32px_rgba(245,158,11,0.32),0_0_14px_rgba(52,211,153,0.25)]",
-  hqIconClassName: "text-amber-200 drop-shadow-[0_0_10px_rgba(245,158,11,0.45)]",
-  regularIconClassName: "text-emerald-200 drop-shadow-[0_0_6px_rgba(16,185,129,0.35)]",
-  node: {
-    regularClassName:
-      "ring-1 ring-dashed ring-emerald-500/35 shadow-[0_0_14px_rgba(16,185,129,0.14),inset_0_0_18px_rgba(0,0,0,0.15)]",
-    hqClassName:
-      "ring-2 ring-amber-500/40 ring-offset-0 shadow-[0_0_28px_rgba(245,158,11,0.22),0_0_12px_rgba(16,185,129,0.18),inset_0_1px_0_rgba(255,255,255,0.04)]",
-    warningClassName: "",
-    criticalClassName: "",
-  },
-  links: {
-    normal: { stroke: "rgba(52,211,153,0.28)", width: "0.5", dash: "2.4 1.1" },
-    warning: { stroke: "rgba(245,158,11,0.34)", width: "0.56", dash: "1.8 0.9" },
-    critical: { stroke: "rgba(244,63,94,0.36)", width: "0.64", dash: "1.2 0.7" },
-  },
-  dots: {
-    normal: {
-      fill: "rgba(16,185,129,0.55)",
-      r: "0.78",
-      filter: "drop-shadow(0 0 1.8px rgba(245,158,11,0.6))",
-    },
-    warning: {
-      fill: "rgba(245,158,11,0.6)",
-      r: "0.9",
-      filter: "drop-shadow(0 0 2px rgba(180,83,9,0.55))",
-    },
-    critical: {
-      fill: "rgba(244,63,94,0.72)",
-      r: "1.06",
-      filter: "drop-shadow(0 0 2.5px rgba(244,63,94,0.82))",
-    },
-    selectedFill: "rgba(236,253,245,0.99)",
-    selectedActive: {
-      r: "1.02",
-      filter:
-        "drop-shadow(0 0 3px rgba(52,211,153,0.9)) drop-shadow(0 0 2px rgba(245,158,11,0.65))",
-    },
-  },
-  overlays: [
-    overlay(
-      "w5-haze",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.28]",
-      {
-        background:
-          "radial-gradient(ellipse 100% 60% at 50% 100%, rgba(120,113,108,0.12), transparent 50%), radial-gradient(ellipse 80% 50% at 20% 20%, rgba(16,185,129,0.08), transparent 45%)",
-      }
-    ),
-    overlay(
-      "w5-dust",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.22]",
-      {
-        backgroundImage:
-          "radial-gradient(circle at 12% 22%, rgba(245,158,11,0.14) 0, transparent 3px), radial-gradient(circle at 72% 58%, rgba(16,185,129,0.12) 0, transparent 2px), radial-gradient(circle at 42% 78%, rgba(120,53,15,0.1) 0, transparent 2px)",
-        backgroundSize: "130px 130px, 100px 100px, 110px 110px",
-      }
-    ),
-    overlay(
-      "w5-floor",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.38]",
-      {
-        background:
-          "linear-gradient(168deg, rgba(15,23,42,0.45) 0%, transparent 42%, rgba(16,185,129,0.07) 100%)",
-      }
-    ),
-  ],
-  mobileAdjustments: {
-    linkSelected: { stroke: "rgba(52,211,153,0.4)", width: "0.54", dash: "1.8 0.5" },
-    overlays: [
-      overlay(
-        "w5-haze-m",
-        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.2]",
-        {
-          background:
-            "linear-gradient(180deg, transparent 0%, rgba(16,185,129,0.06) 100%)",
-        }
-      ),
-    ],
-    mapBadgeText: "Salvage",
-    mapBadgeClassName: "border-dashed",
-    links: {
-      normal: { stroke: "rgba(52,211,153,0.22)", width: "0.46", dash: "2.0 1.0" },
-    },
-    dots: {
-      selectedActive: { r: "0.88", filter: "drop-shadow(0 0 2.5px rgba(52,211,153,0.75))" },
-    },
-  },
-};
-
-/** Nexus prime — harmonized command lattice, sync lock, premium surfaces */
-const WORLD_6_MAP_THEME = {
-  mapShellClassName:
-    "rounded-3xl bg-gradient-to-b from-slate-950/95 via-slate-900/80 to-slate-950/95 shadow-[inset_0_0_80px_rgba(34,211,238,0.1),inset_0_0_120px_rgba(167,139,250,0.08)] ring-1 ring-inset ring-cyan-200/35",
-  mapInnerClassName:
-    "rounded-[1.15rem] ring-1 ring-white/22 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06),inset_0_0_36px_rgba(34,211,238,0.05)]",
-  mapBadgeClassName:
-    "pointer-events-none z-[2] rounded border border-cyan-200/45 bg-slate-950/80 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.26em] text-white shadow-[0_0_24px_rgba(34,211,238,0.28),0_0_12px_rgba(167,139,250,0.2),inset_0_1px_0_rgba(255,255,255,0.12)]",
-  mapBadgeText: "Command nexus",
-  labelClassName: "text-cyan-50/80",
-  linkSelected: {
-    stroke: "rgba(255,255,255,0.42)",
-    width: "0.58",
-    dash: "2.4 1.2",
-  },
-  selectedRingClassName:
-    "ring-2 ring-cyan-100/95 ring-offset-2 ring-offset-slate-950 scale-[1.04] shadow-[0_0_30px_rgba(34,211,238,0.45),0_0_18px_rgba(167,139,250,0.35)]",
-  selectedRingHqClassName:
-    "ring-2 ring-white/95 ring-offset-2 ring-offset-slate-950 scale-[1.06] shadow-[0_0_40px_rgba(255,255,255,0.22),0_0_28px_rgba(34,211,238,0.4),0_0_16px_rgba(167,139,250,0.3)]",
-  hqIconClassName: "text-white drop-shadow-[0_0_14px_rgba(34,211,238,0.65)]",
-  regularIconClassName: "text-cyan-100 drop-shadow-[0_0_6px_rgba(167,139,250,0.35)]",
-  node: {
-    regularClassName:
-      "ring-1 ring-white/12 shadow-[0_0_16px_rgba(167,139,250,0.15),inset_0_1px_0_rgba(255,255,255,0.07)]",
-    hqClassName:
-      "ring-2 ring-cyan-300/45 shadow-[0_0_34px_rgba(34,211,238,0.28),0_0_20px_rgba(167,139,250,0.2),inset_0_0_28px_rgba(34,211,238,0.08),inset_0_1px_0_rgba(255,255,255,0.1)]",
-    warningClassName: "",
-    criticalClassName: "",
-  },
-  links: {
-    normal: { stroke: "rgba(34,211,238,0.28)", width: "0.48", dash: "2.2 1.8" },
-    warning: { stroke: "rgba(196,181,253,0.36)", width: "0.54", dash: "1.6 1.4" },
-    critical: { stroke: "rgba(244,63,94,0.36)", width: "0.64", dash: "1.4 0.85" },
-  },
-  dots: {
-    normal: {
-      fill: "rgba(224,242,254,0.62)",
-      r: "0.74",
-      filter: "drop-shadow(0 0 2px rgba(167,139,250,0.75))",
-    },
-    warning: {
-      fill: "rgba(196,181,253,0.58)",
+      fill: "rgba(251,191,36,0.6)",
       r: "0.88",
-      filter: "drop-shadow(0 0 2px rgba(34,211,238,0.7))",
+      filter: "drop-shadow(0 0 2px rgba(251,191,36,0.75))",
     },
     critical: {
       fill: "rgba(244,63,94,0.74)",
       r: "1.04",
       filter: "drop-shadow(0 0 2.5px rgba(244,63,94,0.85))",
     },
-    selectedFill: "rgba(255,255,255,0.995)",
+    selectedFill: "rgba(255,255,250,0.995)",
     selectedActive: {
       r: "1.08",
       filter:
-        "drop-shadow(0 0 3.5px rgba(255,255,255,0.85)) drop-shadow(0 0 2.5px rgba(34,211,238,0.9))",
+        "drop-shadow(0 0 3.5px rgba(255,247,230,0.9)) drop-shadow(0 0 2.5px rgba(249,115,22,0.8))",
     },
   },
   overlays: [
     overlay(
-      "w6-grid",
+      "w4-chamber",
+      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.72]",
+      {
+        background:
+          "radial-gradient(circle at 50% 46%, rgba(249,115,22,0.14), transparent 54%), radial-gradient(ellipse 125% 80% at 50% 112%, rgba(251,113,133,0.11), transparent 50%)",
+      }
+    ),
+    overlay(
+      "w4-conduit-heat",
       "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.18]",
       {
         background:
-          "linear-gradient(rgba(255,255,255,0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px)",
-        backgroundSize: "18px 18px",
-      }
-    ),
-    overlay(
-      "w6-lattice",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.12]",
-      {
-        background:
-          "linear-gradient(45deg, transparent 48%, rgba(167,139,250,0.06) 49%, rgba(167,139,250,0.06) 51%, transparent 52%), linear-gradient(-45deg, transparent 48%, rgba(34,211,238,0.05) 49%, rgba(34,211,238,0.05) 51%, transparent 52%)",
-        backgroundSize: "28px 28px",
-      }
-    ),
-    overlay(
-      "w6-nexus",
-      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.92]",
-      {
-        background:
-          "radial-gradient(circle at 50% 40%, rgba(34,211,238,0.12), transparent 48%), radial-gradient(circle at 50% 52%, rgba(167,139,250,0.1), transparent 55%)",
+          "repeating-linear-gradient(180deg, rgba(255,210,170,0.06) 0 2px, transparent 2px 9px), repeating-radial-gradient(circle at 50% 44%, rgba(255,255,255,0.05) 0 1px, transparent 1px 11px)",
       }
     ),
   ],
   mobileAdjustments: {
-    linkSelected: { stroke: "rgba(255,255,255,0.32)", width: "0.5", dash: "2.0 1.4" },
+    mapMobileRootClassName: "-mt-1 translate-y-2",
+    linkSelected: { stroke: "rgba(255,247,230,0.48)", width: "0.6", dash: "0.65 0.6" },
+    selectedRingClassName:
+      "ring-2 ring-orange-100/98 ring-offset-1 ring-offset-slate-950 scale-[1.03] shadow-[0_0_20px_rgba(249,115,22,0.48)]",
+    selectedRingHqClassName:
+      "ring-2 ring-rose-100/98 ring-offset-1 ring-offset-orange-950/45 scale-[1.04] shadow-[0_0_22px_rgba(251,113,133,0.35)]",
+    overlays: [
+      overlay(
+        "w4-chamber-m",
+        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.65]",
+        {
+          background:
+            "radial-gradient(circle at 50% 50%, rgba(249,115,22,0.12), transparent 52%)",
+        }
+      ),
+    ],
+    mapBadgeText: "Reactor",
+    mapBadgeClassName: "max-w-[42%] sm:max-w-none",
+    links: {
+      normal: { stroke: "rgba(249,115,22,0.24)", width: "0.48", dash: "0.45 0.78" },
+    },
+    dots: {
+      normal: { r: "0.7", filter: "drop-shadow(0 0 1.5px rgba(249,115,22,0.65))" },
+      selectedActive: { r: "0.92", filter: "drop-shadow(0 0 3px rgba(249,115,22,0.82))" },
+    },
+  },
+};
+
+/** Salvage graveyard — scrapfield haze + patched runs; solids on nodes */
+const WORLD_5_MAP_THEME = {
+  linkStrokeLinecap: "round",
+  mapShellClassName: "rounded-3xl",
+  mapInnerClassName:
+    "rounded-3xl bg-gradient-to-tl from-amber-950/14 via-slate-950/46 to-emerald-950/14 ring-1 ring-inset ring-emerald-500/28 shadow-[inset_0_0_0_1px_rgba(245,158,11,0.08),inset_0_0_52px_rgba(16,185,129,0.045)]",
+  mapBadgeClassName:
+    "pointer-events-none z-[2] max-w-[46%] truncate rounded-md border border-dashed border-emerald-400/45 bg-emerald-950/62 px-2 py-0.5 text-[8px] font-black uppercase leading-tight tracking-[0.18em] text-emerald-50 shadow-[0_0_14px_rgba(16,185,129,0.18)] sm:max-w-none sm:px-2.5 sm:text-[9px] sm:tracking-[0.2em]",
+  mapBadgeText: "Salvage field",
+  labelClassName: "text-amber-100/72",
+  linkSelected: {
+    stroke: "rgba(110,231,183,0.58)",
+    width: "0.64",
+    dash: "2.6 0.45",
+  },
+  selectedRingClassName:
+    "ring-2 ring-emerald-200/95 ring-offset-2 ring-offset-slate-950 scale-[1.04] shadow-[0_0_22px_rgba(16,185,129,0.42)]",
+  selectedRingHqClassName:
+    "ring-2 ring-amber-200/95 ring-offset-2 ring-offset-emerald-950/35 scale-[1.05] shadow-[0_0_26px_rgba(245,158,11,0.34),0_0_12px_rgba(52,211,153,0.22)]",
+  hqIconClassName: "text-amber-100 drop-shadow-[0_0_8px_rgba(245,158,11,0.42)]",
+  regularIconClassName: "text-emerald-100 drop-shadow-[0_0_4px_rgba(16,185,129,0.3)]",
+  node: {
+    regularClassName:
+      "ring-1 ring-dashed ring-emerald-500/38 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+    hqClassName:
+      "ring-2 ring-amber-500/48 shadow-[0_0_20px_rgba(245,158,11,0.26),inset_0_1px_0_rgba(255,255,255,0.05)]",
+    warningClassName: "",
+    criticalClassName: "",
+  },
+  links: {
+    normal: { stroke: "rgba(52,211,153,0.24)", width: "0.48", dash: "2.8 1.05" },
+    warning: { stroke: "rgba(245,158,11,0.32)", width: "0.54", dash: "2.0 0.75" },
+    critical: { stroke: "rgba(244,63,94,0.38)", width: "0.62", dash: "1.1 0.55" },
+  },
+  dots: {
+    normal: {
+      fill: "rgba(16,185,129,0.52)",
+      r: "0.72",
+      filter: "drop-shadow(0 0 1.4px rgba(245,158,11,0.45))",
+    },
+    warning: {
+      fill: "rgba(245,158,11,0.58)",
+      r: "0.86",
+      filter: "drop-shadow(0 0 1.6px rgba(180,83,9,0.48))",
+    },
+    critical: {
+      fill: "rgba(244,63,94,0.72)",
+      r: "1.02",
+      filter: "drop-shadow(0 0 2.2px rgba(244,63,94,0.78))",
+    },
+    selectedFill: "rgba(240,253,250,0.995)",
+    selectedActive: {
+      r: "1.04",
+      filter:
+        "drop-shadow(0 0 3.2px rgba(110,231,183,0.88)) drop-shadow(0 0 2px rgba(245,158,11,0.55))",
+    },
+  },
+  overlays: [
+    overlay(
+      "w5-scrapfield",
+      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.38]",
+      {
+        background:
+          "radial-gradient(ellipse 95% 58% at 50% 100%, rgba(87,83,78,0.08), transparent 52%), radial-gradient(ellipse 70% 48% at 18% 18%, rgba(16,185,129,0.06), transparent 46%), linear-gradient(170deg, rgba(15,23,42,0.18) 0%, transparent 44%, rgba(16,185,129,0.045) 100%)",
+      }
+    ),
+    overlay(
+      "w5-grit",
+      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.14]",
+      {
+        backgroundImage:
+          "radial-gradient(circle at 14% 24%, rgba(245,158,11,0.1) 0, transparent 2px), radial-gradient(circle at 76% 62%, rgba(16,185,129,0.08) 0, transparent 2px)",
+        backgroundSize: "140px 140px, 110px 110px",
+      }
+    ),
+  ],
+  mobileAdjustments: {
+    mapMobileRootClassName: "-mt-1 translate-y-2",
+    linkSelected: { stroke: "rgba(110,231,183,0.46)", width: "0.54", dash: "2.2 0.4" },
+    selectedRingClassName:
+      "ring-2 ring-emerald-200/95 ring-offset-1 ring-offset-slate-950 scale-[1.03] shadow-[0_0_16px_rgba(16,185,129,0.38)]",
+    selectedRingHqClassName:
+      "ring-2 ring-amber-200/95 ring-offset-1 ring-offset-emerald-950/35 scale-[1.04] shadow-[0_0_18px_rgba(245,158,11,0.3)]",
+    overlays: [
+      overlay(
+        "w5-scrap-m",
+        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.28]",
+        {
+          background:
+            "linear-gradient(180deg, transparent 0%, rgba(16,185,129,0.045) 100%)",
+        }
+      ),
+    ],
+    mapBadgeText: "Salvage",
+    mapBadgeClassName: "max-w-[42%] sm:max-w-none",
+    links: {
+      normal: { stroke: "rgba(52,211,153,0.2)", width: "0.44", dash: "2.4 0.95" },
+    },
+    dots: {
+      normal: { r: "0.64", filter: "drop-shadow(0 0 1px rgba(245,158,11,0.4))" },
+      selectedActive: { r: "0.86", filter: "drop-shadow(0 0 2.8px rgba(52,211,153,0.82))" },
+    },
+  },
+};
+
+/** Nexus prime — command grid + soft nexus wash; crisp sync foreground */
+const WORLD_6_MAP_THEME = {
+  linkStrokeLinecap: "round",
+  mapShellClassName: "rounded-3xl",
+  mapInnerClassName:
+    "rounded-3xl bg-gradient-to-b from-slate-900/55 via-slate-950/50 to-slate-900/55 ring-1 ring-inset ring-cyan-200/28 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),inset_0_0_56px_rgba(34,211,238,0.05),inset_0_0_72px_rgba(167,139,250,0.04)]",
+  mapBadgeClassName:
+    "pointer-events-none z-[2] max-w-[46%] truncate rounded-sm border border-cyan-200/50 bg-slate-950/82 px-2 py-0.5 text-[8px] font-black uppercase leading-tight tracking-[0.22em] text-white shadow-[0_0_16px_rgba(34,211,238,0.22),inset_0_1px_0_rgba(255,255,255,0.1)] sm:max-w-none sm:rounded sm:px-2.5 sm:text-[9px] sm:tracking-[0.26em]",
+  mapBadgeText: "Command nexus",
+  labelClassName: "text-cyan-50/85",
+  linkSelected: {
+    stroke: "rgba(255,255,255,0.52)",
+    width: "0.62",
+    dash: "2.6 1.35",
+  },
+  selectedRingClassName:
+    "ring-2 ring-cyan-50/98 ring-offset-2 ring-offset-slate-950 scale-[1.04] shadow-[0_0_26px_rgba(34,211,238,0.48)]",
+  selectedRingHqClassName:
+    "ring-2 ring-white/98 ring-offset-2 ring-offset-slate-950 scale-[1.06] shadow-[0_0_32px_rgba(34,211,238,0.42),0_0_14px_rgba(167,139,250,0.28)]",
+  hqIconClassName: "text-white drop-shadow-[0_0_10px_rgba(34,211,238,0.55)]",
+  regularIconClassName: "text-cyan-50 drop-shadow-[0_0_4px_rgba(167,139,250,0.28)]",
+  node: {
+    regularClassName:
+      "ring-1 ring-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+    hqClassName:
+      "ring-2 ring-cyan-300/52 shadow-[0_0_22px_rgba(34,211,238,0.3),inset_0_1px_0_rgba(255,255,255,0.1)]",
+    warningClassName: "",
+    criticalClassName: "",
+  },
+  links: {
+    normal: { stroke: "rgba(34,211,238,0.26)", width: "0.46", dash: "2.35 1.75" },
+    warning: { stroke: "rgba(196,181,253,0.32)", width: "0.52", dash: "1.75 1.25" },
+    critical: { stroke: "rgba(244,63,94,0.38)", width: "0.62", dash: "1.25 0.8" },
+  },
+  dots: {
+    normal: {
+      fill: "rgba(224,242,254,0.58)",
+      r: "0.72",
+      filter: "drop-shadow(0 0 1.6px rgba(167,139,250,0.55))",
+    },
+    warning: {
+      fill: "rgba(196,181,253,0.55)",
+      r: "0.86",
+      filter: "drop-shadow(0 0 1.7px rgba(34,211,238,0.55))",
+    },
+    critical: {
+      fill: "rgba(244,63,94,0.72)",
+      r: "1.02",
+      filter: "drop-shadow(0 0 2.2px rgba(244,63,94,0.82))",
+    },
+    selectedFill: "rgba(255,255,255,0.998)",
+    selectedActive: {
+      r: "1.06",
+      filter:
+        "drop-shadow(0 0 3.2px rgba(255,255,255,0.88)) drop-shadow(0 0 2.2px rgba(34,211,238,0.92))",
+    },
+  },
+  overlays: [
+    overlay(
+      "w6-command-grid",
+      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.14]",
+      {
+        background:
+          "linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.038) 1px, transparent 1px), linear-gradient(45deg, transparent 47.5%, rgba(167,139,250,0.04) 48.5%, rgba(167,139,250,0.04) 51.5%, transparent 52.5%), linear-gradient(-45deg, transparent 47.5%, rgba(34,211,238,0.032) 48.5%, rgba(34,211,238,0.032) 51.5%, transparent 52.5%)",
+        backgroundSize: "20px 20px, 20px 20px, 26px 26px, 26px 26px",
+      }
+    ),
+    overlay(
+      "w6-nexus",
+      "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.48]",
+      {
+        background:
+          "radial-gradient(circle at 50% 42%, rgba(34,211,238,0.09), transparent 50%), radial-gradient(circle at 50% 54%, rgba(167,139,250,0.07), transparent 56%)",
+      }
+    ),
+  ],
+  mobileAdjustments: {
+    mapMobileRootClassName: "-mt-1 translate-y-2",
+    linkSelected: { stroke: "rgba(255,255,255,0.4)", width: "0.52", dash: "2.2 1.25" },
+    selectedRingClassName:
+      "ring-2 ring-cyan-50/98 ring-offset-1 ring-offset-slate-950 scale-[1.03] shadow-[0_0_18px_rgba(34,211,238,0.44)]",
+    selectedRingHqClassName:
+      "ring-2 ring-white/98 ring-offset-1 ring-offset-slate-950 scale-[1.05] shadow-[0_0_22px_rgba(34,211,238,0.36)]",
     overlays: [
       overlay(
         "w6-nexus-m",
-        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.78]",
+        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.42]",
         {
           background:
-            "radial-gradient(circle at 50% 44%, rgba(34,211,238,0.1), transparent 50%)",
+            "radial-gradient(circle at 50% 46%, rgba(34,211,238,0.08), transparent 52%)",
         }
       ),
       overlay(
         "w6-grid-m",
-        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.1]",
+        "pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.09]",
         {
           background:
-            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px)",
-          backgroundSize: "22px 22px",
+            "linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
         }
       ),
     ],
     mapBadgeText: "Nexus",
+    mapBadgeClassName: "max-w-[40%] sm:max-w-none",
     links: {
-      normal: { stroke: "rgba(34,211,238,0.22)", width: "0.44", dash: "2.0 1.6" },
+      normal: { stroke: "rgba(34,211,238,0.2)", width: "0.42", dash: "2.1 1.55" },
     },
     dots: {
-      selectedActive: { r: "0.95", filter: "drop-shadow(0 0 2.5px rgba(34,211,238,0.85))" },
+      normal: { r: "0.64", filter: "drop-shadow(0 0 1.2px rgba(167,139,250,0.45))" },
+      selectedActive: { r: "0.92", filter: "drop-shadow(0 0 2.8px rgba(34,211,238,0.88))" },
     },
   },
 };
@@ -695,6 +682,7 @@ export function resolveWorldMapTheme(theme, layout) {
   if (m.linkSelected) {
     out.linkSelected = { ...(theme.linkSelected || {}), ...m.linkSelected };
   }
+  if (m.linkStrokeLinecap !== undefined) out.linkStrokeLinecap = m.linkStrokeLinecap;
   if (m.mapBadgeText !== undefined) out.mapBadgeText = m.mapBadgeText;
   if (m.mapBadgeClassName) {
     out.mapBadgeClassName = [theme.mapBadgeClassName, m.mapBadgeClassName].filter(Boolean).join(" ").trim();
@@ -707,5 +695,11 @@ export function resolveWorldMapTheme(theme, layout) {
       .trim();
   }
   if (m.labelClassName) out.labelClassName = [theme.labelClassName, m.labelClassName].filter(Boolean).join(" ").trim();
+  if (m.mapMobileRootClassName) {
+    out.mapMobileRootClassName = [theme.mapMobileRootClassName || "", m.mapMobileRootClassName]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+  }
   return out;
 }

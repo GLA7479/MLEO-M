@@ -12961,7 +12961,7 @@ export default function MleoBase() {
               </>
             ) : null}
 
-            <div className="mt-2">
+            <div className="mt-1">
               <BaseHomeFlowScene
                 base={state}
                 derived={derived}
