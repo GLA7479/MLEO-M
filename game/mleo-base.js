@@ -5134,8 +5134,8 @@ export default function MleoBase() {
   }
 
   function handleCommandHubItemClick(item) {
-    const step = getAlertNavigationTarget(item);
-    if (!step) return;
+    const step = getCommandHubDeepLink(item);
+    if (!step?.target) return;
     setShowReadyPanel(false);
     navigateToBaseTarget(step);
   }
@@ -5744,14 +5744,10 @@ export default function MleoBase() {
   const primaryCommandItem = commandHubItems[0] || null;
   const commandHubCount = commandHubItems.length;
 
-  /** Primary command-hub strip: deep-link (contracts / missions / …), same as item clicks — not only the generic hub modal. */
+  /** Primary strip: open the alerts/actions list; navigation happens when the player picks an item inside the panel. */
   function handleCommandHubBarClick() {
-    if (commandHubCount <= 0 || !primaryCommandItem) return;
-    setShowReadyPanel(false);
-    const step = getCommandHubDeepLink(primaryCommandItem);
-    if (step?.target) {
-      navigateToBaseTarget(step);
-    }
+    if (commandHubCount <= 0) return;
+    setShowReadyPanel(true);
   }
 
   const desktopPrimaryTitle = primaryCommandItem?.title || "Base is stable";
@@ -12467,7 +12463,7 @@ export default function MleoBase() {
             </div>
           ) : null}
 
-          {/* Mobile Ready Panel */}
+          {/* Command hub: full list of alerts & ready actions (tap row inside to navigate). */}
           {showReadyPanel ? (
             <div
               className="fixed inset-0 z-[117] bg-black/60 backdrop-blur-sm"
@@ -12514,7 +12510,7 @@ export default function MleoBase() {
                               : "border-white/10 bg-black/20"
                           } ${
                             isHighlightedTarget(
-                              getAlertNavigationTarget(item)?.target,
+                              getCommandHubDeepLink(item)?.target,
                               highlightTarget
                             )
                               ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
