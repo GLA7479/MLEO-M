@@ -828,6 +828,22 @@ function buildingDisplayName(buildingKey) {
   return def?.name || def?.title || buildingKey;
 }
 
+function buildingMeetsRequires(state, buildingKey) {
+  const def = getBuildingDef(buildingKey);
+  if (!def?.requires?.length) return true;
+  return def.requires.every(
+    (req) => Number(state?.buildings?.[req.key] || 0) >= Number(req.lvl || 1)
+  );
+}
+
+/** Throttled buildings: append " · N% mode · running|off" when level > 0. */
+function bankedGuidanceThrottleModePart(state, buildingKey, baseLevel) {
+  if (!canThrottleBuilding(buildingKey) || Number(baseLevel || 0) <= 0) return "";
+  const mode = getBuildingPowerMode(state, buildingKey);
+  if (mode === 0) return " · 0% mode · off";
+  return ` · ${mode}% mode · running`;
+}
+
 function resolveBankedActionTarget(state, targetKey) {
   if (!targetKey) return "bankedMleo";
   if (targetKey === "maintenance" || targetKey === "shipping" || targetKey === "bankedMleo") {
@@ -924,6 +940,103 @@ function analyticalLevelTargetFloor(current, floor) {
   return f;
 }
 
+/** One-line building/system snapshot for Banked guidance cards (no "Current:" prefix). */
+function getBankedGuidanceCurrentStateText(itemKey, ctx) {
+  const {
+    state,
+    derived,
+    s,
+    refineryBaseLevel,
+    quarryBaseLevel,
+    salvageBaseLevel,
+    powerCellBaseLevel,
+    repairBayBaseLevel,
+    logisticsBaseLevel,
+    refineryMode,
+    refineryOff,
+    energy,
+    energyCap,
+    stability,
+    producedToday,
+    dailyCap,
+    oreFeedHours,
+    scrapFeedHours,
+  } = ctx;
+
+  const rName = buildingDisplayName("refinery");
+  const qName = buildingDisplayName("quarry");
+  const salName = buildingDisplayName("salvage");
+  const pcName = buildingDisplayName("powerCell");
+  const rbName = buildingDisplayName("repairBay");
+  const lcName = buildingDisplayName("logisticsCenter");
+  const bankBonusStr = Number(derived?.bankBonus || 1).toFixed(2);
+
+  if (itemKey === "refinery") {
+    if (refineryBaseLevel <= 0) return `${rName} not built`;
+    if (refineryOff) return `${rName} Lv ${refineryBaseLevel} · 0% power · off`;
+    return `${rName} Lv ${refineryBaseLevel} · ${refineryMode}% power · running`;
+  }
+
+  if (itemKey === "ore") {
+    if (!buildingMeetsRequires(state, "quarry") && quarryBaseLevel <= 0) {
+      return `${qName} not unlocked yet`;
+    }
+    if (quarryBaseLevel <= 0) return `${qName} not built`;
+    const qTh = bankedGuidanceThrottleModePart(state, "quarry", quarryBaseLevel);
+    if (oreFeedHours == null) return `${qName} Lv ${quarryBaseLevel}${qTh}`;
+    return `${qName} Lv ${quarryBaseLevel}${qTh} · support ~${fmtRate(oreFeedHours, 1)}h`;
+  }
+
+  if (itemKey === "scrap") {
+    if (!buildingMeetsRequires(state, "salvage") && salvageBaseLevel <= 0) {
+      return `${salName} locked`;
+    }
+    if (salvageBaseLevel <= 0) return `${salName} not built`;
+    const sTh = bankedGuidanceThrottleModePart(state, "salvage", salvageBaseLevel);
+    if (scrapFeedHours == null) return `${salName} Lv ${salvageBaseLevel}${sTh}`;
+    return `${salName} Lv ${salvageBaseLevel}${sTh} · support ~${fmtRate(scrapFeedHours, 1)}h`;
+  }
+
+  if (itemKey === "energy") {
+    if (!buildingMeetsRequires(state, "powerCell") && powerCellBaseLevel <= 0) {
+      return `${pcName} locked`;
+    }
+    return `${pcName} Lv ${powerCellBaseLevel} · energy ${fmtRate(energy, 0)}/${fmtRate(energyCap, 0)}`;
+  }
+
+  if (itemKey === "stability") {
+    if (!buildingMeetsRequires(state, "repairBay") && repairBayBaseLevel <= 0) {
+      return `${rbName} locked · stability ${fmtRate(stability, 0)}%`;
+    }
+    if (repairBayBaseLevel <= 0) {
+      return `${rbName} Lv 0 · stability ${fmtRate(stability, 0)}%`;
+    }
+    const rbTh = bankedGuidanceThrottleModePart(state, "repairBay", repairBayBaseLevel);
+    return `${rbName} Lv ${repairBayBaseLevel}${rbTh} · stability ${fmtRate(stability, 0)}%`;
+  }
+
+  if (itemKey === "logistics") {
+    if (!buildingMeetsRequires(state, "logisticsCenter") && logisticsBaseLevel <= 0) {
+      return `${lcName} locked · bank bonus x${bankBonusStr}`;
+    }
+    if (logisticsBaseLevel <= 0) {
+      return `${lcName} not built · bank bonus x${bankBonusStr}`;
+    }
+    const lcTh = bankedGuidanceThrottleModePart(state, "logisticsCenter", logisticsBaseLevel);
+    return `${lcName} Lv ${logisticsBaseLevel}${lcTh} · bank bonus x${bankBonusStr}`;
+  }
+
+  if (itemKey === "daily-cap") {
+    const capped = dailyCap > 0 && producedToday >= dailyCap - 1e-9;
+    if (capped) {
+      return `${fmtRate(producedToday, 1)} / ${fmtRate(dailyCap, 0)} · cap reached`;
+    }
+    return `${fmtRate(producedToday, 1)} / ${fmtRate(dailyCap, 0)} produced today`;
+  }
+
+  return "—";
+}
+
 function enrichBankedGuidanceItem(item, ctx) {
   const {
     state,
@@ -950,164 +1063,226 @@ function enrichBankedGuidanceItem(item, ctx) {
   } = ctx;
 
   const next = { ...item };
-  const qTitle = buildingDisplayName("quarry");
-  const sTitle = buildingDisplayName("salvage");
-  const pTitle = buildingDisplayName("powerCell");
   const rTitle = buildingDisplayName("refinery");
-  const lTitle = buildingDisplayName("logisticsCenter");
   const rbTitle = buildingDisplayName("repairBay");
+  const qTitle = buildingDisplayName("quarry");
+  const salTitle = buildingDisplayName("salvage");
+  const pcTitle = buildingDisplayName("powerCell");
+  const lcTitle = buildingDisplayName("logisticsCenter");
 
   if (item.key === "refinery") {
     if (item.tone === "critical" && refineryBaseLevel <= 0) {
-      next.currentLabel = `${rTitle} not built`;
+      next.targetLabel = "Build Refinery after prerequisites";
       next.actionHint = formatBankedBuildUnlockPath(state, "refinery");
     } else if (item.tone === "critical" && refineryOff) {
-      next.currentLabel = `${rTitle} at 0% power`;
-      next.actionHint = "Set Refinery power above 0%";
+      next.targetLabel = "Set Refinery power above 0%";
+      next.actionHint = "Open Refinery and raise power mode above 0%";
     } else if (item.tone === "warning") {
       next.currentLevel = refineryBaseLevel;
-      next.currentLabel = `${rTitle} Lv ${refineryBaseLevel}`;
       const sim = findBankedGuidanceGreenBuildingLevel(state, systemState, "refinery", "refinery");
       if (sim != null) {
         next.targetLevel = sim;
-        next.targetLabel = `Lv ${sim} for green`;
+        next.targetLabel = `${rTitle} Lv ${sim} for green`;
       } else {
+        next.targetLabel = "Higher Refinery level for green";
         next.actionHint = "More upgrades needed";
       }
     } else if (item.tone === "success") {
       next.currentLevel = refineryBaseLevel;
-      next.currentLabel = `${rTitle} Lv ${refineryBaseLevel} · ${refineryMode}% power`;
+      next.targetLabel = "Keep Refinery powered and supplied";
     }
     return next;
   }
 
   if (item.key === "ore") {
     next.currentLevel = quarryBaseLevel;
-    next.currentLabel = `${qTitle} Lv ${quarryBaseLevel}`;
-    if (item.tone !== "success" && refineryBaseLevel > 0) {
-      const floor = Math.max(1, Math.ceil(refineryBaseLevel * 0.9));
-      const analytical = analyticalLevelTargetFloor(quarryBaseLevel, floor);
-      if (analytical != null) {
-        next.targetLevel = analytical;
-        next.targetLabel = `Lv ${analytical} for green (vs Refinery Lv ${refineryBaseLevel})`;
-      }
-      if (oreFeedHours != null && oreFeedHours < 4 && quarryBaseLevel >= floor) {
-        next.actionHint =
-          next.targetLabel == null
-            ? "Stockpile more ORE — support hours are still short"
-            : "Keep Quarry running; ORE tank must catch up for hours-on-hand to improve";
-      } else if (item.tone !== "success" && analytical == null && !s?.hasOre) {
-        next.actionHint = "Produce and stockpile ORE (Quarry + time online) until the refinery feed holds";
-      } else if (item.tone !== "success" && analytical == null) {
-        next.actionHint = "Not green yet with local upgrade only";
-      }
-    } else if (refineryBaseLevel <= 0) {
+    if (item.tone === "success") {
+      next.targetLabel = "Keep ORE support ≥ 4.0h while Refinery runs";
+      return next;
+    }
+    if (refineryBaseLevel <= 0) {
+      next.targetLabel = `Build ${rTitle} first`;
       next.actionHint = `${rTitle} comes first; Quarry is secondary until Refinery exists`;
+      return next;
+    }
+
+    const floor = Math.max(1, Math.ceil(refineryBaseLevel * 0.9));
+    const simOre = findBankedGuidanceGreenBuildingLevel(state, systemState, "ore", "quarry");
+    const analytical = analyticalLevelTargetFloor(quarryBaseLevel, floor);
+
+    if (simOre != null) {
+      next.targetLevel = simOre;
+      next.targetLabel = `${qTitle} Lv ${simOre} for green`;
+    } else if (analytical != null) {
+      next.targetLevel = analytical;
+      next.targetLabel = `${qTitle} Lv ${analytical} for green (vs ${rTitle} Lv ${refineryBaseLevel})`;
+    } else {
+      next.targetLabel = "ORE support ≥ 4.0h for green";
+    }
+
+    if (oreFeedHours != null && oreFeedHours < 4 && quarryBaseLevel >= floor) {
+      next.actionHint = "Stockpile more ORE while Quarry keeps running";
+    } else if (!s?.hasOre) {
+      next.actionHint = "Produce and stockpile ORE (Quarry + time online) until the refinery feed holds";
+    } else if (analytical == null && simOre == null) {
+      next.actionHint = "Raise ORE on-hand until support hours reach the target";
     }
     return next;
   }
 
   if (item.key === "scrap") {
     next.currentLevel = salvageBaseLevel;
-    next.currentLabel = `${sTitle} Lv ${salvageBaseLevel}`;
-    if (item.tone !== "success" && refineryBaseLevel > 0) {
-      const floor = Math.max(1, Math.ceil(refineryBaseLevel * 0.9));
-      const analytical = analyticalLevelTargetFloor(salvageBaseLevel, floor);
-      if (analytical != null) {
-        next.targetLevel = analytical;
-        next.targetLabel = `Lv ${analytical} for green (vs Refinery Lv ${refineryBaseLevel})`;
-      }
-      if (scrapFeedHours != null && scrapFeedHours < 4 && salvageBaseLevel >= floor) {
-        next.actionHint =
-          next.targetLabel == null
-            ? "Stockpile more SCRAP — hours-on-hand are still short"
-            : "Keep Salvage running; SCRAP buffer must catch up";
-      } else if (item.tone !== "success" && analytical == null && !s?.hasScrap) {
-        next.actionHint = "Produce and stockpile SCRAP until refinery feed holds";
-      } else if (item.tone !== "success" && analytical == null) {
-        next.actionHint = "Not green yet with local upgrade only";
-      }
-    } else if (refineryBaseLevel <= 0) {
+    if (item.tone === "success") {
+      next.targetLabel = "Keep SCRAP support ≥ 4.0h while Refinery runs";
+      return next;
+    }
+    if (refineryBaseLevel <= 0) {
+      next.targetLabel = `Build ${rTitle} first`;
       next.actionHint = `${rTitle} comes first; Salvage is secondary until Refinery exists`;
+      return next;
+    }
+
+    const floor = Math.max(1, Math.ceil(refineryBaseLevel * 0.9));
+    const simSc = findBankedGuidanceGreenBuildingLevel(state, systemState, "scrap", "salvage");
+    const analytical = analyticalLevelTargetFloor(salvageBaseLevel, floor);
+
+    if (simSc != null) {
+      next.targetLevel = simSc;
+      next.targetLabel = `${salTitle} Lv ${simSc} for green`;
+    } else if (analytical != null) {
+      next.targetLevel = analytical;
+      next.targetLabel = `${salTitle} Lv ${analytical} for green (vs ${rTitle} Lv ${refineryBaseLevel})`;
+    } else {
+      next.targetLabel = "SCRAP support ≥ 4.0h for green";
+    }
+
+    if (scrapFeedHours != null && scrapFeedHours < 4 && salvageBaseLevel >= floor) {
+      next.actionHint = "Stockpile more SCRAP while Salvage keeps running";
+    } else if (!s?.hasScrap) {
+      next.actionHint = "Produce and stockpile SCRAP until refinery feed holds";
+    } else if (analytical == null && simSc == null) {
+      next.actionHint = "Raise SCRAP on-hand until support hours reach the target";
     }
     return next;
   }
 
   if (item.key === "energy") {
     next.currentLevel = powerCellBaseLevel;
-    next.currentLabel = `${pTitle} Lv ${powerCellBaseLevel} · ENERGY ${fmtRate(energy, 0)}/${fmtRate(energyCap, 0)}`;
-    if (item.tone !== "success" && refineryBaseLevel > 0) {
-      const floor = Math.max(1, Math.ceil(refineryBaseLevel / 2));
-      const analytical = analyticalLevelTargetFloor(powerCellBaseLevel, floor);
-      if (analytical != null) {
-        next.targetLevel = analytical;
-        next.targetLabel = `Lv ${analytical} for green (vs Refinery Lv ${refineryBaseLevel})`;
-      }
-      if (!s?.hasEnergy) {
-        next.actionHint = "Recharge ENERGY or reduce drain so Refinery can run safely above reserve";
-      } else if (energyRatio < 0.28 && powerCellBaseLevel >= floor) {
-        next.actionHint =
-          "Reserve ratio is still low — let ENERGY recover or trim high-drain buildings; Power Cell raises your ceiling";
-      } else if (item.tone !== "success" && analytical == null) {
-        next.actionHint = "More upgrades needed";
-      }
+    if (item.tone === "success") {
+      next.targetLabel =
+        refineryBaseLevel > 0
+          ? "Keep ENERGY above refinery reserve while producing"
+          : "Keep ENERGY healthy for future Refinery";
+      return next;
+    }
+    if (refineryBaseLevel <= 0) {
+      next.targetLabel = "No Refinery drain yet — keep ENERGY topped up";
+      return next;
+    }
+
+    const floor = Math.max(1, Math.ceil(refineryBaseLevel / 2));
+    const simPc = findBankedGuidanceGreenBuildingLevel(state, systemState, "energy", "powerCell");
+    const analytical = analyticalLevelTargetFloor(powerCellBaseLevel, floor);
+
+    if (simPc != null) {
+      next.targetLevel = simPc;
+      next.targetLabel = `${pcTitle} Lv ${simPc} for green`;
+    } else if (analytical != null) {
+      next.targetLevel = analytical;
+      next.targetLabel = `${pcTitle} Lv ${analytical} for green (vs ${rTitle} Lv ${refineryBaseLevel})`;
+    } else if (!s?.hasEnergy) {
+      next.targetLabel = "ENERGY above refinery reserve + drain for green";
+    } else if (energyRatio < 0.28) {
+      next.targetLabel = "Energy reserve ratio ≥ 28% for green";
+    } else {
+      next.targetLabel = "Align Power Cell tier with Refinery for green";
+    }
+
+    if (!s?.hasEnergy) {
+      next.actionHint = "Recharge ENERGY or reduce drain so Refinery can run safely above reserve";
+    } else if (energyRatio < 0.28 && powerCellBaseLevel >= floor) {
+      next.actionHint =
+        "Let ENERGY recover or trim high-drain buildings; Power Cell raises your cap ceiling";
+    } else if (simPc == null && analytical == null) {
+      next.actionHint = "More upgrades needed";
     }
     return next;
   }
 
   if (item.key === "stability") {
-    next.currentLabel = `Stability ${fmtRate(stability, 0)}%`;
+    if (item.tone === "success") {
+      next.targetLabel = "Maintain stability ≥ 85%";
+      if (repairBayBaseLevel < 1) {
+        next.actionHint = `Optional: build ${rbTitle} for smoother recovery when stability dips`;
+      }
+      return next;
+    }
+
+    next.targetLabel = "Stability ≥ 85% for green";
+
     if (item.tone === "critical" || systemState === "critical") {
       next.actionHint = "Open Operations maintenance / repair flow";
-    } else if (repairBayBaseLevel < 1 && item.tone === "warning") {
-      next.currentLabel = `${rbTitle} missing · Stability ${fmtRate(stability, 0)}%`;
+      return next;
+    }
+
+    if (repairBayBaseLevel < 1 && item.tone === "warning") {
       const sim = findBankedGuidanceGreenBuildingLevel(state, systemState, "stability", "repairBay");
       if (sim != null) {
         next.targetLevel = sim;
-        next.targetLabel = `Lv ${sim} for green`;
+        next.targetLabel = `${rbTitle} Lv ${sim} for green`;
       } else {
-        next.actionHint = "Not green yet with local upgrade only — recover stability via maintenance first";
+        next.targetLabel = `Build ${rbTitle} + recover stability via maintenance`;
       }
+      next.actionHint = "Run maintenance; add Repair Bay when unlocked";
     } else if (item.tone === "warning") {
+      const sim = findBankedGuidanceGreenBuildingLevel(state, systemState, "stability", "repairBay");
+      if (sim != null) {
+        next.targetLevel = sim;
+        next.targetLabel = `${rbTitle} Lv ${sim} helps reach green`;
+      }
       next.actionHint =
         "Use maintenance to lift stability; Repair Bay levels help long-term relief once pressure drops";
-      const sim = findBankedGuidanceGreenBuildingLevel(state, systemState, "stability", "repairBay");
-      if (sim != null) {
-        next.targetLevel = sim;
-        next.targetLabel = `Repair Bay Lv ${sim} helps reach green`;
-      }
-    } else if (item.tone === "success" && repairBayBaseLevel < 1) {
-      next.actionHint = `Optional: build ${rbTitle} for smoother recovery when stability dips`;
     }
     return next;
   }
 
   if (item.key === "logistics") {
     next.currentLevel = logisticsBaseLevel;
-    next.currentLabel = `${lTitle} Lv ${logisticsBaseLevel}`;
+    if (item.tone === "success") {
+      next.targetLabel =
+        refineryBaseLevel > 0
+          ? `Keep ${lcTitle} tier matched to Refinery`
+          : `Open ${rTitle} before prioritizing ${lcTitle}`;
+      if (refineryBaseLevel <= 0) {
+        next.actionHint = `${rTitle} first; Logistics matters once production is online`;
+      }
+      return next;
+    }
+
     if (item.tone === "warning" && refineryBaseLevel > 0) {
       const sim = findBankedGuidanceGreenBuildingLevel(state, systemState, "logistics", "logisticsCenter");
       if (sim != null) {
         next.targetLevel = sim;
-        next.targetLabel = `Lv ${sim} for green`;
+        next.targetLabel = `${lcTitle} Lv ${sim} for green`;
       } else {
+        next.targetLabel = `${lcTitle} levels vs ${rTitle} tier for green`;
         next.actionHint = "More upgrades needed";
       }
-    } else if (item.tone === "success" && refineryBaseLevel <= 0) {
-      next.actionHint = `${rTitle} first; Logistics matters once production is online`;
+    } else {
+      next.targetLabel = `Unlock and build ${lcTitle} when prerequisites are met`;
     }
     return next;
   }
 
   if (item.key === "daily-cap") {
     if (item.tone === "critical") {
-      next.currentLabel = "Daily production cap reached";
+      next.targetLabel = "Wait for next server day";
       next.actionHint = "Wait for next server day reset";
     } else if (item.tone === "warning") {
-      next.currentLabel = `Progress ${fmtRate(producedToday, 1)} / ${fmtRate(dailyCap, 0)}`;
+      next.targetLabel = "Hold below daily production cap until reset";
       next.actionHint = "Near cap — output softens; plan tomorrow’s upgrades and shipping";
     } else {
-      next.currentLabel = `Headroom ≈ ${fmtRate(Math.max(0, dailyCap - producedToday), 1)} today`;
+      next.targetLabel = "Use remaining daily production headroom";
     }
     return next;
   }
@@ -1418,6 +1593,31 @@ function getBankedGuidanceItems({
       text: "You still have healthy production room left today.",
       target: "bankedMleo",
     });
+  }
+
+  const stateTextCtx = {
+    state,
+    derived,
+    s,
+    refineryBaseLevel,
+    quarryBaseLevel,
+    salvageBaseLevel,
+    powerCellBaseLevel,
+    repairBayBaseLevel,
+    logisticsBaseLevel,
+    refineryMode,
+    refineryOff,
+    energy,
+    energyCap,
+    stability,
+    producedToday,
+    dailyCap,
+    oreFeedHours,
+    scrapFeedHours,
+  };
+
+  for (const it of items) {
+    it.currentStateText = getBankedGuidanceCurrentStateText(it.key, stateTextCtx);
   }
 
   if (!resolveTargets) return items;
@@ -2044,51 +2244,24 @@ function BankedQuickPanel({
                 {item.text}
               </div>
 
-              {item.currentLabel || item.targetLabel || item.actionHint ? (
-                <div className="mt-2 space-y-0.5 border-t border-white/10 pt-2 text-[11px] leading-4 text-white/58">
-                  {item.currentLabel ? (
-                    <div>
-                      <span className="text-white/40">Current: </span>
-                      {item.currentLabel}
-                    </div>
-                  ) : null}
-                  {item.targetLabel ? (
-                    <div>
-                      <span className="text-white/40">Target: </span>
-                      {item.targetLabel}
-                    </div>
-                  ) : null}
-                  {item.actionHint ? (
-                    <div>
-                      <span className="text-white/40">Action: </span>
-                      {item.actionHint}
-                    </div>
-                  ) : null}
+              <div className="mt-2 space-y-0.5 border-t border-white/10 pt-2 text-[11px] leading-4 text-white/58">
+                <div>
+                  <span className="text-white/40">Current: </span>
+                  {item.currentStateText || "—"}
                 </div>
-              ) : null}
+                <div>
+                  <span className="text-white/40">Target: </span>
+                  {item.targetLabel || "—"}
+                </div>
+                {item.actionHint ? (
+                  <div>
+                    <span className="text-white/40">Action: </span>
+                    {item.actionHint}
+                  </div>
+                ) : null}
+              </div>
             </button>
           ))}
-        </div>
-      </div>
-
-      <div className="mt-2.5 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-          Feed endurance
-        </div>
-
-        <div className="mt-2 grid grid-cols-2 gap-3 text-sm text-white/80">
-          <div>
-            <div className="text-white/50">Ore support</div>
-            <div className="mt-1 font-semibold text-white">
-              {s.oreFeedHours == null ? "—" : `${fmtRate(s.oreFeedHours, 1)}h`}
-            </div>
-          </div>
-          <div>
-            <div className="text-white/50">Scrap support</div>
-            <div className="mt-1 font-semibold text-white">
-              {s.scrapFeedHours == null ? "—" : `${fmtRate(s.scrapFeedHours, 1)}h`}
-            </div>
-          </div>
         </div>
       </div>
 
