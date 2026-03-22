@@ -2057,6 +2057,66 @@ END;
 $$;
 
 -- ============================================================================
+-- DEV ONLY: force sector_world (1–6) for testing — does not replace deploy flow
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.base_dev_set_sector_world(
+  p_device_id text,
+  p_world integer
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_state public.base_device_state%ROWTYPE;
+  v_w integer;
+BEGIN
+  IF coalesce(trim(p_device_id), '') = '' THEN
+    RAISE EXCEPTION 'device_id is required';
+  END IF;
+
+  IF p_world IS NULL OR p_world < 1 OR p_world > 6 THEN
+    RAISE EXCEPTION 'sector_world must be an integer from 1 to 6';
+  END IF;
+
+  v_w := greatest(1, least(6, p_world));
+
+  PERFORM public.base_get_or_create_state(p_device_id);
+
+  UPDATE public.base_device_state
+  SET
+    sector_world = v_w,
+    updated_at = now()
+  WHERE device_id = p_device_id
+  RETURNING *
+  INTO v_state;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'base_device_state update failed';
+  END IF;
+
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'dev_set_sector_world',
+    jsonb_build_object('sector_world', v_w),
+    0,
+    '[]'::jsonb
+  );
+
+  PERFORM public.base_reconcile_state(p_device_id);
+
+  SELECT *
+  INTO v_state
+  FROM public.base_device_state
+  WHERE device_id = p_device_id;
+
+  RETURN to_jsonb(v_state);
+END;
+$$;
+
+-- ============================================================================
 -- Audit table for base actions (ship, spend)
 -- ============================================================================
 
@@ -2125,6 +2185,7 @@ REVOKE EXECUTE ON FUNCTION public.base_install_module(text, text) FROM PUBLIC, a
 REVOKE EXECUTE ON FUNCTION public.base_unlock_research(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_claim_specialization_milestone(text, text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_deploy_next_sector(text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_dev_set_sector_world(text, integer) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.base_ship_to_vault(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text) TO service_role;
@@ -2139,6 +2200,7 @@ GRANT EXECUTE ON FUNCTION public.base_install_module(text, text) TO service_role
 GRANT EXECUTE ON FUNCTION public.base_unlock_research(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_claim_specialization_milestone(text, text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_deploy_next_sector(text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.base_dev_set_sector_world(text, integer) TO service_role;
 
 REVOKE ALL ON public.base_action_audit FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT ON public.base_action_audit TO service_role;

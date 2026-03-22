@@ -1,5 +1,6 @@
 import { ExpandablePanelSectionHeader } from "./ExpandablePanelSectionHeader";
 import { WorldSectorPanel } from "./WorldSectorPanel";
+import { DevSectorSwitchPanel } from "./DevSectorSwitchPanel";
 
 function toneClasses(tone = "info") {
   if (tone === "critical") {
@@ -653,6 +654,8 @@ export function OverviewPanelCards({
   sectorWorldSnapshot,
   onDeployNextSector,
   sectorDeployBusy,
+  onDevSectorServerStateApplied,
+  devSectorShowToast,
 }) {
   const actionFallback =
     nextStep && (nextStep?.title || nextStep?.text)
@@ -709,6 +712,12 @@ export function OverviewPanelCards({
         snapshot={sectorWorldSnapshot}
         onDeploy={onDeployNextSector}
         deployBusy={!!sectorDeployBusy}
+      />
+
+      <DevSectorSwitchPanel
+        snapshot={sectorWorldSnapshot}
+        onServerStateApplied={onDevSectorServerStateApplied}
+        showToast={devSectorShowToast}
       />
 
       <div className="grid gap-4 xl:grid-cols-3">

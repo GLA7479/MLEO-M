@@ -4495,6 +4495,11 @@ export default function MleoBase() {
     });
   }
 
+  function handleDevSectorServerState(serverState) {
+    if (!serverState) return;
+    setState((prev) => mergeAuthoritativeServerState(prev, serverState));
+  }
+
   async function pushPresence({
     interacted = false,
     gameAction = false,
@@ -12147,6 +12152,8 @@ export default function MleoBase() {
                           sectorWorldSnapshot={sectorWorldSnapshot}
                           onDeployNextSector={handleDeployNextSector}
                           sectorDeployBusy={isActionLocked("sectorDeploy")}
+                          onDevSectorServerStateApplied={handleDevSectorServerState}
+                          devSectorShowToast={showToast}
                         />
                       </DesktopPanelSection>
                     ) : null}
@@ -12594,6 +12601,8 @@ export default function MleoBase() {
                         sectorWorldSnapshot={sectorWorldSnapshot}
                         onDeployNextSector={handleDeployNextSector}
                         sectorDeployBusy={isActionLocked("sectorDeploy")}
+                        onDevSectorServerStateApplied={handleDevSectorServerState}
+                        devSectorShowToast={showToast}
                       />
                     </MobilePanelSection>
                   ) : null}
