@@ -1,3 +1,5 @@
+import { COMMAND_PROTOCOL_FAMILY_LABEL } from "../../commandProtocols";
+
 function fmt(value) {
   const n = Number(value || 0);
   if (Math.abs(n) >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
@@ -378,7 +380,15 @@ export function CrewModulesResearchPanel({
                       } ${disableSelect && !isSel ? "cursor-not-allowed opacity-50" : ""}`}
                     >
                       <div className="text-sm font-semibold text-white">{row.name}</div>
+                      {row.family && COMMAND_PROTOCOL_FAMILY_LABEL[row.family] ? (
+                        <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white/35">
+                          {COMMAND_PROTOCOL_FAMILY_LABEL[row.family]}
+                        </div>
+                      ) : null}
                       <div className="mt-0.5 text-[11px] text-white/55">{row.shortDesc}</div>
+                      {row.bestWhen ? (
+                        <div className="mt-1 text-[10px] leading-snug text-white/40">{row.bestWhen}</div>
+                      ) : null}
                       {row.locked ? (
                         <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/85">
                           Unlocks Cmdr Lv {row.minCommanderLevel}

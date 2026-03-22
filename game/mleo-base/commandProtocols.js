@@ -14,6 +14,12 @@ export const PHASE_1A_COMMAND_PROTOCOL_IDS = [
 
 const ID_SET = new Set(PHASE_1A_COMMAND_PROTOCOL_IDS);
 
+/** Phase 1C UI: family tag labels (gameplay unchanged). */
+export const COMMAND_PROTOCOL_FAMILY_LABEL = {
+  clean: "Clean",
+  tradeoff: "Tradeoff",
+};
+
 /** UI + docs: unlock thresholds and copy */
 export const PHASE_1A_COMMAND_PROTOCOLS = [
   {
@@ -21,36 +27,49 @@ export const PHASE_1A_COMMAND_PROTOCOLS = [
     name: "Standard Posture",
     shortDesc: "No protocol modifier.",
     minCommanderLevel: 1,
+    bestWhen: "Best when: you want a neutral baseline with no protocol tradeoff.",
   },
   {
     id: "steady_ops",
     name: "Steady Ops",
     shortDesc: "Maintenance relief +2.5%",
     minCommanderLevel: 2,
+    family: "clean",
+    bestWhen: "Best when: maintenance pressure is rising and you want smoother operations.",
   },
   {
     id: "liquidity_drill",
     name: "Liquidity Drill",
     shortDesc: "Gold output +2%",
     minCommanderLevel: 3,
+    family: "clean",
+    bestWhen: "Best when: you want extra gold without taking on a new drawback.",
   },
   {
     id: "signal_focus",
     name: "Signal Focus",
     shortDesc: "DATA output +2.5%",
     minCommanderLevel: 4,
+    family: "clean",
+    bestWhen:
+      "Best when: you want extra DATA without weakening other economic pressure points.",
   },
   {
     id: "gold_over_watch",
     name: "Gold Overwatch",
     shortDesc: "Gold +2.5%, maintenance relief −1.5%",
     minCommanderLevel: 5,
+    family: "tradeoff",
+    bestWhen:
+      "Best when: gold demand matters more than a small maintenance comfort loss.",
   },
   {
     id: "data_over_watch",
     name: "Data Overwatch",
     shortDesc: "DATA +3%, gold −1.5%",
     minCommanderLevel: 6,
+    family: "tradeoff",
+    bestWhen: "Best when: DATA demand matters more than a small gold efficiency loss.",
   },
 ];
 
