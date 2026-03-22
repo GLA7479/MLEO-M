@@ -105,11 +105,19 @@ export function BaseStructuresPanel({
                     </div>
                   </div>
 
-                  {/* Compact status row: Lv badge + ACTIVE/WARNING */}
+                  {/* Compact status row: Lv badge + tier (support buildings) + ACTIVE/WARNING */}
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/65">
                       Lv {card.level}
                     </div>
+                    {card.tierText ? (
+                      <span
+                        className="inline-flex w-fit rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-200"
+                        title="Building tier"
+                      >
+                        {card.tierText}
+                      </span>
+                    ) : null}
                     <div className="inline-flex w-fit rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-white/65">
                       {card.sectorStatusText}
                     </div>

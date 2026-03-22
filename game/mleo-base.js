@@ -9465,6 +9465,12 @@ export default function MleoBase() {
     const powerMode = getBuildingPowerMode(state, building.key);
     const canThrottle = canThrottleBuilding(building.key);
 
+    const supportsTier = ["logisticsCenter", "researchLab", "repairBay"].includes(building.key);
+    const tier = supportsTier
+      ? Math.max(1, Number(state?.buildingTiers?.[building.key] || 1))
+      : null;
+    const tierText = tier != null ? `T${tier}` : null;
+
     const requirementsText = building.requires?.length
       ? building.requires
           .map((req) => `${reqNameMap[req.key] || req.key} Lv ${req.lvl}`)
@@ -9486,6 +9492,9 @@ export default function MleoBase() {
       roleTagText: buildingRoleTag(building.key),
       synergyTagText: buildingSynergyTag(building.key),
       sectorStatusText: sectorStatusForBuilding(building.key, state).toUpperCase(),
+      supportsTier,
+      tier,
+      tierText,
       requirementsText,
       ready,
       buildBusy: activeBuildKey === building.key,
