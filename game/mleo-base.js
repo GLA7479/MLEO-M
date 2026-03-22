@@ -12229,7 +12229,7 @@ export default function MleoBase() {
                   type="button"
                   onClick={() => navigateToBaseTarget({ tab: "build", target: "command-protocol" })}
                   title={`${commandProtocolSurface.name}${commandProtocolSurface.mismatch ? " · stored not effective" : ""} · Build → Development → Crew`}
-                  className={`inline-flex max-w-[min(100%,9.75rem)] shrink-0 items-center rounded-full border px-2 py-0.5 text-left transition hover:bg-white/[0.08] sm:max-w-[15rem] sm:px-2 sm:py-0.5 lg:max-w-[min(16rem,24vw)] ${
+                  className={`inline-flex max-w-[min(100%,9.75rem)] shrink-0 items-center rounded-full border px-2 py-0.5 text-left transition hover:bg-white/[0.08] sm:max-w-[15rem] sm:px-2 sm:py-0.5 md:hidden lg:max-w-[min(16rem,24vw)] ${
                     commandProtocolSurface.mismatch
                       ? "border-amber-400/15 bg-amber-400/[0.05]"
                       : commandProtocolSurface.effectiveId !== "none"
@@ -12273,6 +12273,38 @@ export default function MleoBase() {
                       </span>
                     ) : null}
                   </span>
+                </button>
+              </div>
+              <div className="hidden md:mt-1.5 md:block md:w-max lg:mt-2">
+                <button
+                  type="button"
+                  onClick={() => navigateToBaseTarget({ tab: "build", target: "command-protocol" })}
+                  title={`${commandProtocolSurface.name}${commandProtocolSurface.mismatch ? " · stored not effective" : ""} · Build → Development → Crew`}
+                  className={`inline-flex w-auto max-w-[10rem] shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-left transition hover:bg-white/[0.05] ${
+                    commandProtocolSurface.mismatch
+                      ? "border-amber-400/12 bg-amber-400/[0.04]"
+                      : commandProtocolSurface.effectiveId !== "none"
+                      ? "border-cyan-400/25 bg-cyan-500/[0.05]"
+                      : "border-white/[0.08] bg-white/[0.02]"
+                  }`}
+                >
+                  <span className="shrink-0 text-[8px] font-semibold uppercase tracking-[0.1em] text-white/32">
+                    Doctrine
+                  </span>
+                  <span
+                    className={`min-w-0 max-w-[3.75rem] shrink truncate text-[9px] font-semibold leading-tight ${
+                      commandProtocolSurface.effectiveId === "none" ? "text-white/42" : "text-cyan-50/85"
+                    }`}
+                  >
+                    {commandProtocolSurface.name}
+                  </span>
+                  {commandProtocolSurface.mismatch ? (
+                    <span className="shrink-0 text-[8px] font-medium text-amber-100/60">Stale</span>
+                  ) : commandProtocolSurface.effectiveId === "none" ? (
+                    <span className="shrink-0 text-[8px] font-normal text-white/28">Base</span>
+                  ) : (
+                    <span className="shrink-0 text-[8px] font-semibold text-cyan-200/65">Live</span>
+                  )}
                 </button>
               </div>
               {/* subtitle removed */}
