@@ -54,3 +54,10 @@ export {
   buildWorld6CommandAlert,
   getWorld6CommandSnapshot,
 } from "./world6Gameplay";
+
+export {
+  DEFAULT_WORLD_MAP_THEME,
+  WORLD_MAP_THEME_BY_ORDER,
+  getWorldMapTheme,
+  resolveWorldMapTheme,
+} from "./worldMapTheme";
