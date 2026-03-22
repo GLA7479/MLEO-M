@@ -116,6 +116,7 @@ import {
   getWorld6CommandSnapshot,
   getWorldDailyMleoCapByOrder,
   resolveSectorWorldOrder,
+  WORLD_BY_ORDER,
 } from "./mleo-base/worlds";
 
 const MAX_LOG_ITEMS = 16;
@@ -5649,6 +5650,29 @@ export default function MleoBase() {
     () => buildWorld6CommandAlert(world6Command),
     [world6Command]
   );
+
+  /** Compact header badge: catalog name + optional live state label from world snapshots (2–6). */
+  const baseWorldHeaderIdentity = useMemo(() => {
+    const order = activeWorldOrder;
+    const meta = WORLD_BY_ORDER[order];
+    const displayName = meta?.name || "Sector";
+    const primaryLine = `WORLD ${order} · ${displayName.toUpperCase()}`;
+    const compactLine = `W${order} · ${displayName}`;
+    let stateChip = null;
+    if (order === 2 && world2Throughput) stateChip = world2Throughput.laneLabel;
+    else if (order === 3 && world3Telemetry) stateChip = world3Telemetry.signalLabel;
+    else if (order === 4 && world4Reactor) stateChip = world4Reactor.loadLabel;
+    else if (order === 5 && world5Salvage) stateChip = world5Salvage.salvageLabel;
+    else if (order === 6 && world6Command) stateChip = world6Command.commandLabel;
+    return { primaryLine, compactLine, stateChip };
+  }, [
+    activeWorldOrder,
+    world2Throughput,
+    world3Telemetry,
+    world4Reactor,
+    world5Salvage,
+    world6Command,
+  ]);
 
   const sectorWorldSnapshot = useMemo(
     () =>
@@ -12077,6 +12101,23 @@ export default function MleoBase() {
                     )}
                   </button>
                 </div>
+              </div>
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
+                <span
+                  className="inline-flex max-w-full items-center rounded-full border border-cyan-400/30 bg-gradient-to-r from-cyan-500/[0.12] to-slate-950/50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-cyan-100 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.1)] sm:text-[10px] sm:tracking-[0.17em]"
+                  title={`Active sector · world ${activeWorldOrder}`}
+                >
+                  <span className="truncate sm:hidden">{baseWorldHeaderIdentity.compactLine}</span>
+                  <span className="hidden truncate sm:inline">{baseWorldHeaderIdentity.primaryLine}</span>
+                </span>
+                {baseWorldHeaderIdentity.stateChip ? (
+                  <span
+                    className="inline-flex max-w-[min(100%,13rem)] shrink-0 truncate rounded-full border border-white/12 bg-white/[0.06] px-2 py-0.5 text-[9px] font-semibold capitalize leading-tight text-white/80 sm:max-w-[17rem] sm:text-[10px]"
+                    title={baseWorldHeaderIdentity.stateChip}
+                  >
+                    {baseWorldHeaderIdentity.stateChip}
+                  </span>
+                ) : null}
               </div>
               {/* subtitle removed */}
             </div>
