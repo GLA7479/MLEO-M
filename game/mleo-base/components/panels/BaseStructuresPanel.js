@@ -8,6 +8,24 @@ function AvailabilityBadge() {
   );
 }
 
+function TabCountBadge({ count, title, onBrightTab = false }) {
+  const n = Number(count || 0);
+  if (!n) return null;
+
+  return (
+    <span
+      title={title || ""}
+      className={`inline-flex min-w-6 h-6 shrink-0 items-center justify-center rounded-full px-2 text-[11px] font-black ${
+        onBrightTab
+          ? "bg-slate-950 text-cyan-300 ring-1 ring-cyan-900/40"
+          : "bg-cyan-400 text-slate-950"
+      }`}
+    >
+      {n > 99 ? "99+" : n}
+    </span>
+  );
+}
+
 function availabilityCardClass(isAvailable) {
   return isAvailable ? "border-cyan-400/30 bg-cyan-500/5" : "border-white/10 bg-black/20";
 }
@@ -15,6 +33,10 @@ function availabilityCardClass(isAvailable) {
 export function BaseStructuresPanel({
   structuresTab,
   onSetStructuresTab,
+  coreMissionReadyCount = 0,
+  coreAvailableBuildingsCount = 0,
+  expansionMissionReadyCount = 0,
+  expansionAvailableBuildingsCount = 0,
   cards,
   highlightTarget,
   powerSteps,
@@ -39,26 +61,46 @@ export function BaseStructuresPanel({
 
   return (
     <div>
-      <div className="mb-3 flex gap-2">
+      <div className="mb-3 flex flex-wrap gap-2">
         <button
           onClick={() => onSetStructuresTab("core")}
-          className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+          className={`flex flex-wrap items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold transition ${
             structuresTab === "core"
               ? "bg-cyan-400 text-slate-950"
               : "border border-white/10 bg-white/5 text-white/75"
           }`}
         >
-          Core
+          <span>Core</span>
+          <TabCountBadge
+            count={coreMissionReadyCount}
+            title="Daily missions ready to claim"
+            onBrightTab={structuresTab === "core"}
+          />
+          <TabCountBadge
+            count={coreAvailableBuildingsCount}
+            title="Affordable structure upgrades in Core"
+            onBrightTab={structuresTab === "core"}
+          />
         </button>
         <button
           onClick={() => onSetStructuresTab("expansion")}
-          className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+          className={`flex flex-wrap items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold transition ${
             structuresTab === "expansion"
               ? "bg-cyan-400 text-slate-950"
               : "border border-white/10 bg-white/5 text-white/75"
           }`}
         >
-          Expansion
+          <span>Expansion</span>
+          <TabCountBadge
+            count={expansionMissionReadyCount}
+            title="Daily missions ready to claim"
+            onBrightTab={structuresTab === "expansion"}
+          />
+          <TabCountBadge
+            count={expansionAvailableBuildingsCount}
+            title="Affordable structure upgrades in Expansion"
+            onBrightTab={structuresTab === "expansion"}
+          />
         </button>
       </div>
 

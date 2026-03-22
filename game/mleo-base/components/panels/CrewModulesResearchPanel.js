@@ -45,6 +45,25 @@ function AvailabilityBadge() {
   );
 }
 
+/** Same cyan count style as BuildPanelCards `SectionAvailabilityBadge` */
+function TabCountBadge({ count, title, onBrightTab = false }) {
+  const n = Number(count || 0);
+  if (!n) return null;
+
+  return (
+    <span
+      title={title || ""}
+      className={`inline-flex min-w-6 h-6 shrink-0 items-center justify-center rounded-full px-2 text-[11px] font-black ${
+        onBrightTab
+          ? "bg-slate-950 text-cyan-300 ring-1 ring-white/15"
+          : "bg-cyan-400 text-slate-950"
+      }`}
+    >
+      {n > 99 ? "99+" : n}
+    </span>
+  );
+}
+
 function availabilityCardClass(isAvailable) {
   return isAvailable ? "border-cyan-400/30 bg-cyan-500/5" : "border-white/10 bg-black/20";
 }
@@ -86,6 +105,10 @@ function QuickTags({ tags }) {
 export function CrewModulesResearchPanel({
   devTab,
   onSetDevTab,
+  modulesMissionReadyCount = 0,
+  researchMissionReadyCount = 0,
+  modulesAvailableCount = 0,
+  researchAvailableCount = 0,
   resources,
   highlightTarget,
   crewTab,
@@ -101,13 +124,33 @@ export function CrewModulesResearchPanel({
   onBuyResearch,
   onOpenResearchInfo,
 }) {
+  const crewHireAvailableCount = crewTab?.hireDisabled ? 0 : 1;
+
   return (
     <div className="space-y-3">
       <div className="flex gap-2 overflow-x-auto pb-1">
         {[
-          { key: "crew", label: "Crew" },
-          { key: "modules", label: "Modules" },
-          { key: "research", label: "Research" },
+          {
+            key: "crew",
+            label: "Crew",
+            missionReady: 0,
+            opportunityCount: crewHireAvailableCount,
+            opportunityTitle: "Ready to hire a worker",
+          },
+          {
+            key: "modules",
+            label: "Modules",
+            missionReady: modulesMissionReadyCount,
+            opportunityCount: modulesAvailableCount,
+            opportunityTitle: "Modules you can purchase now",
+          },
+          {
+            key: "research",
+            label: "Research",
+            missionReady: researchMissionReadyCount,
+            opportunityCount: researchAvailableCount,
+            opportunityTitle: "Research you can unlock now",
+          },
         ].map((tab) => {
           const active = devTab === tab.key;
 
@@ -115,11 +158,21 @@ export function CrewModulesResearchPanel({
             <button
               key={tab.key}
               onClick={() => onSetDevTab(tab.key)}
-              className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              className={`flex shrink-0 flex-wrap items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition ${
                 active ? "bg-cyan-500 text-white" : "border border-white/10 bg-white/5 text-white/70"
               }`}
             >
-              {tab.label}
+              <span>{tab.label}</span>
+              <TabCountBadge
+                count={tab.missionReady}
+                title="Daily missions ready to claim"
+                onBrightTab={active}
+              />
+              <TabCountBadge
+                count={tab.opportunityCount}
+                title={tab.opportunityTitle}
+                onBrightTab={active}
+              />
             </button>
           );
         })}

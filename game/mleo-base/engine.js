@@ -6,6 +6,8 @@ import {
   CREW_ROLES,
   DEFAULT_BUILDING_POWER_MODE,
   RUNTIME_CONTROLLED_BUILDINGS,
+  STRUCTURES_TAB_A,
+  STRUCTURES_TAB_B,
 } from "./data";
 
 const MAX_LOG_ITEMS = 16;
@@ -46,6 +48,8 @@ export const MISSION_GUIDANCE = {
     bestActionHint: "Use blueprint spend when the base is stable.",
     helperLine: "Spend vault on long-term upgrades, not panic buys.",
     target: { tab: "ops", target: "blueprint" },
+    /** Build → Development inner tab: daily mission ready badge */
+    devSubtab: "modules",
   },
   generate_data: {
     shortTitle: "Stabilize DATA flow",
@@ -55,6 +59,7 @@ export const MISSION_GUIDANCE = {
     bestActionHint: "Upgrade lab flow to keep DATA generation steady.",
     helperLine: "Keep lab-fed DATA flow stable.",
     target: { tab: "build", target: "researchLab" },
+    devSubtab: "research",
   },
   perform_maintenance: {
     shortTitle: "Maintain at the right time",
@@ -78,6 +83,20 @@ export const MISSION_GUIDANCE = {
 
 export function getMissionGuidance(missionKey) {
   return MISSION_GUIDANCE[missionKey] || null;
+}
+
+/**
+ * Base Structures tabs: which structure zone a claimable daily mission is associated with.
+ * `upgrade_building` applies to any structure upgrade → show on both Core and Expansion tabs.
+ */
+export function getMissionStructureSubtab(missionKey) {
+  if (missionKey === "upgrade_building") return "both";
+  const g = MISSION_GUIDANCE[missionKey];
+  const targetKey = g?.target?.tab === "build" ? g.target.target : null;
+  if (!targetKey || typeof targetKey !== "string") return null;
+  if (STRUCTURES_TAB_A.includes(targetKey)) return "core";
+  if (STRUCTURES_TAB_B.includes(targetKey)) return "expansion";
+  return null;
 }
 
 export function getMissionGuidancePriority(missionKey) {

@@ -83,6 +83,7 @@ import {
   getMissionProgress,
   getMissionGuidance,
   getMissionGuidancePriority,
+  getMissionStructureSubtab,
   getShipSoftcutFactor,
   normalizeServerState,
   normalizeSpecializationMilestonesClaimed,
@@ -6012,6 +6013,66 @@ export default function MleoBase() {
 
   const structuresAvailableCount = availableStructuresCount;
 
+  const availableExpansionStructuresCount = useMemo(() => {
+    return BUILDINGS.filter((def) => {
+      if (!STRUCTURES_TAB_B.includes(def.key)) return false;
+      const level = Number(state.buildings?.[def.key] || 0);
+      const cost = buildingCost(def, level);
+      return unlocked(def, state) && canCoverCost(state.resources, cost);
+    }).length;
+  }, [state.buildings, state.resources]);
+
+  const availableCoreStructuresCount = useMemo(() => {
+    return BUILDINGS.filter((def) => {
+      if (!STRUCTURES_TAB_A.includes(def.key)) return false;
+      const level = Number(state.buildings?.[def.key] || 0);
+      const cost = buildingCost(def, level);
+      return unlocked(def, state) && canCoverCost(state.resources, cost);
+    }).length;
+  }, [state.buildings, state.resources]);
+
+  const developmentModulesMissionReadyCount = useMemo(() => {
+    return DAILY_MISSIONS.filter((mission) => {
+      const progress = missionProgress[mission.key] || 0;
+      const done = progress >= mission.target;
+      const claimed = !!state.missionState?.claimed?.[mission.key];
+      if (!done || claimed) return false;
+      return getMissionGuidance(mission.key)?.devSubtab === "modules";
+    }).length;
+  }, [missionProgress, state.missionState]);
+
+  const developmentResearchMissionReadyCount = useMemo(() => {
+    return DAILY_MISSIONS.filter((mission) => {
+      const progress = missionProgress[mission.key] || 0;
+      const done = progress >= mission.target;
+      const claimed = !!state.missionState?.claimed?.[mission.key];
+      if (!done || claimed) return false;
+      return getMissionGuidance(mission.key)?.devSubtab === "research";
+    }).length;
+  }, [missionProgress, state.missionState]);
+
+  const structuresCoreMissionReadyCount = useMemo(() => {
+    return DAILY_MISSIONS.filter((mission) => {
+      const progress = missionProgress[mission.key] || 0;
+      const done = progress >= mission.target;
+      const claimed = !!state.missionState?.claimed?.[mission.key];
+      if (!done || claimed) return false;
+      const zone = getMissionStructureSubtab(mission.key);
+      return zone === "core" || zone === "both";
+    }).length;
+  }, [missionProgress, state.missionState]);
+
+  const structuresExpansionMissionReadyCount = useMemo(() => {
+    return DAILY_MISSIONS.filter((mission) => {
+      const progress = missionProgress[mission.key] || 0;
+      const done = progress >= mission.target;
+      const claimed = !!state.missionState?.claimed?.[mission.key];
+      if (!done || claimed) return false;
+      const zone = getMissionStructureSubtab(mission.key);
+      return zone === "expansion" || zone === "both";
+    }).length;
+  }, [missionProgress, state.missionState]);
+
   const operationsConsoleAvailableCount =
     Number(canExpeditionNow) +
     Number(canShipNow);
@@ -7445,6 +7506,10 @@ export default function MleoBase() {
     <CrewModulesResearchPanel
       devTab={devTab}
       onSetDevTab={setDevTab}
+      modulesMissionReadyCount={developmentModulesMissionReadyCount}
+      researchMissionReadyCount={developmentResearchMissionReadyCount}
+      modulesAvailableCount={availableModulesCount}
+      researchAvailableCount={availableResearchCount}
       resources={state.resources}
       highlightTarget={highlightTarget}
       crewTab={{
@@ -10505,6 +10570,10 @@ export default function MleoBase() {
     <BaseStructuresPanel
       structuresTab={structuresTab}
       onSetStructuresTab={setStructuresTab}
+      coreMissionReadyCount={structuresCoreMissionReadyCount}
+      coreAvailableBuildingsCount={availableCoreStructuresCount}
+      expansionMissionReadyCount={structuresExpansionMissionReadyCount}
+      expansionAvailableBuildingsCount={availableExpansionStructuresCount}
       cards={visibleStructuresVM}
       highlightTarget={highlightTarget}
       powerSteps={BUILDING_POWER_STEPS}
