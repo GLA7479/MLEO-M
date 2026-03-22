@@ -344,17 +344,17 @@ export function CrewModulesResearchPanel({
               <div className="mt-1 text-xs text-white/60">
                 One active modifier. Commander level unlocks options. Saved on server — one change per UTC day.
               </div>
-              <div className="mt-2 text-[11px] text-white/45">
-                In effect:{" "}
-                <span className="font-semibold text-cyan-200/90">
+              <div className="mt-2 text-xs text-white/55">
+                <span className="font-semibold text-white/75">In effect:</span>{" "}
+                <span className="font-semibold text-cyan-200">
                   {commandProtocolRows.find((r) => r.id === commandProtocolEffectiveId)?.name || "Standard Posture"}
                 </span>
                 {commandProtocolEffectiveId === "none" ? null : (
-                  <span className="text-white/35"> · Cmdr Lv {commandProtocolCommanderLevel}</span>
+                  <span className="text-white/40"> · Cmdr Lv {commandProtocolCommanderLevel}</span>
                 )}
               </div>
               {commandProtocolStoredId !== commandProtocolEffectiveId && commandProtocolStoredId !== "none" ? (
-                <div className="mt-1 text-[10px] text-amber-200/75">
+                <div className="mt-1 text-[11px] font-medium leading-snug text-amber-200/85">
                   Selection saved but inactive until commander level unlocks it.
                 </div>
               ) : null}
@@ -375,30 +375,32 @@ export function CrewModulesResearchPanel({
                       disabled={disableSelect}
                       className={`rounded-xl border px-3 py-2.5 text-left transition ${
                         isSel
-                          ? "border-cyan-400/60 bg-cyan-500/15"
+                          ? "border-cyan-400/70 bg-cyan-500/15 ring-1 ring-cyan-400/25"
                           : "border-white/10 bg-white/5 hover:bg-white/10"
                       } ${disableSelect && !isSel ? "cursor-not-allowed opacity-50" : ""}`}
                     >
-                      <div className="text-sm font-semibold text-white">{row.name}</div>
-                      {row.family && COMMAND_PROTOCOL_FAMILY_LABEL[row.family] ? (
-                        <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white/35">
-                          {COMMAND_PROTOCOL_FAMILY_LABEL[row.family]}
-                        </div>
-                      ) : null}
-                      <div className="mt-0.5 text-[11px] text-white/55">{row.shortDesc}</div>
-                      {row.bestWhen ? (
-                        <div className="mt-1 text-[10px] leading-snug text-white/40">{row.bestWhen}</div>
-                      ) : null}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1 text-sm font-semibold text-white">{row.name}</div>
+                        {isSel ? (
+                          <span className="shrink-0 rounded-full border border-cyan-400/40 bg-cyan-500/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-cyan-100">
+                            Selected
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-0.5 text-[11px] leading-snug text-white/55">{row.shortDesc}</div>
                       {row.locked ? (
-                        <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/85">
+                        <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-amber-200/90">
                           Unlocks Cmdr Lv {row.minCommanderLevel}
                         </div>
                       ) : null}
-                      {isSel ? (
-                        <div className="mt-2">
-                          <span className="inline-flex rounded-full border border-cyan-400/35 bg-cyan-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-cyan-100">
-                            Selected
-                          </span>
+                      {row.family && COMMAND_PROTOCOL_FAMILY_LABEL[row.family] ? (
+                        <span className="mt-1 inline-flex max-w-full rounded-md border border-white/12 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/50">
+                          {COMMAND_PROTOCOL_FAMILY_LABEL[row.family]}
+                        </span>
+                      ) : null}
+                      {row.bestWhen ? (
+                        <div className="mt-1.5 border-l border-white/15 pl-2 text-[10px] leading-relaxed text-white/38">
+                          {row.bestWhen}
                         </div>
                       ) : null}
                     </button>

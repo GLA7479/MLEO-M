@@ -77,6 +77,7 @@ import {
 } from "./mleo-base/data";
 import {
   applyPhase1ACommandProtocolToDerivedRates,
+  COMMAND_PROTOCOL_FAMILY_LABEL,
   isCommandProtocolUnlocked,
   normalizeCommandProtocolId,
   PHASE_1A_COMMAND_PROTOCOLS,
@@ -5129,6 +5130,10 @@ export default function MleoBase() {
         return "build-development";
       }
 
+      if (normalizedStep.target === "command-protocol") {
+        return "build-development";
+      }
+
       return null;
     })();
 
@@ -5143,7 +5148,7 @@ export default function MleoBase() {
         typeof window !== "undefined" &&
         window.matchMedia("(max-width: 639px)").matches;
 
-      if (normalizedStep.target === "crew") {
+      if (normalizedStep.target === "crew" || normalizedStep.target === "command-protocol") {
         setDevTab("crew");
       }
 
@@ -5695,6 +5700,17 @@ export default function MleoBase() {
     state.commandProtocolLastSwapDay,
     state.commanderLevel,
   ]);
+
+  /** Phase 1D: passive header strip (derive-only; no new server state). */
+  const commandProtocolSurface = useMemo(() => {
+    const effectiveId = commandProtocolUi.effectiveId;
+    const storedId = commandProtocolUi.storedId;
+    const def = PHASE_1A_COMMAND_PROTOCOLS.find((p) => p.id === effectiveId);
+    const name = def?.name || "Standard Posture";
+    const family = effectiveId === "none" ? null : def?.family || null;
+    const mismatch = storedId !== effectiveId && storedId !== "none";
+    return { effectiveId, name, family, mismatch };
+  }, [commandProtocolUi.effectiveId, commandProtocolUi.storedId]);
 
   const contractClaimedMap = useMemo(
     () => state?.contractState?.claimed || state?.contract_state?.claimed || {},
@@ -12158,6 +12174,42 @@ export default function MleoBase() {
                     {baseWorldHeaderIdentity.stateChip}
                   </span>
                 ) : null}
+                <button
+                  type="button"
+                  onClick={() => navigateToBaseTarget({ tab: "build", target: "command-protocol" })}
+                  title="Open Command Protocol (Development → Crew)"
+                  className={`inline-flex max-w-[min(100%,16rem)] shrink-0 items-center gap-1.5 truncate rounded-full border px-2 py-0.5 text-left transition hover:bg-white/[0.08] sm:max-w-[20rem] ${
+                    commandProtocolSurface.mismatch
+                      ? "border-amber-400/35 bg-amber-500/[0.07]"
+                      : commandProtocolSurface.effectiveId !== "none"
+                      ? "border-cyan-400/30 bg-cyan-500/[0.06]"
+                      : "border-white/12 bg-white/[0.05]"
+                  }`}
+                >
+                  <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/40">
+                    Doctrine
+                  </span>
+                  <span
+                    className={`min-w-0 truncate text-[10px] font-semibold leading-tight ${
+                      commandProtocolSurface.effectiveId === "none" ? "text-white/55" : "text-white/90"
+                    }`}
+                  >
+                    {commandProtocolSurface.name}
+                  </span>
+                  {commandProtocolSurface.mismatch ? (
+                    <span className="shrink-0 text-[9px] font-bold text-amber-200/90">Pending</span>
+                  ) : commandProtocolSurface.effectiveId === "none" ? (
+                    <span className="shrink-0 text-[9px] text-white/35">Neutral</span>
+                  ) : (
+                    <span className="shrink-0 text-[9px] font-semibold text-cyan-200/65">Active</span>
+                  )}
+                  {commandProtocolSurface.family &&
+                  COMMAND_PROTOCOL_FAMILY_LABEL[commandProtocolSurface.family] ? (
+                    <span className="hidden shrink-0 rounded border border-white/10 px-1 py-px text-[8px] font-semibold uppercase tracking-wide text-white/45 sm:inline">
+                      {COMMAND_PROTOCOL_FAMILY_LABEL[commandProtocolSurface.family]}
+                    </span>
+                  ) : null}
+                </button>
               </div>
               {/* subtitle removed */}
             </div>
