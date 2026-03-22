@@ -4330,7 +4330,7 @@ function BaseHomeFlowScene({ base, derived, selected, onSelect, layout = "mobile
 
   const links = nodes.filter((n) => n.key !== "hq" && n.pos);
 
-  return (
+  const panel = (
     <BaseHomeFlowScenePanel
       layout={layout}
       hq={hq}
@@ -4341,6 +4341,11 @@ function BaseHomeFlowScene({ base, derived, selected, onSelect, layout = "mobile
       theme={mapTheme}
     />
   );
+
+  if (layout === "desktop") {
+    return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{panel}</div>;
+  }
+  return panel;
 }
 
 export default function MleoBase() {
@@ -12711,9 +12716,9 @@ export default function MleoBase() {
                   `,
                 }}
               >
-                <div className="absolute inset-0 p-6">
-                  <div className="mx-auto flex h-full max-w-[1320px] flex-col">
-                    <div className="mb-2 grid grid-cols-4 gap-2 xl:grid-cols-8">
+                <div className="absolute inset-0 p-3">
+                  <div className="mx-auto flex h-full min-h-0 max-w-[1320px] flex-col">
+                    <div className="mb-2 shrink-0 grid grid-cols-4 gap-2 xl:grid-cols-8">
                       {desktopHudItems.map((item) => {
                         const focus = item.tone === "focus";
 
@@ -12746,7 +12751,7 @@ export default function MleoBase() {
                       })}
                     </div>
 
-                    <div className="min-h-0 flex-1 -mt-1">
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col -mt-1">
                       <BaseHomeFlowScene
                         base={state}
                         derived={derived}

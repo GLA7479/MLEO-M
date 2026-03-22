@@ -43,11 +43,14 @@ export function BaseHomeFlowScenePanel({
     return resolveWorldMapTheme(base, layout);
   }, [themeInput, layout]);
 
+  /** Desktop: grow with the map panel flex region (no fixed 16/7 inset card). */
   const aspectOuter = isDesktop
-    ? "relative mx-auto w-full max-w-[1180px] aspect-[16/7] overflow-visible"
+    ? "relative h-full min-h-0 w-full flex-1 overflow-visible"
     : "relative mx-auto w-full max-w-md aspect-[3/5] overflow-hidden";
 
   const shellClass = [theme.mapShellClassName].filter(Boolean).join(" ").trim();
+  const shellLayout = isDesktop ? "flex min-h-0 h-full w-full flex-1 flex-col" : "";
+  const shellCombined = [shellClass, shellLayout].filter(Boolean).join(" ").trim();
   const innerClass = [aspectOuter, theme.mapInnerClassName].filter(Boolean).join(" ").trim();
 
   /** Selected route paints last so it reads above crossings (no double-stroke). */
@@ -65,7 +68,7 @@ export function BaseHomeFlowScenePanel({
       : "";
 
   const mapCore = (
-    <div className={shellClass || undefined} style={theme.mapShellStyle}>
+    <div className={shellCombined || undefined} style={theme.mapShellStyle}>
       <div className={innerClass} style={theme.mapInnerStyle}>
         {theme.overlays?.length
           ? theme.overlays.map((layer) => (

@@ -148,7 +148,6 @@ const WORLD_2_MAP_THEME = {
     ),
   ],
   mobileAdjustments: {
-    mapMobileRootClassName: "-mt-1 translate-y-2",
     mapInnerClassName: "ring-cyan-400/20",
     linkStrokeLinecap: "round",
     linkSelected: { stroke: "rgba(34,211,238,0.5)", width: "0.58", dash: "1.2 0.7" },
@@ -269,7 +268,6 @@ const WORLD_3_MAP_THEME = {
     ),
   ],
   mobileAdjustments: {
-    mapMobileRootClassName: "-mt-1 translate-y-2",
     linkSelected: { stroke: "rgba(224,242,254,0.62)", width: "0.58", dash: "0.35 0.85" },
     selectedRingClassName:
       "ring-2 ring-cyan-200/98 ring-offset-1 ring-offset-slate-950 scale-[1.03] shadow-[0_0_18px_rgba(34,211,238,0.48)]",
@@ -381,7 +379,6 @@ const WORLD_4_MAP_THEME = {
     ),
   ],
   mobileAdjustments: {
-    mapMobileRootClassName: "-mt-1 translate-y-2",
     linkSelected: { stroke: "rgba(255,247,230,0.48)", width: "0.6", dash: "0.65 0.6" },
     selectedRingClassName:
       "ring-2 ring-orange-100/98 ring-offset-1 ring-offset-slate-950 scale-[1.03] shadow-[0_0_20px_rgba(249,115,22,0.48)]",
@@ -486,7 +483,6 @@ const WORLD_5_MAP_THEME = {
     ),
   ],
   mobileAdjustments: {
-    mapMobileRootClassName: "-mt-1 translate-y-2",
     linkSelected: { stroke: "rgba(110,231,183,0.46)", width: "0.54", dash: "2.2 0.4" },
     selectedRingClassName:
       "ring-2 ring-emerald-200/95 ring-offset-1 ring-offset-slate-950 scale-[1.03] shadow-[0_0_16px_rgba(16,185,129,0.38)]",
@@ -591,7 +587,6 @@ const WORLD_6_MAP_THEME = {
     ),
   ],
   mobileAdjustments: {
-    mapMobileRootClassName: "-mt-1 translate-y-2",
     linkSelected: { stroke: "rgba(255,255,255,0.4)", width: "0.52", dash: "2.2 1.25" },
     selectedRingClassName:
       "ring-2 ring-cyan-50/98 ring-offset-1 ring-offset-slate-950 scale-[1.03] shadow-[0_0_18px_rgba(34,211,238,0.44)]",
