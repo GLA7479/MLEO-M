@@ -5714,6 +5714,21 @@ export default function MleoBase() {
     return { effectiveId, name, family, mismatch };
   }, [commandProtocolUi.effectiveId, commandProtocolUi.storedId]);
 
+  /** Header doctrine chip: below sm, one compact line to avoid triple-label truncation in a narrow pill. */
+  const commandProtocolMobileChipLine = useMemo(() => {
+    const { effectiveId, mismatch } = commandProtocolSurface;
+    if (mismatch) return "DOC · Hold";
+    if (effectiveId === "none") return "DOC · Baseline";
+    const tail = {
+      steady_ops: "Steady",
+      liquidity_drill: "Gold+",
+      signal_focus: "DATA+",
+      gold_over_watch: "Gold OW",
+      data_over_watch: "DATA OW",
+    }[effectiveId];
+    return tail ? `DOC · ${tail}` : `DOC · ${commandProtocolSurface.name}`;
+  }, [commandProtocolSurface]);
+
   const contractClaimedMap = useMemo(
     () => state?.contractState?.claimed || state?.contract_state?.claimed || {},
     [state?.contractState, state?.contract_state]
@@ -12213,8 +12228,8 @@ export default function MleoBase() {
                 <button
                   type="button"
                   onClick={() => navigateToBaseTarget({ tab: "build", target: "command-protocol" })}
-                  title="Protocol stack · Build → Development → Crew"
-                  className={`inline-flex min-w-0 max-w-[min(100%,11rem)] shrink-0 items-center gap-1 truncate rounded-full border px-1.5 py-0.5 text-left transition hover:bg-white/[0.08] sm:max-w-[14rem] sm:gap-1.5 sm:px-2 lg:max-w-[min(15rem,24vw)] ${
+                  title={`${commandProtocolSurface.name}${commandProtocolSurface.mismatch ? " · stored not effective" : ""} · Build → Development → Crew`}
+                  className={`inline-flex max-w-[min(100%,9.75rem)] shrink-0 items-center rounded-full border px-2 py-0.5 text-left transition hover:bg-white/[0.08] sm:max-w-[15rem] sm:px-2 sm:py-0.5 lg:max-w-[min(16rem,24vw)] ${
                     commandProtocolSurface.mismatch
                       ? "border-amber-400/15 bg-amber-400/[0.05]"
                       : commandProtocolSurface.effectiveId !== "none"
@@ -12222,41 +12237,58 @@ export default function MleoBase() {
                       : "border-white/10 bg-white/[0.03]"
                   }`}
                 >
-                  <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/40">
-                    Doctrine
-                  </span>
                   <span
-                    className={`min-w-0 truncate text-[10px] font-semibold leading-tight ${
-                      commandProtocolSurface.effectiveId === "none" ? "text-white/50" : "text-cyan-50/95"
+                    className={`min-w-0 truncate text-[9px] font-semibold leading-tight sm:hidden ${
+                      commandProtocolSurface.mismatch
+                        ? "text-amber-100/80"
+                        : commandProtocolSurface.effectiveId === "none"
+                        ? "text-white/60"
+                        : "text-cyan-100/90"
                     }`}
                   >
-                    {commandProtocolSurface.name}
+                    {commandProtocolMobileChipLine}
                   </span>
-                  {commandProtocolSurface.mismatch ? (
-                    <span className="shrink-0 text-[9px] font-medium text-amber-100/70">Not effective</span>
-                  ) : commandProtocolSurface.effectiveId === "none" ? (
-                    <span className="shrink-0 text-[9px] font-normal text-white/32">Baseline</span>
-                  ) : (
-                    <span className="shrink-0 text-[9px] font-semibold text-cyan-200/80">Live</span>
-                  )}
-                  {commandProtocolSurface.family &&
-                  COMMAND_PROTOCOL_FAMILY_LABEL[commandProtocolSurface.family] ? (
-                    <span className="hidden shrink-0 rounded border border-white/[0.08] px-1 py-px text-[8px] font-medium uppercase tracking-wide text-white/35 sm:inline">
-                      {COMMAND_PROTOCOL_FAMILY_LABEL[commandProtocolSurface.family]}
+                  <span className="hidden min-w-0 flex-1 items-center gap-1 truncate sm:inline-flex sm:gap-1.5">
+                    <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/40">
+                      Doctrine
                     </span>
-                  ) : null}
+                    <span
+                      className={`min-w-0 truncate text-[10px] font-semibold leading-tight ${
+                        commandProtocolSurface.effectiveId === "none" ? "text-white/50" : "text-cyan-50/95"
+                      }`}
+                    >
+                      {commandProtocolSurface.name}
+                    </span>
+                    {commandProtocolSurface.mismatch ? (
+                      <span className="shrink-0 text-[9px] font-medium text-amber-100/70">Not effective</span>
+                    ) : commandProtocolSurface.effectiveId === "none" ? (
+                      <span className="shrink-0 text-[9px] font-normal text-white/32">Baseline</span>
+                    ) : (
+                      <span className="shrink-0 text-[9px] font-semibold text-cyan-200/80">Live</span>
+                    )}
+                    {commandProtocolSurface.family &&
+                    COMMAND_PROTOCOL_FAMILY_LABEL[commandProtocolSurface.family] ? (
+                      <span className="hidden shrink-0 rounded border border-white/[0.08] px-1 py-px text-[8px] font-medium uppercase tracking-wide text-white/35 md:inline">
+                        {COMMAND_PROTOCOL_FAMILY_LABEL[commandProtocolSurface.family]}
+                      </span>
+                    ) : null}
+                  </span>
                 </button>
               </div>
               {/* subtitle removed */}
             </div>
 
-            <div className="hidden w-full min-w-0 flex-nowrap items-center justify-start gap-1.5 overflow-x-auto pb-0.5 no-scrollbar sm:flex md:mt-0 md:flex-1 md:justify-end md:pb-0 lg:mt-0 lg:flex-none lg:w-auto lg:shrink-0 lg:justify-end lg:overflow-visible lg:gap-2">
+            <div className="hidden w-full min-w-0 flex-nowrap items-center justify-start gap-1.5 overflow-x-auto pb-0.5 no-scrollbar sm:flex md:mt-0 md:min-w-0 md:flex-1 md:justify-end md:pb-0 lg:mt-0 lg:max-w-full lg:justify-end lg:gap-1.5 xl:gap-2">
               <button
                 type="button"
                 onClick={handleCommandHubBarClick}
-                className={`flex min-w-0 shrink-0 items-center rounded-2xl border px-2.5 py-0 transition h-[42px] min-h-[42px] max-h-[42px] overflow-visible sm:px-3 md:max-w-[min(17rem,22vw)] lg:max-w-[min(19rem,24vw)] xl:max-w-[21rem] ${
+                className={`group flex h-[42px] min-h-[42px] max-h-[42px] items-center overflow-hidden rounded-2xl border px-2.5 py-0 transition sm:px-3 ${
                   commandHubCount > 0
-                    ? `cursor-pointer shadow-[0_0_24px_rgba(34,211,238,0.18)] hover:border-cyan-400/80 ${
+                    ? "w-full min-w-[14rem] flex-1 basis-0 sm:min-w-[15rem] md:min-w-[18rem] lg:min-w-[20rem] lg:max-w-[min(52rem,72%)] xl:min-w-[22rem] xl:max-w-[56rem]"
+                    : "w-auto max-w-[18rem] shrink-0 min-w-[11rem]"
+                } ${
+                  commandHubCount > 0
+                    ? `cursor-pointer shadow-[0_0_24px_rgba(34,211,238,0.18)] ring-2 ring-cyan-400/35 hover:border-cyan-400/80 hover:ring-cyan-300/60 hover:shadow-[0_0_32px_rgba(34,211,238,0.26)] active:brightness-[1.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70 ${
                         primaryCommandItem?.type === "alert"
                           ? alertToneClasses(primaryCommandItem.tone)
                           : "border-cyan-400/60 bg-cyan-500/10 hover:bg-cyan-500/15"
@@ -12264,9 +12296,9 @@ export default function MleoBase() {
                     : "border-white/10 bg-white/5"
                 } ${commandHubCount > 0 ? "animate-pulse" : ""}`}
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                <div className="flex w-full min-w-0 items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1 overflow-hidden pr-1">
+                    <div className="flex min-w-0 items-center gap-1.5">
                       <div
                         className={`min-w-0 whitespace-nowrap overflow-hidden text-ellipsis font-bold text-white leading-[1.1] ${desktopPrimaryTitleClass}`}
                         title={desktopPrimaryTitle}
@@ -12283,9 +12315,9 @@ export default function MleoBase() {
                   </div>
 
                   <div
-                    className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-semibold leading-none transition ${
+                    className={`shrink-0 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-bold leading-none shadow-inner transition group-hover:border-white/25 group-hover:bg-cyan-400 sm:rounded-xl sm:px-3 ${
                       commandHubCount > 0
-                        ? "bg-cyan-500 text-white hover:bg-cyan-400"
+                        ? "bg-cyan-500 text-white ring-1 ring-cyan-200/25"
                         : "bg-white/10 text-white/80"
                     }`}
                   >
@@ -12296,7 +12328,7 @@ export default function MleoBase() {
 
               <Link
                 href="/mining"
-                className={`shrink-0 rounded-xl border px-3 py-2.5 text-sm font-semibold transition lg:px-4 ${
+                className={`shrink-0 rounded-xl border px-2.5 py-2.5 text-sm font-semibold transition lg:px-3 ${
                   hubGameplayOnline
                     ? "border-cyan-400/70 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/20 shadow-[0_0_24px_rgba(34,211,238,0.22)]"
                     : "border-cyan-400/35 bg-cyan-500/8 text-cyan-200/85 hover:bg-cyan-500/12"
@@ -12312,7 +12344,7 @@ export default function MleoBase() {
                     setShowBankedPanel((v) => !v);
                     setShowReadyPanel(false);
                   }}
-                  className={`relative rounded-xl border px-3 h-[42px] flex flex-col items-center justify-center gap-1 transition ${getBankedSummaryButtonClasses(
+                  className={`relative flex h-[42px] flex-col items-center justify-center gap-1 rounded-xl border px-2.5 transition lg:px-2.5 ${getBankedSummaryButtonClasses(
                     bankedSummary.tone,
                     showBankedPanel
                   )}`}
@@ -12367,7 +12399,7 @@ export default function MleoBase() {
 
               <button
                 onClick={() => setShowHowToPlay(true)}
-                className="shrink-0 rounded-xl border border-blue-500/25 bg-blue-500/10 px-3 py-2.5 text-sm font-semibold text-blue-200 hover:bg-blue-500/20 lg:px-4"
+                className="shrink-0 rounded-xl border border-blue-500/25 bg-blue-500/10 px-2.5 py-2.5 text-xs font-semibold text-blue-200 hover:bg-blue-500/20 sm:text-sm lg:px-3"
               >
                 HOW TO PLAY
               </button>
@@ -12375,7 +12407,7 @@ export default function MleoBase() {
               <button
                 type="button"
                 onClick={() => setOpenInfoKey("sharedVault")}
-                className="shrink-0 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2.5 text-sm font-semibold text-violet-200 hover:bg-violet-500/18 lg:px-4"
+                className="shrink-0 rounded-xl border border-violet-500/30 bg-violet-500/10 px-2.5 py-2.5 text-xs font-semibold text-violet-200 hover:bg-violet-500/18 sm:text-sm lg:px-3"
                 title="Shared Vault"
               >
                 VAULT {fmt(sharedVault)} MLEO
@@ -12384,14 +12416,14 @@ export default function MleoBase() {
               {isConnected ? (
                 <button
                   onClick={() => openAccountModal?.()}
-                  className="shrink-0 rounded-xl bg-white/10 px-3 py-2.5 text-sm font-semibold hover:bg-white/20 lg:px-4"
+                  className="shrink-0 rounded-xl bg-white/10 px-2.5 py-2.5 text-sm font-semibold hover:bg-white/20 lg:px-3"
                 >
                   {address?.slice(0, 6)}…{address?.slice(-4)}
                 </button>
               ) : (
                 <button
                   onClick={() => openConnectModal?.()}
-                  className="shrink-0 rounded-xl bg-rose-600 px-3 py-2.5 text-sm font-semibold hover:bg-rose-500 lg:px-4"
+                  className="shrink-0 rounded-xl bg-rose-600 px-2.5 py-2.5 text-sm font-semibold hover:bg-rose-500 lg:px-3"
                 >
                   Connect
                 </button>
