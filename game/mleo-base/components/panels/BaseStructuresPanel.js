@@ -299,7 +299,7 @@ export function BaseStructuresPanel({
               ) : null}
 
               {card.supportsPrograms && card.milestoneCards?.length ? (
-                <div className="mt-2 rounded-2xl border border-amber-400/18 bg-gradient-to-br from-amber-500/10 via-emerald-500/6 to-transparent px-2.5 py-2">
+                <div className="mt-2 rounded-2xl bg-gradient-to-br from-amber-500/10 via-emerald-500/6 to-transparent px-2.5 py-2 ring-0 outline-none">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <div className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-200/85">
@@ -313,7 +313,7 @@ export function BaseStructuresPanel({
                       type="button"
                       onClick={() => toggleSection(card.key, "milestones")}
                       aria-expanded={milestonesOpen}
-                      className="shrink-0 rounded-lg border border-amber-400/35 bg-amber-500/15 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-amber-50 transition hover:bg-amber-500/25"
+                      className="shrink-0 rounded-lg border border-amber-400/35 bg-amber-500/15 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-amber-50 outline-none ring-0 transition hover:bg-amber-500/25 focus-visible:ring-2 focus-visible:ring-amber-400/45 focus-visible:ring-offset-0"
                     >
                       {milestonesOpen ? "CLOSE" : "OPEN"}
                     </button>
