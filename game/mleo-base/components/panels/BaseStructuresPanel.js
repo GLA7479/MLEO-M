@@ -150,10 +150,10 @@ export function BaseStructuresPanel({
                 {card.desc}
               </div>
 
-              {/* Content row: left meta/status stack + right upgrade impact box */}
-              <div className="mt-1.5 grid grid-cols-1 items-center gap-y-2 md:grid-cols-[1fr_auto] md:gap-x-3">
+              {/* Content row: left meta/status stack + right upgrade impact box (same two-column layout as desktop on all breakpoints) */}
+              <div className="mt-1.5 grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2">
                 {/* LEFT column */}
-                <div className="flex flex-col gap-1">
+                <div className="min-w-0 flex flex-col gap-1">
                   {/* Meta badges row: Production/Utility/Core + Synergy */}
                   <div className="min-h-[24px] max-h-[24px] overflow-hidden">
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -186,7 +186,7 @@ export function BaseStructuresPanel({
                 </div>
 
                 {/* RIGHT column */}
-                <div className="h-[34px] flex items-center">
+                <div className="flex min-h-[34px] shrink-0 items-center justify-self-end">
                   {card.upgradeImpactPreview ? (
                     <div className="rounded-lg border border-cyan-400/20 bg-cyan-500/8 px-2.5 py-1">
                       <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/70">
