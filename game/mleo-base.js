@@ -2207,6 +2207,8 @@ function DesktopFloatingPanelShell({
 function BankedQuickPanel({
   snapshot,
   bankedValue,
+  /** Precomputed in parent via useMemo — avoids re-running guidance simulation on every Banked HUD tick. */
+  guidanceItems: guidanceItemsProp,
   state,
   derived,
   systemState,
@@ -2214,12 +2216,14 @@ function BankedQuickPanel({
   onNavigate,
 }) {
   const s = snapshot || {};
-  const guidanceItems = getBankedGuidanceItems({
-    state,
-    derived,
-    snapshot,
-    systemState,
-  });
+  const guidanceItems =
+    guidanceItemsProp ??
+    getBankedGuidanceItems({
+      state,
+      derived,
+      snapshot,
+      systemState,
+    });
 
   const handleNavigate = (target) => {
     onClose?.();
@@ -10128,6 +10132,7 @@ export default function MleoBase() {
                     <BankedQuickPanel
                       snapshot={bankedSnapshot}
                       bankedValue={bankedDisplayValue}
+                      guidanceItems={bankedGuidanceItems}
                       state={state}
                       derived={derived}
                       systemState={systemState}
@@ -10862,6 +10867,7 @@ export default function MleoBase() {
                   <BankedQuickPanel
                     snapshot={bankedSnapshot}
                     bankedValue={bankedDisplayValue}
+                    guidanceItems={bankedGuidanceItems}
                     state={state}
                     derived={derived}
                     systemState={systemState}
