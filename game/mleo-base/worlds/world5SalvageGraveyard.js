@@ -1,7 +1,12 @@
 /**
- * World 5 — Salvage Graveyard (sector identity + panel copy only).
- * Read-only display — no economy, cap, or progression changes.
+ * World 5 — Salvage Graveyard
+ * Sector identity + salvage gameplay readout.
  */
+
+import {
+  buildWorld5SalvageAlert,
+  getWorld5SalvagePressureSnapshot,
+} from "./world5Gameplay";
 
 export const world5SalvageGraveyard = {
   id: "world5",
@@ -12,14 +17,14 @@ export const world5SalvageGraveyard = {
 
 export const WORLD5_SECTOR_IDENTITY = {
   badgeLabel: "Salvage graveyard",
-  tagline: "Scrap tides · recovery loops · maintenance under fire",
+  tagline: "Recovery pressure · repair loops · sustained salvage discipline",
   descriptor:
-    "This sector assumes sustained wear: salvage throughput, backlog pressure, and repair discipline decide whether you rebuild or break under the higher daily ceiling.",
-  focusShort: "Salvage · recovery · maintenance & repair support",
+    "This sector rewards healthy recovery loops: scrap stock, repair follow-through, and avoiding the maintenance drag that comes from forcing salvage too hard.",
+  focusShort: "Scrap · recovery loops · maintenance stress",
   playstyleHint:
-    "Let salvage and repair cadence lead; clear maintenance before chasing aggressive refinery stretches.",
+    "Build salvage in rhythm with repair support; do not let raw recovery pressure outrun maintenance quality.",
   sectorPressureNote:
-    "4600-class output accelerates wear — keep repair bay and stability in reserve for rough efficiency windows.",
+    "Higher throughput here turns neglect into drag quickly — salvage harder only when reserves and repair are clean.",
 };
 
 function fmtInt(n) {
@@ -27,78 +32,76 @@ function fmtInt(n) {
   return Number.isFinite(v) ? String(v) : "0";
 }
 
-function fmtMaint(n) {
-  const v = Number(n);
-  if (!Number.isFinite(v)) return "0.0";
-  return v.toFixed(1).replace(/\.0$/, "");
-}
-
-/**
- * Read-only salvage / recovery line from existing state.
- */
-export function getWorld5SalvageSnapshot(state) {
-  const scrap = Math.floor(Number(state?.resources?.SCRAP ?? 0));
-  const maintenanceDue = Number(state?.maintenanceDue ?? state?.maintenance_due ?? 0);
-  const stability = Number(state?.stability ?? 100);
-
-  const salvageLv = Math.max(0, Math.floor(Number(state?.buildings?.salvage ?? 0)));
-  const repairLv = Math.max(0, Math.floor(Number(state?.buildings?.repairBay ?? 0)));
-  const repairTier = Math.max(1, Math.floor(Number(state?.buildingTiers?.repairBay ?? 1)));
-
-  const summaryLine = `Scrap ${fmtInt(scrap)} in reserve · Maintenance ${fmtMaint(
-    maintenanceDue
-  )} due · Salvage L${fmtInt(salvageLv)} · Repair bay L${fmtInt(repairLv)} / T${fmtInt(
-    repairTier
-  )} · Stability ${fmtInt(stability)}%`;
-
-  return {
-    scrap,
-    maintenanceDue,
-    stability,
-    salvageLv,
-    repairLv,
-    repairTier,
-    summaryLine,
-  };
-}
-
 function world5ProgressionNote(ctx) {
   const nextName = ctx?.nextWorldName;
   const canDeploy = !!ctx?.canDeployToNextWorld;
-  if (!nextName) return "Final sector — hold the yard; recovery is the win condition.";
+
+  if (!nextName) return "Terminal graveyard posture — recover cleanly and waste nothing.";
+
   if (canDeploy) {
-    return `Next: ${nextName} — salvage gates cleared. Deploy when ready for the final pressure tier.`;
+    return `Next: ${nextName} — salvage gates satisfied. Deploy when ready for full-system command pressure.`;
   }
-  return `Working toward ${nextName}: tier-4 split, deeper program grid, and elite volume still ahead — pace recovery, not ego.`;
+
+  return `Working toward ${nextName}: recovery tiers, elite spread, and repair resilience still need to harden before advance.`;
 }
 
-/**
- * @param {object} state
- * @param {object} _derived unused (kept for router parity)
- * @param {{ nextWorldName?: string | null, canDeployToNextWorld?: boolean }} [ctx]
- */
-export function buildWorld5PanelFlavor(state, _derived, ctx = {}) {
+export function getWorld5SalvageSnapshot(state, derived = {}) {
+  const salvage = getWorld5SalvagePressureSnapshot(state, derived);
+  const scrapStored = Math.floor(Number(state?.resources?.SCRAP ?? state?.resources?.scrap ?? 0));
+
+  return {
+    scrapStored,
+    salvage,
+    alert: buildWorld5SalvageAlert(salvage),
+    summaryLine: salvage
+      ? `${salvage.compactLine} · ${salvage.recoveryLine}`
+      : `Scrap ${fmtInt(scrapStored)} in reserve`,
+  };
+}
+
+export function buildWorld5PanelFlavor(state, derived, ctx = {}) {
   const id = WORLD5_SECTOR_IDENTITY;
-  const snap = getWorld5SalvageSnapshot(state);
+  const flow = getWorld5SalvageSnapshot(state, derived);
+  const salvage = flow.salvage;
+
+  const overviewHint =
+    salvage?.salvageKey === "rich"
+      ? "Rich recovery: strong moment to push salvage while repair stays aligned."
+      : salvage?.salvageKey === "strained"
+        ? "Strained recovery: repair and reserve quality need attention before more pressure."
+        : "Stable recovery: keep salvage and maintenance in balance.";
 
   return {
     worldOrder: 5,
     panelShellClassName:
-      "border-teal-400/25 bg-gradient-to-br from-teal-500/[0.07] via-transparent to-zinc-600/[0.06]",
+      "border-emerald-400/25 bg-gradient-to-br from-emerald-500/[0.07] via-transparent to-amber-500/[0.05]",
     badgeLabel: id.badgeLabel,
     tagline: id.tagline,
     descriptor: id.descriptor,
     focusShort: id.focusShort,
-    playstyleHint: id.playstyleHint,
-    sectorPressureNote: id.sectorPressureNote,
+    playstyleHint: salvage?.actionHint || id.playstyleHint,
+    sectorPressureNote: salvage?.reason || id.sectorPressureNote,
     progressionNote: world5ProgressionNote(ctx),
-    flowMetricLine: snap.summaryLine,
-    overviewStripTitle: "Salvage graveyard",
-    overviewHint:
-      "Treat scrap and maintenance as front-line resources — higher cap increases strain; rebuild loops before you chase peak output.",
+    flowMetricLine: flow.summaryLine,
+    overviewStripTitle: salvage ? `${id.badgeLabel} · ${salvage.salvageLabel}` : "Salvage graveyard",
+    overviewHint,
     overviewStripShellClassName:
-      "rounded-xl border border-teal-400/25 bg-teal-950/40 px-3 py-2 text-[11px] leading-snug text-teal-50/90",
+      salvage?.salvageKey === "rich"
+        ? "rounded-xl border border-emerald-400/25 bg-emerald-500/[0.10] px-3 py-2 text-[11px] leading-snug text-emerald-50/90"
+        : salvage?.salvageKey === "strained"
+          ? "rounded-xl border border-amber-400/25 bg-amber-500/[0.10] px-3 py-2 text-[11px] leading-snug text-amber-50/90"
+          : "rounded-xl border border-emerald-400/25 bg-emerald-500/[0.08] px-3 py-2 text-[11px] leading-snug text-emerald-50/90",
     overviewStripTitleClassName:
-      "font-black uppercase tracking-[0.14em] text-teal-200/90",
+      salvage?.salvageKey === "strained"
+        ? "font-black uppercase tracking-[0.14em] text-amber-200/90"
+        : "font-black uppercase tracking-[0.14em] text-emerald-200/90",
+    extraLines: salvage
+      ? [
+          salvage.systemsLine,
+          salvage.recoveryLine,
+          `Priority: ${salvage.priority}`,
+          `Recommendation: ${salvage.recommendation}`,
+        ]
+      : [],
   };
 }

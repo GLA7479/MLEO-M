@@ -656,6 +656,7 @@ export function OverviewPanelCards({
   sectorDeployBusy,
   onDevSectorServerStateApplied,
   devSectorShowToast,
+  systemsHint,
 }) {
   const actionFallback =
     nextStep && (nextStep?.title || nextStep?.text)
@@ -691,12 +692,19 @@ export function OverviewPanelCards({
           {worldOverviewHint}
         </div>
       ) : null}
-      <BaseStatusBlock
-        status={{
-          ...(safeOverview.baseStatus || {}),
-          chips: safeOverview.bottleneckChips || [],
-        }}
-      />
+      {systemsHint ? (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/65">
+          {systemsHint}
+        </div>
+      ) : null}
+      <div data-base-target="systems">
+        <BaseStatusBlock
+          status={{
+            ...(safeOverview.baseStatus || {}),
+            chips: safeOverview.bottleneckChips || [],
+          }}
+        />
+      </div>
       <BottleneckBlock bottleneck={safeOverview.bottleneck} onNavigate={onNavigate} />
       <NextActionBlock action={safeOverview.nextAction || actionFallback} onNavigate={onNavigate} />
       <RecoveryHintBlock hint={safeOverview.recoveryHint} onNavigate={onNavigate} />

@@ -78,6 +78,7 @@ export function OperationsConsolePanel({
             <p className="mt-1 text-sm text-white/70">
               Send your field team to gather resources.
             </p>
+            {expedition.expeditionHint}
 
             <div className="mt-3 flex flex-wrap gap-2">
               <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-bold text-cyan-200">

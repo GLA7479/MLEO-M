@@ -106,10 +106,14 @@ import {
   buildWorld2FreightAlert,
   buildWorld3TelemetryAlert,
   buildWorld4ReactorAlert,
+  buildWorld5SalvageAlert,
+  buildWorld6CommandAlert,
   getSectorWorldProgressSnapshot,
   getWorld2ThroughputSnapshot,
   getWorld3TelemetrySnapshot,
   getWorld4ReactorSnapshot,
+  getWorld5SalvagePressureSnapshot,
+  getWorld6CommandSnapshot,
   getWorldDailyMleoCapByOrder,
   resolveSectorWorldOrder,
 } from "./mleo-base/worlds";
@@ -146,6 +150,26 @@ function worldReactorToneClass(loadKey) {
     return "border-orange-400/30 bg-orange-500/[0.12] text-orange-100";
   }
   if (loadKey === "strained") {
+    return "border-rose-400/30 bg-rose-500/[0.12] text-rose-100";
+  }
+  return "border-sky-400/25 bg-sky-500/[0.08] text-sky-100";
+}
+
+function worldSalvageToneClass(salvageKey) {
+  if (salvageKey === "rich") {
+    return "border-emerald-400/30 bg-emerald-500/[0.12] text-emerald-100";
+  }
+  if (salvageKey === "strained") {
+    return "border-amber-400/30 bg-amber-500/[0.12] text-amber-100";
+  }
+  return "border-sky-400/25 bg-sky-500/[0.08] text-sky-100";
+}
+
+function worldCommandToneClass(commandKey) {
+  if (commandKey === "harmonized") {
+    return "border-cyan-400/30 bg-cyan-500/[0.12] text-cyan-100";
+  }
+  if (commandKey === "fractured") {
     return "border-rose-400/30 bg-rose-500/[0.12] text-rose-100";
   }
   return "border-sky-400/25 bg-sky-500/[0.08] text-sky-100";
@@ -293,7 +317,9 @@ function getAlerts(
   liveContracts = [],
   world2FreightAlertRow = null,
   world3TelemetryAlertRow = null,
-  world4ReactorAlertRow = null
+  world4ReactorAlertRow = null,
+  world5SalvageAlertRow = null,
+  world6CommandAlertRow = null
 ) {
   const alerts = [];
 
@@ -355,6 +381,26 @@ function getAlerts(
       tone: "success",
       title: "Contract reward ready",
       text: `${claimableContracts} command contract${claimableContracts > 1 ? "s are" : " is"} ready to claim.`,
+    });
+  }
+
+  if (world6CommandAlertRow) {
+    alerts.unshift({
+      key: world6CommandAlertRow.key,
+      tone: world6CommandAlertRow.tone,
+      title: world6CommandAlertRow.title,
+      text: world6CommandAlertRow.text,
+      world6Target: world6CommandAlertRow.target,
+    });
+  }
+
+  if (world5SalvageAlertRow) {
+    alerts.unshift({
+      key: world5SalvageAlertRow.key,
+      tone: world5SalvageAlertRow.tone,
+      title: world5SalvageAlertRow.title,
+      text: world5SalvageAlertRow.text,
+      world5Target: world5SalvageAlertRow.target,
     });
   }
 
@@ -4863,6 +4909,8 @@ export default function MleoBase() {
   }
 
   function getAlertNavigationTarget(item) {
+    if (item?.world6Target) return item.world6Target;
+    if (item?.world5Target) return item.world5Target;
     if (item?.world4Target) return item.world4Target;
     if (item?.world3Target) return item.world3Target;
     if (item?.world2Target) return item.world2Target;
@@ -4871,6 +4919,17 @@ export default function MleoBase() {
 
     if (key === "world3-telemetry-noisy" || key === "world3-telemetry-clean") {
       return { tab: "crew", target: "research" };
+    }
+
+    if (key === "world6-command-fractured" || key === "world6-command-harmonized") {
+      return { tab: "overview", target: "systems" };
+    }
+
+    if (key === "world5-salvage-strained") {
+      return { tab: "operations", target: "maintenance" };
+    }
+    if (key === "world5-salvage-rich") {
+      return { tab: "operations", target: "expedition" };
     }
 
     if (key === "world4-reactor-strained") {
@@ -5571,6 +5630,35 @@ export default function MleoBase() {
     [world4Reactor]
   );
 
+  const world5Salvage = useMemo(() => {
+    if (activeWorldOrder !== 5) return null;
+    return getWorld5SalvagePressureSnapshot(state, derived);
+  }, [activeWorldOrder, state, derived]);
+
+  const world5SalvageAlert = useMemo(
+    () => buildWorld5SalvageAlert(world5Salvage),
+    [world5Salvage]
+  );
+
+  const world6Command = useMemo(() => {
+    if (activeWorldOrder !== 6) return null;
+    return getWorld6CommandSnapshot(state, derived);
+  }, [activeWorldOrder, state, derived]);
+
+  const world6CommandAlert = useMemo(
+    () => buildWorld6CommandAlert(world6Command),
+    [world6Command]
+  );
+
+  const world6SystemsOverviewHint =
+    world6Command != null
+      ? `Command: ${world6Command.commandLabel} · ${
+          world6Command.recommendedPushNow
+            ? "good integrated push window"
+            : "better to stabilize / align first"
+        }`
+      : null;
+
   const sectorWorldSnapshot = useMemo(
     () =>
       getSectorWorldProgressSnapshot(state, derived, {
@@ -6005,7 +6093,9 @@ export default function MleoBase() {
         liveContracts,
         world2FreightAlert,
         world3TelemetryAlert,
-        world4ReactorAlert
+        world4ReactorAlert,
+        world5SalvageAlert,
+        world6CommandAlert
       ),
     [
       state,
@@ -6015,6 +6105,8 @@ export default function MleoBase() {
       world2FreightAlert,
       world3TelemetryAlert,
       world4ReactorAlert,
+      world5SalvageAlert,
+      world6CommandAlert,
     ]
   );
   const desktopPriorityAlert = alerts[0] || null;
@@ -6046,6 +6138,8 @@ export default function MleoBase() {
         ...(alert.world2Target ? { world2Target: alert.world2Target } : {}),
         ...(alert.world3Target ? { world3Target: alert.world3Target } : {}),
         ...(alert.world4Target ? { world4Target: alert.world4Target } : {}),
+        ...(alert.world5Target ? { world5Target: alert.world5Target } : {}),
+        ...(alert.world6Target ? { world6Target: alert.world6Target } : {}),
       });
     });
 
@@ -7143,6 +7237,10 @@ export default function MleoBase() {
         const loot = res.loot || {};
         const xpGain = Number(res?.xp_gain || 0);
 
+        const salvageSuffix = world5Salvage
+          ? ` [${world5Salvage.salvageLabel} · ${world5Salvage.disciplineScore}/100]`
+          : "";
+
         setState((prev) => {
           const next = mergeAuthoritativeServerState(prev, serverState);
           next.log = pushLog(
@@ -7151,7 +7249,7 @@ export default function MleoBase() {
               loot.gold || 0
             } GOLD, ${loot.scrap || 0} SCRAP, ${loot.data || 0} DATA${
               loot.bankedMleo ? ` and ${loot.bankedMleo} MLEO` : ""
-            }.`
+            }.${salvageSuffix}`
           );
           if (expeditionToastNonceRef.current !== now) {
             expeditionToastNonceRef.current = now;
@@ -7171,11 +7269,16 @@ export default function MleoBase() {
             if (xpGain > 0) rewardParts.push(`+${fmt(xpGain)} XP`);
 
             const breakdown = rewardParts.length ? ` · ${rewardParts.join(" · ")}` : "";
+            const salvageToastTail = world5Salvage
+              ? ` · ${world5Salvage.salvageLabel} · ${world5Salvage.disciplineScore}/100`
+              : "";
 
             showToast(
               rewardParts.length
-                ? `Expedition complete · field gains secured${breakdown}`
-                : res?.message || "Expedition completed."
+                ? `Expedition complete · field gains secured${breakdown}${salvageToastTail}`
+                : world5Salvage
+                  ? `${res?.message || "Expedition completed."}${salvageToastTail}`
+                  : res?.message || "Expedition completed."
             );
           }
           return next;
@@ -7852,6 +7955,15 @@ export default function MleoBase() {
           setOpenInfoKey(null);
         },
         onLaunch: handleLaunchExpedition,
+        expeditionHint:
+          world5Salvage != null ? (
+            <span className="mt-1 block text-[11px] text-white/65">
+              Recovery: {world5Salvage.salvageLabel} ·{" "}
+              {world5Salvage.recommendedSalvageNow
+                ? "good salvage window"
+                : "better to stabilize first"}
+            </span>
+          ) : null,
       }}
       blueprint={{
         highlighted: false, // Blueprint card didn't have ring highlight in the original code.
@@ -7908,10 +8020,19 @@ export default function MleoBase() {
             </span>
           ) : null,
         maintenanceHint:
-          world4Reactor != null ? (
-            <span className="mt-1 block text-[11px] text-white/65">
-              Thermal state: {world4Reactor.reactorState} · {world4Reactor.priority}
-            </span>
+          world4Reactor != null || world5Salvage != null ? (
+            <>
+              {world4Reactor != null ? (
+                <span className="mt-1 block text-[11px] text-white/65">
+                  Thermal state: {world4Reactor.reactorState} · {world4Reactor.priority}
+                </span>
+              ) : null}
+              {world5Salvage != null ? (
+                <span className="mt-1 block text-[11px] text-white/65">
+                  Salvage state: {world5Salvage.salvageState} · {world5Salvage.priority}
+                </span>
+              ) : null}
+            </>
           ) : null,
       }}
     />
@@ -7919,6 +8040,29 @@ export default function MleoBase() {
 
   const operationsConsoleContentMobile = (
     <>
+      {world5Salvage ? (
+        <div
+          className={`mb-3 rounded-2xl border px-3 py-2.5 ${worldSalvageToneClass(
+            world5Salvage.salvageKey
+          )}`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-[0.16em] opacity-75">
+                Salvage Graveyard
+              </div>
+              <div className="truncate text-sm font-semibold">
+                {world5Salvage.salvageLabel} · {world5Salvage.disciplineScore}/100
+              </div>
+            </div>
+            <div className="rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-bold">
+              {world5Salvage.recommendedSalvageNow ? "PUSH" : "HOLD"}
+            </div>
+          </div>
+
+          <div className="mt-2 text-[11px] opacity-80">{world5Salvage.priority}</div>
+        </div>
+      ) : null}
       {world4Reactor ? (
         <div
           className={`mb-3 rounded-2xl border px-3 py-2.5 ${worldReactorToneClass(
@@ -11258,6 +11402,26 @@ export default function MleoBase() {
         setHighlightTarget("overclock");
         return;
       }
+
+      if (item.alertKey === "world5-salvage-strained") {
+        openMobilePanel("ops");
+        setOpenInnerPanel("ops-console");
+        setHighlightTarget("maintenance");
+        return;
+      }
+
+      if (item.alertKey === "world5-salvage-rich") {
+        openMobilePanel("ops");
+        setOpenInnerPanel("ops-console");
+        setHighlightTarget("expedition");
+        return;
+      }
+
+      if (item.alertKey === "world6-command-fractured" || item.alertKey === "world6-command-harmonized") {
+        openMobilePanel("overview");
+        setHighlightTarget("systems");
+        return;
+      }
     }
   };
 
@@ -12461,6 +12625,65 @@ export default function MleoBase() {
                   <div ref={desktopPanelScrollRef} className="h-[calc(100%-81px)] overflow-y-auto px-5 py-4">
                     {desktopPanel === "overview" ? (
                       <DesktopPanelSection resourceBar={compactResourceBar}>
+                        {world6Command ? (
+                          <div
+                            className={`mb-3 rounded-2xl border px-3 py-3 ${worldCommandToneClass(
+                              world6Command.commandKey
+                            )}`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="text-[10px] font-black uppercase tracking-[0.18em] opacity-80">
+                                  Nexus Prime
+                                </div>
+                                <div className="text-sm font-semibold">
+                                  {world6Command.flowHeadline} · {world6Command.commandLabel}
+                                </div>
+                                <div className="mt-1 text-[12px] opacity-85">
+                                  {world6Command.actionHint}
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] font-bold">
+                                {world6Command.chipText}
+                              </div>
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-1 gap-2 text-[11px] opacity-85 sm:grid-cols-2 xl:grid-cols-4">
+                              <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">
+                                  Discipline
+                                </div>
+                                <div className="mt-1 text-sm font-semibold">
+                                  {world6Command.disciplineScore}/100
+                                </div>
+                              </div>
+
+                              <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">
+                                  Priority
+                                </div>
+                                <div className="mt-1 text-sm font-semibold">{world6Command.priority}</div>
+                              </div>
+
+                              <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">
+                                  Systems
+                                </div>
+                                <div className="mt-1 text-sm font-semibold">{world6Command.systemsLine}</div>
+                              </div>
+
+                              <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">
+                                  Reserves
+                                </div>
+                                <div className="mt-1 text-sm font-semibold">{world6Command.reservesLine}</div>
+                              </div>
+                            </div>
+
+                            <div className="mt-2 text-[11px] opacity-75">{world6Command.recommendation}</div>
+                          </div>
+                        ) : null}
                         <OverviewPanelCards
                           openInnerPanel={openInnerPanel}
                           toggleInnerPanel={toggleInnerPanel}
@@ -12488,6 +12711,7 @@ export default function MleoBase() {
                           sectorDeployBusy={isActionLocked("sectorDeploy")}
                           onDevSectorServerStateApplied={handleDevSectorServerState}
                           devSectorShowToast={showToast}
+                          systemsHint={world6SystemsOverviewHint}
                         />
                       </DesktopPanelSection>
                     ) : null}
@@ -12910,6 +13134,29 @@ export default function MleoBase() {
 
                   {mobilePanel === "overview" ? (
                     <MobilePanelSection resourceBar={mobileCompactResourceBar}>
+                      {world6Command ? (
+                        <div
+                          className={`mb-3 rounded-2xl border px-3 py-2.5 ${worldCommandToneClass(
+                            world6Command.commandKey
+                          )}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-[10px] font-black uppercase tracking-[0.16em] opacity-75">
+                                Nexus Prime
+                              </div>
+                              <div className="truncate text-sm font-semibold">
+                                {world6Command.commandLabel} · {world6Command.disciplineScore}/100
+                              </div>
+                            </div>
+                            <div className="rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-bold">
+                              {world6Command.recommendedPushNow ? "PUSH" : "HOLD"}
+                            </div>
+                          </div>
+
+                          <div className="mt-2 text-[11px] opacity-80">{world6Command.priority}</div>
+                        </div>
+                      ) : null}
                       <OverviewPanelCards
                         openInnerPanel={openInnerPanel}
                         toggleInnerPanel={toggleInnerPanel}
@@ -12937,6 +13184,7 @@ export default function MleoBase() {
                         sectorDeployBusy={isActionLocked("sectorDeploy")}
                         onDevSectorServerStateApplied={handleDevSectorServerState}
                         devSectorShowToast={showToast}
+                        systemsHint={world6SystemsOverviewHint}
                       />
                     </MobilePanelSection>
                   ) : null}
@@ -13530,6 +13778,59 @@ export default function MleoBase() {
                     derived.dailyMleoCap ?? derived.shipCap
                   )}. Ship banked MLEO to Shared Vault anytime (no daily ship limit).`}
                 >
+                  {world5Salvage ? (
+                    <div
+                      className={`mb-3 rounded-2xl border px-3 py-3 ${worldSalvageToneClass(
+                        world5Salvage.salvageKey
+                      )}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-black uppercase tracking-[0.18em] opacity-80">
+                            Salvage Graveyard
+                          </div>
+                          <div className="text-sm font-semibold">
+                            {world5Salvage.flowHeadline} · {world5Salvage.salvageLabel}
+                          </div>
+                          <div className="mt-1 text-[12px] opacity-85">
+                            {world5Salvage.actionHint}
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] font-bold">
+                          {world5Salvage.chipText}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-1 gap-2 text-[11px] opacity-85 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Discipline</div>
+                          <div className="mt-1 text-sm font-semibold">
+                            {world5Salvage.disciplineScore}/100
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Priority</div>
+                          <div className="mt-1 text-sm font-semibold">{world5Salvage.priority}</div>
+                        </div>
+
+                        <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Systems</div>
+                          <div className="mt-1 text-sm font-semibold">{world5Salvage.systemsLine}</div>
+                        </div>
+
+                        <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Recovery</div>
+                          <div className="mt-1 text-sm font-semibold">{world5Salvage.recoveryLine}</div>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 text-[11px] opacity-75">
+                        {world5Salvage.recommendation}
+                      </div>
+                    </div>
+                  ) : null}
                   {world4Reactor ? (
                     <div
                       className={`mb-3 rounded-2xl border px-3 py-3 ${worldReactorToneClass(
@@ -13717,6 +14018,14 @@ export default function MleoBase() {
                         <p className="mt-1 text-sm text-white/70">
                           Send your field team to gather resources.
                         </p>
+                        {world5Salvage ? (
+                          <span className="mt-1 block text-[11px] text-white/65">
+                            Recovery: {world5Salvage.salvageLabel} ·{" "}
+                            {world5Salvage.recommendedSalvageNow
+                              ? "good salvage window"
+                              : "better to stabilize first"}
+                          </span>
+                        ) : null}
 
                         <div className="mt-3 grid grid-cols-3 gap-2">
                           {["balanced", "scan", "salvage"].map((mode) => (
@@ -13935,10 +14244,19 @@ export default function MleoBase() {
                               : "better to stabilize first"}
                           </span>
                         ) : null}
-                        {world4Reactor ? (
-                          <span className="mt-1 block text-[11px] text-white/65">
-                            Thermal state: {world4Reactor.reactorState} · {world4Reactor.priority}
-                          </span>
+                        {world4Reactor != null || world5Salvage != null ? (
+                          <>
+                            {world4Reactor != null ? (
+                              <span className="mt-1 block text-[11px] text-white/65">
+                                Thermal state: {world4Reactor.reactorState} · {world4Reactor.priority}
+                              </span>
+                            ) : null}
+                            {world5Salvage != null ? (
+                              <span className="mt-1 block text-[11px] text-white/65">
+                                Salvage state: {world5Salvage.salvageState} · {world5Salvage.priority}
+                              </span>
+                            ) : null}
+                          </>
                         ) : null}
                       </div>
 

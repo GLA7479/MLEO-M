@@ -14,7 +14,6 @@ export {
   buildWorld2PanelFlavor,
   getWorld2FlowSnapshot,
 } from "./world2FreightOrbit";
-
 export {
   buildWorld2FreightAlert,
   getWorld2ThroughputSnapshot,
@@ -24,7 +23,6 @@ export {
   buildWorld3PanelFlavor,
   getWorld3SignalSnapshot,
 } from "./world3SignalWastes";
-
 export {
   buildWorld3TelemetryAlert,
   getWorld3TelemetrySnapshot,
@@ -39,5 +37,20 @@ export {
   getWorld4ReactorSnapshot,
 } from "./world4Gameplay";
 
-export { buildWorld5PanelFlavor, getWorld5SalvageSnapshot } from "./world5SalvageGraveyard";
-export { buildWorld6PanelFlavor, getWorld6NexusSnapshot } from "./world6NexusPrime";
+export {
+  buildWorld5PanelFlavor,
+  getWorld5SalvageSnapshot,
+} from "./world5SalvageGraveyard";
+export {
+  buildWorld5SalvageAlert,
+  getWorld5SalvagePressureSnapshot,
+} from "./world5Gameplay";
+
+export {
+  buildWorld6PanelFlavor,
+  getWorld6NexusSnapshot,
+} from "./world6NexusPrime";
+export {
+  buildWorld6CommandAlert,
+  getWorld6CommandSnapshot,
+} from "./world6Gameplay";
