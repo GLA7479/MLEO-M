@@ -1,3 +1,5 @@
+import { ExpandablePanelSectionHeader } from "./ExpandablePanelSectionHeader";
+
 const GROUP_ORDER = ["infrastructure", "specialization", "execution", "stability"];
 
 const GROUP_LABELS = {
@@ -13,7 +15,7 @@ function fmtCap(n) {
   return new Intl.NumberFormat("en-US").format(Math.floor(v));
 }
 
-export function WorldSectorPanel({ snapshot, onDeploy, deployBusy }) {
+export function WorldSectorPanel({ snapshot, onDeploy, deployBusy, openInnerPanel, toggleInnerPanel }) {
   if (!snapshot) return null;
 
   const {
@@ -29,23 +31,43 @@ export function WorldSectorPanel({ snapshot, onDeploy, deployBusy }) {
 
   const atMax = !nextWorldOrder;
   const shellExtra = panelFlavor?.panelShellClassName || "";
+  const openKey = "overview-world-sector";
+  const isOpen = openInnerPanel === openKey;
+  const statusLabel = atMax
+    ? "Final sector"
+    : canDeployToNextWorld
+      ? "Ready to deploy"
+      : "Locked";
+  const worldHint = !isOpen
+    ? `${currentWorldName} · Daily cap ${fmtCap(currentDailyCap)} · ${statusLabel}${
+        panelFlavor?.badgeLabel ? ` · ${panelFlavor.badgeLabel}` : ""
+      }`
+    : null;
 
   return (
     <div
       className={`rounded-2xl border border-cyan-400/20 bg-gradient-to-br from-cyan-500/[0.07] to-transparent p-4 ${shellExtra}`.trim()}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <ExpandablePanelSectionHeader
+        panelKey={openKey}
+        openInnerPanel={openInnerPanel}
+        toggleInnerPanel={toggleInnerPanel}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Sector / world</div>
+          {isOpen && panelFlavor?.badgeLabel ? (
+            <span className="inline-flex max-w-full rounded-full border border-amber-400/35 bg-amber-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-amber-100/95">
+              {panelFlavor.badgeLabel}
+            </span>
+          ) : null}
+        </div>
+        {worldHint ? <div className="mt-1 text-xs text-white/55">{worldHint}</div> : null}
+      </ExpandablePanelSectionHeader>
+
+      {isOpen ? (
+        <>
+      <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-200/75">
-              Sector / world
-            </div>
-            {panelFlavor?.badgeLabel ? (
-              <span className="inline-flex max-w-full rounded-full border border-amber-400/35 bg-amber-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-amber-100/95">
-                {panelFlavor.badgeLabel}
-              </span>
-            ) : null}
-          </div>
           <div className="mt-1 text-lg font-black text-white">{currentWorldName}</div>
           {panelFlavor?.tagline ? (
             <div className="mt-1 text-[11px] leading-snug text-amber-100/75">{panelFlavor.tagline}</div>
@@ -166,6 +188,8 @@ export function WorldSectorPanel({ snapshot, onDeploy, deployBusy }) {
         >
           {deployBusy ? "Deploying…" : "Deploy to next sector"}
         </button>
+      ) : null}
+        </>
       ) : null}
     </div>
   );

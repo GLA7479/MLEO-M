@@ -177,82 +177,131 @@ function NextActionBlock({ action, onNavigate }) {
   );
 }
 
-function RatesBlock({ rates }) {
+function RatesBlock({ rates, openInnerPanel, toggleInnerPanel }) {
   if (!rates) return null;
+  const openKey = "overview-rates";
+  const isOpen = openInnerPanel === openKey;
+  const ratesHint = !isOpen
+    ? `Refinery ${rates.refineryState || "—"} · Banked/hr ${formatValue(rates.bankedPerHour)} · Proj/day ${formatValue(
+        rates.projectedPerDay
+      )}`
+    : null;
+
   return (
     <CardShell>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-        Live Rates
-      </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MiniStat label="Banked / hr" value={`${formatValue(rates.bankedPerHour)}`} />
-        <MiniStat label="Projected / day" value={`${formatValue(rates.projectedPerDay)}`} />
-        <MiniStat label="ORE / hr" value={`${formatValue(rates.orePerHour)}`} />
-        <MiniStat label="DATA / hr" value={`${formatValue(rates.dataPerHour)}`} />
-      </div>
+      <ExpandablePanelSectionHeader
+        panelKey={openKey}
+        openInnerPanel={openInnerPanel}
+        toggleInnerPanel={toggleInnerPanel}
+      >
+        <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Live Rates</div>
+        {ratesHint ? <div className="mt-1 text-xs text-white/55">{ratesHint}</div> : null}
+      </ExpandablePanelSectionHeader>
 
-      <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/55">
-        <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5">
-          Refinery: {rates.refineryState || "Unknown"}
-        </span>
-        {(() => {
-          const eta =
-            rates.etaToMleoCapHours != null ? rates.etaToMleoCapHours : rates.etaToShipCapHours;
-          return eta != null ? (
+      {isOpen ? (
+        <>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MiniStat label="Banked / hr" value={`${formatValue(rates.bankedPerHour)}`} />
+            <MiniStat label="Projected / day" value={`${formatValue(rates.projectedPerDay)}`} />
+            <MiniStat label="ORE / hr" value={`${formatValue(rates.orePerHour)}`} />
+            <MiniStat label="DATA / hr" value={`${formatValue(rates.dataPerHour)}`} />
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/55">
             <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5">
-              MLEO cap ETA: {formatValue(eta, 1)}h
+              Refinery: {rates.refineryState || "Unknown"}
             </span>
-          ) : null;
-        })()}
-      </div>
+            {(() => {
+              const eta =
+                rates.etaToMleoCapHours != null ? rates.etaToMleoCapHours : rates.etaToShipCapHours;
+              return eta != null ? (
+                <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5">
+                  MLEO cap ETA: {formatValue(eta, 1)}h
+                </span>
+              ) : null;
+            })()}
+          </div>
+        </>
+      ) : null}
     </CardShell>
   );
 }
 
-function StabilityBlock({ stability }) {
+function StabilityBlock({ stability, openInnerPanel, toggleInnerPanel }) {
   if (!stability) return null;
 
+  const openKey = "overview-stability";
+  const isOpen = openInnerPanel === openKey;
+  const stabilityHint = !isOpen
+    ? `${formatValue(stability.value)}% stability · ${stability.impactLabel || "Impact"} · ${
+        stability.pressureLabel || "Pressure"
+      }`
+    : null;
+
   return (
     <CardShell>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-        Stability Insight
-      </div>
+      <ExpandablePanelSectionHeader
+        panelKey={openKey}
+        openInnerPanel={openInnerPanel}
+        toggleInnerPanel={toggleInnerPanel}
+      >
+        <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Stability Insight</div>
+        {stabilityHint ? <div className="mt-1 text-xs text-white/55">{stabilityHint}</div> : null}
+      </ExpandablePanelSectionHeader>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MiniStat label="Stability" value={`${formatValue(stability.value)}%`} />
-        <MiniStat label="Impact" value={stability.impactLabel} note={stability.impactText} />
-        <MiniStat label="Pressure" value={stability.pressureLabel} note={stability.pressureText} />
-        <MiniStat label="Repair Support" value={stability.repairSupportLabel} note={stability.repairSupportText} />
-      </div>
+      {isOpen ? (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MiniStat label="Stability" value={`${formatValue(stability.value)}%`} />
+          <MiniStat label="Impact" value={stability.impactLabel} note={stability.impactText} />
+          <MiniStat label="Pressure" value={stability.pressureLabel} note={stability.pressureText} />
+          <MiniStat label="Repair Support" value={stability.repairSupportLabel} note={stability.repairSupportText} />
+        </div>
+      ) : null}
     </CardShell>
   );
 }
 
-function DailyProgressBlock({ progress }) {
+function DailyProgressBlock({ progress, openInnerPanel, toggleInnerPanel }) {
   if (!progress) return null;
+
+  const openKey = "overview-daily-progress";
+  const isOpen = openInnerPanel === openKey;
+  const mleoCur =
+    (progress.mleoDailyProgress?.current ?? progress.shipProgress?.current) || 0;
+  const mleoMax = (progress.mleoDailyProgress?.max ?? progress.shipProgress?.max) || 0;
+  const dailyHint = !isOpen
+    ? `MLEO ${formatValue(mleoCur)}/${formatValue(mleoMax)} · Expeditions ${formatValue(
+        progress.expeditionsDone || 0,
+        0
+      )} · Missions ${formatValue(progress.missionsReady || 0, 0)} ready`
+    : null;
+
   return (
     <CardShell>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-        Daily Progress
-      </div>
+      <ExpandablePanelSectionHeader
+        panelKey={openKey}
+        openInnerPanel={openInnerPanel}
+        toggleInnerPanel={toggleInnerPanel}
+      >
+        <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Daily Progress</div>
+        {dailyHint ? <div className="mt-1 text-xs text-white/55">{dailyHint}</div> : null}
+      </ExpandablePanelSectionHeader>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MiniStat
-          label="Daily MLEO (BASE)"
-          value={`${formatValue(
-            (progress.mleoDailyProgress?.current ?? progress.shipProgress?.current) || 0
-          )}/${formatValue(
-            (progress.mleoDailyProgress?.max ?? progress.shipProgress?.max) || 0
-          )}`}
-        />
-        <MiniStat label="Expeditions" value={formatValue(progress.expeditionsDone || 0, 0)} />
-        <MiniStat label="Maintenance" value={formatValue(progress.maintenanceDone || 0, 0)} />
-        <MiniStat
-          label="Missions"
-          value={`${formatValue(progress.missionsReady || 0, 0)} ready`}
-          note={`${formatValue(progress.missionsCompleted || 0, 0)} completed`}
-        />
-      </div>
+      {isOpen ? (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MiniStat
+            label="Daily MLEO (BASE)"
+            value={`${formatValue(mleoCur)}/${formatValue(mleoMax)}`}
+          />
+          <MiniStat label="Expeditions" value={formatValue(progress.expeditionsDone || 0, 0)} />
+          <MiniStat label="Maintenance" value={formatValue(progress.maintenanceDone || 0, 0)} />
+          <MiniStat
+            label="Missions"
+            value={`${formatValue(progress.missionsReady || 0, 0)} ready`}
+            note={`${formatValue(progress.missionsCompleted || 0, 0)} completed`}
+          />
+        </div>
+      ) : null}
     </CardShell>
   );
 }
@@ -422,10 +471,18 @@ function IdentityCard({
   );
 }
 
-function SpecializationSummaryCard({ summary, onNavigate }) {
+function SpecializationSummaryCard({ summary, onNavigate, openInnerPanel, toggleInnerPanel }) {
   if (!summary?.buildings?.length) return null;
   const t = summary.totals || {};
   const rec = summary.topRecommendation || {};
+
+  const openKey = "overview-specialization";
+  const isOpen = openInnerPanel === openKey;
+  const specHint = !isOpen
+    ? `Late-game · Tiers ${t.supportBuildingsTier2Plus ?? 0}/3 · Programs ${t.totalUnlockedPrograms ?? 0} unlocked · ${
+        t.totalClaimableMilestones ?? 0
+      } milestone${(t.totalClaimableMilestones ?? 0) === 1 ? "" : "s"} ready`
+    : null;
 
   const statMini = (label, value, accentClass = "text-white") => (
     <div className="rounded-xl border border-white/10 bg-black/25 px-2 py-2 sm:px-3 sm:py-2.5">
@@ -438,107 +495,114 @@ function SpecializationSummaryCard({ summary, onNavigate }) {
 
   return (
     <CardShell className="border-cyan-400/15 bg-gradient-to-br from-cyan-500/[0.06] via-violet-500/[0.04] to-amber-500/[0.04]">
-      <SectionHeader
-        title="Specialization"
-        hint="Late-game command layer"
-        right={null}
-      />
+      <ExpandablePanelSectionHeader
+        panelKey={openKey}
+        openInnerPanel={openInnerPanel}
+        toggleInnerPanel={toggleInnerPanel}
+      >
+        <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Specialization</div>
+        {specHint ? <div className="mt-1 text-xs text-white/55">{specHint}</div> : null}
+      </ExpandablePanelSectionHeader>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {statMini(
-          "Tiers",
-          `${t.supportBuildingsTier2Plus ?? 0}/3`,
-          "text-cyan-200"
-        )}
-        {statMini(
-          "Programs",
-          `${t.totalUnlockedPrograms ?? 0} unlocked · ${t.totalActivePrograms ?? 0} active`,
-          "text-violet-200"
-        )}
-        {statMini(
-          "Milestones",
-          `${t.totalClaimedMilestones ?? 0}/${t.totalMilestoneSlots || 6} · ${
-            t.totalClaimableMilestones ?? 0
-          } ready`,
-          "text-amber-100"
-        )}
-        {statMini(
-          "Adv. contracts",
-          `${t.totalVisibleAdvancedContracts ?? 0} shown · ${t.totalReadyAdvancedContracts ?? 0} ready`,
-          "text-cyan-100"
-        )}
-      </div>
+      {isOpen ? (
+        <>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {statMini(
+              "Tiers",
+              `${t.supportBuildingsTier2Plus ?? 0}/3`,
+              "text-cyan-200"
+            )}
+            {statMini(
+              "Programs",
+              `${t.totalUnlockedPrograms ?? 0} unlocked · ${t.totalActivePrograms ?? 0} active`,
+              "text-violet-200"
+            )}
+            {statMini(
+              "Milestones",
+              `${t.totalClaimedMilestones ?? 0}/${t.totalMilestoneSlots || 6} · ${
+                t.totalClaimableMilestones ?? 0
+              } ready`,
+              "text-amber-100"
+            )}
+            {statMini(
+              "Adv. contracts",
+              `${t.totalVisibleAdvancedContracts ?? 0} shown · ${t.totalReadyAdvancedContracts ?? 0} ready`,
+              "text-cyan-100"
+            )}
+          </div>
 
-      {rec.text ? (
-        <button
-          type="button"
-          onClick={() => rec.navigateTarget && onNavigate?.(rec.navigateTarget)}
-          disabled={!rec.navigateTarget}
-          className={`mt-3 w-full rounded-xl border px-3 py-2.5 text-left text-sm font-semibold leading-snug transition ${
-            rec.navigateTarget
-              ? "border-cyan-400/30 bg-cyan-500/10 text-cyan-50 hover:bg-cyan-500/18"
-              : "cursor-default border-white/10 bg-white/5 text-white/70"
-          }`}
-        >
-          <span className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-200/75">
-            Next focus
-          </span>
-          <div className="mt-1 text-white">{rec.text}</div>
-          {rec.navigateTarget ? (
-            <div className="mt-1 text-[11px] text-cyan-200/80">Tap to open in Structures</div>
+          {rec.text ? (
+            <button
+              type="button"
+              onClick={() => rec.navigateTarget && onNavigate?.(rec.navigateTarget)}
+              disabled={!rec.navigateTarget}
+              className={`mt-3 w-full rounded-xl border px-3 py-2.5 text-left text-sm font-semibold leading-snug transition ${
+                rec.navigateTarget
+                  ? "border-cyan-400/30 bg-cyan-500/10 text-cyan-50 hover:bg-cyan-500/18"
+                  : "cursor-default border-white/10 bg-white/5 text-white/70"
+              }`}
+            >
+              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-200/75">
+                Next focus
+              </span>
+              <div className="mt-1 text-white">{rec.text}</div>
+              {rec.navigateTarget ? (
+                <div className="mt-1 text-[11px] text-cyan-200/80">Tap to open in Structures</div>
+              ) : null}
+            </button>
           ) : null}
-        </button>
-      ) : null}
 
-      <div className="mt-3 space-y-2">
-        {summary.buildings.map((row) => (
-          <button
-            key={row.buildingKey}
-            type="button"
-            onClick={() => onNavigate?.({ tab: "build", target: row.buildingKey })}
-            className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left transition hover:border-cyan-400/25 hover:bg-black/30"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="min-w-0 text-[13px] font-bold text-white">{row.buildingName}</div>
-              <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
-                <span className="inline-flex rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-cyan-100">
-                  T{row.tier}
-                </span>
-                {row.activeProgramKey ? (
-                  <span className="inline-flex max-w-[120px] truncate rounded-full border border-violet-400/30 bg-violet-500/12 px-2 py-0.5 text-[9px] font-bold text-violet-100">
-                    Active
+          <div className="mt-3 space-y-2">
+            {summary.buildings.map((row) => (
+              <button
+                key={row.buildingKey}
+                type="button"
+                onClick={() => onNavigate?.({ tab: "build", target: row.buildingKey })}
+                className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left transition hover:border-cyan-400/25 hover:bg-black/30"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0 text-[13px] font-bold text-white">{row.buildingName}</div>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                    <span className="inline-flex rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-cyan-100">
+                      T{row.tier}
+                    </span>
+                    {row.activeProgramKey ? (
+                      <span className="inline-flex max-w-[120px] truncate rounded-full border border-violet-400/30 bg-violet-500/12 px-2 py-0.5 text-[9px] font-bold text-violet-100">
+                        Active
+                      </span>
+                    ) : null}
+                    {row.claimableMilestones > 0 ? (
+                      <span className="inline-flex rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-amber-100">
+                        Milestone
+                      </span>
+                    ) : null}
+                    {row.advancedContractsReady > 0 ? (
+                      <span className="inline-flex rounded-full border border-emerald-400/30 bg-emerald-500/12 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-emerald-100">
+                        Contract
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="mt-1 text-[11px] text-white/60">
+                  {row.activeProgramLabel || "No active program"}
+                </div>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-white/45">
+                  <span>
+                    Milestones: {row.claimedMilestones}/{row.totalMilestones || 0}
                   </span>
-                ) : null}
-                {row.claimableMilestones > 0 ? (
-                  <span className="inline-flex rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-amber-100">
-                    Milestone
+                  <span>Ready items: {row.readyItemsCount}</span>
+                  <span className="text-white/35">
+                    Next: {row.nextMilestoneLabel}
                   </span>
+                </div>
+                {row.nextActionText ? (
+                  <div className="mt-0.5 text-[10px] text-amber-100/55">{row.nextActionText}</div>
                 ) : null}
-                {row.advancedContractsReady > 0 ? (
-                  <span className="inline-flex rounded-full border border-emerald-400/30 bg-emerald-500/12 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-emerald-100">
-                    Contract
-                  </span>
-                ) : null}
-              </div>
-            </div>
-            <div className="mt-1 text-[11px] text-white/60">
-              {row.activeProgramLabel || "No active program"}
-            </div>
-            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-white/45">
-              <span>
-                Milestones: {row.claimedMilestones}/{row.totalMilestones || 0}
-              </span>
-              <span>Ready items: {row.readyItemsCount}</span>
-              <span className="text-white/35">
-                Next: {row.nextMilestoneLabel}
-              </span>
-            </div>
-            {row.nextActionText ? (
-              <div className="mt-0.5 text-[10px] text-amber-100/55">{row.nextActionText}</div>
-            ) : null}
-          </button>
-        ))}
-      </div>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
     </CardShell>
   );
 }
@@ -727,16 +791,35 @@ export function OverviewPanelCards({
       <RecoveryHintBlock hint={safeOverview.recoveryHint} onNavigate={onNavigate} />
       <MissionFocusBlock missionGuidance={missionGuidance} onNavigate={onNavigate} />
       <TodaysLoopBlock steps={safeOverview.todaysLoop} onNavigate={onNavigate} />
-      <RatesBlock rates={safeOverview.rates} />
-      <StabilityBlock stability={safeOverview.stability} />
-      <DailyProgressBlock progress={safeOverview.dailyProgress} />
+      <RatesBlock
+        rates={safeOverview.rates}
+        openInnerPanel={openInnerPanel}
+        toggleInnerPanel={toggleInnerPanel}
+      />
+      <StabilityBlock
+        stability={safeOverview.stability}
+        openInnerPanel={openInnerPanel}
+        toggleInnerPanel={toggleInnerPanel}
+      />
+      <DailyProgressBlock
+        progress={safeOverview.dailyProgress}
+        openInnerPanel={openInnerPanel}
+        toggleInnerPanel={toggleInnerPanel}
+      />
 
-      <SpecializationSummaryCard summary={specializationSummary} onNavigate={onNavigate} />
+      <SpecializationSummaryCard
+        summary={specializationSummary}
+        onNavigate={onNavigate}
+        openInnerPanel={openInnerPanel}
+        toggleInnerPanel={toggleInnerPanel}
+      />
 
       <WorldSectorPanel
         snapshot={sectorWorldSnapshot}
         onDeploy={onDeployNextSector}
         deployBusy={!!sectorDeployBusy}
+        openInnerPanel={openInnerPanel}
+        toggleInnerPanel={toggleInnerPanel}
       />
 
       <div className="grid gap-4 xl:grid-cols-3">
