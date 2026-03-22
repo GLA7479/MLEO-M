@@ -305,9 +305,214 @@ function normalizeSupportProgramActive(raw) {
   return base;
 }
 
+const DEFAULT_SPECIALIZATION_MILESTONES_CLAIMED = () => ({
+  logisticsCenter: {},
+  researchLab: {},
+  repairBay: {},
+});
+
+export function normalizeSpecializationMilestonesClaimed(raw) {
+  const base = DEFAULT_SPECIALIZATION_MILESTONES_CLAIMED();
+  if (!raw || typeof raw !== "object") return base;
+  for (const k of Object.keys(base)) {
+    const bucket = raw[k];
+    base[k] = bucket && typeof bucket === "object" ? { ...bucket } : {};
+  }
+  return base;
+}
+
+/** Server keys per support building — mirrors `base_specialization_milestone_definition`. */
+export const SPECIALIZATION_MILESTONES_BY_BUILDING = {
+  logisticsCenter: ["disciplined_pipeline", "buffer_authority"],
+  researchLab: ["matrix_operator", "telemetry_controller"],
+  repairBay: ["preventive_standard", "mesh_discipline"],
+};
+
+function supportBuildingTier(state, buildingKey) {
+  const t = Math.floor(Number(state?.buildingTiers?.[buildingKey] || 1));
+  return Math.max(1, t);
+}
+
+function supportBuildingLevel(state, buildingKey) {
+  return Math.max(0, Math.floor(Number(state?.buildings?.[buildingKey] || 0)));
+}
+
+function activeSupportProgramKey(state, buildingKey) {
+  const v = state?.supportProgramActive?.[buildingKey];
+  return typeof v === "string" && v.length ? v : null;
+}
+
+function milestoneClaimed(state, buildingKey, milestoneKey) {
+  const bucket = state?.specializationMilestonesClaimed?.[buildingKey];
+  if (!bucket || typeof bucket !== "object") return false;
+  return !!bucket[milestoneKey];
+}
+
+/** UI + condition copy; keys must match SQL catalog. */
+export const SPECIALIZATION_MILESTONE_META = {
+  disciplined_pipeline: {
+    buildingKey: "logisticsCenter",
+    label: "Disciplined Pipeline",
+    minTier: 2,
+    requiredActiveProgram: "routeDiscipline",
+    conditionShort: "Banked MLEO ≥ 220 · Stability ≥ 84",
+    reward: { GOLD: 260, SCRAP: 120, DATA: 8 },
+  },
+  buffer_authority: {
+    buildingKey: "logisticsCenter",
+    label: "Buffer Authority",
+    minTier: 3,
+    requiredActiveProgram: "reserveBuffer",
+    conditionShort: "Stability ≥ 90 · Energy ≥ 55% of cap",
+    reward: { ENERGY: 26, SCRAP: 200, DATA: 10 },
+  },
+  matrix_operator: {
+    buildingKey: "researchLab",
+    label: "Matrix Operator",
+    minTier: 2,
+    requiredActiveProgram: "analysisMatrix",
+    conditionShort: "DATA ≥ 16 · Expedition ready",
+    reward: { DATA: 10, GOLD: 180, ORE: 140 },
+  },
+  telemetry_controller: {
+    buildingKey: "researchLab",
+    label: "Telemetry Controller",
+    minTier: 3,
+    requiredActiveProgram: "predictiveTelemetry",
+    conditionShort: "DATA ≥ 18 · Banked MLEO ≥ 140",
+    reward: { DATA: 12, GOLD: 240, SCRAP: 150 },
+  },
+  preventive_standard: {
+    buildingKey: "repairBay",
+    label: "Preventive Standard",
+    minTier: 2,
+    requiredActiveProgram: "preventiveCycle",
+    conditionShort: "Stability ≥ 92 · Systems stable (≥70)",
+    reward: { SCRAP: 240, ENERGY: 18, GOLD: 170 },
+  },
+  mesh_discipline: {
+    buildingKey: "repairBay",
+    label: "Mesh Discipline",
+    minTier: 3,
+    requiredActiveProgram: "stabilizationMesh",
+    conditionShort: "Stability ≥ 88 · Energy ≥ 45% cap · Banked ≥ 100",
+    reward: { SCRAP: 250, GOLD: 190, DATA: 8 },
+  },
+};
+
+/**
+ * Client preview of milestone status (server is source of truth on claim).
+ * Mirrors SQL `base_specialization_milestone_progress` thresholds.
+ */
+export function getSpecializationMilestonePreview(state, derived, buildingKey, milestoneKey) {
+  const def = SPECIALIZATION_MILESTONE_META[milestoneKey];
+  if (!def || def.buildingKey !== buildingKey) {
+    return {
+      eligible: false,
+      done: false,
+      claimed: false,
+      progressText: "Invalid milestone",
+    };
+  }
+
+  const level = supportBuildingLevel(state, buildingKey);
+  const tier = supportBuildingTier(state, buildingKey);
+  const active = activeSupportProgramKey(state, buildingKey);
+  const req = def.requiredActiveProgram;
+
+  const eligible =
+    level >= 1 &&
+    tier >= def.minTier &&
+    (req == null || active === req);
+
+  const claimed = milestoneClaimed(state, buildingKey, milestoneKey);
+
+  const energyCap = Math.max(1, Number(derived?.energyCap || 148));
+  const energy = Number(state?.resources?.ENERGY || 0);
+  const stability = Number(state?.stability ?? 100);
+  const banked = Number(state?.bankedMleo || 0);
+  const data = Math.floor(Number(state?.resources?.DATA || 0));
+  const expReady = Number(state?.expeditionReadyAt || 0) <= Date.now();
+  const sysNormal = stability >= 70;
+
+  if (!eligible) {
+    let progressText = "Locked";
+    if (level < 1) progressText = "Build this structure first";
+    else if (tier < def.minTier) progressText = `Requires tier ${def.minTier}`;
+    else if (req != null && active !== req) progressText = "Activate the required program";
+    return { eligible, done: false, claimed, progressText };
+  }
+
+  let ok = false;
+  let progressText = "In progress";
+
+  switch (milestoneKey) {
+    case "disciplined_pipeline":
+      ok = banked >= 220 && stability >= 84;
+      if (!ok) {
+        if (banked < 220) progressText = "Reach 220+ banked MLEO";
+        else if (stability < 84) progressText = "Raise stability to 84+";
+      }
+      break;
+    case "buffer_authority":
+      ok = stability >= 90 && energy >= energyCap * 0.55;
+      if (!ok) {
+        if (stability < 90) progressText = "Raise stability to 90+";
+        else if (energy < energyCap * 0.55) progressText = "Reach 55%+ energy cap";
+      }
+      break;
+    case "matrix_operator":
+      ok = data >= 16 && expReady;
+      if (!ok) {
+        if (data < 16) progressText = "Reach 16+ DATA";
+        else if (!expReady) progressText = "Wait for expedition ready";
+      }
+      break;
+    case "telemetry_controller":
+      ok = data >= 18 && banked >= 140;
+      if (!ok) {
+        if (data < 18) progressText = "Reach 18+ DATA";
+        else if (banked < 140) progressText = "Reach 140+ banked MLEO";
+      }
+      break;
+    case "preventive_standard":
+      ok = stability >= 92 && sysNormal;
+      if (!ok) progressText = "Reach 92+ stability (stable systems)";
+      break;
+    case "mesh_discipline":
+      ok = stability >= 88 && energy >= energyCap * 0.45 && banked >= 100;
+      if (!ok) {
+        if (stability < 88) progressText = "Raise stability to 88+";
+        else if (energy < energyCap * 0.45) progressText = "Reach 45%+ energy cap";
+        else if (banked < 100) progressText = "Reach 100+ banked MLEO";
+      }
+      break;
+    default:
+      ok = false;
+      progressText = "Unknown milestone";
+  }
+
+  const done = ok;
+  if (claimed) progressText = "Claimed";
+  else if (ok) progressText = "Ready to claim";
+
+  return { eligible, done, claimed, progressText };
+}
+
+export function countClaimableSpecializationMilestones(state, derived) {
+  let n = 0;
+  for (const buildingKey of Object.keys(SPECIALIZATION_MILESTONES_BY_BUILDING)) {
+    for (const milestoneKey of SPECIALIZATION_MILESTONES_BY_BUILDING[buildingKey]) {
+      const p = getSpecializationMilestonePreview(state, derived, buildingKey, milestoneKey);
+      if (p.done && !p.claimed) n += 1;
+    }
+  }
+  return n;
+}
+
 export function freshState() {
   return {
-    version: 9,
+    version: 10,
     lastDay: todayKey(),
     lastHiddenAt: 0,
     resources: {
@@ -339,6 +544,7 @@ export function freshState() {
     supportProgramUnlocks: DEFAULT_SUPPORT_PROGRAM_UNLOCKS(),
     /** Active program key per support building, or null (server). */
     supportProgramActive: DEFAULT_SUPPORT_PROGRAM_ACTIVE(),
+    specializationMilestonesClaimed: DEFAULT_SPECIALIZATION_MILESTONES_CLAIMED(),
     crew: 0,
     crewRole: "engineer",
     modules: {},
@@ -448,6 +654,9 @@ export function sanitizeBaseState(raw, fallback = null) {
     supportProgramActive: normalizeSupportProgramActive(
       src.supportProgramActive || src.support_program_active
     ),
+    specializationMilestonesClaimed: normalizeSpecializationMilestonesClaimed(
+      src.specializationMilestonesClaimed || src.specialization_milestones_claimed
+    ),
     buildingPowerModes: normalizeBuildingPowerModes(
       src?.buildingPowerModes || src?.building_power_modes || {},
       src?.pausedBuildings || src?.paused_buildings || {}
@@ -549,6 +758,12 @@ export function normalizeServerState(raw, prevState = null) {
           raw.support_program_active ||
           prev?.supportProgramActive ||
           seed.supportProgramActive
+      ),
+      specializationMilestonesClaimed: normalizeSpecializationMilestonesClaimed(
+        raw.specializationMilestonesClaimed ||
+          raw.specialization_milestones_claimed ||
+          prev?.specializationMilestonesClaimed ||
+          seed.specializationMilestonesClaimed
       ),
       buildingPowerModes: normalizeBuildingPowerModes(
         raw.buildingPowerModes ||

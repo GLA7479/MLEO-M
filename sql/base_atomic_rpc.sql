@@ -1555,6 +1555,162 @@ END;
 $$;
 
 -- ============================================================================
+-- 8b) base_claim_specialization_milestone — one-time support-building milestones
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.base_claim_specialization_milestone(
+  p_device_id text,
+  p_building_key text,
+  p_milestone_key text
+)
+RETURNS TABLE(
+  building_key text,
+  milestone_key text,
+  reward jsonb,
+  specialization_milestones_claimed jsonb,
+  new_resources jsonb,
+  new_commander_xp bigint,
+  state jsonb
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_state public.base_device_state%ROWTYPE;
+  v_def jsonb;
+  v_reward jsonb;
+  v_resources jsonb;
+  v_energy_cap integer;
+  v_claimed jsonb;
+  kv record;
+  v_prog_done boolean;
+  v_prog_claimed boolean;
+  v_prog_eligible boolean;
+  v_prog_text text;
+  v_amt bigint;
+  v_cur bigint;
+BEGIN
+  IF coalesce(trim(p_device_id), '') = '' THEN
+    RAISE EXCEPTION 'device_id is required';
+  END IF;
+
+  PERFORM public.base_reconcile_state(p_device_id);
+
+  SELECT *
+  INTO v_state
+  FROM public.base_device_state
+  WHERE device_id = p_device_id
+  FOR UPDATE;
+
+  IF trim(p_building_key) NOT IN ('logisticsCenter', 'researchLab', 'repairBay') THEN
+    RAISE EXCEPTION 'Invalid specialization milestone';
+  END IF;
+
+  v_def := public.base_specialization_milestone_definition(trim(p_building_key), trim(p_milestone_key));
+  IF v_def IS NULL THEN
+    RAISE EXCEPTION 'Invalid specialization milestone';
+  END IF;
+
+  SELECT eligible, done, claimed, progress_text
+  INTO v_prog_eligible, v_prog_done, v_prog_claimed, v_prog_text
+  FROM public.base_specialization_milestone_progress(v_state, trim(p_building_key), trim(p_milestone_key));
+
+  IF v_prog_claimed THEN
+    RAISE EXCEPTION 'Specialization milestone already claimed';
+  END IF;
+
+  IF NOT v_prog_done THEN
+    RAISE EXCEPTION 'Specialization milestone not ready';
+  END IF;
+
+  v_reward := coalesce(v_def->'reward', '{}'::jsonb);
+  v_resources := coalesce(v_state.resources, '{}'::jsonb);
+
+  v_energy_cap :=
+    148
+    + (
+      greatest(0, coalesce((coalesce(v_state.buildings, '{}'::jsonb)->>'powerCell')::integer, 0)) * 42
+    )
+    + CASE
+        WHEN coalesce((coalesce(v_state.research, '{}'::jsonb)->>'coolant')::boolean, false) THEN 22
+        ELSE 0
+      END;
+
+  FOR kv IN SELECT key, value FROM jsonb_each(v_reward)
+  LOOP
+    v_amt := floor(coalesce((kv.value::text)::numeric, 0))::bigint;
+    IF v_amt <= 0 THEN
+      CONTINUE;
+    END IF;
+    IF kv.key = 'ENERGY' THEN
+      v_cur := coalesce((v_resources->>'ENERGY')::bigint, 0);
+      v_resources := jsonb_set(
+        v_resources,
+        ARRAY[kv.key],
+        to_jsonb(least(v_energy_cap::bigint, v_cur + v_amt)),
+        true
+      );
+    ELSIF kv.key IN ('ORE', 'GOLD', 'SCRAP', 'DATA') THEN
+      v_cur := coalesce((v_resources->>kv.key)::bigint, 0);
+      v_resources := jsonb_set(
+        v_resources,
+        ARRAY[kv.key],
+        to_jsonb(v_cur + v_amt),
+        true
+      );
+    ELSE
+      RAISE EXCEPTION 'Invalid specialization milestone';
+    END IF;
+  END LOOP;
+
+  v_claimed := jsonb_set(
+    coalesce(
+      v_state.specialization_milestones_claimed,
+      public.base_default_specialization_milestones_claimed()
+    ),
+    ARRAY[trim(p_building_key), trim(p_milestone_key)],
+    'true'::jsonb,
+    true
+  );
+
+  UPDATE public.base_device_state
+  SET
+    resources = v_resources,
+    specialization_milestones_claimed = v_claimed,
+    commander_xp = coalesce(commander_xp, 0) + 70,
+    updated_at = now()
+  WHERE device_id = p_device_id
+  RETURNING * INTO v_state;
+
+  PERFORM public.base_write_audit(
+    p_device_id,
+    'claim_specialization_milestone',
+    jsonb_build_object(
+      'building_key', trim(p_building_key),
+      'milestone_key', trim(p_milestone_key),
+      'reward', v_reward,
+      'specialization_milestones_claimed', v_claimed,
+      'resources_after', v_resources,
+      'commander_xp_after', coalesce(v_state.commander_xp, 0)
+    ),
+    0,
+    '[]'::jsonb
+  );
+
+  RETURN QUERY
+  SELECT
+    trim(p_building_key),
+    trim(p_milestone_key),
+    v_reward,
+    v_claimed,
+    v_resources,
+    coalesce(v_state.commander_xp, 0)::bigint,
+    to_jsonb(v_state);
+END;
+$$;
+
+-- ============================================================================
 -- Audit table for base actions (ship, spend)
 -- ============================================================================
 
@@ -1621,6 +1777,7 @@ REVOKE EXECUTE ON FUNCTION public.base_hire_crew(text) FROM PUBLIC, anon, authen
 REVOKE EXECUTE ON FUNCTION public.base_perform_maintenance(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_install_module(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_unlock_research(text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_claim_specialization_milestone(text, text, text) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.base_ship_to_vault(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_spend_shared_vault(text, text) TO service_role;
@@ -1633,6 +1790,7 @@ GRANT EXECUTE ON FUNCTION public.base_hire_crew(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_perform_maintenance(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_install_module(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_unlock_research(text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.base_claim_specialization_milestone(text, text, text) TO service_role;
 
 REVOKE ALL ON public.base_action_audit FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT ON public.base_action_audit TO service_role;

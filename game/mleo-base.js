@@ -39,6 +39,7 @@ import {
   performMaintenanceAction,
   claimBaseMission,
   claimBaseContract,
+  claimSpecializationMilestone,
   setBaseProfile,
   setBuildingPowerMode,
   sendBasePresence,
@@ -84,9 +85,14 @@ import {
   getMissionGuidancePriority,
   getShipSoftcutFactor,
   normalizeServerState,
+  normalizeSpecializationMilestonesClaimed,
   offlineFactorFor,
   pushLog,
   sanitizeBaseState,
+  countClaimableSpecializationMilestones,
+  getSpecializationMilestonePreview,
+  SPECIALIZATION_MILESTONE_META,
+  SPECIALIZATION_MILESTONES_BY_BUILDING,
   sectorStatusClasses,
   sectorStatusForBuilding,
   todayKey,
@@ -586,6 +592,18 @@ function getActiveSupportProgram(state, buildingKey) {
   const active = state?.supportProgramActive || state?.support_program_active || {};
   const v = active[buildingKey];
   return typeof v === "string" && v.length ? v : null;
+}
+
+const SUPPORT_BUILDING_CONTRACT_SHORT = {
+  logisticsCenter: "Logistics",
+  researchLab: "Research",
+  repairBay: "Repair",
+};
+
+function supportProgramLabelForContract(buildingKey, programKey) {
+  if (!programKey) return "";
+  const hit = SUPPORT_PROGRAM_CATALOG[buildingKey]?.find((p) => p.key === programKey);
+  return hit?.label || programKey;
 }
 
 function isSupportProgramUnlocked(state, buildingKey, programKey) {
@@ -4232,6 +4250,7 @@ export default function MleoBase() {
   const [tierPromptKey, setTierPromptKey] = useState(null);
   const [activeTierKey, setActiveTierKey] = useState(null);
   const [activeProgramUnlockKey, setActiveProgramUnlockKey] = useState(null);
+  const [activeMilestoneClaimKey, setActiveMilestoneClaimKey] = useState(null);
   const [activeProgramSetKey, setActiveProgramSetKey] = useState(null);
   const [overviewGuidanceState, setOverviewGuidanceState] = useState(null);
   const [bankedDisplayValue, setBankedDisplayValue] = useState(0);
@@ -4320,6 +4339,12 @@ export default function MleoBase() {
           ...(normalized?.missionState?.claimed || {}),
         },
       },
+      specializationMilestonesClaimed: normalizeSpecializationMilestonesClaimed(
+        serverState?.specialization_milestones_claimed ??
+          serverState?.specializationMilestonesClaimed ??
+          normalized?.specializationMilestonesClaimed ??
+          prev?.specializationMilestonesClaimed
+      ),
     });
   }
 
@@ -4645,6 +4670,32 @@ export default function MleoBase() {
       default:
         return { tab: "overview", target: "alerts" };
     }
+  }
+
+  /** Ready-row items in command hub (not `type: "alert"`). */
+  function getReadyHubNavigationTarget(item) {
+    if (!item || item.type !== "ready") return null;
+    switch (item.key) {
+      case "contracts":
+        return { tab: "overview", target: "contracts" };
+      case "missions":
+        return { tab: "operations", target: "missions" };
+      case "expedition":
+        return { tab: "operations", target: "expedition-action" };
+      case "shipment":
+        return { tab: "operations", target: "shipping" };
+      default:
+        return null;
+    }
+  }
+
+  function getCommandHubDeepLink(item) {
+    if (!item) return null;
+    if (item.type === "ready") {
+      const ready = getReadyHubNavigationTarget(item);
+      if (ready?.target) return ready;
+    }
+    return getAlertNavigationTarget(item);
   }
 
   function centerTargetInMobilePanel(targetEl) {
@@ -5261,10 +5312,21 @@ export default function MleoBase() {
   );
 
   const liveContracts = useMemo(() => {
-    return LIVE_CONTRACTS.map((contract) => ({
+    return LIVE_CONTRACTS.filter((contract) =>
+      typeof contract.visible === "function" ? contract.visible(state, derived) : true
+    ).map((contract) => ({
       ...contract,
+      contractClass: contract.contractClass || "basic",
       done: contract.check(state, derived),
       claimed: !!contractClaimedMap[contract.key],
+      advancedTierPill:
+        contract.contractClass === "advanced" && contract.requiresTier && contract.supportBuilding
+          ? `T${contract.requiresTier} ${SUPPORT_BUILDING_CONTRACT_SHORT[contract.supportBuilding] || ""}`.trim()
+          : null,
+      advancedProgramPill:
+        contract.contractClass === "advanced" && contract.requiresProgram && contract.supportBuilding
+          ? `Program: ${supportProgramLabelForContract(contract.supportBuilding, contract.requiresProgram)}`
+          : null,
     }));
   }, [state, derived, contractClaimedMap]);
 
@@ -5287,14 +5349,21 @@ export default function MleoBase() {
       return done && !claimed;
     }).length;
 
+    const claimableSpecMilestones = countClaimableSpecializationMilestones(state, derived);
+
     return {
       expedition: expeditionReadyNow ? 1 : 0,
       contracts: claimableContractsCount,
       missions: claimableMissionsCount,
+      specializationMilestones: claimableSpecMilestones,
       shipment: 0,
-      total: (expeditionReadyNow ? 1 : 0) + claimableContractsCount + claimableMissionsCount,
+      total:
+        (expeditionReadyNow ? 1 : 0) +
+        claimableContractsCount +
+        claimableMissionsCount +
+        claimableSpecMilestones,
     };
-  }, [state, liveContracts, missionProgress]);
+  }, [state, derived, liveContracts, missionProgress]);
 
   // command hub items use alerts; define after alerts below
   const blueprintCost = useMemo(
@@ -5407,6 +5476,17 @@ export default function MleoBase() {
 
   const primaryCommandItem = commandHubItems[0] || null;
   const commandHubCount = commandHubItems.length;
+
+  /** Primary command-hub strip: deep-link (contracts / missions / …), same as item clicks — not only the generic hub modal. */
+  function handleCommandHubBarClick() {
+    if (commandHubCount <= 0 || !primaryCommandItem) return;
+    setShowReadyPanel(false);
+    const step = getCommandHubDeepLink(primaryCommandItem);
+    if (step?.target) {
+      navigateToBaseTarget(step);
+    }
+  }
+
   const desktopPrimaryTitle = primaryCommandItem?.title || "Base is stable";
   const desktopPrimaryTitleClass =
     desktopPrimaryTitle.length > 26
@@ -6044,6 +6124,46 @@ export default function MleoBase() {
         showToast(error?.message || "Set program failed.");
       } finally {
         setActiveProgramSetKey((prev) => (prev === busyKey ? null : prev));
+      }
+    });
+  };
+
+  const handleClaimSpecializationMilestone = async (buildingKey, milestoneKey) => {
+    const lockId = `spec-milestone:${buildingKey}:${milestoneKey}`;
+    if (isActionLocked(lockId)) return;
+    const busyKey = `${buildingKey}:${milestoneKey}`;
+    return runLockedAction(lockId, async () => {
+      setActiveMilestoneClaimKey(busyKey);
+      try {
+        const res = await claimSpecializationMilestone(buildingKey, milestoneKey);
+        const label = SPECIALIZATION_MILESTONE_META[milestoneKey]?.label || milestoneKey;
+        if (res?.success && res?.state) {
+          setState((prev) => {
+            const merged = mergeAuthoritativeServerState(prev, res.state);
+            return {
+              ...merged,
+              log: pushLog(merged.log, `Specialization milestone: ${label} claimed.`),
+            };
+          });
+          markRealGameAction();
+          showToast(`${label} claimed. +70 Commander XP`);
+        } else {
+          const code = res?.code || "";
+          if (code === "BASE_SPECIALIZATION_MILESTONE_ALREADY_CLAIMED") {
+            showToast("Milestone already claimed.");
+          } else if (code === "BASE_SPECIALIZATION_MILESTONE_NOT_READY") {
+            showToast("Milestone requirements not met yet.");
+          } else if (code === "RATE_LIMIT_DEVICE") {
+            showToast("Too many taps detected. Please wait a moment and try again.");
+          } else {
+            showToast(res?.message || "Could not claim milestone.");
+          }
+        }
+      } catch (error) {
+        console.error("claimSpecializationMilestone failed", error);
+        showToast(error?.message || "Claim failed.");
+      } finally {
+        setActiveMilestoneClaimKey((prev) => (prev === busyKey ? null : prev));
       }
     });
   };
@@ -9220,6 +9340,164 @@ export default function MleoBase() {
         why: "This contract depends directly on expedition readiness.",
       },
     },
+
+    route_discipline_window: {
+      title: "Contract: Route Discipline Window",
+      focus: "Logistics T2+ with Route Discipline program active",
+      text:
+        "Advanced logistics contract: align your support program with disciplined banking.\n\n" +
+        "How to complete it:\n" +
+        "• Reach Logistics Center tier 2+ and set Route Discipline as the active support program.\n" +
+        "• Hold at least 180 banked MLEO (before shipping).\n" +
+        "• Keep stability at 80% or higher.",
+      tips: {
+        building: "Logistics Center",
+        research: "Logistics",
+        module: "Vault Compressor",
+        actions: [
+          "Unlock Route Discipline under Support Programs on the Logistics card.",
+          "Patience on shipping helps banked MLEO and this objective.",
+          "Pair with stable play — avoid stability dips while stacking banked.",
+        ],
+      },
+      nextStep: {
+        label: "Open Logistics Center",
+        tab: "build",
+        target: "logisticsCenter",
+        why: "Tier and support programs for Logistics are required for this contract.",
+      },
+    },
+
+    reserve_buffer_hold: {
+      title: "Contract: Reserve Buffer Hold",
+      focus: "Logistics T3+ with Reserve Buffer program",
+      text:
+        "Prove reserve discipline: high stability and a healthy energy buffer while in Reserve Buffer mode.\n\n" +
+        "How to complete it:\n" +
+        "• Logistics Center tier 3+ with Reserve Buffer active.\n" +
+        "• Stability 88%+.\n" +
+        "• Energy at least 50% of your current cap.",
+      tips: {
+        building: "Logistics Center",
+        research: "Logistics",
+        module: "",
+        actions: [
+          "Power Cell and safe power modes help hold the energy buffer.",
+          "Maintenance before pressure makes 88% stability realistic.",
+        ],
+      },
+      nextStep: {
+        label: "Open Logistics Center",
+        tab: "build",
+        target: "logisticsCenter",
+        why: "Advance tier and activate Reserve Buffer from Support Programs.",
+      },
+    },
+
+    analysis_matrix_window: {
+      title: "Contract: Analysis Matrix Window",
+      focus: "Research T2+ with Analysis Matrix program",
+      text:
+        "Turn lab-side control into expedition-ready intelligence.\n\n" +
+        "How to complete it:\n" +
+        "• Research Lab tier 2+ with Analysis Matrix as active support program.\n" +
+        "• Hold at least 12 DATA.\n" +
+        "• Expedition must be off cooldown (ready to launch).",
+      tips: {
+        building: "Research Lab",
+        research: "Deep Scan",
+        module: "Arcade Relay",
+        actions: [
+          "DATA flow from lab, miners, and arcade supports this contract.",
+          "Arcade Ops and expedition timing both matter for readiness.",
+        ],
+      },
+      nextStep: {
+        label: "Open Research Lab",
+        tab: "build",
+        target: "researchLab",
+        why: "Tier 2+ lab and Analysis Matrix unlock this objective.",
+      },
+    },
+
+    predictive_telemetry_sync: {
+      title: "Contract: Predictive Telemetry Sync",
+      focus: "Research T3+ with Predictive Telemetry",
+      text:
+        "Balance DATA-heavy research play with meaningful banked reserves.\n\n" +
+        "How to complete it:\n" +
+        "• Research Lab tier 3+ with Predictive Telemetry active.\n" +
+        "• At least 14 DATA.\n" +
+        "• At least 120 banked MLEO.",
+      tips: {
+        building: "Research Lab",
+        research: "Deep Scan",
+        module: "",
+        actions: [
+          "Refinery output feeds banked MLEO while you push DATA goals.",
+          "Avoid overspending DATA right before claiming.",
+        ],
+      },
+      nextStep: {
+        label: "Open Research Lab",
+        tab: "build",
+        target: "researchLab",
+        why: "Higher lab tier and Predictive Telemetry are required.",
+      },
+    },
+
+    preventive_cycle_standard: {
+      title: "Contract: Preventive Cycle Standard",
+      focus: "Repair T2+ with Preventive Cycle program",
+      text:
+        "Demonstrate long-horizon stability while running preventive repair discipline.\n\n" +
+        "How to complete it:\n" +
+        "• Repair Bay tier 2+ with Preventive Cycle active.\n" +
+        "• Stability 90%+ and system state stable (not warning/critical).\n" +
+        "• Stay ahead of maintenance — this is about prevention, not recovery.",
+      tips: {
+        building: "Repair Bay",
+        research: "Predictive Maintenance",
+        module: "",
+        actions: [
+          "Engineer crew and Predictive Maintenance research reinforce this path.",
+          "Safer energy and event choices keep stability in the safe band.",
+        ],
+      },
+      nextStep: {
+        label: "Open Repair Bay",
+        tab: "build",
+        target: "repairBay",
+        why: "Repair programs and tier unlock this advanced contract.",
+      },
+    },
+
+    stabilization_mesh_balance: {
+      title: "Contract: Stabilization Mesh Balance",
+      focus: "Repair T3+ with Stabilization Mesh",
+      text:
+        "Hold a mixed healthy profile: stability, energy buffer, and modest banked reserves.\n\n" +
+        "How to complete it:\n" +
+        "• Repair Bay tier 3+ with Stabilization Mesh active.\n" +
+        "• Stability 86%+.\n" +
+        "• Energy at least 40% of cap.\n" +
+        "• At least 90 banked MLEO.",
+      tips: {
+        building: "Repair Bay",
+        research: "Predictive Maintenance",
+        module: "Miner Link",
+        actions: [
+          "This contract rewards balanced command — not min-maxing one meter only.",
+          "Logistics and refinery rhythm help banked MLEO without shipping early.",
+        ],
+      },
+      nextStep: {
+        label: "Open Repair Bay",
+        tab: "build",
+        target: "repairBay",
+        why: "Tier 3 repair and Stabilization Mesh are required.",
+      },
+    },
   };
 
   const EVENT_INFO_COPY = {
@@ -9874,6 +10152,45 @@ export default function MleoBase() {
         })
       : [];
 
+    const milestoneCards =
+      supportsProgramsUi && Array.isArray(SPECIALIZATION_MILESTONES_BY_BUILDING[building.key])
+        ? SPECIALIZATION_MILESTONES_BY_BUILDING[building.key]
+            .map((milestoneKey) => {
+              const meta = SPECIALIZATION_MILESTONE_META[milestoneKey];
+              if (!meta) return null;
+              const preview = getSpecializationMilestonePreview(
+                state,
+                derived,
+                building.key,
+                milestoneKey
+              );
+              const reqProgLabel =
+                SUPPORT_PROGRAM_CATALOG[building.key]?.find(
+                  (p) => p.key === meta.requiredActiveProgram
+                )?.label || meta.requiredActiveProgram;
+              const rewardPreview = Object.entries(meta.reward || {})
+                .map(([k, v]) => `${k} +${v}`)
+                .join(" · ");
+              const claimBusy =
+                activeMilestoneClaimKey === `${building.key}:${milestoneKey}`;
+              return {
+                key: milestoneKey,
+                label: meta.label,
+                minTier: meta.minTier,
+                reqProgLabel,
+                conditionShort: meta.conditionShort,
+                rewardPreview,
+                eligible: preview.eligible,
+                done: preview.done,
+                claimed: preview.claimed,
+                progressText: preview.progressText,
+                claimBusy,
+                canClaim: preview.done && !preview.claimed,
+              };
+            })
+            .filter(Boolean)
+        : [];
+
     return {
       key: building.key,
       name: building.name,
@@ -9898,6 +10215,7 @@ export default function MleoBase() {
       activeProgramKey,
       activeProgramLabel,
       programCards,
+      milestoneCards,
       requirementsText,
       ready,
       buildBusy: activeBuildKey === building.key,
@@ -9934,6 +10252,7 @@ export default function MleoBase() {
       activeTierKey={activeTierKey}
       onUnlockSupportProgram={handleUnlockSupportProgram}
       onSetSupportProgram={handleSetSupportProgram}
+      onClaimSpecializationMilestone={handleClaimSpecializationMilestone}
     />
   );
 
@@ -10748,9 +11067,7 @@ export default function MleoBase() {
             <div className="hidden sm:flex flex-wrap items-center gap-2 sm:justify-start">
               <button
                 type="button"
-                onClick={() => {
-                  if (commandHubCount > 0) setShowReadyPanel(true);
-                }}
+                onClick={handleCommandHubBarClick}
                 className={`flex items-center rounded-2xl border px-4 py-0 transition h-[42px] min-h-[42px] max-h-[42px] overflow-visible ${
                   commandHubCount > 0
                     ? `cursor-pointer shadow-[0_0_24px_rgba(34,211,238,0.18)] hover:border-cyan-400/80 ${
@@ -11195,7 +11512,14 @@ export default function MleoBase() {
             <div className="mx-auto max-w-4xl rounded-3xl border border-white/10 bg-slate-950/88 p-2 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
               <div className="grid grid-cols-4 gap-2">
                 {[
-                  { key: "overview", label: "Overview", badge: readyCounts.contracts + readyCounts.missions },
+                  {
+                    key: "overview",
+                    label: "Overview",
+                    badge:
+                      readyCounts.contracts +
+                      readyCounts.missions +
+                      (readyCounts.specializationMilestones || 0),
+                  },
                   { key: "ops", label: "Operations", badge: readyCounts.expedition + readyCounts.shipment },
                   { key: "build", label: "Build", badge: buildOpportunitiesCount },
                   { key: "intel", label: "Intel", badge: 0 },
@@ -11419,7 +11743,14 @@ export default function MleoBase() {
               <div className="mx-auto max-w-5xl rounded-3xl border border-white/10 bg-slate-950/88 p-2 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
                 <div className="grid grid-cols-4 gap-2">
                   {[
-                    { key: "overview", label: "Overview", badge: readyCounts.contracts + readyCounts.missions },
+                    {
+                      key: "overview",
+                      label: "Overview",
+                      badge:
+                        readyCounts.contracts +
+                        readyCounts.missions +
+                        (readyCounts.specializationMilestones || 0),
+                    },
                     { key: "ops", label: "Operations", badge: readyCounts.expedition + readyCounts.shipment },
                     { key: "build", label: "Build", badge: buildOpportunitiesCount },
                     { key: "intel", label: "Intel", badge: 0 },
@@ -11483,9 +11814,15 @@ export default function MleoBase() {
             }}
           >
             <div
-              onClick={() => {
-                if (commandHubCount > 0) setShowReadyPanel(true);
+              role="button"
+              tabIndex={commandHubCount > 0 ? 0 : -1}
+              onKeyDown={(e) => {
+                if (commandHubCount > 0 && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  handleCommandHubBarClick();
+                }
               }}
+              onClick={handleCommandHubBarClick}
               className={`rounded-2xl border px-4 py-2 transition ${
                 commandHubCount > 0
                   ? `cursor-pointer shadow-[0_0_24px_rgba(34,211,238,0.18)] hover:border-cyan-400/80 ${
@@ -11616,7 +11953,14 @@ export default function MleoBase() {
             <div className="mx-auto max-w-md rounded-3xl border border-white/10 bg-slate-950/88 p-2 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
               <div className="grid grid-cols-4 gap-2">
                 {[
-                  { key: "overview", label: "Overview", badge: readyCounts.contracts + readyCounts.missions },
+                  {
+                    key: "overview",
+                    label: "Overview",
+                    badge:
+                      readyCounts.contracts +
+                      readyCounts.missions +
+                      (readyCounts.specializationMilestones || 0),
+                  },
                   { key: "ops", label: "Operations", badge: readyCounts.expedition + readyCounts.shipment },
                   { key: "build", label: "Build", badge: buildOpportunitiesCount },
                   { key: "intel", label: "Intel", badge: 0 },
@@ -12224,6 +12568,23 @@ export default function MleoBase() {
                         </div>
                         <div className="pr-8">
                           <div className="text-sm font-semibold text-white">{contract.title}</div>
+                          {contract.contractClass === "advanced" ? (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              <span className="inline-flex rounded-full border border-violet-400/30 bg-violet-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-violet-100">
+                                Advanced
+                              </span>
+                              {contract.advancedTierPill ? (
+                                <span className="inline-flex rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2 py-0.5 text-[9px] font-bold text-cyan-100">
+                                  {contract.advancedTierPill}
+                                </span>
+                              ) : null}
+                              {contract.advancedProgramPill ? (
+                                <span className="inline-flex max-w-full rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-semibold text-white/70">
+                                  {contract.advancedProgramPill}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : null}
                           <div className="mt-1 text-xs text-white/60">{contract.desc}</div>
                         </div>
 

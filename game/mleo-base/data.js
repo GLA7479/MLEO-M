@@ -416,6 +416,140 @@ export const LIVE_CONTRACTS = [
       Number(state.resources?.DATA || 0) >= 4 && Number(state.expeditionReadyAt || 0) <= Date.now(),
     reward: { GOLD: 60, XP: 18 },
   },
+
+  // --- Advanced contracts (Tier + active support program; resources only, no MLEO reward) ---
+  {
+    key: "route_discipline_window",
+    contractClass: "advanced",
+    supportBuilding: "logisticsCenter",
+    requiresTier: 2,
+    requiresProgram: "routeDiscipline",
+    title: "Route Discipline Window",
+    desc: "Hold a disciplined bank pipeline while running the active route program.",
+    rewardText: "Reward: GOLD 240 · DATA 6 · SCRAP 120",
+    visible: (state) => {
+      const tier = Math.max(1, Number(state?.buildingTiers?.logisticsCenter || 1));
+      const active =
+        state?.supportProgramActive?.logisticsCenter ??
+        state?.support_program_active?.logisticsCenter ??
+        null;
+      return tier >= 2 && active === "routeDiscipline";
+    },
+    check: (state) =>
+      Number(state.bankedMleo || 0) >= 180 && Number(state.stability || 0) >= 80,
+    reward: { GOLD: 240, DATA: 6, SCRAP: 120 },
+  },
+  {
+    key: "reserve_buffer_hold",
+    contractClass: "advanced",
+    supportBuilding: "logisticsCenter",
+    requiresTier: 3,
+    requiresProgram: "reserveBuffer",
+    title: "Reserve Buffer Hold",
+    desc: "Maintain safe reserves while your logistics support is in reserve mode.",
+    rewardText: "Reward: ENERGY 24 · SCRAP 180 · DATA 8",
+    visible: (state) => {
+      const tier = Math.max(1, Number(state?.buildingTiers?.logisticsCenter || 1));
+      const active =
+        state?.supportProgramActive?.logisticsCenter ??
+        state?.support_program_active?.logisticsCenter ??
+        null;
+      return tier >= 3 && active === "reserveBuffer";
+    },
+    check: (state, derived) =>
+      Number(state.stability || 0) >= 88 &&
+      Number(state.resources?.ENERGY || 0) >= Math.floor((derived?.energyCap || 0) * 0.5),
+    reward: { ENERGY: 24, SCRAP: 180, DATA: 8 },
+  },
+  {
+    key: "analysis_matrix_window",
+    contractClass: "advanced",
+    supportBuilding: "researchLab",
+    requiresTier: 2,
+    requiresProgram: "analysisMatrix",
+    title: "Analysis Matrix Window",
+    desc: "Convert stronger research control into field-ready intelligence.",
+    rewardText: "Reward: DATA 7 · GOLD 180 · ORE 120",
+    visible: (state) => {
+      const tier = Math.max(1, Number(state?.buildingTiers?.researchLab || 1));
+      const active =
+        state?.supportProgramActive?.researchLab ??
+        state?.support_program_active?.researchLab ??
+        null;
+      return tier >= 2 && active === "analysisMatrix";
+    },
+    check: (state) =>
+      Number(state.resources?.DATA || 0) >= 12 && Number(state.expeditionReadyAt || 0) <= Date.now(),
+    reward: { DATA: 7, GOLD: 180, ORE: 120 },
+  },
+  {
+    key: "predictive_telemetry_sync",
+    contractClass: "advanced",
+    supportBuilding: "researchLab",
+    requiresTier: 3,
+    requiresProgram: "predictiveTelemetry",
+    title: "Predictive Telemetry Sync",
+    desc: "Balance research pressure with useful bank discipline.",
+    rewardText: "Reward: DATA 10 · GOLD 220 · SCRAP 140",
+    visible: (state) => {
+      const tier = Math.max(1, Number(state?.buildingTiers?.researchLab || 1));
+      const active =
+        state?.supportProgramActive?.researchLab ??
+        state?.support_program_active?.researchLab ??
+        null;
+      return tier >= 3 && active === "predictiveTelemetry";
+    },
+    check: (state) =>
+      Number(state.resources?.DATA || 0) >= 14 && Number(state.bankedMleo || 0) >= 120,
+    reward: { DATA: 10, GOLD: 220, SCRAP: 140 },
+  },
+  {
+    key: "preventive_cycle_standard",
+    contractClass: "advanced",
+    supportBuilding: "repairBay",
+    requiresTier: 2,
+    requiresProgram: "preventiveCycle",
+    title: "Preventive Cycle Standard",
+    desc: "Keep the base healthy long enough to prove preventive discipline.",
+    rewardText: "Reward: SCRAP 220 · ENERGY 18 · GOLD 160",
+    visible: (state) => {
+      const tier = Math.max(1, Number(state?.buildingTiers?.repairBay || 1));
+      const active =
+        state?.supportProgramActive?.repairBay ??
+        state?.support_program_active?.repairBay ??
+        null;
+      return tier >= 2 && active === "preventiveCycle";
+    },
+    check: (state) => {
+      const stability = Number(state.stability || 0);
+      const sys = stability < 50 ? "critical" : stability < 70 ? "warning" : "normal";
+      return stability >= 90 && sys === "normal";
+    },
+    reward: { SCRAP: 220, ENERGY: 18, GOLD: 160 },
+  },
+  {
+    key: "stabilization_mesh_balance",
+    contractClass: "advanced",
+    supportBuilding: "repairBay",
+    requiresTier: 3,
+    requiresProgram: "stabilizationMesh",
+    title: "Stabilization Mesh Balance",
+    desc: "Hold a stable mixed system under advanced repair discipline.",
+    rewardText: "Reward: SCRAP 240 · GOLD 180 · DATA 6",
+    visible: (state) => {
+      const tier = Math.max(1, Number(state?.buildingTiers?.repairBay || 1));
+      const active =
+        state?.supportProgramActive?.repairBay ??
+        state?.support_program_active?.repairBay ??
+        null;
+      return tier >= 3 && active === "stabilizationMesh";
+    },
+    check: (state, derived) =>
+      Number(state.stability || 0) >= 86 &&
+      Number(state.resources?.ENERGY || 0) >= Math.floor((derived?.energyCap || 0) * 0.4) &&
+      Number(state.bankedMleo || 0) >= 90,
+    reward: { SCRAP: 240, GOLD: 180, DATA: 6 },
+  },
 ];
 
 export const BASE_HOME_SCENE_ORDER = [

@@ -454,6 +454,23 @@ function ContractsCard({
             .map((contract) => (
               <div key={contract.key} className="rounded-xl border border-white/10 bg-black/20 p-3">
                 <div className="font-bold text-white">{contract.title}</div>
+                {contract.contractClass === "advanced" ? (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    <span className="inline-flex rounded-full border border-violet-400/30 bg-violet-500/15 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-violet-100">
+                      Advanced
+                    </span>
+                    {contract.advancedTierPill ? (
+                      <span className="inline-flex rounded-full border border-cyan-400/25 bg-cyan-500/10 px-1.5 py-0.5 text-[8px] font-bold text-cyan-100">
+                        {contract.advancedTierPill}
+                      </span>
+                    ) : null}
+                    {contract.advancedProgramPill ? (
+                      <span className="inline-flex max-w-full rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[8px] font-semibold text-white/65">
+                        {contract.advancedProgramPill}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="mt-1 text-sm text-white/65">{contract.rewardText}</div>
                 <button
                   onClick={() => onClaimContract(contract.key)}

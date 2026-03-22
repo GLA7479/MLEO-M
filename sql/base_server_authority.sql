@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.base_device_state (
   device_id text PRIMARY KEY,
-  version integer NOT NULL DEFAULT 9,
+  version integer NOT NULL DEFAULT 10,
   last_day date NOT NULL DEFAULT current_date,
   banked_mleo numeric(20,4) NOT NULL DEFAULT 0,
   sent_today bigint NOT NULL DEFAULT 0,
@@ -205,6 +205,273 @@ WHERE support_program_unlocks = '{}'::jsonb
    OR support_program_active = '{}'::jsonb
    OR NOT (support_program_unlocks ? 'logisticsCenter')
    OR NOT (support_program_active ? 'logisticsCenter');
+
+ALTER TABLE public.base_device_state
+  ADD COLUMN IF NOT EXISTS specialization_milestones_claimed jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+CREATE OR REPLACE FUNCTION public.base_default_specialization_milestones_claimed()
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT jsonb_build_object(
+    'logisticsCenter', '{}'::jsonb,
+    'researchLab', '{}'::jsonb,
+    'repairBay', '{}'::jsonb
+  );
+$$;
+
+-- Catalog: support-building specialization milestones (one-time claims).
+CREATE OR REPLACE FUNCTION public.base_specialization_milestone_definition(
+  p_building_key text,
+  p_milestone_key text
+)
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT CASE
+    WHEN p_building_key = 'logisticsCenter' AND p_milestone_key = 'disciplined_pipeline' THEN
+      jsonb_build_object(
+        'buildingKey', 'logisticsCenter',
+        'milestoneKey', 'disciplined_pipeline',
+        'minTier', 2,
+        'requiredActiveProgram', 'routeDiscipline',
+        'reward', '{"GOLD": 260, "SCRAP": 120, "DATA": 8}'::jsonb
+      )
+    WHEN p_building_key = 'logisticsCenter' AND p_milestone_key = 'buffer_authority' THEN
+      jsonb_build_object(
+        'buildingKey', 'logisticsCenter',
+        'milestoneKey', 'buffer_authority',
+        'minTier', 3,
+        'requiredActiveProgram', 'reserveBuffer',
+        'reward', '{"ENERGY": 26, "SCRAP": 200, "DATA": 10}'::jsonb
+      )
+    WHEN p_building_key = 'researchLab' AND p_milestone_key = 'matrix_operator' THEN
+      jsonb_build_object(
+        'buildingKey', 'researchLab',
+        'milestoneKey', 'matrix_operator',
+        'minTier', 2,
+        'requiredActiveProgram', 'analysisMatrix',
+        'reward', '{"DATA": 10, "GOLD": 180, "ORE": 140}'::jsonb
+      )
+    WHEN p_building_key = 'researchLab' AND p_milestone_key = 'telemetry_controller' THEN
+      jsonb_build_object(
+        'buildingKey', 'researchLab',
+        'milestoneKey', 'telemetry_controller',
+        'minTier', 3,
+        'requiredActiveProgram', 'predictiveTelemetry',
+        'reward', '{"DATA": 12, "GOLD": 240, "SCRAP": 150}'::jsonb
+      )
+    WHEN p_building_key = 'repairBay' AND p_milestone_key = 'preventive_standard' THEN
+      jsonb_build_object(
+        'buildingKey', 'repairBay',
+        'milestoneKey', 'preventive_standard',
+        'minTier', 2,
+        'requiredActiveProgram', 'preventiveCycle',
+        'reward', '{"SCRAP": 240, "ENERGY": 18, "GOLD": 170}'::jsonb
+      )
+    WHEN p_building_key = 'repairBay' AND p_milestone_key = 'mesh_discipline' THEN
+      jsonb_build_object(
+        'buildingKey', 'repairBay',
+        'milestoneKey', 'mesh_discipline',
+        'minTier', 3,
+        'requiredActiveProgram', 'stabilizationMesh',
+        'reward', '{"SCRAP": 250, "GOLD": 190, "DATA": 8}'::jsonb
+      )
+    ELSE NULL::jsonb
+  END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.base_specialization_milestone_progress(
+  p_state public.base_device_state,
+  p_building_key text,
+  p_milestone_key text
+)
+RETURNS TABLE(
+  eligible boolean,
+  done boolean,
+  claimed boolean,
+  progress_text text
+)
+LANGUAGE plpgsql
+STABLE
+SET search_path = public
+AS $$
+DECLARE
+  v_def jsonb;
+  v_tier integer;
+  v_blevel integer;
+  v_active text;
+  v_req text;
+  v_resources jsonb;
+  v_energy_cap integer;
+  v_energy numeric;
+  v_stability numeric;
+  v_banked numeric;
+  v_data integer;
+  v_ok boolean;
+  v_exp_ready boolean;
+  v_sys_normal boolean;
+  v_eligible boolean;
+  v_done boolean;
+  v_claimed boolean;
+  v_progress_text text;
+BEGIN
+  v_def := public.base_specialization_milestone_definition(p_building_key, p_milestone_key);
+  IF v_def IS NULL THEN
+    RETURN QUERY SELECT false, false, false, 'Invalid milestone'::text;
+    RETURN;
+  END IF;
+
+  v_resources := coalesce(p_state.resources, '{}'::jsonb);
+  v_tier := public.base_building_tier(coalesce(p_state.building_tiers, '{}'::jsonb), p_building_key);
+  v_blevel := greatest(0, coalesce((coalesce(p_state.buildings, '{}'::jsonb)->>p_building_key)::integer, 0));
+  v_active := public.base_active_support_program(
+    coalesce(p_state.support_program_active, public.base_default_support_program_active()),
+    p_building_key
+  );
+  v_req := nullif(trim(v_def->>'requiredActiveProgram'), '');
+
+  v_eligible :=
+    v_blevel >= 1
+    AND v_tier >= coalesce((v_def->>'minTier')::integer, 99)
+    AND (v_req IS NULL OR coalesce(v_active, '') = v_req);
+
+  v_claimed := coalesce(
+    (
+      coalesce(p_state.specialization_milestones_claimed, '{}'::jsonb)
+      -> p_building_key
+      ->> p_milestone_key
+    )::boolean,
+    false
+  );
+
+  v_energy_cap :=
+    148
+    + (
+      greatest(0, coalesce((coalesce(p_state.buildings, '{}'::jsonb)->>'powerCell')::integer, 0)) * 42
+    )
+    + CASE
+        WHEN coalesce((coalesce(p_state.research, '{}'::jsonb)->>'coolant')::boolean, false) THEN 22
+        ELSE 0
+      END;
+
+  v_energy := coalesce((v_resources->>'ENERGY')::numeric, 0);
+  v_stability := coalesce(p_state.stability, 100::numeric);
+  v_banked := coalesce(p_state.banked_mleo, 0::numeric);
+  v_data := coalesce((v_resources->>'DATA')::integer, 0);
+  v_exp_ready := coalesce(p_state.expedition_ready_at, now()) <= now();
+  v_sys_normal := v_stability >= 70::numeric;
+
+  IF NOT v_eligible THEN
+    IF v_blevel < 1 THEN
+      v_progress_text := 'Build this structure first';
+    ELSIF v_tier < coalesce((v_def->>'minTier')::integer, 99) THEN
+      v_progress_text := 'Requires tier ' || (v_def->>'minTier');
+    ELSIF v_req IS NOT NULL AND coalesce(v_active, '') <> v_req THEN
+      v_progress_text := 'Activate the required program';
+    ELSE
+      v_progress_text := 'Locked';
+    END IF;
+    RETURN QUERY SELECT v_eligible, false, v_claimed, v_progress_text;
+    RETURN;
+  END IF;
+
+  v_ok := false;
+  v_progress_text := 'In progress';
+
+  IF p_milestone_key = 'disciplined_pipeline' THEN
+    v_ok := v_banked >= 220::numeric AND v_stability >= 84::numeric;
+    IF NOT v_ok THEN
+      IF v_banked < 220::numeric THEN
+        v_progress_text := 'Reach 220+ banked MLEO';
+      ELSIF v_stability < 84::numeric THEN
+        v_progress_text := 'Raise stability to 84+';
+      ELSE
+        v_progress_text := 'In progress';
+      END IF;
+    END IF;
+  ELSIF p_milestone_key = 'buffer_authority' THEN
+    v_ok := v_stability >= 90::numeric AND v_energy >= (v_energy_cap::numeric * 0.55);
+    IF NOT v_ok THEN
+      IF v_stability < 90::numeric THEN
+        v_progress_text := 'Raise stability to 90+';
+      ELSIF v_energy < (v_energy_cap::numeric * 0.55) THEN
+        v_progress_text := 'Reach 55%+ energy cap';
+      ELSE
+        v_progress_text := 'In progress';
+      END IF;
+    END IF;
+  ELSIF p_milestone_key = 'matrix_operator' THEN
+    v_ok := v_data >= 16 AND v_exp_ready;
+    IF NOT v_ok THEN
+      IF v_data < 16 THEN
+        v_progress_text := 'Reach 16+ DATA';
+      ELSIF NOT v_exp_ready THEN
+        v_progress_text := 'Wait for expedition ready';
+      ELSE
+        v_progress_text := 'In progress';
+      END IF;
+    END IF;
+  ELSIF p_milestone_key = 'telemetry_controller' THEN
+    v_ok := v_data >= 18 AND v_banked >= 140::numeric;
+    IF NOT v_ok THEN
+      IF v_data < 18 THEN
+        v_progress_text := 'Reach 18+ DATA';
+      ELSIF v_banked < 140::numeric THEN
+        v_progress_text := 'Reach 140+ banked MLEO';
+      ELSE
+        v_progress_text := 'In progress';
+      END IF;
+    END IF;
+  ELSIF p_milestone_key = 'preventive_standard' THEN
+    v_ok := v_stability >= 92::numeric AND v_sys_normal;
+    IF NOT v_ok THEN
+      v_progress_text := 'Reach 92+ stability (stable systems)';
+    END IF;
+  ELSIF p_milestone_key = 'mesh_discipline' THEN
+    v_ok :=
+      v_stability >= 88::numeric
+      AND v_energy >= (v_energy_cap::numeric * 0.45)
+      AND v_banked >= 100::numeric;
+    IF NOT v_ok THEN
+      IF v_stability < 88::numeric THEN
+        v_progress_text := 'Raise stability to 88+';
+      ELSIF v_energy < (v_energy_cap::numeric * 0.45) THEN
+        v_progress_text := 'Reach 45%+ energy cap';
+      ELSIF v_banked < 100::numeric THEN
+        v_progress_text := 'Reach 100+ banked MLEO';
+      ELSE
+        v_progress_text := 'In progress';
+      END IF;
+    END IF;
+  ELSE
+    v_ok := false;
+    v_progress_text := 'Unknown milestone';
+  END IF;
+
+  v_done := v_ok;
+
+  IF v_claimed THEN
+    v_progress_text := 'Claimed';
+  ELSIF v_ok THEN
+    v_progress_text := 'Ready to claim';
+  END IF;
+
+  RETURN QUERY SELECT v_eligible, v_done, v_claimed, v_progress_text;
+END;
+$$;
+
+ALTER TABLE public.base_device_state
+  ALTER COLUMN specialization_milestones_claimed
+  SET DEFAULT public.base_default_specialization_milestones_claimed();
+
+UPDATE public.base_device_state
+SET specialization_milestones_claimed = public.base_default_specialization_milestones_claimed()
+WHERE specialization_milestones_claimed IS NULL
+   OR specialization_milestones_claimed = '{}'::jsonb
+   OR NOT (specialization_milestones_claimed ? 'logisticsCenter');
 
 CREATE INDEX IF NOT EXISTS idx_base_device_state_updated_at
   ON public.base_device_state(updated_at DESC);
@@ -410,6 +677,7 @@ BEGIN
     building_tiers,
     support_program_unlocks,
     support_program_active,
+    specialization_milestones_claimed,
     modules,
     research,
     stats,
@@ -422,12 +690,13 @@ BEGIN
   )
   VALUES (
     p_device_id,
-    9,
+    10,
     public.base_default_resources(),
     public.base_default_buildings(),
     public.base_default_building_tiers(),
     public.base_default_support_program_unlocks(),
     public.base_default_support_program_active(),
+    public.base_default_specialization_milestones_claimed(),
     '{}'::jsonb,
     '{}'::jsonb,
     public.base_default_stats(),
@@ -481,6 +750,26 @@ BEGIN
           OR NOT (support_program_active ? 'logisticsCenter')
           THEN public.base_default_support_program_active()
         ELSE support_program_active
+      END
+    WHERE device_id = p_device_id;
+
+    SELECT *
+    INTO v_state
+    FROM public.base_device_state
+    WHERE device_id = p_device_id
+    FOR UPDATE;
+  END IF;
+
+  IF v_state.version < 10 THEN
+    UPDATE public.base_device_state
+    SET
+      version = 10,
+      specialization_milestones_claimed = CASE
+        WHEN specialization_milestones_claimed IS NULL
+          OR specialization_milestones_claimed = '{}'::jsonb
+          OR NOT (specialization_milestones_claimed ? 'logisticsCenter')
+          THEN public.base_default_specialization_milestones_claimed()
+        ELSE specialization_milestones_claimed
       END
     WHERE device_id = p_device_id;
 
@@ -693,6 +982,26 @@ BEGIN
           OR NOT (support_program_active ? 'logisticsCenter')
           THEN public.base_default_support_program_active()
         ELSE support_program_active
+      END
+    WHERE device_id = p_device_id;
+
+    SELECT *
+    INTO v_state
+    FROM public.base_device_state
+    WHERE device_id = p_device_id
+    FOR UPDATE;
+  END IF;
+
+  IF v_state.version < 10 THEN
+    UPDATE public.base_device_state
+    SET
+      version = 10,
+      specialization_milestones_claimed = CASE
+        WHEN specialization_milestones_claimed IS NULL
+          OR specialization_milestones_claimed = '{}'::jsonb
+          OR NOT (specialization_milestones_claimed ? 'logisticsCenter')
+          THEN public.base_default_specialization_milestones_claimed()
+        ELSE specialization_milestones_claimed
       END
     WHERE device_id = p_device_id;
 
@@ -1564,6 +1873,8 @@ DECLARE
   v_xp_gain integer := 0;
   v_reward jsonb := '{}'::jsonb;
   v_energy_cap integer := 148;
+  v_tiers jsonb;
+  v_sp_active jsonb;
 BEGIN
   IF coalesce(trim(p_device_id), '') = '' THEN
     RAISE EXCEPTION 'device_id is required';
@@ -1649,6 +1960,186 @@ BEGIN
     );
     v_xp_gain := 18;
     v_reward := jsonb_build_object('GOLD', 60, 'XP', 18);
+
+  ELSIF p_contract_key = 'route_discipline_window' THEN
+    v_tiers := coalesce(v_state.building_tiers, '{}'::jsonb);
+    v_sp_active := coalesce(v_state.support_program_active, public.base_default_support_program_active());
+    IF public.base_building_tier(v_tiers, 'logisticsCenter') < 2
+      OR coalesce(public.base_active_support_program(v_sp_active, 'logisticsCenter'), '') <> 'routeDiscipline' THEN
+      v_done := false;
+    ELSE
+      v_done := coalesce(v_state.banked_mleo, 0)::numeric >= 180
+        AND coalesce(v_state.stability, 100) >= 80;
+    END IF;
+    v_resources := jsonb_set(
+      jsonb_set(
+        jsonb_set(
+          v_resources,
+          '{GOLD}',
+          to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 240),
+          true
+        ),
+        '{DATA}',
+        to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 6),
+        true
+      ),
+      '{SCRAP}',
+      to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 120),
+      true
+    );
+    v_xp_gain := 0;
+    v_reward := jsonb_build_object('GOLD', 240, 'DATA', 6, 'SCRAP', 120);
+
+  ELSIF p_contract_key = 'reserve_buffer_hold' THEN
+    v_tiers := coalesce(v_state.building_tiers, '{}'::jsonb);
+    v_sp_active := coalesce(v_state.support_program_active, public.base_default_support_program_active());
+    IF public.base_building_tier(v_tiers, 'logisticsCenter') < 3
+      OR coalesce(public.base_active_support_program(v_sp_active, 'logisticsCenter'), '') <> 'reserveBuffer' THEN
+      v_done := false;
+    ELSE
+      v_done := coalesce(v_state.stability, 100) >= 88
+        AND coalesce((v_resources->>'ENERGY')::numeric, 0) >= (v_energy_cap * 0.5);
+    END IF;
+    v_resources := jsonb_set(
+      jsonb_set(
+        jsonb_set(
+          v_resources,
+          '{ENERGY}',
+          to_jsonb(least(
+            v_energy_cap,
+            coalesce((v_resources->>'ENERGY')::int, 0) + 24
+          )),
+          true
+        ),
+        '{SCRAP}',
+        to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 180),
+        true
+      ),
+      '{DATA}',
+      to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 8),
+      true
+    );
+    v_xp_gain := 0;
+    v_reward := jsonb_build_object('ENERGY', 24, 'SCRAP', 180, 'DATA', 8);
+
+  ELSIF p_contract_key = 'analysis_matrix_window' THEN
+    v_tiers := coalesce(v_state.building_tiers, '{}'::jsonb);
+    v_sp_active := coalesce(v_state.support_program_active, public.base_default_support_program_active());
+    IF public.base_building_tier(v_tiers, 'researchLab') < 2
+      OR coalesce(public.base_active_support_program(v_sp_active, 'researchLab'), '') <> 'analysisMatrix' THEN
+      v_done := false;
+    ELSE
+      v_done := coalesce((v_resources->>'DATA')::int, 0) >= 12
+        AND coalesce(v_state.expedition_ready_at, now()) <= now();
+    END IF;
+    v_resources := jsonb_set(
+      jsonb_set(
+        jsonb_set(
+          v_resources,
+          '{DATA}',
+          to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 7),
+          true
+        ),
+        '{GOLD}',
+        to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 180),
+        true
+      ),
+      '{ORE}',
+      to_jsonb(coalesce((v_resources->>'ORE')::int, 0) + 120),
+      true
+    );
+    v_xp_gain := 0;
+    v_reward := jsonb_build_object('DATA', 7, 'GOLD', 180, 'ORE', 120);
+
+  ELSIF p_contract_key = 'predictive_telemetry_sync' THEN
+    v_tiers := coalesce(v_state.building_tiers, '{}'::jsonb);
+    v_sp_active := coalesce(v_state.support_program_active, public.base_default_support_program_active());
+    IF public.base_building_tier(v_tiers, 'researchLab') < 3
+      OR coalesce(public.base_active_support_program(v_sp_active, 'researchLab'), '') <> 'predictiveTelemetry' THEN
+      v_done := false;
+    ELSE
+      v_done := coalesce((v_resources->>'DATA')::int, 0) >= 14
+        AND coalesce(v_state.banked_mleo, 0)::numeric >= 120;
+    END IF;
+    v_resources := jsonb_set(
+      jsonb_set(
+        jsonb_set(
+          v_resources,
+          '{DATA}',
+          to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 10),
+          true
+        ),
+        '{GOLD}',
+        to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 220),
+        true
+      ),
+      '{SCRAP}',
+      to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 140),
+      true
+    );
+    v_xp_gain := 0;
+    v_reward := jsonb_build_object('DATA', 10, 'GOLD', 220, 'SCRAP', 140);
+
+  ELSIF p_contract_key = 'preventive_cycle_standard' THEN
+    v_tiers := coalesce(v_state.building_tiers, '{}'::jsonb);
+    v_sp_active := coalesce(v_state.support_program_active, public.base_default_support_program_active());
+    IF public.base_building_tier(v_tiers, 'repairBay') < 2
+      OR coalesce(public.base_active_support_program(v_sp_active, 'repairBay'), '') <> 'preventiveCycle' THEN
+      v_done := false;
+    ELSE
+      v_done := coalesce(v_state.stability, 100) >= 90;
+    END IF;
+    v_resources := jsonb_set(
+      jsonb_set(
+        jsonb_set(
+          v_resources,
+          '{SCRAP}',
+          to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 220),
+          true
+        ),
+        '{ENERGY}',
+        to_jsonb(least(
+          v_energy_cap,
+          coalesce((v_resources->>'ENERGY')::int, 0) + 18
+        )),
+        true
+      ),
+      '{GOLD}',
+      to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 160),
+      true
+    );
+    v_xp_gain := 0;
+    v_reward := jsonb_build_object('SCRAP', 220, 'ENERGY', 18, 'GOLD', 160);
+
+  ELSIF p_contract_key = 'stabilization_mesh_balance' THEN
+    v_tiers := coalesce(v_state.building_tiers, '{}'::jsonb);
+    v_sp_active := coalesce(v_state.support_program_active, public.base_default_support_program_active());
+    IF public.base_building_tier(v_tiers, 'repairBay') < 3
+      OR coalesce(public.base_active_support_program(v_sp_active, 'repairBay'), '') <> 'stabilizationMesh' THEN
+      v_done := false;
+    ELSE
+      v_done := coalesce(v_state.stability, 100) >= 86
+        AND coalesce((v_resources->>'ENERGY')::numeric, 0) >= (v_energy_cap * 0.4)
+        AND coalesce(v_state.banked_mleo, 0)::numeric >= 90;
+    END IF;
+    v_resources := jsonb_set(
+      jsonb_set(
+        jsonb_set(
+          v_resources,
+          '{SCRAP}',
+          to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 240),
+          true
+        ),
+        '{GOLD}',
+        to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 180),
+        true
+      ),
+      '{DATA}',
+      to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 6),
+      true
+    );
+    v_xp_gain := 0;
+    v_reward := jsonb_build_object('SCRAP', 240, 'GOLD', 180, 'DATA', 6);
 
   ELSE
     RAISE EXCEPTION 'Invalid contract key';

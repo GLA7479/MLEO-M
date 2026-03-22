@@ -10,4 +10,7 @@
 --
 -- API: /api/base/action/unlock-support-program, /api/base/action/set-support-program
 -- Client: unlockSupportProgram, setSupportProgram in lib/baseVaultClient.js
+--
+-- Advanced contracts (Tier + active program) also extend `base_claim_contract`
+-- in the same `sql/base_server_authority.sql` (6 new keys; resource rewards only).
 -- ============================================================================

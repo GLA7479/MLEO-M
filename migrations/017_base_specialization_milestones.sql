@@ -1,0 +1,24 @@
+-- ============================================================================
+-- NOT A DEPLOYABLE MIGRATION — DO NOT RUN THIS FILE AS YOUR MAIN SCHEMA UPDATE.
+--
+-- For BASE Stage 5B (specialization milestones), run in order:
+--   1) sql/base_server_authority.sql
+--   2) sql/base_atomic_rpc.sql
+--
+-- State version bumps 9 → 10; new column:
+--   specialization_milestones_claimed (jsonb, per-building milestone flags)
+--
+-- SQL helpers:
+--   base_default_specialization_milestones_claimed()
+--   base_specialization_milestone_definition(building, milestone)
+--   base_specialization_milestone_progress(state row, building, milestone)
+--   base_claim_specialization_milestone(device_id, building, milestone)  -- in atomic RPC file
+--
+-- API: /api/base/action/claim-specialization-milestone
+-- Client: claimSpecializationMilestone in lib/baseVaultClient.js
+--
+-- Milestone keys (6):
+--   logisticsCenter: disciplined_pipeline, buffer_authority
+--   researchLab: matrix_operator, telemetry_controller
+--   repairBay: preventive_standard, mesh_discipline
+-- ============================================================================
