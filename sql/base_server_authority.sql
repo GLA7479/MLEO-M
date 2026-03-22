@@ -1855,6 +1855,38 @@ BEGIN
 END;
 $$;
 
+-- Daily elite rotating offers (2 per UTC day); ordering matches lib/server/baseEliteRotation.js
+CREATE OR REPLACE FUNCTION public.base_elite_daily_offer_templates(p_day text)
+RETURNS text[]
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT coalesce(
+    (
+      SELECT array_agg(z.k ORDER BY z.h)
+      FROM (
+        SELECT
+          u.k AS k,
+          md5(coalesce(trim(p_day), '') || u.k) AS h,
+          row_number() OVER (ORDER BY md5(coalesce(trim(p_day), '') || u.k)) AS rn
+        FROM unnest(ARRAY[
+          'elite_log_export_pressure',
+          'elite_log_buffer_orbit',
+          'elite_log_vault_ledger',
+          'elite_res_expedition_pulse',
+          'elite_res_telemetry_storm',
+          'elite_res_cleanroom_push',
+          'elite_rep_stability_lock',
+          'elite_rep_mesh_overdrive',
+          'elite_rep_service_cadence'
+        ]::text[]) AS u(k)
+      ) z
+      WHERE z.rn <= 2
+    ),
+    ARRAY[]::text[]
+  );
+$$;
+
 CREATE OR REPLACE FUNCTION public.base_claim_contract(
   p_device_id text,
   p_contract_key text
@@ -1875,6 +1907,9 @@ DECLARE
   v_energy_cap integer := 148;
   v_tiers jsonb;
   v_sp_active jsonb;
+  v_elite_day text;
+  v_elite_tpl text;
+  v_b jsonb;
 BEGIN
   IF coalesce(trim(p_device_id), '') = '' THEN
     RAISE EXCEPTION 'device_id is required';
@@ -2141,6 +2176,280 @@ BEGIN
     v_xp_gain := 0;
     v_reward := jsonb_build_object('SCRAP', 240, 'GOLD', 180, 'DATA', 6);
 
+  ELSIF strpos(p_contract_key, 'elite:') = 1 THEN
+    v_elite_tpl := split_part(p_contract_key, ':', 2);
+    v_elite_day := split_part(p_contract_key, ':', 3);
+    IF coalesce(trim(v_elite_tpl), '') = '' OR coalesce(trim(v_elite_day), '') = '' THEN
+      RAISE EXCEPTION 'Invalid elite contract key';
+    END IF;
+    IF v_elite_day <> to_char((timezone('utc', now()))::date, 'YYYY-MM-DD') THEN
+      RAISE EXCEPTION 'Elite contract day mismatch';
+    END IF;
+    IF NOT (v_elite_tpl = ANY(public.base_elite_daily_offer_templates(v_elite_day))) THEN
+      RAISE EXCEPTION 'Elite contract not in rotation today';
+    END IF;
+
+    v_tiers := coalesce(v_state.building_tiers, '{}'::jsonb);
+    v_sp_active := coalesce(v_state.support_program_active, public.base_default_support_program_active());
+    v_b := coalesce(v_state.buildings, '{}'::jsonb);
+    v_done := false;
+    v_xp_gain := 0;
+
+    IF v_elite_tpl = 'elite_log_export_pressure' THEN
+      IF coalesce((v_b->>'logisticsCenter')::int, 0) < 1
+        OR public.base_building_tier(v_tiers, 'logisticsCenter') < 3
+        OR coalesce(public.base_active_support_program(v_sp_active, 'logisticsCenter'), '') <> 'routeDiscipline' THEN
+        v_done := false;
+      ELSE
+        v_done := coalesce(v_state.banked_mleo, 0)::numeric >= 280
+          AND coalesce(v_state.stability, 100) >= 83;
+      END IF;
+      v_resources := jsonb_set(
+        jsonb_set(
+          jsonb_set(
+            v_resources,
+            '{GOLD}',
+            to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 420),
+            true
+          ),
+          '{DATA}',
+          to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 14),
+          true
+        ),
+        '{SCRAP}',
+        to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 260),
+        true
+      );
+      v_reward := jsonb_build_object('GOLD', 420, 'DATA', 14, 'SCRAP', 260);
+
+    ELSIF v_elite_tpl = 'elite_log_buffer_orbit' THEN
+      IF coalesce((v_b->>'logisticsCenter')::int, 0) < 1
+        OR public.base_building_tier(v_tiers, 'logisticsCenter') < 3
+        OR coalesce(public.base_active_support_program(v_sp_active, 'logisticsCenter'), '') <> 'reserveBuffer' THEN
+        v_done := false;
+      ELSE
+        v_done := coalesce(v_state.stability, 100) >= 87
+          AND coalesce((v_resources->>'ENERGY')::numeric, 0) >= (v_energy_cap * 0.5);
+      END IF;
+      v_resources := jsonb_set(
+        jsonb_set(
+          jsonb_set(
+            v_resources,
+            '{ENERGY}',
+            to_jsonb(least(
+              v_energy_cap,
+              coalesce((v_resources->>'ENERGY')::int, 0) + 32
+            )),
+            true
+          ),
+          '{SCRAP}',
+          to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 280),
+          true
+        ),
+        '{DATA}',
+        to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 10),
+        true
+      );
+      v_reward := jsonb_build_object('ENERGY', 32, 'SCRAP', 280, 'DATA', 10);
+
+    ELSIF v_elite_tpl = 'elite_log_vault_ledger' THEN
+      IF coalesce((v_b->>'logisticsCenter')::int, 0) < 1
+        OR public.base_building_tier(v_tiers, 'logisticsCenter') < 4
+        OR coalesce(public.base_active_support_program(v_sp_active, 'logisticsCenter'), '') <> 'vaultCalibration' THEN
+        v_done := false;
+      ELSE
+        v_done := coalesce(v_state.banked_mleo, 0)::numeric >= 200
+          AND coalesce((v_resources->>'DATA')::int, 0) >= 16;
+      END IF;
+      v_resources := jsonb_set(
+        jsonb_set(
+          jsonb_set(
+            v_resources,
+            '{GOLD}',
+            to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 380),
+            true
+          ),
+          '{ORE}',
+          to_jsonb(coalesce((v_resources->>'ORE')::int, 0) + 200),
+          true
+        ),
+        '{SCRAP}',
+        to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 200),
+        true
+      );
+      v_reward := jsonb_build_object('GOLD', 380, 'ORE', 200, 'SCRAP', 200);
+
+    ELSIF v_elite_tpl = 'elite_res_expedition_pulse' THEN
+      IF coalesce((v_b->>'researchLab')::int, 0) < 1
+        OR public.base_building_tier(v_tiers, 'researchLab') < 3
+        OR coalesce(public.base_active_support_program(v_sp_active, 'researchLab'), '') <> 'analysisMatrix' THEN
+        v_done := false;
+      ELSE
+        v_done := coalesce((v_resources->>'DATA')::int, 0) >= 16
+          AND coalesce(v_state.expedition_ready_at, now()) <= now();
+      END IF;
+      v_resources := jsonb_set(
+        jsonb_set(
+          jsonb_set(
+            v_resources,
+            '{DATA}',
+            to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 12),
+            true
+          ),
+          '{GOLD}',
+          to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 260),
+          true
+        ),
+        '{SCRAP}',
+        to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 160),
+        true
+      );
+      v_reward := jsonb_build_object('DATA', 12, 'GOLD', 260, 'SCRAP', 160);
+
+    ELSIF v_elite_tpl = 'elite_res_telemetry_storm' THEN
+      IF coalesce((v_b->>'researchLab')::int, 0) < 1
+        OR public.base_building_tier(v_tiers, 'researchLab') < 3
+        OR coalesce(public.base_active_support_program(v_sp_active, 'researchLab'), '') <> 'predictiveTelemetry' THEN
+        v_done := false;
+      ELSE
+        v_done := coalesce((v_resources->>'DATA')::int, 0) >= 18
+          AND coalesce(v_state.banked_mleo, 0)::numeric >= 140;
+      END IF;
+      v_resources := jsonb_set(
+        jsonb_set(
+          jsonb_set(
+            v_resources,
+            '{DATA}',
+            to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 16),
+            true
+          ),
+          '{GOLD}',
+          to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 300),
+          true
+        ),
+        '{ORE}',
+        to_jsonb(coalesce((v_resources->>'ORE')::int, 0) + 160),
+        true
+      );
+      v_reward := jsonb_build_object('DATA', 16, 'GOLD', 300, 'ORE', 160);
+
+    ELSIF v_elite_tpl = 'elite_res_cleanroom_push' THEN
+      IF coalesce((v_b->>'researchLab')::int, 0) < 1
+        OR public.base_building_tier(v_tiers, 'researchLab') < 4
+        OR coalesce(public.base_active_support_program(v_sp_active, 'researchLab'), '') <> 'cleanroomProtocol' THEN
+        v_done := false;
+      ELSE
+        v_done := coalesce((v_resources->>'DATA')::int, 0) >= 22
+          AND coalesce(v_state.stability, 100) >= 84;
+      END IF;
+      v_resources := jsonb_set(
+        jsonb_set(
+          jsonb_set(
+            v_resources,
+            '{DATA}',
+            to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 14),
+            true
+          ),
+          '{SCRAP}',
+          to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 220),
+          true
+        ),
+        '{GOLD}',
+        to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 240),
+        true
+      );
+      v_reward := jsonb_build_object('DATA', 14, 'SCRAP', 220, 'GOLD', 240);
+
+    ELSIF v_elite_tpl = 'elite_rep_stability_lock' THEN
+      IF coalesce((v_b->>'repairBay')::int, 0) < 1
+        OR public.base_building_tier(v_tiers, 'repairBay') < 3
+        OR coalesce(public.base_active_support_program(v_sp_active, 'repairBay'), '') <> 'preventiveCycle' THEN
+        v_done := false;
+      ELSE
+        v_done := coalesce(v_state.stability, 100) >= 92;
+      END IF;
+      v_resources := jsonb_set(
+        jsonb_set(
+          jsonb_set(
+            v_resources,
+            '{SCRAP}',
+            to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 300),
+            true
+          ),
+          '{ENERGY}',
+          to_jsonb(least(
+            v_energy_cap,
+            coalesce((v_resources->>'ENERGY')::int, 0) + 24
+          )),
+          true
+        ),
+        '{DATA}',
+        to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 8),
+        true
+      );
+      v_reward := jsonb_build_object('SCRAP', 300, 'ENERGY', 24, 'DATA', 8);
+
+    ELSIF v_elite_tpl = 'elite_rep_mesh_overdrive' THEN
+      IF coalesce((v_b->>'repairBay')::int, 0) < 1
+        OR public.base_building_tier(v_tiers, 'repairBay') < 3
+        OR coalesce(public.base_active_support_program(v_sp_active, 'repairBay'), '') <> 'stabilizationMesh' THEN
+        v_done := false;
+      ELSE
+        v_done := coalesce(v_state.stability, 100) >= 88
+          AND coalesce((v_resources->>'ENERGY')::numeric, 0) >= (v_energy_cap * 0.42);
+      END IF;
+      v_resources := jsonb_set(
+        jsonb_set(
+          jsonb_set(
+            v_resources,
+            '{SCRAP}',
+            to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 320),
+            true
+          ),
+          '{GOLD}',
+          to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 220),
+          true
+        ),
+        '{ENERGY}',
+        to_jsonb(least(
+          v_energy_cap,
+          coalesce((v_resources->>'ENERGY')::int, 0) + 20
+        )),
+        true
+      );
+      v_reward := jsonb_build_object('SCRAP', 320, 'GOLD', 220, 'ENERGY', 20);
+
+    ELSIF v_elite_tpl = 'elite_rep_service_cadence' THEN
+      IF coalesce((v_b->>'repairBay')::int, 0) < 1
+        OR public.base_building_tier(v_tiers, 'repairBay') < 4
+        OR coalesce(public.base_active_support_program(v_sp_active, 'repairBay'), '') <> 'serviceDiscipline' THEN
+        v_done := false;
+      ELSE
+        v_done := coalesce(v_state.stability, 100) >= 90
+          AND coalesce(v_state.banked_mleo, 0)::numeric >= 110;
+      END IF;
+      v_resources := jsonb_set(
+        jsonb_set(
+          jsonb_set(
+            v_resources,
+            '{SCRAP}',
+            to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 340),
+            true
+          ),
+          '{GOLD}',
+          to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 260),
+          true
+        ),
+        '{DATA}',
+        to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 12),
+        true
+      );
+      v_reward := jsonb_build_object('SCRAP', 340, 'GOLD', 260, 'DATA', 12);
+
+    ELSE
+      RAISE EXCEPTION 'Unknown elite contract template';
+    END IF;
+
   ELSE
     RAISE EXCEPTION 'Invalid contract key';
   END IF;
@@ -2195,6 +2504,7 @@ REVOKE EXECUTE ON FUNCTION public.base_reconcile_state(text) FROM PUBLIC, anon, 
 REVOKE EXECUTE ON FUNCTION public.base_claim_mission_reward(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_set_profile(text, text, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_claim_contract(text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.base_elite_daily_offer_templates(text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_set_building_paused(text, text, boolean) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.base_set_building_power_mode(text, text, integer) FROM PUBLIC, anon, authenticated;
 
@@ -2203,6 +2513,7 @@ GRANT EXECUTE ON FUNCTION public.base_reconcile_state(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_claim_mission_reward(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_set_profile(text, text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_claim_contract(text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.base_elite_daily_offer_templates(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_set_building_paused(text, text, boolean) TO service_role;
 GRANT EXECUTE ON FUNCTION public.base_set_building_power_mode(text, text, integer) TO service_role;
 

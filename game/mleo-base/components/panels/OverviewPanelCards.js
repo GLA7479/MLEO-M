@@ -572,7 +572,26 @@ function ContractsCard({
             .map((contract) => (
               <div key={contract.key} className="rounded-xl border border-white/10 bg-black/20 p-3">
                 <div className="font-bold text-white">{contract.title}</div>
-                {contract.contractClass === "advanced" ? (
+                {contract.contractClass === "elite" ? (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    <span className="inline-flex rounded-full border border-amber-400/40 bg-amber-500/15 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-amber-100">
+                      Elite
+                    </span>
+                    <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[8px] font-bold text-white/55">
+                      Rotates daily
+                    </span>
+                    {contract.eliteTierPill ? (
+                      <span className="inline-flex rounded-full border border-cyan-400/25 bg-cyan-500/10 px-1.5 py-0.5 text-[8px] font-bold text-cyan-100">
+                        {contract.eliteTierPill}
+                      </span>
+                    ) : null}
+                    {contract.eliteProgramPill ? (
+                      <span className="inline-flex max-w-full rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[8px] font-semibold text-white/65">
+                        {contract.eliteProgramPill}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : contract.contractClass === "advanced" ? (
                   <div className="mt-1 flex flex-wrap gap-1">
                     <span className="inline-flex rounded-full border border-violet-400/30 bg-violet-500/15 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-violet-100">
                       Advanced
@@ -588,6 +607,9 @@ function ContractsCard({
                       </span>
                     ) : null}
                   </div>
+                ) : null}
+                {contract.contractClass === "elite" && contract.desc ? (
+                  <div className="mt-1 text-[11px] leading-snug text-white/50">{contract.desc}</div>
                 ) : null}
                 <div className="mt-1 text-sm text-white/65">{contract.rewardText}</div>
                 <button

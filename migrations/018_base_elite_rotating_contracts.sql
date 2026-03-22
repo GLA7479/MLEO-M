@@ -1,0 +1,11 @@
+-- ============================================================================
+-- NOT A DEPLOYABLE MIGRATION — DO NOT RUN THIS FILE AS YOUR MAIN SCHEMA UPDATE.
+--
+-- Elite / rotating contracts (late-game):
+--   1) Re-apply sql/base_server_authority.sql (adds base_elite_daily_offer_templates + base_claim_contract elite branch)
+--
+-- Claim id format: elite:<template_key>:<YYYY-MM-DD> (UTC day)
+-- API: GET /api/base/state returns eliteRotation { dayKey, offerTemplateKeys }
+-- Client: game/mleo-base/data.js — ELITE_ROTATING_CONTRACTS
+-- Server pick: lib/server/baseEliteRotation.js (must match SQL md5(day||key) ordering)
+-- ============================================================================

@@ -3,6 +3,7 @@ import { checkArcadeRateLimit } from "../../../lib/server/arcadeRateLimit";
 import { getSupabaseAdmin } from "../../../lib/server/supabaseAdmin";
 import { checkIpRateLimit } from "../../../lib/server/ipRateLimit";
 import { logIpRateLimitExceeded } from "../../../lib/server/securityLogger";
+import { getEliteRotationPayload } from "../../../lib/server/baseEliteRotation";
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -37,7 +38,11 @@ export default async function handler(req, res) {
       }
 
       const row = Array.isArray(data) ? data[0] : data;
-      return res.status(200).json({ success: true, state: row || null });
+      return res.status(200).json({
+        success: true,
+        state: row || null,
+        eliteRotation: getEliteRotationPayload(),
+      });
     }
 
     res.setHeader("Allow", "GET");

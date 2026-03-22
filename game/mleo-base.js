@@ -61,6 +61,8 @@ import {
   DEFAULT_BUILDING_POWER_MODE,
   EVENT_COOLDOWN_MS,
   LIVE_CONTRACTS,
+  ELITE_ROTATING_CONTRACTS,
+  getEliteRuntimeContractKey,
   LIVE_EVENTS,
   MODULES,
   OFFLINE_TIERS,
@@ -2966,6 +2968,15 @@ function getSpecializationGuidanceAction(state, derived, specializationSummary, 
     }
   }
 
+  const eliteReady = liveContracts.filter((x) => x.contractClass === "elite" && x.done && !x.claimed);
+  if (eliteReady.length > 0) {
+    const c = eliteReady[0];
+    return {
+      title: "Claim elite contract",
+      text: `${c.title} is ready — rotating high-value assignment. Claim in Live Contracts (resets daily UTC).`,
+    };
+  }
+
   const totalClaimableM = Number(totals.totalClaimableMilestones || 0);
   if (totalClaimableM > 0) {
     for (const row of buildings) {
@@ -4374,6 +4385,7 @@ export default function MleoBase() {
   const lastGameActionAtRef = useRef(0);
   const gameActionInFlightRef = useRef(false);
   const [hubGameplayOnline, setHubGameplayOnline] = useState(false);
+  const [eliteRotation, setEliteRotation] = useState(null);
 
   useEffect(() => {
     if (!tierPromptKey) return;
@@ -4478,9 +4490,6 @@ export default function MleoBase() {
 
     presenceInFlightRef.current = true;
     try {
-      const csrfReady = await ensureCsrfToken();
-      if (!csrfReady) return false;
-
       const payload = await sendBasePresence({
         visibilityState: document.visibilityState || (isGameplay ? "visible" : "hidden"),
         pageName: "base",
@@ -4545,9 +4554,6 @@ export default function MleoBase() {
     const now = Date.now();
     gameActionInFlightRef.current = true;
     try {
-      const csrfReady = await ensureCsrfToken();
-      if (!csrfReady) return false;
-
       const payload = await sendBasePresence({
         visibilityState: document.visibilityState || "visible",
         pageName: "base",
@@ -5269,6 +5275,9 @@ export default function MleoBase() {
         const seed = freshState();
         const serverRes = await getBaseState();
         const saved = serverRes?.state || null;
+        if (serverRes?.eliteRotation) {
+          setEliteRotation(serverRes.eliteRotation);
+        }
 
         // Only explicit reset flag should force a fresh client seed now.
         // Starter resources are server-authoritative.
@@ -5338,6 +5347,9 @@ export default function MleoBase() {
         const serverState = res?.state;
         if (!alive || !serverState) return;
 
+        if (res?.eliteRotation) {
+          setEliteRotation(res.eliteRotation);
+        }
         setState((prev) => mergeAuthoritativeServerState(prev, serverState));
       } catch (error) {
         console.error("BASE refresh failed", error);
@@ -5413,7 +5425,10 @@ export default function MleoBase() {
   );
 
   const liveContracts = useMemo(() => {
-    return LIVE_CONTRACTS.filter((contract) =>
+    const dayKey = String(eliteRotation?.dayKey || "");
+    const offerKeys = new Set(eliteRotation?.offerTemplateKeys || []);
+
+    const base = LIVE_CONTRACTS.filter((contract) =>
       typeof contract.visible === "function" ? contract.visible(state, derived) : true
     ).map((contract) => ({
       ...contract,
@@ -5429,7 +5444,34 @@ export default function MleoBase() {
           ? `Program: ${supportProgramLabelForContract(contract.supportBuilding, contract.requiresProgram)}`
           : null,
     }));
-  }, [state, derived, contractClaimedMap]);
+
+    const eliteRows =
+      dayKey && offerKeys.size
+        ? ELITE_ROTATING_CONTRACTS.filter((c) => offerKeys.has(c.key))
+            .filter((c) => (typeof c.visible === "function" ? c.visible(state, derived) : true))
+            .map((c) => {
+              const runtimeKey = getEliteRuntimeContractKey(c.key, dayKey);
+              return {
+                ...c,
+                templateKey: c.key,
+                key: runtimeKey,
+                contractClass: "elite",
+                done: c.check(state, derived),
+                claimed: !!contractClaimedMap[runtimeKey],
+                eliteTierPill:
+                  c.minTier && c.supportBuilding
+                    ? `T${c.minTier} ${SUPPORT_BUILDING_CONTRACT_SHORT[c.supportBuilding] || ""}`.trim()
+                    : null,
+                eliteProgramPill:
+                  c.requiredProgram && c.supportBuilding
+                    ? `Program: ${supportProgramLabelForContract(c.supportBuilding, c.requiredProgram)}`
+                    : null,
+              };
+            })
+        : [];
+
+    return [...base, ...eliteRows];
+  }, [state, derived, contractClaimedMap, eliteRotation]);
 
   const specializationSummary = useMemo(() => {
     const SUPPORT_ORDER = ["logisticsCenter", "researchLab", "repairBay"];
@@ -6363,7 +6405,6 @@ export default function MleoBase() {
         }
 
         setState((prev) => mergeAuthoritativeServerState(prev, res.state));
-        const contract = LIVE_CONTRACTS.find((item) => item.key === key);
         markRealGameAction();
         showToast("Contract claimed · rewards added");
       } catch (error) {
@@ -10083,10 +10124,14 @@ export default function MleoBase() {
   }
 
   function getContractInfo(contract) {
-    return CONTRACT_INFO_COPY[contract.key] || {
+    const lookupKey = contract.templateKey || contract.key;
+    return CONTRACT_INFO_COPY[lookupKey] || {
       title: contract.title,
-      focus: "Live Contract",
-      text: contract.desc,
+      focus: contract.contractClass === "elite" ? "Elite rotating contract" : "Live Contract",
+      text:
+        contract.contractClass === "elite"
+          ? `${contract.desc}\n\nThese offers rotate daily (UTC) and use a separate claim slot per day.`
+          : contract.desc,
       tips: { building: "", research: "", module: "", actions: [] },
     };
   }
@@ -13010,7 +13055,26 @@ export default function MleoBase() {
                         </div>
                         <div className="pr-8">
                           <div className="text-sm font-semibold text-white">{contract.title}</div>
-                          {contract.contractClass === "advanced" ? (
+                          {contract.contractClass === "elite" ? (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              <span className="inline-flex rounded-full border border-amber-400/40 bg-amber-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-amber-100">
+                                Elite
+                              </span>
+                              <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-bold text-white/55">
+                                Rotates daily
+                              </span>
+                              {contract.eliteTierPill ? (
+                                <span className="inline-flex rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2 py-0.5 text-[9px] font-bold text-cyan-100">
+                                  {contract.eliteTierPill}
+                                </span>
+                              ) : null}
+                              {contract.eliteProgramPill ? (
+                                <span className="inline-flex max-w-full rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-semibold text-white/70">
+                                  {contract.eliteProgramPill}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : contract.contractClass === "advanced" ? (
                             <div className="mt-1 flex flex-wrap gap-1">
                               <span className="inline-flex rounded-full border border-violet-400/30 bg-violet-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-violet-100">
                                 Advanced

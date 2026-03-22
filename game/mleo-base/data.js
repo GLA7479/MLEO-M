@@ -552,6 +552,191 @@ export const LIVE_CONTRACTS = [
   },
 ];
 
+/** Late-game rotating contracts (server day key + claim id `elite:<key>:<day>`). Resources / utility only — no MLEO. */
+function eliteSupportVisible(state, buildingKey, minTier, programKey) {
+  const level = Number(state?.buildings?.[buildingKey] || 0);
+  if (level < 1) return false;
+  const tier = Math.max(1, Number(state?.buildingTiers?.[buildingKey] || 1));
+  if (tier < minTier) return false;
+  const active =
+    state?.supportProgramActive?.[buildingKey] ?? state?.support_program_active?.[buildingKey] ?? null;
+  return active === programKey;
+}
+
+export const ELITE_ROTATING_CONTRACTS = [
+  {
+    key: "elite_log_export_pressure",
+    family: "logistics",
+    contractClass: "elite",
+    elite: true,
+    supportBuilding: "logisticsCenter",
+    minTier: 3,
+    requiredProgram: "routeDiscipline",
+    title: "Export Pressure Surge",
+    desc: "Hold a heavy bank buffer under active route discipline. Elite assignment — rotates daily (UTC).",
+    rewardText: "Reward: GOLD 420 · DATA 14 · SCRAP 260",
+    visible: (state) => eliteSupportVisible(state, "logisticsCenter", 3, "routeDiscipline"),
+    check: (state) =>
+      Number(state.bankedMleo || 0) >= 280 && Number(state.stability || 0) >= 83,
+    reward: { GOLD: 420, DATA: 14, SCRAP: 260 },
+    weight: 1,
+  },
+  {
+    key: "elite_log_buffer_orbit",
+    family: "logistics",
+    contractClass: "elite",
+    elite: true,
+    supportBuilding: "logisticsCenter",
+    minTier: 3,
+    requiredProgram: "reserveBuffer",
+    title: "Buffer Orbit Hold",
+    desc: "Keep stability and reserves aligned while logistics runs in buffer mode. Rotates daily (UTC).",
+    rewardText: "Reward: ENERGY 32 · SCRAP 280 · DATA 10",
+    visible: (state) => eliteSupportVisible(state, "logisticsCenter", 3, "reserveBuffer"),
+    check: (state, derived) =>
+      Number(state.stability || 0) >= 87 &&
+      Number(state.resources?.ENERGY || 0) >= Math.floor((derived?.energyCap || 0) * 0.5),
+    reward: { ENERGY: 32, SCRAP: 280, DATA: 10 },
+    weight: 1,
+  },
+  {
+    key: "elite_log_vault_ledger",
+    family: "logistics",
+    contractClass: "elite",
+    elite: true,
+    supportBuilding: "logisticsCenter",
+    minTier: 4,
+    requiredProgram: "vaultCalibration",
+    title: "Vault Ledger Sprint",
+    desc: "Pair strong bank flow with calibrated telemetry. Rotates daily (UTC).",
+    rewardText: "Reward: GOLD 380 · ORE 200 · SCRAP 200",
+    visible: (state) => eliteSupportVisible(state, "logisticsCenter", 4, "vaultCalibration"),
+    check: (state) =>
+      Number(state.bankedMleo || 0) >= 200 && Number(state.resources?.DATA || 0) >= 16,
+    reward: { GOLD: 380, ORE: 200, SCRAP: 200 },
+    weight: 1,
+  },
+  {
+    key: "elite_res_expedition_pulse",
+    family: "research",
+    contractClass: "elite",
+    elite: true,
+    supportBuilding: "researchLab",
+    minTier: 3,
+    requiredProgram: "analysisMatrix",
+    title: "Expedition Pulse Drill",
+    desc: "Field-ready data while analysis matrix is live. Rotates daily (UTC).",
+    rewardText: "Reward: DATA 12 · GOLD 260 · SCRAP 160",
+    visible: (state) => eliteSupportVisible(state, "researchLab", 3, "analysisMatrix"),
+    check: (state) =>
+      Number(state.resources?.DATA || 0) >= 16 && Number(state.expeditionReadyAt || 0) <= Date.now(),
+    reward: { DATA: 12, GOLD: 260, SCRAP: 160 },
+    weight: 1,
+  },
+  {
+    key: "elite_res_telemetry_storm",
+    family: "research",
+    contractClass: "elite",
+    elite: true,
+    supportBuilding: "researchLab",
+    minTier: 3,
+    requiredProgram: "predictiveTelemetry",
+    title: "Telemetry Storm Window",
+    desc: "Sustain deep telemetry load with bank support. Rotates daily (UTC).",
+    rewardText: "Reward: DATA 16 · GOLD 300 · ORE 160",
+    visible: (state) => eliteSupportVisible(state, "researchLab", 3, "predictiveTelemetry"),
+    check: (state) =>
+      Number(state.resources?.DATA || 0) >= 18 && Number(state.bankedMleo || 0) >= 140,
+    reward: { DATA: 16, GOLD: 300, ORE: 160 },
+    weight: 1,
+  },
+  {
+    key: "elite_res_cleanroom_push",
+    family: "research",
+    contractClass: "elite",
+    elite: true,
+    supportBuilding: "researchLab",
+    minTier: 4,
+    requiredProgram: "cleanroomProtocol",
+    title: "Cleanroom Push Protocol",
+    desc: "High-throughput research under cleanroom discipline. Rotates daily (UTC).",
+    rewardText: "Reward: DATA 14 · SCRAP 220 · GOLD 240",
+    visible: (state) => eliteSupportVisible(state, "researchLab", 4, "cleanroomProtocol"),
+    check: (state) =>
+      Number(state.resources?.DATA || 0) >= 22 && Number(state.stability || 0) >= 84,
+    reward: { DATA: 14, SCRAP: 220, GOLD: 240 },
+    weight: 1,
+  },
+  {
+    key: "elite_rep_stability_lock",
+    family: "repair",
+    contractClass: "elite",
+    elite: true,
+    supportBuilding: "repairBay",
+    minTier: 3,
+    requiredProgram: "preventiveCycle",
+    title: "Stability Lock Drill",
+    desc: "Prove preventive discipline with a long stability hold. Rotates daily (UTC).",
+    rewardText: "Reward: SCRAP 300 · ENERGY 24 · DATA 8",
+    visible: (state) => eliteSupportVisible(state, "repairBay", 3, "preventiveCycle"),
+    check: (state) => Number(state.stability || 0) >= 92,
+    reward: { SCRAP: 300, ENERGY: 24, DATA: 8 },
+    weight: 1,
+  },
+  {
+    key: "elite_rep_mesh_overdrive",
+    family: "repair",
+    contractClass: "elite",
+    elite: true,
+    supportBuilding: "repairBay",
+    minTier: 3,
+    requiredProgram: "stabilizationMesh",
+    title: "Mesh Overdrive Hold",
+    desc: "Balance mesh-stabilized repair pressure with energy headroom. Rotates daily (UTC).",
+    rewardText: "Reward: SCRAP 320 · GOLD 220 · ENERGY 20",
+    visible: (state) => eliteSupportVisible(state, "repairBay", 3, "stabilizationMesh"),
+    check: (state, derived) =>
+      Number(state.stability || 0) >= 88 &&
+      Number(state.resources?.ENERGY || 0) >= Math.floor((derived?.energyCap || 0) * 0.42),
+    reward: { SCRAP: 320, GOLD: 220, ENERGY: 20 },
+    weight: 1,
+  },
+  {
+    key: "elite_rep_service_cadence",
+    family: "repair",
+    contractClass: "elite",
+    elite: true,
+    supportBuilding: "repairBay",
+    minTier: 4,
+    requiredProgram: "serviceDiscipline",
+    title: "Service Cadence Burn",
+    desc: "High-tempo maintenance rhythm with export support. Rotates daily (UTC).",
+    rewardText: "Reward: SCRAP 340 · GOLD 260 · DATA 12",
+    visible: (state) => eliteSupportVisible(state, "repairBay", 4, "serviceDiscipline"),
+    check: (state) =>
+      Number(state.stability || 0) >= 90 && Number(state.bankedMleo || 0) >= 110,
+    reward: { SCRAP: 340, GOLD: 260, DATA: 12 },
+    weight: 1,
+  },
+];
+
+export const ELITE_ROTATING_TEMPLATE_KEYS = ELITE_ROTATING_CONTRACTS.map((c) => c.key);
+
+export function getEliteRuntimeContractKey(templateKey, dayKey) {
+  const t = String(templateKey || "").trim();
+  const d = String(dayKey || "").trim();
+  if (!t || !d) return "";
+  return `elite:${t}:${d}`;
+}
+
+export function parseEliteRuntimeContractKey(runtimeKey) {
+  const s = String(runtimeKey || "");
+  if (!s.startsWith("elite:")) return null;
+  const parts = s.split(":");
+  if (parts.length !== 3) return null;
+  return { templateKey: parts[1], dayKey: parts[2] };
+}
+
 export const BASE_HOME_SCENE_ORDER = [
   "hq",
   "quarry",
