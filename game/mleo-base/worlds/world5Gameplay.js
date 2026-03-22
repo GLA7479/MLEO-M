@@ -141,6 +141,22 @@ export function getWorld5SalvagePressureSnapshot(state, derived = {}) {
     priority = "Best moment for recovery push";
   }
 
+  const expeditionCardHint =
+    salvageKey === "rich" && recommendedSalvageNow
+      ? "Good window for expeditions / field recovery."
+      : salvageKey === "rich"
+        ? "Recovery is strong — align scrap and repair before heavy field ops."
+        : salvageKey === "strained"
+          ? "Hold expeditions — fix repair and reserves first."
+          : "Match expedition cadence to scrap stock and repair support.";
+
+  const maintenanceSalvageHint =
+    salvageKey === "strained"
+      ? `Recovery stress: ${salvageState} — stabilize repair loop first.`
+      : salvageKey === "rich" && recommendedSalvageNow
+        ? "Repair stack aligned with recovery — ok to maintain on rhythm."
+        : `Recovery posture: ${salvageState}.`;
+
   return {
     worldOrder: 5,
     scrapStored,
@@ -177,6 +193,8 @@ export function getWorld5SalvagePressureSnapshot(state, derived = {}) {
         : salvageKey === "strained"
           ? "Recovery loop is strained"
           : "Recovery loop is stable",
+    expeditionCardHint,
+    maintenanceSalvageHint,
   };
 }
 
@@ -198,7 +216,7 @@ export function buildWorld5SalvageAlert(snapshot) {
       key: "world5-salvage-rich",
       tone: "success",
       title: "Rich salvage window",
-      text: "World 5 recovery loop is clean right now. Good moment to push salvage / scrap decisions.",
+      text: "Recovery loop clean — favor expedition / field recovery.",
       target: { tab: "operations", target: "expedition" },
     };
   }

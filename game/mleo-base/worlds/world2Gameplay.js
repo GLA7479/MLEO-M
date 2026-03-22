@@ -150,6 +150,16 @@ export function getWorld2ThroughputSnapshot(state, derived = {}) {
     priority = "Best moment to export";
   }
 
+  /** Short line for shipping card — action-oriented; strip carries fuller state. */
+  const shippingCardHint =
+    laneKey === "open" && recommendedShipNow
+      ? "Ship banked MLEO now — lane is favorable."
+      : laneKey === "open"
+        ? "Lane is open; build bank before exporting."
+        : laneKey === "congested"
+          ? priority
+          : "Keep logistics matched to refinery; export on clean windows only.";
+
   return {
     worldOrder: 2,
     banked,
@@ -190,6 +200,7 @@ export function getWorld2ThroughputSnapshot(state, derived = {}) {
         : laneKey === "congested"
           ? "Flow pressure"
           : "Measured flow",
+    shippingCardHint,
   };
 }
 
@@ -211,7 +222,7 @@ export function buildWorld2FreightAlert(snapshot) {
       key: "world2-freight-open",
       tone: "success",
       title: "Open freight window",
-      text: "World 2 lane is clean right now. Good moment to export banked MLEO.",
+      text: "Favorable lane — export banked MLEO from shipping.",
       target: { tab: "operations", target: "shipping" },
     };
   }

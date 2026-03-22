@@ -5650,15 +5650,6 @@ export default function MleoBase() {
     [world6Command]
   );
 
-  const world6SystemsOverviewHint =
-    world6Command != null
-      ? `Command: ${world6Command.commandLabel} · ${
-          world6Command.recommendedPushNow
-            ? "good integrated push window"
-            : "better to stabilize / align first"
-        }`
-      : null;
-
   const sectorWorldSnapshot = useMemo(
     () =>
       getSectorWorldProgressSnapshot(state, derived, {
@@ -7932,10 +7923,7 @@ export default function MleoBase() {
         onShip: bankToSharedVault,
         freightHint:
           world2Throughput != null ? (
-            <span className="mt-1 block text-[11px] text-white/65">
-              Freight lane: {world2Throughput.laneLabel} ·{" "}
-              {world2Throughput.recommendedShipNow ? "good export window" : "better to stabilize first"}
-            </span>
+            <span className="mt-1 block text-[11px] text-white/65">{world2Throughput.shippingCardHint}</span>
           ) : null,
       }}
       expedition={{
@@ -7957,12 +7945,7 @@ export default function MleoBase() {
         onLaunch: handleLaunchExpedition,
         expeditionHint:
           world5Salvage != null ? (
-            <span className="mt-1 block text-[11px] text-white/65">
-              Recovery: {world5Salvage.salvageLabel} ·{" "}
-              {world5Salvage.recommendedSalvageNow
-                ? "good salvage window"
-                : "better to stabilize first"}
-            </span>
+            <span className="mt-1 block text-[11px] text-white/65">{world5Salvage.expeditionCardHint}</span>
           ) : null,
       }}
       blueprint={{
@@ -8012,24 +7995,19 @@ export default function MleoBase() {
         onMaintain: performMaintenance,
         overclockHint:
           world4Reactor != null ? (
-            <span className="mt-1 block text-[11px] text-white/65">
-              Reactor: {world4Reactor.loadLabel} ·{" "}
-              {world4Reactor.recommendedOverclockNow
-                ? "good overclock window"
-                : "better to stabilize first"}
-            </span>
+            <span className="mt-1 block text-[11px] text-white/65">{world4Reactor.overclockCardHint}</span>
           ) : null,
         maintenanceHint:
           world4Reactor != null || world5Salvage != null ? (
             <>
               {world4Reactor != null ? (
                 <span className="mt-1 block text-[11px] text-white/65">
-                  Thermal state: {world4Reactor.reactorState} · {world4Reactor.priority}
+                  {world4Reactor.maintenanceThermalHint}
                 </span>
               ) : null}
               {world5Salvage != null ? (
                 <span className="mt-1 block text-[11px] text-white/65">
-                  Salvage state: {world5Salvage.salvageState} · {world5Salvage.priority}
+                  {world5Salvage.maintenanceSalvageHint}
                 </span>
               ) : null}
             </>
@@ -8115,15 +8093,7 @@ export default function MleoBase() {
 
   const crewModulesResearchContent = (
     <CrewModulesResearchPanel
-      telemetryHint={
-        world3Telemetry
-          ? `Signal: ${world3Telemetry.signalLabel} · ${
-              world3Telemetry.recommendedResearchNow
-                ? "good research window"
-                : "better to stabilize / stack DATA first"
-            }`
-          : null
-      }
+      telemetryHint={world3Telemetry ? world3Telemetry.researchPanelHint : null}
       devTab={devTab}
       onSetDevTab={setDevTab}
       modulesMissionReadyCount={developmentModulesMissionReadyCount}
@@ -12681,7 +12651,6 @@ export default function MleoBase() {
                               </div>
                             </div>
 
-                            <div className="mt-2 text-[11px] opacity-75">{world6Command.recommendation}</div>
                           </div>
                         ) : null}
                         <OverviewPanelCards
@@ -12711,7 +12680,7 @@ export default function MleoBase() {
                           sectorDeployBusy={isActionLocked("sectorDeploy")}
                           onDevSectorServerStateApplied={handleDevSectorServerState}
                           devSectorShowToast={showToast}
-                          systemsHint={world6SystemsOverviewHint}
+                          systemsHint={world6Command?.overviewSystemsHint ?? null}
                         />
                       </DesktopPanelSection>
                     ) : null}
@@ -13184,7 +13153,7 @@ export default function MleoBase() {
                         sectorDeployBusy={isActionLocked("sectorDeploy")}
                         onDevSectorServerStateApplied={handleDevSectorServerState}
                         devSectorShowToast={showToast}
-                        systemsHint={world6SystemsOverviewHint}
+                        systemsHint={world6Command?.overviewSystemsHint ?? null}
                       />
                     </MobilePanelSection>
                   ) : null}
@@ -13825,10 +13794,6 @@ export default function MleoBase() {
                           <div className="mt-1 text-sm font-semibold">{world5Salvage.recoveryLine}</div>
                         </div>
                       </div>
-
-                      <div className="mt-2 text-[11px] opacity-75">
-                        {world5Salvage.recommendation}
-                      </div>
                     </div>
                   ) : null}
                   {world4Reactor ? (
@@ -13877,10 +13842,6 @@ export default function MleoBase() {
                           <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Thermal</div>
                           <div className="mt-1 text-sm font-semibold">{world4Reactor.thermalLine}</div>
                         </div>
-                      </div>
-
-                      <div className="mt-2 text-[11px] opacity-75">
-                        {world4Reactor.recommendation}
                       </div>
                     </div>
                   ) : null}
@@ -13931,10 +13892,6 @@ export default function MleoBase() {
                           <div className="mt-1 text-sm font-semibold">{world2Throughput.shippingLine}</div>
                         </div>
                       </div>
-
-                      <div className="mt-2 text-[11px] opacity-75">
-                        {world2Throughput.recommendation}
-                      </div>
                     </div>
                   ) : null}
                   <div className="grid gap-3 md:grid-cols-2">
@@ -13970,10 +13927,7 @@ export default function MleoBase() {
                           shipping does not.
                           {world2Throughput ? (
                             <span className="mt-1 block text-[11px] text-white/65">
-                              Freight lane: {world2Throughput.laneLabel} ·{" "}
-                              {world2Throughput.recommendedShipNow
-                                ? "good export window"
-                                : "better to stabilize first"}
+                              {world2Throughput.shippingCardHint}
                             </span>
                           ) : null}
                         </p>
@@ -14020,10 +13974,7 @@ export default function MleoBase() {
                         </p>
                         {world5Salvage ? (
                           <span className="mt-1 block text-[11px] text-white/65">
-                            Recovery: {world5Salvage.salvageLabel} ·{" "}
-                            {world5Salvage.recommendedSalvageNow
-                              ? "good salvage window"
-                              : "better to stabilize first"}
+                            {world5Salvage.expeditionCardHint}
                           </span>
                         ) : null}
 
@@ -14238,25 +14189,18 @@ export default function MleoBase() {
                         </p>
                         {world4Reactor ? (
                           <span className="mt-1 block text-[11px] text-white/65">
-                            Reactor: {world4Reactor.loadLabel} ·{" "}
-                            {world4Reactor.recommendedOverclockNow
-                              ? "good overclock window"
-                              : "better to stabilize first"}
+                            {world4Reactor.overclockCardHint}
                           </span>
                         ) : null}
-                        {world4Reactor != null || world5Salvage != null ? (
-                          <>
-                            {world4Reactor != null ? (
-                              <span className="mt-1 block text-[11px] text-white/65">
-                                Thermal state: {world4Reactor.reactorState} · {world4Reactor.priority}
-                              </span>
-                            ) : null}
-                            {world5Salvage != null ? (
-                              <span className="mt-1 block text-[11px] text-white/65">
-                                Salvage state: {world5Salvage.salvageState} · {world5Salvage.priority}
-                              </span>
-                            ) : null}
-                          </>
+                        {world4Reactor != null ? (
+                          <span className="mt-1 block text-[11px] text-white/65">
+                            {world4Reactor.maintenanceThermalHint}
+                          </span>
+                        ) : null}
+                        {world5Salvage != null ? (
+                          <span className="mt-1 block text-[11px] text-white/65">
+                            {world5Salvage.maintenanceSalvageHint}
+                          </span>
                         ) : null}
                       </div>
 
@@ -14362,10 +14306,6 @@ export default function MleoBase() {
                             <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Telemetry</div>
                             <div className="mt-1 text-sm font-semibold">{world3Telemetry.telemetryLine}</div>
                           </div>
-                        </div>
-
-                        <div className="mt-2 text-[11px] opacity-75">
-                          {world3Telemetry.recommendation}
                         </div>
                       </div>
                     ) : null}

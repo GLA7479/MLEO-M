@@ -147,6 +147,22 @@ export function getWorld4ReactorSnapshot(state, derived = {}) {
     priority = "Best moment for controlled overclock";
   }
 
+  const overclockCardHint =
+    loadKey === "primed" && recommendedOverclockNow
+      ? "Overclock is viable — watch reserve while it runs."
+      : loadKey === "primed"
+        ? "High-output window — overclock only if reserve stays strong."
+        : loadKey === "strained"
+          ? "Avoid overclock until energy and stability recover."
+          : "Overclock only on strong reserve and stability.";
+
+  const maintenanceThermalHint =
+    loadKey === "strained"
+      ? "Thermal pressure — ease output; maintain stability before pushing."
+      : loadKey === "primed"
+        ? "Thermal headroom ok — pair bursts with maintenance cadence."
+        : "Thermal band stable — keep reserve-backed maintenance rhythm.";
+
   return {
     worldOrder: 4,
     energyNow,
@@ -184,6 +200,8 @@ export function getWorld4ReactorSnapshot(state, derived = {}) {
         : loadKey === "strained"
           ? "Reactor stack is strained"
           : "Reactor load is managed",
+    overclockCardHint,
+    maintenanceThermalHint,
   };
 }
 
@@ -205,7 +223,7 @@ export function buildWorld4ReactorAlert(snapshot) {
       key: "world4-reactor-primed",
       tone: "success",
       title: "Primed reactor window",
-      text: "World 4 stack is clean right now. Good moment for controlled overclock / output push.",
+      text: "Thermal window favorable — controlled overclock / output ok.",
       target: { tab: "operations", target: "overclock" },
     };
   }

@@ -171,6 +171,18 @@ export function getWorld3TelemetrySnapshot(state, derived = {}) {
     priority = "Best moment for research push";
   }
 
+  /** One line for Build / research panel — DATA & clarity, not logistics copy. */
+  const researchPanelHint =
+    signalKey === "noisy"
+      ? priority
+      : signalKey === "clean" && recommendedResearchNow
+        ? "DATA clarity is high — good window to spend on research."
+        : signalKey === "clean"
+          ? "Signal is clean; let DATA build before heavy research spend."
+          : recommendedResearchNow
+            ? "Stable telemetry — research spend ok if DATA buffer holds."
+            : "Hold DATA discipline and keep an active lab program.";
+
   return {
     worldOrder: 3,
     dataStored,
@@ -208,6 +220,7 @@ export function getWorld3TelemetrySnapshot(state, derived = {}) {
         : signalKey === "noisy"
           ? "Telemetry is noisy"
           : "Telemetry is stable",
+    researchPanelHint,
   };
 }
 
@@ -229,7 +242,7 @@ export function buildWorld3TelemetryAlert(snapshot) {
       key: "world3-telemetry-clean",
       tone: "success",
       title: "Clean telemetry window",
-      text: "World 3 signal is clean right now. Good moment to push research / DATA decisions.",
+      text: "Signal clear — good moment for research / DATA spend.",
       target: { tab: "crew", target: "research" },
     };
   }

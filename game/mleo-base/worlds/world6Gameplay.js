@@ -234,6 +234,15 @@ export function getWorld6CommandSnapshot(state, derived = {}) {
     priority = "Best moment for integrated push";
   }
 
+  const overviewSystemsHint =
+    commandKey === "fractured"
+      ? priority
+      : commandKey === "harmonized" && recommendedPushNow
+        ? "Systems aligned — good moment for a coordinated push across tabs."
+        : commandKey === "harmonized"
+          ? "Strong alignment — wait for energy/stability thresholds before forcing."
+          : "Balance reserves and support spread; push only when the stack is ready.";
+
   return {
     worldOrder: 6,
     banked,
@@ -283,6 +292,7 @@ export function getWorld6CommandSnapshot(state, derived = {}) {
         : commandKey === "fractured"
           ? "Nexus grid is fractured"
           : "Nexus grid is balanced",
+    overviewSystemsHint,
   };
 }
 
@@ -304,7 +314,7 @@ export function buildWorld6CommandAlert(snapshot) {
       key: "world6-command-harmonized",
       tone: "success",
       title: "Harmonized command window",
-      text: "World 6 systems are aligned right now. Good moment for an integrated push.",
+      text: "Grid aligned — good moment for a coordinated multi-system push.",
       target: { tab: "overview", target: "systems" },
     };
   }
