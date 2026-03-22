@@ -104,8 +104,10 @@ import {
 } from "./mleo-base/engine";
 import {
   buildWorld2FreightAlert,
+  buildWorld3TelemetryAlert,
   getSectorWorldProgressSnapshot,
   getWorld2ThroughputSnapshot,
+  getWorld3TelemetrySnapshot,
   getWorldDailyMleoCapByOrder,
   resolveSectorWorldOrder,
 } from "./mleo-base/worlds";
@@ -122,6 +124,16 @@ function worldLaneToneClass(laneKey) {
     return "border-emerald-400/30 bg-emerald-500/[0.10] text-emerald-100";
   }
   if (laneKey === "congested") {
+    return "border-amber-400/30 bg-amber-500/[0.12] text-amber-100";
+  }
+  return "border-sky-400/25 bg-sky-500/[0.08] text-sky-100";
+}
+
+function worldSignalToneClass(signalKey) {
+  if (signalKey === "clean") {
+    return "border-violet-400/30 bg-violet-500/[0.12] text-violet-100";
+  }
+  if (signalKey === "noisy") {
     return "border-amber-400/30 bg-amber-500/[0.12] text-amber-100";
   }
   return "border-sky-400/25 bg-sky-500/[0.08] text-sky-100";
@@ -262,7 +274,14 @@ function pickLiveEvent(state) {
 }
 
 
-function getAlerts(state, derived, systemState, liveContracts = [], world2FreightAlertRow = null) {
+function getAlerts(
+  state,
+  derived,
+  systemState,
+  liveContracts = [],
+  world2FreightAlertRow = null,
+  world3TelemetryAlertRow = null
+) {
   const alerts = [];
 
   const energy = Number(state.resources?.ENERGY || 0);
@@ -323,6 +342,16 @@ function getAlerts(state, derived, systemState, liveContracts = [], world2Freigh
       tone: "success",
       title: "Contract reward ready",
       text: `${claimableContracts} command contract${claimableContracts > 1 ? "s are" : " is"} ready to claim.`,
+    });
+  }
+
+  if (world3TelemetryAlertRow) {
+    alerts.unshift({
+      key: world3TelemetryAlertRow.key,
+      tone: world3TelemetryAlertRow.tone,
+      title: world3TelemetryAlertRow.title,
+      text: world3TelemetryAlertRow.text,
+      world3Target: world3TelemetryAlertRow.target,
     });
   }
 
@@ -4811,9 +4840,14 @@ export default function MleoBase() {
   }
 
   function getAlertNavigationTarget(item) {
+    if (item?.world3Target) return item.world3Target;
     if (item?.world2Target) return item.world2Target;
 
     const key = item?.alertKey || item?.key;
+
+    if (key === "world3-telemetry-noisy" || key === "world3-telemetry-clean") {
+      return { tab: "crew", target: "research" };
+    }
 
     switch (key) {
       case "critical-stability":
@@ -4965,6 +4999,8 @@ export default function MleoBase() {
         ? "build"
         : normalizedStep.tab === "development"
         ? "build"
+        : normalizedStep.tab === "crew"
+        ? "build"
         : normalizedStep.tab === "systems"
         ? "intel"
         : normalizedStep.tab === "intel"
@@ -5032,6 +5068,10 @@ export default function MleoBase() {
         return "build-development";
       }
 
+      if (normalizedStep.target === "research") {
+        return "build-development";
+      }
+
       if (normalizedStep.target === "crew" || normalizedStep.target === "paths") {
         return "build-development";
       }
@@ -5056,6 +5096,10 @@ export default function MleoBase() {
 
       if (normalizedStep.target === "paths") {
         setDevTab("paths");
+      }
+
+      if (normalizedStep.target === "research") {
+        setDevTab("research");
       }
 
       if (targetStructuresTab) {
@@ -5473,6 +5517,16 @@ export default function MleoBase() {
   const world2FreightAlert = useMemo(
     () => buildWorld2FreightAlert(world2Throughput),
     [world2Throughput]
+  );
+
+  const world3Telemetry = useMemo(() => {
+    if (activeWorldOrder !== 3) return null;
+    return getWorld3TelemetrySnapshot(state, derived);
+  }, [activeWorldOrder, state, derived]);
+
+  const world3TelemetryAlert = useMemo(
+    () => buildWorld3TelemetryAlert(world3Telemetry),
+    [world3Telemetry]
   );
 
   const sectorWorldSnapshot = useMemo(
@@ -5901,8 +5955,16 @@ export default function MleoBase() {
   const expeditionLeft = Math.max(0, (state.expeditionReadyAt || 0) - Date.now());
   const overclockLeft = Math.max(0, (state.overclockUntil || 0) - Date.now());
   const alerts = useMemo(
-    () => getAlerts(state, derived, systemState, liveContracts, world2FreightAlert),
-    [state, derived, systemState, liveContracts, world2FreightAlert]
+    () =>
+      getAlerts(
+        state,
+        derived,
+        systemState,
+        liveContracts,
+        world2FreightAlert,
+        world3TelemetryAlert
+      ),
+    [state, derived, systemState, liveContracts, world2FreightAlert, world3TelemetryAlert]
   );
   const desktopPriorityAlert = alerts[0] || null;
 
@@ -5931,6 +5993,7 @@ export default function MleoBase() {
         text: alert.text,
         count: 0,
         ...(alert.world2Target ? { world2Target: alert.world2Target } : {}),
+        ...(alert.world3Target ? { world3Target: alert.world3Target } : {}),
       });
     });
 
@@ -6974,16 +7037,27 @@ export default function MleoBase() {
       const res = await researchTech(key);
 
       if (res?.success && res?.state) {
+        const telemetrySuffix = world3Telemetry
+          ? ` [${world3Telemetry.signalLabel} · ${world3Telemetry.disciplineScore}/100]`
+          : "";
+
         setState((prev) => {
           const next = mergeAuthoritativeServerState(prev, res.state);
 
-          next.log = pushLog(next.log, `${def.name} research completed.`);
+          next.log = pushLog(
+            next.log,
+            `${def.name} research completed.${telemetrySuffix}`
+          );
           return next;
         });
 
         markRealGameAction();
 
-        showToast(`${def.name} research completed.`);
+        const researchToastBase = world3Telemetry
+          ? `Research updated · ${world3Telemetry.signalLabel} · ${world3Telemetry.disciplineScore}/100`
+          : `${def.name} research completed.`;
+
+        showToast(researchToastBase);
       } else {
         showToast(res?.message || "Research failed.");
       }
@@ -7788,6 +7862,15 @@ export default function MleoBase() {
 
   const crewModulesResearchContent = (
     <CrewModulesResearchPanel
+      telemetryHint={
+        world3Telemetry
+          ? `Signal: ${world3Telemetry.signalLabel} · ${
+              world3Telemetry.recommendedResearchNow
+                ? "good research window"
+                : "better to stabilize / stack DATA first"
+            }`
+          : null
+      }
       devTab={devTab}
       onSetDevTab={setDevTab}
       modulesMissionReadyCount={developmentModulesMissionReadyCount}
@@ -7914,6 +7997,35 @@ export default function MleoBase() {
         setOpenInfoKey(null);
       }}
     />
+  );
+
+  const crewModulesResearchContentMobile = (
+    <>
+      {world3Telemetry ? (
+        <div
+          className={`mb-3 rounded-2xl border px-3 py-2.5 ${worldSignalToneClass(
+            world3Telemetry.signalKey
+          )}`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-[0.16em] opacity-75">
+                Signal Wastes
+              </div>
+              <div className="truncate text-sm font-semibold">
+                {world3Telemetry.signalLabel} · {world3Telemetry.disciplineScore}/100
+              </div>
+            </div>
+            <div className="rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-bold">
+              {world3Telemetry.recommendedResearchNow ? "PUSH" : "HOLD"}
+            </div>
+          </div>
+
+          <div className="mt-2 text-[11px] opacity-80">{world3Telemetry.priority}</div>
+        </div>
+      ) : null}
+      {crewModulesResearchContent}
+    </>
   );
   /*
     <div className="space-y-3">
@@ -11015,6 +11127,14 @@ export default function MleoBase() {
         setHighlightTarget("shipping");
         return;
       }
+
+      if (item.alertKey === "world3-telemetry-noisy" || item.alertKey === "world3-telemetry-clean") {
+        openMobilePanel("build");
+        setOpenInnerPanel("build-development");
+        setDevTab("research");
+        setHighlightTarget("research");
+        return;
+      }
     }
   };
 
@@ -12741,7 +12861,7 @@ export default function MleoBase() {
                         supportHint={buildSectionHint("support", {})}
                         openInnerPanel={openInnerPanel}
                         toggleInnerPanel={toggleInnerPanel}
-                        crewModulesResearchContent={crewModulesResearchContent}
+                        crewModulesResearchContent={crewModulesResearchContentMobile}
                         baseStructuresContent={baseStructuresContent}
                         buildSupportSystemsContent={buildSupportSystemsContent}
                       />
@@ -13680,6 +13800,59 @@ export default function MleoBase() {
                     title="Crew, Modules & Research"
                   subtitle="Shape your long-term command identity through crew, modules and research."
                   >
+                    {world3Telemetry ? (
+                      <div
+                        className={`mb-3 rounded-2xl border px-3 py-3 ${worldSignalToneClass(
+                          world3Telemetry.signalKey
+                        )}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-[10px] font-black uppercase tracking-[0.18em] opacity-80">
+                              Signal Wastes
+                            </div>
+                            <div className="text-sm font-semibold">
+                              {world3Telemetry.flowHeadline} · {world3Telemetry.signalLabel}
+                            </div>
+                            <div className="mt-1 text-[12px] opacity-85">
+                              {world3Telemetry.actionHint}
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] font-bold">
+                            {world3Telemetry.chipText}
+                          </div>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-1 gap-2 text-[11px] opacity-85 sm:grid-cols-2 xl:grid-cols-4">
+                          <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                            <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Discipline</div>
+                            <div className="mt-1 text-sm font-semibold">
+                              {world3Telemetry.disciplineScore}/100
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                            <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Priority</div>
+                            <div className="mt-1 text-sm font-semibold">{world3Telemetry.priority}</div>
+                          </div>
+
+                          <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                            <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Systems</div>
+                            <div className="mt-1 text-sm font-semibold">{world3Telemetry.systemsLine}</div>
+                          </div>
+
+                          <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+                            <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">Telemetry</div>
+                            <div className="mt-1 text-sm font-semibold">{world3Telemetry.telemetryLine}</div>
+                          </div>
+                        </div>
+
+                        <div className="mt-2 text-[11px] opacity-75">
+                          {world3Telemetry.recommendation}
+                        </div>
+                      </div>
+                    ) : null}
                     {crewModulesResearchContent}
                   </Section>
 

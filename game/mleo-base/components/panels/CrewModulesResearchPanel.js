@@ -103,6 +103,7 @@ function QuickTags({ tags }) {
 }
 
 export function CrewModulesResearchPanel({
+  telemetryHint = null,
   devTab,
   onSetDevTab,
   modulesMissionReadyCount = 0,
@@ -395,7 +396,10 @@ export function CrewModulesResearchPanel({
       ) : null}
 
       {devTab === "research" ? (
-        <div className="grid gap-2.5">
+        <div data-base-target="research" className="grid gap-2.5">
+          {telemetryHint ? (
+            <div className="col-span-full text-[11px] text-white/65">{telemetryHint}</div>
+          ) : null}
           {research.map((item) => {
             return (
               <div

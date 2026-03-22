@@ -20,7 +20,16 @@ export {
   getWorld2ThroughputSnapshot,
 } from "./world2Gameplay";
 
-export { buildWorld3PanelFlavor, getWorld3SignalSnapshot } from "./world3SignalWastes";
+export {
+  buildWorld3PanelFlavor,
+  getWorld3SignalSnapshot,
+} from "./world3SignalWastes";
+
+export {
+  buildWorld3TelemetryAlert,
+  getWorld3TelemetrySnapshot,
+} from "./world3Gameplay";
+
 export { buildWorld4PanelFlavor, getWorld4LoadSnapshot } from "./world4ReactorScar";
 export { buildWorld5PanelFlavor, getWorld5SalvageSnapshot } from "./world5SalvageGraveyard";
 export { buildWorld6PanelFlavor, getWorld6NexusSnapshot } from "./world6NexusPrime";
