@@ -25,7 +25,8 @@ export function DevSectorSwitchPanel({ snapshot, onServerStateApplied, showToast
     try {
       const res = await devSetBaseSectorWorld(n);
       if (!res?.success) {
-        showToast?.(res?.message || res?.code || "Dev sector update failed");
+        const parts = [res?.code, res?.message, res?.details, res?.rpcMessage].filter(Boolean);
+        showToast?.(parts.length ? parts.join(" — ") : "Dev sector update failed");
         return;
       }
       if (res.state && typeof onServerStateApplied === "function") {
