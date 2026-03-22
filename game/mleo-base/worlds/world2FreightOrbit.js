@@ -81,5 +81,9 @@ export function buildWorld2PanelFlavor(state, _derived, ctx = {}) {
     overviewStripTitle: "Freight orbit",
     overviewHint:
       "Prioritize logistics throughput and clean shipment timing — cap is higher; pace exports with stability.",
+    overviewStripShellClassName:
+      "rounded-xl border border-amber-400/25 bg-amber-500/[0.07] px-3 py-2 text-[11px] leading-snug text-amber-50/90",
+    overviewStripTitleClassName:
+      "font-black uppercase tracking-[0.14em] text-amber-200/85",
   };
 }
