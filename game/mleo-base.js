@@ -797,6 +797,410 @@ function getBankedRateSnapshot(state, derived) {
   };
 }
 
+function getBankedIndicatorToneLabel(tone) {
+  if (tone === "critical") return "Stopped";
+  if (tone === "warning") return "Boost";
+  return "Balanced";
+}
+
+function getBankedIndicatorCardClasses(tone) {
+  if (tone === "critical") {
+    return "border-rose-400/40 bg-rose-500/12 text-rose-100 hover:bg-rose-500/16 shadow-[0_0_0_1px_rgba(244,63,94,0.08)]";
+  }
+  if (tone === "warning") {
+    return "border-amber-400/35 bg-amber-500/10 text-amber-100 hover:bg-amber-500/14 shadow-[0_0_0_1px_rgba(250,204,21,0.07)]";
+  }
+  return "border-emerald-400/28 bg-white/[0.03] text-emerald-100 hover:bg-white/[0.05] shadow-[0_0_0_1px_rgba(52,211,153,0.07)]";
+}
+
+function getBankedIndicatorPillClasses(tone) {
+  if (tone === "critical") return "bg-rose-500/15 text-rose-200";
+  if (tone === "warning") return "bg-amber-500/15 text-amber-200";
+  return "bg-emerald-500/15 text-emerald-200";
+}
+
+function getBuildingDef(buildingKey) {
+  return BUILDINGS.find((item) => item.key === buildingKey) || null;
+}
+
+function resolveBankedActionTarget(state, targetKey) {
+  if (!targetKey) return "bankedMleo";
+  if (targetKey === "maintenance" || targetKey === "shipping" || targetKey === "bankedMleo") {
+    return targetKey;
+  }
+
+  const def = getBuildingDef(targetKey);
+  if (!def) return targetKey;
+
+  const unmet = (def.requires || []).find(
+    (req) => Number(state?.buildings?.[req.key] || 0) < Number(req?.lvl || 1)
+  );
+
+  if (!unmet) return targetKey;
+  return resolveBankedActionTarget(state, unmet.key);
+}
+
+function getBankedGuidanceItems({ state, derived, snapshot, systemState }) {
+  const s = snapshot || {};
+  const buildings = state?.buildings || {};
+  const resources = state?.resources || {};
+
+  const refineryBaseLevel = Number(buildings.refinery || 0);
+  const quarryBaseLevel = Number(buildings.quarry || 0);
+  const salvageBaseLevel = Number(buildings.salvage || 0);
+  const powerCellBaseLevel = Number(buildings.powerCell || 0);
+  const repairBayBaseLevel = Number(buildings.repairBay || 0);
+  const logisticsBaseLevel = Number(buildings.logisticsCenter || 0);
+
+  const refineryMode = getBuildingPowerMode(state, "refinery");
+  const refineryOff = refineryBaseLevel > 0 && refineryMode === 0;
+
+  const energy = Number(resources.ENERGY || 0);
+  const energyCap = Number(derived?.energyCap || CONFIG.baseEnergyCap || 0);
+  const energyRatio = energyCap > 0 ? energy / energyCap : 0;
+
+  const stability = Number(state?.stability || 100);
+
+  const producedToday = Number(s?.mleoProducedToday || state?.mleoProducedToday || 0);
+  const dailyCap = Number(s?.dailyMleoCap || derived?.dailyMleoCap || CONFIG.dailyBaseMleoCap || 0);
+  const capRatio = dailyCap > 0 ? producedToday / dailyCap : 0;
+
+  const oreFeedHours =
+    s?.oreFeedHours == null ? null : Number(s.oreFeedHours);
+  const scrapFeedHours =
+    s?.scrapFeedHours == null ? null : Number(s.scrapFeedHours);
+
+  const items = [];
+
+  // 1) Refinery
+  if (refineryBaseLevel <= 0) {
+    items.push({
+      key: "refinery",
+      label: "Refinery",
+      tone: "critical",
+      headline: "Build your first Refinery",
+      text: "Without Refinery there is no Banked MLEO production.",
+      target: resolveBankedActionTarget(state, "refinery"),
+    });
+  } else if (refineryOff) {
+    items.push({
+      key: "refinery",
+      label: "Refinery",
+      tone: "critical",
+      headline: "Refinery is off",
+      text: "Refinery exists but is currently at 0% power mode. Turn it back on to restart production.",
+      target: "refinery",
+    });
+  } else if (refineryBaseLevel < 2 && Number(s?.perHour || 0) > 0) {
+    items.push({
+      key: "refinery",
+      label: "Refinery",
+      tone: "warning",
+      headline: `Refinery online · Lv ${refineryBaseLevel}`,
+      text: "One more Refinery level should noticeably improve your current Banked MLEO lane.",
+      target: "refinery",
+    });
+  } else {
+    items.push({
+      key: "refinery",
+      label: "Refinery",
+      tone: "success",
+      headline: `Refinery running · ${refineryMode}% mode`,
+      text: "Refinery itself is online and is not the main reason your production is stopping.",
+      target: "refinery",
+    });
+  }
+
+  // 2) ORE
+  if (refineryBaseLevel > 0 && !s.hasOre) {
+    items.push({
+      key: "ore",
+      label: "ORE feed",
+      tone: "critical",
+      headline: "ORE is stopping output",
+      text: "Refinery cannot keep producing because ORE feed is too weak right now.",
+      target: resolveBankedActionTarget(state, "quarry"),
+    });
+  } else if (
+    refineryBaseLevel > 0 &&
+    (
+      (oreFeedHours != null && oreFeedHours < 4) ||
+      quarryBaseLevel < Math.max(1, Math.ceil(refineryBaseLevel * 0.9))
+    )
+  ) {
+    items.push({
+      key: "ore",
+      label: "ORE feed",
+      tone: "warning",
+      headline: oreFeedHours == null
+        ? "ORE support is thin"
+        : `ORE support ~${fmtRate(oreFeedHours, 1)}h`,
+      text: "Quarry support is getting thin. Strengthening Quarry should improve refinery uptime.",
+      target: resolveBankedActionTarget(state, "quarry"),
+    });
+  } else {
+    items.push({
+      key: "ore",
+      label: "ORE feed",
+      tone: "success",
+      headline: oreFeedHours == null
+        ? "ORE ready"
+        : `ORE support ~${fmtRate(oreFeedHours, 1)}h`,
+      text: refineryBaseLevel > 0
+        ? "ORE supply looks healthy for the current refinery load."
+        : "ORE is not the current blocker. Refinery comes first.",
+      target: resolveBankedActionTarget(state, "quarry"),
+    });
+  }
+
+  // 3) SCRAP
+  if (refineryBaseLevel > 0 && !s.hasScrap) {
+    items.push({
+      key: "scrap",
+      label: "SCRAP feed",
+      tone: "critical",
+      headline: "SCRAP is stopping output",
+      text: "Refinery is starved by SCRAP right now.",
+      target: resolveBankedActionTarget(state, "salvage"),
+    });
+  } else if (
+    refineryBaseLevel > 0 &&
+    (
+      (scrapFeedHours != null && scrapFeedHours < 4) ||
+      salvageBaseLevel < Math.max(1, Math.ceil(refineryBaseLevel * 0.9))
+    )
+  ) {
+    items.push({
+      key: "scrap",
+      label: "SCRAP feed",
+      tone: "warning",
+      headline: scrapFeedHours == null
+        ? "SCRAP support is thin"
+        : `SCRAP support ~${fmtRate(scrapFeedHours, 1)}h`,
+      text: "Salvage support is getting thin. Strengthening Salvage should stabilize refinery feed.",
+      target: resolveBankedActionTarget(state, "salvage"),
+    });
+  } else {
+    items.push({
+      key: "scrap",
+      label: "SCRAP feed",
+      tone: "success",
+      headline: scrapFeedHours == null
+        ? "SCRAP ready"
+        : `SCRAP support ~${fmtRate(scrapFeedHours, 1)}h`,
+      text: refineryBaseLevel > 0
+        ? "SCRAP supply looks healthy for the current refinery load."
+        : "SCRAP is not the current blocker. Refinery comes first.",
+      target: resolveBankedActionTarget(state, "salvage"),
+    });
+  }
+
+  // 4) ENERGY
+  if (refineryBaseLevel > 0 && !s.hasEnergy) {
+    items.push({
+      key: "energy",
+      label: "Energy support",
+      tone: "critical",
+      headline: "Energy is stopping output",
+      text: "Your energy reserve is too low to keep Refinery running safely.",
+      target: resolveBankedActionTarget(state, "powerCell"),
+    });
+  } else if (
+    refineryBaseLevel > 0 &&
+    (
+      energyRatio < 0.28 ||
+      powerCellBaseLevel < Math.max(1, Math.ceil(refineryBaseLevel / 2))
+    )
+  ) {
+    items.push({
+      key: "energy",
+      label: "Energy support",
+      tone: "warning",
+      headline: `Energy reserve ${fmtRate(energy, 0)}/${fmtRate(energyCap, 0)}`,
+      text: "Power support is working, but stronger Power Cell support should improve production stability.",
+      target: resolveBankedActionTarget(state, "powerCell"),
+    });
+  } else {
+    items.push({
+      key: "energy",
+      label: "Energy support",
+      tone: "success",
+      headline: `Energy reserve ${fmtRate(energy, 0)}/${fmtRate(energyCap, 0)}`,
+      text: "Energy support looks balanced for the current Banked MLEO lane.",
+      target: resolveBankedActionTarget(state, "powerCell"),
+    });
+  }
+
+  // 5) Daily cap
+  if (dailyCap > 0 && producedToday >= dailyCap - 1e-9) {
+    items.push({
+      key: "daily-cap",
+      label: "Daily cap",
+      tone: "critical",
+      headline: "Daily production cap reached",
+      text: "This is the reason Banked MLEO stopped. No building can remove today's cap; open the Banked MLEO info to review it.",
+      target: "bankedMleo",
+    });
+  } else if (dailyCap > 0 && capRatio >= 0.9) {
+    items.push({
+      key: "daily-cap",
+      label: "Daily cap",
+      tone: "warning",
+      headline: `Near cap · ${fmtRate(producedToday, 1)} / ${fmtRate(dailyCap, 0)}`,
+      text: "You are close to today's production limit. Output is still running, but gains will soften more from here.",
+      target: "bankedMleo",
+    });
+  } else {
+    items.push({
+      key: "daily-cap",
+      label: "Daily cap",
+      tone: "success",
+      headline: `Room left · ${fmtRate(Math.max(0, dailyCap - producedToday), 1)}`,
+      text: "You still have healthy production room left today.",
+      target: "bankedMleo",
+    });
+  }
+
+  // 6) Stability
+  if (stability < 70 || systemState === "critical") {
+    items.push({
+      key: "stability",
+      label: "Stability",
+      tone: "critical",
+      headline: `Stability drag · ${fmtRate(stability, 0)}%`,
+      text: "Instability is now part of the slowdown. Fix stability first before scaling harder.",
+      target: "maintenance",
+    });
+  } else if (
+    stability < 85 ||
+    (refineryBaseLevel > 0 && repairBayBaseLevel < 1)
+  ) {
+    items.push({
+      key: "stability",
+      label: "Stability",
+      tone: "warning",
+      headline: `Stability watch · ${fmtRate(stability, 0)}%`,
+      text:
+        repairBayBaseLevel < 1
+          ? "Repair Bay support is still missing. Building it should make the refinery lane safer and smoother."
+          : "Stability is okay, but not comfortably strong yet for aggressive scaling.",
+      target:
+        repairBayBaseLevel < 1
+          ? resolveBankedActionTarget(state, "repairBay")
+          : "maintenance",
+    });
+  } else {
+    items.push({
+      key: "stability",
+      label: "Stability",
+      tone: "success",
+      headline: `Stability healthy · ${fmtRate(stability, 0)}%`,
+      text: "Stability is not meaningfully dragging the current refinery lane.",
+      target:
+        repairBayBaseLevel < 1
+          ? resolveBankedActionTarget(state, "repairBay")
+          : "maintenance",
+    });
+  }
+
+  // 7) Logistics / bank bonus
+  if (refineryBaseLevel > 0 && logisticsBaseLevel < 1) {
+    items.push({
+      key: "logistics",
+      label: "Logistics",
+      tone: "warning",
+      headline: "No logistics support yet",
+      text: "Logistics Center is not required to start production, but it is one of the best support upgrades once Refinery is online.",
+      target: resolveBankedActionTarget(state, "logisticsCenter"),
+    });
+  } else if (
+    refineryBaseLevel >= 3 &&
+    logisticsBaseLevel < Math.max(1, Math.ceil(refineryBaseLevel / 3))
+  ) {
+    items.push({
+      key: "logistics",
+      label: "Logistics",
+      tone: "warning",
+      headline: `Bank bonus x${Number(derived?.bankBonus || 1).toFixed(2)}`,
+      text: "Your refinery loop is already running well enough that Logistics support should noticeably help now.",
+      target: resolveBankedActionTarget(state, "logisticsCenter"),
+    });
+  } else {
+    items.push({
+      key: "logistics",
+      label: "Logistics",
+      tone: "success",
+      headline: `Bank bonus x${Number(derived?.bankBonus || 1).toFixed(2)}`,
+      text:
+        refineryBaseLevel > 0
+          ? "Logistics support is currently balanced for your refinery lane."
+          : "Logistics is not the current blocker before Refinery is online.",
+      target: resolveBankedActionTarget(state, "logisticsCenter"),
+    });
+  }
+
+  return items;
+}
+
+function getBankedSummaryFromItems(items) {
+  const list = Array.isArray(items) ? items : [];
+  const criticalCount = list.filter((item) => item?.tone === "critical").length;
+  const warningCount = list.filter((item) => item?.tone === "warning").length;
+
+  if (criticalCount > 0) {
+    return {
+      tone: "critical",
+      count: criticalCount,
+      label: "Issue",
+      title: criticalCount > 1 ? `${criticalCount} issues` : "1 issue",
+    };
+  }
+
+  if (warningCount > 0) {
+    return {
+      tone: "warning",
+      count: warningCount,
+      label: "Boost",
+      title: warningCount > 1 ? `${warningCount} boosts` : "1 boost",
+    };
+  }
+
+  return {
+    tone: "success",
+    count: 0,
+    label: "OK",
+    title: "Balanced",
+  };
+}
+
+function getBankedSummaryButtonClasses(tone, isOpen = false) {
+  if (tone === "critical") {
+    return isOpen
+      ? "border-rose-400/55 bg-rose-500/16 text-rose-100 shadow-[0_0_20px_rgba(244,63,94,0.14)]"
+      : "border-rose-400/40 bg-rose-500/10 text-rose-100 hover:bg-rose-500/14 shadow-[0_0_16px_rgba(244,63,94,0.10)]";
+  }
+
+  if (tone === "warning") {
+    return isOpen
+      ? "border-amber-400/55 bg-amber-500/16 text-amber-100 shadow-[0_0_20px_rgba(250,204,21,0.12)]"
+      : "border-amber-400/38 bg-amber-500/10 text-amber-100 hover:bg-amber-500/14 shadow-[0_0_16px_rgba(250,204,21,0.08)]";
+  }
+
+  return isOpen
+    ? "border-emerald-400/45 bg-emerald-500/12 text-emerald-100 shadow-[0_0_18px_rgba(52,211,153,0.10)]"
+    : "border-emerald-400/28 bg-white/[0.04] text-white hover:bg-white/[0.06]";
+}
+
+function getBankedSummaryBadgeClasses(tone) {
+  if (tone === "critical") {
+    return "bg-rose-400 text-slate-950";
+  }
+  if (tone === "warning") {
+    return "bg-amber-300 text-slate-950";
+  }
+  return "bg-emerald-400 text-slate-950";
+}
+
 function simulate(state, elapsedMs, efficiency = 1) {
   const next = {
     ...state,
@@ -1230,8 +1634,27 @@ function DesktopFloatingPanelShell({
   );
 }
 
-function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
-  const s = snapshot;
+function BankedQuickPanel({
+  snapshot,
+  bankedValue,
+  state,
+  derived,
+  systemState,
+  onClose,
+  onNavigate,
+}) {
+  const s = snapshot || {};
+  const guidanceItems = getBankedGuidanceItems({
+    state,
+    derived,
+    snapshot,
+    systemState,
+  });
+
+  const handleNavigate = (target) => {
+    onClose?.();
+    onNavigate?.(target);
+  };
 
   return (
     <DesktopFloatingPanelShell
@@ -1284,40 +1707,37 @@ function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
 
       <div className="mt-2.5 rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2.5">
         <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-          Refinery status
-        </div>
-        <div className="mt-2 text-sm font-semibold text-white">
-          {s.limitingSystem}
+          Production guidance
         </div>
 
-        <div className="mt-2 flex flex-wrap gap-2">
-          <span
-            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-              s.hasOre
-                ? "bg-emerald-500/15 text-emerald-200"
-                : "bg-rose-500/15 text-rose-200"
-            }`}
-          >
-            {s.hasOre ? "Ore OK" : "Ore low"}
-          </span>
-          <span
-            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-              s.hasScrap
-                ? "bg-emerald-500/15 text-emerald-200"
-                : "bg-rose-500/15 text-rose-200"
-            }`}
-          >
-            {s.hasScrap ? "Scrap OK" : "Scrap low"}
-          </span>
-          <span
-            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-              s.hasEnergy
-                ? "bg-emerald-500/15 text-emerald-200"
-                : "bg-rose-500/15 text-rose-200"
-            }`}
-          >
-            {s.hasEnergy ? "Energy OK" : "Energy low"}
-          </span>
+        <div className="mt-2 grid grid-cols-1 gap-2">
+          {guidanceItems.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => handleNavigate(item.target)}
+              className={`w-full rounded-[18px] border px-3 py-2.5 text-left transition ${getBankedIndicatorCardClasses(item.tone)}`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+                  {item.label}
+                </div>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${getBankedIndicatorPillClasses(item.tone)}`}
+                >
+                  {getBankedIndicatorToneLabel(item.tone)}
+                </span>
+              </div>
+
+              <div className="mt-1 text-sm font-semibold text-white">
+                {item.headline}
+              </div>
+
+              <div className="mt-1 text-[12px] leading-5 text-white/72">
+                {item.text}
+              </div>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -1352,8 +1772,8 @@ function BankedQuickPanel({ snapshot, bankedValue, onClose }) {
           the real shared vault.
         </div>
         <div>
-          To improve this number, focus on Refinery uptime, steady Ore + Scrap flow,
-          and stable Energy.
+          Red means this is the reason output stopped. Orange means this is the best
+          improvement lane right now. Green means this lane is currently balanced.
         </div>
       </div>
     </DesktopFloatingPanelShell>
@@ -3955,6 +4375,23 @@ export default function MleoBase() {
     () => getBankedRateSnapshot(state, derived),
     [state, derived]
   );
+
+  const bankedGuidanceItems = useMemo(
+    () =>
+      getBankedGuidanceItems({
+        state,
+        derived,
+        snapshot: bankedSnapshot,
+        systemState,
+      }),
+    [state, derived, bankedSnapshot, systemState]
+  );
+
+  const bankedSummary = useMemo(
+    () => getBankedSummaryFromItems(bankedGuidanceItems),
+    [bankedGuidanceItems]
+  );
+
   const bankedLiveRatePerSecond = Number(bankedSnapshot?.perSecond || 0);
   const bankedLiveActive =
     Boolean(bankedSnapshot?.active) &&
@@ -8981,7 +9418,10 @@ export default function MleoBase() {
                       setShowReadyPanel(false);
                       setOpenInfoKey(null);
                     }}
-                    className="rounded-2xl border border-white/15 bg-white/5 px-3 h-[35px] flex flex-col items-center justify-center gap-1"
+                    className={`relative rounded-2xl border px-3 h-[35px] flex flex-col items-center justify-center gap-1 transition ${getBankedSummaryButtonClasses(
+                      bankedSummary.tone,
+                      showBankedPanel
+                    )}`}
                     title="Banked MLEO quick view"
                   >
                     <div className="text-[9px] font-black uppercase tracking-[0.12em] text-white/40 leading-none">
@@ -8990,6 +9430,15 @@ export default function MleoBase() {
                     <div className="text-[11px] font-extrabold text-white leading-none">
                       {formatBankedBadgeCompact(bankedDisplayValue)}
                     </div>
+                    {bankedSummary.count > 0 ? (
+                      <span
+                        className={`absolute -right-1 -top-1 inline-flex min-w-5 h-5 items-center justify-center rounded-full px-1 text-[10px] font-black ${getBankedSummaryBadgeClasses(
+                          bankedSummary.tone
+                        )}`}
+                      >
+                        {bankedSummary.count}
+                      </span>
+                    ) : null}
                   </button>
                   <Link
                     href="/mining"
@@ -9078,12 +9527,14 @@ export default function MleoBase() {
               <div className="relative">
                 <button
                   type="button"
-                  onClick={() => setShowBankedPanel((v) => !v)}
-                  className={`rounded-xl border px-3 h-[42px] flex flex-col items-center justify-center gap-1 transition ${
+                  onClick={() => {
+                    setShowBankedPanel((v) => !v);
+                    setShowReadyPanel(false);
+                  }}
+                  className={`relative rounded-xl border px-3 h-[42px] flex flex-col items-center justify-center gap-1 transition ${getBankedSummaryButtonClasses(
+                    bankedSummary.tone,
                     showBankedPanel
-                      ? "border-cyan-400/45 bg-cyan-500/12 text-cyan-100"
-                      : "border-white/15 bg-white/5 text-white"
-                  }`}
+                  )}`}
                   title="Banked MLEO quick view"
                 >
                   <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white/40 leading-none">
@@ -9092,6 +9543,15 @@ export default function MleoBase() {
                   <div className="text-xs font-extrabold leading-none">
                     {formatBankedBadgeCompact(bankedDisplayValue)}
                   </div>
+                  {bankedSummary.count > 0 ? (
+                    <span
+                      className={`absolute -right-1 -top-1 inline-flex min-w-5 h-5 items-center justify-center rounded-full px-1 text-[10px] font-black ${getBankedSummaryBadgeClasses(
+                        bankedSummary.tone
+                      )}`}
+                    >
+                      {bankedSummary.count}
+                    </span>
+                  ) : null}
                 </button>
 
                 {showBankedPanel && !shownInfo ? (
@@ -9099,6 +9559,10 @@ export default function MleoBase() {
                     <BankedQuickPanel
                       snapshot={bankedSnapshot}
                       bankedValue={bankedDisplayValue}
+                      state={state}
+                      derived={derived}
+                      systemState={systemState}
+                      onNavigate={openHomeFlowTarget}
                       onClose={() => setShowBankedPanel(false)}
                     />
                   </div>
@@ -9782,16 +10246,25 @@ export default function MleoBase() {
                         setShowBankedPanel((v) => !v);
                         setShowReadyPanel(false);
                       }}
-                      className={`shrink-0 min-w-[78px] rounded-2xl border px-2 py-1.5 text-left transition ${
+                      className={`relative shrink-0 min-w-[78px] rounded-2xl border px-2 py-1.5 text-left transition ${getBankedSummaryButtonClasses(
+                        bankedSummary.tone,
                         showBankedPanel
-                          ? "border-cyan-400/45 bg-cyan-500/12 text-cyan-100"
-                          : "border-white/10 bg-white/[0.04] text-white"
-                      }`}
+                      )}`}
                     >
                       <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
                         {item.label}
                       </div>
                       <div className="mt-1 text-sm font-bold text-white">{item.value}</div>
+
+                      {bankedSummary.count > 0 ? (
+                        <span
+                          className={`absolute -right-1 -top-1 inline-flex min-w-5 h-5 items-center justify-center rounded-full px-1 text-[10px] font-black ${getBankedSummaryBadgeClasses(
+                            bankedSummary.tone
+                          )}`}
+                        >
+                          {bankedSummary.count}
+                        </span>
+                      ) : null}
                     </button>
                   ) : (
                     <button
@@ -9820,6 +10293,10 @@ export default function MleoBase() {
                   <BankedQuickPanel
                     snapshot={bankedSnapshot}
                     bankedValue={bankedDisplayValue}
+                    state={state}
+                    derived={derived}
+                    systemState={systemState}
+                    onNavigate={openHomeFlowTarget}
                     onClose={() => setShowBankedPanel(false)}
                   />
                 </div>
