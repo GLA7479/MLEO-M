@@ -32,16 +32,28 @@ function CardShell({ className = "", weight = "default", children, ...rest }) {
   );
 }
 
-function MiniStat({ label, value, note }) {
+function MiniStat({ label, value, note, desktopComfort = false }) {
   const pt = useContext(BaseOverviewPanelToneContext);
   const ms = pt?.miniStat ? ` ${pt.miniStat}` : "";
+  const comfort =
+    desktopComfort
+      ? "min-w-0 lg:px-3 lg:py-2.5 lg:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)]"
+      : "";
+  const labelCls = desktopComfort
+    ? "text-[10px] font-medium uppercase tracking-[0.12em] text-white/38 whitespace-normal [word-break:break-word] leading-snug lg:tracking-[0.13em]"
+    : "text-[10px] font-medium uppercase tracking-[0.14em] text-white/38";
+  const valueCls = desktopComfort
+    ? "mt-1 text-sm font-bold tabular-nums text-white/95 break-words lg:text-base lg:leading-tight"
+    : "mt-0.5 text-sm font-bold text-white/95";
+  const noteCls = desktopComfort
+    ? "mt-1 text-[11px] leading-snug text-white/46 line-clamp-2 lg:line-clamp-3 lg:text-[12px]"
+    : "mt-0.5 text-[11px] leading-snug text-white/46 line-clamp-2";
+
   return (
-    <div className={`rounded-lg border border-white/[0.06] bg-black/[0.14] px-2.5 py-2${ms}`}>
-      <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/38">
-        {label}
-      </div>
-      <div className="mt-0.5 text-sm font-bold text-white/95">{value}</div>
-      {note ? <div className="mt-0.5 text-[11px] leading-snug text-white/46 line-clamp-2">{note}</div> : null}
+    <div className={`min-w-0 rounded-lg border border-white/[0.06] bg-black/[0.14] px-2.5 py-2${ms} ${comfort}`}>
+      <div className={labelCls}>{label}</div>
+      <div className={valueCls}>{value}</div>
+      {note ? <div className={noteCls}>{note}</div> : null}
     </div>
   );
 }
@@ -105,15 +117,15 @@ const ovEyebrowPrimary =
   "text-[10px] font-medium uppercase tracking-[0.14em] text-white/38 sm:tracking-[0.15em]";
 const ovTitlePrimary = "font-black leading-tight text-white";
 const ovCtaPrimaryCyan =
-  "mt-2 w-full rounded-lg border border-cyan-400/32 bg-cyan-500/14 px-2.5 py-1.5 text-xs font-semibold text-cyan-100 transition hover:border-cyan-400/40 hover:bg-cyan-500/20 sm:mt-2.5 sm:w-auto sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/22";
+  "mt-2 flex w-full min-h-[44px] items-center justify-center rounded-lg border border-cyan-400/32 bg-cyan-500/14 px-2.5 py-2 text-xs font-semibold text-cyan-100 transition hover:border-cyan-400/42 hover:bg-cyan-500/20 active:brightness-110 sm:mt-2.5 sm:min-h-0 sm:w-auto sm:justify-center sm:rounded-xl sm:py-1.5 sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[#07111f]";
 const ovCtaPrimaryCyanLead =
-  "mt-2 w-full rounded-lg border border-cyan-400/38 bg-cyan-500/18 px-2.5 py-1.5 text-xs font-semibold text-cyan-50 transition hover:border-cyan-400/45 hover:bg-cyan-500/24 sm:mt-2.5 sm:w-auto sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/28";
+  "mt-2 flex w-full min-h-[44px] items-center justify-center rounded-lg border border-cyan-400/42 bg-cyan-500/22 px-3 py-2.5 text-sm font-bold text-cyan-50 shadow-[0_0_24px_rgba(34,211,238,0.08)] transition hover:border-cyan-400/50 hover:bg-cyan-500/28 active:brightness-110 sm:mt-2.5 sm:min-h-0 sm:w-auto sm:rounded-xl sm:px-3 sm:py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[#07111f]";
 const ovCtaPrimaryAmber =
-  "mt-2 w-full rounded-lg border border-amber-400/30 bg-amber-500/12 px-2.5 py-1.5 text-xs font-semibold text-amber-100 transition hover:border-amber-400/38 hover:bg-amber-500/18 sm:mt-2.5 sm:w-auto sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/22";
+  "mt-2 flex w-full min-h-[44px] items-center justify-center rounded-lg border border-amber-400/32 bg-amber-500/14 px-2.5 py-2 text-xs font-semibold text-amber-100 transition hover:border-amber-400/40 hover:bg-amber-500/20 active:brightness-110 sm:mt-2.5 sm:min-h-0 sm:w-auto sm:rounded-xl sm:py-1.5 sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[#07111f]";
 const ovCtaSecondaryNeutral =
-  "mt-2 w-full rounded-lg border border-white/[0.11] bg-white/[0.05] px-2.5 py-1.5 text-xs font-medium text-white/85 transition hover:border-white/[0.14] hover:bg-white/[0.075] sm:mt-2 sm:w-auto sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/12";
+  "mt-2 flex w-full min-h-[44px] items-center justify-center rounded-lg border border-white/[0.12] bg-white/[0.055] px-2.5 py-2 text-xs font-medium text-white/88 transition hover:border-white/[0.16] hover:bg-white/[0.09] active:brightness-110 sm:mt-2 sm:min-h-0 sm:w-auto sm:rounded-xl sm:py-1.5 sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/18 focus-visible:ring-offset-2 focus-visible:ring-offset-[#07111f]";
 const ovCtaTertiaryQuiet =
-  "rounded-lg border border-white/[0.07] bg-white/[0.028] px-2.5 py-1.5 text-xs font-medium text-white/72 transition hover:border-white/[0.1] hover:bg-white/[0.05] sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/12";
+  "flex min-h-[44px] w-full items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-2 text-xs font-medium text-white/74 transition hover:border-white/[0.12] hover:bg-white/[0.055] active:brightness-110 sm:min-h-0 sm:rounded-xl sm:py-1.5 sm:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/18 focus-visible:ring-offset-2 focus-visible:ring-offset-[#07111f]";
 
 const ovSecondaryHeading =
   "text-[11px] font-semibold uppercase tracking-[0.11em] text-white/64 sm:text-xs sm:tracking-[0.13em]";
@@ -124,11 +136,13 @@ function ActionButton({ action, onNavigate, emphasis = "default" }) {
   if (!action?.target || typeof onNavigate !== "function") return null;
 
   const cls =
-    emphasis === "high" ? ovCtaPrimaryCyanLead : "mt-3 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20";
+    emphasis === "high"
+      ? ovCtaPrimaryCyanLead
+      : "mt-3 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/18 active:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25";
 
   return (
     <button onClick={() => onNavigate(action.target)} className={cls}>
-      {action.cta || "Open"}
+      {emphasis === "high" ? action.cta || "Continue" : action.cta || "Open"}
     </button>
   );
 }
@@ -180,8 +194,16 @@ function BaseStatusBlock({ status, variant = "prominent" }) {
 
 function BottleneckBlock({ bottleneck, onNavigate }) {
   if (!bottleneck) return null;
+  const actionable = Boolean(bottleneck.target);
   return (
-    <CardShell weight="attention">
+    <CardShell
+      weight={actionable ? "attention" : "default"}
+      className={
+        actionable
+          ? "transition duration-200 hover:border-white/[0.14] hover:ring-1 hover:ring-cyan-400/14"
+          : "border-dashed border-white/[0.08] bg-white/[0.02]"
+      }
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className={ovEyebrowPrimary}>Main Bottleneck</div>
@@ -211,7 +233,10 @@ function BottleneckBlock({ bottleneck, onNavigate }) {
 function NextActionBlock({ action, onNavigate }) {
   if (!action) return null;
   return (
-    <CardShell weight="attention" className="border-cyan-400/22 bg-cyan-500/[0.055]">
+    <CardShell
+      weight="attention"
+      className="border-cyan-400/26 bg-cyan-500/[0.06] transition duration-200 hover:border-cyan-400/34 hover:bg-cyan-500/[0.07] hover:shadow-[0_0_28px_rgba(34,211,238,0.07)]"
+    >
       <div className={`${ovEyebrowPrimary} text-cyan-100/75`}>Best Next Action</div>
       <div className={`mt-1 text-base ${ovTitlePrimary} sm:text-lg`}>{action.title}</div>
       <div className="mt-1 text-xs leading-snug text-white/76 line-clamp-2 sm:line-clamp-3 sm:text-sm">
@@ -239,6 +264,7 @@ function RatesBlock({ rates, openInnerPanel, toggleInnerPanel }) {
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
         compact
+        overviewTapRow
       >
         <div className={ovSecondaryHeading}>Live Rates</div>
         {ratesHint ? (
@@ -246,15 +272,20 @@ function RatesBlock({ rates, openInnerPanel, toggleInnerPanel }) {
             {ratesHint}
           </div>
         ) : null}
+        {!isOpen ? (
+          <div className="mt-0.5 hidden text-[9px] leading-tight text-white/26 sm:block">
+            ORE/DATA rates · refinery · cap timing
+          </div>
+        ) : null}
       </ExpandablePanelSectionHeader>
 
       {isOpen ? (
         <>
-          <div className="mt-2 grid gap-2 sm:mt-2.5 sm:gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-            <MiniStat label="Banked / hr" value={`${formatValue(rates.bankedPerHour)}`} />
-            <MiniStat label="Projected / day" value={`${formatValue(rates.projectedPerDay)}`} />
-            <MiniStat label="ORE / hr" value={`${formatValue(rates.orePerHour)}`} />
-            <MiniStat label="DATA / hr" value={`${formatValue(rates.dataPerHour)}`} />
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:mt-2.5 sm:grid-cols-2 sm:gap-3">
+            <MiniStat desktopComfort label="Banked / hr" value={`${formatValue(rates.bankedPerHour)}`} />
+            <MiniStat desktopComfort label="Projected / day" value={`${formatValue(rates.projectedPerDay)}`} />
+            <MiniStat desktopComfort label="ORE / hr" value={`${formatValue(rates.orePerHour)}`} />
+            <MiniStat desktopComfort label="DATA / hr" value={`${formatValue(rates.dataPerHour)}`} />
           </div>
 
           <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-white/44">
@@ -293,6 +324,7 @@ function StabilityBlock({ stability, openInnerPanel, toggleInnerPanel }) {
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
         compact
+        overviewTapRow
       >
         <div className={ovSecondaryHeading}>Stability Insight</div>
         {stabilityHint ? (
@@ -300,14 +332,19 @@ function StabilityBlock({ stability, openInnerPanel, toggleInnerPanel }) {
             {stabilityHint}
           </div>
         ) : null}
+        {!isOpen ? (
+          <div className="mt-0.5 hidden text-[9px] leading-tight text-white/26 sm:block">
+            Impact · pressure · repair context
+          </div>
+        ) : null}
       </ExpandablePanelSectionHeader>
 
       {isOpen ? (
-        <div className="mt-2 grid gap-2 sm:mt-2.5 sm:gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-          <MiniStat label="Stability" value={`${formatValue(stability.value)}%`} />
-          <MiniStat label="Impact" value={stability.impactLabel} note={stability.impactText} />
-          <MiniStat label="Pressure" value={stability.pressureLabel} note={stability.pressureText} />
-          <MiniStat label="Repair Support" value={stability.repairSupportLabel} note={stability.repairSupportText} />
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:mt-2.5 sm:grid-cols-2 sm:gap-3">
+          <MiniStat desktopComfort label="Stability" value={`${formatValue(stability.value)}%`} />
+          <MiniStat desktopComfort label="Impact" value={stability.impactLabel} note={stability.impactText} />
+          <MiniStat desktopComfort label="Pressure" value={stability.pressureLabel} note={stability.pressureText} />
+          <MiniStat desktopComfort label="Repair" value={stability.repairSupportLabel} note={stability.repairSupportText} />
         </div>
       ) : null}
     </CardShell>
@@ -336,6 +373,7 @@ function DailyProgressBlock({ progress, openInnerPanel, toggleInnerPanel }) {
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
         compact
+        overviewTapRow
       >
         <div className={ovSecondaryHeading}>Daily Progress</div>
         {dailyHint ? (
@@ -343,17 +381,24 @@ function DailyProgressBlock({ progress, openInnerPanel, toggleInnerPanel }) {
             {dailyHint}
           </div>
         ) : null}
+        {!isOpen ? (
+          <div className="mt-0.5 hidden text-[9px] leading-tight text-white/26 sm:block">
+            MLEO cap · expeditions · missions detail
+          </div>
+        ) : null}
       </ExpandablePanelSectionHeader>
 
       {isOpen ? (
-        <div className="mt-2 grid gap-2 sm:mt-2.5 sm:gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:mt-2.5 sm:grid-cols-2 sm:gap-3">
           <MiniStat
-            label="Daily MLEO (BASE)"
+            desktopComfort
+            label="Daily MLEO"
             value={`${formatValue(mleoCur)}/${formatValue(mleoMax)}`}
           />
-          <MiniStat label="Expeditions" value={formatValue(progress.expeditionsDone || 0, 0)} />
-          <MiniStat label="Maintenance" value={formatValue(progress.maintenanceDone || 0, 0)} />
+          <MiniStat desktopComfort label="Expeditions" value={formatValue(progress.expeditionsDone || 0, 0)} />
+          <MiniStat desktopComfort label="Maintenance" value={formatValue(progress.maintenanceDone || 0, 0)} />
           <MiniStat
+            desktopComfort
             label="Missions"
             value={`${formatValue(progress.missionsReady || 0, 0)} ready`}
             note={`${formatValue(progress.missionsCompleted || 0, 0)} completed`}
@@ -366,8 +411,16 @@ function DailyProgressBlock({ progress, openInnerPanel, toggleInnerPanel }) {
 
 function MissionFocusBlock({ missionGuidance, onNavigate }) {
   if (!missionGuidance?.title) return null;
+  const actionable = Boolean(missionGuidance.target);
   return (
-    <CardShell weight="attention" className="border-cyan-400/18 bg-cyan-500/[0.04]">
+    <CardShell
+      weight={actionable ? "attention" : "default"}
+      className={
+        actionable
+          ? "border-cyan-400/20 bg-cyan-500/[0.045] transition duration-200 hover:border-cyan-400/28 hover:bg-cyan-500/[0.055]"
+          : "border border-cyan-400/12 bg-cyan-500/[0.025]"
+      }
+    >
       <div className={`${ovEyebrowPrimary} text-cyan-100/72`}>Mission Focus</div>
       <div className={`mt-1 text-sm ${ovTitlePrimary} leading-snug`}>{missionGuidance.title}</div>
       <div className="mt-0.5 text-xs leading-snug text-white/70 line-clamp-2 sm:text-sm">
@@ -384,8 +437,16 @@ function MissionFocusBlock({ missionGuidance, onNavigate }) {
 
 function RecoveryHintBlock({ hint, onNavigate }) {
   if (!hint?.text) return null;
+  const actionable = Boolean(hint?.target);
   return (
-    <CardShell weight="attention" className="border-amber-400/26 bg-amber-500/[0.055]">
+    <CardShell
+      weight={actionable ? "attention" : "default"}
+      className={
+        actionable
+          ? "border-amber-400/28 bg-amber-500/[0.055] transition duration-200 hover:border-amber-400/36 hover:bg-amber-500/[0.065]"
+          : "border-amber-400/15 bg-amber-500/[0.03]"
+      }
+    >
       <div className={`${ovEyebrowPrimary} text-amber-100/78`}>{hint.title || "Recovery hint"}</div>
       <div className="mt-1 text-xs leading-snug text-white/76 line-clamp-2 sm:line-clamp-3 sm:text-sm">
         {hint.text}
@@ -413,8 +474,11 @@ function TodaysLoopBlock({ steps, onNavigate }) {
   const firstActionable = list.find((s) => s?.target);
 
   return (
-    <CardShell>
-      <div className={ovSecondaryHeading}>Today&apos;s Loop</div>
+    <CardShell className="border-white/[0.06]">
+      <div className={`${ovSecondaryHeading} text-white/58`}>Today&apos;s Loop</div>
+      <p className="mt-0.5 text-[9px] leading-tight text-white/26 sm:text-[10px] sm:text-white/30">
+        Order at a glance · use the shortcut when shown
+      </p>
       <div className="mt-1.5 space-y-1">
         {list.map((step, idx) => (
           <div
@@ -462,7 +526,7 @@ function BuildOpportunitiesCard({
       <SectionHeader
         quiet
         title="Build Opportunities"
-        hint={hintLine || "No build queue"}
+        hint={hintLine || "Nothing queued"}
         right={
           <AvailabilityBadge subdued count={buildOpportunitiesCount > 0 ? buildOpportunitiesCount : 0} />
         }
@@ -472,8 +536,8 @@ function BuildOpportunitiesCard({
           Open Build
         </button>
       ) : (
-        <div className="rounded-lg border border-white/[0.05] bg-black/12 px-2.5 py-1.5 text-[10px] leading-snug text-white/40 sm:text-[11px]">
-          Gather resources to unlock upgrades.
+        <div className="rounded-lg border border-dashed border-white/[0.08] bg-black/[0.08] px-2.5 py-2 text-center text-[10px] leading-snug text-white/38 sm:text-[11px]">
+          Caught up for now. Earn resources to unlock new build paths.
         </div>
       )}
     </CardShell>
@@ -501,11 +565,17 @@ function IdentityCard({
         toggleInnerPanel={toggleInnerPanel}
         compact
         subtlePill
+        overviewTapRow
       >
         <div className={ovTertiaryHeading}>Command Identity</div>
         {!isOpen ? (
           <div className="mt-0.5 text-[10px] leading-snug text-white/36 line-clamp-1 sm:line-clamp-2 sm:text-[11px]">
-            Role · path
+            Role · path snapshot
+          </div>
+        ) : null}
+        {!isOpen ? (
+          <div className="mt-0.5 hidden text-[9px] leading-tight text-white/24 sm:block">
+            Bonuses · commander details inside
           </div>
         ) : null}
       </ExpandablePanelSectionHeader>
@@ -562,11 +632,17 @@ function SpecializationSummaryCard({ summary, onNavigate, openInnerPanel, toggle
         toggleInnerPanel={toggleInnerPanel}
         compact
         subtlePill
+        overviewTapRow
       >
         <div className={ovTertiaryHeading}>Specialization</div>
         {specHint ? (
           <div className="mt-0.5 text-[10px] leading-snug text-white/36 line-clamp-1 sm:line-clamp-2 sm:text-[11px]">
             {specHint}
+          </div>
+        ) : null}
+        {!isOpen ? (
+          <div className="mt-0.5 hidden text-[9px] leading-tight text-white/24 sm:block">
+            Buildings · programs · milestones
           </div>
         ) : null}
       </ExpandablePanelSectionHeader>
@@ -605,7 +681,7 @@ function SpecializationSummaryCard({ summary, onNavigate, openInnerPanel, toggle
               disabled={!rec.navigateTarget}
               className={`mt-2 w-full rounded-lg border px-2.5 py-2 text-left text-xs font-medium leading-snug transition sm:mt-2.5 sm:rounded-xl sm:px-3 sm:py-2.5 sm:text-sm ${
                 rec.navigateTarget
-                  ? "border-cyan-400/18 bg-cyan-500/[0.055] text-cyan-100/88 hover:border-cyan-400/24 hover:bg-cyan-500/[0.09]"
+                  ? "border-cyan-400/18 bg-cyan-500/[0.055] text-cyan-100/88 hover:border-cyan-400/24 hover:bg-cyan-500/[0.09] active:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/28 focus-visible:ring-offset-2 focus-visible:ring-offset-[#07111f]"
                   : "cursor-default border-white/[0.06] bg-white/[0.025] text-white/58"
               }`}
             >
@@ -625,7 +701,7 @@ function SpecializationSummaryCard({ summary, onNavigate, openInnerPanel, toggle
                 key={row.buildingKey}
                 type="button"
                 onClick={() => onNavigate?.({ tab: "build", target: row.buildingKey })}
-                className="w-full rounded-lg border border-white/[0.08] bg-black/18 px-2.5 py-1.5 text-left transition hover:border-cyan-400/22 hover:bg-black/26 sm:rounded-xl sm:px-3 sm:py-2"
+                className="w-full rounded-lg border border-white/[0.08] bg-black/18 px-2.5 py-1.5 text-left transition hover:border-cyan-400/22 hover:bg-black/26 active:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#07111f] sm:rounded-xl sm:px-3 sm:py-2"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0 text-[13px] font-bold text-white">{row.buildingName}</div>
@@ -686,8 +762,8 @@ function ContractsCard({
 
   const contractsHint = !isOpen
     ? liveContractsAvailableCount > 0
-      ? `${liveContractsAvailableCount} reward${liveContractsAvailableCount > 1 ? "s" : ""} ready`
-      : "None ready"
+      ? `${liveContractsAvailableCount} reward${liveContractsAvailableCount > 1 ? "s" : ""} ready to claim`
+      : "No rewards ready — progress contracts to unlock claims"
     : null;
 
   return (
@@ -698,20 +774,31 @@ function ContractsCard({
         toggleInnerPanel={toggleInnerPanel}
         compact
         subtlePill
+        overviewTapRow
       >
         <div className="flex flex-wrap items-center gap-1.5">
           <div className={ovTertiaryHeading}>Live Contracts</div>
           <AvailabilityBadge subdued count={liveContractsAvailableCount} />
         </div>
         {contractsHint ? (
-          <div className="mt-0.5 text-[10px] leading-snug text-white/36 sm:text-[11px] sm:text-white/40">
+          <div className="mt-0.5 text-[10px] leading-snug text-white/36 line-clamp-2 sm:text-[11px] sm:text-white/40">
             {contractsHint}
+          </div>
+        ) : null}
+        {!isOpen ? (
+          <div className="mt-0.5 hidden text-[9px] leading-tight text-white/24 sm:block">
+            Full list · claim when complete
           </div>
         ) : null}
       </ExpandablePanelSectionHeader>
 
       {isOpen ? (
         <div className="mt-2 space-y-2 sm:mt-2.5 sm:space-y-2.5">
+          {(!liveContracts || liveContracts.length === 0) ? (
+            <div className="rounded-lg border border-dashed border-white/[0.08] bg-black/[0.08] px-2.5 py-3 text-center text-[10px] leading-snug text-white/40">
+              No live contracts in this view.
+            </div>
+          ) : null}
           {[...(liveContracts || [])]
             .sort((a, b) => {
               const aReady = a.done && !a.claimed ? 1 : 0;
@@ -901,7 +988,7 @@ export function OverviewPanelCards({
               <BaseStatusBlock status={baseStatusPayload} variant="support" />
             </div>
           ) : null}
-          <div className="grid gap-2.5 sm:gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-2.5 sm:gap-3 md:grid-cols-2 xl:grid-cols-2">
             <RatesBlock
               rates={safeOverview.rates}
               openInnerPanel={openInnerPanel}

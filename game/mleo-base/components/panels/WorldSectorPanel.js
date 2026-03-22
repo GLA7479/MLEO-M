@@ -67,6 +67,7 @@ export function WorldSectorPanel({
         openInnerPanel={openInnerPanel}
         toggleInnerPanel={toggleInnerPanel}
         compact={compactHeader}
+        overviewTapRow={compactHeader}
       >
         <div className="flex flex-wrap items-center gap-2">
           <div
