@@ -599,7 +599,7 @@ export function freshState() {
     log: pushLog([], "MLEO BASE online. HQ is active."),
     /** Active sector / world (1–6). Server column `sector_world`. */
     sectorWorld: 1,
-    /** Command Protocol Phase 1A — server columns `command_protocol_*`. */
+    /** Command Protocols (1A+1B) — server columns `command_protocol_*`. */
     commandProtocolActive: "none",
     commandProtocolLastSwapDay: "",
   };
@@ -742,7 +742,9 @@ export function sanitizeBaseState(raw, fallback = null) {
       if (
         s === "steady_ops" ||
         s === "liquidity_drill" ||
-        s === "signal_focus"
+        s === "signal_focus" ||
+        s === "gold_over_watch" ||
+        s === "data_over_watch"
       ) {
         return s;
       }

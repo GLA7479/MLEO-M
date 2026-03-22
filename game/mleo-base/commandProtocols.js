@@ -1,9 +1,16 @@
 /**
- * Command Protocols — Phase 1A (economy-safe).
+ * Command Protocols — Phase 1A + 1B MVP (economy-safe).
  * Multipliers must stay aligned with `base_reconcile_state` in `styles/sql/base_server_authority.sql`.
  */
 
-export const PHASE_1A_COMMAND_PROTOCOL_IDS = ["none", "steady_ops", "liquidity_drill", "signal_focus"];
+export const PHASE_1A_COMMAND_PROTOCOL_IDS = [
+  "none",
+  "steady_ops",
+  "liquidity_drill",
+  "signal_focus",
+  "gold_over_watch",
+  "data_over_watch",
+];
 
 const ID_SET = new Set(PHASE_1A_COMMAND_PROTOCOL_IDS);
 
@@ -32,6 +39,18 @@ export const PHASE_1A_COMMAND_PROTOCOLS = [
     name: "Signal Focus",
     shortDesc: "DATA output +2.5%",
     minCommanderLevel: 4,
+  },
+  {
+    id: "gold_over_watch",
+    name: "Gold Overwatch",
+    shortDesc: "Gold +2.5%, maintenance relief −1.5%",
+    minCommanderLevel: 5,
+  },
+  {
+    id: "data_over_watch",
+    name: "Data Overwatch",
+    shortDesc: "DATA +3%, gold −1.5%",
+    minCommanderLevel: 6,
   },
 ];
 
@@ -63,7 +82,7 @@ export function resolveEffectiveCommandProtocol(state) {
 }
 
 /**
- * Apply Phase 1A multipliers after all other derive factors (incl. hq × stability on gold/data).
+ * Apply command protocol multipliers after all other derive factors (incl. hq × stability on gold/data).
  * Only touches maintenanceRelief, goldMult, dataMult — never bankBonus / mleoMult.
  */
 export function applyPhase1ACommandProtocolToDerivedRates(effectiveId, rates) {
@@ -78,6 +97,20 @@ export function applyPhase1ACommandProtocolToDerivedRates(effectiveId, rates) {
   }
   if (effectiveId === "signal_focus") {
     return { maintenanceRelief, goldMult, dataMult: dataMult * 1.025 };
+  }
+  if (effectiveId === "gold_over_watch") {
+    return {
+      maintenanceRelief: maintenanceRelief * 0.985,
+      goldMult: goldMult * 1.025,
+      dataMult,
+    };
+  }
+  if (effectiveId === "data_over_watch") {
+    return {
+      maintenanceRelief,
+      goldMult: goldMult * 0.985,
+      dataMult: dataMult * 1.03,
+    };
   }
   return { maintenanceRelief, goldMult, dataMult };
 }

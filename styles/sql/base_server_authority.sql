@@ -1311,9 +1311,16 @@ BEGIN
   v_mleo_mult := v_mleo_mult * v_hq_bonus * v_stability_factor;
   v_data_mult := v_data_mult * v_hq_bonus * v_stability_factor;
 
-  -- Command Protocols Phase 1A (must match game/mleo-base/commandProtocols.js)
+  -- Command Protocols Phase 1A+1B (must match game/mleo-base/commandProtocols.js)
   v_cmd_protocol := lower(trim(coalesce(v_state.command_protocol_active, 'none')));
-  IF v_cmd_protocol NOT IN ('none', 'steady_ops', 'liquidity_drill', 'signal_focus') THEN
+  IF v_cmd_protocol NOT IN (
+    'none',
+    'steady_ops',
+    'liquidity_drill',
+    'signal_focus',
+    'gold_over_watch',
+    'data_over_watch'
+  ) THEN
     v_cmd_protocol := 'none';
   END IF;
   v_cmd_level := greatest(1, coalesce(v_state.commander_level, 1));
@@ -1323,6 +1330,12 @@ BEGIN
     v_gold_mult := v_gold_mult * 1.02;
   ELSIF v_cmd_protocol = 'signal_focus' AND v_cmd_level >= 4 THEN
     v_data_mult := v_data_mult * 1.025;
+  ELSIF v_cmd_protocol = 'gold_over_watch' AND v_cmd_level >= 5 THEN
+    v_gold_mult := v_gold_mult * 1.025;
+    v_maintenance_relief := v_maintenance_relief * 0.985;
+  ELSIF v_cmd_protocol = 'data_over_watch' AND v_cmd_level >= 6 THEN
+    v_data_mult := v_data_mult * 1.03;
+    v_gold_mult := v_gold_mult * 0.985;
   END IF;
 
   v_energy_cap := 148 + (v_power * 42);
@@ -1958,7 +1971,14 @@ BEGIN
   FOR UPDATE;
 
   v_new := lower(trim(coalesce(p_protocol_id, 'none')));
-  IF v_new NOT IN ('none', 'steady_ops', 'liquidity_drill', 'signal_focus') THEN
+  IF v_new NOT IN (
+    'none',
+    'steady_ops',
+    'liquidity_drill',
+    'signal_focus',
+    'gold_over_watch',
+    'data_over_watch'
+  ) THEN
     RAISE EXCEPTION 'Invalid command protocol';
   END IF;
 
@@ -1970,6 +1990,12 @@ BEGIN
     RAISE EXCEPTION 'Protocol not unlocked yet';
   END IF;
   IF v_new = 'signal_focus' AND v_level < 4 THEN
+    RAISE EXCEPTION 'Protocol not unlocked yet';
+  END IF;
+  IF v_new = 'gold_over_watch' AND v_level < 5 THEN
+    RAISE EXCEPTION 'Protocol not unlocked yet';
+  END IF;
+  IF v_new = 'data_over_watch' AND v_level < 6 THEN
     RAISE EXCEPTION 'Protocol not unlocked yet';
   END IF;
 
