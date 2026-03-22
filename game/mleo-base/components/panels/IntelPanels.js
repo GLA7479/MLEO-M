@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { ExpandablePanelSectionHeader } from "./ExpandablePanelSectionHeader";
+
 function fmt(value) {
   const n = Number(value || 0);
   if (Math.abs(n) >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
@@ -111,6 +113,16 @@ export function ActivityLogPanel({ logEntries, onResetGame }) {
   );
 }
 
+function SectionAvailabilityBadge({ count }) {
+  if (!count) return null;
+
+  return (
+    <span className="inline-flex min-w-6 h-6 items-center justify-center rounded-full bg-cyan-400 px-2 text-[11px] font-black text-slate-950">
+      {count}
+    </span>
+  );
+}
+
 export function IntelPanelCards({
   progressCardClass,
   logCardClass,
@@ -118,25 +130,25 @@ export function IntelPanelCards({
   toggleInnerPanel,
   progressSummaryContent,
   activityLogContent,
+  progressAvailableCount = 0,
+  logAvailableCount = 0,
 }) {
   return (
     <>
       <div className={`rounded-3xl border p-3.5 transition ${progressCardClass}`}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
+        <ExpandablePanelSectionHeader
+          panelKey="intel-summary"
+          openInnerPanel={openInnerPanel}
+          toggleInnerPanel={toggleInnerPanel}
+        >
+          <div className="flex flex-wrap items-center gap-2">
             <div className="text-lg font-bold text-white">Progress Summary</div>
-            {openInnerPanel !== "intel-summary" ? (
-              <div className="mt-1 text-sm text-white/60">Key progress and identity data</div>
-            ) : null}
+            <SectionAvailabilityBadge count={progressAvailableCount} />
           </div>
-
-          <button
-            onClick={() => toggleInnerPanel("intel-summary")}
-            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-          >
-            {openInnerPanel === "intel-summary" ? "CLOSE" : "OPEN"}
-          </button>
-        </div>
+          {openInnerPanel !== "intel-summary" ? (
+            <div className="mt-1 text-sm text-white/60">Key progress and identity data</div>
+          ) : null}
+        </ExpandablePanelSectionHeader>
 
         {openInnerPanel === "intel-summary" ? (
           <div className="mt-3">{progressSummaryContent}</div>
@@ -144,21 +156,19 @@ export function IntelPanelCards({
       </div>
 
       <div className={`rounded-3xl border p-3.5 transition ${logCardClass}`}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
+        <ExpandablePanelSectionHeader
+          panelKey="intel-log"
+          openInnerPanel={openInnerPanel}
+          toggleInnerPanel={toggleInnerPanel}
+        >
+          <div className="flex flex-wrap items-center gap-2">
             <div className="text-lg font-bold text-white">Activity Log</div>
-            {openInnerPanel !== "intel-log" ? (
-              <div className="mt-1 text-sm text-white/60">Recent events and milestones</div>
-            ) : null}
+            <SectionAvailabilityBadge count={logAvailableCount} />
           </div>
-
-          <button
-            onClick={() => toggleInnerPanel("intel-log")}
-            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-          >
-            {openInnerPanel === "intel-log" ? "CLOSE" : "OPEN"}
-          </button>
-        </div>
+          {openInnerPanel !== "intel-log" ? (
+            <div className="mt-1 text-sm text-white/60">Recent events and milestones</div>
+          ) : null}
+        </ExpandablePanelSectionHeader>
 
         {openInnerPanel === "intel-log" ? (
           <div className="mt-3">{activityLogContent}</div>

@@ -2917,27 +2917,28 @@ function BaseResourceBar({
 }
 
 function AccordionSection({ title, subtitle, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+
   return (
-    <details
-      open={defaultOpen}
-      className="group rounded-3xl border border-white/10 bg-white/5"
-    >
-      <summary className="cursor-pointer list-none px-4 py-4 sm:px-5 sm:py-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold text-white">{title}</h2>
-            {subtitle ? (
-              <p className="mt-1 text-sm text-white/60">{subtitle}</p>
-            ) : null}
-          </div>
-          <div className="rounded-xl bg-white/10 px-3 py-1 text-xs font-semibold text-white/70">
-            <span className="group-open:hidden">OPEN</span>
-            <span className="hidden group-open:inline">CLOSE</span>
-          </div>
+    <div className="rounded-3xl border border-white/10 bg-white/5">
+      <div className="flex items-center justify-between gap-3 px-4 py-4 sm:px-5 sm:py-5">
+        <div className="min-w-0 cursor-default">
+          <h2 className="text-lg font-bold text-white">{title}</h2>
+          {subtitle ? <p className="mt-1 text-sm text-white/60">{subtitle}</p> : null}
         </div>
-      </summary>
-      <div className="px-4 pb-4 sm:px-5 sm:pb-5">{children}</div>
-    </details>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((v) => !v);
+          }}
+          className="shrink-0 rounded-xl border border-white/10 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/85 hover:bg-white/15"
+        >
+          {open ? "CLOSE" : "OPEN"}
+        </button>
+      </div>
+      {open ? <div className="px-4 pb-4 sm:px-5 sm:pb-5">{children}</div> : null}
+    </div>
   );
 }
 
@@ -11996,6 +11997,8 @@ export default function MleoBase() {
                           logCardClass={buildSectionCardClass(intelLogAvailableCount > 0)}
                           openInnerPanel={openInnerPanel}
                           toggleInnerPanel={toggleInnerPanel}
+                          progressAvailableCount={intelSummaryAvailableCount}
+                          logAvailableCount={intelLogAvailableCount}
                           progressSummaryContent={progressSummaryContent}
                           activityLogContent={activityLogContent}
                         />
@@ -12435,6 +12438,8 @@ export default function MleoBase() {
                         logCardClass={buildSectionCardClass(intelLogAvailableCount > 0)}
                         openInnerPanel={openInnerPanel}
                         toggleInnerPanel={toggleInnerPanel}
+                        progressAvailableCount={intelSummaryAvailableCount}
+                        logAvailableCount={intelLogAvailableCount}
                         progressSummaryContent={progressSummaryContent}
                         activityLogContent={activityLogContent}
                       />

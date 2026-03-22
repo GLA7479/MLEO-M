@@ -1,3 +1,5 @@
+import { ExpandablePanelSectionHeader } from "./ExpandablePanelSectionHeader";
+
 function SectionAvailabilityBadge({ count }) {
   if (!count) return null;
 
@@ -33,24 +35,19 @@ export function BuildPanelCards({
             : "rounded-3xl border p-3.5 transition"
         }
       >
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <div className="text-lg font-bold text-white">Development</div>
-              <SectionAvailabilityBadge count={developmentCount} />
-            </div>
-            {openInnerPanel !== "build-development" ? (
-              <div className="mt-1 text-sm text-white/60">{developmentHint}</div>
-            ) : null}
+        <ExpandablePanelSectionHeader
+          panelKey="build-development"
+          openInnerPanel={openInnerPanel}
+          toggleInnerPanel={toggleInnerPanel}
+        >
+          <div className="flex items-center gap-2">
+            <div className="text-lg font-bold text-white">Development</div>
+            <SectionAvailabilityBadge count={developmentCount} />
           </div>
-
-          <button
-            onClick={() => toggleInnerPanel("build-development")}
-            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-          >
-            {openInnerPanel === "build-development" ? "CLOSE" : "OPEN"}
-          </button>
-        </div>
+          {openInnerPanel !== "build-development" ? (
+            <div className="mt-1 text-sm text-white/60">{developmentHint}</div>
+          ) : null}
+        </ExpandablePanelSectionHeader>
 
         {openInnerPanel === "build-development" ? (
           <div className="mt-3">{crewModulesResearchContent}</div>
@@ -64,27 +61,20 @@ export function BuildPanelCards({
             : "rounded-3xl border p-3.5 transition"
         }
       >
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <div className="text-lg font-bold text-white">Base Structures</div>
-              <SectionAvailabilityBadge count={structuresCount} />
-            </div>
-
-            {openInnerPanel !== "build-structures" ? (
-              <div className="mt-1 text-sm text-white/60">
-                {structuresHint}
-              </div>
-            ) : null}
+        <ExpandablePanelSectionHeader
+          panelKey="build-structures"
+          openInnerPanel={openInnerPanel}
+          toggleInnerPanel={toggleInnerPanel}
+        >
+          <div className="flex items-center gap-2">
+            <div className="text-lg font-bold text-white">Base Structures</div>
+            <SectionAvailabilityBadge count={structuresCount} />
           </div>
 
-          <button
-            onClick={() => toggleInnerPanel("build-structures")}
-            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-          >
-            {openInnerPanel === "build-structures" ? "CLOSE" : "OPEN"}
-          </button>
-        </div>
+          {openInnerPanel !== "build-structures" ? (
+            <div className="mt-1 text-sm text-white/60">{structuresHint}</div>
+          ) : null}
+        </ExpandablePanelSectionHeader>
 
         {openInnerPanel === "build-structures" ? (
           <div className="mt-3">{baseStructuresContent}</div>
@@ -98,25 +88,20 @@ export function BuildPanelCards({
             : "rounded-3xl border p-3.5 transition"
         }
       >
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <div className="text-lg font-bold text-white">Support Systems</div>
-              <SectionAvailabilityBadge count={supportCount} />
-            </div>
-
-            {openInnerPanel !== "build-support" ? (
-              <div className="mt-1 text-sm text-white/60">{supportHint}</div>
-            ) : null}
+        <ExpandablePanelSectionHeader
+          panelKey="build-support"
+          openInnerPanel={openInnerPanel}
+          toggleInnerPanel={toggleInnerPanel}
+        >
+          <div className="flex items-center gap-2">
+            <div className="text-lg font-bold text-white">Support Systems</div>
+            <SectionAvailabilityBadge count={supportCount} />
           </div>
 
-          <button
-            onClick={() => toggleInnerPanel("build-support")}
-            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-          >
-            {openInnerPanel === "build-support" ? "CLOSE" : "OPEN"}
-          </button>
-        </div>
+          {openInnerPanel !== "build-support" ? (
+            <div className="mt-1 text-sm text-white/60">{supportHint}</div>
+          ) : null}
+        </ExpandablePanelSectionHeader>
 
         {openInnerPanel === "build-support" ? (
           <div className="mt-3">{buildSupportSystemsContent}</div>
@@ -125,4 +110,3 @@ export function BuildPanelCards({
     </>
   );
 }
-

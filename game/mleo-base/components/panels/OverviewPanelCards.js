@@ -37,10 +37,14 @@ function MiniStat({ label, value, note }) {
 function SectionButton({ isOpen, onClick }) {
   return (
     <button
-      onClick={onClick}
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.(e);
+      }}
       className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
     >
-      {isOpen ? "Close" : "Open"}
+      {isOpen ? "CLOSE" : "OPEN"}
     </button>
   );
 }
