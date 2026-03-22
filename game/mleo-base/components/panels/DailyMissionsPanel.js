@@ -32,10 +32,13 @@ function QuickTags({ tags }) {
   );
 }
 
-export function DailyMissionsPanel({ missions, onClaimMission, onOpenMissionInfo }) {
+export function DailyMissionsPanel({ panelTone, missions, onClaimMission, onOpenMissionInfo }) {
   return (
     <div className="space-y-3">
-      {(Array.isArray(missions) ? missions : []).map((mission) => (
+      {(Array.isArray(missions) ? missions : []).map((mission) => {
+        const rowAccent =
+          !mission.highlighted && panelTone?.missionRowAccent ? ` ${panelTone.missionRowAccent}` : "";
+        return (
         <div
           key={mission.key}
           data-base-target={mission.key}
@@ -47,7 +50,7 @@ export function DailyMissionsPanel({ missions, onClaimMission, onOpenMissionInfo
             mission.highlighted
               ? "ring-2 ring-cyan-300/90 border-cyan-300 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
               : ""
-          }`}
+          }${rowAccent}`}
         >
           <div className="absolute right-2.5 top-2.5 z-10">
             <button
@@ -96,7 +99,8 @@ export function DailyMissionsPanel({ missions, onClaimMission, onOpenMissionInfo
             </button>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

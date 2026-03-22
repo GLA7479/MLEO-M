@@ -7806,6 +7806,7 @@ export default function MleoBase() {
 
   const dailyMissionsContent = (
     <DailyMissionsPanel
+      panelTone={internalPanelTone}
       missions={dailyMissionsVM}
       onClaimMission={claimMission}
       onOpenMissionInfo={openMissionInfoByKey}
@@ -11186,6 +11187,7 @@ export default function MleoBase() {
 
   const progressSummaryContent = (
     <ProgressSummaryPanel
+      panelTone={internalPanelTone}
       totalBanked={state.totalBanked}
       totalSharedSpent={state.totalSharedSpent}
       totalExpeditions={state.totalExpeditions}
@@ -11925,7 +11927,7 @@ export default function MleoBase() {
   ];
 
   const activityLogContent = (
-    <ActivityLogPanel logEntries={state.log} onResetGame={handleResetGame} />
+    <ActivityLogPanel panelTone={internalPanelTone} logEntries={state.log} onResetGame={handleResetGame} />
   );
 
   if (!mounted) {
@@ -12637,6 +12639,7 @@ export default function MleoBase() {
                 {desktopPanel === "ops" ? (
                       <DesktopPanelSection resourceBar={compactResourceBar}>
                         <OpsPanelCards
+                          panelTone={internalPanelTone}
                           opsCardClass={buildSectionCardClass(operationsConsoleAvailableCount > 0)}
                           missionsCardClass={`${buildSectionCardClass(dailyMissionsAvailableCount > 0)} ${
                             isHighlightedTarget("missions", highlightTarget)
@@ -12665,6 +12668,7 @@ export default function MleoBase() {
                     {desktopPanel === "build" ? (
                       <DesktopPanelSection resourceBar={compactResourceBar}>
                     <BuildPanelCards
+                      panelTone={internalPanelTone}
                       developmentCardClass={buildSectionCardClass(developmentAvailableCount > 0)}
                       structuresCardClass={buildSectionCardClass(structuresAvailableCount > 0)}
                       supportCardClass={buildSectionCardClass(false)}
@@ -12691,6 +12695,7 @@ export default function MleoBase() {
                 {desktopPanel === "intel" ? (
                       <DesktopPanelSection resourceBar={compactResourceBar}>
                         <IntelPanelCards
+                          panelTone={internalPanelTone}
                           progressCardClass={buildSectionCardClass(intelSummaryAvailableCount > 0)}
                           logCardClass={buildSectionCardClass(intelLogAvailableCount > 0)}
                           openInnerPanel={openInnerPanel}
@@ -13038,6 +13043,7 @@ export default function MleoBase() {
               scrollRef={mobilePanelScrollRef}
             >
                   <ReadyNowSummaryBlock
+                    panelTone={internalPanelTone}
                     readyCounts={readyCounts}
                     showExpeditions={showExpeditions}
                     onOpenMissions={() => {
@@ -13114,6 +13120,7 @@ export default function MleoBase() {
                   {mobilePanel === "ops" ? (
                     <MobilePanelSection resourceBar={mobileCompactResourceBar}>
                       <OpsPanelCards
+                        panelTone={internalPanelTone}
                         opsCardClass={buildSectionCardClass(operationsConsoleAvailableCount > 0)}
                         missionsCardClass={buildSectionCardClass(dailyMissionsAvailableCount > 0)}
                         opsAvailableCount={operationsConsoleAvailableCount}
@@ -13138,6 +13145,7 @@ export default function MleoBase() {
                   {mobilePanel === "build" ? (
                     <MobilePanelSection resourceBar={mobileCompactResourceBar}>
                       <BuildPanelCards
+                        panelTone={internalPanelTone}
                         developmentCardClass={buildSectionCardClass(developmentAvailableCount > 0)}
                         structuresCardClass={buildSectionCardClass(structuresAvailableCount > 0)}
                         supportCardClass={buildSectionCardClass(false)}
@@ -13164,6 +13172,7 @@ export default function MleoBase() {
                   {mobilePanel === "intel" ? (
                     <MobilePanelSection resourceBar={mobileCompactResourceBar}>
                       <IntelPanelCards
+                        panelTone={internalPanelTone}
                         progressCardClass={buildSectionCardClass(intelSummaryAvailableCount > 0)}
                         logCardClass={buildSectionCardClass(intelLogAvailableCount > 0)}
                         openInnerPanel={openInnerPanel}

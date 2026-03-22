@@ -44,6 +44,7 @@ export function MobilePanelOverlayShell({ title, bankedBadge, onClose, scrollRef
 }
 
 export function ReadyNowSummaryBlock({
+  panelTone,
   readyCounts,
   showExpeditions,
   onOpenMissions,
@@ -52,8 +53,10 @@ export function ReadyNowSummaryBlock({
 }) {
   if (!readyCounts?.total) return null;
 
+  const shell = panelTone?.readyNowShell ? ` ${panelTone.readyNowShell}` : "";
+
   return (
-    <div className="mb-4 rounded-2xl border border-cyan-400/40 bg-cyan-400/10 p-3">
+    <div className={`mb-4 rounded-2xl border border-cyan-400/40 bg-cyan-400/10 p-3${shell}`}>
       <div className="mb-2 text-sm font-semibold text-cyan-200">Ready now</div>
       <div className="space-y-2">
         {readyCounts.missions > 0 ? (
