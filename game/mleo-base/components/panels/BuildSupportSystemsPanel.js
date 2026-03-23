@@ -1,13 +1,15 @@
 function AvailabilityBadge() {
   return (
-    <span className="inline-flex items-center justify-center rounded-full bg-cyan-400 px-2 py-1 text-[10px] font-black tracking-[0.14em] text-slate-950">
+    <span className="inline-flex items-center justify-center rounded-full bg-cyan-400 px-1.5 py-0.5 text-[9px] font-black tracking-[0.12em] text-slate-950">
       AVAILABLE
     </span>
   );
 }
 
 function availabilityCardClass(isAvailable) {
-  return isAvailable ? "border-cyan-400/30 bg-cyan-500/5" : "border-white/10 bg-black/20";
+  return isAvailable
+    ? "border-cyan-400/22 bg-cyan-500/[0.04]"
+    : "border-white/[0.08] bg-white/[0.025]";
 }
 
 export function BuildSupportSystemsPanel({
@@ -23,10 +25,8 @@ export function BuildSupportSystemsPanel({
   onMaintain,
 }) {
   return (
-    <div className="space-y-3">
-      <div
-        className={`relative rounded-2xl border p-3.5 ${availabilityCardClass(canBuyBlueprintNow)}`}
-      >
+    <div className="space-y-2">
+      <div className={`relative rounded-xl border p-2.5 sm:p-3 ${availabilityCardClass(canBuyBlueprintNow)}`}>
         <div className="absolute right-2 top-2 z-10">
           <button
             type="button"
@@ -34,7 +34,7 @@ export function BuildSupportSystemsPanel({
               e.stopPropagation();
               onOpenBlueprintInfo?.();
             }}
-            className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/12 bg-white/5 text-[10px] font-semibold text-fuchsia-200/75 outline-none transition hover:border-fuchsia-400/25 hover:bg-fuchsia-500/10 hover:text-fuchsia-100 focus-visible:ring-2 focus-visible:ring-fuchsia-400/30"
             aria-label="Open blueprint info"
             title="Info about blueprint"
           >
@@ -42,60 +42,58 @@ export function BuildSupportSystemsPanel({
           </button>
         </div>
 
-        <div className="flex min-h-[20px] flex-col pr-8">
+        <div className="flex flex-col pr-7">
           <div className="flex items-start justify-between gap-2">
-            <div className="text-base font-bold text-white">Blueprint Cache</div>
+            <div className="text-sm font-medium text-white/88">Blueprint Cache</div>
             {canBuyBlueprintNow ? <AvailabilityBadge /> : null}
           </div>
 
-          <div className="mt-1 text-sm text-white/65">
-            Upgrade your shipment capacity and long-term bank efficiency.
-          </div>
+          <p className="mt-0.5 text-[11px] leading-snug text-white/50">
+            Shipment cap & bank efficiency upgrade.
+          </p>
 
-          <div className="mt-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
-            Cost
-          </div>
-
-          <div className="mt-1 text-xs font-semibold text-white/80">
+          <div className="mt-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/32">Cost</div>
+          <div className="mt-0.5 text-[11px] font-medium text-white/72">
             {blueprintCostText} shared MLEO · DATA {blueprintDataCostText}
           </div>
         </div>
 
         <button
+          type="button"
           onClick={onBuyBlueprint}
-          className="mt-3 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-white/15"
+          className="mt-2 flex min-h-11 w-full items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.07] px-3 py-2 text-sm font-bold text-white outline-none transition hover:bg-white/12 focus-visible:ring-2 focus-visible:ring-white/25 active:scale-[0.99] motion-reduce:active:scale-100"
         >
           {blueprintButtonText}
         </button>
 
-        <div className="mt-1 min-h-[20px] text-center text-[10px] leading-4 text-white/45">
-          {blueprintStatusText}
-        </div>
+        <div className="mt-1 min-h-[16px] text-center text-[10px] leading-tight text-white/40">{blueprintStatusText}</div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2">
         <button
+          type="button"
           onClick={onOverclock}
-          className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3.5 text-sm font-extrabold text-white hover:bg-white/15"
+          className="flex min-h-11 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.06] px-2 py-2 text-xs font-bold text-white/85 outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/20 sm:text-sm"
         >
           Overclock
         </button>
 
         <button
+          type="button"
           onClick={onRefill}
-          className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3.5 text-sm font-extrabold text-white hover:bg-white/15"
+          className="flex min-h-11 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.06] px-2 py-2 text-xs font-bold text-white/85 outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/20 sm:text-sm"
         >
           Refill
         </button>
       </div>
 
       <button
+        type="button"
         onClick={onMaintain}
-        className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3.5 text-sm font-extrabold text-white hover:bg-white/15"
+        className="flex min-h-11 w-full items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.06] px-3 py-2 text-xs font-bold text-white/85 outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/20 sm:text-sm"
       >
         Maintain
       </button>
     </div>
   );
 }
-

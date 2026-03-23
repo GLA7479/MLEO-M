@@ -34,13 +34,13 @@ export function BuildPanelCards({
   const hintRow = panelTone?.helperRow ? ` ${panelTone.helperRow}` : "";
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2.5">
       {/* 1) Primary build loop — base structures first */}
       <div
         className={
           structuresCardClass
-            ? `rounded-2xl border p-2.5 transition sm:rounded-3xl sm:p-3${shell} ${structuresCardClass}`
-            : `rounded-2xl border p-2.5 transition sm:rounded-3xl sm:p-3${shell}`
+            ? `rounded-2xl border p-2 transition sm:rounded-3xl sm:p-2.5${shell} ${structuresCardClass}`
+            : `rounded-2xl border p-2 transition sm:rounded-3xl sm:p-2.5${shell}`
         }
       >
         <ExpandablePanelSectionHeader
@@ -57,7 +57,7 @@ export function BuildPanelCards({
           {panelTone?.sectionBar ? <div className={panelTone.sectionBar} aria-hidden /> : null}
           {openInnerPanel !== "build-structures" ? (
             <div
-              className={`mt-0.5 line-clamp-2 text-[11px] leading-snug sm:text-xs${hintRow} ${
+              className={`mt-0.5 line-clamp-2 text-[10px] leading-snug sm:text-xs${hintRow} ${
                 structuresCount > 0 ? "text-cyan-100/70" : "text-white/48 sm:text-white/52"
               }`}
             >
@@ -67,7 +67,7 @@ export function BuildPanelCards({
         </ExpandablePanelSectionHeader>
 
         {openInnerPanel === "build-structures" ? (
-          <div className="mt-2.5">{baseStructuresContent}</div>
+          <div className="mt-2">{baseStructuresContent}</div>
         ) : null}
       </div>
 
@@ -75,8 +75,8 @@ export function BuildPanelCards({
       <div
         className={
           developmentCardClass
-            ? `rounded-2xl border p-2.5 transition sm:rounded-3xl sm:p-3${shell} ${developmentCardClass}`
-            : `rounded-2xl border p-2.5 transition sm:rounded-3xl sm:p-3${shell}`
+            ? `rounded-2xl border p-2 transition sm:rounded-3xl sm:p-2.5${shell} ${developmentCardClass}`
+            : `rounded-2xl border p-2 transition sm:rounded-3xl sm:p-2.5${shell}`
         }
       >
         <ExpandablePanelSectionHeader
@@ -93,7 +93,7 @@ export function BuildPanelCards({
           {panelTone?.sectionBar ? <div className={panelTone.sectionBar} aria-hidden /> : null}
           {openInnerPanel !== "build-development" ? (
             <div
-              className={`mt-0.5 line-clamp-2 text-[11px] leading-snug sm:text-xs${hintRow} ${
+              className={`mt-0.5 line-clamp-2 text-[10px] leading-snug sm:text-xs${hintRow} ${
                 developmentCount > 0 ? "text-cyan-100/65" : "text-white/48 sm:text-white/52"
               }`}
             >
@@ -103,7 +103,7 @@ export function BuildPanelCards({
         </ExpandablePanelSectionHeader>
 
         {openInnerPanel === "build-development" ? (
-          <div className="mt-2.5">{crewModulesResearchContent}</div>
+          <div className="mt-2">{crewModulesResearchContent}</div>
         ) : null}
       </div>
 
@@ -111,8 +111,8 @@ export function BuildPanelCards({
       <div
         className={
           supportCardClass
-            ? `rounded-2xl border p-2.5 transition sm:rounded-3xl sm:p-3${shell} ${supportCardClass}`
-            : `rounded-2xl border p-2.5 transition sm:rounded-3xl sm:p-3${shell}`
+            ? `rounded-2xl border p-2 transition sm:rounded-3xl sm:p-2.5${shell} ${supportCardClass}`
+            : `rounded-2xl border p-2 transition sm:rounded-3xl sm:p-2.5${shell}`
         }
       >
         <ExpandablePanelSectionHeader
@@ -128,14 +128,16 @@ export function BuildPanelCards({
           </div>
           {panelTone?.sectionBar ? <div className={panelTone.sectionBar} aria-hidden /> : null}
           {openInnerPanel !== "build-support" ? (
-            <div className={`mt-0.5 line-clamp-2 text-[11px] leading-snug text-white/45 sm:text-xs sm:text-white/48${hintRow}`}>
+            <div
+              className={`mt-0.5 line-clamp-2 text-[10px] leading-snug text-white/42 sm:text-xs sm:text-white/46${hintRow}`}
+            >
               {supportHint}
             </div>
           ) : null}
         </ExpandablePanelSectionHeader>
 
         {openInnerPanel === "build-support" ? (
-          <div className="mt-2.5">{buildSupportSystemsContent}</div>
+          <div className="mt-2">{buildSupportSystemsContent}</div>
         ) : null}
       </div>
     </div>

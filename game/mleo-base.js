@@ -2695,17 +2695,17 @@ function buildSectionHint(type, counts) {
     if (counts.research > 0) {
       parts.push(`${counts.research} research`);
     }
-    return parts.length ? `${parts.join(" · ")} — open to add` : "Nothing affordable — open to preview";
+    return parts.length ? `${parts.join(" · ")} · open` : "No buys · preview";
   }
 
   if (type === "structures") {
     return counts.structures > 0
-      ? `${counts.structures} upgrade${counts.structures > 1 ? "s" : ""} — open to build`
-      : "No upgrades ready — open to plan";
+      ? `${counts.structures} upgrade${counts.structures > 1 ? "s" : ""} · open`
+      : "None ready · plan";
   }
 
   if (type === "support") {
-    return "Blueprint & vault tools — open when needed";
+    return "Blueprint & tools · if needed";
   }
 
   return "";
@@ -8346,7 +8346,7 @@ export default function MleoBase() {
     <>
       {world3Telemetry ? (
         <div
-          className={`mb-3 rounded-2xl border px-3 py-2.5 ${worldSignalToneClass(
+          className={`mb-2 rounded-2xl border px-2.5 py-2 ${worldSignalToneClass(
             world3Telemetry.signalKey
           )}`}
         >

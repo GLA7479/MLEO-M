@@ -26,9 +26,9 @@ function ResourceCostRow({ cost, resources }) {
   const entries = Object.entries(cost || {}).filter(([, value]) => Number(value || 0) > 0);
 
   return (
-    <div className="mt-1.5 min-h-[34px] max-h-[34px] overflow-hidden">
+    <div className="mt-1 min-h-[28px] max-h-[28px] overflow-hidden">
       {entries.length ? (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-semibold leading-4">
+        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] font-semibold leading-tight sm:text-[11px]">
           {entries.slice(0, 3).map(([key, value]) => (
             <span key={key} className={costTone(resources?.[key], value)}>
               {key} {formatResourceValue(value)}
@@ -36,7 +36,7 @@ function ResourceCostRow({ cost, resources }) {
           ))}
         </div>
       ) : (
-        <div className="h-[34px]" />
+        <div className="h-[28px]" />
       )}
     </div>
   );
@@ -88,11 +88,11 @@ function quickTagToneClass(tone = "neutral") {
   }
 }
 
-function QuickTags({ tags }) {
+function QuickTags({ tags, className = "" }) {
   if (!Array.isArray(tags) || tags.length === 0) return null;
 
   return (
-    <div className="mt-3 flex flex-wrap gap-2">
+    <div className={`mt-2 flex flex-wrap gap-1.5${className ? ` ${className}` : ""}`}>
       {tags.map((tag) => (
         <span
           key={`${tag?.label}-${tag?.tone || "neutral"}`}
@@ -139,8 +139,8 @@ export function CrewModulesResearchPanel({
   const crewHireAvailableCount = crewTab?.hireDisabled ? 0 : 1;
 
   return (
-    <div className="space-y-3">
-      <div className="flex gap-2 overflow-x-auto pb-1">
+    <div className="space-y-2">
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
         {[
           {
             key: "crew",
@@ -169,8 +169,9 @@ export function CrewModulesResearchPanel({
           return (
             <button
               key={tab.key}
+              type="button"
               onClick={() => onSetDevTab(tab.key)}
-              className={`flex shrink-0 flex-wrap items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              className={`flex shrink-0 flex-wrap items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition sm:rounded-xl sm:px-3.5 sm:py-2 sm:text-sm ${
                 active ? "bg-cyan-500 text-white" : "border border-white/10 bg-white/5 text-white/70"
               }`}
             >
@@ -192,18 +193,19 @@ export function CrewModulesResearchPanel({
 
       {devTab === "crew" ? (
         <>
-          <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <div>
+          <div className="rounded-xl border border-white/10 bg-black/20 p-2.5 sm:p-3">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
                   <div className="text-sm font-semibold">Crew</div>
-                  <div className="text-xs text-white/60">
-                    {crewTab.workerCount} workers · global output bonus {crewTab.globalBonusText}%
+                  <div className="text-[11px] text-white/58 sm:text-xs">
+                    {crewTab.workerCount} workers · +{crewTab.globalBonusText}% output
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={onHire}
-                  className={`rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 ${
+                  className={`shrink-0 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/20 sm:text-sm ${
                     crewTab.hireDisabled ? "opacity-70" : ""
                   }`}
                   disabled={crewTab.hireDisabled}
@@ -212,25 +214,22 @@ export function CrewModulesResearchPanel({
                 </button>
               </div>
 
-              <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">
-                Next Cost
-              </div>
+              <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-wider text-white/35">Next cost</div>
               <ResourceCostRow cost={crewTab.workerNextCost} resources={resources} />
 
               <div>
-                <div className="mb-2 text-xs uppercase tracking-[0.18em] text-white/45">Crew Specialization</div>
-                <div className="mb-3 text-[11px] text-white/35">
-                  Profile preference: saved locally on this device for now.
-                </div>
-                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">Crew specialization</div>
+                <div className="mb-2 text-[10px] text-white/35">Saved on this device.</div>
+                <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-3">
                   {crewTab.roles.map((role) => {
                     const active = !!role.active;
 
                     return (
                       <button
                         key={role.key}
+                        type="button"
                         onClick={() => onSelectCrewRole(role.key)}
-                        className={`relative rounded-xl border px-3 py-2.5 text-left transition ${
+                        className={`relative rounded-lg border px-2.5 py-2 text-left transition sm:rounded-xl sm:px-3 sm:py-2.5 ${
                           active ? "border-cyan-400/60 bg-cyan-500/15" : "border-white/10 bg-white/5 hover:bg-white/10"
                         }`}
                       >
@@ -278,24 +277,22 @@ export function CrewModulesResearchPanel({
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+          <div className="rounded-xl border border-white/10 bg-black/20 p-2.5 sm:p-3">
             <div className="text-sm font-semibold text-white">Commander Path</div>
-            <div className="mt-1 text-xs text-white/60">
-              Choose a command identity for your base. This changes specialization, not the core economy.
-            </div>
-            <div className="mt-2 text-[11px] text-white/35">
-              Profile preference: saved locally on this device for now.
+            <div className="mt-0.5 text-[11px] leading-snug text-white/55 sm:text-xs">
+              Command identity — specialization only, not core economy. Saved on device.
             </div>
 
-            <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            <div className="mt-2 grid gap-1.5 lg:grid-cols-2">
               {crewTab.paths.map((path) => {
                 const active = !!path.active;
 
                 return (
                   <button
                     key={path.key}
+                    type="button"
                     onClick={() => onSelectCommanderPath(path.key)}
-                    className={`relative rounded-xl border px-3 py-2.5 text-left transition ${
+                    className={`relative rounded-lg border px-2.5 py-2 text-left transition sm:rounded-xl sm:px-3 sm:py-2.5 ${
                       active ? "border-cyan-400/60 bg-cyan-500/15" : "border-white/10 bg-white/5 hover:bg-white/10"
                     }`}
                   >
@@ -342,10 +339,10 @@ export function CrewModulesResearchPanel({
           </div>
 
           {commandProtocolRows && onSetCommandProtocol ? (
-            <div className="rounded-xl border border-white/10 bg-black/20 p-3" data-base-target="command-protocol">
+            <div className="rounded-xl border border-white/10 bg-black/20 p-2.5 sm:p-3" data-base-target="command-protocol">
               <div className="text-sm font-semibold text-white">Command Protocol</div>
-              <div className="mt-1 text-xs text-white/60">
-                One effective protocol. Cmdr level gates options. Server-side; one swap per UTC day.
+              <div className="mt-0.5 text-[11px] leading-snug text-white/52 sm:text-xs">
+                One live protocol · Cmdr level gates choices · 1 swap/day (UTC).
               </div>
               <div
                 className={`mt-2 rounded-lg px-2.5 py-1.5 ${
@@ -382,7 +379,7 @@ export function CrewModulesResearchPanel({
               {!commandProtocolCanSwapToday ? (
                 <div className="mt-2 text-[11px] font-normal text-amber-100/60">Next swap: tomorrow (UTC).</div>
               ) : null}
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
                 {commandProtocolRows.map((row) => {
                   const isSel = !!row.selected;
                   const isEffectiveLive =
@@ -444,13 +441,13 @@ export function CrewModulesResearchPanel({
       ) : null}
 
       {devTab === "modules" ? (
-        <div className="grid gap-2.5 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 lg:items-start lg:gap-x-3 lg:gap-y-2">
           {modules.map((module) => {
             return (
               <div
                 key={module.key}
                 data-base-target={module.key}
-                className={`relative flex h-full flex-col gap-2 rounded-2xl border p-3.5 ${availabilityCardClass(
+                className={`relative flex flex-col gap-1 rounded-xl border p-2.5 sm:rounded-2xl sm:p-3 sm:gap-1.5 lg:gap-1 lg:p-2.5 ${availabilityCardClass(
                   module.available
                 )} ${
                   highlightTarget === module.key
@@ -458,14 +455,14 @@ export function CrewModulesResearchPanel({
                     : ""
                 }`}
               >
-                <div className="absolute right-2.5 top-2.5 z-10">
+                <div className="absolute right-2 top-2 z-10 sm:right-2.5 sm:top-2.5 lg:right-1.5 lg:top-1.5">
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       onOpenModuleInfo(module.key);
                     }}
-                    className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white lg:h-6 lg:w-6 lg:text-xs"
                     aria-label={`Open info for ${module.name}`}
                     title={`Info about ${module.name}`}
                   >
@@ -473,23 +470,30 @@ export function CrewModulesResearchPanel({
                   </button>
                 </div>
 
-                <div className="flex min-h-0 flex-1 flex-col pr-8">
+                <div className="flex flex-col gap-1 pr-8 lg:gap-0.5 lg:pr-7">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="text-sm font-semibold">{module.name}</div>
+                    <div className="text-sm font-semibold leading-tight lg:text-[13px]">{module.name}</div>
                     {module.available ? <AvailabilityBadge /> : null}
                   </div>
-                  <div className="mt-1 text-xs text-white/60">{module.desc}</div>
-                  <QuickTags tags={module.quickTags} />
-                  <div className="mt-2 text-[11px] text-white/45">{module.helpText}</div>
+                  <div className="line-clamp-2 text-xs leading-snug text-white/58 lg:mt-0">{module.desc}</div>
+                  <QuickTags tags={module.quickTags} className="lg:mt-1 lg:gap-1" />
+                  {module.helpText ? (
+                    <div className="line-clamp-2 text-[11px] leading-snug text-white/42 lg:mt-0.5">
+                      {module.helpText}
+                    </div>
+                  ) : null}
                 </div>
 
-                <div className="mt-auto shrink-0 border-t border-white/10 pt-3">
-                  <div className="text-[11px] font-black uppercase tracking-[0.18em] text-white/40">Cost</div>
+                <div className="mt-2 shrink-0 border-t border-white/10 pt-1.5 lg:mt-1.5 lg:pt-1.5">
+                  <div className="text-[9px] font-semibold uppercase tracking-wider text-white/35 lg:text-[8px]">
+                    Cost
+                  </div>
                   <ResourceCostRow cost={module.cost} resources={resources} />
                   <button
+                    type="button"
                     onClick={() => onBuyModule(module.key)}
                     disabled={module.owned}
-                    className={`mt-3 w-full rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
+                    className={`mt-1.5 flex min-h-11 w-full items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 lg:mt-1.5 lg:min-h-10 lg:py-1.5 lg:text-[13px] ${
                       module.owned
                         ? "bg-white/10"
                         : module.canAfford
@@ -507,29 +511,29 @@ export function CrewModulesResearchPanel({
       ) : null}
 
       {devTab === "research" ? (
-        <div data-base-target="research" className="grid gap-2.5">
+        <div data-base-target="research" className="grid grid-cols-1 gap-2 lg:grid-cols-2 lg:items-start lg:gap-x-3 lg:gap-y-2">
           {telemetryHint ? (
-            <div className="col-span-full text-[11px] text-white/65">{telemetryHint}</div>
+            <div className="col-span-full text-[11px] text-white/65 lg:col-span-2">{telemetryHint}</div>
           ) : null}
           {research.map((item) => {
             return (
               <div
                 key={item.key}
                 data-base-target={item.key}
-                className={`relative rounded-2xl border p-3.5 ${availabilityCardClass(item.available)} ${
+                className={`relative flex flex-col gap-1.5 rounded-xl border p-2.5 sm:rounded-2xl sm:p-3 lg:gap-1 lg:p-2.5 ${availabilityCardClass(item.available)} ${
                   highlightTarget === item.key
                     ? "border-cyan-300/70 ring-2 ring-cyan-300/35 shadow-[0_0_0_1px_rgba(103,232,249,0.25)]"
                     : ""
                 }`}
               >
-                <div className="absolute right-2.5 top-2.5 z-10">
+                <div className="absolute right-2 top-2 z-10 sm:right-2.5 sm:top-2.5 lg:right-1.5 lg:top-1.5">
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       onOpenResearchInfo(item.key);
                     }}
-                    className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white lg:h-6 lg:w-6 lg:text-xs"
                     aria-label={`Open info for ${item.name}`}
                     title={`Info about ${item.name}`}
                   >
@@ -537,24 +541,33 @@ export function CrewModulesResearchPanel({
                   </button>
                 </div>
 
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="pr-8">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="text-sm font-semibold">{item.name}</div>
-                      {item.available ? <AvailabilityBadge /> : null}
+                <div className="flex flex-col gap-1 pr-8 lg:pr-7 lg:gap-0.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-sm font-semibold leading-tight lg:text-[13px]">{item.name}</div>
+                    {item.available ? <AvailabilityBadge /> : null}
+                  </div>
+                  <div className="mt-0.5 line-clamp-2 text-xs leading-snug text-white/58">{item.desc}</div>
+                  <QuickTags tags={item.quickTags} className="lg:mt-1 lg:gap-1" />
+                  {item.helpText ? (
+                    <div className="mt-1 line-clamp-2 text-[11px] leading-snug text-white/42 lg:mt-0.5">
+                      {item.helpText}
                     </div>
-                    <div className="mt-1 text-xs text-white/60">{item.desc}</div>
-                    <QuickTags tags={item.quickTags} />
-                    <div className="mt-2 text-[11px] text-white/45">{item.helpText}</div>
+                  ) : null}
+                </div>
 
-                    <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/40">Cost</div>
+                {/* One footer: mobile stacked; sm/md side-by-side cost + action; lg stacked full-width for 2-col grid */}
+                <div className="mt-2 flex flex-col gap-1.5 border-t border-white/10 pt-1.5 sm:mt-1.5 sm:flex-row sm:items-end sm:justify-between sm:gap-3 lg:mt-1.5 lg:flex-col lg:items-stretch lg:gap-1 lg:pt-1.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[9px] font-semibold uppercase tracking-wider text-white/35 lg:text-[8px]">
+                      Cost
+                    </div>
                     <ResourceCostRow cost={item.cost} resources={resources} />
                   </div>
-
                   <button
+                    type="button"
                     onClick={() => onBuyResearch(item.key)}
                     disabled={item.done || item.locked}
-                    className={`shrink-0 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 ${
+                    className={`flex min-h-11 w-full shrink-0 items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:min-w-[7.25rem] lg:mt-0 lg:min-h-10 lg:w-full lg:py-1.5 lg:text-[13px] ${
                       item.done || item.locked
                         ? "bg-white/10"
                         : item.canAfford
