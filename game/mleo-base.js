@@ -243,6 +243,347 @@ function getEffectiveBuildingLevel(state, buildingKey) {
   return baseLevel * getBuildingPowerFactor(state, buildingKey);
 }
 
+/** Matches `simulate()` early output boost (per effective runtime level). */
+function earlyOutputBoostForSim(key, effectiveLevel) {
+  const level = Number(effectiveLevel || 0);
+  if (level > 2) return 1;
+  if (key === "quarry") return 1.12;
+  if (key === "salvage") return 1.1;
+  if (key === "researchLab") return 1.1;
+  if (key === "refinery") return 1.08;
+  return 1;
+}
+
+/** Matches `simulate()` early energy relief (per effective runtime level). */
+function earlyEnergyReliefForSim(key, effectiveLevel) {
+  const level = Number(effectiveLevel || 0);
+  if (level > 2) return 1;
+  if (key === "quarry" || key === "salvage" || key === "researchLab" || key === "refinery") {
+    return 0.9;
+  }
+  return 1;
+}
+
+function fmtLiveNumber(value, maxFractionDigits = 1) {
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: maxFractionDigits }).format(
+    Number(value || 0)
+  );
+}
+
+function getReserveEnergyFloor(derived) {
+  return Math.max(8, Math.floor(Number(derived?.energyCap || 0) * 0.05));
+}
+
+/**
+ * Compact live "Now" / "Next" lines for Build cards (UI only; formulas mirror `simulate()` / snapshots).
+ */
+function getBuildingNowNextLines(state, derived, buildingKey, bankedSnapshot) {
+  if (!state || !derived || !buildingKey) {
+    return { nowLine: null, nextLine: null, hideLegacyUpgradeImpact: false };
+  }
+
+  const fmt = (n, d = 1) => fmtLiveNumber(n, d);
+  const b = state.buildings || {};
+  const baseLevel = Number(b[buildingKey] || 0);
+  const energy = Number(state?.resources?.ENERGY || 0);
+  const energyUseMult = Number(derived?.energyUseMult || 1);
+
+  const quarryOrePerHourIdeal = (s, d, baseLv) => {
+    const modeFactor = getBuildingPowerFactor(s, "quarry");
+    const eff = baseLv * modeFactor;
+    if (!eff) return 0;
+    const boost = earlyOutputBoostForSim("quarry", eff);
+    return 1.35 * eff * Number(d?.oreMult || 1) * 3600 * boost;
+  };
+
+  const quarryEnergyBlocked = (s, d, baseLv) => {
+    const modeFactor = getBuildingPowerFactor(s, "quarry");
+    const eff = baseLv * modeFactor;
+    if (!eff) return true;
+    const need =
+      0.72 * eff * energyUseMult * earlyEnergyReliefForSim("quarry", eff);
+    return energy < need;
+  };
+
+  const salvageScrapPerHourIdeal = (s, d, baseLv) => {
+    const modeFactor = getBuildingPowerFactor(s, "salvage");
+    const eff = baseLv * modeFactor;
+    if (!eff) return 0;
+    const boost = earlyOutputBoostForSim("salvage", eff);
+    return 0.5 * eff * Number(d?.scrapMult || 1) * 3600 * boost;
+  };
+
+  const salvageEnergyBlocked = (s, d, baseLv) => {
+    const modeFactor = getBuildingPowerFactor(s, "salvage");
+    const eff = baseLv * modeFactor;
+    if (!eff) return true;
+    const need =
+      0.78 * eff * energyUseMult * earlyEnergyReliefForSim("salvage", eff);
+    return energy < need;
+  };
+
+  const tradeGoldPerHourIdeal = (s, d, baseLv) => {
+    const modeFactor = getBuildingPowerFactor(s, "tradeHub");
+    const eff = baseLv * modeFactor;
+    if (!eff) return 0;
+    return 0.6 * eff * Number(d?.goldMult || 1) * 3600;
+  };
+
+  const tradeEnergyBlocked = (s, d, baseLv) => {
+    const modeFactor = getBuildingPowerFactor(s, "tradeHub");
+    const eff = baseLv * modeFactor;
+    if (!eff) return true;
+    const need = 0.78 * eff * energyUseMult;
+    return energy < need;
+  };
+
+  const dataBuildingPerHourIdeal = (s, d, key, baseLv, perSecond) => {
+    const modeFactor = getBuildingPowerFactor(s, key);
+    const eff = baseLv * modeFactor;
+    if (!eff) return 0;
+    return perSecond * eff * Number(d?.dataMult || 1) * 3600;
+  };
+
+  const dataBuildingEnergyBlocked = (s, d, key, baseLv, perSecondCoef) => {
+    const modeFactor = getBuildingPowerFactor(s, key);
+    const eff = baseLv * modeFactor;
+    if (!eff) return true;
+    const need = perSecondCoef * eff * energyUseMult;
+    const reserve = getReserveEnergyFloor(d);
+    return energy - need < reserve;
+  };
+
+  if (buildingKey === "quarry") {
+    const nowHr = quarryEnergyBlocked(state, derived, baseLevel)
+      ? 0
+      : quarryOrePerHourIdeal(state, derived, baseLevel);
+    const nextHr = quarryEnergyBlocked(state, derived, baseLevel + 1)
+      ? 0
+      : quarryOrePerHourIdeal(state, derived, baseLevel + 1);
+    const delta = nextHr - nowHr;
+    return {
+      nowLine: `Now: +${fmt(nowHr, 1)} ORE/hr`,
+      nextLine:
+        baseLevel > 0
+          ? `Next: +${fmt(nextHr, 1)} ORE/hr (+${fmt(delta, 1)})`
+          : `Next: +${fmt(nextHr, 1)} ORE/hr`,
+      hideLegacyUpgradeImpact: true,
+    };
+  }
+
+  if (buildingKey === "tradeHub") {
+    const nowHr = tradeEnergyBlocked(state, derived, baseLevel)
+      ? 0
+      : tradeGoldPerHourIdeal(state, derived, baseLevel);
+    const nextHr = tradeEnergyBlocked(state, derived, baseLevel + 1)
+      ? 0
+      : tradeGoldPerHourIdeal(state, derived, baseLevel + 1);
+    const delta = nextHr - nowHr;
+    return {
+      nowLine: `Now: +${fmt(nowHr, 1)} GOLD/hr`,
+      nextLine:
+        baseLevel > 0
+          ? `Next: +${fmt(nextHr, 1)} GOLD/hr (+${fmt(delta, 1)})`
+          : `Next: +${fmt(nextHr, 1)} GOLD/hr`,
+      hideLegacyUpgradeImpact: true,
+    };
+  }
+
+  if (buildingKey === "salvage") {
+    const nowHr = salvageEnergyBlocked(state, derived, baseLevel)
+      ? 0
+      : salvageScrapPerHourIdeal(state, derived, baseLevel);
+    const nextHr = salvageEnergyBlocked(state, derived, baseLevel + 1)
+      ? 0
+      : salvageScrapPerHourIdeal(state, derived, baseLevel + 1);
+    const delta = nextHr - nowHr;
+    return {
+      nowLine: `Now: +${fmt(nowHr, 1)} SCRAP/hr`,
+      nextLine:
+        baseLevel > 0
+          ? `Next: +${fmt(nextHr, 1)} SCRAP/hr (+${fmt(delta, 1)})`
+          : `Next: +${fmt(nextHr, 1)} SCRAP/hr`,
+      hideLegacyUpgradeImpact: true,
+    };
+  }
+
+  if (buildingKey === "refinery") {
+    const snap =
+      bankedSnapshot && typeof bankedSnapshot === "object"
+        ? bankedSnapshot
+        : getBankedRateSnapshot(state, derived);
+    const nowHr = Number(snap?.perHour || 0);
+    const nextState = {
+      ...state,
+      buildings: { ...b, refinery: baseLevel + 1 },
+    };
+    const nextDerived = derive(nextState);
+    const nextSnap = getBankedRateSnapshot(nextState, nextDerived);
+    const nextHr = Number(nextSnap?.perHour || 0);
+    const delta = nextHr - nowHr;
+    return {
+      nowLine: `Now: +${fmt(nowHr, 2)} banked/hr`,
+      nextLine:
+        baseLevel > 0
+          ? `Next: +${fmt(nextHr, 2)} banked/hr (+${fmt(delta, 2)})`
+          : `Next: +${fmt(nextHr, 2)} banked/hr`,
+      hideLegacyUpgradeImpact: true,
+    };
+  }
+
+  if (buildingKey === "powerCell") {
+    const L = baseLevel;
+    const capNow = L * 42;
+    const regenNow = L * 2.5;
+    const capNext = (L + 1) * 42;
+    const regenNext = (L + 1) * 2.5;
+    return {
+      nowLine: `Now: +${fmt(capNow, 0)} ENERGY cap, +${fmt(regenNow, 1)}/s regen`,
+      nextLine:
+        L > 0
+          ? `Next: +${fmt(capNext, 0)} cap, +${fmt(regenNext, 1)}/s (+${fmt(42, 0)} cap, +${fmt(2.5, 1)}/s)`
+          : `Next: +${fmt(capNext, 0)} cap, +${fmt(regenNext, 1)}/s`,
+      hideLegacyUpgradeImpact: true,
+    };
+  }
+
+  if (buildingKey === "hq") {
+    const hqLevel = Number(b.hq || 1);
+    const pctNow = hqLevel * 3;
+    const pctNext = (hqLevel + 1) * 3;
+    return {
+      nowLine: `Now: +${fmt(pctNow, 0)}% global output mult`,
+      nextLine: `Next: +${fmt(pctNext, 0)}% mult (+3%)`,
+      hideLegacyUpgradeImpact: true,
+    };
+  }
+
+  if (buildingKey === "researchLab") {
+    const researchDataPerHour = (s, d, baseLv) => {
+      const modeFactor = getBuildingPowerFactor(s, "researchLab");
+      const eff = baseLv * modeFactor;
+      if (!eff) return 0;
+      const boost = earlyOutputBoostForSim("researchLab", eff);
+      return 0.22 * eff * Number(d?.dataMult || 1) * 3600 * boost;
+    };
+    const researchEnergyBlocked = (s, d, baseLv) => {
+      const modeFactor = getBuildingPowerFactor(s, "researchLab");
+      const eff = baseLv * modeFactor;
+      if (!eff) return true;
+      const need =
+        0.24 * eff * energyUseMult * earlyEnergyReliefForSim("researchLab", eff);
+      const reserve = getReserveEnergyFloor(d);
+      return energy - need < reserve;
+    };
+    const nowHr = researchEnergyBlocked(state, derived, baseLevel)
+      ? 0
+      : researchDataPerHour(state, derived, baseLevel);
+    const nextHr = researchEnergyBlocked(state, derived, baseLevel + 1)
+      ? 0
+      : researchDataPerHour(state, derived, baseLevel + 1);
+    const delta = nextHr - nowHr;
+    return {
+      nowLine: `Now: +${fmt(nowHr, 1)} DATA/hr`,
+      nextLine:
+        baseLevel > 0
+          ? `Next: +${fmt(nextHr, 1)} DATA/hr (+${fmt(delta, 1)})`
+          : `Next: +${fmt(nextHr, 1)} DATA/hr`,
+      hideLegacyUpgradeImpact: true,
+    };
+  }
+
+  if (buildingKey === "repairBay") {
+    const modeFactor = getBuildingPowerFactor(state, "repairBay");
+    const eff = baseLevel * modeFactor;
+    const perHourStab = 0.042 * eff * 3600;
+    const relief = Number(derived?.maintenanceRelief || 1);
+    const nextEff = (baseLevel + 1) * modeFactor;
+    const nextHourStab = 0.042 * nextEff * 3600;
+    const deltaStab = nextHourStab - perHourStab;
+    const nextState = {
+      ...state,
+      buildings: { ...b, repairBay: baseLevel + 1 },
+    };
+    const nextDerived = derive(nextState);
+    const reliefNext = Number(nextDerived?.maintenanceRelief || 1);
+    return {
+      nowLine: `Now: +${fmt(perHourStab, 1)} stability/hr · relief ×${fmt(relief, 2)}`,
+      nextLine:
+        baseLevel > 0
+          ? `Next: +${fmt(nextHourStab, 1)} stability/hr (+${fmt(deltaStab, 1)}) · relief ×${fmt(
+              reliefNext,
+              2
+            )}`
+          : `Next: +${fmt(nextHourStab, 1)} stability/hr · relief ×${fmt(reliefNext, 2)}`,
+      hideLegacyUpgradeImpact: true,
+    };
+  }
+
+  if (buildingKey === "minerControl") {
+    const nowHr = dataBuildingEnergyBlocked(state, derived, "minerControl", baseLevel, 0.2)
+      ? 0
+      : dataBuildingPerHourIdeal(state, derived, "minerControl", baseLevel, 0.14);
+    const nextHr = dataBuildingEnergyBlocked(state, derived, "minerControl", baseLevel + 1, 0.2)
+      ? 0
+      : dataBuildingPerHourIdeal(state, derived, "minerControl", baseLevel + 1, 0.14);
+    const delta = nextHr - nowHr;
+    return {
+      nowLine: `Now: +${fmt(nowHr, 1)} DATA/hr`,
+      nextLine:
+        baseLevel > 0
+          ? `Next: +${fmt(nextHr, 1)} DATA/hr (+${fmt(delta, 1)})`
+          : `Next: +${fmt(nextHr, 1)} DATA/hr`,
+      hideLegacyUpgradeImpact: true,
+    };
+  }
+
+  if (buildingKey === "arcadeHub") {
+    const nowHr = dataBuildingEnergyBlocked(state, derived, "arcadeHub", baseLevel, 0.22)
+      ? 0
+      : dataBuildingPerHourIdeal(state, derived, "arcadeHub", baseLevel, 0.11);
+    const nextHr = dataBuildingEnergyBlocked(state, derived, "arcadeHub", baseLevel + 1, 0.22)
+      ? 0
+      : dataBuildingPerHourIdeal(state, derived, "arcadeHub", baseLevel + 1, 0.11);
+    const delta = nextHr - nowHr;
+    return {
+      nowLine: `Now: +${fmt(nowHr, 1)} DATA/hr`,
+      nextLine:
+        baseLevel > 0
+          ? `Next: +${fmt(nextHr, 1)} DATA/hr (+${fmt(delta, 1)})`
+          : `Next: +${fmt(nextHr, 1)} DATA/hr`,
+      hideLegacyUpgradeImpact: true,
+    };
+  }
+
+  if (buildingKey === "logisticsCenter") {
+    const nowHr = dataBuildingEnergyBlocked(state, derived, "logisticsCenter", baseLevel, 0.2)
+      ? 0
+      : dataBuildingPerHourIdeal(state, derived, "logisticsCenter", baseLevel, 0.06);
+    const nextHr = dataBuildingEnergyBlocked(state, derived, "logisticsCenter", baseLevel + 1, 0.2)
+      ? 0
+      : dataBuildingPerHourIdeal(state, derived, "logisticsCenter", baseLevel + 1, 0.06);
+    const delta = nextHr - nowHr;
+    return {
+      nowLine: `Now: +${fmt(nowHr, 1)} DATA/hr`,
+      nextLine:
+        baseLevel > 0
+          ? `Next: +${fmt(nextHr, 1)} DATA/hr (+${fmt(delta, 1)})`
+          : `Next: +${fmt(nextHr, 1)} DATA/hr`,
+      hideLegacyUpgradeImpact: true,
+    };
+  }
+
+  if (buildingKey === "expeditionBay") {
+    return {
+      nowLine: "Now: expedition loot (not a steady /hr rate)",
+      nextLine: null,
+      hideLegacyUpgradeImpact: false,
+    };
+  }
+
+  return { nowLine: null, nextLine: null, hideLegacyUpgradeImpact: false };
+}
+
 function getBuildingEnergyLine(building, level, powerMode) {
   if (building.key === "powerCell") {
     return "Passive: no ENERGY drain · adds cap + regen";
@@ -3356,17 +3697,7 @@ function getUpgradeImpactPreview(state, derived, buildingKey) {
       Number(value || 0)
     );
 
-    // Align early-game "feel" between preview and `simulate()`:
-    // `simulate()` multiplies certain early building output by `earlyOutputBoostFor(key, level)`
-    // when effective level <= 2. Here we approximate the same behavior.
-    const earlyOutputBoostFor = (key, effectiveLevel) => {
-      if (effectiveLevel > 2) return 1;
-      if (key === "quarry") return 1.12;
-      if (key === "salvage") return 1.10;
-      if (key === "refinery") return 1.08;
-      if (key === "researchLab") return 1.10;
-      return 1;
-    };
+    // Align early-game "feel" between preview and `simulate()` (see `earlyOutputBoostForSim`).
 
   const nextState = {
     ...state,
@@ -3383,8 +3714,8 @@ function getUpgradeImpactPreview(state, derived, buildingKey) {
       const nextBaseLevel = curBaseLevel + 1;
       const curEffectiveLevel = curBaseLevel * modeFactor;
       const nextEffectiveLevel = nextBaseLevel * modeFactor;
-      const boostCur = earlyOutputBoostFor("quarry", curEffectiveLevel);
-      const boostNext = earlyOutputBoostFor("quarry", nextEffectiveLevel);
+      const boostCur = earlyOutputBoostForSim("quarry", curEffectiveLevel);
+      const boostNext = earlyOutputBoostForSim("quarry", nextEffectiveLevel);
       const deltaPerHour =
         1.35 *
         modeFactor *
@@ -3400,8 +3731,8 @@ function getUpgradeImpactPreview(state, derived, buildingKey) {
       const nextBaseLevel = curBaseLevel + 1;
       const curEffectiveLevel = curBaseLevel * modeFactor;
       const nextEffectiveLevel = nextBaseLevel * modeFactor;
-      const boostCur = earlyOutputBoostFor("salvage", curEffectiveLevel);
-      const boostNext = earlyOutputBoostFor("salvage", nextEffectiveLevel);
+      const boostCur = earlyOutputBoostForSim("salvage", curEffectiveLevel);
+      const boostNext = earlyOutputBoostForSim("salvage", nextEffectiveLevel);
       const deltaPerHour =
         0.5 *
         modeFactor *
@@ -3417,8 +3748,8 @@ function getUpgradeImpactPreview(state, derived, buildingKey) {
       const nextBaseLevel = curBaseLevel + 1;
       const curEffectiveLevel = curBaseLevel * modeFactor;
       const nextEffectiveLevel = nextBaseLevel * modeFactor;
-      const boostCur = earlyOutputBoostFor("refinery", curEffectiveLevel);
-      const boostNext = earlyOutputBoostFor("refinery", nextEffectiveLevel);
+      const boostCur = earlyOutputBoostForSim("refinery", curEffectiveLevel);
+      const boostNext = earlyOutputBoostForSim("refinery", nextEffectiveLevel);
       const deltaPerHour =
         REFINERY_BANKED_PER_LEVEL *
         modeFactor *
@@ -3461,8 +3792,8 @@ function getUpgradeImpactPreview(state, derived, buildingKey) {
       const nextBaseLevel = curBaseLevel + 1;
       const curEffectiveLevel = curBaseLevel * modeFactor;
       const nextEffectiveLevel = nextBaseLevel * modeFactor;
-      const boostCur = earlyOutputBoostFor("researchLab", curEffectiveLevel);
-      const boostNext = earlyOutputBoostFor("researchLab", nextEffectiveLevel);
+      const boostCur = earlyOutputBoostForSim("researchLab", curEffectiveLevel);
+      const boostNext = earlyOutputBoostForSim("researchLab", nextEffectiveLevel);
       const deltaPerHour =
         0.22 *
         modeFactor *
@@ -11237,6 +11568,8 @@ export default function MleoBase() {
     repairBay: "Repair Bay",
   };
 
+  const bankedSnapshotForBuildCards = getBankedRateSnapshot(state, derived);
+
   const visibleStructuresVM = (visibleStructures || []).map((building) => {
     const level = state.buildings[building.key] || 0;
     const nextLevel = level + 1;
@@ -11391,6 +11724,13 @@ export default function MleoBase() {
             .filter(Boolean)
         : [];
 
+    const liveNowNext = getBuildingNowNextLines(
+      state,
+      derived,
+      building.key,
+      bankedSnapshotForBuildCards
+    );
+
     return {
       key: building.key,
       name: building.name,
@@ -11423,7 +11763,10 @@ export default function MleoBase() {
       canAffordCost: canCoverCostForBtn,
       buttonText,
       costRow: <ResourceCostRow cost={cost} resources={state.resources} />,
-      upgradeImpactPreview: getUpgradeImpactPreview(state, derived, building.key),
+      upgradeImpactPreview: liveNowNext.hideLegacyUpgradeImpact
+        ? null
+        : getUpgradeImpactPreview(state, derived, building.key),
+      liveNowNext,
       energyLineText: getBuildingEnergyLine(building, level, powerMode),
       powerLineText: getBuildingPowerLine(building.key, powerMode),
       canThrottle,

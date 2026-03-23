@@ -176,6 +176,19 @@ export function BaseStructuresPanel({
                 {card.desc}
               </div>
 
+              {card.liveNowNext?.nowLine ? (
+                <div className="mt-1.5 space-y-0.5">
+                  <div className="text-[10px] font-semibold leading-snug text-white/[0.88] sm:text-[11px]">
+                    {card.liveNowNext.nowLine}
+                  </div>
+                  {card.liveNowNext.nextLine ? (
+                    <div className="text-[10px] font-bold leading-snug text-emerald-200/95 sm:text-[11px]">
+                      {card.liveNowNext.nextLine}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
               {/* Content row: left meta/status stack + right upgrade impact box (same two-column layout as desktop on all breakpoints) */}
               <div className="mt-1.5 grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2">
                 {/* LEFT column */}
@@ -214,11 +227,11 @@ export function BaseStructuresPanel({
                 {/* RIGHT column */}
                 <div className="flex min-h-[34px] shrink-0 items-center justify-self-end">
                   {card.upgradeImpactPreview ? (
-                    <div className="rounded-lg border border-cyan-400/20 bg-cyan-500/8 px-2.5 py-1">
+                    <div className="rounded-lg border border-cyan-400/20 bg-cyan-500/8 px-2.5 py-1 max-sm:px-2 max-sm:py-1.5">
                       <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/70">
                         {card.upgradeImpactPreview.label}
                       </div>
-                      <div className="text-[11px] font-semibold text-cyan-100">
+                      <div className="text-[11px] font-semibold text-cyan-100 max-sm:text-xs max-sm:font-bold">
                         {card.upgradeImpactPreview.value}
                       </div>
                       {card.upgradeImpactPreview.note ? (
