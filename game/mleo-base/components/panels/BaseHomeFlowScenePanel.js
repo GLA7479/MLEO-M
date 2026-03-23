@@ -35,7 +35,7 @@ export function BaseHomeFlowScenePanel({
   selected,
   onSelect,
   theme: themeInput,
-  /** When true, map sits on a shared playfield canvas — inner fill is glassy, not a second full-scene gradient. */
+  /** When true, map draws on shared playfield — no inner card, ring, overlays, or theme shell framing the map zone. */
   playfieldEmbed = false,
 }) {
   const isDesktop = layout === "desktop";
@@ -50,13 +50,18 @@ export function BaseHomeFlowScenePanel({
     ? "relative h-full min-h-0 w-full flex-1 overflow-visible"
     : "relative mx-auto w-full max-w-md aspect-[3/5] overflow-hidden";
 
-  const shellClass = [theme.mapShellClassName].filter(Boolean).join(" ").trim();
+  /** On shared playfield canvas: no inner "card" — shell/inner stay transparent; world tint is on the parent only. */
+  const shellClass = playfieldEmbed
+    ? ""
+    : [theme.mapShellClassName].filter(Boolean).join(" ").trim();
   const shellLayout = isDesktop ? "flex min-h-0 h-full w-full flex-1 flex-col" : "";
   const shellCombined = [shellClass, shellLayout].filter(Boolean).join(" ").trim();
   const innerSurface = playfieldEmbed
-    ? "rounded-3xl bg-slate-950/25 ring-1 ring-inset ring-white/12 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[2px]"
+    ? "bg-transparent shadow-none ring-0 outline-none border-0 rounded-none"
     : theme.mapInnerClassName;
   const innerClass = [aspectOuter, innerSurface].filter(Boolean).join(" ").trim();
+  const shellStyle = playfieldEmbed ? undefined : theme.mapShellStyle;
+  const innerStyle = playfieldEmbed ? undefined : theme.mapInnerStyle;
 
   /** Selected route paints last so it reads above crossings (no double-stroke). */
   const linksPaintOrder = useMemo(() => {
@@ -73,9 +78,9 @@ export function BaseHomeFlowScenePanel({
       : "";
 
   const mapCore = (
-    <div className={shellCombined || undefined} style={theme.mapShellStyle}>
-      <div className={innerClass} style={theme.mapInnerStyle}>
-        {theme.overlays?.length
+    <div className={shellCombined || undefined} style={shellStyle}>
+      <div className={innerClass} style={innerStyle}>
+        {!playfieldEmbed && theme.overlays?.length
           ? theme.overlays.map((layer) => (
               <div
                 key={layer.key}

@@ -13086,7 +13086,7 @@ export default function MleoBase() {
           <>
             <div className="mt-4 hidden min-h-0 flex-1 lg:block">
               <div
-                className="relative flex h-[calc(100dvh-190px)] flex-col overflow-hidden rounded-[30px] border border-white/10 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-[1px]"
+                className="relative flex h-[calc(100dvh-190px)] flex-col overflow-hidden rounded-[30px] border border-white/[0.08] shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-[1px]"
                 style={{ background: worldPlayfieldBackground }}
               >
                 <div
@@ -13140,8 +13140,8 @@ export default function MleoBase() {
                       />
                     </div>
 
-                    <div className="mx-auto mt-2 w-full max-w-5xl shrink-0 border-t border-white/10 pt-3">
-                      <div className="grid grid-cols-4 gap-2 rounded-2xl border border-white/10 bg-slate-950/35 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-md">
+                    <div className="mx-auto mt-2 w-full max-w-5xl shrink-0 border-t border-white/[0.07] pt-3">
+                      <div className="grid grid-cols-4 gap-2 rounded-2xl border border-white/[0.06] bg-white/[0.04] p-2 backdrop-blur-sm">
                         {[
                           {
                             key: "overview",
@@ -13211,11 +13211,11 @@ export default function MleoBase() {
           {/* Mobile — world playfield canvas (tabs below use matching bg) */}
           <div className="relative mt-4 space-y-3 sm:hidden overscroll-none pb-28">
             <div
-              className="relative overflow-hidden rounded-[24px] border border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.22)]"
+              className="relative overflow-hidden rounded-[24px] border border-white/[0.07] shadow-[0_12px_40px_rgba(0,0,0,0.18)]"
               style={{ background: worldPlayfieldBackgroundMobile }}
             >
               <div
-                className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-b from-slate-950/50 via-slate-950/32 to-slate-950/52"
+                className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-b from-slate-950/35 via-slate-950/18 to-slate-950/30"
                 aria-hidden
               />
               <div className="relative z-[1] space-y-3 px-2 pb-1 pt-2">
@@ -13361,11 +13361,11 @@ export default function MleoBase() {
           {/* Mobile Bottom Nav - fixed above panels so switching doesn't require closing */}
           <div className="fixed inset-x-0 bottom-0 z-[120] px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 sm:hidden">
             <div
-              className="relative mx-auto max-w-md overflow-hidden rounded-3xl border border-white/10 p-2 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md"
+              className="relative mx-auto max-w-md overflow-hidden rounded-3xl border border-white/[0.06] p-2 shadow-[0_-6px_24px_rgba(0,0,0,0.22)] backdrop-blur-sm"
               style={{ background: worldPlayfieldBackgroundMobile }}
             >
               <div
-                className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-t from-slate-950/40 via-slate-950/25 to-slate-950/35"
+                className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-t from-slate-950/25 via-slate-950/12 to-transparent"
                 aria-hidden
               />
               <div className="relative z-[1]">
