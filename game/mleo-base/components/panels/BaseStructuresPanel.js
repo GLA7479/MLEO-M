@@ -150,7 +150,8 @@ export function BaseStructuresPanel({
               {/* Top row: title (left), AVAILABLE (right), info button (far right) */}
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1 pr-2">
-                  <div className="line-clamp-1 text-[15px] font-semibold leading-5 text-white sm:line-clamp-1 max-sm:line-clamp-2">
+                  {/* Stable title band on mobile (2-line clamp) so the metrics column lines up across cards */}
+                  <div className="line-clamp-1 min-h-[1.25rem] text-[15px] font-semibold leading-5 text-white sm:line-clamp-1 max-sm:line-clamp-2 max-sm:min-h-[2.5rem]">
                     {card.name}
                   </div>
                 </div>
@@ -172,16 +173,17 @@ export function BaseStructuresPanel({
                 </div>
               </div>
 
-              <div className="mt-1 min-h-0 overflow-hidden text-[11px] leading-snug text-white/58 line-clamp-2">
+              {/* Stable height: two lines of description so the metrics slot does not drift between cards */}
+              <div className="mt-1 min-h-[2.75rem] overflow-hidden text-[11px] leading-snug text-white/58 line-clamp-2">
                 {card.desc}
               </div>
 
-              {/* Content row: left meta/status stack + right upgrade impact box (same two-column layout as desktop on all breakpoints) */}
-              <div className="mt-1.5 grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2">
+              {/* Anchored slot: left stack (tags / level / cost) + fixed-width metrics column, top-aligned */}
+              <div className="mt-1.5 grid grid-cols-[1fr_auto] items-start gap-x-3 gap-y-2">
                 {/* LEFT column */}
                 <div className="min-w-0 flex flex-col gap-1">
-                  {/* Meta badges row: Production/Utility/Core + Synergy */}
-                  <div className="min-h-[24px] max-sm:min-h-[40px]">
+                  {/* Meta badges row: Production/Utility/Core + Synergy — stable band for wrap */}
+                  <div className="min-h-[40px]">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <div className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/70">
                         {card.roleTagText}
@@ -193,7 +195,7 @@ export function BaseStructuresPanel({
                   </div>
 
                   {/* Compact status row: Lv badge + tier (support buildings) + ACTIVE/WARNING */}
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex min-h-[22px] flex-wrap items-center gap-2">
                     <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/65">
                       Lv {card.level}
                     </div>
@@ -209,44 +211,47 @@ export function BaseStructuresPanel({
                       {card.sectorStatusText}
                     </div>
                   </div>
+
+                  <div className="mt-0.5">
+                    <div className="text-[9px] font-semibold uppercase tracking-wider text-white/35">Cost</div>
+                    {card.costRow}
+                  </div>
                 </div>
 
-                {/* RIGHT column */}
-                <div className="flex min-h-[34px] shrink-0 items-center justify-self-end">
-                  {card.liveNowNext?.nowLine ? (
-                    <div className="w-[144px] rounded-lg border border-emerald-400/25 bg-emerald-500/10 px-2 py-1">
-                      <div className="line-clamp-1 text-[10px] font-semibold leading-snug text-white/90">
-                        {card.liveNowNext.nowLine}
-                      </div>
-                      {card.liveNowNext.nextLine ? (
-                        <div className="line-clamp-2 text-[10px] font-bold leading-snug text-emerald-100">
-                          {card.liveNowNext.nextLine}
+                {/* RIGHT column — fixed slot: same width + min-height whether Now-only, Next+Δ, or legacy impact */}
+                <div className="flex w-[144px] shrink-0 flex-col justify-self-end self-start">
+                  <div className="flex min-h-[3.5rem] w-full flex-col justify-center">
+                    {card.liveNowNext?.nowLine ? (
+                      <div className="w-full rounded-lg border border-emerald-400/25 bg-emerald-500/10 px-2 py-1">
+                        <div className="line-clamp-2 text-[10px] font-semibold leading-snug text-white/90">
+                          {card.liveNowNext.nowLine}
                         </div>
-                      ) : null}
-                    </div>
-                  ) : card.upgradeImpactPreview ? (
-                    <div className="w-[144px] rounded-lg border border-cyan-400/20 bg-cyan-500/8 px-2 py-1">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/70">
-                        {card.upgradeImpactPreview.label}
+                        {card.liveNowNext.nextLine ? (
+                          <div className="line-clamp-2 text-[10px] font-bold leading-snug text-emerald-100">
+                            {card.liveNowNext.nextLine}
+                          </div>
+                        ) : null}
                       </div>
-                      <div className="text-[11px] font-semibold text-cyan-100 max-sm:text-[10px] max-sm:font-bold">
-                        {card.upgradeImpactPreview.value}
-                      </div>
-                      {card.upgradeImpactPreview.note ? (
-                        <div className="line-clamp-1 text-[10px] text-cyan-100/70">
-                          {card.upgradeImpactPreview.note}
+                    ) : card.upgradeImpactPreview ? (
+                      <div className="w-full rounded-lg border border-cyan-400/20 bg-cyan-500/8 px-2 py-1">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/70">
+                          {card.upgradeImpactPreview.label}
                         </div>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <div className="h-[34px] w-[144px]" />
-                  )}
+                        <div className="text-[11px] font-semibold text-cyan-100 max-sm:text-[10px] max-sm:font-bold">
+                          {card.upgradeImpactPreview.value}
+                        </div>
+                        {card.upgradeImpactPreview.note ? (
+                          <div className="line-clamp-1 text-[10px] text-cyan-100/70">
+                            {card.upgradeImpactPreview.note}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="h-full min-h-[3.5rem] w-full rounded-lg border border-white/[0.06] bg-black/10" aria-hidden />
+                    )}
+                  </div>
                 </div>
               </div>
-
-              <div className="mt-1.5 text-[9px] font-semibold uppercase tracking-wider text-white/35">Cost</div>
-
-              {card.costRow}
 
               {card.tierAdvanceBlock}
 
