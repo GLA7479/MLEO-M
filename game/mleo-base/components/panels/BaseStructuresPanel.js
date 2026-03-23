@@ -231,11 +231,6 @@ export function BaseStructuresPanel({
                             {card.liveNowNext.nextLine}
                           </div>
                         ) : null}
-                        {!card.ready && card.requirementsText ? (
-                          <div className="line-clamp-2 text-[10px] font-semibold leading-snug text-amber-100">
-                            Missing: {card.requirementsText}
-                          </div>
-                        ) : null}
                       </div>
                     ) : card.upgradeImpactPreview ? (
                       <div className="w-full rounded-lg border border-cyan-400/20 bg-cyan-500/8 px-2 py-1">
@@ -250,21 +245,18 @@ export function BaseStructuresPanel({
                             {card.upgradeImpactPreview.note}
                           </div>
                         ) : null}
-                        {!card.ready && card.requirementsText ? (
-                          <div className="line-clamp-2 text-[10px] font-semibold leading-snug text-amber-100">
-                            Missing: {card.requirementsText}
-                          </div>
-                        ) : null}
                       </div>
                     ) : (
-                      <div className="h-full min-h-[3.5rem] w-full rounded-lg border border-white/[0.06] bg-black/10 px-2 py-1 text-[10px] leading-snug text-white/60">
-                        {!card.ready && card.requirementsText ? (
-                          <div className="line-clamp-2 font-semibold text-amber-100">
-                            Missing: {card.requirementsText}
-                          </div>
-                        ) : null}
-                      </div>
+                      <div className="h-full min-h-[3.5rem] w-full rounded-lg border border-white/[0.06] bg-black/10" aria-hidden />
                     )}
+                  </div>
+                  <div className="mt-1 min-h-[1.75rem]">
+                    {!card.ready && card.requirementsText ? (
+                      <div className="w-full rounded-md border border-amber-400/25 bg-amber-500/10 px-2 py-0.5 text-[9px] leading-snug text-amber-100/90">
+                        <span className="font-semibold">Missing:</span>{" "}
+                        <span className="line-clamp-2">{card.requirementsText}</span>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>
