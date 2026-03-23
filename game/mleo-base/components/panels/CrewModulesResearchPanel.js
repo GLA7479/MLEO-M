@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   COMMAND_PROTOCOL_FAMILY_LABEL,
   COMMAND_PROTOCOL_STORED_INACTIVE_OVERVIEW,
@@ -107,6 +108,50 @@ function QuickTags({ tags, className = "" }) {
   );
 }
 
+/** Internal Development accordion — ids must be unique within CrewModulesResearchPanel. */
+const DEV_SUB_CREW_SPEC = "dev-crew-spec";
+const DEV_SUB_COMMANDER_PATH = "dev-commander-path";
+const DEV_SUB_COMMAND_PROTOCOL = "dev-command-protocol";
+
+/** Lighter than top-level Build rows; same OPEN / CLOSE language as ExpandablePanelSectionHeader. */
+function DevCollapsibleSection({
+  sectionId,
+  openSection,
+  onAccordionSelect,
+  title,
+  collapsedHint,
+  openSubtitle,
+  children,
+}) {
+  const open = openSection === sectionId;
+
+  return (
+    <div className="border-t border-white/10 pt-2 first:border-t-0 first:pt-0">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => onAccordionSelect(sectionId)}
+        className="group flex w-full touch-manipulation items-center justify-between gap-2 rounded-xl px-0.5 py-1 text-left outline-none transition hover:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-cyan-400/35 sm:py-1.5"
+      >
+        <div className="min-w-0 flex-1 pr-1">
+          <div className="text-sm font-semibold text-white">{title}</div>
+          {open ? (
+            openSubtitle ? (
+              <div className="mt-0.5 text-[10px] leading-snug text-white/42 sm:text-[11px]">{openSubtitle}</div>
+            ) : null
+          ) : (
+            <div className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-white/48 sm:text-[11px]">{collapsedHint}</div>
+          )}
+        </div>
+        <span className="pointer-events-none shrink-0 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold text-white transition group-hover:border-white/15 group-hover:bg-white/10">
+          {open ? "CLOSE" : "OPEN"}
+        </span>
+      </button>
+      {open ? <div className="mt-2">{children}</div> : null}
+    </div>
+  );
+}
+
 export function CrewModulesResearchPanel({
   telemetryHint = null,
   devTab,
@@ -137,6 +182,20 @@ export function CrewModulesResearchPanel({
   onSetCommandProtocol = null,
 }) {
   const crewHireAvailableCount = crewTab?.hireDisabled ? 0 : 1;
+
+  /** Accordion: at most one Development subsection open; null = all closed. */
+  const [openDevSubsection, setOpenDevSubsection] = useState(null);
+
+  const selectDevSubsection = (sectionId) => {
+    setOpenDevSubsection((prev) => (prev === sectionId ? null : sectionId));
+  };
+
+  const activeRoleName = crewTab?.roles?.find((r) => r.active)?.name || "None";
+  const activePathName = crewTab?.paths?.find((p) => p.active)?.name || "None";
+  const effectiveProtocolName =
+    commandProtocolRows?.find((r) => r.id === commandProtocolEffectiveId)?.name || "Standard Posture";
+  const protocolQueued =
+    commandProtocolStoredId !== commandProtocolEffectiveId && commandProtocolStoredId !== "none";
 
   return (
     <div className="space-y-2">
@@ -217,9 +276,14 @@ export function CrewModulesResearchPanel({
               <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-wider text-white/35">Next cost</div>
               <ResourceCostRow cost={crewTab.workerNextCost} resources={resources} />
 
-              <div>
-                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">Crew specialization</div>
-                <div className="mb-2 text-[10px] text-white/35">Saved on this device.</div>
+              <DevCollapsibleSection
+                sectionId={DEV_SUB_CREW_SPEC}
+                openSection={openDevSubsection}
+                onAccordionSelect={selectDevSubsection}
+                title="Crew specialization"
+                collapsedHint={`Active: ${activeRoleName} · open to pick role & bonuses`}
+                openSubtitle="Saved on this device."
+              >
                 <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-3">
                   {crewTab.roles.map((role) => {
                     const active = !!role.active;
@@ -273,114 +337,124 @@ export function CrewModulesResearchPanel({
                     );
                   })}
                 </div>
-              </div>
+              </DevCollapsibleSection>
             </div>
           </div>
 
           <div className="rounded-xl border border-white/10 bg-black/20 p-2.5 sm:p-3">
-            <div className="text-sm font-semibold text-white">Commander Path</div>
-            <div className="mt-0.5 text-[11px] leading-snug text-white/55 sm:text-xs">
-              Command identity — specialization only, not core economy. Saved on device.
-            </div>
+            <DevCollapsibleSection
+              sectionId={DEV_SUB_COMMANDER_PATH}
+              openSection={openDevSubsection}
+              onAccordionSelect={selectDevSubsection}
+              title="Commander Path"
+              collapsedHint={`Active: ${activePathName} · open to change command identity`}
+              openSubtitle="Specialization only — not core economy. Saved on device."
+            >
+              <div className="grid gap-1.5 lg:grid-cols-2">
+                {crewTab.paths.map((path) => {
+                  const active = !!path.active;
 
-            <div className="mt-2 grid gap-1.5 lg:grid-cols-2">
-              {crewTab.paths.map((path) => {
-                const active = !!path.active;
-
-                return (
-                  <button
-                    key={path.key}
-                    type="button"
-                    onClick={() => onSelectCommanderPath(path.key)}
-                    className={`relative rounded-lg border px-2.5 py-2 text-left transition sm:rounded-xl sm:px-3 sm:py-2.5 ${
-                      active ? "border-cyan-400/60 bg-cyan-500/15" : "border-white/10 bg-white/5 hover:bg-white/10"
-                    }`}
-                  >
-                    <div className="absolute right-2 top-2 z-10">
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenCommanderPathInfo(path.key);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
+                  return (
+                    <button
+                      key={path.key}
+                      type="button"
+                      onClick={() => onSelectCommanderPath(path.key)}
+                      className={`relative rounded-lg border px-2.5 py-2 text-left transition sm:rounded-xl sm:px-3 sm:py-2.5 ${
+                        active ? "border-cyan-400/60 bg-cyan-500/15" : "border-white/10 bg-white/5 hover:bg-white/10"
+                      }`}
+                    >
+                      <div className="absolute right-2 top-2 z-10">
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
                             e.stopPropagation();
                             onOpenCommanderPathInfo(path.key);
-                          }
-                        }}
-                        className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[12px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
-                        aria-label={`Open info for ${path.name}`}
-                        title={`Info about ${path.name}`}
-                      >
-                        i
-                      </span>
-                    </div>
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onOpenCommanderPathInfo(path.key);
+                            }
+                          }}
+                          className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[12px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                          aria-label={`Open info for ${path.name}`}
+                          title={`Info about ${path.name}`}
+                        >
+                          i
+                        </span>
+                      </div>
 
-                    <div className="pr-8">
-                      <div className="text-sm font-semibold text-white">{path.name}</div>
-                      <div className="mt-1 text-xs text-white/60">{path.desc}</div>
-                      <QuickTags tags={path.quickTags} />
-                      <div className="mt-2 text-[11px] font-semibold text-cyan-200/85">{path.statLine}</div>
-                      <div className="mt-1 text-[11px] text-white/45">{path.hint}</div>
+                      <div className="pr-8">
+                        <div className="text-sm font-semibold text-white">{path.name}</div>
+                        <div className="mt-1 text-xs text-white/60">{path.desc}</div>
+                        <QuickTags tags={path.quickTags} />
+                        <div className="mt-2 text-[11px] font-semibold text-cyan-200/85">{path.statLine}</div>
+                        <div className="mt-1 text-[11px] text-white/45">{path.hint}</div>
 
-                      {active ? (
-                        <div className="mt-2">
-                          <AvailabilityBadge />
-                        </div>
-                      ) : null}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                        {active ? (
+                          <div className="mt-2">
+                            <AvailabilityBadge />
+                          </div>
+                        ) : null}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </DevCollapsibleSection>
           </div>
 
           {commandProtocolRows && onSetCommandProtocol ? (
             <div className="rounded-xl border border-white/10 bg-black/20 p-2.5 sm:p-3" data-base-target="command-protocol">
-              <div className="text-sm font-semibold text-white">Command Protocol</div>
-              <div className="mt-0.5 text-[11px] leading-snug text-white/52 sm:text-xs">
-                One live protocol · Cmdr level gates choices · 1 swap/day (UTC).
-              </div>
-              <div
-                className={`mt-2 rounded-lg px-2.5 py-1.5 ${
-                  commandProtocolEffectiveId === "none"
-                    ? "border border-white/10 bg-white/[0.03]"
-                    : "border border-cyan-400/25 bg-cyan-500/[0.09]"
-                }`}
+              <DevCollapsibleSection
+                sectionId={DEV_SUB_COMMAND_PROTOCOL}
+                openSection={openDevSubsection}
+                onAccordionSelect={selectDevSubsection}
+                title="Command Protocol"
+                collapsedHint={`Live: ${effectiveProtocolName} · ${
+                  commandProtocolCanSwapToday ? "Swap ok today" : "Swap locked (UTC)"
+                }${protocolQueued ? " · queued change" : ""}`}
+                openSubtitle="One live protocol · Cmdr level gates choices · 1 swap/day (UTC)."
               >
-                <div className="text-xs text-white/55">
-                  <span
-                    className={`font-semibold ${
-                      commandProtocolEffectiveId === "none" ? "text-white/65" : "text-cyan-100/85"
-                    }`}
-                  >
-                    Effective:
-                  </span>{" "}
-                  <span
-                    className={`font-semibold ${
-                      commandProtocolEffectiveId === "none" ? "text-white/75" : "text-cyan-100"
-                    }`}
-                  >
-                    {commandProtocolRows.find((r) => r.id === commandProtocolEffectiveId)?.name || "Standard Posture"}
-                  </span>
-                  {commandProtocolEffectiveId === "none" ? null : (
-                    <span className="text-white/45"> · Cmdr Lv {commandProtocolCommanderLevel}</span>
-                  )}
+                <div
+                  className={`rounded-lg px-2.5 py-1.5 ${
+                    commandProtocolEffectiveId === "none"
+                      ? "border border-white/10 bg-white/[0.03]"
+                      : "border border-cyan-400/25 bg-cyan-500/[0.09]"
+                  }`}
+                >
+                  <div className="text-xs text-white/55">
+                    <span
+                      className={`font-semibold ${
+                        commandProtocolEffectiveId === "none" ? "text-white/65" : "text-cyan-100/85"
+                      }`}
+                    >
+                      Effective:
+                    </span>{" "}
+                    <span
+                      className={`font-semibold ${
+                        commandProtocolEffectiveId === "none" ? "text-white/75" : "text-cyan-100"
+                      }`}
+                    >
+                      {commandProtocolRows.find((r) => r.id === commandProtocolEffectiveId)?.name || "Standard Posture"}
+                    </span>
+                    {commandProtocolEffectiveId === "none" ? null : (
+                      <span className="text-white/45"> · Cmdr Lv {commandProtocolCommanderLevel}</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              {commandProtocolStoredId !== commandProtocolEffectiveId && commandProtocolStoredId !== "none" ? (
-                <div className="mt-1.5 rounded-md border border-amber-400/10 bg-amber-400/[0.04] px-2 py-1 text-[11px] font-normal leading-snug text-amber-100/65">
-                  {COMMAND_PROTOCOL_STORED_INACTIVE_OVERVIEW}
-                </div>
-              ) : null}
-              {!commandProtocolCanSwapToday ? (
-                <div className="mt-2 text-[11px] font-normal text-amber-100/60">Next swap: tomorrow (UTC).</div>
-              ) : null}
-              <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
-                {commandProtocolRows.map((row) => {
+                {commandProtocolStoredId !== commandProtocolEffectiveId && commandProtocolStoredId !== "none" ? (
+                  <div className="mt-1.5 rounded-md border border-amber-400/10 bg-amber-400/[0.04] px-2 py-1 text-[11px] font-normal leading-snug text-amber-100/65">
+                    {COMMAND_PROTOCOL_STORED_INACTIVE_OVERVIEW}
+                  </div>
+                ) : null}
+                {!commandProtocolCanSwapToday ? (
+                  <div className="mt-2 text-[11px] font-normal text-amber-100/60">Next swap: tomorrow (UTC).</div>
+                ) : null}
+                <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                  {commandProtocolRows.map((row) => {
                   const isSel = !!row.selected;
                   const isEffectiveLive =
                     row.id === commandProtocolEffectiveId && commandProtocolEffectiveId !== "none";
@@ -434,7 +508,8 @@ export function CrewModulesResearchPanel({
                     </button>
                   );
                 })}
-              </div>
+                </div>
+              </DevCollapsibleSection>
             </div>
           ) : null}
         </>
