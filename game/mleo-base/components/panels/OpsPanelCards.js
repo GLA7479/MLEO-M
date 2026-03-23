@@ -33,6 +33,8 @@ export function OpsPanelCards({
   toggleInnerPanel,
   operationsConsoleContent,
   dailyMissionsContent,
+  missionsPanelEmpty = false,
+  opsConsoleEmpty = false,
 }) {
   const shell = panelTone?.panelSectionShell ? ` ${panelTone.panelSectionShell}` : "";
   const hintRow = panelTone?.helperRow ? ` ${panelTone.helperRow}` : "";
@@ -77,7 +79,14 @@ export function OpsPanelCards({
           </ExpandablePanelSectionHeader>
 
           {openInnerPanel === "ops-missions" ? (
-            <div className="mt-2">{dailyMissionsContent}</div>
+            <div className="mt-2">
+              {dailyMissionsContent}
+              {missionsPanelEmpty ? (
+                <div className="mt-2 rounded-lg border border-dashed border-white/[0.08] bg-black/[0.08] px-2.5 py-2 text-center text-[10px] leading-snug text-white/40 sm:text-[11px]">
+                  No mission entries are available in this view yet.
+                </div>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </section>
@@ -112,7 +121,14 @@ export function OpsPanelCards({
           </ExpandablePanelSectionHeader>
 
           {openInnerPanel === "ops-console" ? (
-            <div className="mt-2">{operationsConsoleContent}</div>
+            <div className="mt-2">
+              {operationsConsoleContent}
+              {opsConsoleEmpty ? (
+                <div className="mt-2 rounded-lg border border-dashed border-white/[0.08] bg-black/[0.08] px-2.5 py-2 text-center text-[10px] leading-snug text-white/40 sm:text-[11px]">
+                  No operations are ready in this view right now.
+                </div>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </section>

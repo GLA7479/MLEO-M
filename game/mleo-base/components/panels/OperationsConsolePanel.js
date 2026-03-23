@@ -15,6 +15,13 @@ export function OperationsConsolePanel({
 }) {
   const tone = panelTone || {};
   const hintWrap = tone.opsHintWrap || "";
+  const overclockStatusLabel = maintenance?.overclockStatusLabel || null;
+  const refillStatusLabel = maintenance?.refillStatusLabel || null;
+  const maintainStatusLabel = maintenance?.maintainStatusLabel || null;
+  const overclockStatusTone = overclockStatusLabel === "Cooldown" ? "text-amber-200/75" : "text-white/55";
+  const refillStatusTone = refillStatusLabel === "Insufficient resources" ? "text-rose-200/70" : "text-white/55";
+  const maintainStatusTone =
+    maintainStatusLabel === "Insufficient resources" ? "text-rose-200/70" : "text-white/55";
 
   return (
     <div className={`grid gap-2.5 md:grid-cols-2 ${tone.opsGrid || ""}`}>
@@ -46,7 +53,7 @@ export function OperationsConsolePanel({
             <p className="mt-0.5 text-[13px] leading-snug text-white/68">Field team gathers resources.</p>
             <OpsHintSurface wrapClass={hintWrap}>{expedition.expeditionHint}</OpsHintSurface>
 
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="mt-2 flex min-w-0 flex-wrap gap-1.5">
               <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-0.5 text-[10px] font-bold text-cyan-200">
                 COST: 36 ENERGY
               </span>
@@ -229,32 +236,57 @@ export function OperationsConsolePanel({
             type="button"
             data-base-target="overclock"
             onClick={maintenance.onOverclock}
-            className={`flex min-h-11 items-center justify-center rounded-xl bg-amber-600 px-1.5 py-2 text-center text-[11px] font-bold leading-tight text-white outline-none transition hover:bg-amber-500 focus-visible:ring-2 focus-visible:ring-amber-200/50 focus-visible:ring-offset-2 focus-visible:ring-offset-amber-500/15 active:scale-[0.99] motion-reduce:active:scale-100 sm:px-2 sm:text-sm ${
+            aria-disabled={maintenance.overclockVisualDisabled ? "true" : undefined}
+            data-disabled={maintenance.overclockVisualDisabled ? "true" : undefined}
+            className={`flex min-h-11 items-center justify-center rounded-xl bg-amber-600 px-1.5 py-2 text-center text-[11px] font-bold leading-tight text-white outline-none transition focus-visible:ring-2 focus-visible:ring-amber-200/50 focus-visible:ring-offset-2 focus-visible:ring-offset-amber-500/15 active:scale-[0.99] motion-reduce:active:scale-100 sm:px-2 sm:text-sm ${
               maintenance.highlightOverclock
                 ? "ring-2 ring-cyan-300/90 ring-offset-2 ring-offset-amber-500/10"
                 : ""
+            } ${
+              maintenance.overclockVisualDisabled
+                ? "opacity-65 saturate-[0.85] hover:bg-amber-600 cursor-default"
+                : "hover:bg-amber-500"
             }`}
           >
-            {maintenance.overclockButtonText}
+            <span className="min-w-0 truncate">{maintenance.overclockButtonText}</span>
           </button>
           <button
+            type="button"
             onClick={maintenance.onRefill}
-            className="flex min-h-11 items-center justify-center rounded-xl bg-white/10 px-1.5 py-2 text-center text-[11px] font-bold leading-tight text-white outline-none transition hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-amber-500/15 active:scale-[0.99] motion-reduce:active:scale-100 sm:px-2 sm:text-sm"
+            aria-disabled={maintenance.refillVisualDisabled ? "true" : undefined}
+            data-disabled={maintenance.refillVisualDisabled ? "true" : undefined}
+            className={`flex min-h-11 items-center justify-center rounded-xl bg-white/10 px-1.5 py-2 text-center text-[11px] font-bold leading-tight text-white outline-none transition focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-amber-500/15 active:scale-[0.99] motion-reduce:active:scale-100 sm:px-2 sm:text-sm ${
+              maintenance.refillVisualDisabled
+                ? "opacity-65 saturate-[0.85] hover:bg-white/10 cursor-default"
+                : "hover:bg-white/20"
+            }`}
           >
-            {maintenance.refillButtonText}
+            <span className="min-w-0 truncate">{maintenance.refillButtonText}</span>
           </button>
           <button
+            type="button"
             onClick={maintenance.onMaintain}
+            aria-disabled={maintenance.maintainVisualDisabled ? "true" : undefined}
+            data-disabled={maintenance.maintainVisualDisabled ? "true" : undefined}
             className={`flex min-h-11 items-center justify-center rounded-xl px-1.5 py-2 text-center text-[11px] font-bold leading-tight text-white outline-none transition focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-amber-500/15 active:scale-[0.99] motion-reduce:active:scale-100 sm:px-2 sm:text-sm ${
               maintenance.systemState === "critical"
                 ? "bg-rose-600 hover:bg-rose-500 focus-visible:ring-rose-300/55"
                 : maintenance.systemState === "warning"
                 ? "bg-amber-600 hover:bg-amber-500 focus-visible:ring-amber-200/50"
                 : "bg-white/10 hover:bg-white/20 focus-visible:ring-white/30"
+            } ${
+              maintenance.maintainVisualDisabled
+                ? "opacity-65 saturate-[0.85] hover:bg-inherit cursor-default"
+                : ""
             }`}
           >
-            Maintain
+            <span className="min-w-0 truncate">Maintain</span>
           </button>
+        </div>
+        <div className="mt-1.5 grid min-h-[16px] grid-cols-3 gap-1.5 text-center text-[10px] leading-snug">
+          <div className={overclockStatusTone}>{overclockStatusLabel || ""}</div>
+          <div className={refillStatusTone}>{refillStatusLabel || ""}</div>
+          <div className={maintainStatusTone}>{maintainStatusLabel || ""}</div>
         </div>
       </div>
 
@@ -296,8 +328,9 @@ export function OperationsConsolePanel({
               ? "bg-emerald-600 text-white shadow-[0_0_14px_rgba(16,185,129,0.15)] hover:bg-emerald-500"
               : "bg-white/10 text-white/45"
           }`}
+          title={`Ship ${shipping.bankedMleoText} MLEO`}
         >
-          Ship {shipping.bankedMleoText} MLEO
+          <span className="min-w-0 truncate">Ship {shipping.bankedMleoText} MLEO</span>
         </button>
       </div>
 

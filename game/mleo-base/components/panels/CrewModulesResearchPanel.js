@@ -33,7 +33,7 @@ function ResourceCostRow({ cost, resources }) {
   const entries = Object.entries(cost || {}).filter(([, value]) => Number(value || 0) > 0);
 
   return (
-    <div className="mt-1 min-h-[28px] max-h-[28px] overflow-hidden">
+    <div className="mt-1 min-h-[28px]">
       {entries.length ? (
         <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] font-semibold leading-tight sm:text-[11px]">
           {entries.slice(0, 3).map(([key, value]) => (
@@ -41,6 +41,7 @@ function ResourceCostRow({ cost, resources }) {
               {key} {formatResourceValue(value)}
             </span>
           ))}
+          {entries.length > 3 ? <span className="text-white/45">+{entries.length - 3} more</span> : null}
         </div>
       ) : (
         <div className="h-[28px]" />
@@ -161,6 +162,9 @@ export function CrewModulesResearchPanel({
   commandProtocolCanSwapToday = true,
   onSetCommandProtocol = null,
 }) {
+  const moduleRows = Array.isArray(modules) ? modules : [];
+  const researchRows = Array.isArray(research) ? research : [];
+  const protocolRows = Array.isArray(commandProtocolRows) ? commandProtocolRows : [];
   const crewHireAvailableCount = crewTab?.hireDisabled ? 0 : 1;
 
   /** Accordion: at most one Development subsection open; null = all closed. */
@@ -189,7 +193,7 @@ export function CrewModulesResearchPanel({
   const activeRoleName = crewTab?.roles?.find((r) => r.active)?.name || "None";
   const activePathName = crewTab?.paths?.find((p) => p.active)?.name || "None";
   const effectiveProtocolName =
-    commandProtocolRows?.find((r) => r.id === commandProtocolEffectiveId)?.name || "Standard Posture";
+    protocolRows.find((r) => r.id === commandProtocolEffectiveId)?.name || "Standard Posture";
   const protocolQueued =
     commandProtocolStoredId !== commandProtocolEffectiveId && commandProtocolStoredId !== "none";
 
@@ -434,7 +438,7 @@ export function CrewModulesResearchPanel({
                         commandProtocolEffectiveId === "none" ? "text-white/75" : "text-cyan-100"
                       }`}
                     >
-                      {commandProtocolRows.find((r) => r.id === commandProtocolEffectiveId)?.name || "Standard Posture"}
+                      {protocolRows.find((r) => r.id === commandProtocolEffectiveId)?.name || "Standard Posture"}
                     </span>
                     {commandProtocolEffectiveId === "none" ? null : (
                       <span className="text-white/45"> · Cmdr Lv {commandProtocolCommanderLevel}</span>
@@ -450,7 +454,12 @@ export function CrewModulesResearchPanel({
                   <div className="mt-2 text-[11px] font-normal text-amber-100/60">Next swap: tomorrow (UTC).</div>
                 ) : null}
                 <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
-                  {commandProtocolRows.map((row) => {
+                  {protocolRows.length === 0 ? (
+                    <div className="sm:col-span-2 rounded-lg border border-dashed border-white/[0.08] bg-black/[0.08] px-2.5 py-2 text-center text-[10px] leading-snug text-white/40 sm:text-[11px]">
+                      No protocol entries available yet.
+                    </div>
+                  ) : null}
+                  {protocolRows.map((row) => {
                   const isSel = !!row.selected;
                   const isEffectiveLive =
                     row.id === commandProtocolEffectiveId && commandProtocolEffectiveId !== "none";
@@ -513,7 +522,12 @@ export function CrewModulesResearchPanel({
 
       {devTab === "modules" ? (
         <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 lg:items-start lg:gap-x-3 lg:gap-y-2">
-          {modules.map((module) => {
+          {moduleRows.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-white/[0.08] bg-black/[0.08] px-2.5 py-2 text-center text-[10px] leading-snug text-white/40 sm:text-[11px] lg:col-span-2">
+              No modules available yet.
+            </div>
+          ) : null}
+          {moduleRows.map((module) => {
             return (
               <div
                 key={module.key}
@@ -543,10 +557,14 @@ export function CrewModulesResearchPanel({
 
                 <div className="flex flex-col gap-1 pr-8 lg:gap-0.5 lg:pr-7">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="text-sm font-semibold leading-tight lg:text-[13px]">{module.name}</div>
+                    <div className="min-w-0 break-words text-sm font-semibold leading-tight lg:text-[13px]">
+                      {module.name}
+                    </div>
                     {module.available ? <PanelAvailabilityBadge /> : null}
                   </div>
-                  <div className="line-clamp-2 text-xs leading-snug text-white/58 lg:mt-0">{module.desc}</div>
+                  <div className="line-clamp-2 break-words text-xs leading-snug text-white/58 lg:mt-0">
+                    {module.desc}
+                  </div>
                   <QuickTags tags={module.quickTags} className="lg:mt-1 lg:gap-1" />
                   {module.helpText ? (
                     <div className="line-clamp-2 text-[11px] leading-snug text-white/42 lg:mt-0.5">
@@ -586,7 +604,12 @@ export function CrewModulesResearchPanel({
           {telemetryHint ? (
             <div className="col-span-full text-[11px] text-white/65 lg:col-span-2">{telemetryHint}</div>
           ) : null}
-          {research.map((item) => {
+          {researchRows.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-white/[0.08] bg-black/[0.08] px-2.5 py-2 text-center text-[10px] leading-snug text-white/40 sm:text-[11px] lg:col-span-2">
+              No research entries available yet.
+            </div>
+          ) : null}
+          {researchRows.map((item) => {
             return (
               <div
                 key={item.key}
@@ -614,7 +637,9 @@ export function CrewModulesResearchPanel({
 
                 <div className="flex flex-col gap-1 pr-8 lg:pr-7 lg:gap-0.5">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="text-sm font-semibold leading-tight lg:text-[13px]">{item.name}</div>
+                    <div className="min-w-0 break-words text-sm font-semibold leading-tight lg:text-[13px]">
+                      {item.name}
+                    </div>
                     {item.available ? <PanelAvailabilityBadge /> : null}
                   </div>
                   <div className="mt-0.5 line-clamp-2 text-xs leading-snug text-white/58">{item.desc}</div>

@@ -29,6 +29,7 @@ export function BaseStructuresPanel({
   onSetSupportProgram,
   onClaimSpecializationMilestone,
 }) {
+  const structureCards = cards || [];
   /** Per building card: at most one of "programs" | "milestones" open; missing key = all closed. */
   const [openSpecSubsectionByCard, setOpenSpecSubsectionByCard] = useState({});
 
@@ -124,7 +125,12 @@ export function BaseStructuresPanel({
       </div>
 
       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-        {(cards || []).map((card) => {
+        {structureCards.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-white/[0.08] bg-black/[0.08] px-2.5 py-2 text-center text-[10px] leading-snug text-white/40 sm:text-[11px] md:col-span-2 xl:col-span-3">
+            No structures available yet.
+          </div>
+        ) : null}
+        {structureCards.map((card) => {
           const highlighted = highlightTarget === card.key;
           const specSectionsLocked = !!card.supportProgramsSectionsLocked;
           const supportProgramsOpen = isSectionOpen(card.key, "programs");
@@ -144,7 +150,7 @@ export function BaseStructuresPanel({
               {/* Top row: title (left), AVAILABLE (right), info button (far right) */}
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1 pr-2">
-                  <div className="line-clamp-1 h-[20px] text-[15px] font-semibold leading-5 text-white">
+                  <div className="line-clamp-1 text-[15px] font-semibold leading-5 text-white sm:line-clamp-1 max-sm:line-clamp-2">
                     {card.name}
                   </div>
                 </div>
@@ -175,7 +181,7 @@ export function BaseStructuresPanel({
                 {/* LEFT column */}
                 <div className="min-w-0 flex flex-col gap-1">
                   {/* Meta badges row: Production/Utility/Core + Synergy */}
-                  <div className="min-h-[24px] max-h-[24px] overflow-hidden">
+                  <div className="min-h-[24px] max-sm:min-h-[40px]">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <div className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/70">
                         {card.roleTagText}
@@ -435,10 +441,10 @@ export function BaseStructuresPanel({
               <div className="mt-auto flex flex-col justify-end pt-0 pb-2">
                 {/* Fixed-height bottom info block (stabilizes Upgrade button Y across cards) */}
                 <div className="flex flex-col">
-                  <div className="h-[14px] leading-[14px] text-[10px] font-semibold text-white/50">
+                  <div className="min-h-[14px] text-[10px] font-semibold leading-snug text-white/50">
                     {card.energyLineText}
                   </div>
-                  <div className="h-[14px] leading-[14px] text-[10px] font-semibold text-cyan-200/70">
+                  <div className="min-h-[14px] text-[10px] font-semibold leading-snug text-cyan-200/70">
                     {card.powerLineText}
                   </div>
                 </div>

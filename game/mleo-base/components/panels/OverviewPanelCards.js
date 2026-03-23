@@ -87,6 +87,15 @@ function SectionHeader({ title, hint, right, quiet = false }) {
   );
 }
 
+function SectionEmptyFallback({ text }) {
+  if (!text) return null;
+  return (
+    <div className="rounded-lg border border-dashed border-white/[0.08] bg-black/[0.08] px-2.5 py-2 text-center text-[10px] leading-snug text-white/40 sm:text-[11px]">
+      {text}
+    </div>
+  );
+}
+
 function AvailabilityBadge({ count, subdued = false }) {
   const pt = useContext(BaseOverviewPanelToneContext);
   const badge = pt?.availabilityBadge ? ` ${pt.availabilityBadge}` : "";
@@ -760,6 +769,10 @@ function ContractsCard({
 }) {
   const openKey = "overview-contracts";
   const isOpen = openInnerPanel === openKey;
+  const contractsList = Array.isArray(liveContracts) ? liveContracts : [];
+  const hasContracts = contractsList.length > 0;
+  const claimableCount = contractsList.filter((c) => c?.done && !c?.claimed).length;
+  const allClaimed = hasContracts && claimableCount === 0 && contractsList.every((c) => !!c?.claimed);
 
   const contractsHint = !isOpen
     ? liveContractsAvailableCount > 0
@@ -800,12 +813,20 @@ function ContractsCard({
 
       {isOpen ? (
         <div className="mt-2 space-y-2 sm:mt-2.5 sm:space-y-2.5">
-          {(!liveContracts || liveContracts.length === 0) ? (
+          {!hasContracts ? (
             <div className="rounded-lg border border-dashed border-white/[0.08] bg-black/[0.08] px-2.5 py-3 text-center text-[10px] leading-snug text-white/40">
-              No live contracts in this view.
+              No contracts are available right now.
+            </div>
+          ) : claimableCount === 0 && allClaimed ? (
+            <div className="rounded-lg border border-white/[0.08] bg-black/[0.08] px-2.5 py-3 text-center text-[10px] leading-snug text-white/42">
+              All visible contracts are already claimed.
+            </div>
+          ) : claimableCount === 0 ? (
+            <div className="rounded-lg border border-white/[0.08] bg-black/[0.08] px-2.5 py-3 text-center text-[10px] leading-snug text-white/42">
+              Contracts exist, but none are claimable yet.
             </div>
           ) : null}
-          {[...(liveContracts || [])]
+          {[...contractsList]
             .sort((a, b) => {
               const aReady = a.done && !a.claimed ? 1 : 0;
               const bReady = b.done && !b.claimed ? 1 : 0;
@@ -813,7 +834,7 @@ function ContractsCard({
             })
             .map((contract) => (
               <div key={contract.key} className="rounded-lg border border-white/[0.08] bg-black/18 p-2.5 sm:rounded-xl sm:p-3">
-                <div className="text-sm font-bold text-white">{contract.title}</div>
+                <div className="min-w-0 break-words text-sm font-bold text-white">{contract.title}</div>
                 {contract.contractClass === "elite" ? (
                   <div className="mt-1 flex flex-wrap gap-1">
                     <span className="inline-flex rounded-full border border-amber-400/40 bg-amber-500/15 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-amber-100">
@@ -828,7 +849,10 @@ function ContractsCard({
                       </span>
                     ) : null}
                     {contract.eliteProgramPill ? (
-                      <span className="inline-flex max-w-full rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[8px] font-semibold text-white/65">
+                      <span
+                        title={contract.eliteProgramPill}
+                        className="inline-flex max-w-full truncate rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[8px] font-semibold text-white/65"
+                      >
                         {contract.eliteProgramPill}
                       </span>
                     ) : null}
@@ -844,7 +868,10 @@ function ContractsCard({
                       </span>
                     ) : null}
                     {contract.advancedProgramPill ? (
-                      <span className="inline-flex max-w-full rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[8px] font-semibold text-white/65">
+                      <span
+                        title={contract.advancedProgramPill}
+                        className="inline-flex max-w-full truncate rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[8px] font-semibold text-white/65"
+                      >
                         {contract.advancedProgramPill}
                       </span>
                     ) : null}
@@ -932,6 +959,20 @@ export function OverviewPanelCards({
     chips: safeOverview.bottleneckChips || [],
   };
   const baseStatusUrgent = isBaseStatusUrgent(baseStatusPayload);
+  const hasPrimaryOverviewData = Boolean(
+    safeOverview.bottleneck ||
+      safeOverview.nextAction ||
+      actionFallback ||
+      safeOverview.recoveryHint?.text ||
+      missionGuidance?.title ||
+      baseStatusPayload?.label
+  );
+  const hasSecondaryOverviewData = Boolean(
+    safeOverview.rates ||
+      safeOverview.stability ||
+      safeOverview.dailyProgress ||
+      (Array.isArray(safeOverview.todaysLoop) && safeOverview.todaysLoop.length > 0)
+  );
 
   return (
     <BaseOverviewPanelToneContext.Provider value={panelTone || null}>
@@ -971,6 +1012,7 @@ export function OverviewPanelCards({
           className="space-y-2.5 rounded-xl border border-white/[0.07] bg-white/[0.012] p-1.5 sm:space-y-3 sm:rounded-2xl sm:p-2"
           aria-label="Needs attention"
         >
+          {!hasPrimaryOverviewData ? <SectionEmptyFallback text="No overview data yet." /> : null}
           <div className="grid gap-2.5 sm:gap-3 lg:grid-cols-2 lg:items-stretch">
             <BottleneckBlock bottleneck={safeOverview.bottleneck} onNavigate={onNavigate} />
             <NextActionBlock action={safeOverview.nextAction || actionFallback} onNavigate={onNavigate} />
@@ -989,6 +1031,7 @@ export function OverviewPanelCards({
           className="space-y-2.5 border-t border-white/[0.07] pt-3 sm:space-y-3 sm:pt-4"
           aria-label="Status and rhythm"
         >
+          {!hasSecondaryOverviewData ? <SectionEmptyFallback text="No overview data yet." /> : null}
           {!baseStatusUrgent ? (
             <div data-base-target="systems">
               <BaseStatusBlock status={baseStatusPayload} variant="support" />

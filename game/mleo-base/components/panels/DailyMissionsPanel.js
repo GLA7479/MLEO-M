@@ -33,9 +33,15 @@ function QuickTags({ tags, quiet }) {
 }
 
 export function DailyMissionsPanel({ panelTone, missions, onClaimMission, onOpenMissionInfo }) {
+  const missionRows = Array.isArray(missions) ? missions : [];
   return (
     <div className="space-y-2">
-      {(Array.isArray(missions) ? missions : []).map((mission) => {
+      {missionRows.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-white/[0.08] bg-black/[0.08] px-2.5 py-2 text-center text-[10px] leading-snug text-white/40 sm:text-[11px]">
+          No missions available right now.
+        </div>
+      ) : null}
+      {missionRows.map((mission) => {
         const rowAccent =
           !mission.highlighted && panelTone?.missionRowAccent ? ` ${panelTone.missionRowAccent}` : "";
         return (

@@ -76,6 +76,7 @@ export function ProgressSummaryPanel({
 
 export function ActivityLogPanel({ panelTone, logEntries, onResetGame }) {
   const tile = panelTone?.compactUtilityTile ? ` ${panelTone.compactUtilityTile}` : "";
+  const visibleEntries = (Array.isArray(logEntries) ? logEntries : []).slice(0, 4);
   return (
     <>
       <div className="mb-1.5 flex flex-wrap gap-1">
@@ -106,7 +107,14 @@ export function ActivityLogPanel({ panelTone, logEntries, onResetGame }) {
       </div>
 
       <div className="space-y-1">
-        {(Array.isArray(logEntries) ? logEntries : []).slice(0, 4).map((entry) => (
+        {visibleEntries.length === 0 ? (
+          <div
+            className={`rounded-lg border border-dashed border-white/[0.08] bg-black/[0.08] px-2.5 py-2 text-center text-[10px] leading-snug text-white/40 sm:text-[11px]${tile}`}
+          >
+            No history yet. Actions will appear here.
+          </div>
+        ) : null}
+        {visibleEntries.map((entry) => (
           <div
             key={entry?.id}
             className={`rounded-md border border-white/[0.06] bg-black/20 px-2 py-1.5 text-[11px] leading-snug text-white/58 sm:text-[11px] sm:text-white/60${tile}`}

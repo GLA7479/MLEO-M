@@ -6198,6 +6198,7 @@ export default function MleoBase() {
   );
   const needsRefillNow = Number(state.resources?.ENERGY || 0) < Math.max(35, Math.floor((derived.energyCap || 140) * 0.35));
   const needsMaintenanceNow = Number(state.stability || 100) <= 82;
+  const maintenanceCost = { GOLD: 42, SCRAP: 22, DATA: 4 };
 
   const operationsReadyCount =
     Number(canExpeditionNow) +
@@ -6205,6 +6206,29 @@ export default function MleoBase() {
 
   const expeditionLeft = Math.max(0, (state.expeditionReadyAt || 0) - Date.now());
   const overclockLeft = Math.max(0, (state.overclockUntil || 0) - Date.now());
+  const refillAtCap = Number(state.resources?.ENERGY || 0) >= Number(derived.energyCap || 0) - 1;
+  const hasOverclockResources = Number(state.resources?.DATA || 0) >= 12;
+  const hasRefillResources = Number(state.resources?.DATA || 0) >= 5;
+  const hasMaintenanceResources = hasResources(state.resources, maintenanceCost);
+  const overclockStatusLabel = overclockLeft > 0
+    ? "Cooldown"
+    : isActionLocked("overclock")
+    ? "Unavailable"
+    : !hasOverclockResources
+    ? "Insufficient resources"
+    : "";
+  const refillStatusLabel = isActionLocked("refill")
+    ? "Unavailable"
+    : refillAtCap
+    ? "Unavailable"
+    : !hasRefillResources
+    ? "Insufficient resources"
+    : "";
+  const maintainStatusLabel = isActionLocked("maintenance")
+    ? "Unavailable"
+    : !hasMaintenanceResources
+    ? "Insufficient resources"
+    : "";
   const alerts = useMemo(
     () =>
       getAlerts(
@@ -8182,9 +8206,15 @@ export default function MleoBase() {
           overclockLeft > 0
             ? `Overclock ${Math.ceil(overclockLeft / 1000)}s`
             : `Overclock ${fmt(CONFIG.overclockCost)}`,
+        overclockVisualDisabled: !!overclockStatusLabel,
+        overclockStatusLabel,
         onRefill: refillEnergy,
         refillButtonText: `Refill ${fmt(CONFIG.refillCost)}`,
+        refillVisualDisabled: !!refillStatusLabel,
+        refillStatusLabel,
         onMaintain: performMaintenance,
+        maintainVisualDisabled: !!maintainStatusLabel,
+        maintainStatusLabel,
         overclockHint:
           world4Reactor != null ? (
             <span className="mt-1 block text-[11px] text-white/65">{world4Reactor.overclockCardHint}</span>
@@ -11448,6 +11478,12 @@ export default function MleoBase() {
       onOverclock={activateOverclock}
       onRefill={refillEnergy}
       onMaintain={performMaintenance}
+      overclockVisualDisabled={!!overclockStatusLabel}
+      refillVisualDisabled={!!refillStatusLabel}
+      maintainVisualDisabled={!!maintainStatusLabel}
+      overclockStatusLabel={overclockStatusLabel}
+      refillStatusLabel={refillStatusLabel}
+      maintainStatusLabel={maintainStatusLabel}
     />
   );
 
@@ -13026,6 +13062,8 @@ export default function MleoBase() {
                           toggleInnerPanel={toggleInnerPanel}
                           operationsConsoleContent={operationsConsoleContent}
                           dailyMissionsContent={dailyMissionsContent}
+                          missionsPanelEmpty={dailyMissionsVM.length === 0}
+                          opsConsoleEmpty={false}
                         />
                       </DesktopPanelSection>
                     ) : null}
@@ -13536,6 +13574,8 @@ export default function MleoBase() {
                         toggleInnerPanel={toggleInnerPanel}
                         operationsConsoleContent={operationsConsoleContentMobile}
                         dailyMissionsContent={dailyMissionsContent}
+                        missionsPanelEmpty={dailyMissionsVM.length === 0}
+                        opsConsoleEmpty={false}
                       />
                     </MobilePanelSection>
                   ) : null}

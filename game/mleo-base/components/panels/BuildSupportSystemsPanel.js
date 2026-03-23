@@ -23,6 +23,12 @@ export function BuildSupportSystemsPanel({
   onOverclock,
   onRefill,
   onMaintain,
+  overclockVisualDisabled = false,
+  refillVisualDisabled = false,
+  maintainVisualDisabled = false,
+  overclockStatusLabel = "",
+  refillStatusLabel = "",
+  maintainStatusLabel = "",
 }) {
   return (
     <div className="space-y-2">
@@ -73,7 +79,13 @@ export function BuildSupportSystemsPanel({
         <button
           type="button"
           onClick={onOverclock}
-          className="flex min-h-11 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.06] px-2 py-2 text-xs font-bold text-white/85 outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/20 sm:text-sm"
+          aria-disabled={overclockVisualDisabled ? "true" : undefined}
+          data-disabled={overclockVisualDisabled ? "true" : undefined}
+          className={`flex min-h-11 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.06] px-2 py-2 text-xs font-bold text-white/85 outline-none transition focus-visible:ring-2 focus-visible:ring-white/20 sm:text-sm ${
+            overclockVisualDisabled
+              ? "opacity-65 saturate-[0.85] hover:bg-white/[0.06] cursor-default"
+              : "hover:bg-white/10"
+          }`}
         >
           Overclock
         </button>
@@ -81,19 +93,42 @@ export function BuildSupportSystemsPanel({
         <button
           type="button"
           onClick={onRefill}
-          className="flex min-h-11 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.06] px-2 py-2 text-xs font-bold text-white/85 outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/20 sm:text-sm"
+          aria-disabled={refillVisualDisabled ? "true" : undefined}
+          data-disabled={refillVisualDisabled ? "true" : undefined}
+          className={`flex min-h-11 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.06] px-2 py-2 text-xs font-bold text-white/85 outline-none transition focus-visible:ring-2 focus-visible:ring-white/20 sm:text-sm ${
+            refillVisualDisabled
+              ? "opacity-65 saturate-[0.85] hover:bg-white/[0.06] cursor-default"
+              : "hover:bg-white/10"
+          }`}
         >
           Refill
         </button>
+      </div>
+      <div className="mt-1 grid min-h-[16px] grid-cols-2 gap-2 text-center text-[10px] leading-snug">
+        <div className={overclockStatusLabel === "Cooldown" ? "text-amber-200/75" : "text-white/50"}>
+          {overclockStatusLabel}
+        </div>
+        <div className={refillStatusLabel === "Insufficient resources" ? "text-rose-200/70" : "text-white/50"}>
+          {refillStatusLabel}
+        </div>
       </div>
 
       <button
         type="button"
         onClick={onMaintain}
-        className="flex min-h-11 w-full items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.06] px-3 py-2 text-xs font-bold text-white/85 outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/20 sm:text-sm"
+        aria-disabled={maintainVisualDisabled ? "true" : undefined}
+        data-disabled={maintainVisualDisabled ? "true" : undefined}
+        className={`flex min-h-11 w-full items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.06] px-3 py-2 text-xs font-bold text-white/85 outline-none transition focus-visible:ring-2 focus-visible:ring-white/20 sm:text-sm ${
+          maintainVisualDisabled
+            ? "opacity-65 saturate-[0.85] hover:bg-white/[0.06] cursor-default"
+            : "hover:bg-white/10"
+        }`}
       >
         Maintain
       </button>
+      <div className="mt-1 min-h-[16px] text-center text-[10px] leading-snug text-white/50">
+        {maintainStatusLabel}
+      </div>
     </div>
   );
 }
