@@ -1,0 +1,18 @@
+-- Lane 1 pre-change backup note (file-based snapshot)
+-- Date: 2026-03-23
+--
+-- `psql` is unavailable in this environment, so `pg_get_functiondef(...)`
+-- backups could not be produced from a live DB connection.
+--
+-- Source-of-truth pre-change definitions are preserved in these files:
+-- 1) styles/sql/base_server_authority.sql
+--    - Function: public.base_reconcile_state(text)
+--    - Snapshot range before edit: CREATE OR REPLACE FUNCTION ... AS $$ ... $$;
+--    - Key pre-change line:
+--      v_gold_gain := ((v_trade * v_trade_mode) * 0.60) * v_gold_mult;
+--
+-- 2) styles/sql/base_atomic_rpc.sql
+--    - Function: public.base_perform_maintenance(text)
+--    - Snapshot range before edit: CREATE OR REPLACE FUNCTION ... AS $$ ... $$;
+--    - Key pre-change line:
+--      v_cost jsonb := jsonb_build_object('GOLD', 42, 'SCRAP', 22, 'DATA', 4);
