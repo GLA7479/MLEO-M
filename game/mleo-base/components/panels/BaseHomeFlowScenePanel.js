@@ -35,6 +35,8 @@ export function BaseHomeFlowScenePanel({
   selected,
   onSelect,
   theme: themeInput,
+  /** When true, map sits on a shared playfield canvas — inner fill is glassy, not a second full-scene gradient. */
+  playfieldEmbed = false,
 }) {
   const isDesktop = layout === "desktop";
 
@@ -51,7 +53,10 @@ export function BaseHomeFlowScenePanel({
   const shellClass = [theme.mapShellClassName].filter(Boolean).join(" ").trim();
   const shellLayout = isDesktop ? "flex min-h-0 h-full w-full flex-1 flex-col" : "";
   const shellCombined = [shellClass, shellLayout].filter(Boolean).join(" ").trim();
-  const innerClass = [aspectOuter, theme.mapInnerClassName].filter(Boolean).join(" ").trim();
+  const innerSurface = playfieldEmbed
+    ? "rounded-3xl bg-slate-950/25 ring-1 ring-inset ring-white/12 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[2px]"
+    : theme.mapInnerClassName;
+  const innerClass = [aspectOuter, innerSurface].filter(Boolean).join(" ").trim();
 
   /** Selected route paints last so it reads above crossings (no double-stroke). */
   const linksPaintOrder = useMemo(() => {

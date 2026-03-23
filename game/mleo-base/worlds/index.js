@@ -59,6 +59,7 @@ export {
   DEFAULT_WORLD_MAP_THEME,
   WORLD_MAP_THEME_BY_ORDER,
   getWorldMapTheme,
+  getWorldPlayfieldCanvasBackground,
   resolveWorldMapTheme,
 } from "./worldMapTheme";
 

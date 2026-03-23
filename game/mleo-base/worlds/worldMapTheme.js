@@ -637,6 +637,63 @@ export function getWorldMapTheme(order) {
   return WORLD_MAP_THEME_BY_ORDER[n] || DEFAULT_WORLD_MAP_THEME;
 }
 
+/**
+ * Full BASE playfield canvas (resource strip + flow map + tab bar): per-world accent on shared grid.
+ * Reuses the same visual language as map themes without duplicating node/link tokens.
+ *
+ * @param {number} order Active world order (1+)
+ * @param {"desktop" | "mobile"} layout Slightly tighter grid + stronger veil on mobile
+ * @returns {string} CSS `background` multi-layer value
+ */
+export function getWorldPlayfieldCanvasBackground(order, layout = "desktop") {
+  let n = Number(order);
+  if (!Number.isFinite(n) || n < 1) n = 1;
+  const isMobile = layout === "mobile";
+
+  const grid =
+    "repeating-linear-gradient(90deg, rgba(148,163,184,0.048) 0, rgba(148,163,184,0.048) 1px, transparent 1px, transparent " +
+    (isMobile ? "22px" : "26px") +
+    "), repeating-linear-gradient(0deg, rgba(148,163,184,0.038) 0, rgba(148,163,184,0.038) 1px, transparent 1px, transparent " +
+    (isMobile ? "22px" : "26px") +
+    ")";
+
+  const veil =
+    "linear-gradient(180deg, rgba(2,6,23," +
+    (isMobile ? "0.88" : "0.78") +
+    ") 0%, rgba(8,15,30," +
+    (isMobile ? "0.90" : "0.84") +
+    ") 50%, rgba(2,6,23," +
+    (isMobile ? "0.92" : "0.88") +
+    ") 100%)";
+
+  const accent =
+    n === 2
+      ? isMobile
+        ? "radial-gradient(ellipse 100% 72% at 50% 102%, rgba(251,191,36,0.15), transparent 54%), radial-gradient(ellipse 52% 42% at 12% 12%, rgba(34,211,238,0.08), transparent 50%)"
+        : "radial-gradient(ellipse 92% 68% at 50% 108%, rgba(251,191,36,0.13), transparent 56%), radial-gradient(ellipse 48% 36% at 12% 14%, rgba(34,211,238,0.07), transparent 48%)"
+      : n === 3
+        ? isMobile
+          ? "radial-gradient(circle at 50% 38%, rgba(167,139,250,0.15), transparent 44%), radial-gradient(circle at 78% 70%, rgba(34,211,238,0.07), transparent 52%)"
+          : "radial-gradient(circle at 50% 36%, rgba(167,139,250,0.12), transparent 46%), radial-gradient(circle at 74% 66%, rgba(34,211,238,0.06), transparent 50%)"
+      : n === 4
+        ? isMobile
+          ? "radial-gradient(circle at 50% 48%, rgba(249,115,22,0.14), transparent 50%), radial-gradient(ellipse 90% 60% at 50% 108%, rgba(251,113,133,0.09), transparent 52%)"
+          : "radial-gradient(circle at 50% 44%, rgba(249,115,22,0.12), transparent 52%), radial-gradient(ellipse 95% 58% at 50% 110%, rgba(251,113,133,0.08), transparent 50%)"
+      : n === 5
+        ? isMobile
+          ? "radial-gradient(ellipse 95% 58% at 50% 100%, rgba(87,83,78,0.10), transparent 50%), radial-gradient(ellipse 70% 50% at 18% 18%, rgba(16,185,129,0.08), transparent 46%)"
+          : "radial-gradient(ellipse 92% 56% at 50% 100%, rgba(16,185,129,0.09), transparent 52%), radial-gradient(ellipse 68% 46% at 16% 16%, rgba(245,158,11,0.06), transparent 44%)"
+      : n === 6
+        ? isMobile
+          ? "radial-gradient(circle at 50% 44%, rgba(34,211,238,0.10), transparent 48%), radial-gradient(circle at 50% 58%, rgba(167,139,250,0.09), transparent 54%)"
+          : "radial-gradient(circle at 50% 40%, rgba(34,211,238,0.09), transparent 50%), radial-gradient(circle at 50% 56%, rgba(167,139,250,0.085), transparent 56%)"
+      : isMobile
+        ? "radial-gradient(circle at 50% 52%, rgba(16,185,129,0.16) 0%, transparent 34%), radial-gradient(circle at 50% 62%, rgba(34,211,238,0.10) 0%, transparent 42%)"
+        : "radial-gradient(circle at 50% 46%, rgba(16,185,129,0.11) 0%, transparent 32%), radial-gradient(circle at 50% 58%, rgba(34,211,238,0.075) 0%, transparent 40%)";
+
+  return `${accent}, ${veil}, ${grid}`;
+}
+
 function mergeLinkState(base, patch) {
   if (!patch) return base;
   return {

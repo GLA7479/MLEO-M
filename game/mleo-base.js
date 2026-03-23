@@ -137,6 +137,7 @@ import {
   getWorldDailyMleoCapByOrder,
   resolveSectorWorldOrder,
   getWorldMapTheme,
+  getWorldPlayfieldCanvasBackground,
   getBaseInternalPanelTone,
   WORLD_BY_ORDER,
   WORLDS,
@@ -4320,7 +4321,15 @@ function InfoButton({ infoKey, setOpenInfoKey, className = "" }) {
   );
 }
 
-function BaseHomeFlowScene({ base, derived, selected, onSelect, layout = "mobile", mapTheme }) {
+function BaseHomeFlowScene({
+  base,
+  derived,
+  selected,
+  onSelect,
+  layout = "mobile",
+  mapTheme,
+  playfieldEmbed = false,
+}) {
   const scenePositions =
     layout === "desktop" ? BASE_HOME_SCENE_POSITIONS_DESKTOP : BASE_HOME_SCENE_POSITIONS_MOBILE;
 
@@ -4371,6 +4380,7 @@ function BaseHomeFlowScene({ base, derived, selected, onSelect, layout = "mobile
       selected={selected}
       onSelect={onSelect}
       theme={mapTheme}
+      playfieldEmbed={playfieldEmbed}
     />
   );
 
@@ -5607,6 +5617,15 @@ export default function MleoBase() {
   const activeWorldOrder = useMemo(() => resolveSectorWorldOrder(state), [state]);
 
   const worldMapTheme = useMemo(() => getWorldMapTheme(activeWorldOrder), [activeWorldOrder]);
+
+  const worldPlayfieldBackground = useMemo(
+    () => getWorldPlayfieldCanvasBackground(activeWorldOrder, "desktop"),
+    [activeWorldOrder]
+  );
+  const worldPlayfieldBackgroundMobile = useMemo(
+    () => getWorldPlayfieldCanvasBackground(activeWorldOrder, "mobile"),
+    [activeWorldOrder]
+  );
   const internalPanelTone = useMemo(
     () => getBaseInternalPanelTone(activeWorldOrder),
     [activeWorldOrder]
@@ -13063,23 +13082,19 @@ export default function MleoBase() {
             </div>
           ) : null}
 
-          {/* Desktop Command Center */}
+          {/* Desktop Command Center — single world canvas: HUD + map + tab bar */}
           <>
             <div className="mt-4 hidden min-h-0 flex-1 lg:block">
               <div
-                className="relative h-[calc(100dvh-190px)] overflow-hidden rounded-[30px] border border-white/10 bg-slate-950/78 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl"
-                style={{
-                  background: `
-                    radial-gradient(circle at 50% 50%, rgba(16,185,129,0.10) 0%, rgba(16,185,129,0.04) 12%, transparent 24%),
-                    radial-gradient(circle at 50% 50%, rgba(34,211,238,0.08) 0%, transparent 40%),
-                    linear-gradient(180deg, rgba(2,6,23,0.96) 0%, rgba(8,15,30,0.98) 42%, rgba(2,6,23,0.99) 100%),
-                    repeating-linear-gradient(90deg, rgba(148,163,184,0.045) 0, rgba(148,163,184,0.045) 1px, transparent 1px, transparent 26px),
-                    repeating-linear-gradient(0deg, rgba(148,163,184,0.04) 0, rgba(148,163,184,0.04) 1px, transparent 1px, transparent 26px)
-                  `,
-                }}
+                className="relative flex h-[calc(100dvh-190px)] flex-col overflow-hidden rounded-[30px] border border-white/10 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-[1px]"
+                style={{ background: worldPlayfieldBackground }}
               >
-                <div className="absolute inset-0 p-3">
-                  <div className="mx-auto flex h-full min-h-0 max-w-[1320px] flex-col">
+                <div
+                  className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-b from-slate-950/45 via-slate-950/28 to-slate-950/48"
+                  aria-hidden
+                />
+                <div className="relative z-[1] flex h-full min-h-0 flex-col p-3">
+                  <div className="mx-auto flex h-full min-h-0 w-full max-w-[1320px] flex-col">
                     <div className="mb-2 shrink-0 grid grid-cols-4 gap-2 xl:grid-cols-8">
                       {desktopHudItems.map((item) => {
                         const focus = item.tone === "focus";
@@ -13095,10 +13110,10 @@ export default function MleoBase() {
                                 openDesktopPanel("ops", "ops-console");
                               }
                             }}
-                            className={`min-h-[60px] rounded-2xl border px-3 py-2 text-left transition hover:bg-white/10 ${
+                            className={`min-h-[60px] rounded-2xl border px-3 py-2 text-left transition hover:bg-white/12 ${
                               focus
-                                ? "border-cyan-400/20 bg-cyan-400/8"
-                                : "border-white/10 bg-white/5"
+                                ? "border-cyan-400/25 bg-cyan-400/[0.12]"
+                                : "border-white/10 bg-white/[0.07]"
                             }`}
                           >
                             <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">
@@ -13113,7 +13128,7 @@ export default function MleoBase() {
                       })}
                     </div>
 
-                    <div className="flex min-h-0 min-w-0 flex-1 flex-col -mt-1">
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                       <BaseHomeFlowScene
                         base={state}
                         derived={derived}
@@ -13121,57 +13136,60 @@ export default function MleoBase() {
                         onSelect={openHomeFlowTarget}
                         layout="desktop"
                         mapTheme={worldMapTheme}
+                        playfieldEmbed
                       />
-                  </div>
-                          </div>
-                          </div>
-                          </div>
+                    </div>
+
+                    <div className="mx-auto mt-2 w-full max-w-5xl shrink-0 border-t border-white/10 pt-3">
+                      <div className="grid grid-cols-4 gap-2 rounded-2xl border border-white/10 bg-slate-950/35 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-md">
+                        {[
+                          {
+                            key: "overview",
+                            label: "Overview",
+                            badge:
+                              readyCounts.contracts +
+                              readyCounts.missions +
+                              (readyCounts.specializationMilestones || 0),
+                          },
+                          {
+                            key: "ops",
+                            label: "Operations",
+                            badge: readyCounts.expedition + readyCounts.shipment,
+                          },
+                          { key: "build", label: "Build", badge: buildOpportunitiesCount },
+                          { key: "intel", label: "Intel", badge: 0 },
+                        ].map((tab) => {
+                          const active = desktopPanelOpen && desktopPanel === tab.key;
+                          const hasBadge = Number(tab.badge || 0) > 0;
+
+                          return (
+                            <button
+                              key={tab.key}
+                              type="button"
+                              onClick={() => openDesktopPanel(tab.key)}
+                              className={`relative rounded-2xl px-4 py-3 text-sm font-bold transition ${
+                                active
+                                  ? "bg-cyan-500 text-white"
+                                  : hasBadge
+                                  ? "border border-cyan-400/40 bg-cyan-500/10 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.12)]"
+                                  : "border border-white/10 bg-white/[0.06] text-white/75 hover:bg-white/10"
+                              }`}
+                            >
+                              {tab.label}
+                              {hasBadge ? (
+                                <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-cyan-400 px-1 text-[10px] font-black text-slate-950">
+                                  {tab.badge}
+                                </span>
+                              ) : null}
+                            </button>
+                          );
+                        })}
                       </div>
-
-            {/* Desktop Fixed Nav */}
-            <div className="fixed inset-x-0 bottom-0 z-[118] hidden lg:block px-6 pb-6 pt-3">
-              <div className="mx-auto max-w-5xl rounded-3xl border border-white/10 bg-slate-950/88 p-2 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    {
-                      key: "overview",
-                      label: "Overview",
-                      badge:
-                        readyCounts.contracts +
-                        readyCounts.missions +
-                        (readyCounts.specializationMilestones || 0),
-                    },
-                    { key: "ops", label: "Operations", badge: readyCounts.expedition + readyCounts.shipment },
-                    { key: "build", label: "Build", badge: buildOpportunitiesCount },
-                    { key: "intel", label: "Intel", badge: 0 },
-                  ].map((tab) => {
-                    const active = desktopPanelOpen && desktopPanel === tab.key;
-                    const hasBadge = Number(tab.badge || 0) > 0;
-
-                    return (
-                    <button
-                        key={tab.key}
-                        onClick={() => openDesktopPanel(tab.key)}
-                        className={`relative rounded-2xl px-4 py-3 text-sm font-bold transition ${
-                          active
-                            ? "bg-cyan-500 text-white"
-                            : hasBadge
-                            ? "border border-cyan-400/40 bg-cyan-500/10 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.12)]"
-                            : "border border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
-                        }`}
-                      >
-                        {tab.label}
-                        {hasBadge ? (
-                          <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-cyan-400 px-1 text-[10px] font-black text-slate-950">
-                            {tab.badge}
-                          </span>
-                        ) : null}
-                    </button>
-                    );
-                  })}
-                </div>
+                    </div>
+                  </div>
                 </div>
               </div>
+            </div>
           </>
 
           {shownInfo ? (
@@ -13190,19 +13208,17 @@ export default function MleoBase() {
             </>
           ) : null}
 
-          {/* Mobile */}
-          <div
-            className="relative mt-4 space-y-3 sm:hidden overscroll-none pb-28"
-            style={{
-              background: `
-                radial-gradient(circle at 50% 56%, rgba(16,185,129,0.18) 0%, rgba(16,185,129,0.08) 14%, transparent 24%),
-                radial-gradient(circle at 50% 56%, rgba(34,211,238,0.10) 0%, transparent 42%),
-                linear-gradient(180deg, rgba(2,6,23,0.95) 0%, rgba(8,15,30,0.96) 42%, rgba(2,6,23,0.98) 100%),
-                repeating-linear-gradient(90deg, rgba(148,163,184,0.06) 0, rgba(148,163,184,0.06) 1px, transparent 1px, transparent 22px),
-                repeating-linear-gradient(0deg, rgba(148,163,184,0.05) 0, rgba(148,163,184,0.05) 1px, transparent 1px, transparent 22px)
-              `,
-            }}
-          >
+          {/* Mobile — world playfield canvas (tabs below use matching bg) */}
+          <div className="relative mt-4 space-y-3 sm:hidden overscroll-none pb-28">
+            <div
+              className="relative overflow-hidden rounded-[24px] border border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.22)]"
+              style={{ background: worldPlayfieldBackgroundMobile }}
+            >
+              <div
+                className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-b from-slate-950/50 via-slate-950/32 to-slate-950/52"
+                aria-hidden
+              />
+              <div className="relative z-[1] space-y-3 px-2 pb-1 pt-2">
             <div
               role="button"
               tabIndex={commandHubCount > 0 ? 0 : -1}
@@ -13335,13 +13351,24 @@ export default function MleoBase() {
                 selected={highlightTarget}
                 onSelect={openHomeFlowTarget}
                 mapTheme={worldMapTheme}
+                playfieldEmbed
               />
+            </div>
+              </div>
             </div>
           </div>
 
           {/* Mobile Bottom Nav - fixed above panels so switching doesn't require closing */}
           <div className="fixed inset-x-0 bottom-0 z-[120] px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 sm:hidden">
-            <div className="mx-auto max-w-md rounded-3xl border border-white/10 bg-slate-950/88 p-2 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+            <div
+              className="relative mx-auto max-w-md overflow-hidden rounded-3xl border border-white/10 p-2 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md"
+              style={{ background: worldPlayfieldBackgroundMobile }}
+            >
+              <div
+                className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-t from-slate-950/40 via-slate-950/25 to-slate-950/35"
+                aria-hidden
+              />
+              <div className="relative z-[1]">
               <div className="grid grid-cols-4 gap-1.5 min-[400px]:gap-2">
                 {[
                   {
@@ -13396,6 +13423,7 @@ export default function MleoBase() {
                     </button>
                   );
                 })}
+              </div>
               </div>
             </div>
           </div>
