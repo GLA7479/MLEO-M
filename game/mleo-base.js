@@ -2673,14 +2673,14 @@ function sectionStatusHint(type, data = {}) {
 
   if (type === "intel-summary") {
     return data.count > 0
-      ? "Key progress and identity data available"
-      : "No tracked progress yet";
+      ? `${data.count} signals · open for snapshot`
+      : "Snapshot idle · open to inspect";
   }
 
   if (type === "intel-log") {
     return data.count > 0
-      ? `${data.count} recent log entr${data.count > 1 ? "ies" : "y"}`
-      : "No log entries yet";
+      ? `${data.count} recent · open to read`
+      : "No entries · open for links & tools";
   }
 
   return "";
@@ -12981,7 +12981,11 @@ export default function MleoBase() {
                         <IntelPanelCards
                           panelTone={internalPanelTone}
                           progressCardClass={buildSectionCardClass(intelSummaryAvailableCount > 0)}
-                          logCardClass={buildSectionCardClass(intelLogAvailableCount > 0)}
+                          logCardClass={buildSectionCardClass(false)}
+                          progressHint={sectionStatusHint("intel-summary", {
+                            count: intelSummaryAvailableCount,
+                          })}
+                          logHint={sectionStatusHint("intel-log", { count: intelLogAvailableCount })}
                           openInnerPanel={openInnerPanel}
                           toggleInnerPanel={toggleInnerPanel}
                           progressAvailableCount={intelSummaryAvailableCount}
@@ -13459,7 +13463,11 @@ export default function MleoBase() {
                       <IntelPanelCards
                         panelTone={internalPanelTone}
                         progressCardClass={buildSectionCardClass(intelSummaryAvailableCount > 0)}
-                        logCardClass={buildSectionCardClass(intelLogAvailableCount > 0)}
+                        logCardClass={buildSectionCardClass(false)}
+                        progressHint={sectionStatusHint("intel-summary", {
+                          count: intelSummaryAvailableCount,
+                        })}
+                        logHint={sectionStatusHint("intel-log", { count: intelLogAvailableCount })}
                         openInnerPanel={openInnerPanel}
                         toggleInnerPanel={toggleInnerPanel}
                         progressAvailableCount={intelSummaryAvailableCount}
