@@ -3452,6 +3452,34 @@ function rewardText(reward) {
     .join(" · ");
 }
 
+const HQ_PREVIEW_SCALABLE_RESOURCES = new Set(["GOLD", "ORE", "SCRAP", "DATA"]);
+
+function getHqPreviewRewardMultiplier(hqLevel) {
+  const hq = Math.max(1, Number(hqLevel || 1));
+  if (hq >= 9) return 1.6;
+  if (hq >= 7) return 1.42;
+  if (hq >= 5) return 1.26;
+  if (hq >= 3) return 1.12;
+  return 1.0;
+}
+
+function scalePreviewRewardAmount(baseAmount, multiplier) {
+  const value = Number(baseAmount || 0);
+  if (value <= 0) return 0;
+  return Math.max(1, Math.floor(value * Math.max(0, Number(multiplier || 1))));
+}
+
+function getLane2ScaledPreviewReward(reward, hqLevel) {
+  if (!reward || typeof reward !== "object") return reward;
+  const multiplier = getHqPreviewRewardMultiplier(hqLevel);
+  const next = { ...reward };
+  for (const key of Object.keys(next)) {
+    if (!HQ_PREVIEW_SCALABLE_RESOURCES.has(key)) continue;
+    next[key] = scalePreviewRewardAmount(next[key], multiplier);
+  }
+  return next;
+}
+
 function getSpecializationGuidanceAction(state, derived, specializationSummary, liveContracts = []) {
   if (!specializationSummary || typeof specializationSummary !== "object") return null;
 
@@ -6151,20 +6179,29 @@ export default function MleoBase() {
 
     const base = LIVE_CONTRACTS.filter((contract) =>
       typeof contract.visible === "function" ? contract.visible(state, derived) : true
-    ).map((contract) => ({
-      ...contract,
-      contractClass: contract.contractClass || "basic",
-      done: contract.check(state, derived),
-      claimed: !!contractClaimedMap[contract.key],
-      advancedTierPill:
-        contract.contractClass === "advanced" && contract.requiresTier && contract.supportBuilding
-          ? `T${contract.requiresTier} ${SUPPORT_BUILDING_CONTRACT_SHORT[contract.supportBuilding] || ""}`.trim()
-          : null,
-      advancedProgramPill:
-        contract.contractClass === "advanced" && contract.requiresProgram && contract.supportBuilding
-          ? `Program: ${supportProgramLabelForContract(contract.supportBuilding, contract.requiresProgram)}`
-          : null,
-    }));
+    ).map((contract) => {
+      const contractClass = contract.contractClass || "basic";
+      const isLane2PreviewScope = contractClass === "basic";
+      const previewReward = isLane2PreviewScope
+        ? getLane2ScaledPreviewReward(contract.reward, state?.buildings?.hq)
+        : contract.reward;
+
+      return {
+        ...contract,
+        contractClass,
+        rewardText: isLane2PreviewScope ? `Reward: ${rewardText(previewReward)}` : contract.rewardText,
+        done: contract.check(state, derived),
+        claimed: !!contractClaimedMap[contract.key],
+        advancedTierPill:
+          contract.contractClass === "advanced" && contract.requiresTier && contract.supportBuilding
+            ? `T${contract.requiresTier} ${SUPPORT_BUILDING_CONTRACT_SHORT[contract.supportBuilding] || ""}`.trim()
+            : null,
+        advancedProgramPill:
+          contract.contractClass === "advanced" && contract.requiresProgram && contract.supportBuilding
+            ? `Program: ${supportProgramLabelForContract(contract.supportBuilding, contract.requiresProgram)}`
+            : null,
+      };
+    });
 
     const eliteRows =
       dayKey && offerKeys.size
@@ -8384,6 +8421,7 @@ export default function MleoBase() {
     const ready = done && !claimed;
 
     const guidance = getMissionGuidance(mission.key);
+    const previewReward = getLane2ScaledPreviewReward(mission.reward, state?.buildings?.hq);
 
     return {
       key: mission.key,
@@ -8392,7 +8430,7 @@ export default function MleoBase() {
       target: mission.target,
       progressText: fmt(progress),
       targetText: fmt(mission.target),
-      rewardText: rewardText(mission.reward),
+      rewardText: rewardText(previewReward),
       quickTags: getMissionQuickTags(mission.key),
       helpText: guidance?.helperLine || null,
       guidance,
