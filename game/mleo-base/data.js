@@ -26,7 +26,7 @@ export const BUILDINGS = [
   {
     key: "hq",
     name: "HQ",
-    desc: "Core base level. Improves global efficiency and unlocks advanced systems.",
+    desc: "Boosts efficiency and unlocks advanced systems.",
     baseCost: { GOLD: 80, ORE: 40 },
     growth: 1.18,
     energyUse: 0,

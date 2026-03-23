@@ -11609,11 +11609,11 @@ export default function MleoBase() {
         </div>
       ) : null;
 
-    const requirementsText = building.requires?.length
-      ? building.requires
-          .map((req) => `${reqNameMap[req.key] || req.key} Lv ${req.lvl}`)
-          .join(" · ")
-      : "";
+    const unmetRequirements = (building.requires || [])
+      .filter((req) => Number(state?.buildings?.[req.key] || 0) < Number(req.lvl || 1))
+      .map((req) => `${reqNameMap[req.key] || req.key} Lv ${req.lvl || 1}`);
+
+    const requirementsText = unmetRequirements.join(" · ");
 
     let buttonText = ready
       ? "Upgrade"
@@ -11758,6 +11758,7 @@ export default function MleoBase() {
       programCards,
       milestoneCards,
       requirementsText,
+      unmetRequirements,
       ready,
       buildBusy: activeBuildKey === building.key,
       canAffordCost: canCoverCostForBtn,

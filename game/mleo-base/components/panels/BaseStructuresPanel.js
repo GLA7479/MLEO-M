@@ -212,6 +212,13 @@ export function BaseStructuresPanel({
                     </div>
                   </div>
 
+                  {!card.ready && card.requirementsText ? (
+                    <div className="rounded-md border border-amber-400/25 bg-amber-500/10 px-2 py-1 text-[10px] leading-snug text-amber-100/90">
+                      <span className="font-semibold">Missing:</span>{" "}
+                      <span className="line-clamp-2">{card.requirementsText}</span>
+                    </div>
+                  ) : null}
+
                   <div className="mt-0.5">
                     <div className="text-[9px] font-semibold uppercase tracking-wider text-white/35">Cost</div>
                     {card.costRow}
