@@ -20,21 +20,25 @@ export function MobilePanelOverlayShell({ title, bankedBadge, onClose, scrollRef
   return (
     <div className="fixed inset-0 z-[115] bg-black/55 backdrop-blur-sm sm:hidden">
       <div className="absolute inset-x-0 bottom-0 top-[84px] rounded-t-[28px] border border-white/10 bg-[#0b1526] shadow-2xl">
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-          <div className="min-w-0">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={title ? `Close ${title} panel` : "Close panel"}
+          className="group flex w-full items-center justify-between gap-3 border-b border-white/10 px-4 py-3 text-left outline-none transition hover:bg-white/[0.04] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400/50 focus-visible:ring-offset-0"
+        >
+          <div className="min-w-0 pointer-events-none">
             <div className="text-lg font-bold text-white">{title}</div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 pointer-events-none">
             {bankedBadge}
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-bold text-white/90 outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b1526]"
+            <span
+              aria-hidden
+              className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-bold text-white/90 group-hover:border-white/12 group-hover:bg-white/[0.09]"
             >
               Close
-            </button>
+            </span>
           </div>
-        </div>
+        </button>
 
         <div ref={scrollRef} className="h-[calc(100%-73px)] overflow-y-auto px-4 py-4 pb-28">
           {children}
