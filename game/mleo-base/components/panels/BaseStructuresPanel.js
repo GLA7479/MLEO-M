@@ -236,7 +236,7 @@ export function BaseStructuresPanel({
                     aria-expanded={supportProgramsOpen && !specSectionsLocked}
                     disabled={specSectionsLocked}
                     title={specSectionsLocked ? "Build this structure first" : undefined}
-                    className={`group flex w-full touch-manipulation items-center justify-between gap-2 rounded-lg text-left outline-none transition focus-visible:ring-2 focus-visible:ring-violet-400/40 focus-visible:ring-offset-0 ${
+                    className={`group flex min-h-[44px] w-full touch-manipulation items-center justify-between gap-2 rounded-lg px-0.5 py-1 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-violet-400/40 focus-visible:ring-offset-0 sm:min-h-0 sm:py-0 ${
                       specSectionsLocked
                         ? "cursor-not-allowed opacity-90"
                         : "hover:bg-violet-500/[0.06] active:bg-violet-500/[0.09]"
@@ -340,7 +340,7 @@ export function BaseStructuresPanel({
                     aria-expanded={milestonesOpen && !specSectionsLocked}
                     disabled={specSectionsLocked}
                     title={specSectionsLocked ? "Build this structure first" : undefined}
-                    className={`group flex w-full touch-manipulation items-center justify-between gap-2 rounded-lg text-left outline-none ring-0 transition focus-visible:ring-2 focus-visible:ring-amber-400/45 focus-visible:ring-offset-0 ${
+                    className={`group flex min-h-[44px] w-full touch-manipulation items-center justify-between gap-2 rounded-lg px-0.5 py-1 text-left outline-none ring-0 transition focus-visible:ring-2 focus-visible:ring-amber-400/45 focus-visible:ring-offset-0 sm:min-h-0 sm:py-0 ${
                       specSectionsLocked
                         ? "cursor-not-allowed opacity-90"
                         : "hover:bg-amber-500/[0.07] active:bg-amber-500/[0.1]"

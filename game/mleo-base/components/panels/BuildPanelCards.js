@@ -2,13 +2,16 @@ import { ExpandablePanelSectionHeader } from "./ExpandablePanelSectionHeader";
 
 function SectionAvailabilityBadge({ count, panelTone }) {
   const extra = panelTone?.sectionCountBadge ? ` ${panelTone.sectionCountBadge}` : "";
-  if (!count) return null;
+  const n = Number(count || 0);
+  if (!n) return null;
+  const label = n > 99 ? "99+" : String(n);
 
   return (
     <span
-      className={`inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-cyan-400 px-1.5 text-[10px] font-black text-slate-950${extra}`}
+      title={n > 99 ? `${n} available` : undefined}
+      className={`inline-flex min-h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-cyan-400 px-1.5 text-[10px] font-black tabular-nums text-slate-950${extra}`}
     >
-      {count}
+      {label}
     </span>
   );
 }
@@ -50,8 +53,8 @@ export function BuildPanelCards({
           overviewTapRow
           subtlePill={structuresCount === 0}
         >
-          <div className="flex flex-wrap items-center gap-1.5">
-            <div className="text-[15px] font-extrabold tracking-tight text-white sm:text-lg">Base Structures</div>
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <div className="min-w-0 text-[15px] font-extrabold tracking-tight text-white sm:text-lg">Base Structures</div>
             <SectionAvailabilityBadge count={structuresCount} panelTone={panelTone} />
           </div>
           {panelTone?.sectionBar ? <div className={panelTone.sectionBar} aria-hidden /> : null}
@@ -86,8 +89,8 @@ export function BuildPanelCards({
           overviewTapRow
           subtlePill={developmentCount === 0}
         >
-          <div className="flex flex-wrap items-center gap-1.5">
-            <div className="text-[15px] font-bold tracking-tight text-white/95 sm:text-lg">Development</div>
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <div className="min-w-0 text-[15px] font-bold tracking-tight text-white/95 sm:text-lg">Development</div>
             <SectionAvailabilityBadge count={developmentCount} panelTone={panelTone} />
           </div>
           {panelTone?.sectionBar ? <div className={panelTone.sectionBar} aria-hidden /> : null}
@@ -122,8 +125,8 @@ export function BuildPanelCards({
           overviewTapRow
           subtlePill
         >
-          <div className="flex flex-wrap items-center gap-1.5">
-            <div className="text-[15px] font-semibold tracking-tight text-white/82 sm:text-base">Support Systems</div>
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <div className="min-w-0 text-[15px] font-semibold tracking-tight text-white/82 sm:text-base">Support Systems</div>
             <SectionAvailabilityBadge count={supportCount} panelTone={panelTone} />
           </div>
           {panelTone?.sectionBar ? <div className={panelTone.sectionBar} aria-hidden /> : null}

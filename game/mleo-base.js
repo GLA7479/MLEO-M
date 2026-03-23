@@ -13276,30 +13276,38 @@ export default function MleoBase() {
           {/* Mobile Bottom Nav - fixed above panels so switching doesn't require closing */}
           <div className="fixed inset-x-0 bottom-0 z-[120] px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 sm:hidden">
             <div className="mx-auto max-w-md rounded-3xl border border-white/10 bg-slate-950/88 p-2 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-1.5 min-[400px]:gap-2">
                 {[
                   {
                     key: "overview",
                     label: "Overview",
+                    ariaLabel: "Overview",
                     badge:
                       readyCounts.contracts +
                       readyCounts.missions +
                       (readyCounts.specializationMilestones || 0),
                   },
-                  { key: "ops", label: "Ops", badge: readyCounts.expedition + readyCounts.shipment },
-                  { key: "build", label: "Build", badge: buildOpportunitiesCount },
-                  { key: "intel", label: "Intel", badge: 0 },
+                  {
+                    key: "ops",
+                    label: "Ops",
+                    ariaLabel: "Operations",
+                    badge: readyCounts.expedition + readyCounts.shipment,
+                  },
+                  { key: "build", label: "Build", ariaLabel: "Build", badge: buildOpportunitiesCount },
+                  { key: "intel", label: "Intel", ariaLabel: "Intel", badge: 0 },
                 ].map((tab) => {
                   const active = mobilePanel === tab.key;
-                  const hasBadge = Number(tab.badge || 0) > 0;
+                  const badgeN = Number(tab.badge || 0);
+                  const hasBadge = badgeN > 0;
+                  const badgeText = badgeN > 99 ? "99+" : String(badgeN);
 
                   return (
                     <button
                       key={tab.key}
                       type="button"
-                      aria-label={tab.key === "ops" ? "Operations" : undefined}
+                      aria-label={tab.ariaLabel}
                       onClick={() => openMobilePanel(tab.key)}
-                      className={`relative rounded-2xl px-3 py-3 text-xs font-bold transition ${
+                      className={`relative min-h-[44px] min-w-0 rounded-2xl px-2 py-2.5 text-center text-[11px] font-bold leading-tight transition min-[400px]:px-3 min-[400px]:py-3 min-[400px]:text-xs ${
                         active
                           ? "bg-cyan-500 text-white"
                           : hasBadge
@@ -13307,10 +13315,13 @@ export default function MleoBase() {
                           : "border border-white/10 bg-white/5 text-white/70"
                       }`}
                     >
-                      {tab.label}
+                      <span className="line-clamp-2">{tab.label}</span>
                       {hasBadge ? (
-                        <span className="absolute -right-1 -top-1 inline-flex min-w-5 h-5 items-center justify-center rounded-full bg-cyan-400 px-1 text-[10px] font-black text-slate-950">
-                          {tab.badge}
+                        <span
+                          title={badgeN > 99 ? `${badgeN} ready` : undefined}
+                          className="absolute -right-0.5 -top-0.5 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-cyan-400 px-1 text-[9px] font-black tabular-nums text-slate-950 min-[400px]:-right-1 min-[400px]:-top-1 min-[400px]:text-[10px]"
+                        >
+                          {badgeText}
                         </span>
                       ) : null}
                     </button>

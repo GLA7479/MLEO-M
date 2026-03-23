@@ -56,16 +56,16 @@ export function ProgressSummaryPanel({
       <div className={`rounded-lg border border-white/[0.09] bg-black/18 p-2 sm:p-2.5${tile}`}>
         <div className="text-[13px] font-medium text-white/92">Identity</div>
         <div className="mt-1.5 space-y-1 text-[12px] leading-snug text-white/62 sm:text-[13px] sm:text-white/65">
-          <div>
+          <div className="break-words">
             <span className="text-white/40">Role:</span> {crewRoleName}
           </div>
-          <div>
+          <div className="break-words">
             <span className="text-white/40">Path:</span> {commanderPathName}
           </div>
-          <div>
+          <div className="break-words">
             <span className="text-white/40">State:</span> {systemStateLabel}
           </div>
-          <div>
+          <div className="break-words">
             <span className="text-white/40">Profile:</span> {baseProfile}
           </div>
         </div>
@@ -106,7 +106,7 @@ export function ActivityLogPanel({ panelTone, logEntries, onResetGame }) {
             key={entry?.id}
             className={`rounded-md border border-white/[0.06] bg-black/20 px-2 py-1.5 text-[11px] leading-snug text-white/58 sm:text-[11px] sm:text-white/60${tile}`}
           >
-            <div>{entry?.text}</div>
+            <div className="break-words">{entry?.text}</div>
             <div className="mt-px text-[9px] text-white/32">
               {entry?.ts ? new Date(entry.ts).toLocaleTimeString() : ""}
             </div>
