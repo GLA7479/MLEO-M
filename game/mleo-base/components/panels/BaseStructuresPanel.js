@@ -176,19 +176,6 @@ export function BaseStructuresPanel({
                 {card.desc}
               </div>
 
-              {card.liveNowNext?.nowLine ? (
-                <div className="mt-1.5 space-y-0.5">
-                  <div className="text-[10px] font-semibold leading-snug text-white/[0.88] sm:text-[11px]">
-                    {card.liveNowNext.nowLine}
-                  </div>
-                  {card.liveNowNext.nextLine ? (
-                    <div className="text-[10px] font-bold leading-snug text-emerald-200/95 sm:text-[11px]">
-                      {card.liveNowNext.nextLine}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-
               {/* Content row: left meta/status stack + right upgrade impact box (same two-column layout as desktop on all breakpoints) */}
               <div className="mt-1.5 grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2">
                 {/* LEFT column */}
@@ -226,12 +213,23 @@ export function BaseStructuresPanel({
 
                 {/* RIGHT column */}
                 <div className="flex min-h-[34px] shrink-0 items-center justify-self-end">
-                  {card.upgradeImpactPreview ? (
-                    <div className="rounded-lg border border-cyan-400/20 bg-cyan-500/8 px-2.5 py-1 max-sm:px-2 max-sm:py-1.5">
+                  {card.liveNowNext?.nowLine ? (
+                    <div className="w-[144px] rounded-lg border border-emerald-400/25 bg-emerald-500/10 px-2 py-1">
+                      <div className="line-clamp-1 text-[10px] font-semibold leading-snug text-white/90">
+                        {card.liveNowNext.nowLine}
+                      </div>
+                      {card.liveNowNext.nextLine ? (
+                        <div className="line-clamp-2 text-[10px] font-bold leading-snug text-emerald-100">
+                          {card.liveNowNext.nextLine}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : card.upgradeImpactPreview ? (
+                    <div className="w-[144px] rounded-lg border border-cyan-400/20 bg-cyan-500/8 px-2 py-1">
                       <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/70">
                         {card.upgradeImpactPreview.label}
                       </div>
-                      <div className="text-[11px] font-semibold text-cyan-100 max-sm:text-xs max-sm:font-bold">
+                      <div className="text-[11px] font-semibold text-cyan-100 max-sm:text-[10px] max-sm:font-bold">
                         {card.upgradeImpactPreview.value}
                       </div>
                       {card.upgradeImpactPreview.note ? (
@@ -241,7 +239,7 @@ export function BaseStructuresPanel({
                       ) : null}
                     </div>
                   ) : (
-                    <div className="h-[34px]" />
+                    <div className="h-[34px] w-[144px]" />
                   )}
                 </div>
               </div>
