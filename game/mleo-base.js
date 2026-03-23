@@ -2661,26 +2661,22 @@ function sectionStatusHint(type, data = {}) {
     if (data.refill) parts.push("Refill up");
     if (data.maintain) parts.push("Maintain up");
     return parts.length
-      ? `${parts.join(" · ")} — open to act`
-      : "Field run, vault tools, transfers — open when ready";
+      ? `${parts.join(" · ")} · open`
+      : "Field, vault, transfers · open when ready";
   }
 
   if (type === "daily-missions") {
     return data.count > 0
-      ? `${data.count} to claim — open to collect`
-      : "No claims yet — preview tasks inside";
+      ? `${data.count} to claim · open`
+      : "No claims · preview inside";
   }
 
   if (type === "intel-summary") {
-    return data.count > 0
-      ? `${data.count} signals · open for snapshot`
-      : "Snapshot idle · open to inspect";
+    return data.count > 0 ? `${data.count} signals · open` : "Idle · open";
   }
 
   if (type === "intel-log") {
-    return data.count > 0
-      ? `${data.count} recent · open to read`
-      : "No entries · open for links & tools";
+    return data.count > 0 ? `${data.count} lines · open` : "Empty · open";
   }
 
   return "";
@@ -2705,7 +2701,7 @@ function buildSectionHint(type, counts) {
   }
 
   if (type === "support") {
-    return "Blueprint & tools · if needed";
+    return "Blueprint & tools · open if needed";
   }
 
   return "";

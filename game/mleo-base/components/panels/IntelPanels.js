@@ -30,43 +30,43 @@ export function ProgressSummaryPanel({
       : "Early Outpost";
 
   return (
-    <div className="grid gap-2 md:grid-cols-2">
-      <div className={`rounded-xl border border-white/10 bg-black/20 p-2.5 sm:p-3${tile}`}>
-        <div className="text-sm font-semibold text-white">Totals</div>
-        <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-white/70 sm:gap-3">
+    <div className="grid gap-1.5 md:grid-cols-2">
+      <div className={`rounded-lg border border-white/[0.09] bg-black/18 p-2 sm:p-2.5${tile}`}>
+        <div className="text-[13px] font-medium text-white/92">Totals</div>
+        <div className="mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1.5 text-[13px] text-white/68 sm:text-sm sm:text-white/72">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Shipped</div>
-            <div className="mt-0.5 font-semibold text-white">{fmt(totalBanked)} MLEO</div>
+            <div className="text-[9px] font-semibold uppercase tracking-wider text-white/38">Shipped</div>
+            <div className="mt-px font-semibold text-white">{fmt(totalBanked)} MLEO</div>
           </div>
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Vault Spent</div>
-            <div className="mt-0.5 font-semibold text-white">{fmt(totalSharedSpent)} MLEO</div>
+            <div className="text-[9px] font-semibold uppercase tracking-wider text-white/38">Vault Spent</div>
+            <div className="mt-px font-semibold text-white">{fmt(totalSharedSpent)} MLEO</div>
           </div>
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Expeditions</div>
-            <div className="mt-0.5 font-semibold text-white">{fmt(totalExpeditions)}</div>
+            <div className="text-[9px] font-semibold uppercase tracking-wider text-white/38">Expeditions</div>
+            <div className="mt-px font-semibold text-white">{fmt(totalExpeditions)}</div>
           </div>
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Missions</div>
-            <div className="mt-0.5 font-semibold text-white">{fmt(totalMissionsDone)}</div>
+            <div className="text-[9px] font-semibold uppercase tracking-wider text-white/38">Missions</div>
+            <div className="mt-px font-semibold text-white">{fmt(totalMissionsDone)}</div>
           </div>
         </div>
       </div>
 
-      <div className={`rounded-xl border border-white/10 bg-black/20 p-2.5 sm:p-3${tile}`}>
-        <div className="text-sm font-semibold text-white">Identity Snapshot</div>
-        <div className="mt-2 space-y-1.5 text-[13px] text-white/68 sm:text-sm sm:text-white/70">
+      <div className={`rounded-lg border border-white/[0.09] bg-black/18 p-2 sm:p-2.5${tile}`}>
+        <div className="text-[13px] font-medium text-white/92">Identity</div>
+        <div className="mt-1.5 space-y-1 text-[12px] leading-snug text-white/62 sm:text-[13px] sm:text-white/65">
           <div>
-            <span className="text-white/45">Crew role:</span> {crewRoleName}
+            <span className="text-white/40">Role:</span> {crewRoleName}
           </div>
           <div>
-            <span className="text-white/45">Commander path:</span> {commanderPathName}
+            <span className="text-white/40">Path:</span> {commanderPathName}
           </div>
           <div>
-            <span className="text-white/45">System state:</span> {systemStateLabel}
+            <span className="text-white/40">State:</span> {systemStateLabel}
           </div>
           <div>
-            <span className="text-white/45">Base profile:</span> {baseProfile}
+            <span className="text-white/40">Profile:</span> {baseProfile}
           </div>
         </div>
       </div>
@@ -78,36 +78,36 @@ export function ActivityLogPanel({ panelTone, logEntries, onResetGame }) {
   const tile = panelTone?.compactUtilityTile ? ` ${panelTone.compactUtilityTile}` : "";
   return (
     <>
-      <div className="mb-2 flex flex-wrap gap-1.5">
+      <div className="mb-1.5 flex flex-wrap gap-1">
         <Link
           href="/mleo-miners"
-          className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-1.5 text-xs font-semibold text-emerald-200/90 hover:bg-emerald-500/15 sm:rounded-xl sm:px-3.5 sm:py-2 sm:text-sm"
+          className="rounded-md border border-emerald-500/15 bg-emerald-500/[0.05] px-2.5 py-1 text-[11px] font-medium text-emerald-200/75 hover:bg-emerald-500/12 sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs"
         >
-          Open Miners
+          Miners
         </Link>
         <Link
           href="/arcade"
-          className="rounded-lg border border-sky-500/20 bg-sky-500/[0.07] px-3 py-1.5 text-xs font-semibold text-sky-200/90 hover:bg-sky-500/15 sm:rounded-xl sm:px-3.5 sm:py-2 sm:text-sm"
+          className="rounded-md border border-sky-500/15 bg-sky-500/[0.05] px-2.5 py-1 text-[11px] font-medium text-sky-200/75 hover:bg-sky-500/12 sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs"
         >
-          Open Arcade
+          Arcade
         </Link>
         <button
           type="button"
           onClick={onResetGame}
-          className="rounded-lg border border-rose-500/20 bg-rose-500/[0.07] px-3 py-1.5 text-xs font-semibold text-rose-200/90 hover:bg-rose-500/15 sm:rounded-xl sm:px-3.5 sm:py-2 sm:text-sm"
+          className="rounded-md border border-rose-500/15 bg-rose-500/[0.05] px-2.5 py-1 text-[11px] font-medium text-rose-200/75 hover:bg-rose-500/12 sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs"
         >
-          Reset Game
+          Reset
         </button>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         {(Array.isArray(logEntries) ? logEntries : []).slice(0, 4).map((entry) => (
           <div
             key={entry?.id}
-            className={`rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-white/68 sm:px-3 sm:py-2 sm:text-xs${tile}`}
+            className={`rounded-md border border-white/[0.06] bg-black/20 px-2 py-1.5 text-[11px] leading-snug text-white/58 sm:text-[11px] sm:text-white/60${tile}`}
           >
             <div>{entry?.text}</div>
-            <div className="mt-0.5 text-[10px] text-white/38">
+            <div className="mt-px text-[9px] text-white/32">
               {entry?.ts ? new Date(entry.ts).toLocaleTimeString() : ""}
             </div>
           </div>
@@ -134,11 +134,8 @@ export function IntelPanelCards({
   const hintRow = panelTone?.helperRow ? ` ${panelTone.helperRow}` : "";
 
   const progressHintText =
-    progressHint != null && progressHint !== ""
-      ? progressHint
-      : "Key progress and identity — open to view";
-  const logHintText =
-    logHint != null && logHint !== "" ? logHint : "Recent events and external links — open to view";
+    progressHint != null && progressHint !== "" ? progressHint : "Totals & identity · open";
+  const logHintText = logHint != null && logHint !== "" ? logHint : "History & links · open";
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -162,7 +159,7 @@ export function IntelPanelCards({
           {openInnerPanel !== "intel-summary" ? (
             <div
               className={`mt-0.5 line-clamp-2 text-[10px] leading-snug sm:text-xs${hintRow} ${
-                progressAvailableCount > 0 ? "text-cyan-100/68" : "text-white/48 sm:text-white/52"
+                progressAvailableCount > 0 ? "text-cyan-100/70" : "text-white/48 sm:text-white/52"
               }`}
             >
               {progressHintText}
@@ -175,7 +172,7 @@ export function IntelPanelCards({
         ) : null}
       </div>
 
-      {/* Tertiary — log, links, reference */}
+      {/* Reference — log & tools */}
       <div
         className={
           logCardClass
@@ -190,11 +187,11 @@ export function IntelPanelCards({
           overviewTapRow
           subtlePill
         >
-          <div className="text-[15px] font-semibold tracking-tight text-white/88 sm:text-base">Activity Log</div>
+          <div className="text-[15px] font-semibold tracking-tight text-white/82 sm:text-base">Activity Log</div>
           {panelTone?.sectionBar ? <div className={panelTone.sectionBar} aria-hidden /> : null}
           {openInnerPanel !== "intel-log" ? (
             <div
-              className={`mt-0.5 line-clamp-2 text-[10px] leading-snug text-white/44 sm:text-[11px] sm:text-white/48${hintRow}`}
+              className={`mt-0.5 line-clamp-2 text-[10px] leading-snug text-white/42 sm:text-xs sm:text-white/46${hintRow}`}
             >
               {logHintText}
             </div>

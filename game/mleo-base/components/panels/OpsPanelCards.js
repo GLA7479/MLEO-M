@@ -33,11 +33,11 @@ export function OpsPanelCards({
   const hintRow = panelTone?.helperRow ? ` ${panelTone.helperRow}` : "";
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2.5">
       {/* A) Action now — daily missions */}
       <section aria-label="Daily missions">
         <div
-          className={`rounded-2xl border p-2.5 transition sm:rounded-3xl sm:p-3${shell} ${missionsCardClass} ${
+          className={`rounded-2xl border p-2 transition sm:rounded-3xl sm:p-2.5${shell} ${missionsCardClass} ${
             missionsAvailableCount > 0 ? "shadow-[0_0_20px_rgba(251,191,36,0.06)]" : ""
           }`}
         >
@@ -61,7 +61,7 @@ export function OpsPanelCards({
             {panelTone?.sectionBar ? <div className={panelTone.sectionBar} aria-hidden /> : null}
             {openInnerPanel !== "ops-missions" ? (
               <div
-                className={`mt-0.5 line-clamp-2 text-[11px] leading-snug sm:text-xs${hintRow} ${
+                className={`mt-0.5 line-clamp-2 text-[10px] leading-snug sm:text-xs${hintRow} ${
                   missionsAvailableCount > 0 ? "text-amber-100/78" : "text-white/48 sm:text-white/52"
                 }`}
               >
@@ -71,14 +71,14 @@ export function OpsPanelCards({
           </ExpandablePanelSectionHeader>
 
           {openInnerPanel === "ops-missions" ? (
-            <div className="mt-2.5">{dailyMissionsContent}</div>
+            <div className="mt-2">{dailyMissionsContent}</div>
           ) : null}
         </div>
       </section>
 
       {/* B) Operating console — ship, expedition, blueprint, utilities */}
       <section aria-label="Operations console">
-        <div className={`rounded-2xl border p-2.5 transition sm:rounded-3xl sm:p-3${shell} ${opsCardClass}`}>
+        <div className={`rounded-2xl border p-2 transition sm:rounded-3xl sm:p-2.5${shell} ${opsCardClass}`}>
           <ExpandablePanelSectionHeader
             panelKey="ops-console"
             openInnerPanel={openInnerPanel}
@@ -87,14 +87,14 @@ export function OpsPanelCards({
             subtlePill={opsAvailableCount === 0}
           >
             <div className="flex flex-wrap items-center gap-1.5">
-              <div className="text-[15px] font-bold text-white/90 sm:text-lg">Operations Console</div>
+              <div className="text-[15px] font-bold text-white/95 sm:text-lg">Operations Console</div>
               <SectionAvailabilityBadge count={opsAvailableCount} panelTone={panelTone} />
             </div>
             {panelTone?.sectionBar ? <div className={panelTone.sectionBar} aria-hidden /> : null}
             {openInnerPanel !== "ops-console" ? (
               <div
-                className={`mt-0.5 line-clamp-2 text-[11px] leading-snug sm:text-xs${hintRow} ${
-                  opsAvailableCount > 0 ? "text-cyan-100/70" : "text-white/45 sm:text-white/50"
+                className={`mt-0.5 line-clamp-2 text-[10px] leading-snug sm:text-xs${hintRow} ${
+                  opsAvailableCount > 0 ? "text-cyan-100/70" : "text-white/48 sm:text-white/52"
                 }`}
               >
                 {opsHintText}
@@ -103,7 +103,7 @@ export function OpsPanelCards({
           </ExpandablePanelSectionHeader>
 
           {openInnerPanel === "ops-console" ? (
-            <div className="mt-2.5">{operationsConsoleContent}</div>
+            <div className="mt-2">{operationsConsoleContent}</div>
           ) : null}
         </div>
       </section>
