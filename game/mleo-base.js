@@ -12624,8 +12624,8 @@ export default function MleoBase() {
 
   return (
     <Layout title="MLEO BASE">
-      <main className="h-[100dvh] overflow-hidden overflow-x-hidden bg-[#07111f] text-white sm:min-h-screen sm:h-auto sm:overflow-visible lg:h-[100dvh] lg:overflow-hidden">
-        <div className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:flex lg:h-full lg:flex-col lg:px-8 lg:pb-32">
+      <main className="h-[100dvh] overflow-hidden overflow-x-hidden bg-[#07111f] text-white sm:min-h-screen sm:h-auto sm:overflow-visible md:h-[100dvh] md:overflow-hidden">
+        <div className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 md:flex md:h-full md:flex-col md:px-8 md:pb-32">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3 lg:gap-4">
             <div className="min-w-0 w-full md:max-w-[min(100%,46%)] md:flex-[0_1_auto] md:shrink md:min-w-0 lg:max-w-[min(100%,42%)] xl:max-w-[min(100%,38%)]">
               {/* Title pill removed for a cleaner V3 look */}
@@ -12964,7 +12964,7 @@ export default function MleoBase() {
           {null}
 
           {/* Desktop */}
-          <div className="mt-6 hidden sm:grid grid-cols-2 lg:hidden gap-3 xl:items-stretch">
+          <div className="mt-6 hidden sm:grid grid-cols-2 md:hidden gap-3 xl:items-stretch">
             <div className="relative">
               <InfoButton
                 infoKey="sharedVault"
@@ -13504,7 +13504,7 @@ export default function MleoBase() {
 
           {/* Desktop Command Center — single world canvas: HUD + map + tab bar */}
           <>
-            <div className="mt-4 hidden min-h-0 flex-1 lg:block">
+            <div className="mt-4 hidden min-h-0 flex-1 md:block">
               <div
                 className="relative flex h-[calc(100dvh-190px)] flex-col overflow-hidden rounded-[30px] border border-white/[0.08] shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-[1px]"
                 style={{ background: worldPlayfieldBackground }}
