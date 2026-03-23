@@ -402,6 +402,8 @@ DECLARE
   v_softcut numeric := 1;
   v_banked_add numeric := 0;
   v_raw_mleo numeric := 0;
+  v_hq integer := 1;
+  v_reward_mult numeric := 1.0;
 BEGIN
   -- Get and lock state
   v_state := public.base_get_or_create_state(p_device_id);
@@ -417,6 +419,8 @@ BEGIN
   v_research := coalesce(v_state.research, '{}'::jsonb);
   v_expedition_ready_at := v_state.expedition_ready_at;
   v_stats := coalesce(v_state.stats, '{}'::jsonb);
+  v_hq := greatest(1, coalesce((v_buildings->>'hq')::integer, 1));
+  v_reward_mult := public.base_hq_reward_multiplier(v_hq);
 
   -- Check cooldown
   IF v_expedition_ready_at IS NOT NULL AND v_expedition_ready_at > now() THEN
@@ -451,6 +455,13 @@ BEGIN
   v_gold := floor((20 + (random() * 45)) * v_base)::integer;
   v_scrap := floor((12 + (random() * 28)) * v_base)::integer;
   v_data := floor((6 + (random() * 14)) * v_rare_bonus)::integer;
+
+  -- Lane 3: HQ-band scaling for expedition resources only (ORE/GOLD/SCRAP/DATA).
+  -- Cost/cooldown/banked-MLEO chance-value/gating remain unchanged.
+  v_ore := public.base_scale_reward_amount(v_ore::numeric, v_reward_mult)::integer;
+  v_gold := public.base_scale_reward_amount(v_gold::numeric, v_reward_mult)::integer;
+  v_scrap := public.base_scale_reward_amount(v_scrap::numeric, v_reward_mult)::integer;
+  v_data := public.base_scale_reward_amount(v_data::numeric, v_reward_mult)::integer;
   
   v_mleo_chance := 0.08 + (v_bay_level * 0.01) + CASE WHEN v_has_deep_scan THEN 0.02 ELSE 0.0 END;
   v_banked_mleo := CASE 
