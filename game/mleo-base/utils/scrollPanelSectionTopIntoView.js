@@ -58,3 +58,57 @@ export function scrollPanelHeaderIntoView(container, headerEl, options = {}) {
 export function scrollPanelSectionTopIntoView(container, target, options = {}) {
   scrollPanelHeaderIntoView(container, target, { padding: Number(options.offset) || 8 });
 }
+
+/** Run after the next two animation frames (layout/paint settled before measuring). */
+export function runAfterDoubleRaf(callback) {
+  if (typeof window === "undefined" || typeof callback !== "function") return;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(callback);
+  });
+}
+
+/**
+ * Scroll `container` so `headerEl` is aligned after layout; uses {@link runAfterDoubleRaf} internally.
+ * @param {HTMLElement | null} container
+ * @param {HTMLElement | null} headerEl
+ * @param {{ padding?: number }} [options]
+ */
+export function scheduleScrollPanelHeaderIntoView(container, headerEl, options = {}) {
+  if (!container || !headerEl) return;
+  runAfterDoubleRaf(() => {
+    scrollPanelHeaderIntoView(container, headerEl, options);
+  });
+}
+
+/** `data-base-inner-panel-header` for the open key, with legacy `data-base-inner-panel` fallback. */
+export function queryInnerPanelHeaderElement(panelKey) {
+  if (typeof document === "undefined" || panelKey == null) return null;
+  const key = String(panelKey);
+  let headerEl = null;
+  try {
+    headerEl = document.querySelector(`[data-base-inner-panel-header="${CSS.escape(key)}"]`);
+  } catch {
+    headerEl = document.querySelector(`[data-base-inner-panel-header="${key}"]`);
+  }
+  if (!headerEl) {
+    try {
+      headerEl = document.querySelector(`[data-base-inner-panel="${CSS.escape(key)}"]`);
+    } catch {
+      headerEl = document.querySelector(`[data-base-inner-panel="${key}"]`);
+    }
+  }
+  return headerEl;
+}
+
+/**
+ * Prefer mobile or desktop BASE overlay scroll roots when they contain the header; else nearest scroller.
+ * @param {HTMLElement | null} headerEl
+ * @param {HTMLElement | null | undefined} mobileRoot
+ * @param {HTMLElement | null | undefined} desktopRoot
+ */
+export function resolvePanelScrollContainerForElement(headerEl, mobileRoot, desktopRoot) {
+  if (!headerEl) return null;
+  if (mobileRoot?.contains(headerEl)) return mobileRoot;
+  if (desktopRoot?.contains(headerEl)) return desktopRoot;
+  return findVerticalScrollContainer(headerEl);
+}

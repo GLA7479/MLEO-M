@@ -1,35 +1,10 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
+import { PanelAvailabilityBadge, PanelTabCountBadge } from "./BasePanelBadges";
 import {
   findVerticalScrollContainer,
-  scrollPanelHeaderIntoView,
+  scheduleScrollPanelHeaderIntoView,
 } from "../../utils/scrollPanelSectionTopIntoView";
-
-function AvailabilityBadge() {
-  return (
-    <span className="inline-flex items-center justify-center rounded-full bg-cyan-400 px-2 py-1 text-[10px] font-black tracking-[0.14em] text-slate-950">
-      AVAILABLE
-    </span>
-  );
-}
-
-function TabCountBadge({ count, title, onBrightTab = false }) {
-  const n = Number(count || 0);
-  if (!n) return null;
-
-  return (
-    <span
-      title={title || ""}
-      className={`inline-flex min-w-6 h-6 shrink-0 items-center justify-center rounded-full px-2 text-[11px] font-black ${
-        onBrightTab
-          ? "bg-slate-950 text-cyan-300 ring-1 ring-cyan-900/40"
-          : "bg-cyan-400 text-slate-950"
-      }`}
-    >
-      {n > 99 ? "99+" : n}
-    </span>
-  );
-}
 
 function availabilityCardClass(isAvailable) {
   return isAvailable ? "border-cyan-400/30 bg-cyan-500/5" : "border-white/10 bg-black/20";
@@ -89,11 +64,7 @@ export function BaseStructuresPanel({
         );
         const scrollParent = headerEl ? findVerticalScrollContainer(headerEl) : null;
         if (scrollParent && headerEl) {
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              scrollPanelHeaderIntoView(scrollParent, headerEl, { padding: 8 });
-            });
-          });
+          scheduleScrollPanelHeaderIntoView(scrollParent, headerEl, { padding: 8 });
         }
       }
     }
@@ -114,12 +85,14 @@ export function BaseStructuresPanel({
           }`}
         >
           <span>Core</span>
-          <TabCountBadge
+          <PanelTabCountBadge
+            brightTabStyle="structures"
             count={coreMissionReadyCount}
             title="Daily missions ready to claim"
             onBrightTab={structuresTab === "core"}
           />
-          <TabCountBadge
+          <PanelTabCountBadge
+            brightTabStyle="structures"
             count={coreAvailableBuildingsCount}
             title="Affordable structure upgrades in Core"
             onBrightTab={structuresTab === "core"}
@@ -135,12 +108,14 @@ export function BaseStructuresPanel({
           }`}
         >
           <span>Expansion</span>
-          <TabCountBadge
+          <PanelTabCountBadge
+            brightTabStyle="structures"
             count={expansionMissionReadyCount}
             title="Daily missions ready to claim"
             onBrightTab={structuresTab === "expansion"}
           />
-          <TabCountBadge
+          <PanelTabCountBadge
+            brightTabStyle="structures"
             count={expansionAvailableBuildingsCount}
             title="Affordable structure upgrades in Expansion"
             onBrightTab={structuresTab === "expansion"}
@@ -175,7 +150,7 @@ export function BaseStructuresPanel({
                 </div>
 
                 <div className="shrink-0 flex items-center gap-2">
-                  {card.ready ? <AvailabilityBadge /> : null}
+                  {card.ready ? <PanelAvailabilityBadge /> : null}
                   <button
                     type="button"
                     onClick={(e) => {

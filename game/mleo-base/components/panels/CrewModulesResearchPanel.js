@@ -1,8 +1,9 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
+import { PanelAvailabilityBadge, PanelTabCountBadge } from "./BasePanelBadges";
 import {
   findVerticalScrollContainer,
-  scrollPanelHeaderIntoView,
+  scheduleScrollPanelHeaderIntoView,
 } from "../../utils/scrollPanelSectionTopIntoView";
 import {
   COMMAND_PROTOCOL_FAMILY_LABEL,
@@ -45,33 +46,6 @@ function ResourceCostRow({ cost, resources }) {
         <div className="h-[28px]" />
       )}
     </div>
-  );
-}
-
-function AvailabilityBadge() {
-  return (
-    <span className="inline-flex items-center justify-center rounded-full bg-cyan-400 px-2 py-1 text-[10px] font-black tracking-[0.14em] text-slate-950">
-      AVAILABLE
-    </span>
-  );
-}
-
-/** Same cyan count style as BuildPanelCards `SectionAvailabilityBadge` */
-function TabCountBadge({ count, title, onBrightTab = false }) {
-  const n = Number(count || 0);
-  if (!n) return null;
-
-  return (
-    <span
-      title={title || ""}
-      className={`inline-flex min-w-6 h-6 shrink-0 items-center justify-center rounded-full px-2 text-[11px] font-black ${
-        onBrightTab
-          ? "bg-slate-950 text-cyan-300 ring-1 ring-white/15"
-          : "bg-cyan-400 text-slate-950"
-      }`}
-    >
-      {n > 99 ? "99+" : n}
-    </span>
   );
 }
 
@@ -203,19 +177,13 @@ export function CrewModulesResearchPanel({
 
     if (openDevSubsection == null || openDevSubsection === prev) return;
 
-    const run = () => {
-      const headerEl = document.querySelector(
-        `[data-base-dev-accordion-header="${CSS.escape(String(openDevSubsection))}"]`
-      );
-      const scrollParent = headerEl ? findVerticalScrollContainer(headerEl) : null;
-      if (scrollParent && headerEl) {
-        scrollPanelHeaderIntoView(scrollParent, headerEl, { padding: 8 });
-      }
-    };
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(run);
-    });
+    const headerEl = document.querySelector(
+      `[data-base-dev-accordion-header="${CSS.escape(String(openDevSubsection))}"]`
+    );
+    const scrollParent = headerEl ? findVerticalScrollContainer(headerEl) : null;
+    if (scrollParent && headerEl) {
+      scheduleScrollPanelHeaderIntoView(scrollParent, headerEl, { padding: 8 });
+    }
   }, [openDevSubsection]);
 
   const activeRoleName = crewTab?.roles?.find((r) => r.active)?.name || "None";
@@ -263,12 +231,12 @@ export function CrewModulesResearchPanel({
               }`}
             >
               <span>{tab.label}</span>
-              <TabCountBadge
+              <PanelTabCountBadge
                 count={tab.missionReady}
                 title="Daily missions ready to claim"
                 onBrightTab={active}
               />
-              <TabCountBadge
+              <PanelTabCountBadge
                 count={tab.opportunityCount}
                 title={tab.opportunityTitle}
                 onBrightTab={active}
@@ -357,7 +325,7 @@ export function CrewModulesResearchPanel({
 
                           {active ? (
                             <div className="mt-2">
-                              <AvailabilityBadge />
+                              <PanelAvailabilityBadge />
                             </div>
                           ) : null}
                         </div>
@@ -423,7 +391,7 @@ export function CrewModulesResearchPanel({
 
                         {active ? (
                           <div className="mt-2">
-                            <AvailabilityBadge />
+                            <PanelAvailabilityBadge />
                           </div>
                         ) : null}
                       </div>
@@ -576,7 +544,7 @@ export function CrewModulesResearchPanel({
                 <div className="flex flex-col gap-1 pr-8 lg:gap-0.5 lg:pr-7">
                   <div className="flex items-start justify-between gap-2">
                     <div className="text-sm font-semibold leading-tight lg:text-[13px]">{module.name}</div>
-                    {module.available ? <AvailabilityBadge /> : null}
+                    {module.available ? <PanelAvailabilityBadge /> : null}
                   </div>
                   <div className="line-clamp-2 text-xs leading-snug text-white/58 lg:mt-0">{module.desc}</div>
                   <QuickTags tags={module.quickTags} className="lg:mt-1 lg:gap-1" />
@@ -647,7 +615,7 @@ export function CrewModulesResearchPanel({
                 <div className="flex flex-col gap-1 pr-8 lg:pr-7 lg:gap-0.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="text-sm font-semibold leading-tight lg:text-[13px]">{item.name}</div>
-                    {item.available ? <AvailabilityBadge /> : null}
+                    {item.available ? <PanelAvailabilityBadge /> : null}
                   </div>
                   <div className="mt-0.5 line-clamp-2 text-xs leading-snug text-white/58">{item.desc}</div>
                   <QuickTags tags={item.quickTags} className="lg:mt-1 lg:gap-1" />
